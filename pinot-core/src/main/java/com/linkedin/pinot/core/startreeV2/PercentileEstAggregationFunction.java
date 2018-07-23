@@ -44,7 +44,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Num
 
   @Nonnull
   @Override
-  public int getEntrySize() {
+  public int getLongestEntrySize() {
     return _maxLength;
   }
 

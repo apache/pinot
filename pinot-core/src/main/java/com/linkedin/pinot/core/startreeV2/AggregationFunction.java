@@ -22,6 +22,10 @@ import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
+/**
+ * Interface to be implemented by each aggregation function. Here 'R' is the datatype for raw data to aggregate.
+ *  and 'A' is the datatype it supports.
+ */
 public interface AggregationFunction<R, A> {
 
   /**
@@ -40,7 +44,7 @@ public interface AggregationFunction<R, A> {
    * Get length of longest Entry
    */
   @Nonnull
-  int getEntrySize();
+  int getLongestEntrySize();
 
   /**
    * Perform aggregation on the given raw data.
@@ -60,5 +64,5 @@ public interface AggregationFunction<R, A> {
   /**
    * Perform deserialization of a object
    */
-  A deserialize(byte[] obj) throws IOException;
+  A deserialize(byte[] byteArray) throws IOException;
 }

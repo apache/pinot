@@ -52,6 +52,8 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
   /**
    * Helper function to create files if do not exist to hold star tree information.
    *
+   * @param indexStarTreeDir 'file' directory where new files will be stored
+   *
    * @return void.
    */
   private void createFilesIfNotExist(File indexStarTreeDir) throws IOException {
@@ -71,6 +73,10 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
 
   /**
    * Helper function to copy indexes to single file.
+   *
+   * @param v2Directory 'file' directory where everything will be stored.
+   * @param v2Metadata Segment metadata to fetch star tree meta data.
+   * @param starTreeId Star Tree Id to work on.
    *
    * @return void.
    */
@@ -97,6 +103,9 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
   /**
    * Helper function to copy star tree to a single file.
    *
+   * @param v2Directory 'file' where everything will be stored.
+   * @param starTreeId 'int' to work on.
+   *
    * @return void.
    */
   private void copyStarTreeData(File v2Directory, int starTreeId) throws Exception {
@@ -106,6 +115,11 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
 
   /**
    * Helper function to append data from one file to another.
+   *
+   * @param path 'file' directory
+   * @param column 'string' to work on.
+   * @param type 'string' if it is dimension or metric or star tree.
+   * @param starTreeId 'int' star tree file to append.
    *
    * @return void.
    */

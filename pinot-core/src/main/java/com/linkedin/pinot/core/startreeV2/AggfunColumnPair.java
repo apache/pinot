@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+
 /**
  * Utility class to store a primitive 'String' and 'String' pair.
  */
@@ -27,16 +28,17 @@ public class AggfunColumnPair {
   /**
    * Constructor for the class
    *
-   * @param met 'String' metric
+   * @param column 'String' column name
    * @param aggfun 'String' aggregate function
    */
-  public AggfunColumnPair(String aggfun, String met) {
+  public AggfunColumnPair(String aggfun, String column) {
     _aggregatefunction = aggfun;
-    _columnName = met;
+    _columnName = column;
   }
 
   /**
    * Sets the provided value into the 'aggfunc' field.
+   *
    * @param aggfunc Value to set
    */
   public void setAggregatefunction(String aggfunc) {
@@ -45,6 +47,7 @@ public class AggfunColumnPair {
 
   /**
    * Returns the aggFunc in pair
+   *
    * @return 'String' value
    */
   public String getAggregatefunction() {
@@ -52,15 +55,17 @@ public class AggfunColumnPair {
   }
 
   /**
-   * Sets the provided value into the 'met' field.
-   * @param met Value to set
+   * Sets the provided value into the 'column' field.
+   *
+   * @param column Value to set
    */
-  public void setColumnName(String met) {
-    _columnName = met;
+  public void setColumnName(String column) {
+    _columnName = column;
   }
 
   /**
-   * Returns the Metric in  pair
+   * Returns the column name in pair
+   *
    * @return 'String' value
    */
   public String getColumnName() {

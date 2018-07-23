@@ -18,6 +18,9 @@ package com.linkedin.pinot.core.startreeV2;
 import java.util.List;
 
 
+/**
+ * Utility class to mimic behavior of 'generic row'.
+ */
 public class Record {
   protected int[] _dimensionValues;
   protected List<Object> _metricValues;

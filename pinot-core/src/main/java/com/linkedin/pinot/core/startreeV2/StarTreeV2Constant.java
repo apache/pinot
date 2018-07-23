@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+
 public class StarTreeV2Constant {
 
   // final strings
