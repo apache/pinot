@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.nio.charset.Charset;
 import xerial.larray.mmap.MMapBuffer;
 import com.linkedin.pinot.core.startree.OffHeapStarTree;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class OnHeapStarTreeV2BuilderHelper extends StarTreeV2BuilderHelper{
