@@ -40,7 +40,7 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
   @Nonnull
   @Override
   public int getLongestEntrySize() {
-    return V1Constants.Numbers.LONG_SIZE;
+    return Long.BYTES;
   }
 
   @Override
