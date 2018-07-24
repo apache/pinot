@@ -17,8 +17,8 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.Map;
+import java.io.IOException;
 
 
 public class OffHeapStarTreeV2Builder implements StarTreeV2Builder{
