@@ -64,8 +64,7 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
    * @throws IOException
    */
   public FixedByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int sizeOfEntry)
-      throws IOException {
+      int totalDocs, int numDocsPerChunk, int sizeOfEntry) throws IOException {
 
     super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
         CURRENT_VERSION);
@@ -75,28 +74,28 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
   @Override
   public void setInt(int row, int value) {
     _chunkBuffer.putInt(value);
-    _chunkDataOffset += INT_SIZE;
+    _chunkDataOffset += Integer.BYTES;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setFloat(int row, float value) {
     _chunkBuffer.putFloat(value);
-    _chunkDataOffset += FLOAT_SIZE;
+    _chunkDataOffset += Float.BYTES;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setLong(int row, long value) {
     _chunkBuffer.putLong(value);
-    _chunkDataOffset += LONG_SIZE;
+    _chunkDataOffset += Long.BYTES;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setDouble(int row, double value) {
     _chunkBuffer.putDouble(value);
-    _chunkDataOffset += DOUBLE_SIZE;
+    _chunkDataOffset += Double.BYTES;
     flushChunkIfNeeded();
   }
 

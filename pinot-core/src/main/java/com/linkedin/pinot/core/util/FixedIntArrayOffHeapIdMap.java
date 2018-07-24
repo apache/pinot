@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.IOException;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
@@ -42,7 +41,7 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
 
     int initialSize = nearestPowerOf2(estimatedCardinality);
     int[] columnSizesInBytes = new int[numColumns];
-    Arrays.fill(columnSizesInBytes, V1Constants.Numbers.INTEGER_SIZE);
+    Arrays.fill(columnSizesInBytes, Integer.BYTES);
 
     _dictIdToValue = new FixedByteSingleValueMultiColumnReaderWriter(initialSize, columnSizesInBytes, memoryManager,
         allocationContext);
@@ -95,8 +94,7 @@ public class FixedIntArrayOffHeapIdMap extends BaseOffHeapMutableDictionary impl
   }
 
   @Override
-  public void doClose()
-      throws IOException {
+  public void doClose() throws IOException {
     _dictIdToValue.close();
   }
 

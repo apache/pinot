@@ -65,7 +65,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
   public void testIntArray(final long seed) throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     int rows = 1000;
-    int columnSizeInBytes = Integer.SIZE / 8;
+    int columnSizeInBytes = Integer.BYTES;
     int maxNumberOfMultiValuesPerRow = 2000;
     readerWriter =
         new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes,
@@ -92,7 +92,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
   public void testIntArrayFixedSize(int multiValuesPerRow, long seed) throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     int rows = 1000;
-    int columnSizeInBytes = Integer.SIZE / 8;
+    int columnSizeInBytes = Integer.BYTES;
     // Keep the rowsPerChunk as a multiple of multiValuesPerRow to check the cases when both data and header buffers
     // transition to new ones
     readerWriter =
@@ -121,7 +121,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     final int maxNumberOfMultiValuesPerRow = 5;
     int rows = 1000;
-    int columnSizeInBytes = Integer.SIZE / 8;
+    int columnSizeInBytes = Integer.BYTES;
     Random r = new Random(seed);
     readerWriter = new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1,
         columnSizeInBytes, _memoryManager, "ZeroSize");

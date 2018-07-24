@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function.customobject;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;
 
@@ -49,7 +48,7 @@ public class AvgPair implements Comparable<AvgPair> {
 
   @Nonnull
   public byte[] toBytes() {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(V1Constants.Numbers.DOUBLE_SIZE + V1Constants.Numbers.LONG_SIZE);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES + Long.BYTES);
     byteBuffer.putDouble(_sum);
     byteBuffer.putLong(_count);
     return byteBuffer.array();

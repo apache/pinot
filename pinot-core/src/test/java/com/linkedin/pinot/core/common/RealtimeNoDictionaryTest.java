@@ -62,16 +62,16 @@ public class RealtimeNoDictionaryTest {
     _random = new Random(seed);
 
     FixedByteSingleColumnSingleValueReaderWriter intRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Integer.SIZE / 8,
-            _memoryManager, "int");
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Integer.BYTES, _memoryManager,
+            "int");
     FixedByteSingleColumnSingleValueReaderWriter longRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Long.SIZE / 8, _memoryManager,
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Long.BYTES, _memoryManager,
             "long");
     FixedByteSingleColumnSingleValueReaderWriter floatRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Float.SIZE / 8, _memoryManager,
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Float.BYTES, _memoryManager,
             "float");
     FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Double.SIZE / 8, _memoryManager,
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Double.BYTES, _memoryManager,
             "double");
 
     for (int i = 0; i < NUM_ROWS; i++) {

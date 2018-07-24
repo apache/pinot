@@ -24,6 +24,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
@@ -31,7 +32,6 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   private volatile SoftReference<SoftReference<ImmutableRoaringBitmap>[]> bitmaps = null;
 
   private PinotDataBuffer buffer;
-  public static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
 
   private File file;
 
@@ -83,7 +83,6 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
       }
       return value;
     }
-
   }
 
   private synchronized ImmutableRoaringBitmap buildRoaringBitmapForIndex(final int index) {
@@ -105,11 +104,11 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
   }
 
   private int getOffset(final int index) {
-    return buffer.getInt(index * INT_SIZE_IN_BYTES);
+    return buffer.getInt(index * Integer.BYTES);
   }
 
   private void load(PinotDataBuffer indexDataBuffer) throws IOException {
-    final int lastOffset = indexDataBuffer.getInt(numberOfBitmaps * INT_SIZE_IN_BYTES);
+    final int lastOffset = indexDataBuffer.getInt(numberOfBitmaps * Integer.BYTES);
     assert lastOffset == indexDataBuffer.size();
     this.buffer = indexDataBuffer;
   }
