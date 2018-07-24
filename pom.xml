@@ -307,14 +307,9 @@
         <version>19.0</version>
       </dependency>
       <dependency>
-      <groupId>com.microsoft.azure</groupId>
-      <artifactId>azure-data-lake-store-sdk</artifactId>
-      <version>2.3.1</version>
-    </dependency>
-      <dependency>
         <groupId>com.microsoft.azure</groupId>
-        <artifactId>azure-storage</artifactId>
-        <version>2.1.0</version>
+        <artifactId>azure-data-lake-store-sdk</artifactId>
+        <version>2.3.1</version>
       </dependency>
       <dependency>
         <groupId>com.yammer.metrics</groupId>
@@ -540,11 +535,6 @@
             <artifactId>jackson-xc</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.hadoop</groupId>
-        <artifactId>hadoop-azure-datalake</artifactId>
-        <version>3.1.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.hadoop</groupId>
