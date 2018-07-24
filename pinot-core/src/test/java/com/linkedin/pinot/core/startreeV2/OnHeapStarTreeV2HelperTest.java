@@ -220,8 +220,8 @@ public class OnHeapStarTreeV2HelperTest {
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    StarTreeV2AggfuncColumnPairDataSource source =
-        new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -258,8 +258,8 @@ public class OnHeapStarTreeV2HelperTest {
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    StarTreeV2AggfuncColumnPairDataSource source =
-        new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -297,8 +297,8 @@ public class OnHeapStarTreeV2HelperTest {
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    StarTreeV2AggfuncColumnPairDataSource source =
-        new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -338,8 +338,8 @@ public class OnHeapStarTreeV2HelperTest {
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    StarTreeV2AggfuncColumnPairDataSource source =
-        new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -380,8 +380,8 @@ public class OnHeapStarTreeV2HelperTest {
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
-    StarTreeV2AggfuncColumnPairDataSource source =
-        new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -417,8 +417,8 @@ public class OnHeapStarTreeV2HelperTest {
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
-    StarTreeV2AggfuncColumnPairDataSource source =
-        new StarTreeV2AggfuncColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,11 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.io.File;
+import java.nio.ByteOrder;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
@@ -56,8 +55,8 @@ public class StarTreeV2DimensionDataSource extends DataSource {
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
     PinotDataBuffer buffer =
-        PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-            "testing");
+        PinotDataBuffer.mapFile(_columnDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
+            "Star Tree V2");
     _forwardIndex = new FixedBitSingleValueReader(buffer, numDocs, bits);
 
     _isSorted = false;
@@ -130,5 +129,9 @@ public class StarTreeV2DimensionDataSource extends DataSource {
   @Override
   public String getOperatorName() {
     return _operatorName;
+  }
+
+  public DataFileReader getForwardIndex() {
+    return _forwardIndex;
   }
 }

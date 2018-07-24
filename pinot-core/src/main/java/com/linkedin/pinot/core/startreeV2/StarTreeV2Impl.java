@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,14 +26,14 @@ public class StarTreeV2Impl implements StarTreeV2 {
 
   private final StarTree _starTree;
   private final Map<String, StarTreeV2DimensionDataSource> _dimensionDataSources;
-  private final Map<String, StarTreeV2AggfuncColumnPairDataSource> _metricaggFuncPairSources;
+  private final Map<String, StarTreeV2AggfunColumnPairDataSource> _aggfuncColumnPairSources;
 
   public StarTreeV2Impl(StarTree starTree, Map<String, StarTreeV2DimensionDataSource> dimensionDataSources,
-      Map<String, StarTreeV2AggfuncColumnPairDataSource> metricaggFuncPairSources) {
+      Map<String, StarTreeV2AggfunColumnPairDataSource> aggfuncColumnPairSources) {
 
     _starTree = starTree;
     _dimensionDataSources = dimensionDataSources;
-    _metricaggFuncPairSources = metricaggFuncPairSources;
+    _aggfuncColumnPairSources = aggfuncColumnPairSources;
   }
 
   @Override
@@ -46,7 +46,28 @@ public class StarTreeV2Impl implements StarTreeV2 {
     if (_dimensionDataSources.containsKey(column)) {
       return _dimensionDataSources.get(column);
     } else {
-      return _metricaggFuncPairSources.get(column);
+      return _aggfuncColumnPairSources.get(column);
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (_starTree != null) {
+      _starTree.close();
+    }
+
+    if (_dimensionDataSources.size() > 0) {
+      for (String dimension: _dimensionDataSources.keySet()) {
+        StarTreeV2DimensionDataSource source = _dimensionDataSources.get(dimension);
+        source.getForwardIndex().close();
+      }
+    }
+
+    if (_aggfuncColumnPairSources.size() > 0) {
+      for (String pair: _aggfuncColumnPairSources.keySet()) {
+        StarTreeV2AggfunColumnPairDataSource source = _aggfuncColumnPairSources.get(pair);
+        source.getForwardIndex().close();
+      }
     }
   }
 }

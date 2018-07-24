@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,13 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import java.io.Closeable;
 import java.io.IOException;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.startree.StarTree;
 
 
-public interface StarTreeV2 {
+public interface StarTreeV2 extends Closeable {
 
   /**
    * load star tree.
