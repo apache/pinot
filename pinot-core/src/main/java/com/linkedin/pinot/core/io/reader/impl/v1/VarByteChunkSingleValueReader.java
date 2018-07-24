@@ -41,7 +41,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
   public VarByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer) {
     super(pinotDataBuffer);
 
-    int chunkHeaderSize = _numDocsPerChunk * INT_SIZE;
+    int chunkHeaderSize = _numDocsPerChunk * Integer.BYTES;
     _maxChunkSize = chunkHeaderSize + (_lengthOfLongestEntry * _numDocsPerChunk);
   }
 
@@ -55,7 +55,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
 
-    int rowOffset = chunkBuffer.getInt(chunkRowId * INT_SIZE);
+    int rowOffset = chunkBuffer.getInt(chunkRowId * Integer.BYTES);
     int nextRowOffset = getNextRowOffset(chunkRowId, chunkBuffer);
 
     int length = nextRowOffset - rowOffset;
@@ -77,7 +77,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
 
-    int rowOffset = chunkBuffer.getInt(chunkRowId * INT_SIZE);
+    int rowOffset = chunkBuffer.getInt(chunkRowId * Integer.BYTES);
     int nextRowOffset = getNextRowOffset(chunkRowId, chunkBuffer);
 
     int length = nextRowOffset - rowOffset;
@@ -109,7 +109,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
       // Last row in this trunk.
       nextRowOffset = chunkBuffer.limit();
     } else {
-      nextRowOffset = chunkBuffer.getInt((currentRowId + 1) * INT_SIZE);
+      nextRowOffset = chunkBuffer.getInt((currentRowId + 1) * Integer.BYTES);
       // For incomplete chunks, the next string's offset will be 0 as row offset for absent rows are 0.
       if (nextRowOffset == 0) {
         nextRowOffset = chunkBuffer.limit();

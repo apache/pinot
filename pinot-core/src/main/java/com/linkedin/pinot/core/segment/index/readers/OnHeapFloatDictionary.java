@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.floats.Float2IntOpenHashMap;
 import java.util.Arrays;
@@ -42,7 +41,7 @@ public class OnHeapFloatDictionary extends OnHeapDictionary {
    * @param length Length of the dictionary
    */
   public OnHeapFloatDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, V1Constants.Numbers.FLOAT_SIZE, (byte) 0);
+    super(dataBuffer, length, Float.BYTES, (byte) 0);
 
     _valToDictId = new Float2IntOpenHashMap(length);
     _valToDictId.defaultReturnValue(-1);

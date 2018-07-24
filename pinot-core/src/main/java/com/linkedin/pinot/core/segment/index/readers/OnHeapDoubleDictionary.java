@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
 import java.util.Arrays;
@@ -42,7 +41,7 @@ public class OnHeapDoubleDictionary extends OnHeapDictionary {
    * @param length Length of the dictionary
    */
   public OnHeapDoubleDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, V1Constants.Numbers.DOUBLE_SIZE, (byte) 0);
+    super(dataBuffer, length, Double.BYTES, (byte) 0);
 
     _valToDictId = new Double2IntOpenHashMap(length);
     _valToDictId.defaultReturnValue(-1);

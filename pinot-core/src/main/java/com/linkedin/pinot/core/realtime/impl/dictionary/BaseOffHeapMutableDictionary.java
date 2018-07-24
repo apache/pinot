@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.nio.IntBuffer;
@@ -249,8 +248,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     doClose();
 
     _numEntries = 0;
@@ -277,7 +275,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   private long computeBBsize(long numRows) {
-    return numRows * NUM_COLUMNS * V1Constants.Numbers.INTEGER_SIZE;
+    return numRows * NUM_COLUMNS * Integer.BYTES;
   }
 
   // Assume prevNumRows is a valid value, and return it if the new one overflows.
@@ -473,7 +471,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     ValueToDictId valueToDictId = _valueToDict;
     long size = 0;
     for (IntBuffer iBuf : valueToDictId._iBufList) {
-      size = size + iBuf.capacity() * V1Constants.Numbers.INTEGER_SIZE;
+      size = size + iBuf.capacity() * Integer.BYTES;
     }
     return size;
   }
@@ -492,8 +490,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return value.equals(get(dictId));
   }
 
-  public abstract void doClose()
-      throws IOException;
+  public abstract void doClose() throws IOException;
 
   protected abstract void setRawValueAt(int dictId, Object rawValue, byte[] serializedValue);
 }

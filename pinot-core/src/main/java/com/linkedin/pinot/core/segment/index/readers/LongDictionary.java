@@ -19,10 +19,9 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class LongDictionary extends ImmutableDictionaryReader {
-  private static final int LONG_SIZE_IN_BYTES = Long.SIZE / Byte.SIZE;
 
   public LongDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, LONG_SIZE_IN_BYTES, (byte) 0);
+    super(dataBuffer, length, Long.BYTES, (byte) 0);
   }
 
   @Override
