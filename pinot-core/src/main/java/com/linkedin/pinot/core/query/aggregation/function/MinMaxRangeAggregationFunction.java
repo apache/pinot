@@ -26,18 +26,17 @@ import javax.annotation.Nonnull;
 
 
 public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMaxRangePair, Double> {
-  private static final String NAME = AggregationFunctionType.MINMAXRANGE.getName();
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.MINMAXRANGE;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.MINMAXRANGE.getName() + "_" + columns[0];
   }
 
   @Override

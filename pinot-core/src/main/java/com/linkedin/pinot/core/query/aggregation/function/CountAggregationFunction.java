@@ -25,19 +25,19 @@ import javax.annotation.Nonnull;
 
 
 public class CountAggregationFunction implements AggregationFunction<Long, Long> {
-  private static final String NAME = AggregationFunctionType.COUNT.getName();
+  private static final String COLUMN_NAME = AggregationFunctionType.COUNT.getName() + "_star";
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.COUNT;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_star";
+    return COLUMN_NAME;
   }
 
   @Override

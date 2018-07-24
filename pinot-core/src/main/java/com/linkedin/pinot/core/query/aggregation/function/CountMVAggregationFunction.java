@@ -22,18 +22,17 @@ import javax.annotation.Nonnull;
 
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
-  private static final String NAME = AggregationFunctionType.COUNTMV.getName();
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.COUNTMV;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.COUNTMV.getName() + "_" + columns[0];
   }
 
   @Override
