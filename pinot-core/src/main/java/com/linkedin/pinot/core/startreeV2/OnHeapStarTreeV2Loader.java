@@ -19,15 +19,12 @@ package com.linkedin.pinot.core.startreeV2;
 import java.io.File;
 import java.util.Map;
 import java.util.List;
-import java.io.IOException;
 import java.util.ArrayList;
 import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
-import org.apache.commons.configuration.ConfigurationException;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 
 
 public class OnHeapStarTreeV2Loader {
@@ -41,12 +38,9 @@ public class OnHeapStarTreeV2Loader {
   private static List<StarTreeV2Metadata> _starTreeV2MetadataList;
   private static List<StarTreeV2> _starTreeV2DataSources;
 
-  public static List<StarTreeV2> load(File indexDir) throws IOException, ConfigurationException {
+  public static List<StarTreeV2> load(File indexDir, ImmutableSegment obj) throws Exception {
     // segment
     _indexDir = indexDir;
-    _v3IndexLoadingConfig = new IndexLoadingConfig();
-    _v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
-    _v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
     _segmentMetadataImpl = new SegmentMetadataImpl(indexDir);
 
     // star tree
@@ -57,7 +51,7 @@ public class OnHeapStarTreeV2Loader {
     for (StarTreeV2Metadata metaData : _starTreeV2MetadataList) {
       StarTreeV2DataSource dataSource = new StarTreeV2DataSource(_segmentMetadataImpl, metaData, _indexDir);
       StarTree starTree = dataSource.loadStarTree(starTreeId);
-      dataSource.loadColumnsDataSource(starTreeId);
+      dataSource.loadColumnsDataSource(starTreeId, obj);
       Map<String, StarTreeV2DimensionDataSource> dimensionDataSourceMap = dataSource.getDimensionForwardIndexReader();
       Map<String, StarTreeV2AggfunColumnPairDataSource> metricAggfuncPairDataSourceMap =
           dataSource.getMetricRawIndexReader();

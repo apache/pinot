@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+
 
 /**
  * Utility class to store a primitive 'String' and 'String' pair.
@@ -23,7 +25,7 @@ package com.linkedin.pinot.core.startreeV2;
 public class AggfunColumnPair {
 
   protected String _columnName;
-  protected String _aggregatefunction;
+  protected AggregationFunctionType _aggregatefunction;
 
   /**
    * Constructor for the class
@@ -31,7 +33,7 @@ public class AggfunColumnPair {
    * @param column 'String' column name
    * @param aggfun 'String' aggregate function
    */
-  public AggfunColumnPair(String aggfun, String column) {
+  public AggfunColumnPair(AggregationFunctionType aggfun, String column) {
     _aggregatefunction = aggfun;
     _columnName = column;
   }
@@ -41,7 +43,7 @@ public class AggfunColumnPair {
    *
    * @param aggfunc Value to set
    */
-  public void setAggregatefunction(String aggfunc) {
+  public void setAggregatefunction(AggregationFunctionType aggfunc) {
     _aggregatefunction = aggfunc;
   }
 
@@ -50,7 +52,7 @@ public class AggfunColumnPair {
    *
    * @return 'String' value
    */
-  public String getAggregatefunction() {
+  public AggregationFunctionType getAggregatefunction() {
     return _aggregatefunction;
   }
 

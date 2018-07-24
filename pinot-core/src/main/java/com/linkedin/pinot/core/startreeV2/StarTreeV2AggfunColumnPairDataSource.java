@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.File;
-import java.nio.ByteOrder;
 import java.io.IOException;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -25,7 +23,6 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.segment.memory.PinotByteBuffer;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -41,25 +38,16 @@ public class StarTreeV2AggfunColumnPairDataSource extends DataSource {
   private boolean _isSingleValue;
   private FieldSpec.DataType _dataType;
 
-  private File _columnDataFile;
   private String _operatorName;
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-  public StarTreeV2AggfunColumnPairDataSource(File dataFile, String columnName, int numDocs, int start, long size,
-      FieldSpec.DataType dataType) throws IOException {
-    _columnDataFile = dataFile;
+  public StarTreeV2AggfunColumnPairDataSource(PinotDataBuffer buffer, String columnName, int numDocs, FieldSpec.DataType dataType) throws IOException {
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
     if (dataType.equals(FieldSpec.DataType.BYTES)) {
-      PinotDataBuffer buffer =
-          PinotByteBuffer.mapFile(_columnDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
-              "star tree v2");
       _forwardIndex = new VarByteChunkSingleValueReader(buffer);
     } else {
-      PinotDataBuffer buffer =
-          PinotDataBuffer.mapFile(_columnDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
-              "star tree v2");
       _forwardIndex = new FixedByteChunkSingleValueReader(buffer);
     }
     _numDocs = numDocs;

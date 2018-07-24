@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.File;
-import java.nio.ByteOrder;
 import java.io.IOException;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -29,6 +27,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
@@ -43,24 +42,17 @@ public class StarTreeV2DimensionDataSource extends DataSource {
   private FieldSpec.DataType _dataType;
   private InvertedIndexReader _invertedIndex;
 
-  private File _columnDataFile;
   private String _operatorName;
   private Dictionary _dictionary;
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-  public StarTreeV2DimensionDataSource(File dataFile, String columnName, ColumnMetadata columnMetadata, int numDocs,
-      int start, long size, int bits) throws IOException {
-    _columnDataFile = dataFile;
+  public StarTreeV2DimensionDataSource(PinotDataBuffer buffer, String columnName, ImmutableSegment obj, ColumnMetadata columnMetadata, int numDocs, int bits) throws IOException {
     _operatorName = "ColumnDataSource [" + columnName + "]";
-
-    PinotDataBuffer buffer =
-        PinotDataBuffer.mapFile(_columnDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
-            "Star Tree V2");
     _forwardIndex = new FixedBitSingleValueReader(buffer, numDocs, bits);
 
     _isSorted = false;
-    _dictionary = null;
+    _dictionary = obj.getDictionary(columnName);
     _numDocs = numDocs;
     _invertedIndex = null;
     _dataType = columnMetadata.getDataType();

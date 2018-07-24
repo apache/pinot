@@ -26,8 +26,14 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 public class OnHeapStarTreeV2IntegrationTest {
@@ -53,13 +59,14 @@ public class OnHeapStarTreeV2IntegrationTest {
     List<AggfunColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
     List<AggfunColumnPair> metric2aggFuncPairs2 = new ArrayList<>();
 
-    AggfunColumnPair pair1 = new AggfunColumnPair("sum", "salary");
-    AggfunColumnPair pair2 = new AggfunColumnPair("max", "salary");
-    AggfunColumnPair pair3 = new AggfunColumnPair("min", "salary");
-    AggfunColumnPair pair4 = new AggfunColumnPair("distinctcounthll", "salary");
-    AggfunColumnPair pair5 = new AggfunColumnPair("percentileTDigest", "salary");
-    AggfunColumnPair pair6 = new AggfunColumnPair("percentileest", "salary");
-    AggfunColumnPair pair7 = new AggfunColumnPair("count", "star");
+
+    AggfunColumnPair pair1 = new AggfunColumnPair(AggregationFunctionType.valueOf("SUM"), "salary");
+    AggfunColumnPair pair2 = new AggfunColumnPair(AggregationFunctionType.valueOf("MAX"), "salary");
+    AggfunColumnPair pair3 = new AggfunColumnPair(AggregationFunctionType.valueOf("MIN"), "salary");
+    AggfunColumnPair pair4 = new AggfunColumnPair(AggregationFunctionType.valueOf("DISTINCTCOUNTHLL"), "salary");
+    AggfunColumnPair pair5 = new AggfunColumnPair(AggregationFunctionType.valueOf("PERCENTILETDIGEST"), "salary");
+    AggfunColumnPair pair6 = new AggfunColumnPair(AggregationFunctionType.valueOf("PERCENTILEEST"), "salary");
+    AggfunColumnPair pair7 = new AggfunColumnPair(AggregationFunctionType.valueOf("COUNT"), "star");
 
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
@@ -105,8 +112,14 @@ public class OnHeapStarTreeV2IntegrationTest {
   @Test
   public void testLoaderAndExecutor() throws Exception {
     OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
+    IndexLoadingConfig v3IndexLoadingConfig = new IndexLoadingConfig();
+    v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
+    v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
+
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, v3IndexLoadingConfig);
+
     try {
-      List<StarTreeV2> starTreeImplList = loadTest.load(_filepath);
+      List<StarTreeV2> starTreeImplList = loadTest.load(_filepath, immutableSegment);
 
       int starTreeId = 0;
       for (StarTreeV2 impl : starTreeImplList) {
@@ -122,10 +135,10 @@ public class OnHeapStarTreeV2IntegrationTest {
         }
 
         for (AggfunColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
-          String metpair = pair.getAggregatefunction() + "_" + pair.getColumnName();
+          String metpair = pair.getAggregatefunction().getName() + "_" + pair.getColumnName();
           DataSource source = impl.getDataSource(metpair);
           System.out.println("Printing for Met2AggPair : " + metpair);
-          StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getAggregatefunction());
+          StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getAggregatefunction().getName());
         }
         starTreeId += 1;
       }

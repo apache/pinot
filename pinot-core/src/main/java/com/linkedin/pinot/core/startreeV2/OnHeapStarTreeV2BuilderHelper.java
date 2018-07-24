@@ -117,7 +117,7 @@ public class OnHeapStarTreeV2BuilderHelper {
     AggregationFunctionFactory functionFactory = new AggregationFunctionFactory();
     for (int i = 0; i < aggfunColumnPairs.size(); i++) {
       AggfunColumnPair pair = aggfunColumnPairs.get(i);
-      String aggfunc = pair.getAggregatefunction();
+      String aggfunc = pair.getAggregatefunction().getName();
       List<Object> data = metricValues.get(i);
       AggregationFunction function = functionFactory.getAggregationFunction(aggfunc);
       aggregatedMetricsValue.add(aggregate(function, isRawData, data));
