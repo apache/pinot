@@ -28,24 +28,19 @@ import org.slf4j.LoggerFactory;
  */
 public class PinotFSFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotFSFactory.class);
-  private static final PinotFSFactory INSTANCE = new PinotFSFactory();
+  private static Configuration _schemeConfig;
 
-  private PinotFSFactory() {
-
+  public PinotFSFactory(Configuration config) {
+    _schemeConfig = config.subset("controller.storage.factory.class");
   }
 
-  public static PinotFSFactory getInstance() {
-    return INSTANCE;
-  }
-
-  public PinotFS init(Configuration config, URI uri) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+  public PinotFS create(URI uri) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
     String scheme = uri.getScheme();
     if (scheme == null) {
       // Assume local
       scheme = "file";
     }
-    Configuration schemeConfig = config.subset("controller.storage.factory.class");
-    String className = schemeConfig.getString(scheme);
+    String className = _schemeConfig.getString(scheme);
 
     Preconditions.checkNotNull(className, "No fs class defined for scheme: " + scheme);
     LOGGER.info("Creating a new pinot fs for fs: {} with class: {}", scheme, className);
