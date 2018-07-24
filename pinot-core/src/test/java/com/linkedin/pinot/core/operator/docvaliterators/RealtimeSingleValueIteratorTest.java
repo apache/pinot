@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator.docvaliterators;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.IOException;
 import java.util.Random;
 import org.testng.Assert;
@@ -45,17 +44,17 @@ public class RealtimeSingleValueIteratorTest {
   public void setUp() {
     _memoryManager = new DirectMemoryManager(RealtimeSingleValueIteratorTest.class.getName());
     _intReader =
-        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.INTEGER_SIZE,
-            _memoryManager, "intReader");
+        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, Integer.BYTES, _memoryManager,
+            "intReader");
     _longReader =
-        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.LONG_SIZE,
-            _memoryManager, "longReader");
+        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, Long.BYTES, _memoryManager,
+            "longReader");
     _floatReader =
-        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.FLOAT_SIZE,
-            _memoryManager, "floatReader");
+        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, Float.BYTES, _memoryManager,
+            "floatReader");
     _doubleReader =
-        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, V1Constants.Numbers.DOUBLE_SIZE,
-            _memoryManager, "doubleReader");
+        new FixedByteSingleColumnSingleValueReaderWriter(RANDOM.nextInt(NUM_ROWS) + 1, Double.BYTES, _memoryManager,
+            "doubleReader");
 
     for (int i = 0; i < NUM_ROWS; i++) {
       _intVals[i] = RANDOM.nextInt();

@@ -19,7 +19,6 @@ import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
@@ -81,8 +80,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
 
     FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            V1Constants.Numbers.INTEGER_SIZE);
+        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Integer.BYTES);
 
     for (int i = 0; i < NUM_VALUES; i++) {
       writer.setInt(i, expected[i]);
@@ -117,8 +115,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
 
     FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            V1Constants.Numbers.LONG_SIZE);
+        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Long.BYTES);
 
     for (int i = 0; i < NUM_VALUES; i++) {
       writer.setLong(i, expected[i]);
@@ -153,8 +150,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
 
     FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            V1Constants.Numbers.FLOAT_SIZE);
+        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Float.BYTES);
 
     for (int i = 0; i < NUM_VALUES; i++) {
       writer.setFloat(i, expected[i]);
@@ -189,8 +185,7 @@ public class FixedByteChunkSingleValueReaderWriteTest {
     FileUtils.deleteQuietly(outFile);
 
     FixedByteChunkSingleValueWriter writer =
-        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK,
-            V1Constants.Numbers.DOUBLE_SIZE);
+        new FixedByteChunkSingleValueWriter(outFile, compressionType, NUM_VALUES, NUM_DOCS_PER_CHUNK, Double.BYTES);
 
     for (int i = 0; i < NUM_VALUES; i++) {
       writer.setDouble(i, expected[i]);

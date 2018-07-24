@@ -66,19 +66,27 @@ public class RealtimeNoDictionaryColStatsTest {
     FieldSpec doubleSpec = new MetricFieldSpec(DOUBLE_COL_NAME, FieldSpec.DataType.DOUBLE);
     random = new Random(seed);
 
-    FixedByteSingleColumnSingleValueReaderWriter intRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Integer.SIZE/8, _memoryManager, "int");
-    FixedByteSingleColumnSingleValueReaderWriter longRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Long.SIZE/8, _memoryManager, "long");
-    FixedByteSingleColumnSingleValueReaderWriter floatRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Float.SIZE/8, _memoryManager, "float");
-    FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex = new FixedByteSingleColumnSingleValueReaderWriter(
-        random.nextInt(NUM_ROWS)+1, Double.SIZE/8, _memoryManager, "double");
+    FixedByteSingleColumnSingleValueReaderWriter intRawIndex =
+        new FixedByteSingleColumnSingleValueReaderWriter(random.nextInt(NUM_ROWS) + 1, Integer.BYTES, _memoryManager,
+            "int");
+    FixedByteSingleColumnSingleValueReaderWriter longRawIndex =
+        new FixedByteSingleColumnSingleValueReaderWriter(random.nextInt(NUM_ROWS) + 1, Long.BYTES, _memoryManager,
+            "long");
+    FixedByteSingleColumnSingleValueReaderWriter floatRawIndex =
+        new FixedByteSingleColumnSingleValueReaderWriter(random.nextInt(NUM_ROWS) + 1, Float.BYTES, _memoryManager,
+            "float");
+    FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex =
+        new FixedByteSingleColumnSingleValueReaderWriter(random.nextInt(NUM_ROWS) + 1, Double.BYTES, _memoryManager,
+            "double");
 
-    _intMinVal = Integer.MAX_VALUE; _intMaxVal = Integer.MIN_VALUE;
-    _longMinVal = Long.MAX_VALUE; _longMaxVal = Long.MIN_VALUE;
-    _floatMinVal = Float.MAX_VALUE; _floatMaxVal = Float.MIN_VALUE;
-    _doubleMinVal = Double.MAX_VALUE; _doubleMaxVal = Double.MIN_VALUE;
+    _intMinVal = Integer.MAX_VALUE;
+    _intMaxVal = Integer.MIN_VALUE;
+    _longMinVal = Long.MAX_VALUE;
+    _longMaxVal = Long.MIN_VALUE;
+    _floatMinVal = Float.MAX_VALUE;
+    _floatMaxVal = Float.MIN_VALUE;
+    _doubleMinVal = Double.MAX_VALUE;
+    _doubleMaxVal = Double.MIN_VALUE;
 
     int[] intVals = new int[NUM_ROWS];
     long[] longVals = new long[NUM_ROWS];
@@ -94,7 +102,7 @@ public class RealtimeNoDictionaryColStatsTest {
       if (intVals[i] < _intMinVal) {
         _intMinVal = intVals[i];
       }
-      longVals[i]  = random.nextLong();
+      longVals[i] = random.nextLong();
       longRawIndex.setLong(i, longVals[i]);
       if (longVals[i] > _longMaxVal) {
         _longMaxVal = longVals[i];
@@ -137,7 +145,7 @@ public class RealtimeNoDictionaryColStatsTest {
       Assert.assertEquals(statsContainer.getTotalNumberOfEntries(), NUM_ROWS);
     } catch (Throwable t) {
       t.printStackTrace();
-      Assert.fail("Failed with seed "  + seed);
+      Assert.fail("Failed with seed " + seed);
     }
   }
 
@@ -152,7 +160,7 @@ public class RealtimeNoDictionaryColStatsTest {
       Assert.assertEquals(statsContainer.getTotalNumberOfEntries(), NUM_ROWS);
     } catch (Throwable t) {
       t.printStackTrace();
-      Assert.fail("Failed with seed "  + seed);
+      Assert.fail("Failed with seed " + seed);
     }
   }
 
@@ -167,7 +175,7 @@ public class RealtimeNoDictionaryColStatsTest {
       Assert.assertEquals(statsContainer.getTotalNumberOfEntries(), NUM_ROWS);
     } catch (Throwable t) {
       t.printStackTrace();
-      Assert.fail("Failed with seed "  + seed);
+      Assert.fail("Failed with seed " + seed);
     }
   }
 
@@ -182,7 +190,7 @@ public class RealtimeNoDictionaryColStatsTest {
       Assert.assertEquals(statsContainer.getTotalNumberOfEntries(), NUM_ROWS);
     } catch (Throwable t) {
       t.printStackTrace();
-      Assert.fail("Failed with seed "  + seed);
+      Assert.fail("Failed with seed " + seed);
     }
   }
 }

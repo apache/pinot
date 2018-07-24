@@ -45,7 +45,7 @@ public class DataTableImplV2 implements DataTable {
   // DATA_SCHEMA (START|SIZE)
   // FIXED_SIZE_DATA (START|SIZE)
   // VARIABLE_SIZE_DATA (START|SIZE)
-  private static final int HEADER_SIZE = (Integer.SIZE / Byte.SIZE) * 13;
+  private static final int HEADER_SIZE = Integer.BYTES * 13;
 
   private final int _numRows;
   private final int _numColumns;

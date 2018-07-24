@@ -34,11 +34,6 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleValueReader<ChunkReaderContext> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSingleValueReader.class);
 
-  protected static final int INT_SIZE = Integer.SIZE / Byte.SIZE;
-  protected static final int LONG_SIZE = Long.SIZE / Byte.SIZE;
-  protected static final int FLOAT_SIZE = Float.SIZE / Byte.SIZE;
-  protected static final int DOUBLE_SIZE = Double.SIZE / Byte.SIZE;
-
   protected final PinotDataBuffer _dataBuffer;
   protected final PinotDataBuffer _dataHeader;
   protected final int _chunkSize;
@@ -60,28 +55,28 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
 
     int headerOffset = 0;
     int version = _dataBuffer.getInt(headerOffset);
-    headerOffset += INT_SIZE;
+    headerOffset += Integer.BYTES;
 
     _numChunks = _dataBuffer.getInt(headerOffset);
-    headerOffset += INT_SIZE;
+    headerOffset += Integer.BYTES;
 
     _numDocsPerChunk = _dataBuffer.getInt(headerOffset);
-    headerOffset += INT_SIZE;
+    headerOffset += Integer.BYTES;
 
     _lengthOfLongestEntry = _dataBuffer.getInt(headerOffset);
-    headerOffset += INT_SIZE;
+    headerOffset += Integer.BYTES;
 
     int dataHeaderStart = headerOffset;
     if (version > 1) {
       _dataBuffer.getInt(headerOffset); // Total docs
-      headerOffset += INT_SIZE;
+      headerOffset += Integer.BYTES;
 
       ChunkCompressorFactory.CompressionType compressionType =
           ChunkCompressorFactory.CompressionType.values()[_dataBuffer.getInt(headerOffset)];
       _chunkDecompressor = ChunkCompressorFactory.getDecompressor(compressionType);
       _isCompressed = !compressionType.equals(ChunkCompressorFactory.CompressionType.PASS_THROUGH);
 
-      headerOffset += INT_SIZE;
+      headerOffset += Integer.BYTES;
       dataHeaderStart = _dataBuffer.getInt(headerOffset);
     } else {
       _isCompressed = true;
@@ -91,7 +86,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
     _chunkSize = (_lengthOfLongestEntry * _numDocsPerChunk);
 
     // Slice out the header from the data buffer.
-    int dataHeaderLength = _numChunks * INT_SIZE;
+    int dataHeaderLength = _numChunks * Integer.BYTES;
     int rawDataStart = dataHeaderStart + dataHeaderLength;
     _dataHeader = _dataBuffer.view(dataHeaderStart, rawDataStart);
 
@@ -151,7 +146,7 @@ public abstract class BaseChunkSingleValueReader extends BaseSingleColumnSingleV
    * @return Position (offset) of the chunk in the data.
    */
   protected int getChunkPosition(int chunkId) {
-    return _dataHeader.getInt(chunkId * INT_SIZE);
+    return _dataHeader.getInt(chunkId * Integer.BYTES);
   }
 
   /**

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function.customobject;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;
 
@@ -57,7 +56,7 @@ public class MinMaxRangePair implements Comparable<MinMaxRangePair> {
 
   @Nonnull
   public byte[] toBytes() {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(V1Constants.Numbers.DOUBLE_SIZE + V1Constants.Numbers.DOUBLE_SIZE);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES + Double.BYTES);
     byteBuffer.putDouble(_min);
     byteBuffer.putDouble(_max);
     return byteBuffer.array();

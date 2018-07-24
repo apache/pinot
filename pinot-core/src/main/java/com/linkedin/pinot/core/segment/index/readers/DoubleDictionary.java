@@ -19,10 +19,9 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class DoubleDictionary extends ImmutableDictionaryReader {
-  private static final int DOUBLE_SIZE_IN_BYTES = Double.SIZE / Byte.SIZE;
 
   public DoubleDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, DOUBLE_SIZE_IN_BYTES, (byte) 0);
+    super(dataBuffer, length, Double.BYTES, (byte) 0);
   }
 
   @Override

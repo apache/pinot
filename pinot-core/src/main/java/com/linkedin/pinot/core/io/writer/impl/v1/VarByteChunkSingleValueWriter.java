@@ -45,8 +45,6 @@ import javax.annotation.concurrent.NotThreadSafe;
  */
 @NotThreadSafe
 public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
-
-  private static final int INT_SIZE = Integer.SIZE / Byte.SIZE;
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int CURRENT_VERSION = 2;
 
@@ -65,15 +63,14 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
    * @throws IOException
    */
   public VarByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int lengthOfLongestEntry)
-      throws IOException {
+      int numDocsPerChunk, int lengthOfLongestEntry) throws IOException {
 
     super(file, compressionType, totalDocs, numDocsPerChunk,
-        ((numDocsPerChunk * INT_SIZE) + (lengthOfLongestEntry * numDocsPerChunk)), // chunkSize
+        ((numDocsPerChunk * Integer.BYTES) + (lengthOfLongestEntry * numDocsPerChunk)), // chunkSize
         lengthOfLongestEntry, CURRENT_VERSION);
 
     _chunkHeaderOffset = 0;
-    _chunkHeaderSize = numDocsPerChunk * INT_SIZE;
+    _chunkHeaderSize = numDocsPerChunk * Integer.BYTES;
     _chunkDataOffSet = _chunkHeaderSize;
   }
 
@@ -86,7 +83,7 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
   @Override
   public void setBytes(int row, byte[] bytes) {
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
-    _chunkHeaderOffset += INT_SIZE;
+    _chunkHeaderOffset += Integer.BYTES;
 
     _chunkBuffer.position(_chunkDataOffSet);
     _chunkBuffer.put(bytes);
@@ -99,8 +96,7 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
 
     // Write the chunk if it is non-empty.
     if (_chunkBuffer.position() > 0) {
@@ -125,7 +121,7 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
    */
   protected void writeChunk() {
     // For partially filled chunks, we still need to clear the offsets for remaining rows, as we reuse this buffer.
-    for (int i = _chunkHeaderOffset; i < _chunkHeaderSize; i += INT_SIZE) {
+    for (int i = _chunkHeaderOffset; i < _chunkHeaderSize; i += Integer.BYTES) {
       _chunkBuffer.putInt(i, 0);
     }
 
