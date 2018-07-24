@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ public class StarTreeV2DataSource {
   private Map<String, Integer> _columnIndexInfoMap;
   private AggregationFunctionFactory _aggregationFunctionFactory;
   private Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
-  private Map<String, StarTreeV2AggfuncColumnPairDataSource> _metricRawIndexReader;
+  private Map<String, StarTreeV2AggfunColumnPairDataSource> _metricRawIndexReader;
 
   private File _starTreeFile;
   private File _starTreeIndexMapFile;
@@ -117,10 +117,10 @@ public class StarTreeV2DataSource {
       String parts[] = pair.split("_");
       function = _aggregationFunctionFactory.getAggregationFunction(parts[0]);
 
-      StarTreeV2AggfuncColumnPairDataSource starTreeV2AggfuncColumnPairDataSource =
-          new StarTreeV2AggfuncColumnPairDataSource(_indexDataFile, pair, _docsCount, start, size,
+      StarTreeV2AggfunColumnPairDataSource starTreeV2AggfunColumnPairDataSource =
+          new StarTreeV2AggfunColumnPairDataSource(_indexDataFile, pair, _docsCount, start, size,
               function.getDataType());
-      _metricRawIndexReader.put(pair, starTreeV2AggfuncColumnPairDataSource);
+      _metricRawIndexReader.put(pair, starTreeV2AggfunColumnPairDataSource);
     }
 
     return;
@@ -130,7 +130,7 @@ public class StarTreeV2DataSource {
     return _dimensionIndexReader;
   }
 
-  public Map<String, StarTreeV2AggfuncColumnPairDataSource> getMetricRawIndexReader() {
+  public Map<String, StarTreeV2AggfunColumnPairDataSource> getMetricRawIndexReader() {
     return _metricRawIndexReader;
   }
 }

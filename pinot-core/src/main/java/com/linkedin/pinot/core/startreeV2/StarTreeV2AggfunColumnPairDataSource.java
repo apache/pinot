@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,11 @@
 package com.linkedin.pinot.core.startreeV2;
 
 import java.io.File;
+import java.nio.ByteOrder;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
@@ -36,7 +35,7 @@ import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 
 
-public class StarTreeV2AggfuncColumnPairDataSource extends DataSource {
+public class StarTreeV2AggfunColumnPairDataSource extends DataSource {
 
   private int _numDocs;
   private boolean _isSingleValue;
@@ -47,20 +46,20 @@ public class StarTreeV2AggfuncColumnPairDataSource extends DataSource {
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-  public StarTreeV2AggfuncColumnPairDataSource(File dataFile, String columnName, int numDocs, int start, long size,
+  public StarTreeV2AggfunColumnPairDataSource(File dataFile, String columnName, int numDocs, int start, long size,
       FieldSpec.DataType dataType) throws IOException {
     _columnDataFile = dataFile;
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
     if (dataType.equals(FieldSpec.DataType.BYTES)) {
       PinotDataBuffer buffer =
-          PinotByteBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-              "testing");
+          PinotByteBuffer.mapFile(_columnDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
+              "star tree v2");
       _forwardIndex = new VarByteChunkSingleValueReader(buffer);
     } else {
       PinotDataBuffer buffer =
-          PinotDataBuffer.fromFile(_columnDataFile, start, size, ReadMode.mmap, FileChannel.MapMode.READ_ONLY,
-              "testing");
+          PinotDataBuffer.mapFile(_columnDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
+              "star tree v2");
       _forwardIndex = new FixedByteChunkSingleValueReader(buffer);
     }
     _numDocs = numDocs;
@@ -129,5 +128,9 @@ public class StarTreeV2AggfuncColumnPairDataSource extends DataSource {
   @Override
   public String getOperatorName() {
     return _operatorName;
+  }
+
+  public DataFileReader getForwardIndex() {
+    return _forwardIndex;
   }
 }

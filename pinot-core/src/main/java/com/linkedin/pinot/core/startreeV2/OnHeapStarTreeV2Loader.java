@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ public class OnHeapStarTreeV2Loader {
       StarTree starTree = dataSource.loadStarTree(starTreeId);
       dataSource.loadColumnsDataSource(starTreeId);
       Map<String, StarTreeV2DimensionDataSource> dimensionDataSourceMap = dataSource.getDimensionForwardIndexReader();
-      Map<String, StarTreeV2AggfuncColumnPairDataSource> metricAggfuncPairDataSourceMap =
+      Map<String, StarTreeV2AggfunColumnPairDataSource> metricAggfuncPairDataSourceMap =
           dataSource.getMetricRawIndexReader();
 
       StarTreeV2Impl impl = new StarTreeV2Impl(starTree, dimensionDataSourceMap, metricAggfuncPairDataSourceMap);
