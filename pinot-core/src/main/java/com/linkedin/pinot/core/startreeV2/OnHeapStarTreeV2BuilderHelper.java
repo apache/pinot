@@ -202,12 +202,12 @@ public class OnHeapStarTreeV2BuilderHelper {
     int headerSizeInBytes = 20;
 
     for (String dimension : dimensionsName) {
-      headerSizeInBytes += V1Constants.Numbers.INTEGER_SIZE; // For dimension index
-      headerSizeInBytes += V1Constants.Numbers.INTEGER_SIZE; // For length of dimension name
+      headerSizeInBytes += Integer.BYTES;  // For dimension index
+      headerSizeInBytes += Integer.BYTES;  // For length of dimension name
       headerSizeInBytes += dimension.getBytes(UTF_8).length; // For dimension name
     }
 
-    headerSizeInBytes += V1Constants.Numbers.INTEGER_SIZE; // For number of nodes.
+    headerSizeInBytes += Integer.BYTES; // For number of nodes.
     return headerSizeInBytes;
   }
 
@@ -218,34 +218,34 @@ public class OnHeapStarTreeV2BuilderHelper {
       List<String> dimensionsName, int nodesCount) {
     long offset = 0L;
     dataBuffer.putLong(offset, OffHeapStarTree.MAGIC_MARKER);
-    offset += V1Constants.Numbers.LONG_SIZE;
+    offset += Long.BYTES;
 
     dataBuffer.putInt(offset, OffHeapStarTree.VERSION);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     dataBuffer.putInt(offset, headerSizeInBytes);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     dataBuffer.putInt(offset, dimensionCount);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     for (int i = 0; i < dimensionCount; i++) {
       String dimensionName = dimensionsName.get(i);
 
       dataBuffer.putInt(offset, i);
-      offset += V1Constants.Numbers.INTEGER_SIZE;
+      offset += Integer.BYTES;
 
       byte[] dimensionBytes = dimensionName.getBytes(UTF_8);
       int dimensionLength = dimensionBytes.length;
       dataBuffer.putInt(offset, dimensionLength);
-      offset += V1Constants.Numbers.INTEGER_SIZE;
+      offset += Integer.BYTES;
 
       dataBuffer.readFrom(dimensionBytes, offset);
       offset += dimensionLength;
     }
 
     dataBuffer.putInt(offset, nodesCount);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     return offset;
   }
@@ -282,25 +282,25 @@ public class OnHeapStarTreeV2BuilderHelper {
   private static long writeNode(MMapBuffer dataBuffer, TreeNode node, long offset, int startChildrenIndex,
       int endChildrenIndex) {
     dataBuffer.putInt(offset, node._dimensionId);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     dataBuffer.putInt(offset, node._dimensionValue);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     dataBuffer.putInt(offset, node._startDocId);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     dataBuffer.putInt(offset, node._endDocId);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     dataBuffer.putInt(offset, node._aggDataDocumentId);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     dataBuffer.putInt(offset, startChildrenIndex);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     dataBuffer.putInt(offset, endChildrenIndex);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     return offset;
   }
