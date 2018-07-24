@@ -1,27 +1,34 @@
 {{#te-modal
   headerText="Manage Subscription Groups"
+  footerText=footerText
   isShowingModal=showManageGroupsModal
+  isInvalid=isInvalid
   cancelAction=(action "onCancel")
   submitAction=(action "onSubmit")
   hasFooter=true
 }}
 
-  {{#if message}}
+  {{#if hasFunction}}
     <div class="row te-modal__settings">
       <div class="col-md-2">
-        <span class="te-label te-label--bold te-label--dark"></span>
+        <span class="te-label te-label--bold te-label--dark">Group shortcuts</span>
       </div>
       <div class="col-md-10">
-        {{message}}
+        {{#each groupShortcuts as |group index| }}
+          {{#if index}}, {{/if}}
+          <a {{action "onGroup" group}}>{{group.name}}</a>
+        {{/each}}
       </div>
     </div>
+
+    <hr/>
   {{/if}}
 
   <div class="row te-modal__settings">
     <div class="col-md-2">
-      <span class="te-label te-label--bold te-label--dark">Select Application</span>
+      <span class="te-label te-label--bold te-label--dark">Find Group</span>
     </div>
-    <div class="col-md-10">
+    <div class="col-md-3">
       {{#power-select
         class="te-modal__input"
         triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
@@ -37,13 +44,8 @@
         {{option.name}}
       {{/power-select}}
     </div>
-  </div>
 
-  <div class="row te-modal__settings">
-    <div class="col-md-2">
-      <span class="te-label te-label--bold te-label--dark">Select Group</span>
-    </div>
-    <div class="col-md-9">
+    <div class="col-md-5">
       {{#power-select
         triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
         selected=group
@@ -59,8 +61,8 @@
         {{group.name}}
       {{/power-select}}
     </div>
-    <div class="col-md-1">
-      <button id="button-new" onclick={{action "onCopy"}} disabled={{cannotEdit}}>Copy</button>
+    <div class="col-md-2">
+      <button id="button-new" onclick={{action "onCopy"}} disabled={{cannotEdit}}>Create copy</button>
     </div>
   </div>
 
@@ -68,23 +70,26 @@
 
   <div class="row te-modal__settings">
     <div class="col-md-2">
-      <span class="te-label te-label--bold te-label--dark">Group name / subject</span>
+      <span class="te-label te-label--bold te-label--dark">Group name</span>
     </div>
     <div class="col-md-10">
       {{input
         type="text"
         id="name"
         value=group.name
-        placeholder="My Email Subject"
         class="te-modal__input te-modal__input--fullwidth"
         disabled=cannotEdit
+        key-up=(action "onName")
      }}
+      {{#if groupNameMessage}}
+        ({{groupNameMessage}})
+      {{/if}}
     </div>
   </div>
 
   <div class="row te-modal__settings">
     <div class="col-md-2">
-      <span class="te-label te-label--bold te-label--dark">FunctionIds</span>
+      <span class="te-label te-label--bold te-label--dark">Alerts</span>
     </div>
     <div class="col-md-10">
       {{#power-select-multiple
@@ -100,6 +105,9 @@
       }}
         {{option.name}}
       {{/power-select-multiple}}
+      {{#if hasFunctionShortcut}}
+        (add <a {{action "onFunctionShortcut"}}>{{functionName}}</a> to alerts)
+      {{/if}}
     </div>
   </div>
 
@@ -107,7 +115,7 @@
     <div class="col-md-2">
       <span class="te-label te-label--bold te-label--dark">Schedule</span>
     </div>
-    <div class="col-md-10">
+    <div class="col-md-8">
       {{#power-select
         triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
         selected=cronOptionSelected
@@ -122,20 +130,14 @@
         {{option.name}}
       {{/power-select}}
     </div>
-  </div>
-
-  <div class="row te-modal__settings">
     <div class="col-md-2">
-      <span class="te-label te-label--bold te-label--dark">Enabled</span>
-    </div>
-    <div class="col-md-10">
-      {{input
+      <input
         type="checkbox"
         id="active"
-        checked=group.active
-        class="te-modal__input te-modal__input--fullwidth"
-        disabled=cannotEdit
-      }}
+        checked={{group.active}}
+        disabled={{cannotEdit}}
+      />
+      <label for="active">Enabled</label>
     </div>
   </div>
 
@@ -148,7 +150,6 @@
         type="text"
         id="from-address"
         value=group.fromAddress
-        placeholder="me@example.org"
         class="te-modal__input te-modal__input--fullwidth"
         disabled=cannotEdit
       }}
@@ -160,11 +161,11 @@
       <span class="te-label te-label--bold te-label--dark">Recipients</span>
     </div>
     <div class="col-md-10">
-      {{input
+      {{textarea-autosize
+        cols=80
         type="text"
         id="recipients"
         value=groupRecipients
-        placeholder="recipient@example.org, other@example.org"
         class="te-modal__input te-modal__input--fullwidth"
         disabled=cannotEdit
         change=(action "onRecipients")

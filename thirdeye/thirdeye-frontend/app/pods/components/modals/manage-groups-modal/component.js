@@ -8,8 +8,10 @@
  * - transactional cancel or save
  *
  * @module components/modals/manage-groups-modal
- * @property {Function} onSubmit          - save the events
- * @property {Function} onCancel          - toggle off the modal
+ * @property {Function} onSubmit          - closure action saving group changes
+ * @property {Function} onCancel          - closure action cancelling the modal
+ * @property {int} preselectedGroupId     - preselected group id (optional)
+ * @property {int} preselectedFunctionId  - preselected group id (optional)
  * @example
  {{modals/manage-groups-modal
    showManageGroupsModal
@@ -23,6 +25,7 @@ import { computed, get, set, getProperties, setProperties } from '@ember/object'
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
+import RSVP from 'rsvp';
 
 export default Component.extend({
 
@@ -40,15 +43,53 @@ export default Component.extend({
   showManageGroupsModal: false,
 
   /**
+   * id of preselected group
+   * @type {int}
+   */
+  preselectedGroupId: null,
+
+  /**
+   * id of preselected function
+   * @type {int}
+   */
+  preselectedFunctionId: null,
+
+  /**
    * Action for save/confirm. Passes selected group as argument
+   * @type {Function}
    */
   onSave: null,
 
   /**
    * Action for cancellation.
+   * @type {Function}
    */
   onExit: null,
 
+  /**
+   * Cache for current group
+   * @type {object}
+   */
+  changeCacheCurrent: null,
+
+  /**
+   * Cache for all changed groups
+   * @type {Set}
+   */
+  changeCache: null,
+
+  /**
+   * Cache for existing group names
+   * @type {Set}
+   */
+  groupNameCache: computed('groupOptionsRaw', function () {
+    const groupOptionsRaw = get(this, 'groupOptionsRaw');
+    return new Set(groupOptionsRaw.map(opt => opt.name));
+  }),
+
+  /**
+   * Handle init of properties
+   */
   didReceiveAttrs() {
     this._super(...arguments);
 
@@ -63,6 +104,10 @@ export default Component.extend({
     fetch('/thirdeye/entity/ALERT_CONFIG')
       .then(checkStatus)
       .then(res => this._makeGroupOptions(res))
+      .then(options => {
+        this._handlePreselection(options, get(this, 'preselectedGroupId'));
+        return options;
+      })
       .then(options => set(this, 'groupOptionsRaw', options));
 
     // TODO use ember data API for anomaly functions
@@ -71,6 +116,10 @@ export default Component.extend({
       .then(checkStatus)
       .then(res => this._makeFunctionOptions(res))
       .then(options => set(this, 'functionOptions', options));
+
+    // TODO optimize reverse lookup of options via dict if necessary
+
+    set(this, 'changeCache', new Set());
   },
 
   /**
@@ -90,10 +139,67 @@ export default Component.extend({
   }),
 
   /**
-   * Modal message for input validation and errors
+   * Preselected function name, resolved via functionOptions
    * @type {string}
    */
-  message: null,
+  functionName: computed('functionOptions', 'preselectedFunctionId', function () {
+    const { functionOptions, preselectedFunctionId } =
+      getProperties(this, 'functionOptions', 'preselectedFunctionId');
+
+    if (!_.isNumber(preselectedFunctionId)) { return; }
+
+    const opt = functionOptions.find(opt => opt.id === preselectedFunctionId);
+
+    if (_.isEmpty(opt)) { return; }
+
+    return opt.name;
+  }),
+
+  /**
+   * Flag for preselected function
+   * @type {boolean}
+   */
+  hasFunction: computed('functionName', function () {
+    return _.isNumber(get(this, 'preselectedFunctionId'));
+  }),
+
+  /**
+   * Flag for add function shortcut
+   * @type {boolean}
+   */
+  hasFunctionShortcut: computed('preselectedFunctionId', 'group', function () {
+    const { preselectedFunctionId, group } =
+      getProperties(this, 'preselectedFunctionId', 'group');
+
+    if (_.isEmpty(group) || !_.isNumber(preselectedFunctionId)) { return false; }
+
+    if (group.emailConfig.functionIds.includes(preselectedFunctionId)) {
+      return false;
+    }
+
+    return true;
+  }),
+
+  /**
+   * Footer text tracking change cache
+   * @type {string}
+   */
+  footerText: computed('changeCache', function () {
+    const changeCache = get(this, 'changeCache');
+    if (_.isEmpty(changeCache)) {
+      return '';
+    }
+    if (changeCache.size === 1) {
+      return '(1 group will be modified)';
+    }
+    return `(${changeCache.size} groups will be modified)`;
+  }),
+
+  /**
+   * Error message container for group name
+   * @type {string}
+   */
+  groupNameMessage: null,
 
   /**
    * Temp storage for group recipients from text input
@@ -116,6 +222,17 @@ export default Component.extend({
     const options = groupOptionsRaw.filter(opt => opt.application === null || opt.application === application);
     options[0].application = application; // set application for "new" template
     return options;
+  }),
+
+  /**
+   * Shortcut header for groups an alert is already part of
+   * @type {Array}
+   */
+  groupShortcuts: computed('preselectedFunctionId', 'groupOptionsRaw', function () {
+    const { preselectedFunctionId, groupOptionsRaw } =
+      getProperties(this, 'preselectedFunctionId', 'groupOptionsRaw');
+
+    return groupOptionsRaw.filter(group => group.emailConfig.functionIds.includes(preselectedFunctionId));
   }),
 
   /**
@@ -155,7 +272,7 @@ export default Component.extend({
    * Cron options available for selection
    * @type {Array}
    */
-  cronOptions: [
+  cronOptionsRaw: [
     { name: 'immediately', cron: '0 0/5 * * * ? *' },
     { name: 'every 15 min', cron: '0 0/15 * * * ? *' },
     { name: 'every hour', cron: '0 0 * * * ? *' },
@@ -164,6 +281,22 @@ export default Component.extend({
     { name: 'daily', cron: '0 0 0 * * ? *' },
     { name: 'weekly', cron: '0 0 0 * * SUN *' }
   ],
+
+  /**
+   * Cron options including an optional custom, pre-existing option
+   * @type {Array}
+   */
+  cronOptions: computed('group', 'cronOptionsRaw', function () {
+    const { group, cronOptionsRaw } = getProperties(this, 'group', 'cronOptionsRaw');
+
+    if (_.isEmpty(group)) { return cronOptionsRaw; }
+
+    if (_.isEmpty(cronOptionsRaw.find(opt => opt.cron === group.cronExpression))) {
+      return [...cronOptionsRaw].concat([{ name: `custom setting ("${group.cronExpression}")`, cron: group.cronExpression  }]);
+    }
+
+    return cronOptionsRaw;
+  }),
 
   /**
    * Currently selected cron option
@@ -253,6 +386,84 @@ export default Component.extend({
     return res.map(f => Object.assign({}, { name: f.functionName, id: f.id })).sortBy('name');
   },
 
+  /**
+   * Selects the group with given id
+   *
+   * @param groupOptions {Array} available groups
+   * @param groupId {int} preselected group id
+   * @private
+   */
+  _handlePreselection(groupOptions, groupId) {
+    if (_.isEmpty(groupId)) { return; }
+
+    const group = groupOptions.find(opt => opt.id === groupId);
+    if (_.isEmpty(group)) { return; }
+
+    setProperties(this, { group, application: group.application });
+  },
+
+  /**
+   * Stage a newly selected group for caching if not already tracked in change cache
+   *
+   * @param group {object} group
+   * @private
+   */
+  _makeChangeCacheCurrent(group) {
+    const changeCache = get(this, 'changeCache');
+
+    if (_.isEmpty(group)) { return; }
+
+    if (changeCache.has(group)) {
+      set(this, 'changeCacheCurrent', group);
+      return;
+    }
+
+    set(this, 'changeCacheCurrent', _.cloneDeep(group));
+  },
+
+  /**
+   * Checks for changes of the selected group and adds it to the change cache if verified
+   * // TODO trigger this (debounced) on every edit?
+   *
+   * @private
+   */
+  _updateChangeCache() {
+    const { changeCacheCurrent, changeCache, group } =
+      getProperties(this, 'changeCacheCurrent', 'changeCache', 'group');
+
+    if (_.isEmpty(group)) { return; }
+
+    if (!changeCache.has(group) && !_.isEqual(changeCacheCurrent, group)) {
+      const newChangeCache = new Set([...changeCache].concat([group]));
+      set(this, 'changeCache', newChangeCache);
+    }
+  },
+
+  /**
+   * Validate the group name for validity and uniqueness and display warning if necessary.
+   *
+   * @param group {object} group
+   * @private
+   */
+  _validateGroupName(group) {
+    const { groupNameCache, changeCacheCurrent } =
+      getProperties(this, 'groupNameCache', 'changeCacheCurrent');
+
+    if (_.isEmpty(group)) { return; }
+    if (_.isEmpty(groupNameCache)) { return; }
+
+    const inUse = new Set(groupNameCache);
+    if (!_.isEmpty(changeCacheCurrent)) {
+      inUse.delete(changeCacheCurrent.name);
+    }
+
+    if (_.isEmpty(group.name) || group.name.startsWith('(') || inUse.has(group.name)) {
+      set(this, 'groupNameMessage', 'group name invalid or already in use');
+    } else {
+      set(this, 'groupNameMessage', null);
+    }
+  },
+
   actions: {
     /**
      * Handles recipient updates
@@ -264,11 +475,38 @@ export default Component.extend({
 
     /**
      * Handles functionIds selection
-     * @param functionOption {Array} function options
+     * @param functionOptions {Array} function options
      */
     onFunctionIds (functionOptions) {
+      const prevFunctionIds = get(this, 'group.emailConfig.functionIds');
+      const fid = get(this, 'preselectedFunctionId');
+
       const functionIds = functionOptions.map(opt => opt.id);
       set(this, 'group.emailConfig.functionIds', functionIds);
+
+      // trigger group shortcut compute (instead of deep nested listener)
+      if (_.isNumber(fid) && (prevFunctionIds.includes(fid) || functionIds.includes(fid))) {
+        this.notifyPropertyChange('preselectedFunctionId');
+      }
+    },
+
+    /**
+     * Handles adding preselected function id to selected function ids
+     */
+    onFunctionShortcut () {
+      const { preselectedFunctionId, group } =
+        getProperties(this, 'preselectedFunctionId', 'group');
+
+      if (!_.isNumber(preselectedFunctionId)) { return; }
+      if (_.isEmpty(group)) { return; }
+
+      const functionIds = new Set(group.emailConfig.functionIds);
+      functionIds.add(preselectedFunctionId);
+
+      set(this, 'group.emailConfig.functionIds', [...functionIds]);
+
+      // trigger group shortcut compute (instead of deep nested listener)
+      this.notifyPropertyChange('preselectedFunctionId');
     },
 
     /**
@@ -277,7 +515,14 @@ export default Component.extend({
     onCancel () {
       const onExit = get(this, 'onExit');
 
-      setProperties(this, { group: null, application: null, groupRecipients: null, isShowingModal: false });
+      setProperties(this, {
+        application: null,
+        group: null,
+        groupRecipients: null,
+        showManageGroupsModal: false,
+        changeCache: new Set(),
+        groupNameMessage: null
+      });
 
       if (onExit) { onExit(); }
     },
@@ -286,28 +531,24 @@ export default Component.extend({
      * Handles save event
      */
     onSubmit () {
-      const { group, onSave } = getProperties(this, 'group', 'onSave');
+      this._updateChangeCache();
 
-      // TODO fix modal still hiding regardless of input validation results
+      const { group, onSave, changeCache } = getProperties(this, 'group', 'onSave', 'changeCache');
 
-      if (_.isEmpty(group)) {
-        set(this, 'message', 'Please select a group first');
-        return;
-      }
-
-      if (_.isEmpty(group.name) || group.name.startsWith('(')) {
-        set(this, 'message', 'Please enter a valid group name');
-        return;
-      }
+      const promises = [...changeCache].map(group => {
+        fetch('/thirdeye/entity?entityType=ALERT_CONFIG', {method: 'POST', body: JSON.stringify(group)})
+          .then(checkStatus);
+      });
 
       // TODO use ember data API for alert configs
-      fetch('/thirdeye/entity?entityType=ALERT_CONFIG', { method: 'POST', body: JSON.stringify(group) })
-        .then(checkStatus)
+      RSVP.allSettled(promises)
         .then(res => setProperties(this, {
-          isShowingModal: false,
           application: null,
           group: null,
-          groupRecipients: null
+          groupRecipients: null,
+          showManageGroupsModal: false,
+          changeCache: new Set(),
+          groupNameMessage: null
         }))
         .then(res => {
           if (onSave) { onSave(group); }
@@ -320,18 +561,24 @@ export default Component.extend({
      * @param group
      */
     onGroup (group) {
+      this._updateChangeCache();
+      this._makeChangeCacheCurrent(group);
+
       setProperties(this, {
+        application: group.application, // in case not set
         group,
         groupFunctionIds: (group.emailConfig.functionIds || []).join(', '),
         groupRecipients: (group.recipients || '').split(',').join(', ')
       });
+
+      this._validateGroupName(group);
     },
 
     /**
      * Handles copy button
      */
     onCopy () {
-      const { group, groupOptions } = getProperties(this, 'group', 'groupOptions');
+      const { group, groupOptions, groupOptionsRaw } = getProperties(this, 'group', 'groupOptions', 'groupOptionsRaw');
 
       if (_.isEmpty(group) || group.id === null) { return; }
 
@@ -340,9 +587,12 @@ export default Component.extend({
         name: `Copy of ${group.name}`
       });
 
+      // push options directly rather than triggering re-compute
+      groupOptionsRaw.pushObject(newGroup);
       groupOptions.pushObject(newGroup);
 
-      setProperties(this, { group: newGroup });
+      setProperties(this, { group: newGroup, changeCacheCurrent: group });
+      this._validateGroupName(newGroup);
     },
 
     /**
@@ -358,7 +608,16 @@ export default Component.extend({
      * @param applicationOption {object} application option
      */
     onApplication (applicationOption) {
-      setProperties(this, { application: applicationOption.application, group: null, groupRecipients: null });
+      this._updateChangeCache();
+      setProperties(this, { application: applicationOption.application, group: null, groupRecipients: null, groupNameMessage: null });
+    },
+
+    /**
+     * Handle group name edit
+     */
+    onName () {
+      const group = get(this, 'group');
+      this._validateGroupName(group);
     }
   }
 });

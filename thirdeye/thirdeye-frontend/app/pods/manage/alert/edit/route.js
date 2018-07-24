@@ -3,7 +3,6 @@
  * @module manage/alert/edit/edit
  * @exports manage/alert/edit/edit
  */
-import _ from 'lodash';
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import Route from '@ember/routing/route';
@@ -28,35 +27,26 @@ export default Route.extend({
   async model(params, transition) {
     const {
       id,
-      alertData,
-      allConfigGroups,
-      allAppNames
+      alertData
     } = this.modelFor('manage.alert');
 
     if (!id) { return; }
-    const email = await fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus);
+
+    const alertGroups = await fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus);
 
     return RSVP.hash({
-      email,
-      alertData,
-      allConfigGroups,
-      allAppNames
+      alertGroups,
+      alertData
     });
   },
 
   afterModel(model) {
     const {
       alertData,
-      email: groupByAlertId,
-      allConfigGroups,
-      allAppNames
+      alertGroups
     } = model;
 
     const {
-      id,
-      filters,
-      bucketSize,
-      bucketUnit,
       properties: alertProps
     } = alertData;
 
@@ -66,17 +56,9 @@ export default Route.extend({
       return { name, value: decodeURIComponent(value) };
     });
 
-    const originalConfigGroup = groupByAlertId.length ? groupByAlertId.pop() : null;
-    const selectedAppName = originalConfigGroup ? originalConfigGroup.application : null;
-    const selectedApplication = _.find(allAppNames, function(appsObj) { return appsObj.application === selectedAppName; });
-
     Object.assign(model, {
       propsArray,
-      allConfigGroups: _.uniq(allConfigGroups, name),
-      originalConfigGroup,
-      selectedAppName,
-      allApps: allAppNames,
-      selectedApplication
+      alertGroups
     });
   },
 
@@ -85,14 +67,10 @@ export default Route.extend({
 
     const {
       alertData,
-      selectedAppName,
-      selectedApplication,
-      allApps: allApplications,
+      alertGroups,
       propsArray: alertProps,
       loadError: isLoadError,
-      loadErrorMsg: loadErrorMessage,
-      allConfigGroups: alertConfigGroups,
-      originalConfigGroup: selectedConfigGroup
+      loadErrorMsg: loadErrorMessage
     } = model;
 
     const {
@@ -109,21 +87,14 @@ export default Route.extend({
       alertData,
       alertFilters,
       alertProps,
-      alertConfigGroups,
       alertFunctionName,
       alertId,
+      alertGroups,
       isActive,
-      allApplications,
-      selectedConfigGroup,
-      selectedApplication,
-      selectedAppName,
       isLoadError,
       loadErrorMessage,
       granularity: `${bucketSize}_${bucketUnit}`
     });
-
-    // Populate 'alerts monitored' table with currently selected config group
-    get(this, 'prepareAlertList').perform(selectedConfigGroup);
   },
 
   /**
@@ -135,19 +106,6 @@ export default Route.extend({
   fetchAlertDataById: task(function * (functionIds) {
     const functionArray = yield functionIds.map(id => fetch(selfServeApiCommon.alertById(id)).then(checkStatus));
     return RSVP.hash(functionArray);
-  }),
-
-  /**
-   * Fetch alert data for each function id that the currently selected group watches
-   * @method prepareAlertList
-   * @param {Object} configGroup - currently selected config group
-   * @return {undefined}
-   */
-  prepareAlertList: task(function * (configGroup) {
-    const functionIds = getWithDefault(configGroup, 'emailConfig.functionIds', []);
-    const functionData = yield get(this, 'fetchAlertDataById').perform(functionIds);
-    const formattedData = _.values(functionData).map(data => formatConfigGroupProps(data));
-    this.controller.set('selectedGroupFunctions', formattedData);
   }),
 
   actions: {
