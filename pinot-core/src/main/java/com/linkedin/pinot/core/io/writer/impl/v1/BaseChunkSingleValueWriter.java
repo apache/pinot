@@ -35,11 +35,6 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleValueWriter {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseChunkSingleValueWriter.class);
 
-  protected static final int INT_SIZE = Integer.SIZE / Byte.SIZE;
-  protected static final int LONG_SIZE = Long.SIZE / Byte.SIZE;
-  protected static final int FLOAT_SIZE = Float.SIZE / Byte.SIZE;
-  protected static final int DOUBLE_SIZE = Double.SIZE / Byte.SIZE;
-
   protected final FileChannel _dataFile;
   protected ByteBuffer _header;
   protected final ByteBuffer _chunkBuffer;
@@ -62,8 +57,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
    * @throws FileNotFoundException
    */
   protected BaseChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version)
-      throws FileNotFoundException {
+      int numDocsPerChunk, int chunkSize, int sizeOfEntry, int version) throws FileNotFoundException {
     _chunkSize = chunkSize;
     _chunkCompressor = ChunkCompressorFactory.getCompressor(compressionType);
 
@@ -114,8 +108,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
 
     // Write the chunk if it is non-empty.
     if (_chunkBuffer.position() > 0) {
@@ -141,34 +134,34 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
   private int writeHeader(ChunkCompressorFactory.CompressionType compressionType, int totalDocs, int numDocsPerChunk,
       int sizeOfEntry, int version) {
     int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
-    int headerSize = (numChunks + 7) * INT_SIZE; // 7 items written before chunk indexing.
+    int headerSize = (numChunks + 7) * Integer.BYTES; // 7 items written before chunk indexing.
 
     _header = ByteBuffer.allocateDirect(headerSize);
 
     int offset = 0;
     _header.putInt(version);
-    offset += INT_SIZE;
+    offset += Integer.BYTES;
 
     _header.putInt(numChunks);
-    offset += INT_SIZE;
+    offset += Integer.BYTES;
 
     _header.putInt(numDocsPerChunk);
-    offset += INT_SIZE;
+    offset += Integer.BYTES;
 
     _header.putInt(sizeOfEntry);
-    offset += INT_SIZE;
+    offset += Integer.BYTES;
 
     if (version > 1) {
       // Write total number of docs.
       _header.putInt(totalDocs);
-      offset += INT_SIZE;
+      offset += Integer.BYTES;
 
       // Write the compressor type
       _header.putInt(compressionType.getValue());
-      offset += INT_SIZE;
+      offset += Integer.BYTES;
 
       // Start of chunk offsets.
-      int dataHeaderStart = offset + INT_SIZE;
+      int dataHeaderStart = offset + Integer.BYTES;
       _header.putInt(dataHeaderStart);
     }
 

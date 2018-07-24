@@ -40,7 +40,7 @@ public class SumAggregationFunction implements AggregationFunction<Number, Doubl
   @Nonnull
   @Override
   public int getLongestEntrySize() {
-    return V1Constants.Numbers.DOUBLE_SIZE;
+    return Double.BYTES;
   }
 
   @Override

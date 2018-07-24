@@ -19,10 +19,9 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class FloatDictionary extends ImmutableDictionaryReader {
-  private static final int FLOAT_SIZE_IN_BYTES = Float.SIZE / Byte.SIZE;
 
   public FloatDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, FLOAT_SIZE_IN_BYTES, (byte) 0);
+    super(dataBuffer, length, Float.BYTES, (byte) 0);
   }
 
   @Override

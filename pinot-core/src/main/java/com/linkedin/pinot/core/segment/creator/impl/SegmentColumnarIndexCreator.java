@@ -504,23 +504,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     SingleValueRawIndexCreator indexCreator;
     switch (dataType) {
       case INT:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs,
-            V1Constants.Numbers.INTEGER_SIZE);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Integer.BYTES);
         break;
 
       case LONG:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs,
-            V1Constants.Numbers.LONG_SIZE);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Long.BYTES);
         break;
 
       case FLOAT:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs,
-            V1Constants.Numbers.FLOAT_SIZE);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Float.BYTES);
         break;
 
       case DOUBLE:
-        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs,
-            V1Constants.Numbers.DOUBLE_SIZE);
+        indexCreator = new SingleValueFixedByteRawIndexCreator(file, compressionType, column, totalDocs, Double.BYTES);
         break;
 
       case STRING:

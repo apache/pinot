@@ -37,11 +37,6 @@ public class V1Constants {
     public static final Long NULL_LONG = Long.MIN_VALUE;
     public static final Float NULL_FLOAT = Float.MIN_VALUE;
     public static final Double NULL_DOUBLE = Double.MIN_VALUE;
-
-    public static final int INTEGER_SIZE = Integer.SIZE / Byte.SIZE;
-    public static final int LONG_SIZE = Long.SIZE / Byte.SIZE;
-    public static final int FLOAT_SIZE = Float.SIZE / Byte.SIZE;
-    public static final int DOUBLE_SIZE = Double.SIZE / Byte.SIZE;
   }
 
   public static class Str {
@@ -139,8 +134,8 @@ public class V1Constants {
       public static final String DATETIME_FORMAT = "datetimeFormat";
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
 
-
       private static final String COLUMN_PROPS_KEY_PREFIX = "column.";
+
       public static String getKeyFor(String column, String key) {
         return COLUMN_PROPS_KEY_PREFIX + column + "." + key;
       }

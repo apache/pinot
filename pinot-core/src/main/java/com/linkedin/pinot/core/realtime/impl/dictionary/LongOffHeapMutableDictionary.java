@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.IOException;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
@@ -29,12 +28,12 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   private final FixedByteSingleColumnSingleValueReaderWriter _dictIdToValue;
 
-  public LongOffHeapMutableDictionary(int estimatedCardinality, int overflowSize, PinotDataBufferMemoryManager memoryManager,
-      String allocationContext) {
+  public LongOffHeapMutableDictionary(int estimatedCardinality, int overflowSize,
+      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     super(estimatedCardinality, overflowSize, memoryManager, allocationContext);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);
-    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.LONG_SIZE,
-        memoryManager, allocationContext);
+    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, Long.BYTES, memoryManager,
+        allocationContext);
   }
 
   public Object get(int dictionaryId) {
@@ -126,7 +125,7 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   @Override
   public int getAvgValueSize() {
-    return V1Constants.Numbers.LONG_SIZE;
+    return Long.BYTES;
   }
 
   @Override
@@ -170,6 +169,6 @@ public class LongOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
 
   @Override
   public long getTotalOffHeapMemUsed() {
-    return super.getTotalOffHeapMemUsed() + V1Constants.Numbers.LONG_SIZE * length();
+    return super.getTotalOffHeapMemUsed() + length() * Long.BYTES;
   }
 }
