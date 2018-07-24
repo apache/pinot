@@ -16,7 +16,11 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.segment.memory.PinotByteBuffer;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
+import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Arrays;
 import org.testng.Assert;
@@ -80,13 +84,14 @@ public class OnHeapStarTreeV2HelperTest {
 
   public List<AggfunColumnPair> createMet2AggfuncPairs() {
     List<AggfunColumnPair> metric2aggFuncPairs = new ArrayList<>();
-    AggfunColumnPair pair1 = new AggfunColumnPair("sum", "m1");
+
+    AggfunColumnPair pair1 = new AggfunColumnPair(AggregationFunctionType.SUM, "m1");
     metric2aggFuncPairs.add(pair1);
-    AggfunColumnPair pair2 = new AggfunColumnPair("min", "m2");
+    AggfunColumnPair pair2 = new AggfunColumnPair(AggregationFunctionType.MIN, "m2");
     metric2aggFuncPairs.add(pair2);
-    AggfunColumnPair pair3 = new AggfunColumnPair("max", "m3");
+    AggfunColumnPair pair3 = new AggfunColumnPair(AggregationFunctionType.MAX, "m3");
     metric2aggFuncPairs.add(pair3);
-    AggfunColumnPair pair4 = new AggfunColumnPair("count", "star");
+    AggfunColumnPair pair4 = new AggfunColumnPair(AggregationFunctionType.COUNT, "star");
     metric2aggFuncPairs.add(pair4);
 
     return metric2aggFuncPairs;
@@ -219,9 +224,8 @@ public class OnHeapStarTreeV2HelperTest {
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
-
-    StarTreeV2AggfunColumnPairDataSource source =
-        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -258,8 +262,8 @@ public class OnHeapStarTreeV2HelperTest {
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    StarTreeV2AggfunColumnPairDataSource source =
-        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -297,8 +301,8 @@ public class OnHeapStarTreeV2HelperTest {
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    StarTreeV2AggfunColumnPairDataSource source =
-        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -338,8 +342,8 @@ public class OnHeapStarTreeV2HelperTest {
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    StarTreeV2AggfunColumnPairDataSource source =
-        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -380,8 +384,8 @@ public class OnHeapStarTreeV2HelperTest {
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
-    StarTreeV2AggfunColumnPairDataSource source =
-        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -417,8 +421,8 @@ public class OnHeapStarTreeV2HelperTest {
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
-    StarTreeV2AggfunColumnPairDataSource source =
-        new StarTreeV2AggfunColumnPairDataSource(columnDataFile, "random", 1, 0, size, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();

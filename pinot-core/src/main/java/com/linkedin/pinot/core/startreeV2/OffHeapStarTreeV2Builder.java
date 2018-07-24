@@ -16,21 +16,29 @@
 
 package com.linkedin.pinot.core.startreeV2;
 
-import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.startree.StarTree;
+import java.util.Map;
 
 
-public interface StarTreeV2 extends Closeable {
+public class OffHeapStarTreeV2Builder implements StarTreeV2Builder{
+  @Override
+  public void init(File indexDir, StarTreeV2Config config) throws Exception {
 
-  /**
-   * Loads star tree.
-   */
-  StarTree getStarTree() throws IOException;
+  }
 
-  /**
-   * return data source for particular star tree.
-   */
-  DataSource getDataSource(String column) throws Exception;
+  @Override
+  public void build() throws IOException {
+
+  }
+
+  @Override
+  public void serialize() throws Exception {
+
+  }
+
+  @Override
+  public Map<String, String> getMetaData() {
+    return null;
+  }
 }

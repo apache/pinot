@@ -41,9 +41,9 @@ public class StarTreeV2Constant {
     public static final String SUM = "sum";
     public static final String MIN = "min";
     public static final String COUNT = "count";
-    public static final String DISTINCTCOUNTHLL = "distinctcounthll";
+    public static final String DISTINCTCOUNTHLL = "distinctCountHLL";
     public static final String PERCENTILETDIGEST = "percentileTDigest";
-    public static final String PERCENTILEEST = "percentileest";
+    public static final String PERCENTILEEST = "percentileEst";
   }
 
   // star tree meta data.

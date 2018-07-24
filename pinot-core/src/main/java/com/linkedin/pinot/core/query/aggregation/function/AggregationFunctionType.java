@@ -28,6 +28,8 @@ public enum AggregationFunctionType {
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL"),
+  PERCENTILETDIGEST("percentileTDigest"),
+  PERCENTILEEST("percentileEst"),
   FASTHLL("fastHLL"),
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV"),

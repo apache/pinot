@@ -60,6 +60,7 @@ public class StarTreeV2Impl implements StarTreeV2 {
       for (String dimension: _dimensionDataSources.keySet()) {
         StarTreeV2DimensionDataSource source = _dimensionDataSources.get(dimension);
         source.getForwardIndex().close();
+        source.getDictionary().close();
       }
     }
 
