@@ -35,12 +35,14 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import com.linkedin.pinot.core.util.FixedIntArray;
 import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import com.linkedin.pinot.core.util.IdMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.roaringbitmap.IntIterator;
@@ -368,6 +370,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public StarTree getStarTree() {
+    return null;
+  }
+
+  @Override
+  public List<StarTreeV2> getStarTrees() {
     return null;
   }
 
