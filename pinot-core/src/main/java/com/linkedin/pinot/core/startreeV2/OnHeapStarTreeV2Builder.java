@@ -204,7 +204,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
           metricRawValues.add(1L);
         } else {
           MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(metricName);
-          Object val = readHelper(metricColumnReaders.get(metricName), metricFieldSpec.getDataType(), i);
+          Object val = OnHeapStarTreeV2BuilderHelper.readHelper(metricColumnReaders.get(metricName), metricFieldSpec.getDataType(), i);
           metricRawValues.add(val);
         }
       }
@@ -487,32 +487,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     rangeMap.put(currentValue, new Pairs.IntPair(groupStartDocId, endDocId));
 
     return rangeMap;
-  }
-
-  /**
-   * Helper function to read value of a doc in a column
-   *
-   * @param reader 'PinotSegmentColumnReader' to read data.
-   * @param dataType 'FieldSpec.DataType' of the data to be read.
-   * @param docId 'int' doc id to be read.
-   *
-   * @return Object
-   */
-  private Object readHelper(PinotSegmentColumnReader reader, FieldSpec.DataType dataType, int docId) {
-    switch (dataType) {
-      case INT:
-        return reader.readInt(docId);
-      case FLOAT:
-        return reader.readFloat(docId);
-      case LONG:
-        return reader.readLong(docId);
-      case DOUBLE:
-        return reader.readDouble(docId);
-      case STRING:
-        return reader.readString(docId);
-    }
-
-    return null;
   }
 
   /**

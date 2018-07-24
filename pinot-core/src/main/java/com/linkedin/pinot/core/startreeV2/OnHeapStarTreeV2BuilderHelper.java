@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.startree.OffHeapStarTree;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
-public class OnHeapStarTreeV2BuilderHelper {
+public class OnHeapStarTreeV2BuilderHelper extends StarTreeV2BuilderHelper{
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
