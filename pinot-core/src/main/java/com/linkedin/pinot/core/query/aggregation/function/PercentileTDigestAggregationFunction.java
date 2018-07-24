@@ -32,28 +32,22 @@ import javax.annotation.Nonnull;
 public class PercentileTDigestAggregationFunction implements AggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
-  private final String _name;
   private final int _percentile;
 
   public PercentileTDigestAggregationFunction(int percentile) {
-    this("percentileTDigest" + percentile, percentile);
-  }
-
-  protected PercentileTDigestAggregationFunction(String name, int percentile) {
-    _name = name;
     _percentile = percentile;
   }
 
   @Nonnull
   @Override
-  public String getName() {
-    return _name;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILETDIGEST;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return _name + "_" + columns[0];
+    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + columns[0];
   }
 
   @Override

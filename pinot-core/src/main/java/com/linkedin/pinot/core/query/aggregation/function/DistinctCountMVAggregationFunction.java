@@ -24,18 +24,17 @@ import javax.annotation.Nonnull;
 
 
 public class DistinctCountMVAggregationFunction extends DistinctCountAggregationFunction {
-  private static final String NAME = AggregationFunctionType.DISTINCTCOUNTMV.getName();
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.DISTINCTCOUNTMV;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.DISTINCTCOUNTMV.getName() + "_" + columns[0];
   }
 
   @Override

@@ -29,28 +29,22 @@ import javax.annotation.Nonnull;
 public class PercentileAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
-  private final String _name;
-  private final int _percentile;
+  protected final int _percentile;
 
   public PercentileAggregationFunction(int percentile) {
-    this("percentile" + percentile, percentile);
-  }
-
-  protected PercentileAggregationFunction(String name, int percentile) {
-    _name = name;
     _percentile = percentile;
   }
 
   @Nonnull
   @Override
-  public String getName() {
-    return _name;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILE;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return _name + "_" + columns[0];
+    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + columns[0];
   }
 
   @Override

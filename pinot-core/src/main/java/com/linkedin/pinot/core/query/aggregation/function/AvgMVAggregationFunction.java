@@ -22,18 +22,17 @@ import javax.annotation.Nonnull;
 
 
 public class AvgMVAggregationFunction extends AvgAggregationFunction {
-  private static final String NAME = AggregationFunctionType.AVGMV.getName();
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.AVGMV;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.AVGMV.getName() + "_" + columns[0];
   }
 
   @Override

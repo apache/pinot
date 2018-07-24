@@ -25,20 +25,18 @@ import javax.annotation.Nonnull;
 
 
 public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggregationFunction {
-  private static final String NAME = AggregationFunctionType.DISTINCTCOUNTHLLMV.getName();
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.DISTINCTCOUNTHLLMV;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.DISTINCTCOUNTHLLMV.getName() + "_" + columns[0];
   }
-
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {

@@ -25,7 +25,19 @@ import javax.annotation.Nonnull;
 public class PercentileMVAggregationFunction extends PercentileAggregationFunction {
 
   public PercentileMVAggregationFunction(int percentile) {
-    super("percentile" + percentile + "MV", percentile);
+    super(percentile);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILEMV;
+  }
+
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "MV_" + columns[0];
   }
 
   @Override

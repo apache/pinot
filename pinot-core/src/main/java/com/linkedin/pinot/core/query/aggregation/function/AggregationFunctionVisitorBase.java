@@ -62,10 +62,6 @@ public class AggregationFunctionVisitorBase {
     visitFunction(function);
   }
 
-  public void visit(FastHLLMVAggregationFunction function) {
-    visitFunction(function);
-  }
-
   public void visit(MaxAggregationFunction function) {
     visitFunction(function);
   }
