@@ -49,6 +49,7 @@ public class SegmentFetcherFactory {
         put("http", HttpSegmentFetcher.class.getName());
         put("https", HttpsSegmentFetcher.class.getName());
         put("hdfs", HdfsSegmentFetcher.class.getName());
+        put("adl", AzureSegmentFetcher.class.getName());
       }});
   public static final String FETCHER_CLASS_KEY_SUFFIX = ".class";
 
