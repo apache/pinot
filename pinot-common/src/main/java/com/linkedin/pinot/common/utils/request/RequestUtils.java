@@ -28,7 +28,6 @@ import com.linkedin.pinot.common.request.HavingFilterQueryMap;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

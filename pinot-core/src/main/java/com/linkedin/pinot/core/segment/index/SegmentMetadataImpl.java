@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startreeV2.StarTreeV2Constant;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2Constant;
 import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2Metadata;
 import com.linkedin.pinot.startree.hll.HllConstants;
@@ -564,6 +564,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public StarTreeMetadata getStarTreeMetadata() {
     return _starTreeMetadata;
+  }
+
+  public List<StarTreeV2Metadata> getStarTreeV2Metadata() {
+    return _starTreeV2MetadataList;
   }
 
   @Override

@@ -457,15 +457,6 @@ public class MutableSegmentImpl implements MutableSegment {
     }
   }
 
-  @Override
-  public StarTreeV2 getStarTreeV2(int starTreeId) {
-    if (_starTreeV2List.size() > 0) {
-      return _starTreeV2List.get(starTreeId);
-    }
-
-    return null;
-  }
-
   private IntIterator[] getSortedBitmapIntIteratorsForIntColumn(String column) {
     MutableDictionary dictionary = _dictionaryMap.get(column);
     int numValues = dictionary.length();
