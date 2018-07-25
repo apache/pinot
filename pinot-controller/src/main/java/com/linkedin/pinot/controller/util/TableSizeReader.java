@@ -193,8 +193,8 @@ public class TableSizeReader {
       }
       // after iterating over all servers update summary reported and estimated size of the segment
       if (errors != segmentSizes.serverInfo.size()) {
+        // at least one server reported size for this segment
         if (errors > 0) {
-          // at least one server reported size for this segment
           LOGGER.info("Could not get size for segment {} from {} servers. Using segmentLevelMax {} to estimate the size",
               segmentEntry.getKey(), errors, segmentLevelMax);
         }
