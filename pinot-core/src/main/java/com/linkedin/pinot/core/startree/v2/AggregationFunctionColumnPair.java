@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.linkedin.pinot.core.startree.v2;
 
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import javax.annotation.Nonnull;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 public class AggregationFunctionColumnPair {

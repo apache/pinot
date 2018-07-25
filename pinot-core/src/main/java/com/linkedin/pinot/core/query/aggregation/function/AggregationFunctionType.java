@@ -29,8 +29,6 @@ public enum AggregationFunctionType {
   MINMAXRANGE("minMaxRange"),
   DISTINCTCOUNT("distinctCount"),
   DISTINCTCOUNTHLL("distinctCountHLL"),
-  PERCENTILETDIGEST("percentileTDigest"),
-  PERCENTILEEST("percentileEst"),
   FASTHLL("fastHLL"),
   PERCENTILE("percentile"),
   PERCENTILEEST("percentileEst"),

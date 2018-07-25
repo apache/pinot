@@ -21,12 +21,14 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
-import com.linkedin.pinot.common.segment.StarTreeV2Metadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startreeV2.StarTreeV2Constant;
+import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2Constant;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2Metadata;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.DataInputStream;
 import java.io.File;
@@ -361,17 +363,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     _starTreeV2MetadataList = new ArrayList<>();
     for ( int i = 0; i < starTreesCount;  i++ ) {
-      StarTreeV2Metadata metadata = new StarTreeV2Metadata();
 
       // met2agg func pairs
-      String met2agg = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAT2FUNC_MAP;
+      String met2agg = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
       Iterator<String> iterator = _segmentMetadataPropertiesConfiguration.getList(met2agg).iterator();
-      List<String> met2AggfuncPairs = new ArrayList<>();
+      Set<AggregationFunctionColumnPair> aggFunColPairs = new HashSet<>();
       while (iterator.hasNext()) {
-        final String pair = iterator.next();
-        met2AggfuncPairs.add(pair);
+        final String sPair = iterator.next();
+        String[] parts = sPair.split("_");
+        AggregationFunctionColumnPair pair = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf(parts[0].toUpperCase()) , parts[1]);
+        aggFunColPairs.add(pair);
       }
-      metadata.setMet2AggfuncPairs(met2AggfuncPairs);
+
 
       // dimension split order
       String splitOrder = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
@@ -381,15 +384,26 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         final String splitColumn = iterator.next();
         dimensionsSplitOrder.add(splitColumn);
       }
-      metadata.setDimensionsSplitOrder(dimensionsSplitOrder);
+
+      // dimension split order
+      String withoutStarNode = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
+      iterator = _segmentMetadataPropertiesConfiguration.getList(withoutStarNode).iterator();
+      Set<String> dimensionWithoutStarNode = new HashSet<>();
+      while (iterator.hasNext()) {
+        final String splitColumn = iterator.next();
+        dimensionWithoutStarNode.add(splitColumn);
+      }
 
       // number of aggregated docs.
       String aggregatedDocsCount = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
       String docsCount = _segmentMetadataPropertiesConfiguration.getString(aggregatedDocsCount);
-      if (docsCount != null) {
-        metadata.setDocsCount(Integer.parseInt(docsCount));
-      }
 
+      // max number of records in leaf.
+      String maxLeafRecordString = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
+      String maxLeafRecord = _segmentMetadataPropertiesConfiguration.getString(maxLeafRecordString);
+
+
+      StarTreeV2Metadata metadata = new StarTreeV2Metadata(Integer.parseInt(docsCount), dimensionsSplitOrder, aggFunColPairs, Integer.parseInt(maxLeafRecord), dimensionWithoutStarNode);
       _starTreeV2MetadataList.add(metadata);
     }
 
@@ -553,7 +567,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _starTreeMetadata;
   }
 
-  @Override
   public List<StarTreeV2Metadata> getStarTreeV2Metadata() {
     return _starTreeV2MetadataList;
   }
