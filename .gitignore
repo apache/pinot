@@ -40,3 +40,5 @@ pinot-dashboard/dist
 pinot-dashboard/pinotui.egg-info
 *.log
 .doppelganger
+*.ipr
+*.iws
