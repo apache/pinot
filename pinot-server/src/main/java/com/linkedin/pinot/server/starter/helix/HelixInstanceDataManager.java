@@ -191,13 +191,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     String segmentName = segmentMetadata.getName();
     LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
 
-    String indexDirString = segmentMetadata.getIndexDir();
-    if (indexDirString == null) {
+    File indexDir = segmentMetadata.getIndexDir();
+    if (indexDir == null) {
       LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
       return;
     }
-
-    File indexDir = new File(indexDirString);
     Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
 
     File parentFile = indexDir.getParentFile();

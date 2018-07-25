@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.segment;
 
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -53,7 +54,7 @@ public interface SegmentMetadata {
 
   int getTotalRawDocs();
 
-  String getIndexDir();
+  File getIndexDir();
 
   String getName();
 
