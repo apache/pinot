@@ -15,39 +15,39 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import javax.annotation.Nonnull;
 
 
-public class PercentileEstMVAggregationFunction extends PercentileEstAggregationFunction {
+public class PercentileTDigestMVAggregationFunction extends PercentileTDigestAggregationFunction {
 
-  public PercentileEstMVAggregationFunction(int percentile) {
+  public PercentileTDigestMVAggregationFunction(int percentile) {
     super(percentile);
   }
 
   @Nonnull
   @Override
   public AggregationFunctionType getType() {
-    return AggregationFunctionType.PERCENTILEESTMV;
+    return AggregationFunctionType.PERCENTILETDIGESTMV;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + columns[0];
+    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "MV_" + columns[0];
   }
 
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    QuantileDigest quantileDigest = getQuantileDigest(aggregationResultHolder);
+    TDigest tDigest = getTDigest(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
       for (double value : valuesArray[i]) {
-        quantileDigest.add((long) value);
+        tDigest.add(value);
       }
     }
   }
@@ -57,9 +57,9 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
-      QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
+      TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
       for (double value : valuesArray[i]) {
-        quantileDigest.add((long) value);
+        tDigest.add(value);
       }
     }
   }
@@ -71,9 +71,9 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
+        TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
         for (double value : values) {
-          quantileDigest.add((long) value);
+          tDigest.add(value);
         }
       }
     }
