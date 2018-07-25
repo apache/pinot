@@ -16,7 +16,7 @@ import {
   get, set, getProperties
 } from '@ember/object';
 import { inject as service } from '@ember/service';
-
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 
 import createEventApi from 'thirdeye-frontend/utils/api/create-event';
@@ -37,7 +37,7 @@ export default Component.extend({
      * @return {undefined}
      */
     onExit() {
-      this.set('isShowingModal', false);
+      this.set('showCreateEventModal', false);
     },
 
     /**
@@ -53,6 +53,10 @@ export default Component.extend({
       const endTimeSinceEpoch = new Date(endTime).getTime();
 
       fetch(createEventApi.createEventUrl(startTimeSinceEpoch, endTimeSinceEpoch, eventName, countryCode), {method: 'POST'})
+        .then(checkStatus)
+        .then(res => set(this, 'showCreateEventModal', false))
+
+      // TODO catch error on create
     }
   }
 });
