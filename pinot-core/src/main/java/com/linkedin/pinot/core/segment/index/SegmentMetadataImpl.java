@@ -65,8 +65,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
   private final File _indexDir;
-  private final PropertiesConfiguration _segmentMetadataPropertiesConfiguration;
   private final Map<String, ColumnMetadata> _columnMetadataMap;
+  private String _tableName;
   private String _segmentName;
   private final Set<String> _allColumns;
   private final Schema _schema;
@@ -90,6 +90,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _segmentStartTime;
   private long _segmentEndTime;
 
+ 
   /**
    * For segments on disk.
    * <p>Index directory passed in should be top level segment directory.
@@ -97,21 +98,21 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   public SegmentMetadataImpl(File indexDir) throws IOException {
     _indexDir = indexDir;
-    _segmentMetadataPropertiesConfiguration = getPropertiesConfiguration(indexDir);
+    PropertiesConfiguration segmentMetadataPropertiesConfiguration = getPropertiesConfiguration(indexDir);
     _columnMetadataMap = new HashMap<>();
     _allColumns = new HashSet<>();
     _schema = new Schema();
 
-    init();
+    init(segmentMetadataPropertiesConfiguration);
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
     if (creationMetaFile != null) {
       loadCreationMeta(creationMetaFile);
     }
 
-    setTimeInfo();
-    _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
+    setTimeInfo(segmentMetadataPropertiesConfiguration);
+    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
     _totalRawDocs =
-        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
+        segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
             _totalDocs);
   }
 
@@ -120,7 +121,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
     _indexDir = null;
-    _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
+    PropertiesConfiguration _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
     _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
     _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER,
         V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
@@ -143,8 +144,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     _crc = segmentMetadata.getCrc();
     _creationTime = segmentMetadata.getCreationTime();
-    setTimeInfo();
+    setTimeInfo(_segmentMetadataPropertiesConfiguration);
     _columnMetadataMap = null;
+    _tableName = segmentMetadata.getTableName();
     _segmentName = segmentMetadata.getSegmentName();
     _allColumns = schema.getColumnNames();
     _schema = schema;
@@ -173,7 +175,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    *   <li> Start and End time. </li>
    * </ul>
    */
-  private void setTimeInfo() {
+  private void setTimeInfo(PropertiesConfiguration _segmentMetadataPropertiesConfiguration) {
     _timeColumn = _segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
     if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME)
         && _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME)
@@ -212,7 +214,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _allColumns;
   }
 
-  private void init() {
+  private void init(PropertiesConfiguration _segmentMetadataPropertiesConfiguration) {
     if (_segmentMetadataPropertiesConfiguration.containsKey(Segment.SEGMENT_CREATOR_VERSION)) {
       _creatorName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_CREATOR_VERSION);
     }
@@ -271,6 +273,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         _allColumns.add(columnName);
       }
     }
+    //set the table name
+    _tableName = _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.TABLE_NAME);
     // Set segment name.
     _segmentName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_NAME);
 
@@ -291,14 +295,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // Build star-tree metadata.
     _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
     if (_hasStarTree) {
-      initStarTreeMetadata();
+      initStarTreeMetadata(_segmentMetadataPropertiesConfiguration);
     }
   }
 
   /**
    * Reads and initializes the star tree metadata from segment metadata properties.
    */
-  private void initStarTreeMetadata() {
+  private void initStarTreeMetadata(PropertiesConfiguration _segmentMetadataPropertiesConfiguration) {
     _starTreeMetadata = new StarTreeMetadata();
 
     // Set the splitOrder
@@ -357,7 +361,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public String getTableName() {
-    return (String) _segmentMetadataPropertiesConfiguration.getProperty(V1Constants.MetadataKeys.Segment.TABLE_NAME);
+    return _tableName;
   }
 
   @Override
