@@ -25,19 +25,18 @@ import javax.annotation.Nonnull;
 
 
 public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
-  private static final String NAME = AggregationFunctionType.MAX.getName();
   private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.MAX;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.MAX.getName() + "_" + columns[0];
   }
 
   @Override

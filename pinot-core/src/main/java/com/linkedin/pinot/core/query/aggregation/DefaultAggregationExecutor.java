@@ -44,7 +44,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       _functions[i] = function;
       _resultHolders[i] = _functions[i].createAggregationResultHolder();
       // TODO: currently only support single argument aggregation
-      if (!function.getName().equals(AggregationFunctionType.COUNT.getName())) {
+      if (function.getType() != AggregationFunctionType.COUNT) {
         _expressions[i] =
             TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
       }
@@ -58,7 +58,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       AggregationFunction function = _functions[i];
       AggregationResultHolder resultHolder = _resultHolders[i];
 
-      if (function.getName().equals(AggregationFunctionType.COUNT.getName())) {
+      if (function.getType() == AggregationFunctionType.COUNT) {
         function.aggregate(length, resultHolder);
       } else {
         function.aggregate(length, resultHolder, transformBlock.getBlockValueSet(_expressions[i]));

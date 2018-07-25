@@ -27,7 +27,7 @@ import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeNode;
-import com.linkedin.pinot.core.startreeV2.OnHeapStarTreeV2Loader;
+import com.linkedin.pinot.core.startree.v2.OnHeapStarTreeV2Loader;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;

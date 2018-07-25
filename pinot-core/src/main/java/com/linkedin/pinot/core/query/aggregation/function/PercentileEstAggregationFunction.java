@@ -28,28 +28,22 @@ import javax.annotation.Nonnull;
 public class PercentileEstAggregationFunction implements AggregationFunction<QuantileDigest, Long> {
   public static final double DEFAULT_MAX_ERROR = 0.05;
 
-  private final String _name;
-  private final int _percentile;
+  protected final int _percentile;
 
   public PercentileEstAggregationFunction(int percentile) {
-    this("percentileEst" + percentile, percentile);
-  }
-
-  protected PercentileEstAggregationFunction(String name, int percentile) {
-    _name = name;
     _percentile = percentile;
   }
 
   @Nonnull
   @Override
-  public String getName() {
-    return _name;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILEEST;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return _name + "_" + columns[0];
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "_" + columns[0];
   }
 
   @Override

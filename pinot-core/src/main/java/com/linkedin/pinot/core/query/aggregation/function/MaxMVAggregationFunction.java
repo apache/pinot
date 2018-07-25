@@ -22,18 +22,17 @@ import javax.annotation.Nonnull;
 
 
 public class MaxMVAggregationFunction extends MaxAggregationFunction {
-  private static final String NAME = AggregationFunctionType.MAXMV.getName();
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.MAXMV;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.MAXMV.getName() + "_" + columns[0];
   }
 
   @Override

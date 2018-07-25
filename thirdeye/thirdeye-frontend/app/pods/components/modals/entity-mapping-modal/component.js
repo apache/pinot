@@ -1,9 +1,9 @@
 /**
  * Component displaying the entity mapping inside a modal
  * @module components/modals/entity-mapping-modal
- * @property {Boolean} showEntityMapping  - Flag toggling the modal view
- * @property {Object} metric              - primary metric Object
- * @property {Function} onSubmit          - closure action that handles the submit events
+ * @property {Boolean} showEntityMappingModal  - Flag toggling the modal view
+ * @property {Object} metric                   - primary metric Object
+ * @property {Function} onSubmit               - closure action that handles the submit events
  * @example
     {{modals/entity-mapping-modal
       showEntityMappingModal=showEntityMappingModal
@@ -103,6 +103,12 @@ export default Component.extend({
    * @type {Array}
    */
   _relatedEntities: Object.assign([]),
+
+  /**
+   * Flag for displaying the modal
+   * @type {boolean}
+   */
+  showEntityMappingModal: true,
 
   /**
    * current logged in user
@@ -436,6 +442,7 @@ export default Component.extend({
      * @return {undefined}
      */
     onExit() {
+      set(this, 'showEntityMappingModal', false);
       this.onSubmit();
     },
 

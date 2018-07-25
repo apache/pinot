@@ -31,10 +31,10 @@ import javax.annotation.Nonnull;
 public interface AggregationFunction<IntermediateResult, FinalResult extends Comparable> {
 
   /**
-   * Get the name of the aggregation function.
+   * Get the type of the aggregation function.
    */
   @Nonnull
-  String getName();
+  AggregationFunctionType getType();
 
   /**
    * Given the aggregation columns, get the column name for the results.

@@ -23,10 +23,21 @@ import javax.annotation.Nonnull;
 
 
 public class PercentileEstMVAggregationFunction extends PercentileEstAggregationFunction {
-  private static final double DEFAULT_MAX_ERROR = 0.01;
 
   public PercentileEstMVAggregationFunction(int percentile) {
-    super("percentileEst" + percentile + "MV", percentile);
+    super(percentile);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILEESTMV;
+  }
+
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + columns[0];
   }
 
   @Override

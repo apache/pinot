@@ -69,7 +69,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
       AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
-      AggregationFunctionType functionType = AggregationFunctionType.valueOf(function.getName().toUpperCase());
+      AggregationFunctionType functionType = function.getType();
       String column = aggregationFunctionContext.getAggregationColumns()[0];
       Dictionary dictionary = _dictionaryMap.get(column);
       AggregationResultHolder resultHolder;
@@ -87,8 +87,8 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
           resultHolder.setValue(new MinMaxRangePair(min, max));
           break;
         default:
-          throw new UnsupportedOperationException(
-              "Dictionary based aggregation operator does not support function " + function.getName());
+          throw new IllegalStateException(
+              "Dictionary based aggregation operator does not support function type: " + functionType);
       }
       aggregationResults.add(function.extractAggregationResult(resultHolder));
     }

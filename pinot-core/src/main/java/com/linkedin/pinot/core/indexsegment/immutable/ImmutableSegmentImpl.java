@@ -26,7 +26,7 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startreeV2.StarTreeV2;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -153,10 +153,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public StarTreeV2 getStarTreeV2(int starTreeId) {
+  public List<StarTreeV2> getStarTrees() {
 
     if (_starTreeV2List.size() > 0) {
-      return _starTreeV2List.get(starTreeId);
+      return _starTreeV2List;
     }
 
     return null;

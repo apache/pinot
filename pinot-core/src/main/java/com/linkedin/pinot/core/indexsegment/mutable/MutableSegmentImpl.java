@@ -35,8 +35,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startreeV2.StarTreeV2;
-import com.linkedin.pinot.core.startreeV2.StarTreeV2Impl;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import com.linkedin.pinot.core.util.FixedIntArray;
 import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import com.linkedin.pinot.core.util.IdMap;
@@ -376,6 +375,11 @@ public class MutableSegmentImpl implements MutableSegment {
 
   @Override
   public StarTree getStarTree() {
+    return null;
+  }
+
+  @Override
+  public List<StarTreeV2> getStarTrees() {
     return null;
   }
 

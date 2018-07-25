@@ -28,7 +28,7 @@ public class AggregationFunctionFactory {
   }
 
   /**
-   * Given the name of aggregation function, create and return a new instance of the corresponding aggregation function.
+   * Given the name of the aggregation function, returns a new instance of the corresponding aggregation function.
    */
   @Nonnull
   public static AggregationFunction getAggregationFunction(@Nonnull String functionName) {
@@ -54,7 +54,7 @@ public class AggregationFunctionFactory {
           return new PercentileEstMVAggregationFunction(
               parsePercentile(remainingFunctionName.substring(3, remainingFunctionName.length() - 2)));
         } else {
-          throw new UnsupportedOperationException();
+          throw new IllegalArgumentException();
         }
       } else {
         switch (AggregationFunctionType.valueOf(upperCaseFunctionName)) {
@@ -92,10 +92,8 @@ public class AggregationFunctionFactory {
             return new DistinctCountMVAggregationFunction();
           case DISTINCTCOUNTHLLMV:
             return new DistinctCountHLLMVAggregationFunction();
-          case FASTHLLMV:
-            return new FastHLLMVAggregationFunction();
           default:
-            throw new UnsupportedOperationException();
+            throw new IllegalArgumentException();
         }
       }
     } catch (Exception e) {

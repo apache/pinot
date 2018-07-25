@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import javax.annotation.Nonnull;
 
 
@@ -31,6 +32,9 @@ public enum AggregationFunctionType {
   PERCENTILETDIGEST("percentileTDigest"),
   PERCENTILEEST("percentileEst"),
   FASTHLL("fastHLL"),
+  PERCENTILE("percentile"),
+  PERCENTILEEST("percentileEst"),
+  PERCENTILETDIGEST("percentileTDigest"),
   // Aggregation functions for multi-valued columns
   COUNTMV("countMV"),
   MINMV("minMV"),
@@ -40,7 +44,8 @@ public enum AggregationFunctionType {
   MINMAXRANGEMV("minMaxRangeMV"),
   DISTINCTCOUNTMV("distinctCountMV"),
   DISTINCTCOUNTHLLMV("distinctCountHLLMV"),
-  FASTHLLMV("fastHLLMV");
+  PERCENTILEMV("percentileMV"),
+  PERCENTILEESTMV("percentileEstMV");
 
   private final String _name;
 
@@ -53,14 +58,42 @@ public enum AggregationFunctionType {
     return _name;
   }
 
-  public static boolean isOfType(@Nonnull String functionName,
-      @Nonnull AggregationFunctionType... aggregationFunctionTypes) {
-    String upperCaseFunctionName = functionName.toUpperCase();
+  public boolean isOfType(@Nonnull AggregationFunctionType... aggregationFunctionTypes) {
     for (AggregationFunctionType aggregationFunctionType : aggregationFunctionTypes) {
-      if (upperCaseFunctionName.equals(aggregationFunctionType.name())) {
+      if (this == aggregationFunctionType) {
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * Given the name of the aggregation function, returns the corresponding aggregation function type.
+   */
+  @Nonnull
+  public static AggregationFunctionType getAggregationFunctionType(@Nonnull String functionName) {
+    try {
+      String upperCaseFunctionName = functionName.toUpperCase();
+      if (upperCaseFunctionName.startsWith("PERCENTILE")) {
+        String remainingFunctionName = upperCaseFunctionName.substring(10);
+        if (remainingFunctionName.matches("\\d+")) {
+          return PERCENTILE;
+        } else if (remainingFunctionName.matches("EST\\d+")) {
+          return PERCENTILEEST;
+        } else if (remainingFunctionName.matches("TDIGEST\\d+")) {
+          return PERCENTILETDIGEST;
+        } else if (remainingFunctionName.matches("\\d+MV")) {
+          return PERCENTILEMV;
+        } else if (remainingFunctionName.matches("EST\\d+MV")) {
+          return PERCENTILEESTMV;
+        } else {
+          throw new IllegalArgumentException();
+        }
+      } else {
+        return AggregationFunctionType.valueOf(upperCaseFunctionName);
+      }
+    } catch (Exception e) {
+      throw new BadQueryRequestException("Invalid aggregation function name: " + functionName);
+    }
   }
 }

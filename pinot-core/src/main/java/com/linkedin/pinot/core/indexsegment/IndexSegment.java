@@ -19,7 +19,8 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startreeV2.StarTreeV2;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import java.util.List;
 import java.util.Set;
 
 
@@ -62,6 +63,11 @@ public interface IndexSegment {
   StarTree getStarTree();
 
   /**
+   * Returns a list of star-trees (V2), or null if there is no star-tree (V2) in the segment.
+   */
+  List<StarTreeV2> getStarTrees();
+
+  /**
    * Returns the record for the given document Id.
    * <p>NOTE: don't use this method for high performance code.
    *
@@ -75,11 +81,4 @@ public interface IndexSegment {
    * Destroys segment in memory and closes file handlers if in MMAP mode.
    */
   void destroy();
-
-  /**
-   * Returns the Star-tree v2 index.
-   *
-   * @return Star-tree V2 index
-   */
-  StarTreeV2 getStarTreeV2(int starTreeId);
 }

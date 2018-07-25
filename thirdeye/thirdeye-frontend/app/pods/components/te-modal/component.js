@@ -4,10 +4,11 @@
  * a cancelAction and a submitAction
  * @module components/te-modal
  * @property {String} headerText        - text for the header
- * @property {String} headerSubext     - optional secondary text for the header
+ * @property {String} headerSubext      - optional secondary text for the header
  * @property {String} cancelButtonText  - text for the cancel button
  * @property {String} submitButtonText  - text for the submit button
- * @property {Boolean} isCancellable    - wether the modal can be exited
+ * @property {Boolean} isCancellable    - whether the modal can be exited
+ * @property {Boolean} isInvalid        - whether the modal is blocked from being submitted
  * @property {Boolean} hasFooter        - toggles the footer view
  * @property {Boolean} hasHeader        - toggles the header view
  * @property {Function} submitAction    - closure action that handles the submit button click
@@ -35,7 +36,9 @@ export default Component.extend({
   targetAttachment: 'center',
   headerText: 'Title',
   headerSubtext: '',
+  footerText: '',
   isCancellable: true,
+  isInvalid: false,
   hasHeader: true,
   hasFooter: true,
   cancelButtonText: 'Cancel',
@@ -52,6 +55,7 @@ export default Component.extend({
         return action();
       }
     },
+
     /**
      * Invokes the passed cancel closure action
      */
@@ -67,7 +71,6 @@ export default Component.extend({
      */
     async onCancel() {
       await this.send('cancelAction');
-      set(this, 'isShowingModal', false);
     },
 
     /**
@@ -75,7 +78,6 @@ export default Component.extend({
      */
     async onSubmit() {
       await this.send('submitAction');
-      set(this, 'isShowingModal', false);
     }
   }
 });

@@ -31,8 +31,6 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.SelectionPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.List;
@@ -151,40 +149,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   private static boolean isMetadataBasedAggregationFunction(AggregationInfo aggregationInfo,
       IndexSegment indexSegment) {
-    String functionName = aggregationInfo.getAggregationType();
-    if (AggregationFunctionType.isOfType(functionName, AggregationFunctionType.COUNT)) {
-      return true;
-    }
-
-    /** This code tries to get max and min value from segment metadata
-     * By default metadata is generated only for time column.
-     * In case of star tree, the min max values are incorrect,
-     * as those values are read from the dictionary during segment load time
-     * Also, in case of realtime, this metadata is not generated at all
-     * Keeping this code for reference, but not using it for now,
-     * until all the edge cases are fixed
-     */
-    //isMetadataBasedMinMax(functionName, indexSegment, aggregationInfo);
-    return false;
-  }
-
-  private static boolean isMetadataBasedMinMax(String functionName, IndexSegment indexSegment,
-      AggregationInfo aggregationInfo) {
-    // Use minValue and maxValue from metadata, in non star tree cases
-    // minValue and maxValue is generated from dictionary on segment load, so it won't be correct in case of star tree
-    if (AggregationFunctionType.isOfType(functionName, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
-        AggregationFunctionType.MINMAXRANGE) && !indexSegment.getSegmentMetadata().hasStarTree()) {
-      String column = aggregationInfo.getAggregationParams().get("column");
-      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) indexSegment.getSegmentMetadata();
-      if (segmentMetadata == null || segmentMetadata.getColumnMetadataMap() == null) {
-        return false;
-      }
-      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
-      if (columnMetadata.getMaxValue() != null && columnMetadata.getMinValue() != null) {
-        return true;
-      }
-    }
-    return false;
+    return AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType())
+        == AggregationFunctionType.COUNT;
   }
 
   /**
@@ -216,8 +182,10 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
 
   private static boolean isDictionaryBasedAggregationFunction(AggregationInfo aggregationInfo,
       IndexSegment indexSegment) {
-    if (AggregationFunctionType.isOfType(aggregationInfo.getAggregationType(), AggregationFunctionType.MIN,
-        AggregationFunctionType.MAX, AggregationFunctionType.MINMAXRANGE)) {
+    AggregationFunctionType functionType =
+        AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
+    if (functionType.isOfType(AggregationFunctionType.MIN, AggregationFunctionType.MAX,
+        AggregationFunctionType.MINMAXRANGE)) {
       String column = aggregationInfo.getAggregationParams().get("column");
       Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
       return dictionary != null && dictionary.isSorted();

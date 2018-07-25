@@ -29,20 +29,18 @@ import javax.annotation.Nonnull;
 
 
 public class FastHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
-  private static final String NAME = AggregationFunctionType.FASTHLL.getName();
-
-  protected int _log2m = HllConstants.DEFAULT_LOG2M;
+  private int _log2m = HllConstants.DEFAULT_LOG2M;
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.FASTHLL;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.FASTHLL.getName() + "_" + columns[0];
   }
 
   public void setLog2m(int log2m) {
