@@ -64,12 +64,12 @@ import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataK
 public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
+  private final File _indexDir;
   private final PropertiesConfiguration _segmentMetadataPropertiesConfiguration;
   private final Map<String, ColumnMetadata> _columnMetadataMap;
   private String _segmentName;
   private final Set<String> _allColumns;
   private final Schema _schema;
-  private final String _indexDir;
   private long _crc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
   private String _timeColumn;
@@ -91,19 +91,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _segmentEndTime;
 
   /**
-   * Load segment metadata in any segment version.
+   * For segments on disk.
    * <p>Index directory passed in should be top level segment directory.
    * <p>If segment metadata file exists in multiple segment version, load the one in highest segment version.
    */
-  public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
-    File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
-    Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
-
-    _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(metadataFile);
+  public SegmentMetadataImpl(File indexDir) throws IOException {
+    _indexDir = indexDir;
+    _segmentMetadataPropertiesConfiguration = getPropertiesConfiguration(indexDir);
     _columnMetadataMap = new HashMap<>();
     _allColumns = new HashSet<>();
     _schema = new Schema();
-    _indexDir = indexDir.getPath();
 
     init();
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
@@ -118,7 +115,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
             _totalDocs);
   }
 
+  /**
+   * For REALTIME consuming segments.
+   */
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
+    _indexDir = null;
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration();
     _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
     _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER,
@@ -147,15 +148,20 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _segmentName = segmentMetadata.getSegmentName();
     _allColumns = schema.getColumnNames();
     _schema = schema;
-    _indexDir = null;
     _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
     _totalRawDocs =
         _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
             _totalDocs);
   }
 
-  public PropertiesConfiguration getSegmentMetadataPropertiesConfiguration() {
-    return _segmentMetadataPropertiesConfiguration;
+  public static PropertiesConfiguration getPropertiesConfiguration(File indexDir) {
+    File metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
+    Preconditions.checkNotNull(metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
+    try {
+      return new PropertiesConfiguration(metadataFile);
+    } catch (ConfigurationException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -419,7 +425,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public String getIndexDir() {
+  public File getIndexDir() {
     return _indexDir;
   }
 
