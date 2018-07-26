@@ -173,7 +173,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long endTime,
       long functionId) {
     Predicate predicate =
-        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LT("endTime", endTime),
+        Predicate.AND(Predicate.LT("startTime", endTime), Predicate.GT("endTime", startTime),
             Predicate.EQ("functionId", functionId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return convertMergedAnomalyBean2DTO(list);
@@ -222,8 +222,8 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Override
   public List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime, long endTime) {
     Predicate predicate = Predicate
-        .AND(Predicate.EQ("collection", collection), Predicate.GT("startTime", startTime),
-            Predicate.LT("endTime", endTime));
+        .AND(Predicate.EQ("collection", collection), Predicate.LT("startTime", endTime),
+            Predicate.GT("endTime", startTime));
 
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return convertMergedAnomalyBean2DTO(list);
