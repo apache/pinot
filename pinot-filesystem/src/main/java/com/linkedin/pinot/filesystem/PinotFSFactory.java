@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.filesystem;
 
-import com.google.common.base.Preconditions;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
@@ -24,7 +23,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Initializes the PinotFS implementation.
+ * This factory class initializes the PinotFS class. It creates a PinotFS object based on the URI found.
  */
 public class PinotFSFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotFSFactory.class);
@@ -42,7 +41,10 @@ public class PinotFSFactory {
     }
     String className = _schemeConfig.getString(scheme);
 
-    Preconditions.checkNotNull(className, "No fs class defined for scheme: " + scheme);
+    if (className == null) {
+      throw new RuntimeException("No fs class defined for scheme: " + scheme);
+    }
+
     LOGGER.info("Creating a new pinot fs for fs: {} with class: {}", scheme, className);
 
     return (PinotFS) Class.forName(className).newInstance();

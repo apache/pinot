@@ -48,6 +48,7 @@ import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
@@ -344,34 +345,9 @@ public class PinotSegmentUploadRestletResource {
           }
           if (!isSegmentMetadataUpload) {
             // Get segment fetcher based on the download URI
-            SegmentFetcher segmentFetcher;
-            try {
-              segmentFetcher = SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURI);
-            } catch (URISyntaxException e) {
-              throw new ControllerApplicationException(LOGGER,
-                  "Caught exception while parsing download URI: " + downloadURI, Response.Status.BAD_REQUEST, e);
-            }
-            if (segmentFetcher == null) {
-              throw new ControllerApplicationException(LOGGER,
-                  "Failed to get segment fetcher for download URI: " + downloadURI, Response.Status.BAD_REQUEST);
-            }
-            // Download segment tar file to local
-            segmentFetcher.fetchSegmentToLocal(downloadURI, tempTarredSegmentFile);
+            downloadSegment(tempTarredSegmentFile, downloadURI);
           } else {
-            // Read segment metadata file and directly use that information to update zk
-            Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();
-            if (!validateMultiPart(segmentMetadataMap, null)) {
-              throw new ControllerApplicationException(LOGGER, "Invalid multi-part form for segment metadata", Response.Status.BAD_REQUEST);
-            }
-            File segmentMetadataFile = null;
-            FormDataBodyPart segmentMetadataBodyPart = segmentMetadataMap.values().iterator().next().get(0);
-            try (InputStream inputStream = segmentMetadataBodyPart.getValueAs(InputStream.class);
-                OutputStream outputStream = new FileOutputStream(segmentMetadataFile)) {
-                IOUtils.copyLarge(inputStream, outputStream);
-            }
-            finally {
-              multiPart.cleanup();
-            }
+            File segmentMetadataFile = getMetadataFile(multiPart);
             segmentMetadataObject = new SegmentMetadataImpl(segmentMetadataFile);
           }
           break;
@@ -427,6 +403,40 @@ public class PinotSegmentUploadRestletResource {
       FileUtils.deleteQuietly(tempTarredSegmentFile);
       FileUtils.deleteQuietly(tempSegmentDir);
     }
+  }
+
+  private File getMetadataFile(FormDataMultiPart multiPart) throws IOException {
+    // Read segment metadata file and directly use that information to update zk
+    Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();
+    if (!validateMultiPart(segmentMetadataMap, null)) {
+      throw new ControllerApplicationException(LOGGER, "Invalid multi-part form for segment metadata", Response.Status.BAD_REQUEST);
+    }
+    File segmentMetadataFile = null;
+    FormDataBodyPart segmentMetadataBodyPart = segmentMetadataMap.values().iterator().next().get(0);
+    try (InputStream inputStream = segmentMetadataBodyPart.getValueAs(InputStream.class);
+        OutputStream outputStream = new FileOutputStream(segmentMetadataFile)) {
+        IOUtils.copyLarge(inputStream, outputStream);
+    }
+    finally {
+      multiPart.cleanup();
+    }
+    return segmentMetadataFile;
+  }
+
+  private void downloadSegment(File tempTarredSegmentFile, String downloadURI) throws Exception {
+    SegmentFetcher segmentFetcher;
+    try {
+      segmentFetcher = SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURI);
+    } catch (URISyntaxException e) {
+      throw new ControllerApplicationException(LOGGER,
+          "Caught exception while parsing download URI: " + downloadURI, Response.Status.BAD_REQUEST, e);
+    }
+    if (segmentFetcher == null) {
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to get segment fetcher for download URI: " + downloadURI, Response.Status.BAD_REQUEST);
+    }
+    // Download segment tar file to local
+    segmentFetcher.fetchSegmentToLocal(downloadURI, tempTarredSegmentFile);
   }
 
   private FileUploadDownloadClient.FileUploadType getUploadType(String uploadTypeStr) {
@@ -488,14 +498,6 @@ public class PinotSegmentUploadRestletResource {
       }
     }
 
-    uploadSegmentMetadata(downloadUrl, provider, tempTarredSegmentFile, segmentMetadata, headers, enableParallelPushProtection);
-  }
-
-  private void uploadSegmentMetadata(String downloadUrl, FileUploadPathProvider provider, File tempTarredSegmentFile, SegmentMetadata segmentMetadata,
-      HttpHeaders headers, boolean enableParallelPushProtection) throws Exception {
-    String rawTableName = segmentMetadata.getTableName();
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    String segmentName = segmentMetadata.getName();
     // Check time range
     if (!isSegmentTimeValid(segmentMetadata)) {
       throw new ControllerApplicationException(LOGGER,

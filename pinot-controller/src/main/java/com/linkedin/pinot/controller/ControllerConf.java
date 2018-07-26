@@ -61,7 +61,7 @@ public class ControllerConf extends PropertiesConfiguration {
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
-  private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.localFS";
+  private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -99,7 +99,7 @@ public class ControllerConf extends PropertiesConfiguration {
     }
   }
 
-  public void setPinotFSFactoryClass(Configuration pinotFSFactoryClasses) {
+  public void setPinotFSFactoryClasses(Configuration pinotFSFactoryClasses) {
     setProperty(PINOT_FS_FACTORY_CLASS_LOCAL, DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL);
 
     if (pinotFSFactoryClasses != null) {
