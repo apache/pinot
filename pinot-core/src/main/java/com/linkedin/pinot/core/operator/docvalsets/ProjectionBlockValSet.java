@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -100,6 +100,11 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
   @Override
   public String[] getStringValuesSV() {
     return _dataBlockCache.getStringValuesForSVColumn(_column);
+  }
+
+  @Override
+  public byte[][] getBytesValuesSV() {
+    return _dataBlockCache.getBytesValuesForSVColumn(_column);
   }
 
   @Override

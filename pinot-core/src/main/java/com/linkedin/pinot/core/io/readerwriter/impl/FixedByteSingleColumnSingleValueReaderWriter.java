@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -165,10 +164,8 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   private void addBuffer() {
     LOGGER.info("Allocating {} bytes for: {}", _chunkSizeInBytes, _allocationContext);
     PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
-    _capacityInRows += _numRowsPerChunk;
-
-    buffer.order(ByteOrder.nativeOrder());
     _dataBuffers.add(buffer);
+    _capacityInRows += _numRowsPerChunk;
 
     FixedByteSingleValueMultiColReader reader =
         new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, new int[]{_columnSizesInBytes});
@@ -204,7 +201,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
       _writer.close();
     }
 
@@ -238,7 +235,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     }
 
     @Override
-    public void close() {
+    public void close() throws IOException {
       _reader.close();
     }
 

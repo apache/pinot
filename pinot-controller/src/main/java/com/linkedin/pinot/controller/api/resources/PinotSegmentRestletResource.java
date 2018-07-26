@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -135,7 +134,7 @@ public class PinotSegmentRestletResource {
   public String toggleStateOrListMetadataForOneSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @ApiParam(value = "online|offline|drop", required = false) @QueryParam("state") String stateStr,
+      @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr)
       throws JSONException {
     segmentName = checkGetEncodedParam(segmentName);
@@ -420,6 +419,7 @@ public class PinotSegmentRestletResource {
    * @return
    * @throws JSONException
    */
+  // TODO: move this method into PinotHelixResourceManager
   private static PinotResourceManagerResponse toggleSegmentsForTable(@Nonnull List<String> segmentsToToggle,
       @Nonnull String tableName, String segmentName, @Nonnull StateType state,
       PinotHelixResourceManager helixResourceManager) {
@@ -429,9 +429,9 @@ public class PinotSegmentRestletResource {
       if (state == StateType.ENABLE) {
         int instanceCount = helixResourceManager.getAllInstances().size();
         if (instanceCount != 0) {
-          timeOutInSeconds = (long) ((_offlineToOnlineTimeoutInseconds * segmentsToToggle.size()) / instanceCount);
+          timeOutInSeconds = (_offlineToOnlineTimeoutInseconds * segmentsToToggle.size()) / instanceCount;
         } else {
-          return new PinotResourceManagerResponse("Error: could not find any instances in table " + tableName, false);
+          return PinotResourceManagerResponse.failure("No instance found for table " + tableName);
         }
       }
     }
@@ -447,7 +447,7 @@ public class PinotSegmentRestletResource {
       //
       // In jersey, API, if there are no segments in realtime (or in offline), we succeed the operation AND return 200
       // if we succeeded.
-      return new PinotResourceManagerResponse("No segments to toggle", true);
+      return PinotResourceManagerResponse.success("No segment to toggle");
     }
 
     switch (state) {

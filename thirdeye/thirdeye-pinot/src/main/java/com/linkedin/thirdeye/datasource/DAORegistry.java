@@ -9,6 +9,8 @@ import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.ConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
@@ -20,6 +22,7 @@ import com.linkedin.thirdeye.datalayer.bao.OnboardDatasetMetricManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RootcauseSessionManager;
+import com.linkedin.thirdeye.datalayer.bao.SessionManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertSnapshotManagerImpl;
@@ -30,6 +33,8 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionAlertConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EntityToEntityMappingManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
@@ -41,6 +46,7 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.OnboardDatasetMetricManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.RootcauseSessionManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.SessionManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
@@ -151,5 +157,17 @@ public class DAORegistry {
 
   public RootcauseSessionManager getRootcauseSessionDAO() {
     return DaoProviderUtil.getInstance(RootcauseSessionManagerImpl.class);
+  }
+
+  public SessionManager getSessionDAO() {
+    return DaoProviderUtil.getInstance(SessionManagerImpl.class);
+  }
+
+  public DetectionConfigManager getDetectionConfigManager() {
+    return DaoProviderUtil.getInstance(DetectionConfigManagerImpl.class);
+  }
+
+  public DetectionAlertConfigManager getDetectionAlertConfigManager() {
+    return DaoProviderUtil.getInstance(DetectionAlertConfigManagerImpl.class);
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -159,6 +159,9 @@ public class AvroUtils {
             break;
           case STRING:
             fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().stringType().noDefault();
+            break;
+          case BYTES:
+            fieldAssembler = fieldAssembler.name(fieldSpec.getName()).type().bytesType().noDefault();
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + dataType);

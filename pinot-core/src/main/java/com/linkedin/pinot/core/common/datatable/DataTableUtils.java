@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,19 +41,7 @@ public class DataTableUtils {
     int rowSizeInBytes = 0;
     for (int i = 0; i < numColumns; i++) {
       columnOffsets[i] = rowSizeInBytes;
-      switch (dataSchema.getColumnType(i)) {
-        case BOOLEAN:
-          rowSizeInBytes += 1;
-          break;
-        case BYTE:
-          rowSizeInBytes += 1;
-          break;
-        case CHAR:
-          rowSizeInBytes += 2;
-          break;
-        case SHORT:
-          rowSizeInBytes += 2;
-          break;
+      switch (dataSchema.getColumnDataType(i)) {
         case INT:
           rowSizeInBytes += 4;
           break;

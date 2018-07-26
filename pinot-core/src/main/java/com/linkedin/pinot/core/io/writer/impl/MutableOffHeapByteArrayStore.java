@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -83,7 +80,6 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class MutableOffHeapByteArrayStore implements Closeable {
-  private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableOffHeapByteArrayStore.class);
 
   private static class Buffer implements Closeable {
@@ -102,7 +98,6 @@ public class MutableOffHeapByteArrayStore implements Closeable {
       }
       LOGGER.info("Allocating byte array store buffer of size {} for: {}", size, allocationContext);
       _pinotDataBuffer = memoryManager.allocate(size, allocationContext);
-      _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
       _startIndex = startIndex;
       _availEndOffset = _byteBuffer.capacity();
@@ -111,23 +106,23 @@ public class MutableOffHeapByteArrayStore implements Closeable {
 
     private int add(byte[] value) {
       int startOffset = _availEndOffset - value.length;
-      if (startOffset < (_numValues + 1) * INT_SIZE) {
+      if (startOffset < (_numValues + 1) * Integer.BYTES) {
         // full
         return -1;
       }
       for (int i = 0, j = startOffset; i < value.length; i++, j++) {
         _byteBuffer.put(j, value[i]);
       }
-      _byteBuffer.putInt(_numValues * INT_SIZE, startOffset);
+      _byteBuffer.putInt(_numValues * Integer.BYTES, startOffset);
       _availEndOffset = startOffset;
       return _numValues++;
     }
 
     private boolean equalsValueAt(byte[] value, int index) {
-      int startOffset = _byteBuffer.getInt(index * INT_SIZE);
+      int startOffset = _byteBuffer.getInt(index * Integer.BYTES);
       int endOffset = _byteBuffer.capacity();
       if (index > 0) {
-        endOffset = _byteBuffer.getInt((index - 1) * INT_SIZE);
+        endOffset = _byteBuffer.getInt((index - 1) * Integer.BYTES);
       }
       if ((endOffset - startOffset) != value.length) {
         return false;
@@ -141,10 +136,10 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     }
 
     private byte[] get(final int index) {
-      int startOffset = _byteBuffer.getInt(index * INT_SIZE);
+      int startOffset = _byteBuffer.getInt(index * Integer.BYTES);
       int endOffset = _byteBuffer.capacity();
       if (index > 0) {
-        endOffset = _byteBuffer.getInt((index - 1) * INT_SIZE);
+        endOffset = _byteBuffer.getInt((index - 1) * Integer.BYTES);
       }
       byte[] value = new byte[endOffset - startOffset];
       for (int i = 0, j = startOffset; i < value.length; i++, j++) {
@@ -154,8 +149,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       _pinotDataBuffer.close();
     }
 
@@ -181,8 +175,8 @@ public class MutableOffHeapByteArrayStore implements Closeable {
     return _startSize;
   }
 
-  public MutableOffHeapByteArrayStore(PinotDataBufferMemoryManager memoryManager, String allocationContext, int numArrays,
-      int avgArrayLen) {
+  public MutableOffHeapByteArrayStore(PinotDataBufferMemoryManager memoryManager, String allocationContext,
+      int numArrays, int avgArrayLen) {
     _memoryManager = memoryManager;
     _allocationContext = allocationContext;
     _startSize = numArrays * (avgArrayLen + 4); // For each array, we store the array and its startoffset (4 bytes)
@@ -211,7 +205,7 @@ public class MutableOffHeapByteArrayStore implements Closeable {
   }
 
   private Buffer expand(long sizeOfNewValue) {
-    return expand(_currentBuffer.getSize() * 2, sizeOfNewValue + INT_SIZE);
+    return expand(_currentBuffer.getSize() * 2, sizeOfNewValue + Integer.BYTES);
   }
 
   // Returns a byte array, given an index

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.api.resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -58,7 +59,6 @@ public class TableSizeReaderTest {
 
   private PinotHelixResourceManager helix;
   private Map<String, FakeSizeServer> serverMap = new HashMap<>();
-  private final int serverPortStart = 20000;
   private final String URI_PATH = "/table/";
   private final int timeoutMsec = 10000;
 
@@ -86,37 +86,37 @@ public class TableSizeReaderTest {
 
     int counter = 0;
     // server0
-    FakeSizeServer s = new FakeSizeServer(Arrays.asList("s1","s2", "s3"), serverPortStart + counter);
+    FakeSizeServer s = new FakeSizeServer(Arrays.asList("s1","s2", "s3"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server1
-    s = new FakeSizeServer(Arrays.asList("s2","s5"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("s2","s5"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server2
-    s = new FakeSizeServer(Arrays.asList("s3", "s6"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("s3", "s6"));
     s.start(URI_PATH, createHandler(404, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server3
-    s = new FakeSizeServer(Arrays.asList("r1", "r2"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("r1", "r2"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server4
-    s = new FakeSizeServer(Arrays.asList("r2"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("r2"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
 
     // server5 ... timing out server
-    s = new FakeSizeServer(Arrays.asList("s3","s5"), serverPortStart + counter);
+    s = new FakeSizeServer(Arrays.asList("s3","s5"));
     s.start(URI_PATH, createHandler(200, s.sizes, timeoutMsec * 100));
     serverMap.put(serverName(counter), s);
     ++counter;
@@ -165,14 +165,12 @@ public class TableSizeReaderTest {
   private static class FakeSizeServer {
     List<String> segments;
     String endpoint;
-    int port;
+    InetSocketAddress socket = new InetSocketAddress(0);
     List<SegmentSizeInfo> sizes = new ArrayList<>();
     HttpServer httpServer;
 
-    FakeSizeServer(List<String> segments, int port) {
+    FakeSizeServer(List<String> segments) {
       this.segments = segments;
-      this.endpoint = "localhost:" + port;
-      this.port = port;
       populateSizes(segments);
     }
 
@@ -191,7 +189,7 @@ public class TableSizeReaderTest {
 
     private void  start(String path, HttpHandler handler)
         throws IOException {
-      httpServer = HttpServer.create(new InetSocketAddress(port), 0);
+      httpServer = HttpServer.create(socket, 0);
       httpServer.createContext(path, handler);
       new Thread(new Runnable() {
         @Override
@@ -199,6 +197,7 @@ public class TableSizeReaderTest {
           httpServer.start();
         }
       }).start();
+      endpoint = "localhost:" + httpServer.getAddress().getPort();
     }
   }
 
@@ -219,12 +218,13 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testNoSuchTable() {
+  public void testNoSuchTable() throws InvalidConfigException {
     TableSizeReader reader = new TableSizeReader(executor, connectionManager, helix);
     Assert.assertNull(reader.getTableSizeDetails("mytable", 5000));
   }
 
-  private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table) {
+  private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table)
+      throws InvalidConfigException {
     when(helix.getInstanceToSegmentsInATableMap(anyString()))
         .thenAnswer(new Answer<Object>() {
           @Override
@@ -308,7 +308,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizeAllSuccess() {
+  public void testGetTableSubTypeSizeAllSuccess() throws InvalidConfigException {
     final String[] servers = { "server0", "server1"};
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "offline");
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
@@ -322,7 +322,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void testGetTableSubTypeSizesWithErrors() {
+  public void testGetTableSubTypeSizesWithErrors() throws InvalidConfigException {
     final String[] servers = { "server0", "server1", "server2", "server5"};
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "offline");
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
@@ -333,7 +333,7 @@ public class TableSizeReaderTest {
   }
 
   @Test
-  public void getTableSizeDetailsRealtimeOnly() {
+  public void getTableSizeDetailsRealtimeOnly() throws InvalidConfigException {
     final String[] servers = { "server3", "server4"};
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "realtime");
     Assert.assertNull(tableSizeDetails.offlineSegments);

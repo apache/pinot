@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import org.slf4j.Logger;
@@ -30,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * Abstract class to map the columnar indices to their location on disk.
  *
  */
-abstract class ColumnIndexDirectory implements AutoCloseable {
+abstract class ColumnIndexDirectory implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnIndexDirectory.class);
 
   protected File segmentDirectory;
@@ -141,9 +142,6 @@ abstract class ColumnIndexDirectory implements AutoCloseable {
    * @return true if the index removal is supported
    */
   public abstract boolean isIndexRemovalSupported();
-
-  @Override
-  public abstract void close();
 
   protected File starTreeIndexFile() {
     // this is not version dependent for now

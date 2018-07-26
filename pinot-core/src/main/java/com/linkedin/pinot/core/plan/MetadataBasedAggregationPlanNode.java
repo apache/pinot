@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.query.MetadataBasedAggregationOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import java.util.HashMap;
 import java.util.List;
@@ -59,9 +59,7 @@ public class MetadataBasedAggregationPlanNode implements PlanNode {
 
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
-      if (!aggregationFunctionContext.getAggregationFunction()
-          .getName()
-          .equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (aggregationFunctionContext.getAggregationFunction().getType() != AggregationFunctionType.COUNT) {
         for (String column : aggregationFunctionContext.getAggregationColumns()) {
           if (!dataSourceMap.containsKey(column)) {
             dataSourceMap.put(column, _indexSegment.getDataSource(column));

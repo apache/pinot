@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
 
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), getClass().getSimpleName());
+  protected final File _avroDir = new File(_tempDir, "avroDir");
   protected final File _segmentDir = new File(_tempDir, "segmentDir");
   protected final File _tarDir = new File(_tempDir, "tarDir");
 

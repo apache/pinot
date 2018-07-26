@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -63,16 +62,16 @@ public class RealtimeNoDictionaryTest {
     _random = new Random(seed);
 
     FixedByteSingleColumnSingleValueReaderWriter intRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Integer.SIZE / 8,
-            _memoryManager, "int");
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Integer.BYTES, _memoryManager,
+            "int");
     FixedByteSingleColumnSingleValueReaderWriter longRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Long.SIZE / 8, _memoryManager,
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Long.BYTES, _memoryManager,
             "long");
     FixedByteSingleColumnSingleValueReaderWriter floatRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Float.SIZE / 8, _memoryManager,
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Float.BYTES, _memoryManager,
             "float");
     FixedByteSingleColumnSingleValueReaderWriter doubleRawIndex =
-        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Double.SIZE / 8, _memoryManager,
+        new FixedByteSingleColumnSingleValueReaderWriter(_random.nextInt(NUM_ROWS) + 1, Double.BYTES, _memoryManager,
             "double");
 
     for (int i = 0; i < NUM_ROWS; i++) {

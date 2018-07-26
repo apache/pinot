@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -85,6 +85,10 @@ public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
   }
 
   public byte[] getBytes(int row) {
+    throw new UnsupportedOperationException();
+  }
+
+  public byte[] getBytes(int row, T context) {
     throw new UnsupportedOperationException();
   }
 

@@ -10,7 +10,7 @@ import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
-import { computed, set } from '@ember/object';
+import { computed, set, getWithDefault } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import {
   isPresent,
@@ -29,6 +29,7 @@ import {
   formatConfigGroupProps,
   getTopDimensions
 } from 'thirdeye-frontend/utils/manage-alert-utils';
+import config from 'thirdeye-frontend/config/environment';
 
 export default Controller.extend({
 
@@ -44,7 +45,7 @@ export default Controller.extend({
   isMetricDataLoading: false,
   isGroupNameDuplicate: false,
   isAlertNameDuplicate: false,
-  isFetchingDimensions: false,
+  isSecondaryDataLoading: false,
   isDimensionFetchDone: false,
   isProcessingForm: false,
   isEmailError: false,
@@ -56,17 +57,12 @@ export default Controller.extend({
   topDimensions: [],
   originalDimensions: [],
   bsAlertBannerType: 'success',
+  selectedTuneType: 'current',
   graphEmailLinkProps: '',
   dimensionCount: 7,
   availableDimensions: 0,
-  legendText: {
-    dotted: {
-      text: 'WoW'
-    },
-    solid: {
-      text: 'Observed'
-    }
-  },
+  metricLookupCache: [],
+  metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
 
   /**
    * Component property initial settings
@@ -207,8 +203,9 @@ export default Controller.extend({
    */
   searchMetricsList: task(function* (metric) {
     yield timeout(600);
-    const url = selfServeApiCommon.metricAutoComplete(metric);
-    return fetch(url).then(checkStatus);
+    const autoCompleteResults = yield fetch(selfServeApiCommon.metricAutoComplete(metric)).then(checkStatus);
+    this.get('metricLookupCache').push( ...autoCompleteResults );
+    return autoCompleteResults;
   }),
 
   /**
@@ -245,7 +242,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   fetchAlertsByName(functionName) {
-    const url = selfServeApiCommon.alertAutoComplete(functionName);
+    const url = selfServeApiCommon.alertFunctionByName(functionName);
     return fetch(url).then(checkStatus);
   },
 
@@ -295,6 +292,7 @@ export default Controller.extend({
           metricId: metric.id,
           isMetricSelected: isDataGood,
           isMetricDataLoading: false,
+          isSecondaryDataLoading: false,
           showGraphLegend: true,
           selectedMetric: Object.assign(metricData, { color: 'blue' }),
           isMetricDataInvalid: !isDataGood
@@ -306,7 +304,6 @@ export default Controller.extend({
           // Update graph only if we have new dimension data
           if (orderedDimensions.length) {
             this.setProperties({
-              isFetchingDimensions: false,
               isDimensionFetchDone: true,
               topDimensions: orderedDimensions,
               availableDimensions: orderedDimensions.length
@@ -317,6 +314,7 @@ export default Controller.extend({
         this.setProperties({
           isMetricDataInvalid: true,
           isMetricDataLoading: false,
+          isSecondaryDataLoading: false,
           selectMetricErrMsg: error
         });
       });
@@ -541,7 +539,7 @@ export default Controller.extend({
       const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
 
       if (isPresent(appName)) {
-        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName));
+        return groupsWithAppName.filter(group => group.application.toLowerCase().includes(appName.toLowerCase()));
       } else {
         return activeGroups;
       }
@@ -585,20 +583,6 @@ export default Controller.extend({
   ),
 
   /**
-   * Sets the message text over the graph placeholder before data is loaded
-   * @method graphMessageText
-   * @return {String} the appropriate graph placeholder text
-   */
-  graphMessageText: computed(
-    'isMetricDataInvalid',
-    function() {
-      const defaultMsg = 'Once a metric is selected, the metric replay graph will show here';
-      const invalidMsg = 'Sorry, metric has no current data';
-      return this.get('isMetricDataInvalid') ? invalidMsg : defaultMsg;
-    }
-  ),
-
-  /**
    * Determines whether input fields in general are enabled. When metric data is 'invalid',
    * we will still enable alert creation.
    * @method generalFieldsEnabled
@@ -614,10 +598,10 @@ export default Controller.extend({
   graphMailtoLink: computed(
     'selectedMetricOption',
     function() {
+      const recipient = config.email;
       const selectedMetric = this.get('selectedMetricOption');
-      const fullMetricName = `${selectedMetric.dataset}::${selectedMetric.name}`;
-      const recipient = 'ask_thirdeye@linkedin.com';
       const subject = 'TE Self-Serve Create Alert Metric Issue';
+      const fullMetricName = selectedMetric ? `${selectedMetric.dataset}::${selectedMetric.name}` : '';
       const body = `TE Team, please look into a possible inconsistency issue with [ ${fullMetricName} ]`;
       const mailtoString = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       return mailtoString;
@@ -695,7 +679,7 @@ export default Controller.extend({
 
       // Conditionally send recipients property
       if (alertGroupNewRecipient) {
-        Object.assign(newAlertObj, { alertRecipients: alertGroupNewRecipient });
+        Object.assign(newAlertObj, { alertRecipients: alertGroupNewRecipient.replace(/ /g, '') });
       }
 
       // Do we have custom sensitivity settings to add?
@@ -715,7 +699,7 @@ export default Controller.extend({
 
       // Add speedup prop for minutely metrics
       if (selectedGranularity.toLowerCase().includes('minute')) {
-        Object.assign(newAlertObj, { speedup: true });
+        Object.assign(newAlertObj, { speedup: 'true' });
       }
 
       return {
@@ -733,7 +717,7 @@ export default Controller.extend({
    */
   clearAll() {
     this.setProperties({
-      isFetchingDimensions: false,
+      isSecondaryDataLoading: false,
       isDimensionFetchDone: false,
       isEmailError: false,
       isEmptyEmail: false,
@@ -770,13 +754,6 @@ export default Controller.extend({
   actions: {
 
     /**
-     * Handles the primary metric selection in the alert creation
-     */
-    onPrimaryMetricToggle() {
-      return;
-    },
-
-    /**
      * When a metric is selected, fetch its props, and send them to the graph builder
      * TODO: if 'hash.dimensions' is not needed, lets refactor the RSVP object instead of renaming
      * @method onSelectMetric
@@ -786,21 +763,27 @@ export default Controller.extend({
     onSelectMetric(selectedObj) {
       this.clearAll();
       this.setProperties({
-        isMetricDataLoading: true,
         topDimensions: [],
+        isMetricDataLoading: true,
         selectedMetricOption: selectedObj
       });
       this.fetchMetricData(selectedObj.id)
         .then((metricHash) => {
           const { maxTime, filters, dimensions, granularities } = metricHash;
+          const targetMetric = this.get('metricLookupCache').find(metric => metric.id === selectedObj.id);
+          const inGraphLink = getWithDefault(targetMetric, 'extSourceLinkInfo.INGRAPH', null);
+          // In the event that we have an "ingraph" metric, enable only "minute" level granularity
+          const adjustedGranularity = (targetMetric && inGraphLink) ? granularities.filter(g => g.toLowerCase().includes('minute')) : granularities;
+
           this.setProperties({
             maxTime,
             filters,
             dimensions,
-            granularities,
+            metricLookupCache: [],
+            granularities: adjustedGranularity,
             originalDimensions: dimensions,
-            metricGranularityOptions: granularities,
-            selectedGranularity: granularities[0],
+            metricGranularityOptions: adjustedGranularity,
+            selectedGranularity: adjustedGranularity[0],
             alertFunctionName: this.get('functionNamePrimer')
           });
           this.triggerGraphFromMetric();
@@ -838,7 +821,7 @@ export default Controller.extend({
       // Update dimension options and loader
       this.setProperties({
         dimensions: [...dimensionNameSet],
-        isMetricDataLoading: true
+        isSecondaryDataLoading: true
       });
       // Do not allow selected dimension to match selected filter
       if (isSelectedDimensionEqualToSelectedFilter) {
@@ -863,13 +846,10 @@ export default Controller.extend({
       if (selectedDimension === 'All') {
         this.setProperties({
           topDimensions: [],
-          isFetchingDimensions: false
+          isSecondaryDataLoading: false
         });
       } else {
-        this.setProperties({
-          isMetricDataLoading: true,
-          isFetchingDimensions: true
-        });
+        this.set('isSecondaryDataLoading', true);
         this.modifyAlertFunctionName();
         this.triggerGraphFromMetric();
       }
@@ -884,7 +864,7 @@ export default Controller.extend({
     onSelectGranularity(selectedObj) {
       this.setProperties({
         selectedGranularity: selectedObj,
-        isMetricDataLoading: true
+        isSecondaryDataLoading: true
       });
       this.modifyAlertFunctionName();
       this.triggerGraphFromMetric();
@@ -1029,16 +1009,6 @@ export default Controller.extend({
      */
     onResetForm() {
       this.clearAll();
-    },
-
-    /**
-     * Enable reaction to dimension toggling in graph legend component
-     * @method onSelection
-     * @return {undefined}
-     */
-    onSelection(selectedDimension) {
-      const { isSelected } = selectedDimension;
-      set(selectedDimension, 'isSelected', !isSelected);
     },
 
     /**

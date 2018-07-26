@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,11 @@ package com.linkedin.pinot.core.io.util;
 
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
+import java.io.IOException;
 import java.nio.charset.Charset;
 
 
 public final class FixedByteValueReaderWriter implements Closeable {
-  private static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
-  private static final int LONG_SIZE_IN_BYTES = Long.SIZE / Byte.SIZE;
-  private static final int FLOAT_SIZE_IN_BYTES = Float.SIZE / Byte.SIZE;
-  private static final int DOUBLE_SIZE_IN_BYTES = Double.SIZE / Byte.SIZE;
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private final PinotDataBuffer _dataBuffer;
@@ -34,19 +31,19 @@ public final class FixedByteValueReaderWriter implements Closeable {
   }
 
   public int getInt(int index) {
-    return _dataBuffer.getInt(index * INT_SIZE_IN_BYTES);
+    return _dataBuffer.getInt(index * Integer.BYTES);
   }
 
   public long getLong(int index) {
-    return _dataBuffer.getLong(index * LONG_SIZE_IN_BYTES);
+    return _dataBuffer.getLong(index * Long.BYTES);
   }
 
   public float getFloat(int index) {
-    return _dataBuffer.getFloat(index * FLOAT_SIZE_IN_BYTES);
+    return _dataBuffer.getFloat(index * Float.BYTES);
   }
 
   public double getDouble(int index) {
-    return _dataBuffer.getDouble(index * DOUBLE_SIZE_IN_BYTES);
+    return _dataBuffer.getDouble(index * Double.BYTES);
   }
 
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
@@ -69,20 +66,29 @@ public final class FixedByteValueReaderWriter implements Closeable {
     return new String(buffer, UTF_8);
   }
 
+  public byte[] getBytes(int index, int numBytesPerValue, byte[] output) {
+    assert output.length == numBytesPerValue;
+    int startOffset = index * numBytesPerValue;
+    for (int i = 0; i < numBytesPerValue; i++) {
+      output[i] = _dataBuffer.getByte(startOffset + i);
+    }
+    return output;
+  }
+
   public void writeInt(int index, int value) {
-    _dataBuffer.putInt(index * INT_SIZE_IN_BYTES, value);
+    _dataBuffer.putInt(index * Integer.BYTES, value);
   }
 
   public void writeLong(int index, long value) {
-    _dataBuffer.putLong(index * LONG_SIZE_IN_BYTES, value);
+    _dataBuffer.putLong(index * Long.BYTES, value);
   }
 
   public void writeFloat(int index, float value) {
-    _dataBuffer.putFloat(index * FLOAT_SIZE_IN_BYTES, value);
+    _dataBuffer.putFloat(index * Float.BYTES, value);
   }
 
   public void writeDouble(int index, double value) {
-    _dataBuffer.putDouble(index * DOUBLE_SIZE_IN_BYTES, value);
+    _dataBuffer.putDouble(index * Double.BYTES, value);
   }
 
   public void writeUnpaddedString(int index, int numBytesPerValue, byte[] value) {
@@ -99,7 +105,7 @@ public final class FixedByteValueReaderWriter implements Closeable {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _dataBuffer.close();
   }
 }

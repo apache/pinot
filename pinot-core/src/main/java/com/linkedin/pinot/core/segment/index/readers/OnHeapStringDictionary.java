@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ public class OnHeapStringDictionary extends OnHeapDictionary {
       Integer id = _unPaddedStringToIdMap.get(rawValue);
       return (id != null) ? id : Arrays.binarySearch(_unpaddedStrings, rawValue);
     } else {
-      String paddedValue = addPadding((String) rawValue);
+      String paddedValue = padString((String) rawValue);
       return Arrays.binarySearch(_paddedStrings, paddedValue);
     }
   }

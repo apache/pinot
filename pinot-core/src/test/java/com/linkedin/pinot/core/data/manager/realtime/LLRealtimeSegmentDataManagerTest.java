@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
@@ -115,14 +115,13 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private RealtimeTableDataManager createTableDataManager() {
     final String instanceId = "server-1";
-    SegmentBuildTimeLeaseExtender.create(instanceId);
+    SegmentBuildTimeLeaseExtender.create(instanceId, new ServerMetrics(new MetricsRegistry()));
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedCardinality(any(String.class))).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(any(String.class))).thenReturn(32);
     when(tableDataManager.getStatsHistory()).thenReturn(statsHistory);
-    when(tableDataManager.getServerMetrics()).thenReturn(new ServerMetrics(new MetricsRegistry()));
     return tableDataManager;
   }
 
@@ -566,7 +565,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   // Replace the realtime segment with a mock that returns numDocs for raw doc count.
   private void replaceRealtimeSegment(FakeLLRealtimeSegmentDataManager segmentDataManager, int numDocs) throws Exception {
-    RealtimeSegmentImpl mockSegmentImpl = mock(RealtimeSegmentImpl.class);
+    MutableSegmentImpl mockSegmentImpl = mock(MutableSegmentImpl.class);
     when(mockSegmentImpl.getNumDocsIndexed()).thenReturn(numDocs);
     Field segmentImpl = LLRealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
     segmentImpl.setAccessible(true);
@@ -590,7 +589,7 @@ public class LLRealtimeSegmentDataManagerTest {
     final long leaseTime = 50000L;
 
     // The first time we invoke build, it should go ahead and build the segment.
-    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime);
+    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
     Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
     Assert.assertTrue(new File(segTarFileName).exists());
@@ -598,7 +597,7 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager._buildSegmentCalled = false;
 
     // This time around it should not build the segment.
-    String segTarFileName1 = segmentDataManager.invokeBuildForCommit(leaseTime);
+    String segTarFileName1 = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
     Assert.assertFalse(segmentDataManager._buildSegmentCalled);
     Assert.assertEquals(segTarFileName1, segTarFileName);
     Assert.assertTrue(new File(segTarFileName).exists());
@@ -623,7 +622,7 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager.setCurrentOffset(finalOffset);
 
     // We have set up commit to fail, so we should carry over the segment file.
-    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime);
+    String segTarFileName = segmentDataManager.invokeBuildForCommit(leaseTime).getSegmentTarFilePath();
     Assert.assertTrue(segmentDataManager._buildSegmentCalled);
     Assert.assertFalse(segmentDataManager.invokeCommit(segTarFileName));
     Assert.assertTrue(new File(segTarFileName).exists());
@@ -692,14 +691,15 @@ public class LLRealtimeSegmentDataManagerTest {
       return consumer;
     }
 
-    public String invokeBuildForCommit(long leaseTime) {
-      return super.buildSegmentForCommit(leaseTime);
+    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) {
+      super.buildSegmentForCommit(leaseTime);
+      return getSegmentBuildDescriptor();
     }
 
     public boolean invokeCommit(String segTarFileName) {
       SegmentCompletionProtocol.Response response = mock(SegmentCompletionProtocol.Response.class);
       when(response.getIsSplitCommit()).thenReturn(false);
-      return super.commitSegment(segTarFileName, response);
+      return super.commitSegment(response);
     }
 
     private void terminateLoopIfNecessary() {
@@ -735,7 +735,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected SegmentCompletionProtocol.Response postSegmentCommitMsg(File segTarFile) {
+    protected SegmentCompletionProtocol.Response postSegmentCommitMsg() {
       SegmentCompletionProtocol.Response response = _responses.remove();
       return response;
     }
@@ -778,13 +778,13 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected String buildSegmentInternal(boolean forCommit) {
+    protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
         return null;
       }
       if (!forCommit) {
-        return _segmentDir;
+        return new SegmentBuildDescriptor(null, getCurrentOffset(), _segmentDir, 0, 0, -1);
       }
       final String segTarFileName =  _segmentDir + "/" + "segmentFile";
       File segmentTgzFile = new File(segTarFileName);
@@ -793,11 +793,11 @@ public class LLRealtimeSegmentDataManagerTest {
       } catch (IOException e) {
         Assert.fail("Could not create file " + segmentTgzFile);
       }
-      return segTarFileName;
+      return new SegmentBuildDescriptor(segTarFileName, getCurrentOffset(), null, 0, 0, -1);
     }
 
     @Override
-    protected boolean commitSegment(final String segTarFile, SegmentCompletionProtocol.Response response) {
+    protected boolean commitSegment(SegmentCompletionProtocol.Response response) {
       _commitSegmentCalled = true;
       return true;
     }

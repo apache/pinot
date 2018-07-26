@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ package com.linkedin.pinot.segments.v1.creator;
 
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OnHeapBitmapInvertedIndexCreator;
@@ -25,7 +24,6 @@ import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
@@ -78,7 +76,7 @@ public class BitmapInvertedIndexCreatorTest {
     try (OnHeapBitmapInvertedIndexCreator onHeapCreator = new OnHeapBitmapInvertedIndexCreator(ON_HEAP_INDEX_DIR,
         COLUMN_NAME, CARDINALITY)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
-        onHeapCreator.addSV(docId, dictIds[docId]);
+        onHeapCreator.add(dictIds[docId]);
       }
       onHeapCreator.seal();
     }
@@ -87,7 +85,7 @@ public class BitmapInvertedIndexCreatorTest {
     try (OffHeapBitmapInvertedIndexCreator offHeapCreator = new OffHeapBitmapInvertedIndexCreator(OFF_HEAP_INDEX_DIR,
         new DimensionFieldSpec(COLUMN_NAME, DataType.INT, true), CARDINALITY, NUM_DOCS, 0)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
-        offHeapCreator.addSV(docId, dictIds[docId]);
+        offHeapCreator.add(dictIds[docId]);
       }
       offHeapCreator.seal();
     }
@@ -123,7 +121,7 @@ public class BitmapInvertedIndexCreatorTest {
     try (OnHeapBitmapInvertedIndexCreator onHeapCreator = new OnHeapBitmapInvertedIndexCreator(ON_HEAP_INDEX_DIR,
         COLUMN_NAME, CARDINALITY)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
-        onHeapCreator.addMV(docId, dictIds[docId]);
+        onHeapCreator.add(dictIds[docId], dictIds[docId].length);
       }
       onHeapCreator.seal();
     }
@@ -132,7 +130,7 @@ public class BitmapInvertedIndexCreatorTest {
     try (OffHeapBitmapInvertedIndexCreator offHeapCreator = new OffHeapBitmapInvertedIndexCreator(OFF_HEAP_INDEX_DIR,
         new DimensionFieldSpec(COLUMN_NAME, DataType.INT, false), CARDINALITY, NUM_DOCS, numValues)) {
       for (int docId = 0; docId < NUM_DOCS; docId++) {
-        offHeapCreator.addMV(docId, dictIds[docId]);
+        offHeapCreator.add(dictIds[docId], dictIds[docId].length);
       }
       offHeapCreator.seal();
     }
@@ -143,9 +141,8 @@ public class BitmapInvertedIndexCreatorTest {
   }
 
   private void validate(File invertedIndex, Set<Integer>[] postingLists) throws IOException {
-    try (PinotDataBuffer dataBuffer = PinotDataBuffer.fromFile(invertedIndex, ReadMode.mmap,
-        FileChannel.MapMode.READ_ONLY, "BitmapInvertedIndexCreatorTest")) {
-      BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(dataBuffer, CARDINALITY);
+    try (BitmapInvertedIndexReader reader = new BitmapInvertedIndexReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(invertedIndex), CARDINALITY)) {
       for (int dictId = 0; dictId < CARDINALITY; dictId++) {
         ImmutableRoaringBitmap bitmap = reader.getDocIds(dictId);
         Set<Integer> expected = postingLists[dictId];

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,17 +28,21 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
                                          // to replicas in ideal state
   SEGMENTS_IN_ERROR_STATE("segments", false),
   PERCENT_SEGMENTS_AVAILABLE("segments", false), // Percentage of segments with at least one online replica in external view
-                                          // as compared to total number of segments in ideal state
+                                                 // as compared to total number of segments in ideal state
+  SEGMENT_COUNT("SegmentCount", false),
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true),
+  DISABLED_TABLE_COUNT("TableCount", true),
 
   SHORT_OF_LIVE_INSTANCES("ShortOfLiveInstances", false), // Number of extra live instances needed.
 
   REALTIME_TABLE_ESTIMATED_SIZE("RealtimeTableEstimatedSize", false), // Estimated size of realtime table.
   OFFLINE_TABLE_ESTIMATED_SIZE("OfflineTableEstimatedSize", false),   // Estimated size of offline table.
 
-  TABLE_QUOTA("TableQuotaBasedOnTableConfig", false); // Table quota based on setting in table config.
+  TABLE_QUOTA("TableQuotaBasedOnTableConfig", false), // Table quota based on setting in table config.
+
+  TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false); // Table storage quota utilization.
 
   private final String gaugeName;
   private final String unit;

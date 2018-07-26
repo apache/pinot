@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
 import java.util.ArrayList;
@@ -39,19 +39,19 @@ import javax.annotation.Nullable;
 
 
 public class RealtimeSegmentConverter {
-
-  private RealtimeSegmentImpl realtimeSegmentImpl;
+  private MutableSegmentImpl realtimeSegmentImpl;
   private String outputPath;
   private Schema dataSchema;
   private String tableName;
+  private String timeColumnName;
   private String segmentName;
   private String sortedColumn;
   private List<String> invertedIndexColumns;
   private List<String> noDictionaryColumns;
   private StarTreeIndexSpec starTreeIndexSpec;
 
-  public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
+      String tableName, String timeColumnName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
       List<String> noDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
@@ -85,10 +85,10 @@ public class RealtimeSegmentConverter {
     this.starTreeIndexSpec = starTreeIndexSpec;
   }
 
-  public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String segmentName, String sortedColumn) {
-    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>(),
-        new ArrayList<String>(), null/*StarTreeIndexSpec*/);
+  public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
+      String tableName, String timeColumnName, String segmentName, String sortedColumn) {
+    this(realtimeSegment, outputPath, schema, tableName, timeColumnName, segmentName, sortedColumn, new ArrayList<>(),
+        new ArrayList<>(), null/*StarTreeIndexSpec*/);
   }
 
   public void build(@Nullable SegmentVersion segmentVersion, ServerMetrics serverMetrics) throws Exception {
@@ -122,7 +122,9 @@ public class RealtimeSegmentConverter {
       genConfig.enableStarTreeIndex(starTreeIndexSpec);
     }
 
+    // TODO: use timeColumnName field
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
+    // TODO: find timeColumnName in schema.getDateTimeFieldSpec, in order to get the timeUnit
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     if (segmentVersion != null) {
       genConfig.setSegmentVersion(segmentVersion);

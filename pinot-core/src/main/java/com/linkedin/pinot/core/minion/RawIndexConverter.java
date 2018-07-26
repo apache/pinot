@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,9 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
@@ -70,7 +70,7 @@ public class RawIndexConverter {
   // BITS_PER_ELEMENT is not applicable for raw index
   private static final int BITS_PER_ELEMENT_FOR_RAW_INDEX = -1;
 
-  private final IndexSegment _originalIndexSegment;
+  private final ImmutableSegment _originalImmutableSegment;
   private final SegmentMetadataImpl _originalSegmentMetadata;
   private final File _convertedIndexDir;
   private final PropertiesConfiguration _convertedProperties;
@@ -86,8 +86,8 @@ public class RawIndexConverter {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v1);
     indexLoadingConfig.setReadMode(ReadMode.mmap);
-    _originalIndexSegment = ColumnarSegmentLoader.load(originalIndexDir, indexLoadingConfig);
-    _originalSegmentMetadata = (SegmentMetadataImpl) _originalIndexSegment.getSegmentMetadata();
+    _originalImmutableSegment = ImmutableSegmentLoader.load(originalIndexDir, indexLoadingConfig);
+    _originalSegmentMetadata = (SegmentMetadataImpl) _originalImmutableSegment.getSegmentMetadata();
     _convertedIndexDir = convertedIndexDir;
     _convertedProperties =
         new PropertiesConfiguration(new File(_convertedIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
@@ -159,7 +159,7 @@ public class RawIndexConverter {
     // In bits
     int lengthOfEachEntry;
     if (dataType.equals(FieldSpec.DataType.STRING)) {
-      lengthOfEachEntry = columnMetadata.getStringColumnMaxLength() * Byte.SIZE;
+      lengthOfEachEntry = columnMetadata.getColumnMaxLength() * Byte.SIZE;
     } else {
       lengthOfEachEntry = dataType.size() * Byte.SIZE;
     }
@@ -187,10 +187,10 @@ public class RawIndexConverter {
         new File(_convertedIndexDir, columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION));
 
     // Create the raw index
-    DataSource dataSource = _originalIndexSegment.getDataSource(columnName);
+    DataSource dataSource = _originalImmutableSegment.getDataSource(columnName);
     Dictionary dictionary = dataSource.getDictionary();
     FieldSpec.DataType dataType = fieldSpec.getDataType();
-    int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getStringColumnMaxLength();
+    int lengthOfLongestEntry = _originalSegmentMetadata.getColumnMetadataFor(columnName).getColumnMaxLength();
     try (SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(
         _convertedIndexDir, ChunkCompressorFactory.CompressionType.SNAPPY, columnName, dataType,
         _originalSegmentMetadata.getTotalDocs(), lengthOfLongestEntry)) {

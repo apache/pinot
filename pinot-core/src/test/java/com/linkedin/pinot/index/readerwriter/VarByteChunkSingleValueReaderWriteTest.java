@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
@@ -24,7 +23,6 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
-import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -39,56 +37,67 @@ import org.testng.annotations.Test;
 public class VarByteChunkSingleValueReaderWriteTest {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
-  private static final int NUM_STRINGS = 5003;
+  private static final int NUM_ENTRIES = 5003;
   private static final int NUM_DOCS_PER_CHUNK = 1009;
   private static final int MAX_STRING_LENGTH = 101;
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "varByteSVRTest";
 
+  @Test
+  public void testWithCompression() throws Exception {
+    test(ChunkCompressorFactory.CompressionType.SNAPPY);
+  }
+
+  @Test
+  public void testWithoutCompression() throws Exception {
+    test(ChunkCompressorFactory.CompressionType.PASS_THROUGH);
+  }
   /**
-   * This test writes {@link #NUM_STRINGS} using {@link VarByteChunkSingleValueWriter}. It then reads
-   * the strings using {@link VarByteChunkSingleValueReader}, and asserts that what was written is the same as
+   * This test writes {@link #NUM_ENTRIES} using {@link VarByteChunkSingleValueWriter}. It then reads
+   * the strings & bytes using {@link VarByteChunkSingleValueReader}, and asserts that what was written is the same as
    * what was read in.
    *
    * Number of docs and docs per chunk are chosen to generate complete as well partial chunks.
    *
+   * @param compressionType Compression type
    * @throws Exception
    */
-  @Test
-  public void test()
+  public void test(ChunkCompressorFactory.CompressionType compressionType)
       throws Exception {
-    String[] expected = new String[NUM_STRINGS];
+    String[] expected = new String[NUM_ENTRIES];
     Random random = new Random();
 
     File outFile = new File(TEST_FILE);
     FileUtils.deleteQuietly(outFile);
 
     int maxStringLengthInBytes = 0;
-    for (int i = 0; i < NUM_STRINGS; i++) {
+    for (int i = 0; i < NUM_ENTRIES; i++) {
       expected[i] = RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH));
       maxStringLengthInBytes = Math.max(maxStringLengthInBytes, expected[i].getBytes(UTF_8).length);
     }
 
-    ChunkCompressorFactory.CompressionType compressionType = ChunkCompressorFactory.CompressionType.SNAPPY;
     VarByteChunkSingleValueWriter writer =
-        new VarByteChunkSingleValueWriter(outFile, compressionType, NUM_STRINGS, NUM_DOCS_PER_CHUNK,
+        new VarByteChunkSingleValueWriter(outFile, compressionType, NUM_ENTRIES, NUM_DOCS_PER_CHUNK,
             maxStringLengthInBytes);
 
-    for (int i = 0; i < NUM_STRINGS; i++) {
+    for (int i = 0; i < NUM_ENTRIES; i += 2) {
       writer.setString(i, expected[i]);
+      writer.setBytes(i + 1, expected[i].getBytes(UTF_8));
     }
+
     writer.close();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
+    try (VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(outFile))) {
+      ChunkReaderContext context = reader.createContext();
 
-    VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    for (int i = 0; i < NUM_STRINGS; i++) {
-      String actual = reader.getString(i, context);
-      Assert.assertEquals(actual, expected[i]);
+      for (int i = 0; i < NUM_ENTRIES; i += 2) {
+        String actual = reader.getString(i, context);
+        Assert.assertEquals(actual, expected[i]);
+        Assert.assertEquals(actual.getBytes(UTF_8), expected[i].getBytes(UTF_8));
+        Assert.assertEquals(reader.getBytes(i + 1), expected[i].getBytes(UTF_8));
+      }
     }
-    reader.close();
+
     FileUtils.deleteQuietly(outFile);
   }
 
@@ -110,18 +119,15 @@ public class VarByteChunkSingleValueReaderWriteTest {
     }
 
     File file = new File(resource.getFile());
+    try (VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(
+        PinotDataBuffer.mapReadOnlyBigEndianFile(file))) {
+      ChunkReaderContext context = reader.createContext();
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.fromFile(file, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
-
-    VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(pinotDataBuffer);
-    ChunkReaderContext context = reader.createContext();
-
-    int numEntries = 1009; // Number of entries in the input file.
-    for (int i = 0; i < numEntries; i++) {
-      String actual = reader.getString(i, context);
-      Assert.assertEquals(actual, expected[i % expected.length]);
+      int numEntries = 1009; // Number of entries in the input file.
+      for (int i = 0; i < numEntries; i++) {
+        String actual = reader.getString(i, context);
+        Assert.assertEquals(actual, expected[i % expected.length]);
+      }
     }
-    reader.close();
   }
 }

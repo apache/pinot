@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.io.writer.impl;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -21,6 +20,7 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.nio.ByteOrder;
 
 
 // Allocates memory using direct allocation
@@ -48,7 +48,7 @@ public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
    */
   @Override
   protected PinotDataBuffer allocateInternal(long size, String allocationContext) {
-    return PinotDataBuffer.allocateDirect(size, allocationContext);
+    return PinotDataBuffer.allocateDirect(size, PinotDataBuffer.NATIVE_ORDER, allocationContext);
   }
 
   @Override

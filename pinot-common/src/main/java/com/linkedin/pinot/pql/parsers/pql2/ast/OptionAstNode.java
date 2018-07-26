@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -37,13 +36,13 @@ public class OptionAstNode extends BaseAstNode {
     AstNode rightNode = getChildren().get(1);
 
     if (leftNode instanceof IdentifierAstNode) {
-      left = ((IdentifierAstNode) leftNode).getName();
+      left = ((IdentifierAstNode) leftNode).getExpression();
     } else {
       throw new Pql2CompilationException("Expected left child node of OptionAstNode to be an identifier");
     }
 
     if (rightNode instanceof IdentifierAstNode) {
-      right = ((IdentifierAstNode) rightNode).getName();
+      right = ((IdentifierAstNode) rightNode).getExpression();
     } else if (rightNode instanceof LiteralAstNode) {
       right = ((LiteralAstNode) rightNode).getValueAsString();
     } else {

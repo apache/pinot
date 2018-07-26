@@ -1,6 +1,6 @@
 #!/bin/bash -x
 #
-# Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+# Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ if [ $noThirdEyeChange -eq 0 ]; then
   fi
 fi
 
-mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true
+mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true -Pbuild-shaded-jar
 if [ $? -ne 0 ]; then
   exit 1
 fi

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package com.linkedin.pinot.common.segment.fetcher;
 import com.google.common.base.Strings;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import java.io.File;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
@@ -27,17 +29,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.Callable;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.HadoopSegmentOperations.*;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.*;
 
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY_DEFAULT;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY_WAITIME_MS;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.RETRY_WAITIME_MS_DEFAULT;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.HADOOP_CONF_PATH;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.KEYTAB;
-import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.HdfsSegmentFetcher.PRINCIPLE;
 
 public class HdfsSegmentFetcher implements SegmentFetcher {
 
@@ -72,7 +66,7 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
   }
 
   private void authenticate(Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {
-    String principal = configs.getString(PRINCIPLE);
+    String principal = configs.getString(PRINCIPAL);
     String keytab = configs.getString(KEYTAB);
     if (!Strings.isNullOrEmpty(principal) && !Strings.isNullOrEmpty(keytab)) {
       UserGroupInformation.setConfiguration(hadoopConf);
@@ -83,10 +77,9 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
             LOGGER.info("Trying to authenticate user [%s] with keytab [%s]..", principal, keytab);
             UserGroupInformation.loginUserFromKeytab(principal, keytab);
           }
-        }
-        catch (IOException e) {
-          throw new RuntimeException(String.format("Failed to authenticate user principal [%s] with keytab [%s]",
-                  principal, keytab), e);
+        } catch (IOException e) {
+          throw new RuntimeException(
+              String.format("Failed to authenticate user principal [%s] with keytab [%s]", principal, keytab), e);
         }
       }
     }
@@ -101,22 +94,19 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
       final Path localFile = new Path(tempFile.toURI());
 
       RetryPolicy fixDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(retryCount, retryWaitMs);
-      fixDelayRetryPolicy.attempt(new Callable<Boolean>() {
-        @Override
-        public Boolean call() throws Exception {
-          try{
-            if (hadoopFS == null) {
-                throw new RuntimeException("hadoopFS client is not initialized when trying to copy files");
-              }
-              long startMs = System.currentTimeMillis();
-              hadoopFS.copyToLocalFile(remoteFile, localFile);
-              LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms",
-                  uri, tempFilePath, tempFile.length(), System.currentTimeMillis() - startMs);
-              return true;
-          } catch (IOException ex) {
-            LOGGER.warn(String.format("failed to fetch segment %s from hdfs, might retry", uri), ex);
-            return false;
+      fixDelayRetryPolicy.attempt(() -> {
+        try {
+          if (hadoopFS == null) {
+            throw new RuntimeException("hadoopFS client is not initialized when trying to copy files");
           }
+          long startMs = System.currentTimeMillis();
+          hadoopFS.copyToLocalFile(remoteFile, localFile);
+          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", uri, tempFilePath,
+              tempFile.length(), System.currentTimeMillis() - startMs);
+          return true;
+        } catch (IOException ex) {
+          LOGGER.warn(String.format("failed to fetch segment %s from hdfs, might retry", uri), ex);
+          return false;
         }
       });
     } catch (Exception ex) {
@@ -127,6 +117,6 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    return Collections.<String>emptySet();
+    return Collections.emptySet();
   }
 }

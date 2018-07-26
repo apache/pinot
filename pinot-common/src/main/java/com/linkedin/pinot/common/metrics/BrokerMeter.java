@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,7 +81,10 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   ROUTING_TABLE_REBUILD_FAILURES("failures", false),
 
   GROUP_BY_SIZE("queries", false),
-  TOTAL_SERVER_RESPONSE_SIZE("queries", false);
+  TOTAL_SERVER_RESPONSE_SIZE("queries", false),
+
+  QUERY_QUOTA_EXCEEDED("exceptions", false);
+
 
   private final String brokerMeterName;
   private final String unit;

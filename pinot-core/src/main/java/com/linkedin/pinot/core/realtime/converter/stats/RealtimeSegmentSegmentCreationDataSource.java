@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.realtime.converter.stats;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.creator.SegmentCreationDataSource;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
@@ -29,11 +28,11 @@ import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
  * Segment creation data source that is based on an in-memory realtime segment.
  */
 public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreationDataSource {
-  private final RealtimeSegmentImpl _realtimeSegment;
+  private final MutableSegmentImpl _realtimeSegment;
   private final RealtimeSegmentRecordReader _realtimeSegmentRecordReader;
   private final Schema _schema;
 
-  public RealtimeSegmentSegmentCreationDataSource(RealtimeSegmentImpl realtimeSegment, RealtimeSegmentRecordReader realtimeSegmentRecordReader, Schema schema) {
+  public RealtimeSegmentSegmentCreationDataSource(MutableSegmentImpl realtimeSegment, RealtimeSegmentRecordReader realtimeSegmentRecordReader, Schema schema) {
     _realtimeSegment = realtimeSegment;
     _realtimeSegmentRecordReader = realtimeSegmentRecordReader;
     _schema = schema;

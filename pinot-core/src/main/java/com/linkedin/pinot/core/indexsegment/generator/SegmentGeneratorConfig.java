@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
 package com.linkedin.pinot.core.indexsegment.generator;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
@@ -41,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
@@ -68,6 +72,7 @@ public class SegmentGeneratorConfig {
   private Set<String> _rawIndexCreationColumns = new HashSet<>();
   private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
+  private List<String> _columnSortOrder = new ArrayList<>();
   private String _dataDir = null;
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
@@ -143,6 +148,41 @@ public class SegmentGeneratorConfig {
     _onHeap = config._onHeap;
   }
 
+  public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
+    Preconditions.checkNotNull(schema);
+    _schema = schema;
+
+    if (tableConfig == null) {
+      return;
+    }
+
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
+    Map<String, String> noDictionaryColumnMap = indexingConfig.getnoDictionaryConfig();
+
+    if (noDictionaryColumns != null) {
+      this.setRawIndexCreationColumns(noDictionaryColumns);
+
+      if (noDictionaryColumnMap != null) {
+        Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
+            noDictionaryColumnMap.entrySet().stream()
+            .collect(Collectors.toMap(Map.Entry::getKey,
+                e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
+        this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
+      }
+    }
+    _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    StarTreeIndexSpec starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
+    if (starTreeIndexSpec != null) {
+      enableStarTreeIndex(starTreeIndexSpec);
+    }
+    _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    _hllConfig = validationConfig.getHllConfig();
+  }
+
+
   public SegmentGeneratorConfig(Schema schema) {
     _schema = schema;
   }
@@ -187,6 +227,10 @@ public class SegmentGeneratorConfig {
     return _invertedIndexCreationColumns;
   }
 
+  public List<String> getColumnSortOrder() {
+    return _columnSortOrder;
+  }
+
   public void setRawIndexCreationColumns(List<String> rawIndexCreationColumns) {
     Preconditions.checkNotNull(rawIndexCreationColumns);
     _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
@@ -195,6 +239,11 @@ public class SegmentGeneratorConfig {
   public void setInvertedIndexCreationColumns(List<String> indexCreationColumns) {
     Preconditions.checkNotNull(indexCreationColumns);
     _invertedIndexCreationColumns.addAll(indexCreationColumns);
+  }
+
+  public void setColumnSortOrder(List<String> sortOrder) {
+    Preconditions.checkNotNull(sortOrder);
+    _columnSortOrder.addAll(sortOrder);
   }
 
   public void createInvertedIndexForColumn(String column) {
@@ -308,6 +357,7 @@ public class SegmentGeneratorConfig {
     if (_segmentTimeColumnName != null) {
       return _segmentTimeColumnName;
     }
+    // TODO: if segmentTimeColumnName is null, getQualifyingFields DATETIME. If multiple found, throw exception "must specify primary timeColumnName"
     return getQualifyingFields(FieldType.TIME);
   }
 
@@ -474,14 +524,6 @@ public class SegmentGeneratorConfig {
 
   public void setOnHeap(boolean onHeap) {
     _onHeap = onHeap;
-  }
-
-  @JsonIgnore
-  public ChunkCompressorFactory.CompressionType getColumnCompressionType(String columnName) {
-    if (_rawIndexCompressionType.containsKey(columnName)) {
-      return _rawIndexCompressionType.get(columnName);
-    }
-    return ChunkCompressorFactory.CompressionType.SNAPPY;
   }
 
   public Map<String, ChunkCompressorFactory.CompressionType> getRawIndexCompressionType() {

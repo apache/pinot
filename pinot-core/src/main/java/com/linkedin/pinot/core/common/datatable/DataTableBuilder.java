@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.common.datatable;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
@@ -154,7 +153,7 @@ public class DataTableBuilder {
     if (dictionary == null) {
       dictionary = new HashMap<>();
       _dictionaryMap.put(columnName, dictionary);
-      _reverseDictionaryMap.put(columnName, new HashMap<Integer, String>());
+      _reverseDictionaryMap.put(columnName, new HashMap<>());
     }
 
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
@@ -167,8 +166,7 @@ public class DataTableBuilder {
     _currentRowDataByteBuffer.putInt(dictId);
   }
 
-  public void setColumn(int colId, @Nonnull Object value)
-      throws IOException {
+  public void setColumn(int colId, @Nonnull Object value) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     byte[] bytes = ObjectCustomSerDe.serialize(value);
@@ -186,8 +184,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull char[] values)
-      throws IOException {
+  public void setColumn(int colId, @Nonnull char[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -196,8 +193,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull short[] values)
-      throws IOException {
+  public void setColumn(int colId, @Nonnull short[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -206,8 +202,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull int[] values)
-      throws IOException {
+  public void setColumn(int colId, @Nonnull int[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -216,8 +211,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull long[] values)
-      throws IOException {
+  public void setColumn(int colId, @Nonnull long[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -226,8 +220,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull float[] values)
-      throws IOException {
+  public void setColumn(int colId, @Nonnull float[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -236,8 +229,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull double[] values)
-      throws IOException {
+  public void setColumn(int colId, @Nonnull double[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -246,8 +238,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void setColumn(int colId, @Nonnull String[] values)
-      throws IOException {
+  public void setColumn(int colId, @Nonnull String[] values) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
     _currentRowDataByteBuffer.putInt(values.length);
@@ -257,7 +248,7 @@ public class DataTableBuilder {
     if (dictionary == null) {
       dictionary = new HashMap<>();
       _dictionaryMap.put(columnName, dictionary);
-      _reverseDictionaryMap.put(columnName, new HashMap<Integer, String>());
+      _reverseDictionaryMap.put(columnName, new HashMap<>());
     }
 
     for (String value : values) {
@@ -271,8 +262,7 @@ public class DataTableBuilder {
     }
   }
 
-  public void finishRow()
-      throws IOException {
+  public void finishRow() throws IOException {
     _fixedSizeDataByteArrayOutputStream.write(_currentRowDataByteBuffer.array());
   }
 
@@ -284,17 +274,17 @@ public class DataTableBuilder {
   /**
    * Build an empty data table based on the broker request.
    */
-  public static DataTable buildEmptyDataTable(BrokerRequest brokerRequest)
-      throws IOException {
+  public static DataTable buildEmptyDataTable(BrokerRequest brokerRequest) throws IOException {
     // Selection query.
     if (brokerRequest.isSetSelections()) {
       Selection selection = brokerRequest.getSelections();
       List<String> selectionColumns = selection.getSelectionColumns();
       int numSelectionColumns = selectionColumns.size();
-      FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[numSelectionColumns];
-      // Use STRING data type as default for selection query.
-      Arrays.fill(dataTypes, FieldSpec.DataType.STRING);
-      DataSchema dataSchema = new DataSchema(selectionColumns.toArray(new String[numSelectionColumns]), dataTypes);
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numSelectionColumns];
+      // Use STRING column data type as default for selection query.
+      Arrays.fill(columnDataTypes, DataSchema.ColumnDataType.STRING);
+      DataSchema dataSchema =
+          new DataSchema(selectionColumns.toArray(new String[numSelectionColumns]), columnDataTypes);
       return new DataTableBuilder(dataSchema).build();
     }
 
@@ -309,10 +299,11 @@ public class DataTableBuilder {
       // Aggregation group-by query.
 
       String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
-      FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.OBJECT};
+      DataSchema.ColumnDataType[] columnDataTypes =
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.OBJECT};
 
       // Build the data table.
-      DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
+      DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
       for (int i = 0; i < numAggregations; i++) {
         dataTableBuilder.startRow();
         dataTableBuilder.setColumn(0, aggregationFunctionContexts[i].getAggregationColumnName());
@@ -324,22 +315,22 @@ public class DataTableBuilder {
       // Aggregation only query.
 
       String[] aggregationColumnNames = new String[numAggregations];
-      FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[numAggregations];
+      DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregations];
       Object[] aggregationResults = new Object[numAggregations];
       for (int i = 0; i < numAggregations; i++) {
         AggregationFunctionContext aggregationFunctionContext = aggregationFunctionContexts[i];
         aggregationColumnNames[i] = aggregationFunctionContext.getAggregationColumnName();
         AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
-        dataTypes[i] = aggregationFunction.getIntermediateResultDataType();
+        columnDataTypes[i] = aggregationFunction.getIntermediateResultColumnType();
         aggregationResults[i] =
             aggregationFunction.extractAggregationResult(aggregationFunction.createAggregationResultHolder());
       }
 
       // Build the data table.
-      DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(aggregationColumnNames, dataTypes));
+      DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(aggregationColumnNames, columnDataTypes));
       dataTableBuilder.startRow();
       for (int i = 0; i < numAggregations; i++) {
-        switch (dataTypes[i]) {
+        switch (columnDataTypes[i]) {
           case LONG:
             dataTableBuilder.setColumn(i, ((Number) aggregationResults[i]).longValue());
             break;
@@ -351,7 +342,7 @@ public class DataTableBuilder {
             break;
           default:
             throw new UnsupportedOperationException(
-                "Unsupported aggregation column data type: " + dataTypes[i] + " for column: "
+                "Unsupported aggregation column data type: " + columnDataTypes[i] + " for column: "
                     + aggregationColumnNames[i]);
         }
       }

@@ -1,0 +1,140 @@
+<div class="container">
+  <h3>Dataset auto onboard</h3>
+  {{#power-select
+    classNames="te-input"
+    options=datasets
+    selected=datasetName
+    onchange=(action "onSave")
+    onopen=(action "onLoadDatasets")
+    loadingMessage="Waiting for the server...."
+    placeholder="Choose a dataset to onboard"
+    searchPlaceholder="Type to filter..."
+    triggerId="select-dataset"
+    triggerClass="te-form__select"
+    disabled=false
+  as |dataset|
+  }}
+    {{dataset}}
+  {{/power-select}}
+  {{#if metricUrn}}
+    <div class="row">
+      <label class="control-label te-label te-label--taller">
+        Detection Name:
+      </label>
+    </div>
+    {{input
+      type="text"
+      id="anomaly-form-function-name"
+      class="form-control te-input te-input--read-only"
+      placeholder="Add a descriptive name"
+      value=detectionConfigName
+      key-up=(action "onChangeName" detectionConfigName)
+    }}
+    <div class="row">
+      <label class="control-label te-label te-label--taller">
+        Choose the metrics:
+      </label>
+    </div>
+    {{#each-in metricsProperties as |name metric|}}
+      <div>
+        {{name}}
+        <input type="checkbox"
+               checked={{metric.monitor}}
+                 onclick={{action "toggleCheckBox" name}}/>
+      </div>
+    {{/each-in}}
+    <div class="row">
+      <label class="control-label te-label te-label--taller">
+        Filter metric by(Optional):
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element class="te-tooltip"}}
+            For example, filter on countryCode::US implies only anomalies in US will be detected.
+          {{/tooltip-on-element}}
+        </span>
+      </label>
+    </div>
+    {{filter-select
+      options=filterOptions
+      selected=selectedFilters
+      triggerId="select-filters"
+      onChange=(action "onFilters")
+    }}
+    <div class="row">
+      <label for="select-dimension" class="control-label te-label te-label--taller">
+        Create an alert for each dimension value in: (optional)
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element class="te-tooltip"}}
+            For example, selecting Continent means anomalies on each continent will be monitored.
+          {{/tooltip-on-element}}
+        </span>
+      </label>
+      {{filter-select
+        selected=selectedDimensions
+        options=dimensions
+        triggerId="select-dimensions"
+        onChange=(action "onSelectDimension")
+      }}
+    </div>
+    <div class="row">
+      <label class="control-label te-label te-label--taller">
+        Set up the business rules(Optional):
+        <span>
+          <i class="glyphicon glyphicon-question-sign"></i>
+          {{#tooltip-on-element class="te-tooltip"}}
+            For example, selecting page_view metric and set top k dimensions to 5 means the dimensions that have top 5 page_view will be monitored.
+          {{/tooltip-on-element}}
+        </span>
+      </label>
+    </div>
+    <label for="select-dimension" class="control-label te-label te-label--taller">
+      Metric used in dimension breakdown
+    </label>
+    {{#power-select
+      classNames="te-input"
+      options=metrics
+      selected=selectedMetric
+      onchange=(action "onSelectMetric")
+      loadingMessage="Waiting for the server...."
+      placeholder="Choose metric for rules"
+      searchPlaceholder="Type to filter..."
+      triggerId="select-metric"
+      triggerClass="te-form__select"
+      disabled=(not metricsFieldEnabled)
+    as |metric|
+    }}
+      {{metric}}
+    {{/power-select}}
+    <div class="col-xs-4">
+      <label class="control-label te-label te-label--taller">
+        Explore top k dimensions:
+      </label>
+      <input type="text"
+             value={{topk}}
+               onChange={{action (action "onChangeValue" "topk") value="target.value"}}/>
+    </div>
+    <div class="col-xs-4">
+      <label class="control-label te-label te-label--taller">
+        Min value:
+      </label>
+      <input type="text"
+             value={{minValue}}
+               onChange={{action (action "onChangeValue" "minValue") value="target.value"}}/>
+    </div>
+    <div class="col-xs-4">
+      <label class="control-label te-label te-label--taller">
+        Min contribution:
+      </label>
+      <input type="text"
+             value={{minContribution}}
+               onChange={{action (action "onChangeValue" "minContribution") value="target.value"}}/>
+    </div>
+    <div class="row">
+      <button onClick={{action "onSubmit"}}>submit</button>
+    </div>
+  {{/if}}
+  <div class="row">
+    {{output}}
+  </div>
+</div>

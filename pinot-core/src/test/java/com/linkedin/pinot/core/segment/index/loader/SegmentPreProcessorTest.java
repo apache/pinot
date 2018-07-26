@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -292,7 +292,7 @@ public class SegmentPreProcessorTest {
     Assert.assertEquals(columnMetadata.getTotalAggDocs(), 0);
     Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.INT);
     Assert.assertEquals(columnMetadata.getBitsPerElement(), 1);
-    Assert.assertEquals(columnMetadata.getStringColumnMaxLength(), 0);
+    Assert.assertEquals(columnMetadata.getColumnMaxLength(), 0);
     Assert.assertEquals(columnMetadata.getFieldType(), FieldSpec.FieldType.METRIC);
     Assert.assertTrue(columnMetadata.isSorted());
     Assert.assertFalse(columnMetadata.hasNulls());
@@ -318,7 +318,7 @@ public class SegmentPreProcessorTest {
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_BOOLEAN_SV_DIMENSION_COLUMN_NAME);
     Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.STRING);
-    Assert.assertEquals(columnMetadata.getStringColumnMaxLength(), 5);
+    Assert.assertEquals(columnMetadata.getColumnMaxLength(), 5);
     Assert.assertEquals(columnMetadata.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertEquals(columnMetadata.getDefaultNullValueString(), "false");
 
@@ -328,7 +328,7 @@ public class SegmentPreProcessorTest {
 
     columnMetadata = segmentMetadata.getColumnMetadataFor(NEW_STRING_MV_DIMENSION_COLUMN_NAME);
     Assert.assertEquals(columnMetadata.getDataType(), FieldSpec.DataType.STRING);
-    Assert.assertEquals(columnMetadata.getStringColumnMaxLength(), 4);
+    Assert.assertEquals(columnMetadata.getColumnMaxLength(), 4);
     Assert.assertFalse(columnMetadata.isSorted());
     Assert.assertFalse(columnMetadata.isSingleValue());
     Assert.assertEquals(columnMetadata.getMaxNumberOfMultiValues(), 1);

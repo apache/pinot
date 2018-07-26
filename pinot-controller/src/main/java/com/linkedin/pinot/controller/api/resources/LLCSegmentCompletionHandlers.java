@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -170,7 +170,10 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_LOCATION) String segmentLocation,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
+      @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
+      @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
     if (instanceId == null || segmentName == null || offset == -1 || segmentLocation == null) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, segmentLocation={}", offset, segmentName,
           instanceId, segmentLocation);
@@ -183,6 +186,9 @@ public class LLCSegmentCompletionHandlers {
         .withSegmentName(segmentName)
         .withOffset(offset)
         .withSegmentLocation(segmentLocation)
+        .withSegmentSizeBytes(segmentSizeBytes)
+        .withBuildTimeMillis(buildTimeMillis)
+        .withWaitTimeMillis(waitTimeMillis)
         .withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommitEnd:{}", requestParams.toString());
 
@@ -204,11 +210,17 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
       @QueryParam(SegmentCompletionProtocol.PARAM_OFFSET) long offset,
       @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
+      @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
+      @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
       FormDataMultiPart multiPart) {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId)
         .withSegmentName(segmentName)
         .withOffset(offset)
+        .withSegmentSizeBytes(segmentSizeBytes)
+        .withBuildTimeMillis(buildTimeMillis)
+        .withWaitTimeMillis(waitTimeMillis)
         .withMemoryUsedBytes(memoryUsedBytes);
     LOGGER.info("Processing segmentCommit:{}", requestParams.toString());
 

@@ -3,13 +3,20 @@
  * @module manage/alerts/controller
  * @exports alerts controller
  */
-import { computed, set } from '@ember/object';
-
-import Controller from '@ember/controller';
-import fetch from 'fetch';
+import RSVP from 'rsvp';
 import _ from 'lodash';
+import fetch from 'fetch';
+import {
+  set,
+  get,
+  computed,
+  setProperties,
+  getWithDefault
+} from '@ember/object';
+import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 
 export default Controller.extend({
   queryParams: ['selectedSearchMode', 'alertId', 'testMode'],
@@ -181,9 +188,7 @@ export default Controller.extend({
    */
   searchByFunctionName: task(function* (alert) {
     yield timeout(600);
-
-    const url = `/data/autocomplete/functionByName?name=${alert}`;
-    return fetch(url)
+    return fetch(selfServeApiCommon.alertFunctionByName(alert))
       .then(res => res.json());
   }),
 
@@ -194,12 +199,11 @@ export default Controller.extend({
   searchByApplicationName: task(function* (appName) {
     this.set('isLoading', true);
     yield timeout(600);
-    const url = `/data/autocomplete/functionByAppname?appname=${appName}`;
 
     this.set('selectedApplicationName', appName);
     this.set('currentPage', 1);
 
-    return fetch(url)
+    return fetch(selfServeApiCommon.alertFunctionByAppName(appName))
       .then(res => res.json())
       .then((alerts) => {
         this.set('isLoading', false);
@@ -208,23 +212,32 @@ export default Controller.extend({
   }),
 
   /**
-   * Handler for search by subscriber gropu name
+   * Handler for search by subscriber group name
    * Utilizing ember concurrency (task)
    */
-  searchByDatasetName: task(function* (groupName) {
-    this.set('isLoading', true);
-    yield timeout(600);
-
-    this.set('selectedsubscriberGroupNames', groupName);
-    this.set('currentPage', 1);
-
-    const url = `/data/autocomplete/functionByAlertName?alertName=${groupName}`;
-    return fetch(url)
-      .then(res => res.json())
-      .then((filters) => {
-        this.set('isLoading', false);
-        this.set('selectedAlerts', filters);
-      });
+  searchByConfigGroup: task(function* (groupName) {
+    const allGroups = this.get('model.subscriberGroups');
+    // Add selected name to select input, start loader
+    setProperties(this, {
+      isLoading: true,
+      currentPage: 1,
+      selectedsubscriberGroupNames: groupName
+    });
+    // Smooth loading perception
+    yield timeout(50);
+    // Find selected group among all by name
+    const targetGroup = allGroups.find(group => group.name === groupName);
+    // Extract all of found config groups function Ids
+    const alertIds = getWithDefault(targetGroup, 'emailConfig.functionIds', []);
+    // Fecth data for each alert function by Id
+    const selectedAlerts = yield RSVP.all(alertIds.map((id) => {
+      return fetch(selfServeApiCommon.alertById(id)).then(checkStatus);
+    }));
+    // Load resolved records to template
+    setProperties(this, {
+      isLoading: false,
+      selectedAlerts
+    });
   }),
 
   actions: {
@@ -234,14 +247,6 @@ export default Controller.extend({
       this.set('selectedAlerts', [alert]);
       this.set('primaryMetric', alert);
       this.set('resultsActive', true);
-    },
-
-    // Handle transition to alert page while refreshing the duration cache.
-    navigateToAlertPage(alertId) {
-      if (sessionStorage.getItem('duration') !== null) {
-        sessionStorage.removeItem('duration');
-      }
-      this.transitionToRoute('manage.alert', alertId);
     },
 
     // Handles filtering of alerts in response to filter selection
@@ -276,7 +281,7 @@ export default Controller.extend({
         method: 'delete',
         headers: { 'content-type': 'text/plain' }
       };
-      const url = '/dashboard/anomaly-function?id=' + functionId;
+      const url = selfServeApiCommon.deleteAlert(functionId);
       fetch(url, postProps).then(checkStatus).then(() => {
         this.send('refreshModel');
       });

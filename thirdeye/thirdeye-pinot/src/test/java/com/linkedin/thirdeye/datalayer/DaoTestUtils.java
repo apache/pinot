@@ -34,6 +34,7 @@ import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -62,9 +63,10 @@ public class DaoTestUtils {
     functionSpec.setWindowDelayUnit(TimeUnit.HOURS);
     functionSpec.setWindowSize(1);
     functionSpec.setWindowUnit(TimeUnit.DAYS);
-    functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
+    functionSpec.setProperties("baseline=w/w;changeThreshold=0.001;min=100;max=900");
     functionSpec.setIsActive(true);
     functionSpec.setRequiresCompletenessCheck(false);
+    functionSpec.setSecondaryAnomalyFunctionsType(Arrays.asList("MIN_MAX_THRESHOLD"));
     return functionSpec;
   }
 
@@ -139,6 +141,7 @@ public class DaoTestUtils {
     datasetConfigDTO.setTimeUnit(TimeUnit.HOURS);
     datasetConfigDTO.setActive(true);
     datasetConfigDTO.setRequiresCompletenessCheck(false);
+    datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
     return datasetConfigDTO;
   }
 

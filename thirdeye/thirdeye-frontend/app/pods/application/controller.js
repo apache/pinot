@@ -18,21 +18,27 @@ export default Controller.extend({
    */
   globalNavItems: [
     {
+      className: 'dashboard',
+      link: 'home',
+      title: 'Home',
+      isCustomLink: false
+    },
+    {
       className: 'anomalies',
       link: '/thirdeye#anomalies',
       isCustomLink: true,
       title: 'Anomalies'
     },
     {
+      className: 'manage',
+      link: 'manage.alerts',
+      title: 'Alerts'
+    },
+    {
       className: 'rootcause',
       link: 'rootcause',
       title: 'Root Cause Analysis',
       isCustomLink: false
-    },
-    {
-      className: 'manage',
-      link: 'manage.alerts',
-      title: 'Manage Alerts'
     }
   ]
 });

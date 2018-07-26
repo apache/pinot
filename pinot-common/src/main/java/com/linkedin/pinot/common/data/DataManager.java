@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,10 +28,22 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 // TODO: maybe better to merge APIs for adding segment to OFFLINE/REALTIME table
 public interface DataManager {
-  void init(Configuration config, ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics);
 
+  /**
+   * Initializes the data manager. Should be called only once and before calling any other method.
+   */
+  void init(Configuration config, ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics)
+      throws Exception;
+
+  /**
+   * Starts the data manager. Should be called only once after data manager gets initialized but before calling any
+   * other method.
+   */
   void start();
 
+  /**
+   * Shuts down the data manager. Should be called only once. After calling shut down, no other method should be called.
+   */
   void shutDown();
 
   /**

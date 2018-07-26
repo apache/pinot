@@ -63,7 +63,7 @@ public class CSVThirdEyeDataSourceIntergrationTest {
     ThirdEyeConfiguration thirdEyeConfiguration = new ThirdEyeConfiguration();
     thirdEyeConfiguration.setDataSources(dataSourcesConfig.toString());
 
-    ThirdEyeCacheRegistry.initializeCachesWithoutRefreshing(thirdEyeConfiguration);
+    ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfiguration);
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package com.linkedin.pinot.index.readerwriter;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleValueMultiColumnReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.IOException;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
@@ -38,8 +37,7 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest {
   private static final int STRING_LENGTH = 11;
 
   private static final int[] COLUMN_SIZES_IN_BYTES =
-      new int[]{V1Constants.Numbers.INTEGER_SIZE, V1Constants.Numbers.LONG_SIZE, V1Constants.Numbers.FLOAT_SIZE,
-          V1Constants.Numbers.DOUBLE_SIZE, STRING_LENGTH};
+      new int[]{Integer.BYTES, Long.BYTES, Float.BYTES, Double.BYTES, STRING_LENGTH};
 
   private PinotDataBufferMemoryManager _memoryManager;
   private FixedByteSingleValueMultiColumnReaderWriter _readerWriter;
@@ -55,8 +53,7 @@ public class FixedByteSingleValueMultiColumnReaderWriterTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     _readerWriter.close();
     _memoryManager.close();
   }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
+import java.util.concurrent.locks.Lock;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -56,29 +57,35 @@ public class SegmentFetcherAndLoader {
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
   }
 
-  public void addOrReplaceOfflineSegment(String tableName, String segmentId) {
+  public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {
     OfflineSegmentZKMetadata newSegmentZKMetadata =
-        ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableName, segmentId);
+        ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, tableNameWithType, segmentName);
     Preconditions.checkNotNull(newSegmentZKMetadata);
 
-    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentId, tableName, newSegmentZKMetadata);
+    LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentName, tableNameWithType,
+        newSegmentZKMetadata);
+
+    // This method might modify the file on disk. Use segment lock to prevent race condition
+    Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
     try {
+      segmentLock.lock();
+
       // We lock the segment in order to get its metadata, and then release the lock, so it is possible
       // that the segment is dropped after we get its metadata.
-      SegmentMetadata localSegmentMetadata = _dataManager.getSegmentMetadata(tableName, segmentId);
+      SegmentMetadata localSegmentMetadata = _dataManager.getSegmentMetadata(tableNameWithType, segmentName);
 
       if (localSegmentMetadata == null) {
-        LOGGER.info("Segment {} of table {} is not loaded in memory, checking disk", segmentId, tableName);
-        File indexDir = new File(getSegmentLocalDirectory(tableName, segmentId));
+        LOGGER.info("Segment {} of table {} is not loaded in memory, checking disk", segmentName, tableNameWithType);
+        File indexDir = new File(getSegmentLocalDirectory(tableNameWithType, segmentName));
         // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
         // segment backup directory existed), need to first try to recover from reload failure before checking the
         // existence of the index directory and loading segment metadata from it
         LoaderUtils.reloadFailureRecovery(indexDir);
         if (indexDir.exists()) {
-          LOGGER.info("Segment {} of table {} found on disk, attempting to load it", segmentId, tableName);
+          LOGGER.info("Segment {} of table {} found on disk, attempting to load it", segmentName, tableNameWithType);
           try {
             localSegmentMetadata = new SegmentMetadataImpl(indexDir);
-            LOGGER.info("Found segment {} of table {} with crc {} on disk", segmentId, tableName,
+            LOGGER.info("Found segment {} of table {} with crc {} on disk", segmentName, tableNameWithType,
                 localSegmentMetadata.getCrc());
           } catch (Exception e) {
             // The localSegmentDir should help us get the table name,
@@ -88,21 +95,21 @@ public class SegmentFetcherAndLoader {
           }
           try {
             if (!isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
-              LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentId,
-                  tableName, localSegmentMetadata.getCrc());
-              _dataManager.addOfflineSegment(tableName, segmentId, indexDir);
+              LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentName,
+                  tableNameWithType, localSegmentMetadata.getCrc());
+              _dataManager.addOfflineSegment(tableNameWithType, segmentName, indexDir);
               // TODO Update zk metadata with CRC for this instance
               return;
             }
           } catch (V3RemoveIndexException e) {
             LOGGER.info(
                 "Unable to remove local index from V3 format segment: {}, table: {}, try to reload it from controller.",
-                segmentId, tableName, e);
+                segmentName, tableNameWithType, e);
             FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           } catch (Exception e) {
-            LOGGER.error("Failed to load {} of table {} from local, will try to reload it from controller!", segmentId,
-                tableName, e);
+            LOGGER.error("Failed to load {} of table {} from local, will try to reload it from controller!",
+                segmentName, tableNameWithType, e);
             FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           }
@@ -120,25 +127,27 @@ public class SegmentFetcherAndLoader {
       // that we have is different from that in zookeeper.
       if (isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
         if (localSegmentMetadata == null) {
-          LOGGER.info("Loading new segment {} of table {} from controller", segmentId, tableName);
+          LOGGER.info("Loading new segment {} of table {} from controller", segmentName, tableNameWithType);
         } else {
-          LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentId, tableName);
+          LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentName, tableNameWithType);
         }
         String uri = newSegmentZKMetadata.getDownloadUrl();
         // Retry will be done here.
-        String localSegmentDir = downloadSegmentToLocal(uri, tableName, segmentId);
+        String localSegmentDir = downloadSegmentToLocal(uri, tableNameWithType, segmentName);
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
-        _dataManager.addOfflineSegment(tableName, segmentId, new File(localSegmentDir));
-        LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentId, tableName,
+        _dataManager.addOfflineSegment(tableNameWithType, segmentName, new File(localSegmentDir));
+        LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentName, tableNameWithType,
             segmentMetadata.getCrc());
       } else {
-        LOGGER.info("Got already loaded segment {} of table {} crc {} again, will do nothing.", segmentId, tableName,
-            localSegmentMetadata.getCrc());
+        LOGGER.info("Got already loaded segment {} of table {} crc {} again, will do nothing.", segmentName,
+            tableNameWithType, localSegmentMetadata.getCrc());
       }
     } catch (final Exception e) {
-      LOGGER.error("Cannot load segment : " + segmentId + " for table " + tableName, e);
+      LOGGER.error("Cannot load segment : " + segmentName + " for table " + tableNameWithType, e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
+    } finally {
+      segmentLock.unlock();
     }
   }
 

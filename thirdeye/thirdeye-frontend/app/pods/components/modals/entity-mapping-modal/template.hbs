@@ -1,6 +1,5 @@
 {{#te-modal
-  headerText="Configure Filters for analyzing"
-  subText=metric.label
+  headerText=headerText
   cancelButtonText="Back"
   submitButtonText="Reload Analysis"
   submitTooltip="Unsaved changes will be lost."
@@ -36,7 +35,7 @@
 
       {{#if showAdvancedInput}}
         <div class="te-modal__dropdown--expand">
-          {{#power-select 
+          {{#power-select
             triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
             selected=selectedEntity
             renderInPlace=true
@@ -61,7 +60,7 @@
 
       <a class="thirdeye-link thirdeye-link--secondary" class={{unless canAddMapping 'thirdeye-link--disabled'}} {{action "onAddFilter"}}>
         Add Mapping
-        {{#tooltip-on-element 
+        {{#tooltip-on-element
           class="te-modal__tooltip"
           isShown=showTooltip}}
 

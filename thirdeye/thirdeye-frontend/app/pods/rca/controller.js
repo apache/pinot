@@ -2,6 +2,7 @@ import { computed } from '@ember/object';
 import { oneWay } from '@ember/object/computed';
 import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 
 export default Controller.extend({
   primaryMetric: oneWay('model'),
@@ -12,7 +13,6 @@ export default Controller.extend({
    */
   searchMetrics: task(function* (metric) {
     yield timeout(600);
-    let url = `/data/autocomplete/metric?name=${metric}`;
 
     /**
      * Necessary headers for fetch
@@ -27,7 +27,7 @@ export default Controller.extend({
       credentials: 'include'
     };
 
-    return fetch(url, headers)
+    return fetch(selfServeApiCommon.metricAutoComplete(metric), headers)
       .then(res => res.json());
   }),
 

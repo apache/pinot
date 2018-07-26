@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,6 +44,11 @@ public class NettyTCPServer extends NettyServer {
 
   public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry) {
     this(port, handlerFactory, registry, 100);
+  }
+
+  public NettyTCPServer(int port, RequestHandlerFactory handlerFactory, AggregatedMetricsRegistry registry, long defaultLargeQueryLatencyMs,
+      int numThreadsForBossGroup, int numThreadsForWorkerGroup) {
+    super(port, handlerFactory, registry, defaultLargeQueryLatencyMs, numThreadsForBossGroup, numThreadsForWorkerGroup);
   }
 
   @Override

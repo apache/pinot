@@ -3,13 +3,14 @@ import Route from '@ember/routing/route';
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
+import config from 'thirdeye-frontend/config/environment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 import {
   toCurrentUrn,
   toBaselineUrn,
-  filterPrefix,
   dateFormatFull,
-  appendFilters
+  appendFilters,
+  filterPrefix
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
@@ -18,16 +19,52 @@ const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
 const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
 const ROOTCAUSE_SETUP_MODE_NONE = "none";
 
+const UNIT_MAPPING = {
+  NANOSECONDS: 'nanosecond',
+  MILLISECONDS: 'millisecond',
+  SECONDS: 'second',
+  MINUTES: 'minute',
+  HOURS: 'hour',
+  DAYS: 'day'
+};
+
+/**
+ * adjusts RCA backend granularity to a sane scale
+ */
+const adjustGranularity = (attrGranularity) => {
+  const [count, unit] = attrGranularity.split('_');
+  const granularity = [parseInt(count, 10), unit];
+
+  if (['NANOSECONDS', 'MILLISECONDS', 'SECONDS'].includes(granularity[1])) {
+    granularity[0] = 5;
+    granularity[1] = 'MINUTES';
+  }
+
+  if (['MINUTES'].includes(granularity[1])) {
+    granularity[0] = Math.max(granularity[0], 5);
+    granularity[1] = 'MINUTES';
+  }
+
+  return granularity[0] + "_" + granularity[1];
+};
+
+/**
+ * adjusts metric max time based on metric granularity
+ */
+const adjustMaxTime = (maxTime, metricGranularity) => {
+  const time = moment(parseInt(maxTime, 10));
+  const [count, unit] = metricGranularity;
+
+  const start = time.startOf(unit);
+  const remainder = start.get(unit) % count;
+
+  return start.add(-1 * remainder, unit);
+};
+
 /**
  * converts RCA backend granularity strings into units understood by moment.js
  */
 const toMetricGranularity = (attrGranularity) => {
-  const UNIT_MAPPING = {
-    MINUTES: 'minute',
-    HOURS: 'hour',
-    DAYS: 'day'
-  };
-
   const [count, unit] = attrGranularity.split('_');
   return [parseInt(count, 10), UNIT_MAPPING[unit]];
 };
@@ -50,7 +87,7 @@ const toAnomalyOffset = (granularity) => {
 const toAnalysisOffset = (granularity) => {
   const UNIT_MAPPING = {
     minute: -1,
-    hour: -3,
+    hour: -2,
     day: -7
   };
   return UNIT_MAPPING[granularity[1]] || -1;
@@ -76,6 +113,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   model(params) {
     const { metricId, sessionId, anomalyId } = params;
+    const isDevEnv = config.environment === 'development';
 
     let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions;
 
@@ -95,6 +133,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     }
 
     return RSVP.hash({
+      isDevEnv,
       metricId,
       metricUrn,
       metricEntity,
@@ -105,6 +144,20 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomalyEntity,
       anomalySessions
     });
+  },
+
+  /**
+   * @description Resets any query params to allow not to have leak state or sticky query-param
+   * @method resetController
+   * @param {Object} controller - active controller
+   * @param {Boolean} isExiting - exit status
+   * @return {undefined}
+   */
+  resetController(controller, isExiting) {
+    this._super(...arguments);
+    if (isExiting) {
+      controller.set('sessionId', null);
+    }
   },
 
   afterModel(model, transition) {
@@ -188,9 +241,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
     // metric-initialized context
     if (metricId && metricUrn) {
       if (!_.isEmpty(metricEntity)) {
-        const maxTime = parseInt(metricEntity.attributes.maxTime[0], 10);
-        const granularity = metricEntity.attributes.granularity[0];
+        const granularity = adjustGranularity(metricEntity.attributes.granularity[0]);
         const metricGranularity = toMetricGranularity(granularity);
+        const maxTime = adjustMaxTime(metricEntity.attributes.maxTime[0], metricGranularity);
 
         const anomalyRangeEnd = moment(maxTime).startOf(metricGranularity[1]).valueOf();
         const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
@@ -219,33 +272,48 @@ export default Route.extend(AuthenticatedRouteMixin, {
     // anomaly-initialized context
     if (anomalyId && anomalyUrn) {
       if (!_.isEmpty(anomalyEntity)) {
+        const granularity = adjustGranularity(anomalyEntity.attributes.metricGranularity[0]);
+        const metricGranularity = toMetricGranularity(granularity);
+
         const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10)];
 
         // align to local end of day
-        const analysisRange = [moment(anomalyRange[0]).startOf('day').add(-1, 'day').valueOf(), moment(anomalyRange[1]).startOf('day').add(1, 'day').valueOf()];
+        const analysisRangeEnd = moment(anomalyRange[1]).startOf('day').add(1, 'day').valueOf();
+        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
+        const analysisRangeStart = moment(anomalyRange[0]).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
+        const analysisRange = [analysisRangeStart, analysisRangeEnd];
 
         const anomalyDimNames = anomalyEntity.attributes['dimensions'] || [];
-        const anomalyFilters = anomalyDimNames.map(dimName => [dimName, anomalyEntity.attributes[dimName]]);
+        const anomalyFilters = [];
+        anomalyDimNames.forEach(dimName => {
+          anomalyEntity.attributes[dimName].forEach(dimValue => {
+            anomalyFilters.pushObject([dimName, dimValue]);
+          });
+        });
 
         const anomalyMetricUrnRaw = `thirdeye:metric:${anomalyEntity.attributes['metricId'][0]}`;
         const anomalyMetricUrn = appendFilters(anomalyMetricUrnRaw, anomalyFilters);
 
-        const anomalyFunctionUrnRaw = `frontend:anomalyfunction:${anomalyEntity.attributes['functionId'][0]}`;
-        const anomalyFunctionUrn = appendFilters(anomalyFunctionUrnRaw, anomalyFilters);
+        const anomalyFunctionUrns = [];
+        if (!_.isEmpty(anomalyEntity.attributes['functionId'])) {
+          const anomalyFunctionUrnRaw = `frontend:anomalyfunction:${anomalyEntity.attributes['functionId'][0]}`;
+          anomalyFunctionUrns.pushObject(appendFilters(anomalyFunctionUrnRaw, anomalyFilters));
+        }
+
 
         context = {
           urns: new Set([anomalyMetricUrn]),
           anomalyRange,
           analysisRange,
           granularity,
-          compareMode: 'predicted',
-          anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn, anomalyFunctionUrn])
+          compareMode: 'WoW',
+          anomalyUrns: new Set([anomalyUrn, anomalyMetricUrn].concat(anomalyFunctionUrns))
         };
 
         selectedUrns = new Set([anomalyUrn, anomalyMetricUrn]);
         sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormatFull) + ')';
         setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
-
+        sessionText = anomalyEntity.attributes.comment[0];
       } else {
         routeErrors.add(`Could not find anomalyId ${anomalyId}`);
       }
@@ -279,6 +347,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       }
     }
 
+    // update secondary metrics
+    const sizeMetricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
+
     controller.setProperties({
       routeErrors,
       anomalyId,
@@ -292,35 +363,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       sessionUpdatedTime,
       sessionModified,
       selectedUrns,
+      sizeMetricUrns,
       setupMode,
       context
     });
-  },
-
-  actions: {
-    /**
-     * transition from the new rootcause to legacy rca details
-     * @param {Number} id metric Id
-     */
-    transitionToRcaDetails(id) {
-      this.transitionTo('rca.details', id, {
-        queryParams: {
-          startDate: undefined,
-          endDate: undefined,
-          analysisStart: undefined,
-          analysisEnd: undefined,
-          granularity: undefined,
-          filters: JSON.stringify({}),
-          compareMode: 'WoW'
-        }
-      });
-    },
-
-    /**
-     * transition from the new rootcause to legacy rca
-     */
-    transitionToRca() {
-      this.transitionTo('rca');
-    }
   }
 });

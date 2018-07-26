@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.query.selection.iterator;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.Serializable;
 
@@ -29,15 +31,22 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 public class SelectionSingleValueColumnWithDictIterator implements SelectionColumnIterator {
   protected BlockSingleValIterator _blockSingleValIterator;
   protected Dictionary _dictionary;
+  private final FieldSpec.DataType _dataType;
 
   public SelectionSingleValueColumnWithDictIterator(Block block) {
     _blockSingleValIterator = (BlockSingleValIterator) block.getBlockValueSet().iterator();
+    _dataType = block.getMetadata().getDataType();
     _dictionary = block.getMetadata().getDictionary();
   }
 
   @Override
   public Serializable getValue(int docId) {
     _blockSingleValIterator.skipTo(docId);
+
+    // For selection, we convert BYTES data type to equivalent HEX string.
+    if (_dataType.equals(FieldSpec.DataType.BYTES)) {
+      return ByteArray.toHexString(_dictionary.getBytesValue(_blockSingleValIterator.nextIntVal()));
+    }
     return (Serializable) _dictionary.get(_blockSingleValIterator.nextIntVal());
   }
 }

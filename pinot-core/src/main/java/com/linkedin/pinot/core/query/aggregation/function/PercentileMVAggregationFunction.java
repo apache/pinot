@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,39 +23,21 @@ import javax.annotation.Nonnull;
 
 
 public class PercentileMVAggregationFunction extends PercentileAggregationFunction {
-  private final String _name;
 
   public PercentileMVAggregationFunction(int percentile) {
     super(percentile);
-    switch (percentile) {
-      case 50:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE50MV.getName();
-        break;
-      case 90:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE90MV.getName();
-        break;
-      case 95:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE95MV.getName();
-        break;
-      case 99:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE99MV.getName();
-        break;
-      default:
-        throw new UnsupportedOperationException(
-            "Unsupported percentile for PercentileAggregationFunction: " + percentile);
-    }
   }
 
   @Nonnull
   @Override
-  public String getName() {
-    return _name;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILEMV;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return _name + "_" + columns[0];
+    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "MV_" + columns[0];
   }
 
   @Override

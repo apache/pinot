@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,11 +23,12 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.TableDataManager;
 import com.linkedin.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
 import java.io.File;
+import java.util.concurrent.locks.Lock;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
@@ -189,17 +190,24 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
       _logger.info("SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
-      final String segmentId = message.getPartitionName();
-      final String tableName = message.getResourceName();
+      String tableNameWithType = message.getResourceName();
+      String segmentName = message.getPartitionName();
+
+      // This method might modify the file on disk. Use segment lock to prevent race condition
+      Lock segmentLock = SegmentLocks.getSegmentLock(tableNameWithType, segmentName);
       try {
-        final File segmentDir = new File(_fetcherAndLoader.getSegmentLocalDirectory(tableName, segmentId));
+        segmentLock.lock();
+
+        final File segmentDir = new File(_fetcherAndLoader.getSegmentLocalDirectory(tableNameWithType, segmentName));
         if (segmentDir.exists()) {
           FileUtils.deleteQuietly(segmentDir);
           _logger.info("Deleted segment directory {}", segmentDir);
         }
       } catch (final Exception e) {
-        _logger.error("Cannot delete the segment : " + segmentId + " from local directory!\n" + e.getMessage(), e);
+        _logger.error("Cannot delete the segment : " + segmentName + " from local directory!\n" + e.getMessage(), e);
         Utils.rethrowException(e);
+      } finally {
+        segmentLock.unlock();
       }
     }
 

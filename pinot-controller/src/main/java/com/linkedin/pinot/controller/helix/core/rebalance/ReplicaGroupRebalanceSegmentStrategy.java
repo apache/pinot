@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.google.common.base.Function;
@@ -161,7 +160,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     int targetNumInstancesPerPartition = replicaGroupConfig.getNumInstancesPerPartition();
     int targetNumReplicaGroup = tableConfig.getValidationConfig().getReplicationNumber();
 
-    OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig, _helixManager);
+    OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
     List<String> serverInstances =
         _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, offlineTagConfig.getOfflineServerTag());
 

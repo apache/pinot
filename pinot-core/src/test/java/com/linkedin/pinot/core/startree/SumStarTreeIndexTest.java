@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -108,11 +108,11 @@ public class SumStarTreeIndexTest extends BaseStarTreeIndexTest {
   public void testQueries() throws Exception {
     File indexDir = new File(DATA_DIR, SEGMENT_NAME);
 
-    _segment = ColumnarSegmentLoader.load(indexDir, ReadMode.heap);
+    _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.heap);
     testHardCodedQueries();
     _segment.destroy();
 
-    _segment = ColumnarSegmentLoader.load(indexDir, ReadMode.mmap);
+    _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
     testHardCodedQueries();
     _segment.destroy();
   }

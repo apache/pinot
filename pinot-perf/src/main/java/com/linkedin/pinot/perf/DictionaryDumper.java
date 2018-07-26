@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,37 +15,34 @@
  */
 package com.linkedin.pinot.perf;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class DictionaryDumper {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryDumper.class);
-  public static void main(String[] args)
-      throws Exception {
+
+  public static void main(String[] args) throws Exception {
     if (args.length != 3) {
-      LOGGER.error("Usage: DictionaryDumper <segmentDirectory> <dimensionName> <comma-separated dictionaryIds>");
+      System.err.println("Usage: DictionaryDumper <segmentDirectory> <dimensionName> <comma-separated dictionaryIds>");
       System.exit(1);
     }
-    File[] segmentDirs = new File(args[0]).listFiles();
+    File[] indexDirs = new File(args[0]).listFiles();
+    Preconditions.checkNotNull(indexDirs);
 
-    for (int i = 0; i < segmentDirs.length; i++) {
-      File indexSegmentDir = segmentDirs[i];
-      System.out.println("Loading " + indexSegmentDir.getName());
+    for (File indexDir : indexDirs) {
+      System.out.println("Loading " + indexDir.getName());
 
-      IndexSegmentImpl indexSegmentImpl =
-          (IndexSegmentImpl) Loaders.IndexSegment.load(indexSegmentDir, ReadMode.heap);
-      ImmutableDictionaryReader colDictionary = indexSegmentImpl.getDictionaryFor(args[1]);
+      ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.heap);
+      ImmutableDictionaryReader colDictionary = immutableSegment.getDictionary(args[1]);
       List<String> strIdList = Arrays.asList(args[2].split(","));
 
-      for (String strId: strIdList) {
+      for (String strId : strIdList) {
         int id = Integer.valueOf(strId);
         String s = colDictionary.getStringValue(id);
         System.out.println(String.format("%d -> %s", id, s));

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,10 @@
 package com.linkedin.pinot.core.segment.index.readers;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
@@ -61,7 +63,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _valueReader.close();
   }
 
@@ -151,7 +153,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
         }
       }
     } else {
-      String paddedValue = addPadding(value);
+      String paddedValue = padString(value);
       while (low <= high) {
         int mid = (low + high) >>> 1;
         String midValue = _valueReader.getPaddedString(mid, _numBytesPerValue, buffer);
@@ -168,7 +170,27 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     return -(low + 1);
   }
 
-  protected String addPadding(String value) {
+  protected int binarySearch(byte[] value) {
+    byte[] buffer = getBuffer();
+    int low = 0;
+    int high = _length - 1;
+
+    while (low <= high) {
+      int mid = (low + high) >>> 1;
+      byte[] midValue = _valueReader.getBytes(mid, _numBytesPerValue, buffer);
+      int compareResult = ByteArray.compare(midValue, value);
+      if (compareResult < 0) {
+        low = mid + 1;
+      } else if (compareResult > 0) {
+        high = mid - 1;
+      } else {
+        return mid;
+      }
+    }
+    return -(low + 1);
+  }
+
+  protected String padString(String value) {
     byte[] valueBytes = value.getBytes(UTF_8);
     int length = valueBytes.length;
     String paddedValue;
@@ -205,6 +227,10 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
 
   protected String getPaddedString(int dictId, byte[] buffer) {
     return _valueReader.getPaddedString(dictId, _numBytesPerValue, buffer);
+  }
+
+  protected byte[] getBytes(int dictId, byte[] buffer) {
+    return _valueReader.getBytes(dictId, _numBytesPerValue, buffer);
   }
 
   protected byte[] getBuffer() {

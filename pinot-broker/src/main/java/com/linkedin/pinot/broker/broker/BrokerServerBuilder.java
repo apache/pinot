@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.linkedin.pinot.broker.broker;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
 import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
+import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.routing.CfgBasedRouting;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
@@ -95,6 +96,8 @@ public class BrokerServerBuilder {
   private final Configuration _config;
   private final LiveInstancesChangeListenerImpl listener;
 
+  private final TableQueryQuotaManager _tableQueryQuotaManager;
+
   public static enum State {
     INIT,
     STARTING,
@@ -107,13 +110,15 @@ public class BrokerServerBuilder {
   private AtomicReference<State> _state = new AtomicReference<State>();
 
   public BrokerServerBuilder(Configuration configuration, HelixExternalViewBasedRouting helixExternalViewBasedRouting,
-      TimeBoundaryService timeBoundaryService, LiveInstancesChangeListenerImpl listener) throws ConfigurationException {
+      TimeBoundaryService timeBoundaryService, LiveInstancesChangeListenerImpl listener,
+      TableQueryQuotaManager tableQueryQuotaManager) throws ConfigurationException {
     _config = configuration;
     if (_config.containsKey(BROKER_DELAY_SHUTDOWN_TIME_CONFIG)) {
       delayedShutdownTimeMs = _config.getLong(BROKER_DELAY_SHUTDOWN_TIME_CONFIG, DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS);
     }
     _routingTable = helixExternalViewBasedRouting;
     _timeBoundaryService = timeBoundaryService;
+    _tableQueryQuotaManager = tableQueryQuotaManager;
     this.listener = listener;
   }
 
@@ -175,7 +180,8 @@ public class BrokerServerBuilder {
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _accessControlFactory = AccessControlFactory.loadFactory(_config.subset(BROKER_ACCESS_CONTROL_PREFIX));
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
-        reduceServiceRegistry, brokerPrunerService, _brokerMetrics, _config, _accessControlFactory);
+        reduceServiceRegistry, brokerPrunerService, _brokerMetrics, _config, _accessControlFactory,
+        _tableQueryQuotaManager);
 
     LOGGER.info("Network initialized !!");
   }

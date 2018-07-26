@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.io.writer.impl;
 
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -87,15 +84,12 @@ public class OffHeapStringStore implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapStringStore.class);
 
   private static final int START_SIZE = 32 * 1024;
-  private static final int INT_SIZE = V1Constants.Numbers.INTEGER_SIZE;
 
   public static int getStartSize() {
     return START_SIZE;
   }
 
   private static class Buffer implements Closeable {
-    private static final int CHAR_SIZE = Character.SIZE / 8;
-
     private final PinotDataBuffer _pinotDataBuffer;
     private final ByteBuffer _byteBuffer;
     private final int _startIndex;
@@ -110,7 +104,6 @@ public class OffHeapStringStore implements Closeable {
       }
       LOGGER.info("Allocationg string buffer of size {} for column {}", size, columnName);
       _pinotDataBuffer = memoryManager.allocate(size, columnName);
-      _pinotDataBuffer.order(ByteOrder.nativeOrder());
       _byteBuffer = _pinotDataBuffer.toDirectByteBuffer(0, (int) size);
       _startIndex = startIndex;
       _availEndOffset = _byteBuffer.capacity();
@@ -118,35 +111,34 @@ public class OffHeapStringStore implements Closeable {
     }
 
     private int add(String string) {
-      int startOffset = _availEndOffset - string.length() * CHAR_SIZE;
-      if (startOffset < (_numStrings + 1) * INT_SIZE) {
+      int startOffset = _availEndOffset - string.length() * Character.BYTES;
+      if (startOffset < (_numStrings + 1) * Integer.BYTES) {
         // full
         return -1;
       }
-      for (int i = 0, j = startOffset; i < string.length(); i++, j = j + CHAR_SIZE) {
+      for (int i = 0, j = startOffset; i < string.length(); i++, j = j + Character.BYTES) {
         _byteBuffer.putChar(j, string.charAt(i));
       }
-      _byteBuffer.putInt(_numStrings * INT_SIZE, startOffset);
+      _byteBuffer.putInt(_numStrings * Integer.BYTES, startOffset);
       _availEndOffset = startOffset;
       return _numStrings++;
     }
 
     private String get(final int index) {
-      int startOffset = _byteBuffer.getInt(index * INT_SIZE);
+      int startOffset = _byteBuffer.getInt(index * Integer.BYTES);
       int endOffset = _byteBuffer.capacity();
       if (index > 0) {
-        endOffset = _byteBuffer.getInt((index - 1) * INT_SIZE);
+        endOffset = _byteBuffer.getInt((index - 1) * Integer.BYTES);
       }
-      char[] chars = new char[(endOffset - startOffset) / CHAR_SIZE];
-      for (int i = 0, j = startOffset; i < chars.length; i++, j = j + CHAR_SIZE) {
+      char[] chars = new char[(endOffset - startOffset) / Character.BYTES];
+      for (int i = 0, j = startOffset; i < chars.length; i++, j = j + Character.BYTES) {
         chars[i] = _byteBuffer.getChar(j);
       }
       return new String(chars);
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() throws IOException {
       _pinotDataBuffer.close();
     }
 
@@ -186,7 +178,7 @@ public class OffHeapStringStore implements Closeable {
   }
 
   private Buffer expand(long sizeOfNewValue) {
-    return expand(_currentBuffer.getSize() * 2, sizeOfNewValue + INT_SIZE);
+    return expand(_currentBuffer.getSize() * 2, sizeOfNewValue + Integer.BYTES);
   }
 
   // Returns a string, given an index

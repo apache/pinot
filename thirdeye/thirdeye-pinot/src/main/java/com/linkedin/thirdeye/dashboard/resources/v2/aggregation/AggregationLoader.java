@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources.v2.aggregation;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import java.util.List;
 
 
 public interface AggregationLoader {
@@ -12,5 +13,5 @@ public interface AggregationLoader {
 
   DataFrame loadBreakdown(MetricSlice slice) throws Exception;
 
-  double loadAggregate(MetricSlice slice) throws Exception;
+  DataFrame loadAggregate(MetricSlice slice, List<String> dimensions) throws Exception;
 }

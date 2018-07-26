@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
 import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
-import java.nio.channels.FileChannel;
+import java.io.IOException;
+import java.nio.ByteOrder;
 
 
 public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter {
@@ -29,14 +29,14 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
   public FixedBitSingleValueWriter(File file, int rows, int columnSizeInBits) throws Exception {
     // Convert to long in order to avoid int overflow
     long length =  ((long) rows * columnSizeInBits + Byte.SIZE - 1) / Byte.SIZE;
+    // Backward-compatible: index file is always big-endian
     PinotDataBuffer dataBuffer =
-        PinotDataBuffer.fromFile(file, 0, (int) length, ReadMode.mmap,
-            FileChannel.MapMode.READ_WRITE, file.getAbsolutePath());
+        PinotDataBuffer.mapFile(file, false, 0, length, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
     dataFileWriter = new FixedBitIntReaderWriter(dataBuffer, rows, columnSizeInBits);
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     dataFileWriter.close();
   }
 

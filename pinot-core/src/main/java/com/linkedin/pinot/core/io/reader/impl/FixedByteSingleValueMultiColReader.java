@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.io.reader.impl;
 
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
@@ -172,7 +172,6 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
     final int length = getColumnSizes()[col];
     final byte[] dst = new byte[length];
     final int offset = computeOffset(row, col);
-    // copy starting from offset into dst index 0 and length elements
     indexDataBuffer.copyTo(offset, dst, 0, length);
     return dst;
   }
@@ -186,9 +185,8 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     indexDataBuffer.close();
-    indexDataBuffer = null;
   }
 
   public boolean open() {

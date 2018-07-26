@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -205,8 +205,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
   }
 
   @Override
-  public void close()
-      throws Exception {
+  public void close() throws IOException {
     segmentLock.close();
     synchronized (this) {
       if (columnIndexDirectory != null) {
@@ -440,7 +439,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       return segmentDirectory.toString();
     }
 
-    public void close() {
+    @Override
+    public void close() throws IOException {
       segmentLock.unlock();
       if (columnIndexDirectory != null) {
         columnIndexDirectory.close();

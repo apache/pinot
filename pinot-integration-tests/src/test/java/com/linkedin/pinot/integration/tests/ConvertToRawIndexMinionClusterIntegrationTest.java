@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.base.Function;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -74,7 +73,7 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     // The parent setUp() sets up Zookeeper, Kafka, controller, broker and servers
     super.setUp();
 
-    startMinions(NUM_MINIONS, null);
+    startMinions(NUM_MINIONS, null, null);
 
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
@@ -113,57 +112,54 @@ public class ConvertToRawIndexMinionClusterIntegrationTest extends HybridCluster
     Assert.assertFalse(_taskManager.scheduleTasks().containsKey(MinionConstants.ConvertToRawIndexTask.TASK_TYPE));
 
     // Wait at most 600 seconds for all tasks COMPLETED and new segments refreshed
-    TestUtils.waitForCondition(new Function<Void, Boolean>() {
-      @Override
-      public Boolean apply(@Nullable Void aVoid) {
-        // Check task state
-        for (TaskState taskState : _helixTaskResourceManager.getTaskStates(
-            MinionConstants.ConvertToRawIndexTask.TASK_TYPE).values()) {
-          if (taskState != TaskState.COMPLETED) {
-            return false;
-          }
+    TestUtils.waitForCondition(input -> {
+      // Check task state
+      for (TaskState taskState : _helixTaskResourceManager.getTaskStates(
+          MinionConstants.ConvertToRawIndexTask.TASK_TYPE).values()) {
+        if (taskState != TaskState.COMPLETED) {
+          return false;
+        }
+      }
+
+      // Check segment ZK metadata
+      for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _helixResourceManager.getOfflineSegmentMetadata(
+          offlineTableName)) {
+        Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
+        if (customMap == null || customMap.size() != 1 || !customMap.containsKey(
+            MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
+          return false;
+        }
+      }
+
+      // Check segment metadata
+      File[] indexDirs1 = tableDataDir.listFiles();
+      Assert.assertNotNull(indexDirs1);
+      for (File indexDir : indexDirs1) {
+        SegmentMetadata segmentMetadata;
+
+        // Segment metadata file might not exist if the segment is refreshing
+        try {
+          segmentMetadata = new SegmentMetadataImpl(indexDir);
+        } catch (Exception e) {
+          return false;
         }
 
-        // Check segment ZK metadata
-        for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : _helixResourceManager.getOfflineSegmentMetadata(
-            offlineTableName)) {
-          Map<String, String> customMap = offlineSegmentZKMetadata.getCustomMap();
-          if (customMap == null || customMap.size() != 1 || !customMap.containsKey(
-              MinionConstants.ConvertToRawIndexTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
-            return false;
-          }
-        }
-
-        // Check segment metadata
-        File[] indexDirs = tableDataDir.listFiles();
-        Assert.assertNotNull(indexDirs);
-        for (File indexDir : indexDirs) {
-          SegmentMetadata segmentMetadata;
-
-          // Segment metadata file might not exist if the segment is refreshing
-          try {
-            segmentMetadata = new SegmentMetadataImpl(indexDir);
-          } catch (Exception e) {
-            return false;
-          }
-
-          // The columns in COLUMNS_TO_CONVERT should have raw index
-          List<String> rawIndexColumns = Arrays.asList(StringUtils.split(COLUMNS_TO_CONVERT, ','));
-          for (String columnName : segmentMetadata.getSchema().getColumnNames()) {
-            if (rawIndexColumns.contains(columnName)) {
-              if (segmentMetadata.hasDictionary(columnName)) {
-                return false;
-              }
-            } else {
-              if (!segmentMetadata.hasDictionary(columnName)) {
-                return false;
-              }
+        // The columns in COLUMNS_TO_CONVERT should have raw index
+        List<String> rawIndexColumns = Arrays.asList(StringUtils.split(COLUMNS_TO_CONVERT, ','));
+        for (String columnName : segmentMetadata.getSchema().getColumnNames()) {
+          if (rawIndexColumns.contains(columnName)) {
+            if (segmentMetadata.hasDictionary(columnName)) {
+              return false;
+            }
+          } else {
+            if (!segmentMetadata.hasDictionary(columnName)) {
+              return false;
             }
           }
         }
-
-        return true;
       }
+
+      return true;
     }, 600_000L, "Failed to get all tasks COMPLETED and new segments refreshed");
   }
 

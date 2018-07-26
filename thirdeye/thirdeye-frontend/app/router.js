@@ -11,6 +11,8 @@ Router.map(function() {
   this.route('logout');
   //this.route('error'); disable for now
 
+  this.route('home');
+
   this.route('manage', function() {
     this.route('alert', { path: 'alert/:alert_id' }, function() {
       this.route('explore');
@@ -39,7 +41,8 @@ Router.map(function() {
 
   this.route('screenshot', { path: 'screenshot/:anomaly_id' });
   this.route('rootcause');
-  this.route('home');
+  this.route('preview');
+  this.route('auto-onboard');
 });
 
 export default Router;

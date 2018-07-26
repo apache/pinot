@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,8 +59,7 @@ public class SchemaUtils {
   /**
    * Wrap {@link Schema} into a {@link ZNRecord}.
    */
-  public static ZNRecord toZNRecord(@Nonnull Schema schema)
-      throws IllegalArgumentException, IllegalAccessException {
+  public static ZNRecord toZNRecord(@Nonnull Schema schema) {
     ZNRecord record = new ZNRecord(schema.getSchemaName());
     record.setSimpleField("schemaJSON", schema.getJSONSchema());
     return record;

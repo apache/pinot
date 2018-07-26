@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.metrics;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.yammer.metrics.core.MetricName;
@@ -24,9 +25,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
 import javax.annotation.Nullable;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,11 +92,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    *
    * @param request The broker request associated with this query
    * @param phase The query phase for which to log time
-   * @param nanos The number of nanoseconds that the phase execution took to complete
+   * @param duration The duration that the phase execution took to complete
+   * @param timeUnit The time unit of the duration
    */
-  public void addPhaseTiming(@Nullable final BrokerRequest request, final QP phase, final long nanos) {
-    final String fullTimerName = buildMetricName(request, phase.getQueryPhaseName());
-    addValueToTimer(fullTimerName, nanos, TimeUnit.NANOSECONDS);
+  public void addPhaseTiming(BrokerRequest request, QP phase, long duration, TimeUnit timeUnit) {
+    String fullTimerName = buildMetricName(request, phase.getQueryPhaseName());
+    addValueToTimer(fullTimerName, duration, timeUnit);
+  }
+
+  public void addPhaseTiming(BrokerRequest request, QP phase, long nanos) {
+    addPhaseTiming(request, phase, nanos, TimeUnit.NANOSECONDS);
   }
 
   public void addPhaseTiming(String tableName, QP phase, long nanos) {
@@ -361,6 +365,16 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       }
     } else {
       _gaugeValues.get(gaugeName).set(value);
+    }
+  }
+
+  @VisibleForTesting
+  public long getValueOfGlobalGauge(final G gauge) {
+    String gaugeName = gauge.getGaugeName();
+    if (!_gaugeValues.containsKey(gaugeName)) {
+      return 0;
+    } else {
+      return _gaugeValues.get(gaugeName).get();
     }
   }
 

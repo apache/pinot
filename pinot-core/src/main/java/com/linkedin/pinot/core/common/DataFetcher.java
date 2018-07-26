@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -182,6 +182,25 @@ public class DataFetcher {
       dictionary.readStringValues(dictIds, 0, length, outValues, 0);
     } else {
       _singleValueSetMap.get(column).getStringValues(inDocIds, 0, length, outValues, 0);
+    }
+  }
+
+  /**
+   * Fetch byte[] values for a single-valued column.
+   *
+   * @param column Column to read
+   * @param inDocIds Input document id's buffer
+   * @param length Number of input document id'
+   * @param outValues Buffer for output
+   */
+  public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][] outValues) {
+    Dictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchDictIds(column, inDocIds, length, dictIds);
+      dictionary.readBytesValues(dictIds, 0, length, outValues, 0);
+    } else {
+      _singleValueSetMap.get(column).getBytesValues(inDocIds, 0, length, outValues, 0);
     }
   }
 

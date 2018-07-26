@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,8 +37,8 @@ import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.HLRealtimeSegmentDataManager;
 import com.linkedin.pinot.core.data.manager.realtime.TimerService;
-import com.linkedin.pinot.core.realtime.RealtimeFileBasedReaderTest;
-import com.linkedin.pinot.core.realtime.RealtimeSegment;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegment;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImplTest;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -154,7 +154,7 @@ public class RealtimeTableDataManagerTest {
         long start = System.currentTimeMillis();
         long sum = 0;
         try {
-          RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
+          MutableSegment segment = (MutableSegment) manager.getSegment();
           DataSource mDs = segment.getDataSource("count");
           BlockValSet valSet = mDs.nextBlock().getBlockValueSet();
           BlockSingleValIterator valIt = (BlockSingleValIterator) valSet.iterator();
@@ -180,7 +180,7 @@ public class RealtimeTableDataManagerTest {
         long start = System.currentTimeMillis();
         long sum = 0;
         try {
-          RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
+          MutableSegment segment = (MutableSegment) manager.getSegment();
           DataSource mDs = segment.getDataSource("viewerId");
           BlockValSet valSet = mDs.nextBlock().getBlockValueSet();
           BlockSingleValIterator valIt = (BlockSingleValIterator) valSet.iterator();
@@ -206,7 +206,7 @@ public class RealtimeTableDataManagerTest {
         long start = System.currentTimeMillis();
         long sum = 0;
         try {
-          RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
+          MutableSegment segment = (MutableSegment) manager.getSegment();
           DataSource mDs = segment.getDataSource("daysSinceEpoch");
           BlockValSet valSet = mDs.nextBlock().getBlockValueSet();
           BlockSingleValIterator valIt = (BlockSingleValIterator) valSet.iterator();
@@ -233,7 +233,7 @@ public class RealtimeTableDataManagerTest {
         float sumOfLengths = 0F;
         float counter = 0F;
         try {
-          RealtimeSegment segment = (RealtimeSegment) manager.getSegment();
+          MutableSegment segment = (MutableSegment) manager.getSegment();
           DataSource mDs = segment.getDataSource("viewerCompanies");
           Block b = mDs.nextBlock();
           BlockValSet valSet = b.getBlockValueSet();
@@ -293,7 +293,7 @@ public class RealtimeTableDataManagerTest {
   }
 
   private static Schema getTestSchema() throws FileNotFoundException, IOException {
-    filePath = RealtimeFileBasedReaderTest.class.getClassLoader().getResource(AVRO_DATA).getFile();
+    filePath = MutableSegmentImplTest.class.getClassLoader().getResource(AVRO_DATA).getFile();
     fieldTypeMap = new HashMap<String, FieldSpec.FieldType>();
     fieldTypeMap.put("viewerId", FieldType.DIMENSION);
     fieldTypeMap.put("vieweeId", FieldType.DIMENSION);

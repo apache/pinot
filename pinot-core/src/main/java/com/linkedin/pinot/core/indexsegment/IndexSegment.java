@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,10 @@ package com.linkedin.pinot.core.indexsegment;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import java.util.List;
 import java.util.Set;
 
 
@@ -53,18 +56,26 @@ public interface IndexSegment {
   DataSource getDataSource(String columnName);
 
   /**
-   * Returns the {@link StarTree} index if it exists, or null if it does not exist.
+   * Returns the Star-tree index if it exists, or null if it does not exist.
    *
    * @return Star-tree index
    */
   StarTree getStarTree();
 
   /**
-   * Returns the total size of the segment in bytes.
-   *
-   * @return Size of the segment in bytes
+   * Returns a list of star-trees (V2), or null if there is no star-tree (V2) in the segment.
    */
-  long getDiskSizeBytes();
+  List<StarTreeV2> getStarTrees();
+
+  /**
+   * Returns the record for the given document Id.
+   * <p>NOTE: don't use this method for high performance code.
+   *
+   * @param docId Document Id
+   * @param reuse Reusable buffer for the record
+   * @return Record for the given document Id
+   */
+  GenericRow getRecord(int docId, GenericRow reuse);
 
   /**
    * Destroys segment in memory and closes file handlers if in MMAP mode.

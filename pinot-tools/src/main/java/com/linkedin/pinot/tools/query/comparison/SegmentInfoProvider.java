@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.util.ArrayList;
@@ -100,7 +100,7 @@ public class SegmentInfoProvider {
       segmentDir = segmentFile;
     }
 
-    IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.heap);
     Schema schema = indexSegment.getSegmentMetadata().getSchema();
 
     // Add time column if exists.

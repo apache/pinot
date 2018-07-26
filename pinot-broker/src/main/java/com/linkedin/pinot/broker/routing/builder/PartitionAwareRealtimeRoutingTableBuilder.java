@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.config.TableConfig;
@@ -21,8 +20,11 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.LLCUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,7 +49,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     super.init(configuration, tableConfig, propertyStore);
-    _numReplicas = Integer.valueOf(_tableConfig.getValidationConfig().getReplicasPerPartition());
+    _numReplicas = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
   }
 
   @Override
@@ -68,7 +70,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
 
     // Gather all segments and group them by Kafka partition, sorted by sequence number
     Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition =
-        KafkaLowLevelRoutingTableBuilderUtil.getSortedSegmentsByKafkaPartition(externalView);
+        LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
 
     // Ensure that for each Kafka partition, we have at most one Helix partition (Pinot segment) in consuming state
     Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition =
@@ -118,6 +120,16 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
       if (!segmentSet.contains(segmentName)) {
         _segmentToZkMetadataMapping.remove(segmentName);
       }
+    }
+
+    // Get the unique set of replica ids and find the maximum id to update the number of replicas
+    Set<Integer> replicaGroupIds = new HashSet<>();
+    for (Map<Integer, String> replicaToServer : segmentToReplicaToServerMap.values()) {
+      replicaGroupIds.addAll(replicaToServer.keySet());
+    }
+    int numReplicas = Collections.max(replicaGroupIds) + 1;
+    if (_numReplicas != numReplicas) {
+      _numReplicas = numReplicas;
     }
 
     setSegmentToReplicaToServerMap(segmentToReplicaToServerMap);

@@ -54,3 +54,17 @@
 .rootcause-alert {
   margin: 0 $te-spacing--lg 10px $te-spacing--lg;
 }
+
+.rootcause-tabs {
+  background-color: app-shade($te-main-background, 0.8);
+
+  .pull-right {
+    margin-right: 5px;
+  }
+}
+
+.rootcause-dimensions-table {
+  .table thead tr th {
+    border-bottom: none;
+  }
+}

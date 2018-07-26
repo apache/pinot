@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,13 @@ package com.linkedin.pinot.controller.helix.core;
 import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.config.Tenant;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -69,7 +70,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   }
 
   @Test
-  public void testGetInstanceEndpoints() {
+  public void testGetInstanceEndpoints() throws InvalidConfigException {
     Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(servers);
     for (int i = 0; i < NUM_INSTANCES; i++) {
@@ -100,7 +101,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     // Untag all Brokers assigned to broker tenant
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
       _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
-          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(BROKER_TENANT_NAME));
+          TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 
@@ -121,7 +122,7 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     // Untag all Brokers for other tests
     for (String brokerInstance : _helixResourceManager.getAllInstancesForBrokerTenant(BROKER_TENANT_NAME)) {
       _helixAdmin.removeInstanceTag(_helixClusterName, brokerInstance,
-          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(BROKER_TENANT_NAME));
+          TagNameUtils.getBrokerTagForTenant(BROKER_TENANT_NAME));
       _helixAdmin.addInstanceTag(_helixClusterName, brokerInstance, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
 

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardJobStatus;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -30,6 +31,7 @@ public class AnomalyFunctionBean extends AbstractBean {
   private MetricAggFunction metricFunction;
 
   private String type;
+  private List<String> secondaryAnomalyFunctionsType;
 
   private boolean isActive = true;
 
@@ -76,12 +78,21 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private AnomalyMergeConfig anomalyMergeConfig;
 
+  private DetectionOnboardJobStatus onboardJobStatus;
+
   /**
    * This flag always true.
    * This flag would typically be unset, in backfill cases, where we want to override the completeness check,
    */
   private boolean requiresCompletenessCheck = true;
 
+  public List<String> getSecondaryAnomalyFunctionsType() {
+    return secondaryAnomalyFunctionsType;
+  }
+
+  public void setSecondaryAnomalyFunctionsType(List<String> secondaryAnomalyFunctionsType) {
+    this.secondaryAnomalyFunctionsType = secondaryAnomalyFunctionsType;
+  }
 
   public long getMetricId() {
     return metricId;
@@ -296,37 +307,50 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.anomalyMergeConfig = anomalyMergeConfig;
   }
 
+  public void setWindowSize(Integer windowSize) {
+    this.windowSize = windowSize;
+  }
+
+  public void setWindowDelay(Integer windowDelay) {
+    this.windowDelay = windowDelay;
+  }
+
+  public DetectionOnboardJobStatus getOnboardJobStatus() {
+    return onboardJobStatus;
+  }
+
+  public void setOnboardJobStatus(DetectionOnboardJobStatus onboardJobStatus) {
+    this.onboardJobStatus = onboardJobStatus;
+  }
+
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof AnomalyFunctionBean)) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    AnomalyFunctionBean af = (AnomalyFunctionBean) o;
-    return Objects.equals(getId(), af.getId()) && Objects.equals(collection, af.getCollection())
-        && Objects.equals(metric, af.getMetric())
-        && Objects.equals(metrics, af.getMetrics())
-        && Objects.equals(metricFunction, af.getMetricFunction())
-        && Objects.equals(type, af.getType()) && Objects.equals(isActive, af.getIsActive())
-        && Objects.equals(cron, af.getCron()) && Objects.equals(properties, af.getProperties())
-        && Objects.equals(frequency, af.getFrequency())
-        && Objects.equals(bucketSize, af.getBucketSize())
-        && Objects.equals(bucketUnit, af.getBucketUnit())
-        && Objects.equals(windowSize, af.getWindowSize())
-        && Objects.equals(windowUnit, af.getWindowUnit())
-        && Objects.equals(windowDelay, af.getWindowDelay())
-        && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
-        && Objects.equals(exploreDimensions, af.getExploreDimensions())
-        && Objects.equals(filters, af.getFilters())
-        && Objects.equals(globalMetric, af.getGlobalMetric())
-        && Objects.equals(globalMetricFilters, af.getGlobalMetricFilters())
-        && Objects.equals(alertFilter, af.getAlertFilter())
-        && Objects.equals(requiresCompletenessCheck,  af.isRequiresCompletenessCheck());
+    AnomalyFunctionBean that = (AnomalyFunctionBean) o;
+    return isActive == that.isActive && metricId == that.metricId
+        && requiresCompletenessCheck == that.requiresCompletenessCheck && Objects.equals(collection, that.collection)
+        && Objects.equals(functionName, that.functionName) && Objects.equals(metric, that.metric) && Objects.equals(
+        metrics, that.metrics) && metricFunction == that.metricFunction && Objects.equals(type, that.type)
+        && Objects.equals(globalMetric, that.globalMetric) && Objects.equals(globalMetricFilters,
+        that.globalMetricFilters) && Objects.equals(properties, that.properties) && Objects.equals(cron, that.cron)
+        && Objects.equals(frequency, that.frequency) && Objects.equals(bucketSize, that.bucketSize)
+        && bucketUnit == that.bucketUnit && Objects.equals(windowSize, that.windowSize) && windowUnit == that.windowUnit
+        && Objects.equals(windowDelay, that.windowDelay) && windowDelayUnit == that.windowDelayUnit && Objects.equals(
+        exploreDimensions, that.exploreDimensions) && Objects.equals(filters, that.filters) && Objects.equals(
+        dataFilter, that.dataFilter) && Objects.equals(alertFilter, that.alertFilter) && Objects.equals(
+        anomalyMergeConfig, that.anomalyMergeConfig) && Objects.equals(onboardJobStatus, that.onboardJobStatus);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron, frequency,
-        properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
-        exploreDimensions, filters, globalMetric, globalMetricFilters, alertFilter, requiresCompletenessCheck);
+    return Objects.hash(collection, functionName, metric, metrics, metricFunction, type, isActive, globalMetric,
+        globalMetricFilters, properties, cron, frequency, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay,
+        windowDelayUnit, exploreDimensions, filters, metricId, dataFilter, alertFilter, anomalyMergeConfig,
+        onboardJobStatus, requiresCompletenessCheck);
   }
 }

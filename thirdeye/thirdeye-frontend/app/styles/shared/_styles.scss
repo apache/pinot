@@ -107,7 +107,8 @@ body {
     display: inline-block;
     padding-left: 10px;
     font-weight: normal;
-    font-size: 15px;
+    font-size: $te-font-size-small;
+    color: app-shade(black, 8);
   }
 
   &__radio {
@@ -273,7 +274,7 @@ body {
   }
 
   &__side-link {
-    font-size: 15px;
+    font-size: $te-font-size-small;
     color: $te-link-blue;
     font-weight: 600;
     letter-spacing: .03em;
@@ -375,7 +376,7 @@ body {
   }
 
   &__card-tooltip {
-    font-size: 15px;
+    font-size: $te-font-size-small;
     float: left;
   }
 
@@ -399,7 +400,7 @@ body {
   }
 
   &__card-units {
-    font-size: 18px;
+    font-size: $te-font-size-medium;
     margin-left: -3px;
 
     &--small {
@@ -410,10 +411,10 @@ body {
 
 .te-graph-container {
   margin: 10px 0 20px -15px;
-}
 
-.te-block-container {
-  position: relative;
+  &--marginless {
+    margin: 0;
+  }
 }
 
 .te-anomaly-table-stats {
@@ -450,7 +451,7 @@ body {
     display: block;
 
     &--number {
-      font-size: 18px;
+      font-size: $te-font-size-medium;
       color: $te-blue;
     }
   }
@@ -476,7 +477,7 @@ body {
   }
 
   &__text {
-    font-size: 15px;
+    font-size: $te-font-size-small;
     color: app-shade(black, 6);
   }
 
@@ -538,7 +539,7 @@ body {
 
   &__row {
     display: flex;
-    font-size: 15px;
+    font-size: $te-font-size-small;
   }
 
   &__option {
@@ -548,7 +549,7 @@ body {
       display: inline-block;
       width: 100px;
       min-width: 100px;
-      font-size: 14px;
+      font-size: 15px;
       overflow: hidden;
       text-overflow: ellipsis;
       text-align: right;
@@ -608,7 +609,7 @@ body {
     &--title {
       margin: 0;
       color: $te-blue-4;
-      font-size: 18px;
+      font-size: $te-font-size-medium;
       font-weight: 400;
     }
   }
@@ -627,7 +628,7 @@ body {
 
   &__tag {
     background-color: app-shade(black, 3);
-    font-size: 15px;
+    font-size: $te-font-size-small;
     line-height: 20px;
     letter-spacing: .05em;
     border-radius: 3px;

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,12 +115,12 @@ public class AggregationGroupByTrimmingServiceTest {
       List<String> sumGroup = sumGroupByResult.getGroup();
       Assert.assertEquals(sumGroup.size(), NUM_GROUP_KEYS, ERROR_MESSAGE);
       Assert.assertEquals(buildGroupString(sumGroup), _groups.get(expectedGroupIndex), ERROR_MESSAGE);
-      Assert.assertEquals((int) Double.parseDouble((String) sumGroupByResult.getValue()), expectedGroupIndex,
-          ERROR_MESSAGE);
+      Double value = (Double) sumGroupByResult.getValue();
+      Assert.assertEquals(value.intValue(), expectedGroupIndex, ERROR_MESSAGE);
       // For distinctCount, because multiple groups have same value, so there is no guarantee on the order of groups,
       // just check the value
       GroupByResult distinctCountGroupByResult = distinctCountGroupByResultList.get(i);
-      Assert.assertEquals(Integer.parseInt((String) distinctCountGroupByResult.getValue()),
+      Assert.assertEquals(distinctCountGroupByResult.getValue(),
           expectedGroupIndex / (NUM_GROUPS / MAX_SIZE_OF_SET) + 1, ERROR_MESSAGE);
     }
   }

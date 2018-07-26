@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,32 +22,48 @@ import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.core.minion.SegmentPurger;
 import java.io.File;
 import java.util.Collections;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 
 public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
+  public static final String RECORD_PURGER_KEY = "recordPurger";
+  public static final String RECORD_MODIFIER_KEY = "recordModifier";
+  public static final String NUM_RECORDS_PURGED_KEY = "numRecordsPurged";
+  public static final String NUM_RECORDS_MODIFIED_KEY = "numRecordsModified";
 
   @Override
-  protected File convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
+  protected SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,
       @Nonnull File workingDir) throws Exception {
-    String rawTableName =
-        TableNameBuilder.extractRawTableName(pinotTaskConfig.getConfigs().get(MinionConstants.TABLE_NAME_KEY));
+    Map<String, String> configs = pinotTaskConfig.getConfigs();
+    String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+
     SegmentPurger.RecordPurgerFactory recordPurgerFactory = MINION_CONTEXT.getRecordPurgerFactory();
-    SegmentPurger.RecordPurger recordPurger = null;
-    if (recordPurgerFactory != null) {
-      recordPurger = recordPurgerFactory.getRecordPurger(rawTableName);
-    }
+    SegmentPurger.RecordPurger recordPurger =
+        recordPurgerFactory != null ? recordPurgerFactory.getRecordPurger(rawTableName) : null;
     SegmentPurger.RecordModifierFactory recordModifierFactory = MINION_CONTEXT.getRecordModifierFactory();
-    SegmentPurger.RecordModifier recordModifier = null;
-    if (recordModifierFactory != null) {
-      recordModifier = recordModifierFactory.getRecordModifier(rawTableName);
+    SegmentPurger.RecordModifier recordModifier =
+        recordModifierFactory != null ? recordModifierFactory.getRecordModifier(rawTableName) : null;
+    SegmentPurger segmentPurger = new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier);
+
+    File purgedSegmentFile = segmentPurger.purgeSegment();
+    if (purgedSegmentFile == null) {
+      purgedSegmentFile = originalIndexDir;
     }
 
-    return new SegmentPurger(originalIndexDir, workingDir, recordPurger, recordModifier).purgeSegment();
+    return new SegmentConversionResult.Builder().setFile(purgedSegmentFile)
+        .setTableNameWithType(tableNameWithType)
+        .setSegmentName(configs.get(MinionConstants.SEGMENT_NAME_KEY))
+        .setCustomProperty(RECORD_PURGER_KEY, segmentPurger.getRecordPurger())
+        .setCustomProperty(RECORD_MODIFIER_KEY, segmentPurger.getRecordModifier())
+        .setCustomProperty(NUM_RECORDS_PURGED_KEY, segmentPurger.getNumRecordsPurged())
+        .setCustomProperty(NUM_RECORDS_MODIFIED_KEY, segmentPurger.getNumRecordsModified())
+        .build();
   }
 
   @Override
-  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() throws Exception {
+  protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier() {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE,
         Collections.singletonMap(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));

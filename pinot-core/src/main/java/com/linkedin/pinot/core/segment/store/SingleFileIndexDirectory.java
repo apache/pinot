@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.channels.FileChannel;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -151,25 +151,20 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     entry.startOffset = indexFile.length();
     entry.size = size + MAGIC_MARKER_SIZE_BYTES;
 
-    // read-mode is always mmap so that buffer changes are synced
-    // to the file
-    PinotDataBuffer appendBuffer = PinotDataBuffer.fromFile(indexFile,
-        entry.startOffset,
-        entry.size,
-        ReadMode.mmap,
-        FileChannel.MapMode.READ_WRITE,
-        allocContext);
+    // Backward-compatible: index file is always big-endian
+    PinotDataBuffer appendBuffer =
+        PinotDataBuffer.mapFile(indexFile, false, entry.startOffset, entry.size, ByteOrder.BIG_ENDIAN, allocContext);
 
     LOGGER.debug("Allotted buffer for key: {}, startOffset: {}, size: {}", key, entry.startOffset, entry.size);
     appendBuffer.putLong(0, MAGIC_MARKER);
     allocBuffers.add(appendBuffer);
 
-    entry.buffer = appendBuffer.view(0 + MAGIC_MARKER_SIZE_BYTES, entry.size);
+    entry.buffer = appendBuffer.view(MAGIC_MARKER_SIZE_BYTES, entry.size);
     columnEntries.put(key, entry);
 
     persistIndexMap(entry);
 
-    return entry.buffer.duplicate();
+    return entry.buffer;
   }
 
   private void checkKeyNotPresent(IndexKey key) {
@@ -278,13 +273,18 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
     Preconditions.checkArgument(offsetAccum.size() >= 1);
 
     long fromFilePos = offsetAccum.get(0);
-    long toFilePos = endOffset - fromFilePos;
+    long size = endOffset - fromFilePos;
 
     String context = allocationContext(indexFile, "single_file_index.rw." +
-        "." + String.valueOf(fromFilePos) + "." + String.valueOf(toFilePos));
+        "." + String.valueOf(fromFilePos) + "." + String.valueOf(size));
 
-    PinotDataBuffer buffer = PinotDataBuffer.fromFile(indexFile, fromFilePos, toFilePos, readMode,
-        FileChannel.MapMode.READ_WRITE, context);
+    // Backward-compatible: index file is always big-endian
+    PinotDataBuffer buffer;
+    if (readMode == ReadMode.mmap) {
+      buffer = PinotDataBuffer.loadFile(indexFile, fromFilePos, size, ByteOrder.BIG_ENDIAN, context);
+    } else {
+      buffer = PinotDataBuffer.mapFile(indexFile, true, fromFilePos, size, ByteOrder.BIG_ENDIAN, context);
+    }
     allocBuffers.add(buffer);
 
     int prevSlicePoint = 0;
@@ -324,7 +324,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     for (PinotDataBuffer buf : allocBuffers) {
       buf.close();
     }

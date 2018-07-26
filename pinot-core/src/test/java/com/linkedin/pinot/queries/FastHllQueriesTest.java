@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,12 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
@@ -106,7 +107,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     // Test inner segment queries
     // Test base query
     AggregationOperator aggregationOperator = getOperatorForQuery(BASE_QUERY);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 1L, 0L, 2L, 30000L);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -114,7 +115,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
     // Test query with filter
     aggregationOperator = getOperatorForQueryWithFilter(BASE_QUERY);
-    resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
+    resultsBlock = aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 112472L, 12258L, 30000L);
     aggregationResult = resultsBlock.getAggregationResult();
@@ -122,7 +123,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
     // Test query with group-by
     AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(BASE_QUERY + GROUP_BY);
-    resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
+    resultsBlock = aggregationGroupByOperator.nextBlock();
     executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 4613L, 0L, 13839L, 30000L);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
@@ -153,7 +154,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     // Test inner segment queries
     // Test base query
     AggregationOperator aggregationOperator = getOperatorForQuery(BASE_QUERY);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
     ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 60000L, 30000L);
     List<Object> aggregationResult = resultsBlock.getAggregationResult();
@@ -161,7 +162,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1762L);
     // Test query with filter
     aggregationOperator = getOperatorForQueryWithFilter(BASE_QUERY);
-    resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
+    resultsBlock = aggregationOperator.nextBlock();
     executionStatistics = aggregationOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 6129L, 84134L, 12258L, 30000L);
     aggregationResult = resultsBlock.getAggregationResult();
@@ -169,7 +170,7 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(((HyperLogLog) aggregationResult.get(1)).cardinality(), 1197L);
     // Test query with group-by
     AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(BASE_QUERY + GROUP_BY);
-    resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
+    resultsBlock = aggregationGroupByOperator.nextBlock();
     executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(executionStatistics, 30000L, 0L, 90000L, 30000L);
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
@@ -246,9 +247,10 @@ public class FastHllQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig);
     driver.build();
 
-    _indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
-    _segmentDataManagers = Arrays.<SegmentDataManager>asList(new OfflineSegmentDataManager(_indexSegment),
-        new OfflineSegmentDataManager(_indexSegment));
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    _indexSegment = immutableSegment;
+    _segmentDataManagers =
+        Arrays.asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
   }
 
   private void deleteSegment() {

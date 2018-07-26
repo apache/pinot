@@ -3,35 +3,50 @@
  * @module manage/alert/edit/edit
  * @exports manage/alert/edit/edit
  */
-import _ from 'lodash';
+import RSVP from 'rsvp';
+import fetch from 'fetch';
 import Route from '@ember/routing/route';
+import { task, timeout } from 'ember-concurrency';
+import { get, getWithDefault } from '@ember/object';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
+import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Route.extend({
-  model(params) {
-    const { id, alertData, email, allConfigGroups, allAppNames } = this.modelFor('manage.alert');
+
+/**
+ * Optional params to load a fresh view
+ */
+  queryParams: {
+    refresh: {
+      refreshModel: true,
+      replace: false
+    }
+  },
+
+  async model(params, transition) {
+    const {
+      id,
+      alertData
+    } = this.modelFor('manage.alert');
+
     if (!id) { return; }
 
-    return {
-      alertData,
-      email,
-      allConfigGroups,
-      allAppNames
-    };
+    const alertGroups = await fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus);
+
+    return RSVP.hash({
+      alertGroups,
+      alertData
+    });
   },
 
   afterModel(model) {
     const {
       alertData,
-      email: groupByAlertId,
-      allConfigGroups,
-      allAppNames
+      alertGroups
     } = model;
 
     const {
-      id,
-      filters,
-      bucketSize,
-      bucketUnit,
       properties: alertProps
     } = alertData;
 
@@ -41,17 +56,9 @@ export default Route.extend({
       return { name, value: decodeURIComponent(value) };
     });
 
-    const originalConfigGroup = groupByAlertId.length ? groupByAlertId.pop() : null;
-    const selectedAppName = originalConfigGroup ? originalConfigGroup.application : null;
-    const selectedApplication = _.find(allAppNames, function(appsObj) { return appsObj.application === selectedAppName; });
-
     Object.assign(model, {
       propsArray,
-      allConfigGroups: _.uniq(allConfigGroups, name),
-      originalConfigGroup,
-      selectedAppName,
-      allApps: allAppNames,
-      selectedApplication
+      alertGroups
     });
   },
 
@@ -60,14 +67,10 @@ export default Route.extend({
 
     const {
       alertData,
-      selectedAppName,
-      selectedApplication,
-      allApps: allApplications,
+      alertGroups,
       propsArray: alertProps,
       loadError: isLoadError,
-      loadErrorMsg: loadErrorMessage,
-      allConfigGroups: alertConfigGroups,
-      originalConfigGroup: selectedConfigGroup
+      loadErrorMsg: loadErrorMessage
     } = model;
 
     const {
@@ -84,21 +87,26 @@ export default Route.extend({
       alertData,
       alertFilters,
       alertProps,
-      alertConfigGroups,
       alertFunctionName,
       alertId,
+      alertGroups,
       isActive,
-      allApplications,
-      selectedConfigGroup,
-      selectedApplication,
-      selectedAppName,
       isLoadError,
       loadErrorMessage,
       granularity: `${bucketSize}_${bucketUnit}`
     });
-
-    controller.initialize();
   },
+
+  /**
+   * Fetch alert data for each function id that the currently selected group watches
+   * @method fetchAlertDataById
+   * @param {Object} functionIds - alert ids included in the currently selected group
+   * @return {RSVP.hash} A new list of functions (alerts)
+   */
+  fetchAlertDataById: task(function * (functionIds) {
+    const functionArray = yield functionIds.map(id => fetch(selfServeApiCommon.alertById(id)).then(checkStatus));
+    return RSVP.hash(functionArray);
+  }),
 
   actions: {
     /**
@@ -106,6 +114,13 @@ export default Route.extend({
      */
     refreshModel() {
       this.refresh();
+    },
+
+    /**
+    * Refresh anomaly data when changes are made
+    */
+    loadFunctionsTable(selectedConfigGroup) {
+      get(this, 'prepareAlertList').perform(selectedConfigGroup);
     }
   }
 });

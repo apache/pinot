@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.api.resources;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -407,14 +407,23 @@ public class PinotSegmentUploadRestletResource {
     TableConfig offlineTableConfig =
         ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
 
+    LOGGER.info("Starting upload for segment {}, tempTarredSegmentFile {}", segmentName,
+        tempTarredSegmentFile.getAbsolutePath());
+
     if (offlineTableConfig == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find table config for table: " + offlineTableName,
           Response.Status.NOT_FOUND);
     }
 
     // Check quota
-    StorageQuotaChecker.QuotaCheckerResponse quotaResponse =
-        checkStorageQuota(indexDir, segmentMetadata, offlineTableConfig);
+    StorageQuotaChecker.QuotaCheckerResponse quotaResponse;
+    try {
+      quotaResponse = checkStorageQuota(indexDir, segmentMetadata, offlineTableConfig);
+    } catch (InvalidConfigException e) {
+      // Admin port is missing, return response with 500 status code.
+      throw new ControllerApplicationException(LOGGER, "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: "
+          + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
     if (!quotaResponse.isSegmentWithinQuota) {
       throw new ControllerApplicationException(LOGGER,
           "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: "
@@ -432,6 +441,7 @@ public class PinotSegmentUploadRestletResource {
 
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
+      LOGGER.info("Adding new segment: {}", segmentName);
       if (downloadUrl == null) {
         downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile);
       }
@@ -439,7 +449,8 @@ public class PinotSegmentUploadRestletResource {
       return;
     }
 
-    // Segment already exists, refresh if necessary
+    LOGGER.info("Segment {} already exists, refreshing if necessary", segmentName);
+
     OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
     long existingCrc = existingSegmentZKMetadata.getCrc();
 
@@ -512,13 +523,16 @@ public class PinotSegmentUploadRestletResource {
       // Update ZK metadata and refresh the segment if necessary
       long newCrc = Long.valueOf(segmentMetadata.getCrc());
       if (newCrc == existingCrc) {
-        // New segment is the same as the existing one, only update ZK metadata without refresh the segment
+        LOGGER.info("New segment crc {} is same as existing segment crc {} for segment {}. Updating ZK metadata without refreshing the segment {}",
+            newCrc, existingCrc, segmentName);
         if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
           throw new RuntimeException(
               "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
         }
       } else {
         // New segment is different with the existing one, update ZK metadata and refresh the segment
+        LOGGER.info("New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing segment {}",
+            newCrc, existingCrc, segmentName);
         if (downloadUrl == null) {
           downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile);
         }
@@ -538,6 +552,8 @@ public class PinotSegmentUploadRestletResource {
     File tarredSegmentFile = new File(new File(provider.getBaseDataDir(), tableName), segmentName);
     FileUtils.deleteQuietly(tarredSegmentFile);
     FileUtils.moveFile(tempTarredSegmentFile, tarredSegmentFile);
+    LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, tempTarredSegmentFile.getAbsolutePath(),
+        tarredSegmentFile.getAbsolutePath());
     return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
   }
 
@@ -620,9 +636,9 @@ public class PinotSegmentUploadRestletResource {
    * @param offlineTableConfig offline table configuration. This should not be null.
    */
   private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
-      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) {
+      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) throws InvalidConfigException {
     TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics);
+    StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName, metadata.getName(),
         _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);

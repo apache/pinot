@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ public class QueryException {
   // TODO: Handle these errors in broker
   public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
   public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
+  public static final int QUERY_SCHEDULING_TIMEOUT_ERROR_CODE = 240;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
   public static final int DATA_TABLE_DESERIALIZATION_ERROR_CODE = 310;
@@ -49,6 +50,7 @@ public class QueryException {
   public static final int BROKER_TIMEOUT_ERROR_CODE = 400;
   public static final int BROKER_RESOURCE_MISSING_ERROR_CODE = 410;
   public static final int BROKER_INSTANCE_MISSING_ERROR_CODE = 420;
+  public static final int TOO_MANY_REQUESTS_ERROR_CODE = 429;
   public static final int INTERNAL_ERROR_CODE = 450;
   public static final int MERGE_RESPONSE_ERROR_CODE = 500;
   public static final int FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE = 550;
@@ -65,8 +67,12 @@ public class QueryException {
   public static final ProcessingException COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR =
       new ProcessingException(COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE);
   public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(QUERY_EXECUTION_ERROR_CODE);
-  public static final ProcessingException SERVER_SCHEDULER_DOWN_ERROR = new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
-  public static final ProcessingException SERVER_OUT_OF_CAPACITY_ERROR = new ProcessingException(SERVER_OUT_OF_CAPACITY_ERROR_CODE);
+  public static final ProcessingException SERVER_SCHEDULER_DOWN_ERROR =
+      new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
+  public static final ProcessingException SERVER_OUT_OF_CAPACITY_ERROR =
+      new ProcessingException(SERVER_OUT_OF_CAPACITY_ERROR_CODE);
+  public static final ProcessingException QUERY_SCHEDULING_TIMEOUT_ERROR =
+      new ProcessingException(QUERY_SCHEDULING_TIMEOUT_ERROR_CODE);
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
       new ProcessingException(EXECUTION_TIMEOUT_ERROR_CODE);
   public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(BROKER_GATHER_ERROR_CODE);
@@ -86,6 +92,7 @@ public class QueryException {
       new ProcessingException(COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE);
   public static final ProcessingException QUERY_VALIDATION_ERROR = new ProcessingException(QUERY_VALIDATION_ERROR_CODE);
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
+  public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
 
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");
@@ -96,6 +103,7 @@ public class QueryException {
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
     SERVER_SCHEDULER_DOWN_ERROR.setMessage("ServerShuttingDown");
     SERVER_OUT_OF_CAPACITY_ERROR.setMessage("ServerOutOfCapacity");
+    QUERY_SCHEDULING_TIMEOUT_ERROR.setMessage("QuerySchedulingTimeoutError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
     DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableDeserializationError");
@@ -109,6 +117,7 @@ public class QueryException {
     COMBINE_GROUP_BY_EXCEPTION_ERROR.setMessage("CombineGroupByExceptionError");
     QUERY_VALIDATION_ERROR.setMessage("QueryValidationError");
     UNKNOWN_ERROR.setMessage("UnknownError");
+    QUOTA_EXCEEDED_ERROR.setMessage("QuotaExceededError");
   }
 
   public static ProcessingException getException(ProcessingException processingException, Exception exception) {

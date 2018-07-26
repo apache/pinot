@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,7 +33,8 @@ public enum ObjectType {
   HyperLogLog(6),
   QuantileDigest(7),
   HashMap(8),
-  IntOpenHashSet(9);
+  IntOpenHashSet(9),
+  TDigest(10);
 
   // Map from type value to type.
   private static Map<Integer, ObjectType> _objectTypeMap = new HashMap<>();

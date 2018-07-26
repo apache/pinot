@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,14 +46,14 @@ import org.slf4j.LoggerFactory;
 @Api(tags = Constants.INSTANCE_TAG)
 @Path("/")
 public class PinotInstanceRestletResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      PinotInstanceRestletResource.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotInstanceRestletResource.class);
+
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
 
-  public static  class Instances
-  {
+  public static class Instances {
     List<String> instances;
+
     public Instances(@JsonProperty("instances") List<String> instances) {
       this.instances = instances;
     }
@@ -72,10 +72,11 @@ public class PinotInstanceRestletResource {
   @Path("/instances")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List all instances")
-  @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
-      @ApiResponse(code=500, message = "Error reading instances")})
-  public Instances getAllInstances(
-  ) {
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public Instances getAllInstances() {
     return new Instances(pinotHelixResourceManager.getAllInstances());
   }
 
@@ -83,18 +84,17 @@ public class PinotInstanceRestletResource {
   @Path("/instances/{instanceName}")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get instance information", produces = MediaType.APPLICATION_JSON)
-  @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Instance not found"),
-      @ApiResponse(code=500, message = "Error reading instances")})
+      @ApiResponse(code = 500, message = "Internal error")
+  })
   public String getInstance(
-      @ApiParam(value = "Instance name", required = true,
-          example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
-      @PathParam("instanceName") String instanceName)
-  {
-
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
+      @PathParam("instanceName") String instanceName) {
     if (!pinotHelixResourceManager.instanceExists(instanceName)) {
-      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " does not exist",
-          javax.ws.rs.core.Response.Status.NOT_FOUND);
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
+          Response.Status.NOT_FOUND);
     }
     InstanceConfig instanceConfig = pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
     JSONObject response = new JSONObject();
@@ -114,91 +114,89 @@ public class PinotInstanceRestletResource {
   @Path("/instances")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON, notes = "Creates a new instance with given instance config")
-  @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully created"),
-      @ApiResponse(code=409, message="Instance exists already"),
-      @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addInstance(
-      Instance instance
-  ) {
+  @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON,
+      notes = "Creates a new instance with given instance config")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 409, message = "Instance already exists"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public SuccessResponse addInstance(Instance instance) {
     LOGGER.info("Instance creation request received for instance " + instance.toInstanceId());
-    final PinotResourceManagerResponse resp = pinotHelixResourceManager.addInstance(instance);
-    if (resp.status == PinotResourceManagerResponse.ResponseStatus.failure) {
-      throw new ControllerApplicationException(LOGGER, "Instance already exists",
-          javax.ws.rs.core.Response.Status.CONFLICT);
+    if (!pinotHelixResourceManager.addInstance(instance).isSuccessful()) {
+      throw new ControllerApplicationException(LOGGER, "Instance already exists", Response.Status.CONFLICT);
     }
     return new SuccessResponse("Instance successfully created");
   }
 
-  // TODO: @consumes text/plain but swagger doc says json. Does that work. It's better this way if it works
   @POST
   @Path("/instances/{instanceName}/state")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation(value = "Create a new instance", consumes = MediaType.APPLICATION_JSON, notes = "Creates a new instance with given instance config")
-  @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully created"),
-      @ApiResponse(code=409, message="Instance exists already"),
-      @ApiResponse(code = 400, message="Bad Request"),
-      @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse addInstance(
-      @ApiParam(value = "Instance name", required = true,
-          example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
+  @ApiOperation(value = "Enable/disable/drop an instance", notes = "Enable/disable/drop an instance")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Instance not found"),
+      @ApiResponse(code = 409, message = "Instance cannot be dropped"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public SuccessResponse toggleInstanceState(
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
       @PathParam("instanceName") String instanceName,
-      String state
-  ) {
-    // TODO: state should be moved to path or form parameter
-    if (! pinotHelixResourceManager.instanceExists(instanceName)) {
-      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " does not exist",
+      String state) {
+    if (!pinotHelixResourceManager.instanceExists(instanceName)) {
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
           Response.Status.NOT_FOUND);
     }
-    PinotResourceManagerResponse response;
+
     if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
-      response = pinotHelixResourceManager.enableInstance(instanceName);
+      if (!pinotHelixResourceManager.enableInstance(instanceName).isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER, "Failed to enable instance " + instanceName,
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
     } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
-      response = pinotHelixResourceManager.disableInstance(instanceName);
+      if (!pinotHelixResourceManager.disableInstance(instanceName).isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER, "Failed to disable instance " + instanceName,
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
     } else if (StateType.DROP.name().equalsIgnoreCase(state)) {
-      response = pinotHelixResourceManager.dropInstance(instanceName);
+      PinotResourceManagerResponse response = pinotHelixResourceManager.dropInstance(instanceName);
+      if (!response.isSuccessful()) {
+        throw new ControllerApplicationException(LOGGER,
+            "Failed to drop instance " + instanceName + " - " + response.getMessage(), Response.Status.CONFLICT);
+      }
     } else {
-     throw new ControllerApplicationException(LOGGER, "Unknown state " + state + " for instance request",
-         Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, "Unknown state " + state + " for instance request",
+          Response.Status.BAD_REQUEST);
     }
-    if (response.isSuccessful()) {
-      return new SuccessResponse("Request to " + state + " instance " + instanceName  + " is successful");
-    }
-    throw new ControllerApplicationException(LOGGER, "Failed to " + state + " instance " + instanceName,
-        Response.Status.INTERNAL_SERVER_ERROR);
+    return new SuccessResponse("Request to " + state + " instance " + instanceName + " is successful");
   }
 
   @DELETE
   @Path("/instances/{instanceName}")
   @Consumes(MediaType.TEXT_PLAIN)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Delete an instance", consumes = MediaType.APPLICATION_JSON,
-      notes = "Deletes an instance of given name")
-  @ApiResponses(value = {@ApiResponse(code = 200, message="Instance successfully deleted"),
+  @ApiOperation(value = "Drop an instance", notes = "Drop an instance")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
       @ApiResponse(code = 404, message = "Instance not found"),
-      @ApiResponse(code = 409, message = "Forbidden operation typically because the instance is live or "
-          + "idealstates still contain some information of this instance"),
-      @ApiResponse(code = 400, message = "Bad Request"),
-      @ApiResponse(code = 500, message = "Internal error")})
-  public SuccessResponse deleteInstance(
-      @ApiParam(value = "Instance name", required = true,
-          example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
-      @PathParam("instanceName") String instanceName
-  ) {
-    if (! pinotHelixResourceManager.instanceExists(instanceName)) {
-      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " does not exist",
+      @ApiResponse(code = 409, message = "Instance cannot be dropped"),
+      @ApiResponse(code = 500, message = "Internal error")
+  })
+  public SuccessResponse dropInstance(
+      @ApiParam(value = "Instance name", required = true, example = "Server_a.b.com_20000 | Broker_my.broker.com_30000")
+      @PathParam("instanceName") String instanceName) {
+    if (!pinotHelixResourceManager.instanceExists(instanceName)) {
+      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " not found",
           Response.Status.NOT_FOUND);
     }
-    if (!pinotHelixResourceManager.isInstanceDroppable(instanceName)) {
-      throw new ControllerApplicationException(LOGGER, "Instance " + instanceName + " is live or it still appears in the idealstate",
-          Response.Status.CONFLICT);
-    }
+
     PinotResourceManagerResponse response = pinotHelixResourceManager.dropInstance(instanceName);
     if (!response.isSuccessful()) {
-      LOGGER.error("Failed to delete instance: {}, response: {}", instanceName, response.message);
-      throw new ControllerApplicationException(LOGGER, "Failed to delete instance", Response.Status.INTERNAL_SERVER_ERROR);
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to drop instance " + instanceName + " - " + response.getMessage(), Response.Status.CONFLICT);
     }
-    return new SuccessResponse("Successfully deleted instance");
+    return new SuccessResponse("Successfully dropped instance");
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,5 +40,51 @@ public class UtilsTest {
     Assert.assertEquals(TimeUtils.timeUnitFromString("MINUTES"), TimeUnit.MINUTES);
     Assert.assertNull(TimeUtils.timeUnitFromString("daysSinceEpoch"));
     Assert.assertNull(TimeUtils.timeUnitFromString(null));
+  }
+
+  @Test
+  public void testFlushThresholdTimeConversion() {
+
+    Long millis = TimeUtils.convertPeriodToMillis("8d");
+    Assert.assertEquals(millis.longValue(), 8*24*60*60*1000L);
+    millis = TimeUtils.convertPeriodToMillis("8d6h");
+    Assert.assertEquals(millis.longValue(), 8*24*60*60*1000L + 6*60*60*1000L);
+    millis = TimeUtils.convertPeriodToMillis("8d10m");
+    Assert.assertEquals(millis.longValue(), 8*24*60*60*1000L + 10*60*1000L);
+    millis = TimeUtils.convertPeriodToMillis("6h");
+    Assert.assertEquals(millis.longValue(), 6*60*60*1000L);
+    millis = TimeUtils.convertPeriodToMillis("6h30m");
+    Assert.assertEquals(millis.longValue(), 6*60*60*1000L + 30*60*1000);
+    millis = TimeUtils.convertPeriodToMillis("50m");
+    Assert.assertEquals(millis.longValue(), 50*60*1000L);
+    millis = TimeUtils.convertPeriodToMillis("10s");
+    Assert.assertEquals(millis.longValue(), 10*1000L);
+    millis = TimeUtils.convertPeriodToMillis(null);
+    Assert.assertEquals(millis.longValue(), 0);
+    millis = TimeUtils.convertPeriodToMillis("-1d");
+    Assert.assertEquals(millis.longValue(),  -86400000L);
+    try {
+      millis = TimeUtils.convertPeriodToMillis("hhh");
+      Assert.fail("Expected exception to be thrown while converting an invalid input string");
+    } catch (IllegalArgumentException e){
+      // expected
+    }
+
+    String periodStr = TimeUtils.convertMillisToPeriod(10 * 1000L);
+    Assert.assertEquals(periodStr, "10s");
+    periodStr = TimeUtils.convertMillisToPeriod(50*60*1000L);
+    Assert.assertEquals(periodStr, "50m");
+    periodStr = TimeUtils.convertMillisToPeriod(50*60*1000L + 30*1000);
+    Assert.assertEquals(periodStr, "50m30s");
+    periodStr = TimeUtils.convertMillisToPeriod(6*60*60*1000L);
+    Assert.assertEquals(periodStr, "6h");
+    periodStr = TimeUtils.convertMillisToPeriod(6*60*60*1000L + 20*60*1000 + 10*1000);
+    Assert.assertEquals(periodStr, "6h20m10s");
+    periodStr = TimeUtils.convertMillisToPeriod(0L);
+    Assert.assertEquals(periodStr, "0s");
+    periodStr = TimeUtils.convertMillisToPeriod(-1L);
+    Assert.assertEquals(periodStr, "");
+    periodStr = TimeUtils.convertMillisToPeriod(null);
+    Assert.assertEquals(periodStr, null);
   }
 }

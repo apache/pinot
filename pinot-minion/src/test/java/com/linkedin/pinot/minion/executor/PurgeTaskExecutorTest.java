@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,14 +25,12 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.minion.SegmentPurger;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.minion.MinionContext;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -82,35 +80,21 @@ public class PurgeTaskExecutorTest {
     _originalIndexDir = new File(ORIGINAL_SEGMENT_DIR, SEGMENT_NAME);
 
     MinionContext minionContext = MinionContext.getInstance();
-    minionContext.setRecordPurgerFactory(new SegmentPurger.RecordPurgerFactory() {
-      @Override
-      public SegmentPurger.RecordPurger getRecordPurger(@Nonnull String tableName) {
-        if (tableName.equals(TABLE_NAME)) {
-          return new SegmentPurger.RecordPurger() {
-            @Override
-            public boolean shouldPurge(GenericRow row) {
-              return row.getValue(D1).equals(0);
-            }
-          };
-        } else {
-          return null;
-        }
+    minionContext.setRecordPurgerFactory(rawTableName -> {
+      if (rawTableName.equals(TABLE_NAME)) {
+        return row -> row.getValue(D1).equals(0);
+      } else {
+        return null;
       }
     });
-    minionContext.setRecordModifierFactory(new SegmentPurger.RecordModifierFactory() {
-      @Override
-      public SegmentPurger.RecordModifier getRecordModifier(@Nonnull String tableName) {
-        if (tableName.equals(TABLE_NAME)) {
-          return new SegmentPurger.RecordModifier() {
-            @Override
-            public boolean modifyRecord(GenericRow row) {
-              row.putField(D1, Integer.MAX_VALUE);
-              return true;
-            }
-          };
-        } else {
-          return null;
-        }
+    minionContext.setRecordModifierFactory(rawTableName -> {
+      if (rawTableName.equals(TABLE_NAME)) {
+        return row -> {
+          row.putField(D1, Integer.MAX_VALUE);
+          return true;
+        };
+      } else {
+        return null;
       }
     });
   }
@@ -121,7 +105,7 @@ public class PurgeTaskExecutorTest {
     PinotTaskConfig pinotTaskConfig = new PinotTaskConfig(MinionConstants.PurgeTask.TASK_TYPE,
         Collections.singletonMap(MinionConstants.TABLE_NAME_KEY,
             TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)));
-    File purgedIndexDir = purgeTaskExecutor.convert(pinotTaskConfig, _originalIndexDir, PURGED_SEGMENT_DIR);
+    File purgedIndexDir = purgeTaskExecutor.convert(pinotTaskConfig, _originalIndexDir, PURGED_SEGMENT_DIR).getFile();
 
     try (PinotSegmentRecordReader pinotSegmentRecordReader = new PinotSegmentRecordReader(purgedIndexDir)) {
       int numRecordsRemaining = 0;

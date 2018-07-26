@@ -281,7 +281,7 @@
                         <input id="monitoring-schedule-time" type="text" placeholder="HH:MM or HH,HH,HH" value="{{#if schedule/scheduleHour}}{{schedule/scheduleHour}}{{else}}{{/if}}{{#if schedule/scheduleMinute}}:{{schedule/scheduleMinute}}{{else}}{{/if}}">
                         <span id="schedule-timezone">UTC</span>
                     </span>
-           {{#if data/cron}}<span class="form-row uk-hidden">cron: {{data/cron}}</span>{{/if}}
+           {{#if data/cronExpression}}<span class="form-row uk-hidden">cronExpression: {{data/cronExpression}}</span>{{/if}}
 
                     <span>assessing the last</span>
                     <input id="monitoring-window-size" class="thin-input" type="number" value="{{#if data/windowSize}}{{data/windowSize}}{{else}}1{{/if}}">

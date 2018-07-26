@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,6 +52,8 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -60,6 +62,8 @@ import org.json.JSONObject;
  */
 @SuppressWarnings("unused")
 public class FileUploadDownloadClient implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadDownloadClient.class);
+
   public static class CustomHeaders {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
@@ -79,11 +83,15 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   public static final int DEFAULT_SOCKET_TIMEOUT_MS = 600 * 1000; // 10 minutes
+  public static final int GET_REQUEST_SOCKET_TIMEOUT_MS = 5 * 1000; // 5 seconds
 
   private static final String HTTP = "http";
   private static final String HTTPS = "https";
   private static final String SCHEMA_PATH = "/schemas";
   private static final String SEGMENT_PATH = "/segments";
+  private static final String TABLES_PATH = "/tables";
+  private static final String TYPE_DELIMITER = "?type=";
+  private static final String SLASH = "/";
 
   private final CloseableHttpClient _httpClient;
 
@@ -91,19 +99,30 @@ public class FileUploadDownloadClient implements Closeable {
    * Construct the client with default settings.
    */
   public FileUploadDownloadClient() {
-    _httpClient = HttpClients.createDefault();
+    this(null);
   }
 
   /**
-   * Construct the client with {@link SSLContext} to handle HTTPS request properly.
-   * @param sslContext
+   * Construct the client with optional {@link SSLContext} to handle HTTPS request properly.
+   *
+   * @param sslContext SSL context
    */
-  public FileUploadDownloadClient(SSLContext sslContext) {
+  public FileUploadDownloadClient(@Nullable SSLContext sslContext) {
     _httpClient = HttpClients.custom().setSSLContext(sslContext).build();
   }
 
   private static URI getURI(String scheme, String host, int port, String path) throws URISyntaxException {
     return new URI(scheme, null, host, port, path, null, null);
+  }
+
+  public static URI getRetrieveTableConfigURI(String host, int port, String tableName) throws URISyntaxException {
+    String path = TABLES_PATH + SLASH + tableName;
+    return getURI(HTTP, host, port, path);
+  }
+
+  public static URI getRetrieveSchemaHttpURI(String host, int port, String tableName) throws URISyntaxException {
+    String path = SCHEMA_PATH + SLASH + tableName;
+    return getURI(HTTP, host, port, path);
   }
 
   public static URI getUploadSchemaHttpURI(String host, int port) throws URISyntaxException {
@@ -135,6 +154,13 @@ public class FileUploadDownloadClient implements Closeable {
         RequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
+    return requestBuilder.build();
+  }
+
+  private static HttpUriRequest constructGetRequest(URI uri) {
+    RequestBuilder requestBuilder = RequestBuilder.get(uri)
+        .setVersion(HttpVersion.HTTP_1_1);
+    setTimeout(requestBuilder, GET_REQUEST_SOCKET_TIMEOUT_MS);
     return requestBuilder.build();
   }
 
@@ -223,6 +249,15 @@ public class FileUploadDownloadClient implements Closeable {
 
   private SimpleHttpResponse sendRequest(HttpUriRequest request) throws IOException, HttpErrorStatusException {
     try (CloseableHttpResponse response = _httpClient.execute(request)) {
+      String controllerHost = null;
+      String controllerVersion = null;
+      if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
+        controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
+        controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
+      }
+      if (controllerHost != null) {
+        LOGGER.info(String.format("Sending request: %s to controller: %s, version: %s", request.getURI(), controllerHost, controllerVersion));
+      }
       int statusCode = response.getStatusLine().getStatusCode();
       if (statusCode >= 300) {
         throw new HttpErrorStatusException(getErrorMessage(request, response), statusCode);
@@ -252,6 +287,30 @@ public class FileUploadDownloadClient implements Closeable {
           String.format("%s to controller: %s, version: %s", errorMessage, controllerHost, controllerVersion);
     }
     return errorMessage;
+  }
+
+  /**
+   * Get request to retrieve table config
+   * @param uri URI
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse getTableConfig(URI uri)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(constructGetRequest(uri));
+  }
+
+  /**
+   * Get request to retrieve schema
+   * @param uri URI
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse getSchema(URI uri)
+      throws IOException, HttpErrorStatusException {
+    return sendRequest(constructGetRequest(uri));
   }
 
   /**

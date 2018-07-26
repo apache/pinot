@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.query.aggregation;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -44,7 +44,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       _functions[i] = function;
       _resultHolders[i] = _functions[i].createAggregationResultHolder();
       // TODO: currently only support single argument aggregation
-      if (!function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (function.getType() != AggregationFunctionType.COUNT) {
         _expressions[i] =
             TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
       }
@@ -58,7 +58,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       AggregationFunction function = _functions[i];
       AggregationResultHolder resultHolder = _resultHolders[i];
 
-      if (function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (function.getType() == AggregationFunctionType.COUNT) {
         function.aggregate(length, resultHolder);
       } else {
         function.aggregate(length, resultHolder, transformBlock.getBlockValueSet(_expressions[i]));

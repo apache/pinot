@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,26 +38,6 @@ public class StringDictionary extends ImmutableDictionaryReader {
   @Override
   public String get(int dictId) {
     return getUnpaddedString(dictId, getBuffer());
-  }
-
-  @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

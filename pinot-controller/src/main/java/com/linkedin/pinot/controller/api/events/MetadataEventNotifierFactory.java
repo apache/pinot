@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public abstract class   MetadataEventNotifierFactory {
+public abstract class MetadataEventNotifierFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(MetadataEventNotifierFactory.class);
   public static final String METADATA_EVENT_CLASS_CONFIG = "factory.class";
 

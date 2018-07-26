@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,35 +26,5 @@ public abstract class OnHeapDictionary extends ImmutableDictionaryReader {
 
   protected OnHeapDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);
-  }
-
-  @Override
-  public Object get(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public String getStringValue(int dictId) {
-    throw new UnsupportedOperationException();
   }
 }

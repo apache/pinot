@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
   private String min = V1Constants.Str.NULL_STRING;
   private String max = V1Constants.Str.NULL_STRING;
+
+  private int smallestStringLength = Integer.MAX_VALUE;
   private int longestStringLength = 0;
   private final ObjectSet<String> rawStringSet;
   private final ObjectSet<String> aggregatedStringSet;
@@ -56,7 +58,10 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       for (final Object e : (Object[]) entry) {
         String value = e.toString();
         set.add(value);
-        longestStringLength = Math.max(longestStringLength, value.getBytes(UTF_8).length);
+
+        int valueLength = value.getBytes(UTF_8).length;
+        smallestStringLength = Math.min(smallestStringLength, valueLength);
+        longestStringLength = Math.max(longestStringLength, valueLength);
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -73,7 +78,10 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       addressSorted(value);
       updatePartition(value);
       set.add(value);
-      longestStringLength = Math.max(longestStringLength, value.getBytes(UTF_8).length);
+
+      int valueLength = value.getBytes(UTF_8).length;
+      smallestStringLength = Math.min(smallestStringLength, valueLength);
+      longestStringLength = Math.max(longestStringLength, valueLength);
       totalNumberOfEntries++;
     }
   }

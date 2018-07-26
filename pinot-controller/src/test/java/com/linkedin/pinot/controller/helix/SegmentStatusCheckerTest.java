@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -525,6 +525,52 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.PERCENT_OF_REPLICAS), 100);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+    segmentStatusChecker.stop();
+  }
+
+  @Test
+  public void disabledTableTest() throws Exception {
+
+    final String tableName = "myTable_OFFLINE";
+    List<String> allTableNames = new ArrayList<String>();
+    allTableNames.add(tableName);
+    IdealState idealState = new IdealState(tableName);
+    // disable table in idealstate
+    idealState.enable(false);
+    idealState.setPartitionState("myTable_OFFLINE", "pinot1", "OFFLINE");
+    idealState.setPartitionState("myTable_OFFLINE", "pinot2", "OFFLINE");
+    idealState.setPartitionState("myTable_OFFLINE", "pinot3", "OFFLINE");
+    idealState.setReplicas("1");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    HelixAdmin helixAdmin;
+    {
+      helixAdmin = mock(HelixAdmin.class);
+      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
+      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
+    }
+    {
+      helixResourceManager = mock(PinotHelixResourceManager.class);
+      when(helixResourceManager.isLeader()).thenReturn(true);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
+      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
+      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+    }
+    {
+      config = mock(ControllerConf.class);
+      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+    }
+    metricsRegistry = new MetricsRegistry();
+    controllerMetrics = new ControllerMetrics(metricsRegistry);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    // verify state before test
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
+        ControllerGauge.DISABLED_TABLE_COUNT), 0);
+    // update metrics
+    segmentStatusChecker.updateSegmentMetrics();
+    Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
+        ControllerGauge.DISABLED_TABLE_COUNT), 1);
+
     segmentStatusChecker.stop();
   }
 

@@ -49,6 +49,13 @@
       {{/bs-alert}}
     {{/if}}
 
+    {{#if (and anomaliesLoaded isAnomalyLoadError)}}
+      {{#bs-alert type="danger" class="te-form__banner te-form__banner--failure"}}
+        <strong>Warning:</strong> We are not able to load data for {{model.totalAnomalies}} anomalies.
+        Please <a class="thirdeye-link-secondary thirdeye-link-secondary--warning" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a> for confirmation.
+      {{/bs-alert}}
+    {{/if}}
+
     <div class="te-content-block">
       <h4 class="te-self-serve__block-title">Anomalies over time ({{#if anomaliesLoaded}}{{filteredAnomalies.length}}{{else}}...loading anomalies{{/if}})</h4>
       <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
@@ -109,13 +116,13 @@
             viewRegionEnd=viewRegionEnd
             topDimensions=topDimensions
             alertDimension=alertDimension
+            graphMailtoLink=graphMailtoLink
             viewRegionStart=viewRegionStart
             alertName=alertData.functionName
             predefinedRanges=predefinedRanges
             dimensionOptions=dimensionOptions
             timePickerIncrement=timePickerIncrement
             isDimensionFetchDone=isDimensionFetchDone
-            isFetchingDimensions=alertHasDimensions
             isMetricDataLoading=isMetricDataLoading
             isMetricDataInvalid=isMetricDataInvalid
             inputAction=(action "onInputMissingAnomaly")
@@ -127,11 +134,13 @@
 
       {{!-- Alert page graph --}}
       {{self-serve-graph
-        isMetricSelected=true
         metricData=metricData
+        isMetricSelected=true
         componentId='alert-page'
         topDimensions=topDimensions
         selectedDimension=alertDimension
+        selectedDimensions=selectedDimensions
+        graphMailtoLink=graphMailtoLink
         isMetricDataLoading=isMetricDataLoading
         isMetricDataInvalid=isMetricDataInvalid
         isDimensionFetchDone=isDimensionFetchDone
@@ -149,7 +158,7 @@
       {{!-- Alert anomaly table --}}
       <div class="te-block-container">
         {{#if baselineOptionsLoading}}
-          <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve__custom">{{ember-spinner}}</div>
+          <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve--custom">{{ember-spinner}}</div>
         {{/if}}
         <table class="te-anomaly-table">
           {{#if filteredAnomalies}}
@@ -193,7 +202,7 @@
                   <ul class="te-anomaly-table__list">
                     <li class="te-anomaly-table__list-item te-anomaly-table__list-item--shadow">{{anomaly.index}}</li>
                     <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
-                      <a target="_blank" class="te-anomaly-table__link" href="/thirdeye#investigate?anomalyId={{anomaly.anomalyId}}">
+                      <a target="_blank" class="te-anomaly-table__link" href="/app/#/rootcause?anomalyId={{anomaly.anomalyId}}">
                         {{anomaly.startDateStr}}
                       </a>
                     </li>

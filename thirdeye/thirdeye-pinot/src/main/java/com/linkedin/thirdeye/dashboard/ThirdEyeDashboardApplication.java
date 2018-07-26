@@ -3,10 +3,9 @@ package com.linkedin.thirdeye.dashboard;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.cache.CacheBuilder;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.onboard.FunctionOnboardingResource;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.auth.AuthCookieSerializer;
 import com.linkedin.thirdeye.auth.Credentials;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthFilter;
 import com.linkedin.thirdeye.auth.ThirdEyeAuthenticatorDisabled;
@@ -49,11 +48,13 @@ import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detection.DetectionResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
 import com.linkedin.thirdeye.tracking.RequestStatisticsLogger;
+import com.linkedin.thirdeye.dataset.DatasetAutoOnboardResource;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.auth.Authenticator;
 import io.dropwizard.auth.CachingAuthenticator;
@@ -71,12 +72,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
-import javax.servlet.ServletRegistration;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.eclipse.jetty.proxy.ProxyServlet;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,6 +133,7 @@ public class ThirdEyeDashboardApplication
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
 
+    env.jersey().register(new DatasetAutoOnboardResource());
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
     env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
@@ -152,23 +151,20 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new OnboardDatasetMetricResource());
     env.jersey().register(new AutoOnboardResource(config));
     env.jersey().register(new ConfigResource(DAO_REGISTRY.getConfigDAO()));
-    env.jersey().register(new FunctionOnboardingResource());
     env.jersey().register(new CustomizedEventResource(DAO_REGISTRY.getEventDAO()));
     env.jersey().register(new TimeSeriesResource());
-    env.jersey().register(new UserDashboardResource(DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(), DAO_REGISTRY.getMetricConfigDAO()));
+    env.jersey().register(new UserDashboardResource(
+        DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
+        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
+        DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
+    env.jersey().register(new DetectionOnboardResource(DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));
+    env.jersey().register(new DetectionResource());
 
     TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
     AggregationLoader aggregationLoader = new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
+
     env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
     env.jersey().register(new RootCauseMetricResource(Executors.newCachedThreadPool(), aggregationLoader, timeSeriesLoader, DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
-
-    if (config.getOnboardingHost() != null) {
-      LOG.info("Setting up onboarding proxy for '{}'", config.getOnboardingHost());
-      ServletRegistration.Dynamic proxy = env.servlets().addServlet("detection-onboard", ProxyServlet.Transparent.class);
-      proxy.setInitParameter("proxyTo", config.getOnboardingHost());
-      proxy.setInitParameter("prefix", "/detection-onboard");
-      proxy.addMapping("/detection-onboard/*");
-    }
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
@@ -201,8 +197,6 @@ public class ThirdEyeDashboardApplication
 
     if (config.getAuthConfig() != null) {
       final AuthConfiguration authConfig = config.getAuthConfig();
-      final SecretKeySpec aesKey = new SecretKeySpec(authConfig.getAuthKey().getBytes("UTF-8"), "AES");
-      final AuthCookieSerializer serializer = new AuthCookieSerializer(aesKey, new ObjectMapper());
 
       // default permissive authenticator
       Authenticator<Credentials, ThirdEyePrincipal> authenticator = new ThirdEyeAuthenticatorDisabled();
@@ -212,18 +206,16 @@ public class ThirdEyeDashboardApplication
         final ThirdEyeAuthenticatorLdap authenticatorLdap = new ThirdEyeAuthenticatorLdap(authConfig.getDomainSuffix(), authConfig.getLdapUrl());
         authenticator = new CachingAuthenticator<>(env.metrics(), authenticatorLdap, CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
       }
-
       // auth filter
-      env.jersey().register(new ThirdEyeAuthFilter(authenticator, serializer, authConfig.getAllowedPaths()));
-
+      env.jersey().register(new ThirdEyeAuthFilter(authenticator, authConfig.getAllowedPaths()));
       // auth resource
-      env.jersey().register(new AuthResource(authenticator, serializer, authConfig.getCookieTTL() * 1000));
+      env.jersey().register(new AuthResource(authenticator, authConfig.getCookieTTL() * 1000));
     }
 
     env.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
-        requestStatisticsLogger = new RequestStatisticsLogger(new TimeGranularity(1, TimeUnit.HOURS));
+        requestStatisticsLogger = new RequestStatisticsLogger(new TimeGranularity(1, TimeUnit.DAYS));
         requestStatisticsLogger.start();
       }
 

@@ -1,33 +1,37 @@
 package com.linkedin.thirdeye.auto.onboard;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.DataSourceConfig;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
-
+import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
 
 /**
  * This is a service to onboard datasets automatically to thirdeye from pinot
@@ -39,6 +43,8 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private final DatasetConfigManager datasetDAO;
+  private final MetricConfigManager metricDAO;
 
   private AutoOnboardPinotMetricsUtils autoLoadPinotMetricsUtils;
 
@@ -51,11 +57,15 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
       throw e;
     }
+    this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
   }
 
   public AutoOnboardPinotDataSource(DataSourceConfig dataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
     super(dataSourceConfig);
     autoLoadPinotMetricsUtils = utils;
+    this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
   }
 
   public void run() {
@@ -66,18 +76,56 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
       Map<String, Map<String, String>> allCustomConfigs = new HashMap<>();
       loadDatasets(allDatasets, allSchemas, allCustomConfigs);
       LOG.info("Checking all datasets");
+      removeDeletedDataset(allDatasets);
       for (String dataset : allDatasets) {
         LOG.info("Checking dataset {}", dataset);
 
         Schema schema = allSchemas.get(dataset);
         Map<String, String> customConfigs = allCustomConfigs.get(dataset);
-        DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+        DatasetConfigDTO datasetConfig = datasetDAO.findByDataset(dataset);
         addPinotDataset(dataset, schema, customConfigs, datasetConfig);
       }
     } catch (Exception e) {
       LOG.error("Exception in loading datasets", e);
     }
   }
+
+  void removeDeletedDataset(List<String> allDatasets) {
+    LOG.info("Removing deleted Pinot datasets");
+    List<DatasetConfigDTO> allExsistingDataset = this.datasetDAO.findAll();
+    Set<String> datasets = new HashSet<>(allDatasets);
+
+    Collection<DatasetConfigDTO> filtered = Collections2.filter(allExsistingDataset, new com.google.common.base.Predicate<DatasetConfigDTO>() {
+      @Override
+      public boolean apply(@Nullable DatasetConfigDTO datasetConfigDTO) {
+        return datasetConfigDTO.getDataSource().equals(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
+      }
+    });
+
+    for (DatasetConfigDTO datasetConfigDTO : filtered) {
+      if (shouldRemoveDataset(datasetConfigDTO, datasets)) {
+        LOG.info("Deleting pinot dataset '{}'", datasetConfigDTO.getDataset());
+        datasetDAO.deleteByPredicate(Predicate.EQ("dataset", datasetConfigDTO.getDataset()));
+      }
+    }
+  }
+
+  private boolean shouldRemoveDataset(DatasetConfigDTO datasetConfigDTO, Set<String> datasets) {
+    if (!datasets.contains(datasetConfigDTO.getDataset())) {
+      List<MetricConfigDTO> metrics = metricDAO.findByDataset(datasetConfigDTO.getDataset());
+      int metricCount = metrics.size();
+      for (MetricConfigDTO metric : metrics) {
+        if (!metric.isDerived()) {
+          metricDAO.delete(metric);
+          metricCount--;
+        }
+      }
+      return metricCount == 0;
+    } else {
+      return false;
+    }
+  }
+
 
   /**
    * Adds a dataset to the thirdeye database
@@ -107,13 +155,13 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     // Create DatasetConfig
     DatasetConfigDTO datasetConfigDTO = ConfigGenerator.generateDatasetConfig(dataset, schema, customConfigs);
     LOG.info("Creating dataset for {}", dataset);
-    DAO_REGISTRY.getDatasetConfigDAO().save(datasetConfigDTO);
+    this.datasetDAO.save(datasetConfigDTO);
 
     // Create MetricConfig
     for (MetricFieldSpec metricFieldSpec : metricSpecs) {
       MetricConfigDTO metricConfigDTO = ConfigGenerator.generateMetricConfig(metricFieldSpec, dataset);
       LOG.info("Creating metric {} for {}", metricConfigDTO.getName(), dataset);
-      DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO);
+      this.metricDAO.save(metricConfigDTO);
     }
   }
 
@@ -242,8 +290,7 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
           String configKey = customConfig.getKey();
           String configValue = customConfig.getValue();
 
-          String existingValue = properties.get(configKey);
-          if (!Objects.equals(configValue, existingValue)) {
+          if (!properties.containsKey(configKey)) {
             properties.put(configKey, configValue);
             hasUpdate = true;
           }

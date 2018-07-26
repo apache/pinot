@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,133 +13,86 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.common.query.context;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
+
 
 public class TimerContext {
+  private final BrokerRequest _brokerRequest;
+  private final ServerMetrics _serverMetrics;
+  private final long _queryArrivalTimeMs;
+  private final Timer[] _phaseTimers = new Timer[ServerQueryPhase.values().length];
 
-  private final ServerMetrics serverMetrics;
-  private final Map<ServerQueryPhase, Timer> phaseTimers = new HashMap<>();
-  private final BrokerRequest brokerRequest;
-  private long queryArrivalTimeNs;
+  public class Timer {
+    private final ServerQueryPhase _queryPhase;
+    private final long _startTimeMs;
 
-  public class Timer implements AutoCloseable {
-    private final ServerQueryPhase queryPhase;
-    long startTimeNs;
-    long endTimeNs;
-    boolean isRunning;
+    private long _durationMs;
+    private boolean _ended;
 
-    Timer(ServerQueryPhase phase) {
-      this.queryPhase = phase;
-    }
-
-    void start() {
-      startTimeNs = System.nanoTime();
-      isRunning = true;
-    }
-
-    void setStartTimeNs(long startTimeNs) {
-      this.startTimeNs = startTimeNs;
-      isRunning = true;
+    private Timer(ServerQueryPhase queryPhase, long startTimeMs) {
+      _queryPhase = queryPhase;
+      _startTimeMs = startTimeMs;
     }
 
     public void stopAndRecord() {
-      if (isRunning) {
-        endTimeNs = System.nanoTime();
-
-        recordPhaseTime(this);
-        isRunning = false;
+      if (!_ended) {
+        _durationMs = System.currentTimeMillis() - _startTimeMs;
+        _serverMetrics.addPhaseTiming(_brokerRequest, _queryPhase, _durationMs, TimeUnit.MILLISECONDS);
+        _ended = true;
       }
     }
 
-    public long getDurationNs() {
-      return endTimeNs - startTimeNs;
-    }
-
     public long getDurationMs() {
-      return TimeUnit.MILLISECONDS.convert(endTimeNs - startTimeNs, TimeUnit.NANOSECONDS);
-    }
-    @Override
-    public void close()
-        throws Exception {
-      stopAndRecord();
+      return _ended ? _durationMs : -1;
     }
   }
 
-  public TimerContext(BrokerRequest brokerRequest, ServerMetrics serverMetrics) {
-    this.brokerRequest = brokerRequest;
-    this.serverMetrics = serverMetrics;
-  }
-
-  public void setQueryArrivalTimeNs(long queryStartTimeNs) {
-    this.queryArrivalTimeNs = queryStartTimeNs;
-  }
-
-  public long getQueryArrivalTimeNs() {
-    return queryArrivalTimeNs;
+  public TimerContext(BrokerRequest brokerRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
+    _brokerRequest = brokerRequest;
+    _serverMetrics = serverMetrics;
+    _queryArrivalTimeMs = queryArrivalTimeMs;
   }
 
   public long getQueryArrivalTimeMs() {
-    return TimeUnit.MILLISECONDS.convert(queryArrivalTimeNs, TimeUnit.NANOSECONDS);
+    return _queryArrivalTimeMs;
   }
 
   /**
-   * Creates and starts a new timer for query phase.
-   * Calling this again for same phase will overwrite existing timing information
-   * @param queryPhase query phase that is being timed
-   * @return
+   * Creates a new timer for query phase with the given start time in millis.
+   * <p>Calling this again for same phase will overwrite existing timing information.
+   *
+   * @param queryPhase Query phase to be timed
+   * @param startTimeMs Timer start time in millis
+   * @return Timer for the query phase
+   */
+  public Timer startNewPhaseTimer(ServerQueryPhase queryPhase, long startTimeMs) {
+    Timer phaseTimer = new Timer(queryPhase, startTimeMs);
+    _phaseTimers[queryPhase.ordinal()] = phaseTimer;
+    return phaseTimer;
+  }
+
+  /**
+   * Creates a new timer for query phase with {@link System#currentTimeMillis()} as the start time.
+   * <p>Calling this again for same phase will overwrite existing timing information.
+   *
+   * @param queryPhase Query phase to be timed
+   * @return Timer for the query phase
    */
   public Timer startNewPhaseTimer(ServerQueryPhase queryPhase) {
-    Timer phaseTimer = new Timer(queryPhase);
-    phaseTimers.put(queryPhase, phaseTimer);
-    phaseTimer.start();
-    return phaseTimer;
+    return startNewPhaseTimer(queryPhase, System.currentTimeMillis());
   }
 
-  public Timer startNewPhaseTimerAtNs(ServerQueryPhase queryPhase, long startTimeNs) {
-    Timer phaseTimer = startNewPhaseTimer(queryPhase);
-    phaseTimer.setStartTimeNs(startTimeNs);
-    return phaseTimer;
-  }
-
-  public @Nullable Timer getPhaseTimer(ServerQueryPhase queryPhase) {
-    return phaseTimers.get(queryPhase);
-  }
-
-  public long getPhaseDurationNs(ServerQueryPhase queryPhase) {
-    Timer timer = phaseTimers.get(queryPhase);
-    if (timer == null) {
-      return -1;
-    }
-    return timer.getDurationNs();
+  public Timer getPhaseTimer(ServerQueryPhase queryPhase) {
+    return _phaseTimers[queryPhase.ordinal()];
   }
 
   public long getPhaseDurationMs(ServerQueryPhase queryPhase) {
-    return TimeUnit.MILLISECONDS.convert(getPhaseDurationNs(queryPhase), TimeUnit.NANOSECONDS);
-  }
-
-  void recordPhaseTime(Timer phaseTimer) {
-    serverMetrics.addPhaseTiming(brokerRequest, phaseTimer.queryPhase, phaseTimer.getDurationNs());
-  }
-
-  // for logging
-  @Override
-  public String toString() {
-    return String.format("%d,%d,%d,%d,%d,%d,%d,%d (in ns)", queryArrivalTimeNs,
-        getPhaseDurationNs(ServerQueryPhase.REQUEST_DESERIALIZATION),
-        getPhaseDurationNs(ServerQueryPhase.SCHEDULER_WAIT),
-        getPhaseDurationNs(ServerQueryPhase.BUILD_QUERY_PLAN),
-        getPhaseDurationNs(ServerQueryPhase.QUERY_PLAN_EXECUTION),
-        getPhaseDurationNs(ServerQueryPhase.QUERY_PROCESSING),
-        getPhaseDurationNs(ServerQueryPhase.RESPONSE_SERIALIZATION),
-        getPhaseDurationNs(ServerQueryPhase.TOTAL_QUERY_TIME));
+    Timer phaseTimer = _phaseTimers[queryPhase.ordinal()];
+    return phaseTimer != null ? phaseTimer.getDurationMs() : -1;
   }
 }

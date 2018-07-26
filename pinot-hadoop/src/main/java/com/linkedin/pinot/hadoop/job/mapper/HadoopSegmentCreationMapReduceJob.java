@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.hadoop.job.mapper;
 
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.DataSize;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -24,7 +26,8 @@ import com.linkedin.pinot.core.data.readers.ThriftRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
-
+import java.io.File;
+import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -33,17 +36,20 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.io.IOException;
 
 
 public class HadoopSegmentCreationMapReduceJob {
 
   public static class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, LongWritable, Text> {
     private static Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentCreationMapper.class);
+
+    private static final String PINOT_HADOOP_TMP = "pinot_hadoop_tmp";
+    private static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
+    private static final String SEGMENT_TAR = "/segmentTar";
+
     private Configuration _properties;
 
     private String _inputFilePath;
@@ -51,50 +57,61 @@ public class HadoopSegmentCreationMapReduceJob {
     private String _tableName;
     private String _postfix;
 
-    private Path _currentHdfsWorkDir;
+    // Temporary local disk path for current working directory
     private String _currentDiskWorkDir;
 
-    // Temporary HDFS path for local machine
+    // Temporary hdfs path for segment tar file
     private String _localHdfsSegmentTarPath;
 
-    private String _localDiskSegmentDirectory;
+    // Temporary local disk path for segment tar file
     private String _localDiskSegmentTarPath;
+
+    // Temporary local disk path for output segment directory
+    private String _localDiskOutputSegmentDir;
+
+    private TableConfig _tableConfig = null;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
+      // Compute current working HDFS directory
+      Path currentHdfsWorkDir = FileOutputFormat.getWorkOutputPath(context);
+      _localHdfsSegmentTarPath = currentHdfsWorkDir + SEGMENT_TAR;
 
+      // Compute current working LOCAL DISK directory
+      _currentDiskWorkDir = PINOT_HADOOP_TMP;
+      _localDiskSegmentTarPath = _currentDiskWorkDir + SEGMENT_TAR;
 
-      _currentHdfsWorkDir = FileOutputFormat.getWorkOutputPath(context);
-      _currentDiskWorkDir = "pinot_hadoop_tmp";
-
-      // Temporary HDFS path for local machine
-      _localHdfsSegmentTarPath =  _currentHdfsWorkDir + "/segmentTar";
-      _localDiskSegmentTarPath = _currentDiskWorkDir + "/segmentsTar";
-
-
-
+      // Create directory
       new File(_localDiskSegmentTarPath).mkdirs();
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("Configurations : {}", context.getConfiguration().toString());
       LOGGER.info("*********************************************************************");
-      LOGGER.info("Current HDFS working dir : {}", _currentHdfsWorkDir);
-      LOGGER.info("Current DISK working dir : {}", new File(_currentDiskWorkDir).getAbsolutePath());
+      LOGGER.info("Current HDFS working dir(setup) : {}", currentHdfsWorkDir);
+      LOGGER.info("Current DISK working dir(setup) : {}", new File(_currentDiskWorkDir).getAbsolutePath());
       LOGGER.info("*********************************************************************");
-      _properties = context.getConfiguration();
 
-      _outputPath = _properties.get("path.to.output");
-      _tableName = _properties.get("segment.table.name");
-      _postfix = _properties.get("segment.name.postfix", null);
+      _properties = context.getConfiguration();
+      _outputPath = _properties.get(JobConfigConstants.PATH_TO_OUTPUT);
+      _tableName = _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME);
+      _postfix = _properties.get(SEGMENT_NAME_POSTFIX, null);
 
       if (_outputPath == null || _tableName == null) {
         throw new RuntimeException(
-            "Missing configs: " +
-                "\n\toutputPath: " +
-                _properties.get("path.to.output") +
-                "\n\ttableName: " +
-                _properties.get("segment.table.name"));
+            "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
+                + "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
       }
+
+        String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
+        if (tableConfigString != null) {
+          try {
+            _tableConfig = TableConfig.init(tableConfigString);
+          } catch (JSONException e) {
+            // Though we get table config directly from the controller of hosts and port of push location are set,
+            // it is possible for the user to pass in a table config as a parameter
+            LOGGER.error("Exception when parsing table config: {}", tableConfigString);
+          }
+        }
     }
 
     protected String getTableName() {
@@ -103,12 +120,13 @@ public class HadoopSegmentCreationMapReduceJob {
 
     @Override
     public void cleanup(Context context) throws IOException, InterruptedException {
-      FileUtils.deleteQuietly(new File(_currentDiskWorkDir));
+      File currentDiskWorkDir = new File(_currentDiskWorkDir);
+      LOGGER.info("Clean up directory: {}", currentDiskWorkDir.getAbsolutePath());
+      FileUtils.deleteQuietly(currentDiskWorkDir);
     }
 
     @Override
     protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-
       String line = value.toString();
       String[] lineSplits = line.split(" ");
 
@@ -121,6 +139,8 @@ public class HadoopSegmentCreationMapReduceJob {
       for (String split : lineSplits) {
         LOGGER.info("Command line : {}", split);
       }
+
+      LOGGER.info("Current DISK working dir(mapper): {}", new File(_currentDiskWorkDir).getAbsolutePath());
       LOGGER.info("*********************************************************************");
 
       if (lineSplits.length != 3) {
@@ -128,23 +148,25 @@ public class HadoopSegmentCreationMapReduceJob {
       }
       _inputFilePath = lineSplits[1].trim();
 
-      String segmentDirectory = _tableName + "_" + Integer.parseInt(lineSplits[2]);
-      _localDiskSegmentDirectory = _currentDiskWorkDir + "/segments/" + segmentDirectory;
+      String segmentDirectoryName = _tableName + "_" + Integer.parseInt(lineSplits[2]);
+      _localDiskOutputSegmentDir = _currentDiskWorkDir + "/segments/" + segmentDirectoryName;
 
       // To inherit from from the Hadoop Mapper class, you can't directly throw a general exception.
       Schema schema;
       final FileSystem fs = FileSystem.get(new Configuration());
-      final Path hdfsAvroPath = new Path(_inputFilePath);
-      final File dataPath = new File(_currentDiskWorkDir, "data");
-      try {
-        if (dataPath.exists()) {
-          dataPath.delete();
-        }
-        dataPath.mkdir();
+      final Path hdfsInputFilePath = new Path(_inputFilePath);
 
-        final Path localAvroPath = new Path(dataPath + "/" + hdfsAvroPath.getName());
-        LOGGER.info("Copy from " + hdfsAvroPath + " to " + localAvroPath);
-        fs.copyToLocalFile(hdfsAvroPath, localAvroPath);
+      final File localInputDataDir = new File(_currentDiskWorkDir, "inputData");
+      try {
+        if (localInputDataDir.exists()) {
+          localInputDataDir.delete();
+        }
+        localInputDataDir.mkdir();
+
+        final Path localInputFilePath =
+            new Path(localInputDataDir.getAbsolutePath() + "/" + hdfsInputFilePath.getName());
+        LOGGER.info("Copy from " + hdfsInputFilePath + " to " + localInputFilePath);
+        fs.copyToLocalFile(hdfsInputFilePath, localInputFilePath);
 
         String schemaString = context.getConfiguration().get("data.schema");
         try {
@@ -161,40 +183,46 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("*********************************************************************");
       LOGGER.info("input data file path : {}", _inputFilePath);
       LOGGER.info("local hdfs segment tar path: {}", _localHdfsSegmentTarPath);
-      LOGGER.info("local disk segment path: {}", _localDiskSegmentDirectory);
+      LOGGER.info("local disk output segment path: {}", _localDiskOutputSegmentDir);
       LOGGER.info("local disk segment tar path: {}", _localDiskSegmentTarPath);
-      LOGGER.info("data schema: {}", _localDiskSegmentTarPath);
+      LOGGER.info("data schema: {}", schema);
       LOGGER.info("*********************************************************************");
 
       try {
-        String segmentName = createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsAvroPath, dataPath, fs);
+        String segmentName =
+            createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsInputFilePath, localInputDataDir,
+                fs);
         LOGGER.info(segmentName);
-        LOGGER.info("finished segment creation job successfully");
+        LOGGER.info("Finished segment creation job successfully");
       } catch (Exception e) {
         LOGGER.error("Got exceptions during creating segments!", e);
       }
 
-      context.write(new LongWritable(Long.parseLong(lineSplits[2])),
-          new Text(FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
-      LOGGER.info("finished the job successfully");
+      context.write(new LongWritable(Long.parseLong(lineSplits[2])), new Text(
+          FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
+      LOGGER.info("Finished the job successfully");
     }
 
-    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId, Path hdfsAvroPath, File dataPath) {
+    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
+        Path hdfsAvroPath, File dataPath) {
 
     }
 
-    protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsDataPath, File dataPath, FileSystem fs) throws Exception {
-      LOGGER.info("Data schema is : {}", schema);
-      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
+        File localInputDataDir, FileSystem fs) throws Exception {
+      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
+
       segmentGeneratorConfig.setTableName(_tableName);
-      setSegmentNameGenerator(segmentGeneratorConfig, seqId, hdfsDataPath, dataPath);
+      setSegmentNameGenerator(segmentGeneratorConfig, seqId, hdfsInputFilePath, localInputDataDir);
 
-      segmentGeneratorConfig.setInputFilePath(new File(dataPath, hdfsDataPath.getName()).getAbsolutePath());
+      String inputFilePath = new File(localInputDataDir, hdfsInputFilePath.getName()).getAbsolutePath();
+      LOGGER.info("Create segment input path: {}", inputFilePath);
+      segmentGeneratorConfig.setInputFilePath(inputFilePath);
 
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setFormat(fileFormat);
       segmentGeneratorConfig.setOnHeap(true);
-      
+
       if (null != _postfix) {
         segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
       } else {
@@ -202,7 +230,7 @@ public class HadoopSegmentCreationMapReduceJob {
       }
       segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
 
-      segmentGeneratorConfig.setOutDir(_localDiskSegmentDirectory);
+      segmentGeneratorConfig.setOutDir(_localDiskOutputSegmentDir);
 
       // Add the current java package version to the segment metadata
       // properties file.
@@ -218,19 +246,30 @@ public class HadoopSegmentCreationMapReduceJob {
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(segmentGeneratorConfig);
       driver.build();
+
       // Tar the segment directory into file.
       String segmentName = driver.getSegmentName();
-      String localSegmentPath = new File(_localDiskSegmentDirectory, segmentName).getAbsolutePath();
 
-      String localTarPath = _localDiskSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
-      LOGGER.info("Trying to tar the segment to: {}", localTarPath);
-      TarGzCompressionUtils.createTarGzOfDirectory(localSegmentPath, localTarPath);
-      String hdfsTarPath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
+      File localDiskOutputSegmentDir = new File(_localDiskOutputSegmentDir, segmentName);
+      String localDiskOutputSegmentDirAbsolutePath = localDiskOutputSegmentDir.getAbsolutePath();
+      String localDiskSegmentTarFileAbsolutePath =
+          new File(_localDiskSegmentTarPath).getAbsolutePath() + "/" + segmentName + JobConfigConstants.TARGZ;
+
+      LOGGER.info("Trying to tar the segment to: {}", localDiskSegmentTarFileAbsolutePath);
+      TarGzCompressionUtils.createTarGzOfDirectory(localDiskOutputSegmentDirAbsolutePath,
+          localDiskSegmentTarFileAbsolutePath);
+      String hdfsSegmentTarFilePath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
+
+      // Log segment size.
+      long uncompressedSegmentSize = FileUtils.sizeOfDirectory(localDiskOutputSegmentDir);
+      long compressedSegmentSize = new File(localDiskSegmentTarFileAbsolutePath).length();
+      LOGGER.info(String.format("Segment %s uncompressed size: %s, compressed size: %s", segmentName,
+          DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
 
       LOGGER.info("*********************************************************************");
-      LOGGER.info("Copy from : {} to {}", localTarPath, hdfsTarPath);
+      LOGGER.info("Copy from : {} to {}", localDiskSegmentTarFileAbsolutePath, hdfsSegmentTarFilePath);
       LOGGER.info("*********************************************************************");
-      fs.copyFromLocalFile(true, true, new Path(localTarPath), new Path(hdfsTarPath));
+      fs.copyFromLocalFile(true, true, new Path(localDiskSegmentTarFileAbsolutePath), new Path(hdfsSegmentTarFilePath));
       return segmentName;
     }
 

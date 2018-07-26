@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package com.linkedin.pinot.server.starter.helix;
 
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
-import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import java.util.concurrent.Semaphore;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
@@ -96,14 +96,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
   private class SegmentRefreshMessageHandler extends MessageHandler {
     private final String _segmentName;
-    private final String _tableName;
+    private final String _tableNameWithType;
     private final Logger _logger;
 
     public SegmentRefreshMessageHandler(SegmentRefreshMessage refreshMessage, NotificationContext context) {
       super(refreshMessage, context);
       _segmentName = refreshMessage.getPartitionName();
-      _tableName = refreshMessage.getResourceName();
-      _logger = LoggerFactory.getLogger(_tableName + "-" + SegmentRefreshMessageHandler.class);
+      _tableNameWithType = refreshMessage.getResourceName();
+      _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + SegmentRefreshMessageHandler.class);
     }
 
     @Override
@@ -112,8 +112,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling message: {}", _message);
       try {
         acquireSema(_segmentName, LOGGER);
-        // The number of retry times depends on the retry count in SegmentFetcher.
-        _fetcherAndLoader.addOrReplaceOfflineSegment(_tableName, _segmentName);
+        // The number of retry times depends on the retry count in SegmentOperations.
+        _fetcherAndLoader.addOrReplaceOfflineSegment(_tableNameWithType, _segmentName);
         result.setSuccess(true);
       } finally {
         releaseSema();

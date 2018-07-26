@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,9 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
@@ -83,7 +83,7 @@ public class ColumnMetadataTest {
     Assert.assertEquals(col7Meta.getTotalAggDocs(), 0);
     Assert.assertEquals(col7Meta.getDataType(), FieldSpec.DataType.INT);
     Assert.assertEquals(col7Meta.getBitsPerElement(), 9);
-    Assert.assertEquals(col7Meta.getStringColumnMaxLength(), 0);
+    Assert.assertEquals(col7Meta.getColumnMaxLength(), 0);
     Assert.assertEquals(col7Meta.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertFalse(col7Meta.isSorted());
     Assert.assertFalse(col7Meta.hasNulls());
@@ -104,7 +104,7 @@ public class ColumnMetadataTest {
     Assert.assertEquals(col3Meta.getTotalAggDocs(), 0);
     Assert.assertEquals(col3Meta.getDataType(), FieldSpec.DataType.STRING);
     Assert.assertEquals(col3Meta.getBitsPerElement(), 3);
-    Assert.assertEquals(col3Meta.getStringColumnMaxLength(), 4);
+    Assert.assertEquals(col3Meta.getColumnMaxLength(), 4);
     Assert.assertEquals(col3Meta.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertFalse(col3Meta.isSorted());
     Assert.assertFalse(col3Meta.hasNulls());
@@ -125,7 +125,7 @@ public class ColumnMetadataTest {
     Assert.assertEquals(timeColumn.getTotalAggDocs(), 0);
     Assert.assertEquals(timeColumn.getDataType(), FieldSpec.DataType.INT);
     Assert.assertEquals(timeColumn.getBitsPerElement(), 1);
-    Assert.assertEquals(timeColumn.getStringColumnMaxLength(), 0);
+    Assert.assertEquals(timeColumn.getColumnMaxLength(), 0);
     Assert.assertEquals(timeColumn.getFieldType(), FieldSpec.FieldType.DIMENSION);
     Assert.assertTrue(timeColumn.isSorted());
     Assert.assertFalse(timeColumn.hasNulls());
@@ -147,7 +147,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     verifySegmentAfterLoading(metadata);
 
@@ -165,7 +165,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     verifySegmentAfterLoading(metadata);
 
@@ -183,7 +183,7 @@ public class ColumnMetadataTest {
     driver.build();
 
     // Load segment metadata.
-    IndexSegment segment = Loaders.IndexSegment.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    IndexSegment segment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
     verifySegmentAfterLoading(metadata);
 
@@ -199,10 +199,10 @@ public class ColumnMetadataTest {
       // Build the Segment metadata.
       helper = new SegmentWithHllIndexCreateHelper(
           "testHllIndexRelatedMetadata", getClass().getClassLoader().getResource("data/test_data-sv.avro"), "daysSinceEpoch", TimeUnit.DAYS, "starTreeSegment");
-      helper.build(true, new HllConfig(9, new HashSet<String>(Arrays.asList("column7")), "_hllSuffix"));
+      helper.build(true, new HllConfig(9, new HashSet<>(Arrays.asList("column7")), "_hllSuffix"));
 
       // Load segment metadata.
-      IndexSegment segment = Loaders.IndexSegment.load(helper.getSegmentDirectory(), ReadMode.mmap);
+      IndexSegment segment = ImmutableSegmentLoader.load(helper.getSegmentDirectory(), ReadMode.mmap);
       SegmentMetadataImpl metadata = (SegmentMetadataImpl) segment.getSegmentMetadata();
       Assert.assertEquals(metadata.getHllLog2m(), 9);
 

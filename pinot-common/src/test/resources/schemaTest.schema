@@ -1,16 +1,6 @@
 {
   "metricFieldSpecs": [
     {
-      "name": "byteMetric",
-      "dataType": "BYTE",
-      "defaultNullValue": "-1"
-    },
-    {
-      "name": "shortMetric",
-      "dataType": "SHORT",
-      "singleValueField": true
-    },
-    {
       "name": "intMetric",
       "dataType": "INT",
       "defaultNullValue": -2
@@ -36,23 +26,6 @@
       "name": "booleanDimension",
       "dataType": "BOOLEAN",
       "defaultNullValue": false
-    },
-    {
-      "name": "byteDimension",
-      "dataType": "BYTE",
-      "singleValueField": true,
-      "delimiter": null
-    },
-    {
-      "name": "charDimension",
-      "dataType": "CHAR",
-      "singleValueField": false,
-      "defaultNullValue": "%"
-    },
-    {
-      "name": "shortDimension",
-      "dataType": "SHORT",
-      "delimiter": null
     },
     {
       "name": "intDimension",

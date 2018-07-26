@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import java.util.Arrays;
@@ -42,7 +41,7 @@ public class OnHeapIntDictionary extends OnHeapDictionary {
    * @param length Length of the dictionary
    */
   public OnHeapIntDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, V1Constants.Numbers.INTEGER_SIZE, (byte) 0);
+    super(dataBuffer, length, Integer.BYTES, (byte) 0);
 
     _valToDictId = new Int2IntOpenHashMap(length);
     _valToDictId.defaultReturnValue(-1);

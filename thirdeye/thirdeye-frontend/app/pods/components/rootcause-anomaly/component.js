@@ -18,7 +18,7 @@ import { equal, reads } from '@ember/object/computed';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
 
-const OFFSETS = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+const OFFSETS = ['current', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
 
 /**
  * Maps the status from the db to something human readable to display on the form
@@ -146,7 +146,7 @@ export default Component.extend({
    * Anomaly baseline as computed by anomaly function
    * @type {Float}
    */
-  baseline: reads('anomaly.attributes.baseline.firstObject'),
+  predicted: reads('anomaly.attributes.baseline.firstObject'),
 
   /**
    * Anomaly unique identifier
@@ -299,10 +299,10 @@ export default Component.extend({
    * @private
    */
   _getAggregate(offset) {
-    const { metricUrn, aggregates, baseline } = getProperties(this, 'metricUrn', 'aggregates', 'baseline');
+    const { metricUrn, aggregates, predicted } = getProperties(this, 'metricUrn', 'aggregates', 'predicted');
 
-    if (offset === 'baseline') {
-      return parseFloat(baseline);
+    if (offset === 'predicted') {
+      return parseFloat(predicted);
     }
 
     return aggregates[toOffsetUrn(metricUrn, offset)];
@@ -318,7 +318,7 @@ export default Component.extend({
       const { onFeedback, anomalyUrn } = getProperties(this, 'onFeedback', 'anomalyUrn');
 
       if (onFeedback) {
-        onFeedback(anomalyUrn, status, '');
+        onFeedback(anomalyUrn, status);
       }
 
       // TODO reload anomaly entity instead

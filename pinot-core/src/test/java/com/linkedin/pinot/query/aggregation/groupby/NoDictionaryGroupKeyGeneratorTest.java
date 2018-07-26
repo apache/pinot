@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.plan.TransformPlanNode;
@@ -33,7 +34,6 @@ import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator;
 import com.linkedin.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.util.ArrayList;
@@ -80,7 +80,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     _recordReader = buildSegment();
 
     // Load the segment.
-    IndexSegment indexSegment = Loaders.IndexSegment.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
 
     // Create transform operator and block
     // NOTE: put all columns into group-by so that transform operator has expressions for all columns

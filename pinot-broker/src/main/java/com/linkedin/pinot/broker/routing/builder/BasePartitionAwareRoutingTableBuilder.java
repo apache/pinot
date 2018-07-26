@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,9 +61,8 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
 
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
   protected SegmentZKMetadataPrunerService _pruner;
-  protected TableConfig _tableConfig;
   protected Random _random = new Random();
-  protected int _numReplicas;
+  protected volatile int _numReplicas;
 
   protected void setSegmentToReplicaToServerMap(Map<String, Map<Integer, String>> segmentToReplicaToServerMap) {
     _segmentToReplicaToServerMap = segmentToReplicaToServerMap;
@@ -71,7 +70,6 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    _tableConfig = tableConfig;
     _propertyStore = propertyStore;
 
     // TODO: We need to specify the type of pruners via config instead of hardcoding.

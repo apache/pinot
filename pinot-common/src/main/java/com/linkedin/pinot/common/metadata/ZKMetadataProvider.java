@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,6 @@ public class ZKMetadataProvider {
   private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
-  private static final String PROPERTYSTORE_KAFKA_PARTITIONS_PREFIX = "/KAFKA_PARTITIONS";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
   private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
@@ -83,10 +82,6 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_SCHEMAS_PREFIX, schemaName);
   }
 
-  public static String constructPropertyStorePathForKafkaPartitions(String realtimeTableName) {
-    return StringUtil.join("/", PROPERTYSTORE_KAFKA_PARTITIONS_PREFIX, realtimeTableName);
-  }
-
   public static String constructPropertyStorePathForInstancePartitions(String offlineTableName) {
     return StringUtil.join("/", PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX, offlineTableName);
   }
@@ -117,13 +112,6 @@ public class ZKMetadataProvider {
 
   public static void removeResourceConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
     String propertyStorePath = constructPropertyStorePathForResourceConfig(resourceName);
-    if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
-      propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
-    }
-  }
-
-  public static void removeKafkaPartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName) {
-    String propertyStorePath = constructPropertyStorePathForKafkaPartitions(realtimeTableName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }
@@ -317,6 +305,30 @@ public class ZKMetadataProvider {
       if (znRecordList != null) {
         for (ZNRecord record : znRecordList) {
           resultList.add(new RealtimeSegmentZKMetadata(record));
+        }
+      }
+    }
+    return resultList;
+  }
+
+  @Nonnull
+  public static List<LLCRealtimeSegmentZKMetadata> getLLCRealtimeSegmentZKMetadataListForTable(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+    List<LLCRealtimeSegmentZKMetadata> resultList = new ArrayList<>();
+    if (propertyStore == null) {
+      return resultList;
+    }
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(resourceName);
+    if (propertyStore.exists(constructPropertyStorePathForResource(realtimeTableName), AccessOption.PERSISTENT)) {
+      List<ZNRecord> znRecordList =
+          propertyStore.getChildren(constructPropertyStorePathForResource(realtimeTableName), null,
+              AccessOption.PERSISTENT);
+      if (znRecordList != null) {
+        for (ZNRecord record : znRecordList) {
+          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = new RealtimeSegmentZKMetadata(record);
+          if (SegmentName.isLowLevelConsumerSegmentName(realtimeSegmentZKMetadata.getSegmentName())) {
+            resultList.add(new LLCRealtimeSegmentZKMetadata(record));
+          }
         }
       }
     }

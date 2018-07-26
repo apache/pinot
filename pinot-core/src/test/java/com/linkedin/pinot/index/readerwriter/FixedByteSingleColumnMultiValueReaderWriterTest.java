@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
@@ -23,9 +26,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class FixedByteSingleColumnMultiValueReaderWriterTest {
@@ -62,14 +62,14 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     }
   }
 
-  public void testIntArray(final long seed)
-      throws IOException {
+  public void testIntArray(final long seed) throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     int rows = 1000;
-    int columnSizeInBytes = Integer.SIZE / 8;
+    int columnSizeInBytes = Integer.BYTES;
     int maxNumberOfMultiValuesPerRow = 2000;
     readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows/2, columnSizeInBytes, _memoryManager, "IntArray");
+        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 2, rows / 2, columnSizeInBytes,
+            _memoryManager, "IntArray");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -83,22 +83,21 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     int[] ret = new int[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getIntArray(i, ret);
-      Assert.assertEquals(data[i].length, length, "Failed with seed="+seed);
-      Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed="+seed);
+      Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
+      Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
     readerWriter.close();
   }
 
-  public void testIntArrayFixedSize(int multiValuesPerRow, long seed)
-      throws IOException {
+  public void testIntArrayFixedSize(int multiValuesPerRow, long seed) throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     int rows = 1000;
-    int columnSizeInBytes = Integer.SIZE / 8;
+    int columnSizeInBytes = Integer.BYTES;
     // Keep the rowsPerChunk as a multiple of multiValuesPerRow to check the cases when both data and header buffers
     // transition to new ones
     readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2, columnSizeInBytes,
-            _memoryManager, "IntArrayFixedSize");
+        new FixedByteSingleColumnMultiValueReaderWriter(multiValuesPerRow, multiValuesPerRow, multiValuesPerRow * 2,
+            columnSizeInBytes, _memoryManager, "IntArrayFixedSize");
 
     Random r = new Random(seed);
     int[][] data = new int[rows][];
@@ -112,21 +111,20 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     int[] ret = new int[multiValuesPerRow];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getIntArray(i, ret);
-      Assert.assertEquals(data[i].length, length, "Failed with seed="+seed);
-      Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed="+seed);
+      Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
+      Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
     readerWriter.close();
   }
 
-  public void testWithZeroSize(long seed) {
+  public void testWithZeroSize(long seed) throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     final int maxNumberOfMultiValuesPerRow = 5;
     int rows = 1000;
-    int columnSizeInBytes = Integer.SIZE / 8;
+    int columnSizeInBytes = Integer.BYTES;
     Random r = new Random(seed);
-    readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1, columnSizeInBytes,
-            _memoryManager, "ZeroSize");
+    readerWriter = new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, 3, r.nextInt(rows) + 1,
+        columnSizeInBytes, _memoryManager, "ZeroSize");
 
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
@@ -144,41 +142,19 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     int[] ret = new int[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getIntArray(i, ret);
-      Assert.assertEquals(data[i].length, length, "Failed with seed="+seed);
+      Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
     readerWriter.close();
-
   }
 
-  private FixedByteSingleColumnMultiValueReaderWriter createReaderWriter(FieldSpec.DataType type, Random r, int rows, int maxNumberOfMultiValuesPerRow) {
-    final int columnSize = sizeForType(type);
+  private FixedByteSingleColumnMultiValueReaderWriter createReaderWriter(FieldSpec.DataType dataType, Random r,
+      int rows, int maxNumberOfMultiValuesPerRow) {
     final int avgMultiValueCount = r.nextInt(maxNumberOfMultiValuesPerRow) + 1;
     final int rowCountPerChunk = r.nextInt(rows) + 1;
 
     return new FixedByteSingleColumnMultiValueReaderWriter(maxNumberOfMultiValuesPerRow, avgMultiValueCount,
-        rowCountPerChunk, columnSize, _memoryManager, "ReaderWriter");
-  }
-
-  private int sizeForType(FieldSpec.DataType type) {
-    int size;
-    switch (type) {
-      case SHORT_ARRAY:
-        size = Short.SIZE/8;
-        break;
-      case LONG_ARRAY:
-        size = Long.SIZE/8;
-        break;
-      case FLOAT_ARRAY:
-        size = Float.SIZE/8;
-        break;
-      case DOUBLE_ARRAY:
-        size = Double.SIZE/8;
-        break;
-      default:
-        throw new UnsupportedOperationException();
-    }
-    return size;
+        rowCountPerChunk, dataType.size(), _memoryManager, "ReaderWriter");
   }
 
   private long generateSeed() {
@@ -187,12 +163,13 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
   }
 
   @Test
-  public void testLongArray() throws Exception {
+  public void testLongArray() throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
-    FixedByteSingleColumnMultiValueReaderWriter readerWriter = createReaderWriter(FieldSpec.DataType.LONG_ARRAY, r, rows, maxNumberOfMultiValuesPerRow);
+    FixedByteSingleColumnMultiValueReaderWriter readerWriter =
+        createReaderWriter(FieldSpec.DataType.LONG, r, rows, maxNumberOfMultiValuesPerRow);
 
     long[][] data = new long[rows][];
     for (int i = 0; i < rows; i++) {
@@ -210,18 +187,20 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     long[] ret = new long[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getLongArray(i, ret);
-      Assert.assertEquals(data[i].length, length, "Failed with seed="+seed);
+      Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
     readerWriter.close();
   }
+
   @Test
-  public void testFloatArray() throws Exception {
+  public void testFloatArray() throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
-    FixedByteSingleColumnMultiValueReaderWriter readerWriter = createReaderWriter(FieldSpec.DataType.FLOAT_ARRAY, r, rows, maxNumberOfMultiValuesPerRow);
+    FixedByteSingleColumnMultiValueReaderWriter readerWriter =
+        createReaderWriter(FieldSpec.DataType.FLOAT, r, rows, maxNumberOfMultiValuesPerRow);
 
     float[][] data = new float[rows][];
     for (int i = 0; i < rows; i++) {
@@ -239,19 +218,20 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     float[] ret = new float[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getFloatArray(i, ret);
-      Assert.assertEquals(data[i].length, length, "Failed with seed="+seed);
+      Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
     readerWriter.close();
   }
 
   @Test
-  public void testDoubleArray() throws Exception {
+  public void testDoubleArray() throws IOException {
     final long seed = generateSeed();
     Random r = new Random(seed);
     int rows = 1000;
     final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
-    FixedByteSingleColumnMultiValueReaderWriter readerWriter = createReaderWriter(FieldSpec.DataType.DOUBLE_ARRAY, r, rows, maxNumberOfMultiValuesPerRow);
+    FixedByteSingleColumnMultiValueReaderWriter readerWriter =
+        createReaderWriter(FieldSpec.DataType.DOUBLE, r, rows, maxNumberOfMultiValuesPerRow);
 
     double[][] data = new double[rows][];
     for (int i = 0; i < rows; i++) {
@@ -269,37 +249,7 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     double[] ret = new double[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
       int length = readerWriter.getDoubleArray(i, ret);
-      Assert.assertEquals(data[i].length, length, "Failed with seed="+seed);
-      Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
-    }
-    readerWriter.close();
-  }
-
-  @Test
-  public void testShortArray() throws Exception {
-    final long seed = generateSeed();
-    Random r = new Random(seed);
-    int rows = 1000;
-    final int maxNumberOfMultiValuesPerRow = r.nextInt(100) + 1;
-    FixedByteSingleColumnMultiValueReaderWriter readerWriter = createReaderWriter(FieldSpec.DataType.SHORT_ARRAY, r, rows, maxNumberOfMultiValuesPerRow);
-
-    short[][] data = new short[rows][];
-    for (int i = 0; i < rows; i++) {
-      if (r.nextInt() > 0) {
-        data[i] = new short[r.nextInt(maxNumberOfMultiValuesPerRow)];
-        for (int j = 0; j < data[i].length; j++) {
-          data[i][j] = (short)r.nextInt(Short.MAX_VALUE);
-        }
-        readerWriter.setShortArray(i, data[i]);
-      } else {
-        data[i] = new short[0];
-        readerWriter.setShortArray(i, data[i]);
-      }
-    }
-    short[] ret = new short[maxNumberOfMultiValuesPerRow];
-    for (int i = 0; i < rows; i++) {
-      int length = readerWriter.getShortArray(i, ret);
-      Assert.assertEquals(data[i].length, length, "Failed with seed="+seed);
+      Assert.assertEquals(data[i].length, length, "Failed with seed=" + seed);
       Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed=" + seed);
     }
     readerWriter.close();

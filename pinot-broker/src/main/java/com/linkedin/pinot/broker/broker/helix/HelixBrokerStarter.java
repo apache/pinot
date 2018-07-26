@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,12 @@ package com.linkedin.pinot.broker.broker.helix;
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
+import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -65,6 +66,7 @@ public class HelixBrokerStarter {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
   private final MetricsRegistry _metricsRegistry;
+  private final TableQueryQuotaManager _tableQueryQuotaManager;
 
   // Set after broker is started, which is actually in the constructor.
   private AccessControlFactory _accessControlFactory;
@@ -115,10 +117,11 @@ public class HelixBrokerStarter {
     _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
     _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, _spectatorHelixManager,
         pinotHelixProperties.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
+    _tableQueryQuotaManager = new TableQueryQuotaManager(_spectatorHelixManager);
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _metricsRegistry = _brokerServerBuilder.getMetricsRegistry();
     ClusterChangeMediator clusterChangeMediator =
-        new ClusterChangeMediator(_helixExternalViewBasedRouting, _brokerServerBuilder.getBrokerMetrics());
+        new ClusterChangeMediator(_helixExternalViewBasedRouting, _tableQueryQuotaManager, _brokerServerBuilder.getBrokerMetrics());
     _spectatorHelixManager.addExternalViewChangeListener(clusterChangeMediator);
     _spectatorHelixManager.addInstanceConfigChangeListener(clusterChangeMediator);
     _spectatorHelixManager.addLiveInstanceChangeListener(_liveInstancesListener);
@@ -128,7 +131,8 @@ public class HelixBrokerStarter {
         HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
     StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     StateModelFactory<?> stateModelFactory =
-        new BrokerResourceOnlineOfflineStateModelFactory(_spectatorHelixManager, _propertyStore, _helixExternalViewBasedRouting);
+        new BrokerResourceOnlineOfflineStateModelFactory(_spectatorHelixManager, _propertyStore,
+            _helixExternalViewBasedRouting, _tableQueryQuotaManager);
     stateMachineEngine.registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
@@ -172,7 +176,7 @@ public class HelixBrokerStarter {
     if (instanceTags == null || instanceTags.isEmpty()) {
       if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         _helixAdmin.addInstanceTag(clusterName, instanceName,
-            ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+            TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
       } else {
         _helixAdmin.addInstanceTag(clusterName, instanceName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
       }
@@ -185,11 +189,12 @@ public class HelixBrokerStarter {
     }
     final BrokerServerBuilder brokerServerBuilder =
         new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
-            _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener);
+            _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener, _tableQueryQuotaManager);
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
     _accessControlFactory = brokerServerBuilder.getAccessControlFactory();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
+    _tableQueryQuotaManager.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
     brokerServerBuilder.start();
 
     LOGGER.info("Pinot broker ready and listening on port {} for API requests",

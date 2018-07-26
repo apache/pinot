@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.onboard;
 
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import java.util.HashMap;
 import java.util.Map;

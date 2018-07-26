@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataSchema;
@@ -212,18 +211,18 @@ public class IntermediateResultsBlock implements Block {
     // Extract each aggregation column name and type from aggregation function context.
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     String[] columnNames = new String[numAggregationFunctions];
-    FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[numAggregationFunctions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
       columnNames[i] = aggregationFunctionContext.getAggregationColumnName();
-      columnTypes[i] = aggregationFunctionContext.getAggregationFunction().getIntermediateResultDataType();
+      columnDataTypes[i] = aggregationFunctionContext.getAggregationFunction().getIntermediateResultColumnType();
     }
 
     // Build the data table.
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     dataTableBuilder.startRow();
     for (int i = 0; i < numAggregationFunctions; i++) {
-      switch (columnTypes[i]) {
+      switch (columnDataTypes[i]) {
         case LONG:
           dataTableBuilder.setColumn(i, ((Number) _aggregationResult.get(i)).longValue());
           break;
@@ -235,7 +234,7 @@ public class IntermediateResultsBlock implements Block {
           break;
         default:
           throw new UnsupportedOperationException(
-              "Unsupported aggregation column data type: " + columnTypes[i] + " for column: " + columnNames[i]);
+              "Unsupported aggregation column data type: " + columnDataTypes[i] + " for column: " + columnNames[i]);
       }
     }
     dataTableBuilder.finishRow();
@@ -245,13 +244,13 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nonnull
-  private DataTable getAggregationGroupByResultDataTable()
-      throws Exception {
+  private DataTable getAggregationGroupByResultDataTable() throws Exception {
     String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
-    FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.OBJECT};
+    DataSchema.ColumnDataType[] columnDataTypes =
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.OBJECT};
 
     // Build the data table.
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     for (int i = 0; i < numAggregationFunctions; i++) {
       dataTableBuilder.startRow();

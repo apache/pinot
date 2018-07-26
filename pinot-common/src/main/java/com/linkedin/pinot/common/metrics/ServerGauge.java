@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   LLC_PARTITION_CONSUMING("state", false),
   HIGHEST_KAFKA_OFFSET_CONSUMED("messages", false),
   LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS("seconds", false),
+  LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS("seconds", false),

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,238 +17,226 @@ package com.linkedin.pinot.core.segment.creator.impl.inv;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
-import java.nio.channels.FileChannel;
 import org.apache.commons.io.FileUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
  * Implementation of {@link InvertedIndexCreator} that uses off-heap memory.
+ * <p>We use 2 passes to create the inverted index.
  * <ul>
- *   High level idea:
  *   <li>
- *     We use 2 passes to create the inverted index.
+ *     In the first pass (adding values phase), when add() method is called, store the dictIds into the forward index
+ *     value buffer (for multi-valued column also store number of values for each docId into forward index length
+ *     buffer). We also compute the inverted index length for each dictId while adding values.
  *   </li>
  *   <li>
- *     In the first pass (adding values phase), when addSV/addMV method is called, store the values (dictIds) into
- *     value buffer (for multi-value column also store number of values for each docId into numValues buffer). We also
- *     compute the posting list length for each value while processing values.
- *   </li>
- *   <li>
- *     We create inverted index in the second pass when seal method is called. By this time, all the values should
- *     already been added. We first construct the posting list by going over the values in value buffer (for multi-value
- *     column we also need numValues buffer to get the docId for each value).
- *     <p>Once we have the posting list for each value (dictId), we simply go over the posting list and create the
- *     bitmap for each value and serialize them into a file.
- *   </li>
- *   <li>
- *     When serializing bitmaps, we first create two files, one for bitmap offsets and one for serialized data. After
- *     serializing all bitmaps, append the serialized data file to the offsets file to get the final inverted index
- *     file.
+ *     In the second pass (processing values phase), when seal() method is called, all the dictIds should already been
+ *     added. We first reorder the values into the inverted index buffers by going over the dictIds in forward index
+ *     value buffer (for multi-valued column we also need forward index length buffer to get the docId for each dictId).
+ *     <p>Once we have the inverted index buffers, we simply go over them and create the bitmap for each dictId and
+ *     serialize them into a file.
  *   </li>
  * </ul>
+ * <p>Based on the number of values we need to store, we use direct memory or MMap file to allocate the buffer.
  */
 public final class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
-  // Maximum number of values due to 2GB file size limit
-  public static final int MAX_NUM_VALUES = Integer.MAX_VALUE / V1Constants.Numbers.INTEGER_SIZE;
+  // Use MMapBuffer if the buffer size is larger than 100MB
+  private static final int NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER = 25_000_000;
 
-  private final String _columnName;
+  private static final String FORWARD_INDEX_VALUE_BUFFER_SUFFIX = ".fwd.idx.val.buf";
+  private static final String FORWARD_INDEX_LENGTH_BUFFER_SUFFIX = ".fwd.idx.len.buf";
+  private static final String INVERTED_INDEX_VALUE_BUFFER_SUFFIX = ".inv.idx.val.buf";
+  private static final String INVERTED_INDEX_LENGTH_BUFFER_SUFFIX = ".inv.idx.len.buf";
+
+  private final File _invertedIndexFile;
+  private final File _forwardIndexValueBufferFile;
+  private final File _forwardIndexLengthBufferFile;
+  private final File _invertedIndexValueBufferFile;
+  private final File _invertedIndexLengthBufferFile;
   private final boolean _singleValue;
   private final int _cardinality;
   private final int _numDocs;
   private final int _numValues;
-  private final File _indexDir;
-  private final File _invertedIndexFile;
+  private final boolean _useMMapBuffer;
 
-  private ByteBuffer _valueByteBuffer;
-  private IntBuffer _valueIntBuffer;
+  // Forward index buffers (from docId to dictId)
+  private int _nextDocId;
+  private PinotDataBuffer _forwardIndexValueBuffer;
+  // For multi-valued column only because each docId can have multiple dictIds
+  private int _nextValueId;
+  private PinotDataBuffer _forwardIndexLengthBuffer;
 
-  // For multi-value column only
-  private int _valueBufferOffset;
-  private ByteBuffer _numValuesByteBuffer;
-  private IntBuffer _numValuesIntBuffer;
-
-  // Posting list related buffers
-  // Constructed in first pass
-  private ByteBuffer _postingListLengthByteBuffer;
-  private IntBuffer _postingListLengthIntBuffer;
-  // Constructed in second pass
-  private ByteBuffer _postingListValueByteBuffer;
-  private ByteBuffer _postingListCurrentOffsetByteBuffer;
+  // Inverted index buffers (from dictId to docId)
+  private PinotDataBuffer _invertedIndexValueBuffer;
+  private PinotDataBuffer _invertedIndexLengthBuffer;
 
   public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
-      int numValues) {
-    _columnName = fieldSpec.getName();
+      int numValues) throws IOException {
+    String columnName = fieldSpec.getName();
+    _invertedIndexFile = new File(indexDir, columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+    _forwardIndexValueBufferFile = new File(indexDir, columnName + FORWARD_INDEX_VALUE_BUFFER_SUFFIX);
+    _forwardIndexLengthBufferFile = new File(indexDir, columnName + FORWARD_INDEX_LENGTH_BUFFER_SUFFIX);
+    _invertedIndexValueBufferFile = new File(indexDir, columnName + INVERTED_INDEX_VALUE_BUFFER_SUFFIX);
+    _invertedIndexLengthBufferFile = new File(indexDir, columnName + INVERTED_INDEX_LENGTH_BUFFER_SUFFIX);
     _singleValue = fieldSpec.isSingleValueField();
     _cardinality = cardinality;
     _numDocs = numDocs;
-    if (_singleValue) {
-      Preconditions.checkArgument(numDocs <= MAX_NUM_VALUES,
-          "For single-value column: %s, numDocs: %s is too large to create inverted index", _columnName, numDocs);
-      _numValues = numDocs;
-    } else {
-      Preconditions.checkArgument(numValues <= MAX_NUM_VALUES,
-          "For multi-value column: %s, numValues: %s is too large to create inverted index", _columnName, numValues);
-      _numValues = numValues;
-    }
-    _indexDir = indexDir;
-    _invertedIndexFile = new File(indexDir, _columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+    _numValues = _singleValue ? numDocs : numValues;
+    _useMMapBuffer = _numValues > NUM_VALUES_THRESHOLD_FOR_MMAP_BUFFER;
 
     try {
-      // Create value buffer
-      _valueByteBuffer = MmapUtils.allocateDirectByteBuffer(_numValues * V1Constants.Numbers.INTEGER_SIZE, null,
-          "bitmap value buffer for: " + _columnName);
-      _valueIntBuffer = _valueByteBuffer.asIntBuffer();
-
-      // Create numValues buffer for multi-value column
+      _forwardIndexValueBuffer = createTempBuffer((long) _numValues * Integer.BYTES, _forwardIndexValueBufferFile);
       if (!_singleValue) {
-        _numValuesByteBuffer = MmapUtils.allocateDirectByteBuffer(_numDocs * V1Constants.Numbers.INTEGER_SIZE, null,
-            "bitmap numValues buffer for: " + _columnName);
-        _numValuesIntBuffer = _numValuesByteBuffer.asIntBuffer();
+        _forwardIndexLengthBuffer = createTempBuffer((long) _numDocs * Integer.BYTES, _forwardIndexLengthBufferFile);
       }
 
-      // Create length buffer for posting list
-      _postingListLengthByteBuffer =
-          MmapUtils.allocateDirectByteBuffer(_cardinality * V1Constants.Numbers.INTEGER_SIZE, null,
-              "bitmap posting list length buffer for: " + _columnName);
-      _postingListLengthIntBuffer = _postingListLengthByteBuffer.asIntBuffer();
+      // We need to clear the inverted index length buffer because we rely on the initial value of 0, and keep updating
+      // the value instead of directly setting the value
+      _invertedIndexLengthBuffer =
+          createTempBuffer((long) _cardinality * Integer.BYTES, _invertedIndexLengthBufferFile);
+      for (int i = 0; i < _cardinality; i++) {
+        _invertedIndexLengthBuffer.putInt((long) i * Integer.BYTES, 0);
+      }
     } catch (Exception e) {
-      MmapUtils.unloadByteBuffer(_valueByteBuffer);
-      MmapUtils.unloadByteBuffer(_numValuesByteBuffer);
-      MmapUtils.unloadByteBuffer(_postingListLengthByteBuffer);
+      destroyBuffer(_forwardIndexValueBuffer, _forwardIndexValueBufferFile);
+      destroyBuffer(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile);
+      destroyBuffer(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile);
       throw e;
     }
   }
 
   @Override
-  public void addSV(int docId, int dictId) {
-    _valueIntBuffer.put(docId, dictId);
-    _postingListLengthIntBuffer.put(dictId, _postingListLengthIntBuffer.get(dictId) + 1);
+  public void add(int dictId) {
+    putInt(_forwardIndexValueBuffer, _nextDocId++, dictId);
+    putInt(_invertedIndexLengthBuffer, dictId, getInt(_invertedIndexLengthBuffer, dictId) + 1);
   }
 
   @Override
-  public void addMV(int docId, int[] dictIds) {
-    addMV(docId, dictIds, dictIds.length);
-  }
-
-  @Override
-  public void addMV(int docId, int[] dictIds, int numDictIds) {
-    _numValuesIntBuffer.put(docId, numDictIds);
-    for (int i = 0; i < numDictIds; i++) {
+  public void add(int[] dictIds, int length) {
+    for (int i = 0; i < length; i++) {
       int dictId = dictIds[i];
-      _valueIntBuffer.put(_valueBufferOffset++, dictId);
-      _postingListLengthIntBuffer.put(dictId, _postingListLengthIntBuffer.get(dictId) + 1);
+      putInt(_forwardIndexValueBuffer, _nextValueId++, dictId);
+      putInt(_invertedIndexLengthBuffer, dictId, getInt(_invertedIndexLengthBuffer, dictId) + 1);
     }
+    putInt(_forwardIndexLengthBuffer, _nextDocId++, length);
   }
 
   @Override
   public void seal() throws IOException {
-    // Construct the posting list
-
-    // Create posting list value buffer
-    _postingListValueByteBuffer =
-        MmapUtils.allocateDirectByteBuffer(_numValues * V1Constants.Numbers.INTEGER_SIZE, null,
-            "bitmap posting list value buffer for: " + _columnName);
-    IntBuffer postingListValueIntBuffer = _postingListValueByteBuffer.asIntBuffer();
-
-    // Create posting list current offset buffer and initialize it using posting list length buffer
-    _postingListCurrentOffsetByteBuffer =
-        MmapUtils.allocateDirectByteBuffer(_cardinality * V1Constants.Numbers.INTEGER_SIZE, null,
-            "bitmap posting list current offset buffer for: " + _columnName);
-    IntBuffer postingListCurrentOffsetIntBuffer = _postingListCurrentOffsetByteBuffer.asIntBuffer();
-    int postingListStartOffset = 0;
+    // Calculate value index for each dictId in the inverted index value buffer
+    // Re-use inverted index length buffer to store the value index for each dictId, where value index is the index in
+    // the inverted index value buffer where we should put next docId for the dictId
+    int invertedValueIndex = 0;
     for (int dictId = 0; dictId < _cardinality; dictId++) {
-      postingListCurrentOffsetIntBuffer.put(dictId, postingListStartOffset);
-      postingListStartOffset += _postingListLengthIntBuffer.get(dictId);
+      int length = getInt(_invertedIndexLengthBuffer, dictId);
+      putInt(_invertedIndexLengthBuffer, dictId, invertedValueIndex);
+      invertedValueIndex += length;
     }
 
-    // Dump values into posting list
+    // Put values into inverted index value buffer
+    _invertedIndexValueBuffer = createTempBuffer((long) _numValues * Integer.BYTES, _invertedIndexValueBufferFile);
     if (_singleValue) {
       for (int docId = 0; docId < _numDocs; docId++) {
-        int dictId = _valueIntBuffer.get(docId);
-        int offset = postingListCurrentOffsetIntBuffer.get(dictId);
-        postingListValueIntBuffer.put(offset++, docId);
-        postingListCurrentOffsetIntBuffer.put(dictId, offset);
+        int dictId = getInt(_forwardIndexValueBuffer, docId);
+        int index = getInt(_invertedIndexLengthBuffer, dictId);
+        putInt(_invertedIndexValueBuffer, index, docId);
+        putInt(_invertedIndexLengthBuffer, dictId, index + 1);
       }
+
+      // Destroy buffer no longer needed
+      destroyBuffer(_forwardIndexValueBuffer, _forwardIndexValueBufferFile);
+      _forwardIndexValueBuffer = null;
     } else {
-      int valueOffset = 0;
+      int valueId = 0;
       for (int docId = 0; docId < _numDocs; docId++) {
-        int numValues = _numValuesIntBuffer.get(docId);
-        for (int i = 0; i < numValues; i++) {
-          int dictId = _valueIntBuffer.get(valueOffset++);
-          int offset = postingListCurrentOffsetIntBuffer.get(dictId);
-          postingListValueIntBuffer.put(offset++, docId);
-          postingListCurrentOffsetIntBuffer.put(dictId, offset);
+        int length = getInt(_forwardIndexLengthBuffer, docId);
+        for (int i = 0; i < length; i++) {
+          int dictId = getInt(_forwardIndexValueBuffer, valueId++);
+          int index = getInt(_invertedIndexLengthBuffer, dictId);
+          putInt(_invertedIndexValueBuffer, index, docId);
+          putInt(_invertedIndexLengthBuffer, dictId, index + 1);
         }
       }
-      // Release numValues buffer
-      MmapUtils.unloadByteBuffer(_numValuesByteBuffer);
-      _numValuesByteBuffer = null;
+
+      // Destroy buffers no longer needed
+      destroyBuffer(_forwardIndexValueBuffer, _forwardIndexValueBufferFile);
+      _forwardIndexValueBuffer = null;
+      destroyBuffer(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile);
+      _forwardIndexLengthBuffer = null;
     }
 
-    // Release value buffer and posting list current offset buffer
-    MmapUtils.unloadByteBuffer(_valueByteBuffer);
-    _valueByteBuffer = null;
-    MmapUtils.unloadByteBuffer(_postingListCurrentOffsetByteBuffer);
-    _postingListCurrentOffsetByteBuffer = null;
+    // Create bitmaps from inverted index buffers and serialize them to file
+    try (DataOutputStream offsetDataStream = new DataOutputStream(
+        new BufferedOutputStream(new FileOutputStream(_invertedIndexFile)));
+        FileOutputStream bitmapFileStream = new FileOutputStream(_invertedIndexFile);
+        DataOutputStream bitmapDataStream = new DataOutputStream(new BufferedOutputStream(bitmapFileStream))) {
+      int bitmapOffset = (_cardinality + 1) * Integer.BYTES;
+      offsetDataStream.writeInt(bitmapOffset);
+      bitmapFileStream.getChannel().position(bitmapOffset);
 
-    File tempBitmapDataFile = new File(_indexDir, _invertedIndexFile.getName() + ".tmp");
-    try {
-      // First write offsets and serialized bitmaps into two files
-      try (DataOutputStream offsetOut = new DataOutputStream(
-          new BufferedOutputStream(new FileOutputStream(_invertedIndexFile)));
-          DataOutputStream bitmapOut = new DataOutputStream(
-              new BufferedOutputStream(new FileOutputStream(tempBitmapDataFile)))) {
-        // Write the offset for the first bitmap
-        int bitmapDataStartOffset = (_cardinality + 1) * V1Constants.Numbers.INTEGER_SIZE;
-        offsetOut.writeInt(bitmapDataStartOffset);
-
-        // Write offsets and serialized bitmaps
-        int postingListOffset = 0;
-        for (int dictId = 0; dictId < _cardinality; dictId++) {
-          MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
-          int postingListLength = _postingListLengthIntBuffer.get(dictId);
-          for (int i = 0; i < postingListLength; i++) {
-            bitmap.add(postingListValueIntBuffer.get(postingListOffset++));
-          }
-          bitmapDataStartOffset += bitmap.serializedSizeInBytes();
-          offsetOut.writeInt(bitmapDataStartOffset);
-          bitmap.serialize(bitmapOut);
+      int startIndex = 0;
+      for (int dictId = 0; dictId < _cardinality; dictId++) {
+        MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+        int endIndex = getInt(_invertedIndexLengthBuffer, dictId);
+        for (int i = startIndex; i < endIndex; i++) {
+          bitmap.add(getInt(_invertedIndexValueBuffer, i));
         }
-      }
+        startIndex = endIndex;
 
-      // Append the bitmap data file to the inverted index file
-      try (FileChannel out = new FileOutputStream(_invertedIndexFile, true).getChannel();
-          FileChannel in = new FileInputStream(tempBitmapDataFile).getChannel()) {
-        // jfim: For some reason, it seems like the second argument of transferFrom is relative on Linux while it is
-        // an absolute position on MacOS X. As such, we reposition the stream to 0 on both platforms to make it an
-        // absolute position call.
-        out.position(0).transferFrom(in, out.size(), in.size());
+        // Write offset and bitmap into file
+        bitmapOffset += bitmap.serializedSizeInBytes();
+        // Check for int overflow
+        Preconditions.checkState(bitmapOffset > 0, "Inverted index file: %s exceeds 2GB limit", _invertedIndexFile);
+        offsetDataStream.writeInt(bitmapOffset);
+        bitmap.serialize(bitmapDataStream);
       }
     } catch (Exception e) {
       FileUtils.deleteQuietly(_invertedIndexFile);
-      FileUtils.deleteQuietly(tempBitmapDataFile);
       throw e;
     }
   }
 
   @Override
-  public void close() {
-    MmapUtils.unloadByteBuffer(_valueByteBuffer);
-    MmapUtils.unloadByteBuffer(_numValuesByteBuffer);
-    MmapUtils.unloadByteBuffer(_postingListLengthByteBuffer);
-    MmapUtils.unloadByteBuffer(_postingListValueByteBuffer);
-    MmapUtils.unloadByteBuffer(_postingListCurrentOffsetByteBuffer);
+  public void close() throws IOException {
+    destroyBuffer(_forwardIndexValueBuffer, _forwardIndexValueBufferFile);
+    destroyBuffer(_forwardIndexLengthBuffer, _forwardIndexLengthBufferFile);
+    destroyBuffer(_invertedIndexValueBuffer, _invertedIndexValueBufferFile);
+    destroyBuffer(_invertedIndexLengthBuffer, _invertedIndexLengthBufferFile);
+  }
+
+  private static void putInt(PinotDataBuffer buffer, long index, int value) {
+    buffer.putInt(index << 2, value);
+  }
+
+  private static int getInt(PinotDataBuffer buffer, long index) {
+    return buffer.getInt(index << 2);
+  }
+
+  private PinotDataBuffer createTempBuffer(long size, File mmapFile) throws IOException {
+    if (_useMMapBuffer) {
+      return PinotDataBuffer.mapFile(mmapFile, false, 0, size, PinotDataBuffer.NATIVE_ORDER,
+          "OffHeapBitmapInvertedIndexCreator: temp buffer");
+    } else {
+      return PinotDataBuffer.allocateDirect(size, PinotDataBuffer.NATIVE_ORDER,
+          "OffHeapBitmapInvertedIndexCreator: temp buffer for " + mmapFile.getName());
+    }
+  }
+
+  private void destroyBuffer(PinotDataBuffer buffer, File mmapFile) throws IOException {
+    if (buffer != null) {
+      buffer.close();
+      if (mmapFile.exists()) {
+        FileUtils.forceDelete(mmapFile);
+      }
+    }
   }
 }

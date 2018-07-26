@@ -54,7 +54,7 @@ export function makeSortable(f) {
  * Returns true for collection-like objects with an iterator function, but treats strings as atomic item. Also null-safe.
  */
 export function isIterable(obj) {
-  if (obj === null || _.isString(obj)) {
+  if (typeof obj === 'undefined' || obj === null || _.isString(obj)) {
     return false;
   }
   return typeof obj[Symbol.iterator] === 'function';
@@ -232,6 +232,16 @@ export function toMetricUrn(urn) {
 }
 
 /**
+ * Converts any percent string to number
+ * Example: '34%' returns 34
+ *
+ * @param {string} width - percent string
+ */
+export function toWidthNumber(width) {
+  return Number(width.replace('%',''));
+}
+
+/**
  * Returns a human-readable label for a metric urn, optionally using information from the entities cache.
  *
  * @param {string} urn metric urn
@@ -406,7 +416,13 @@ export function toFilters(urns) {
   return [...new Set([...dimensionFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctoinFilters])].sort();
 }
 
-function splitFilterFragment(fragment) {
+/**
+ * Splits filter fragments strings into 2-tuples (e.g. 'key=value' to ['key', 'value'])
+ *
+ * @param {String} fragment
+ * @returns {Array} filter tuples
+ */
+export function splitFilterFragment(fragment) {
   const parts = fragment.split('=');
   return [parts[0], _.slice(parts, 1).join('=')];
 }
@@ -595,6 +611,7 @@ export default {
   toMetricLabel,
   toColor,
   toColorDirection,
+  toWidthNumber,
   isInverse,
   makeSortable,
   fromFilterMap,
@@ -602,5 +619,6 @@ export default {
   colorMapping,
   eventColorMapping,
   dateFormatFull,
-  trimTimeRanges
+  trimTimeRanges,
+  splitFilterFragment
 };

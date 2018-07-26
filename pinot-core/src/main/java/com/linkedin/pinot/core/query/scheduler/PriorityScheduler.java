@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -70,7 +69,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
     final SchedulerQueryContext schedQueryContext = new SchedulerQueryContext(queryRequest);
     try {
       queryQueue.put(schedQueryContext);
-    } catch (OutOfCapacityError e) {
+    } catch (OutOfCapacityException e) {
       LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableName(), e.getMessage());
       return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
     }

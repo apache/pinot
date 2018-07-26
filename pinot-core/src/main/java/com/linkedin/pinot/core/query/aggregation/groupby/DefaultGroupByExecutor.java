@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -82,7 +82,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       AggregationFunction function = functionContexts[i].getAggregationFunction();
       _functions[i] = function;
       // TODO: currently only support single argument aggregation
-      if (!function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (function.getType() != AggregationFunctionType.COUNT) {
         _aggregationExpressions[i] =
             TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
       }
@@ -149,7 +149,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       GroupByResultHolder resultHolder = _resultHolders[i];
 
       resultHolder.ensureCapacity(capacityNeeded);
-      if (function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      if (function.getType() == AggregationFunctionType.COUNT) {
         if (_hasMVGroupByExpression) {
           function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder);
         } else {

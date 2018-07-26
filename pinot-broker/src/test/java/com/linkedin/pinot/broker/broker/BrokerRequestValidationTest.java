@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ public class BrokerRequestValidationTest {
 
     // Set the value for query response limit.
     config.addProperty(QUERY_RESPONSE_LIMIT_CONFIG, QUERY_RESPONSE_LIMIT);
-    brokerBuilder = new BrokerServerBuilder(config, null, timeBoundaryService, null);
+    brokerBuilder = new BrokerServerBuilder(config, null, timeBoundaryService, null, null);
     brokerBuilder.buildNetwork();
     brokerBuilder.buildHTTP();
     brokerBuilder.start();

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +17,26 @@ package com.linkedin.pinot.core.data.manager.offline;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.data.manager.BaseTableDataManager;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import javax.annotation.Nonnull;
+import javax.annotation.concurrent.ThreadSafe;
 
 
 /**
  * Table data manager for OFFLINE table.
  */
-public class OfflineTableDataManager extends AbstractTableDataManager {
+@ThreadSafe
+public class OfflineTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doInit() {
+  }
+
+  @Override
+  protected void doStart() {
   }
 
   @Override
@@ -38,7 +45,7 @@ public class OfflineTableDataManager extends AbstractTableDataManager {
 
   @Override
   public void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
-    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableName);
-    addSegment(ColumnarSegmentLoader.load(indexDir, indexLoadingConfig, schema));
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
   }
 }

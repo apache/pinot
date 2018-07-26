@@ -18,9 +18,16 @@
   &__header {
     padding: 8px 24px;
     border-bottom: 1px solid rgba(0,0,0,0.15);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+
+    &--text {
+      float: left;
+      display: inline-block;
+    }
+  }
+
+  &__close-icon {
+    float: right;
+    display: inline-block;
   }
 
   &__title {
@@ -52,7 +59,8 @@
   &__body {
     // needed to avoid unscrollable overflow
     max-height: 80vh;
-    overflow: scroll;
+    overflow-x: hidden;
+    overflow-y: scroll;
   }
 
   &__footer {
@@ -125,7 +133,11 @@
 
   &__input {
     // this is needed to force similar styling
-    padding-left: $te-spacing--sm !important; 
+    padding-left: $te-spacing--sm !important;
+
+    &--fullwidth {
+      width: 100%;
+    }
   }
 
   &__label-wrapper {

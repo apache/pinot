@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 
+@ConfigDoc(value = "Configuration for a table", mandatory = true)
+@ConfigKey("table")
 public class TableConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -46,15 +48,37 @@ public class TableConfig {
   private static final String TASK_CONFIG_KEY = "task";
   private static final String ROUTING_CONFIG_KEY = "routing";
 
+  @ConfigKey("name")
+  @ConfigDoc(value = "The name for the table.", mandatory = true, exampleValue = "myTable")
   private String _tableName;
+
+  @ConfigKey("type")
+  @ConfigDoc(value = "The type of the table, either realtime or offline", mandatory = true)
   private TableType _tableType;
+
+  @NestedConfig
   private SegmentsValidationAndRetentionConfig _validationConfig;
+
+  @NestedConfig
   private TenantConfig _tenantConfig;
+
+  @NestedConfig
   private IndexingConfig _indexingConfig;
+
+  @NestedConfig
   private TableCustomConfig _customConfig;
+
+  @ConfigKey("quota")
+  @ConfigDoc("Resource quota associated with this table")
   private QuotaConfig _quotaConfig;
+
+  @NestedConfig
   private TableTaskConfig _taskConfig;
+
+  @NestedConfig
   private RoutingConfig _routingConfig;
+
+  public TableConfig() {}
 
   private TableConfig(@Nonnull String tableName, @Nonnull TableType tableType,
       @Nonnull SegmentsValidationAndRetentionConfig validationConfig, @Nonnull TenantConfig tenantConfig,
@@ -306,11 +330,12 @@ public class TableConfig {
         EqualityUtils.isEqual(_validationConfig, that._validationConfig) &&
         EqualityUtils.isEqual(_tenantConfig, that._tenantConfig) &&
         EqualityUtils.isEqual(_indexingConfig, that._indexingConfig) &&
-        EqualityUtils.isEqual( _customConfig, that._customConfig) &&
+        EqualityUtils.isEqual(_customConfig, that._customConfig) &&
         EqualityUtils.isEqual(_quotaConfig, that._quotaConfig) &&
         EqualityUtils.isEqual(_taskConfig, that._taskConfig) &&
         EqualityUtils.isEqual(_routingConfig, that._routingConfig);
   }
+
 
   @Override
   public int hashCode() {
@@ -353,6 +378,7 @@ public class TableConfig {
     // Tenant config related
     private String _brokerTenant;
     private String _serverTenant;
+    private TagOverrideConfig _tagOverrideConfig;
 
     // Indexing config related
     private String _loadMode = DEFAULT_LOAD_MODE;
@@ -446,6 +472,11 @@ public class TableConfig {
       return this;
     }
 
+    public Builder setTagOverrideConfig(TagOverrideConfig tagOverrideConfig) {
+      _tagOverrideConfig = tagOverrideConfig;
+      return this;
+    }
+
     public Builder setLoadMode(String loadMode) {
       if (MMAP_LOAD_MODE.equalsIgnoreCase(loadMode)) {
         _loadMode = MMAP_LOAD_MODE;
@@ -532,6 +563,7 @@ public class TableConfig {
       TenantConfig tenantConfig = new TenantConfig();
       tenantConfig.setBroker(_brokerTenant);
       tenantConfig.setServer(_serverTenant);
+      tenantConfig.setTagOverrideConfig(_tagOverrideConfig);
 
       // Indexing config
       IndexingConfig indexingConfig = new IndexingConfig();

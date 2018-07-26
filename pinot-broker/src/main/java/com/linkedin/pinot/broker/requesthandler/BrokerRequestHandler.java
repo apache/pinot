@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ import com.google.common.base.Splitter;
 import com.linkedin.pinot.broker.api.RequesterIdentity;
 import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
+
+import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
 import com.linkedin.pinot.broker.routing.RoutingTable;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService;
@@ -63,12 +65,14 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.lang.mutable.MutableLong;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.linkedin.pinot.common.utils.CommonConstants.Broker.*;
+import static com.linkedin.pinot.common.utils.CommonConstants.Broker.Request.*;
 
 
 /**
@@ -79,10 +83,6 @@ import org.slf4j.LoggerFactory;
 public class BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
-
-  private static final String BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
-  private static final ResponseType DEFAULT_BROKER_RESPONSE_TYPE = ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
-  private static final int DEFAULT_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
 
   private final SegmentZKMetadataPrunerService _segmentPrunerService;
   private final int _queryLogLength;
@@ -97,11 +97,12 @@ public class BrokerRequestHandler {
   private final int _queryResponseLimit;
   private final AtomicLong _requestIdGenerator;
   private final String _brokerId;
+  private final TableQueryQuotaManager _tableQueryQuotaManager;
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
       ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry,
       SegmentZKMetadataPrunerService segmentPrunerService, BrokerMetrics brokerMetrics, Configuration config,
-      AccessControlFactory accessControlFactory) {
+      AccessControlFactory accessControlFactory, TableQueryQuotaManager tableQueryQuotaManager) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _reduceServiceRegistry = reduceServiceRegistry;
@@ -109,14 +110,13 @@ public class BrokerRequestHandler {
     _brokerMetrics = brokerMetrics;
     _optimizer = new BrokerRequestOptimizer();
     _requestIdGenerator = new AtomicLong(0);
-    _queryResponseLimit = config.getInt(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT,
-        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    _queryLogLength = config.getInt(BROKER_QUERY_LOG_LENGTH, DEFAULT_QUERY_LOG_LENGTH);
-    _brokerTimeOutMs = config.getLong(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
-        CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
-    _brokerId = config.getString(CommonConstants.Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
+    _queryResponseLimit = config.getInt(CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    _queryLogLength = config.getInt(CONFIG_OF_BROKER_QUERY_LOG_LENGTH, DEFAULT_BROKER_QUERY_LOG_LENGTH);
+    _brokerTimeOutMs = config.getLong(CONFIG_OF_BROKER_TIMEOUT_MS, DEFAULT_BROKER_TIMEOUT_MS);
+    _brokerId = config.getString(CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     _segmentPrunerService = segmentPrunerService;
     _accessControlFactory = accessControlFactory;
+    _tableQueryQuotaManager = tableQueryQuotaManager;
 
     LOGGER.info("Broker response limit is: " + _queryResponseLimit);
     LOGGER.info("Broker timeout is - " + _brokerTimeOutMs + " ms");
@@ -142,38 +142,26 @@ public class BrokerRequestHandler {
    * @throws Exception
    */
   @Nonnull
-  public BrokerResponse handleRequest(@Nonnull JSONObject request, RequesterIdentity requesterIdentity) throws Exception {
+  public BrokerResponse handleRequest(@Nonnull JSONObject request, RequesterIdentity requesterIdentity)
+      throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
-    String pql = request.getString("pql");
-    LOGGER.debug("Query string for requestId {}: {}", requestId, pql);
-
-    boolean isTraceEnabled = false;
-    if (request.has("trace")) {
-      isTraceEnabled = Boolean.parseBoolean(request.getString("trace"));
-      LOGGER.debug("Trace is set to: {} for requestId {}: {}", isTraceEnabled, requestId, pql);
-    }
-
-    Map<String, String> debugOptions = null;
-    if (request.has("debugOptions")) {
-      String routingOptionParameter = request.getString("debugOptions");
-      debugOptions =
-          Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=').split(routingOptionParameter);
-      LOGGER.debug("Debug options are set to: {} for requestId {}: {}", debugOptions, requestId, pql);
-    }
+    String query = request.getString(PQL);
+    LOGGER.debug("Query string for requestId {}: {}", requestId, query);
 
     // Compile the request
     final long compilationStartTime = System.nanoTime();
     BrokerRequest brokerRequest;
     try {
-      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
+      brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query);
     } catch (Exception e) {
-      LOGGER.info("Parsing error on requestId {}: {}, {}", requestId, pql, e.getMessage());
+      LOGGER.info("Parsing error on requestId {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1L);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
     final String tableName = brokerRequest.getQuerySource().getTableName();
     final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         System.nanoTime() - compilationStartTime);
 
@@ -181,12 +169,13 @@ public class BrokerRequestHandler {
     try {
       boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
       if (!hasAccess) {
-        _brokerMetrics.addMeteredTableValue(brokerRequest.getQuerySource().getTableName(), BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
-        return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE, QueryException.ACCESS_DENIED_ERROR);
+        _brokerMetrics.addMeteredTableValue(brokerRequest.getQuerySource().getTableName(),
+            BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+        return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
+            QueryException.ACCESS_DENIED_ERROR);
       }
     } finally {
-      _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
-          System.nanoTime() - authStartTime);
+      _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - authStartTime);
     }
 
     // Get the resources hit by the request
@@ -221,23 +210,41 @@ public class BrokerRequestHandler {
       return BrokerResponseFactory.getStaticNoTableHitBrokerResponse(ResponseType.BROKER_RESPONSE_TYPE_NATIVE);
     }
 
+    // Validate qps quota.
+    if (!_tableQueryQuotaManager.acquire(tableName)) {
+      String msg = String.format("Query quota exceeded on requestId %d. TableName: %s. Broker Id: %s", requestId, rawTableName, _brokerId);
+      LOGGER.error(msg);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1L);
+      return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
+          QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, msg));
+    }
+
     // Validate the request
     try {
       validateRequest(brokerRequest);
     } catch (Exception e) {
-      LOGGER.info("Validation error on requestId {}: {}, {}", requestId, pql, e.getMessage());
+      LOGGER.info("Validation error on requestId {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1L);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
 
-    if (isTraceEnabled) {
+    // Set extra settings into broker request
+    if (request.has(TRACE) && Boolean.parseBoolean(request.getString(TRACE))) {
+      LOGGER.debug("Enable trace for requestId {}: {}", requestId, query);
       brokerRequest.setEnableTrace(true);
     }
-    if (debugOptions != null) {
+    if (request.has(DEBUG_OPTIONS)) {
+      Map<String, String> debugOptions = Splitter.on(';')
+          .omitEmptyStrings()
+          .trimResults()
+          .withKeyValueSeparator('=')
+          .split(request.getString(DEBUG_OPTIONS));
+      LOGGER.debug("Debug options are set to: {} for requestId {}: {}", debugOptions, requestId, query);
       brokerRequest.setDebugOptions(debugOptions);
     }
     brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name());
+
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1L);
 
     // Execute the query.
@@ -258,7 +265,7 @@ public class BrokerRequestHandler {
             + "numEntriesScannedPostFilter: {}, totalDocs: {}, scatterGatherStats: {}, query: {}", requestId,
         brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
         brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
-        brokerResponse.getTotalDocs(), scatterGatherStats, StringUtils.substring(pql, 0, _queryLogLength));
+        brokerResponse.getTotalDocs(), scatterGatherStats, StringUtils.substring(query, 0, _queryLogLength));
 
     return brokerResponse;
   }
@@ -516,13 +523,15 @@ public class BrokerRequestHandler {
     long totalServerResponseSize = 0L;
     if (offlineServerResponseMap != null) {
       numServersResponded += offlineServerResponseMap.size();
-      totalServerResponseSize += deserializeServerResponses(offlineServerResponseMap, true, dataTableMap, offlineTableName,
-          processingExceptions);
+      totalServerResponseSize +=
+          deserializeServerResponses(offlineServerResponseMap, true, dataTableMap, offlineTableName,
+              processingExceptions);
     }
     if (realtimeServerResponseMap != null) {
       numServersResponded += realtimeServerResponseMap.size();
-      totalServerResponseSize += deserializeServerResponses(realtimeServerResponseMap, false, dataTableMap, realtimeTableName,
-          processingExceptions);
+      totalServerResponseSize +=
+          deserializeServerResponses(realtimeServerResponseMap, false, dataTableMap, realtimeTableName,
+              processingExceptions);
     }
     phaseTimes.addToDeserializationTime(System.nanoTime() - deserializationStartTime);
 
@@ -547,7 +556,8 @@ public class BrokerRequestHandler {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED,
           1L);
     }
-    _brokerMetrics.addMeteredQueryValue(originalBrokerRequest, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalServerResponseSize);
+    _brokerMetrics.addMeteredQueryValue(originalBrokerRequest, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
+        totalServerResponseSize);
 
     return brokerResponse;
   }

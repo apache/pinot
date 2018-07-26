@@ -75,7 +75,7 @@ public class HolidayEventsLoaderTest {
   /**
    * Test merge with existing holidays.
    */
-  @Test
+  @Test(dependsOnMethods = "testGetHolidayNameToEventDtoMap")
   public void testMergeWithExistingHolidays() {
     holidayEventsLoader.mergeWithExistingHolidays(holidayNameToHolidayEvent, eventsDAO.findAll());
     List<EventDTO> holidays = eventsDAO.findAll();

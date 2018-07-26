@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.common.segment.fetcher;
 
 import java.io.File;
@@ -22,6 +21,7 @@ import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 // This class is provided as a means to override any standard fetchers that will not be used
 // in a given Pinot installation.
@@ -34,12 +34,12 @@ public class NoOpFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
+  public void fetchSegmentToLocal(String uri, File tempFile) {
     throw new RuntimeException("NoOpFetcher cannot fetch any segments");
   }
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    return Collections.<String>emptySet();
+    return Collections.emptySet();
   }
 }

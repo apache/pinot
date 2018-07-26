@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.api.resources;
 
 import com.google.common.base.Preconditions;
@@ -21,14 +20,15 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
@@ -110,11 +110,13 @@ public class PinotTableRestletResource {
     try {
       ensureMinReplicas(tableConfig);
       _pinotHelixResourceManager.addTable(tableConfig);
+      // TODO: validate that table was created successfully
+      // (in realtime case, metadata might not have been created but would be created successfully in the next run of the validation manager)
       return new SuccessResponse("Table " + tableName + " succesfully added");
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
-        String errStr = "Invalid table config for table: " + tableName;
+        String errStr = String.format("Invalid table config for table %s: %s", tableName, e.getMessage());
         throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
       } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
@@ -128,11 +130,26 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables")
   @ApiOperation(value = "Lists all tables in cluster", notes = "Lists all tables in cluster")
-  public String listTableConfigs() {
+  public String listTableConfigs(@ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
-      List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
-      Collections.sort(rawTables);
-      JSONArray tableArray = new JSONArray(rawTables);
+      List<String> tableNames;
+      CommonConstants.Helix.TableType tableType = null;
+      if (tableTypeStr != null) {
+        tableType = CommonConstants.Helix.TableType.valueOf(tableTypeStr.toUpperCase());
+      }
+
+      if (tableType == null) {
+        tableNames = _pinotHelixResourceManager.getAllRawTables();
+      } else {
+        if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+          tableNames = _pinotHelixResourceManager.getAllRealtimeTables();
+        } else {
+          tableNames = _pinotHelixResourceManager.getAllOfflineTables();
+        }
+      }
+
+      Collections.sort(tableNames);
+      JSONArray tableArray = new JSONArray(tableNames);
       JSONObject resultObject = new JSONObject();
       resultObject.put("tables", tableArray);
       return resultObject.toString();
@@ -171,22 +188,14 @@ public class PinotTableRestletResource {
       "Get/Enable/Disable/Drop a table. If table name is the only parameter specified "
           + ", the tableconfig will be printed")
   public String alterTableStateOrListTableConfig(
-      @ApiParam(value = "Name of the table", required = false) @PathParam("tableName") String tableName,
-      @ApiParam(value = "enable|disable|drop", required = false) @QueryParam("state") String stateStr,
-      @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "enable|disable|drop") @QueryParam("state") String stateStr,
+      @ApiParam(value = "realtime|offline") @QueryParam("type") String tableTypeStr) {
     try {
-      if (tableName == null) {
-        List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
-        Collections.sort(rawTables);
-        JSONArray tableArray = new JSONArray(rawTables);
-        JSONObject resultObject = new JSONObject();
-        resultObject.put("tables", tableArray);
-        return resultObject.toString();
-      }
       if (stateStr == null) {
         return listTableConfigs(tableName, tableTypeStr);
       }
-      StateType state = Constants.validateState(stateStr);
+      Constants.validateState(stateStr);
       JSONArray ret = new JSONArray();
       boolean tableExists = false;
 
@@ -197,7 +206,7 @@ public class PinotTableRestletResource {
         tableExists = true;
 
         offline.put(FileUploadPathProvider.TABLE_NAME, offlineTableName);
-        offline.put(FileUploadPathProvider.STATE, toggleTableState(offlineTableName, stateStr).toJSON().toString());
+        offline.put(FileUploadPathProvider.STATE, toggleTableState(offlineTableName, stateStr));
         ret.put(offline);
       }
 
@@ -208,7 +217,7 @@ public class PinotTableRestletResource {
         tableExists = true;
 
         realTime.put(FileUploadPathProvider.TABLE_NAME, realTimeTableName);
-        realTime.put(FileUploadPathProvider.STATE, toggleTableState(realTimeTableName, stateStr).toJSON().toString());
+        realTime.put(FileUploadPathProvider.STATE, toggleTableState(realTimeTableName, stateStr));
         ret.put(realTime);
       }
       if (tableExists) {
@@ -257,7 +266,7 @@ public class PinotTableRestletResource {
       JSONObject tableConfigJson = new JSONObject(tableConfigStr);
       tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Invalid JSON", Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
 
     try {
@@ -285,7 +294,7 @@ public class PinotTableRestletResource {
       ensureMinReplicas(tableConfig);
       _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
-      String errStr = "Failed to update configuration for table " + tableName;
+      String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
@@ -315,10 +324,11 @@ public class PinotTableRestletResource {
       }
       return tableConfigValidateStr.toString();
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, "Invalid JSON", Response.Status.BAD_REQUEST);
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
   }
 
+  // TODO: move this method into PinotHelixResourceManager
   private PinotResourceManagerResponse toggleTableState(String tableName, String state) {
     if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
       return _pinotHelixResourceManager.toggleTableState(tableName, true);
@@ -329,7 +339,7 @@ public class PinotTableRestletResource {
     } else {
       String errorMessage = "Invalid state: " + state + ", must be one of {enable|disable|drop}";
       LOGGER.info(errorMessage);
-      return new PinotResourceManagerResponse("Failed: " + errorMessage, false);
+      return PinotResourceManagerResponse.failure(errorMessage);
     }
   }
 
@@ -346,7 +356,8 @@ public class PinotTableRestletResource {
       try {
         streamMetadata = new StreamMetadata(config.getIndexingConfig().getStreamConfigs());
       } catch (Exception e) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid tableIndexConfig or streamConfigs", e);
+        String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
+        throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
       }
       verifyReplicasPerPartition = streamMetadata.hasSimpleKafkaConsumerType();
       verifyReplication = streamMetadata.hasHighLevelKafkaConsumerType();
@@ -405,16 +416,22 @@ public class PinotTableRestletResource {
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
 
+    TableType type = TableType.valueOf(tableType.toUpperCase());
+    if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
+        || type == TableType.REALTIME && (!_pinotHelixResourceManager
+        .hasRealtimeTable(tableName))) {
+      throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
+          Response.Status.NOT_FOUND);
+    }
+
     JSONObject jsonObject;
     try {
-      jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName,
-          CommonConstants.Helix.TableType.valueOf(tableType.toUpperCase()), rebalanceUserConfig);
+      jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
     } catch (JSONException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
     return jsonObject.toString();
-
   }
 }

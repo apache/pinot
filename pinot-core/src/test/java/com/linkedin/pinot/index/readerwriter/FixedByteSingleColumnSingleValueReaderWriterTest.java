@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,14 +36,12 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws Exception {
+  public void tearDown() throws Exception {
     _memoryManager.close();
   }
 
   @Test
-  public void testInt()
-      throws IOException {
+  public void testInt() throws IOException {
     Random r = new Random();
     final long seed = r.nextLong();
     r = new Random(seed);
@@ -58,10 +56,9 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
     }
   }
 
-  private void testInt(final Random random, final int rows, final int div)
-      throws IOException {
+  private void testInt(final Random random, final int rows, final int div) throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
-    final int columnSizesInBytes = Integer.SIZE / 8;
+    final int columnSizesInBytes = Integer.BYTES;
     readerWriter =
         new FixedByteSingleColumnSingleValueReaderWriter(rows / div, columnSizesInBytes, _memoryManager, "Int");
     int[] data = new int[rows];
@@ -112,14 +109,13 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
     // Ensure that rows not written default to zero.
     start = rows * 2;
     for (int i = 0; i < 2 * rows; i++) {
-      Assert.assertEquals(readerWriter.getInt(start+i), 0);
+      Assert.assertEquals(readerWriter.getInt(start + i), 0);
     }
     readerWriter.close();
   }
 
   @Test
-  public void testLong()
-      throws IOException {
+  public void testLong() throws IOException {
     int rows = 10;
     Random r = new Random();
     final long seed = r.nextLong();
@@ -129,12 +125,9 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
     }
   }
 
-  private void testLong(final Random random, final int rows, final int div)
-      throws IOException {
+  private void testLong(final Random random, final int rows, final int div) throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
-    final int columnSizesInBytes = Long.SIZE / 8;
-    readerWriter =
-        new FixedByteSingleColumnSingleValueReaderWriter(rows / div, columnSizesInBytes, _memoryManager, "Long");
+    readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows / div, Long.BYTES, _memoryManager, "Long");
     long[] data = new long[rows];
 
     for (int i = 0; i < rows; i++) {
@@ -170,7 +163,7 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
     // Ensure that rows not written default to zero.
     start = rows * 2;
     for (int i = 0; i < 2 * rows; i++) {
-      Assert.assertEquals(readerWriter.getLong(start+i), 0);
+      Assert.assertEquals(readerWriter.getLong(start + i), 0);
     }
     readerWriter.close();
   }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package com.linkedin.pinot.startree.hll;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.ConfigKey;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -27,6 +28,11 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.map.ObjectMapper;
 
+import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
+import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+
 
 /**
  * HllConfig is used at segment generation.
@@ -36,9 +42,15 @@ import org.codehaus.jackson.map.ObjectMapper;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class HllConfig {
+  @ConfigKey("hllLog2m")
   private int hllLog2m = HllConstants.DEFAULT_LOG2M;
+
+  @ConfigKey("hllFieldSize")
   private int hllFieldSize = HllSizeUtils.getHllFieldSizeFromLog2m(HllConstants.DEFAULT_LOG2M);
+
+  @ConfigKey("hllDeriveColumnSuffix")
   private String hllDeriveColumnSuffix = HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX;
+
   private Set<String> columnsToDeriveHllFields = new HashSet<>();
 
   private transient Map<String, String> derivedHllFieldToOriginMap;
@@ -139,5 +151,34 @@ public class HllConfig {
 
   public static HllConfig fromJsonString(String jsonString) throws IOException {
     return OBJECT_MAPPER.readValue(jsonString, HllConfig.class);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (isSameReference(this, o)) {
+      return true;
+    }
+
+    if (isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    HllConfig hllConfig = (HllConfig) o;
+
+    return isEqual(hllLog2m, hllConfig.hllLog2m) &&
+        isEqual(hllFieldSize, hllConfig.hllFieldSize) &&
+        isEqual(hllDeriveColumnSuffix, hllConfig.hllDeriveColumnSuffix) &&
+        isEqual(columnsToDeriveHllFields, hllConfig.columnsToDeriveHllFields) &&
+        isEqual(derivedHllFieldToOriginMap, hllConfig.derivedHllFieldToOriginMap);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = hashCodeOf(hllLog2m);
+    result = hashCodeOf(result, hllFieldSize);
+    result = hashCodeOf(result, hllDeriveColumnSuffix);
+    result = hashCodeOf(result, columnsToDeriveHllFields);
+    result = hashCodeOf(result, derivedHllFieldToOriginMap);
+    return result;
   }
 }

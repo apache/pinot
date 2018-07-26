@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -190,10 +189,8 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
    */
   private void addBuffer() {
     PinotDataBuffer buffer = _memoryManager.allocate(_chunkSizeInBytes, _allocationContext);
-    _capacityInRows += _numRowsPerChunk;
-
-    buffer.order(ByteOrder.nativeOrder());
     _dataBuffers.add(buffer);
+    _capacityInRows += _numRowsPerChunk;
 
     FixedByteSingleValueMultiColReader reader =
         new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, _columnSizesInBytes);

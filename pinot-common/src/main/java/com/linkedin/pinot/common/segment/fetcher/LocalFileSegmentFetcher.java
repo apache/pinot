@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import java.io.File;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
@@ -22,7 +23,6 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 
 public class LocalFileSegmentFetcher implements SegmentFetcher {
 
@@ -40,6 +40,6 @@ public class LocalFileSegmentFetcher implements SegmentFetcher {
 
   @Override
   public Set<String> getProtectedConfigKeys() {
-    return Collections.<String>emptySet();
+    return Collections.emptySet();
   }
 }

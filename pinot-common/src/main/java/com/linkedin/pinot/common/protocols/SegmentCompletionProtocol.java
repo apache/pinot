@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,6 +111,7 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_OFFSET = "offset";
   public static final String PARAM_INSTANCE_ID = "instance";
   public static final String PARAM_MEMORY_USED_BYTES = "memoryUsedBytes";
+  public static final String PARAM_SEGMENT_SIZE_BYTES = "segmentSizeBytes";
   public static final String PARAM_REASON = "reason";
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec"; // Sent by servers to request additional time to build
   public static final String PARAM_ROW_COUNT = "rowCount"; // Sent by servers to indicate the number of rows read so far
@@ -166,6 +167,8 @@ public class SegmentCompletionProtocol {
           (_params.getBuildTimeMillis() <= 0 ? "" :("&" + PARAM_BUILD_TIME_MILLIS + "=" + _params.getBuildTimeMillis())) +
           (_params.getWaitTimeMillis() <= 0 ? "" : ("&" + PARAM_WAIT_TIME_MILLIS + "=" + _params.getWaitTimeMillis())) +
           (_params.getExtraTimeSec() <= 0 ? "" : ("&" + PARAM_EXTRA_TIME_SEC + "=" + _params.getExtraTimeSec())) +
+          (_params.getMemoryUsedBytes() <= 0 ? "" : ("&" + PARAM_MEMORY_USED_BYTES + "=" + _params.getMemoryUsedBytes())) +
+          (_params.getSegmentSizeBytes() <= 0 ? "" : ("&" + PARAM_SEGMENT_SIZE_BYTES + "=" + _params.getSegmentSizeBytes())) +
           (_params.getNumRows() <= 0 ? "" : ("&" + PARAM_ROW_COUNT + "=" + _params.getNumRows())) +
           (_params.getSegmentLocation() == null ? "" : ("&" + PARAM_SEGMENT_LOCATION + "=" + _params.getSegmentLocation()));
     }
@@ -181,6 +184,7 @@ public class SegmentCompletionProtocol {
       private int _extraTimeSec;
       private String _segmentLocation;
       private long _memoryUsedBytes;
+      private long _segmentSizeBytes;
 
       public Params() {
         _offset = -1L;
@@ -192,6 +196,7 @@ public class SegmentCompletionProtocol {
         _extraTimeSec = -1;
         _segmentLocation = null;
         _memoryUsedBytes = -1;
+        _segmentSizeBytes = -1;
       }
 
       public Params withOffset(long offset) {
@@ -243,6 +248,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withSegmentSizeBytes(long segmentSizeBytes) {
+        _segmentSizeBytes = segmentSizeBytes;
+        return this;
+      }
+
       public String getSegmentName() {
         return _segmentName;
       }
@@ -279,7 +289,13 @@ public class SegmentCompletionProtocol {
         return _segmentLocation;
       }
 
-      public long getMemoryUsedBytes() { return _memoryUsedBytes; }
+      public long getMemoryUsedBytes() {
+        return _memoryUsedBytes;
+      }
+
+      public long getSegmentSizeBytes() {
+        return _segmentSizeBytes;
+      }
 
       public String toString() {
         return "Offset: " + _offset
@@ -291,7 +307,8 @@ public class SegmentCompletionProtocol {
             + ",WaitTimeMillis: " + _waitTimeMillis
             + ",ExtraTimeSec: " + _extraTimeSec
             + ",SegmentLocation: " + _segmentLocation
-            + ",Memory Used Bytes: " + _memoryUsedBytes;
+            + ",MemoryUsedBytes: " + _memoryUsedBytes
+            + ",SegmentSizeBytes: " + _segmentSizeBytes;
       }
     }
   }

@@ -14,6 +14,10 @@
     margin-top: 6px;
   }
 
+  &--lifted {
+    margin-top: -10px;
+  }
+
   &__label {
     display: flex;
     align-items: center;

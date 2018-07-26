@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,6 +68,8 @@ public class TableViewsTest extends ControllerTest {
         .build();
     _helixResourceManager.addTable(tableConfig);
 
+    // add schema for realtime table
+    addDummySchema(HYBRID_TABLE_NAME);
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.CONSUMER_TYPE,
         DataSource.Realtime.Kafka.ConsumerType.highLevel.toString());

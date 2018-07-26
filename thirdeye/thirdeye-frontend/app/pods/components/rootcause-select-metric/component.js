@@ -1,6 +1,7 @@
 import Component from '@ember/component';
 import fetch from 'fetch';
 import { toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/utils/rca-utils';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
 
@@ -27,8 +28,7 @@ export default Component.extend({
    */
   searchMetrics: task(function* (metric) {
     yield timeout(1000);
-    const url = `/data/autocomplete/metric?name=${metric}`;
-    return fetch(url)
+    return fetch(selfServeApiCommon.metricAutoComplete(metric))
       .then(res => res.json());
   }),
 

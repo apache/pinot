@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,47 +15,44 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.IntBuffer;
 
 
 public class DimensionBuffer {
-  private static final ByteOrder NATIVE_ORDER = ByteOrder.nativeOrder();
-
-  private final int _numDimensions;
-  private final IntBuffer _intBuffer;
-
-  public DimensionBuffer(int numDimensions) {
-    _numDimensions = numDimensions;
-    _intBuffer = ByteBuffer.wrap(new byte[numDimensions * V1Constants.Numbers.INTEGER_SIZE]).asIntBuffer();
-  }
-
-  public DimensionBuffer(byte[] bytes) {
-    _numDimensions = bytes.length / V1Constants.Numbers.INTEGER_SIZE;
-    // NOTE: the byte array is returned from Unsafe which uses native order
-    _intBuffer = ByteBuffer.wrap(bytes).order(NATIVE_ORDER).asIntBuffer();
-  }
+  private final ByteBuffer _buffer;
 
   public static DimensionBuffer fromBytes(byte[] bytes) {
     return new DimensionBuffer(bytes);
   }
 
-  public int getDimension(int index) {
-    return _intBuffer.get(index);
+  public DimensionBuffer(int numDimensions) {
+    _buffer = ByteBuffer.wrap(new byte[numDimensions * Integer.BYTES]).order(PinotDataBuffer.NATIVE_ORDER);
   }
 
-  public void setDimension(int index, int value) {
-    _intBuffer.put(index, value);
+  private DimensionBuffer(byte[] bytes) {
+    _buffer = ByteBuffer.wrap(bytes).order(PinotDataBuffer.NATIVE_ORDER);
   }
 
-  @SuppressWarnings({"EqualsWhichDoesntCheckParameterClass", "CheckStyle"})
-  @Override
-  public boolean equals(Object obj) {
-    DimensionBuffer that = (DimensionBuffer) obj;
-    for (int i = 0; i < _numDimensions; i++) {
-      if (_intBuffer.get(i) != that._intBuffer.get(i)) {
+  public int getDictId(int index) {
+    return _buffer.getInt(index * Integer.BYTES);
+  }
+
+  public void setDictId(int index, int dictId) {
+    _buffer.putInt(index * Integer.BYTES, dictId);
+  }
+
+  public byte[] toBytes() {
+    return _buffer.array();
+  }
+
+  // NOTE: we don't check whether the array is null or the length of the array for performance concern. All the
+  // dimension buffers should have the same length.
+  public boolean hasSameBytes(byte[] dimensionBytes) {
+    byte[] bytes = _buffer.array();
+    int numBytes = bytes.length;
+    for (int i = 0; i < numBytes; i++) {
+      if (bytes[i] != dimensionBytes[i]) {
         return false;
       }
     }
@@ -66,8 +63,9 @@ public class DimensionBuffer {
   public String toString() {
     StringBuilder builder = new StringBuilder("[");
     String delimiter = "";
-    for (int i = 0; i < _numDimensions; i++) {
-      builder.append(delimiter).append(_intBuffer.get(i));
+    int numBytes = _buffer.limit();
+    for (int i = 0; i < numBytes; i += Integer.BYTES) {
+      builder.append(delimiter).append(_buffer.getInt(i));
       delimiter = ", ";
     }
     builder.append("]");

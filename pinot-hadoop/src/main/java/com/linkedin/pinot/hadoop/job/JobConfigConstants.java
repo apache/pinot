@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,5 +20,19 @@ public class JobConfigConstants {
   public static final String PATH_TO_INPUT = "path.to.input";
   public static final String PATH_TO_OUTPUT = "path.to.output";
 
+  // Leave this for backward compatibility. We prefer to use the schema fetched from the controller.
+  public static final String PATH_TO_SCHEMA = "path.to.schema";
+
   public static final String TARGZ = ".tar.gz";
+
+  public static final String TIME_COLUMN_NAME = "table.time.column.name";
+  public static final String TIME_COLUMN_TYPE = "table.time.column.type";
+  public static final String TABLE_PUSH_TYPE = "table.push.type";
+  public static final String SCHEMA = "data.schema";
+  public static final String SEGMENT_TABLE_NAME = "segment.table.name";
+
+  public static final String PUSH_TO_HOSTS = "push.to.hosts";
+  public static final String PUSH_TO_PORT = "push.to.port";
+
+  public static final String TABLE_CONFIG = "table.config";
 }

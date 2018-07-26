@@ -19,10 +19,25 @@ export default Route.extend(UnauthenticatedRouteMixin, {
   },
 
   /**
-   * The route to redirect to if already logged in
+   * The route to redirect to if already logged in and trying to route to login again.
    * @override UnauthenticatedRouteMixin.routeIfAlreadyAuthenticated
    */
-  routeIfAlreadyAuthenticated: 'rootcause',
+  routeIfAlreadyAuthenticated: 'home',
+
+  /**
+   * @description Resets any query params to allow not to have leak state or sticky query-param
+   * @summary Reset the fromUrl param
+   * @method resetController
+   * @param {Object} controller - active controller
+   * @param {Boolean} isExiting - exit status
+   * @return {undefined}
+   */
+  resetController(controller, isExiting) {
+    this._super(...arguments);
+    if (isExiting) {
+      controller.set('fromUrl', null);
+    }
+  },
 
   actions: {
     /**
@@ -31,12 +46,14 @@ export default Route.extend(UnauthenticatedRouteMixin, {
      */
     willTransition(transition) {
       const fromUrl = get(transition, 'intent.url');
-      const isRedirectedToRca = fromUrl && fromUrl.startsWith('/rca');
       const isAuthenticated = this.get('session.isAuthenticated');
 
-      if (isRedirectedToRca && !isAuthenticated) {
+      if (!isAuthenticated) {
         transition.abort();
-        this.transitionTo('login', { queryParams: { fromUrl } });
+        // set the fromUrl param to the controller prior to re-route to login
+        let loginController = this.controllerFor('login');
+        loginController.set('fromUrl', fromUrl)
+        this.transitionTo('login');
       } else {
         return true;
       }

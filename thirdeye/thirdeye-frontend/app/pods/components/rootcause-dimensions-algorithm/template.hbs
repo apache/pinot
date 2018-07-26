@@ -1,0 +1,17 @@
+{{#if fetchDimensionAnalysisData.isRunning}}
+  {{ember-spinner}}
+{{/if}}
+
+{{update-table
+  pageSize=25
+  data=dimensionTableData
+  columns=dimensionTableColumns
+  groupedHeaders=dimensionTableHeaders
+  showColumnsDropdown=false
+  showGlobalFilter=false
+  filteringIgnoreCase=true
+  multipleExpand=true
+  multipleSelect=true
+  customClasses=dimensionTableClasses
+  headerFilteringRowTemplate=headerFilteringRowTemplate
+}}

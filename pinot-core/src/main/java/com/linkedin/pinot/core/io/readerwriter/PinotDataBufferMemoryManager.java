@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import java.io.Closeable;
 public interface PinotDataBufferMemoryManager extends Closeable {
 
   /**
-   * Allocates and returns a PinotDataBuffer of specified size.
+   * Allocates and returns a PinotDataBuffer of specified size with native byte order.
    *
    * @param size Size of the data buffer to be allocated.
    * @param allocationContext Context for allocation.

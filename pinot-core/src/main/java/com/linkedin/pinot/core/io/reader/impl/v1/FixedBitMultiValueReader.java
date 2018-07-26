@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.IOException;
 
 
 /**
@@ -43,7 +44,6 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  * </ul>
  */
 public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueReader<FixedBitMultiValueReader.Context> {
-  private static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
 
   private final PinotDataBuffer _dataBuffer;
@@ -60,7 +60,7 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
     _numValues = numValues;
     _numRowsPerChunk = (int) (Math.ceil((float) PREFERRED_NUM_VALUES_PER_CHUNK / (numValues / numRows)));
     int numChunks = (numRows + _numRowsPerChunk - 1) / _numRowsPerChunk;
-    long endOffset = numChunks * INT_SIZE_IN_BYTES;
+    long endOffset = numChunks * Integer.BYTES;
     _chunkOffsetReader = new FixedByteValueReaderWriter(dataBuffer.view(0L, endOffset));
     int bitmapSize = (numValues + Byte.SIZE - 1) / Byte.SIZE;
     _bitmapReader = new PinotDataBitSet(dataBuffer.view(endOffset, endOffset + bitmapSize));
@@ -137,7 +137,7 @@ public final class FixedBitMultiValueReader extends BaseSingleColumnMultiValueRe
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _chunkOffsetReader.close();
     _bitmapReader.close();
     _rawDataReader.close();

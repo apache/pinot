@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,13 +21,17 @@ import com.linkedin.pinot.common.data.DateTimeGranularitySpec;
 import com.linkedin.pinot.core.operator.transform.transformer.DataTransformer;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+
+import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormatter;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 
 /**
  * Base date time transformer to transform and bucket date time values from epoch/simple date format to epoch/simple
  * date format.
- * <p>NOTE: time size, time unit and output granularity does not apply to simple date format.
+ * <p>NOTE: time size and time unit do not apply to simple date format.
  */
 public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I, O> {
   private final int _inputTimeSize;
@@ -36,7 +40,13 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   private final int _outputTimeSize;
   private final DateTimeTransformUnit _outputTimeUnit;
   private final DateTimeFormatter _outputDateTimeFormatter;
+  private final DateTimeGranularitySpec _outputGranularity;
   private final long _outputGranularityMillis;
+  private final SDFDateTimeTruncate _dateTimeTruncate;
+
+  private interface SDFDateTimeTruncate {
+    String truncate(DateTime dateTime);
+  }
 
   public BaseDateTimeTransformer(@Nonnull DateTimeFormatSpec inputFormat, @Nonnull DateTimeFormatSpec outputFormat,
       @Nonnull DateTimeGranularitySpec outputGranularity) {
@@ -46,7 +56,50 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     _outputTimeSize = outputFormat.getColumnSize();
     _outputTimeUnit = outputFormat.getColumnDateTimeTransformUnit();
     _outputDateTimeFormatter = outputFormat.getDateTimeFormatter();
+    _outputGranularity = outputGranularity;
     _outputGranularityMillis = outputGranularity.granularityToMillis();
+
+    // setup date time truncating based on output granularity
+    final int sz = _outputGranularity.getSize();
+    switch (_outputGranularity.getTimeUnit()) {
+      case MILLISECONDS:
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
+          dateTime.withMillisOfSecond(
+            (dateTime.getMillisOfSecond()/sz)*sz
+          )
+        );
+        break;
+      case SECONDS:
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
+          dateTime.withSecondOfMinute(
+            (dateTime.getSecondOfMinute()/sz)*sz
+          ).secondOfMinute().roundFloorCopy()
+        );
+        break;
+      case MINUTES:
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
+          dateTime.withMinuteOfHour(
+            (dateTime.getMinuteOfHour()/sz)*sz
+          ).minuteOfHour().roundFloorCopy()
+        );
+        break;
+      case HOURS:
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
+          dateTime.withHourOfDay(
+            (dateTime.getHourOfDay()/sz)*sz
+          ).hourOfDay().roundFloorCopy()
+        );
+        break;
+      case DAYS:
+        _dateTimeTruncate = (dateTime) -> _outputDateTimeFormatter.print(
+          dateTime.withDayOfMonth(
+            (dateTime.getDayOfMonth()/sz)*sz
+          ).dayOfMonth().roundFloorCopy()
+        );
+        break;
+      default:
+        _dateTimeTruncate = _outputDateTimeFormatter::print;
+    }
   }
 
   protected long transformEpochToMillis(long epochTime) {
@@ -62,7 +115,8 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   }
 
   protected String transformMillisToSDF(long millisSinceEpoch) {
-    return _outputDateTimeFormatter.print(millisSinceEpoch);
+    // convert to date time (with timezone), then truncate/bucket to the desired output granularity
+    return _dateTimeTruncate.truncate(new DateTime(millisSinceEpoch, _outputDateTimeFormatter.getZone()));
   }
 
   protected long transformToOutputGranularity(long millisSinceEpoch) {

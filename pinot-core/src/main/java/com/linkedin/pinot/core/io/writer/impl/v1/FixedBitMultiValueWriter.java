@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
+import java.io.IOException;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,8 +82,9 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
     rawDataSize = ((long) totalNumValues * columnSizeInBits + 7) / 8;
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
     Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: ", file.toString());
-    indexDataBuffer = PinotDataBuffer.fromFile(file, 0, totalSize, ReadMode.mmap, FileChannel.MapMode.READ_WRITE,
-        file.getAbsolutePath() + ".fixedBitMVWriter");
+    // Backward-compatible: index file is always big-endian
+    indexDataBuffer =
+        PinotDataBuffer.mapFile(file, false, 0, totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
 
     chunkOffsetsBuffer = indexDataBuffer.view(0, chunkOffsetHeaderSize);
     int bitsetEndPos = chunkOffsetHeaderSize + bitsetSize;
@@ -118,7 +121,7 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     customBitSet.close();
     chunkOffsetsWriter.close();
     rawDataWriter.close();

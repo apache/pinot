@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -230,7 +230,7 @@ public class AggregationGroupByTrimmingService {
 
         GroupByResult groupByResult = new GroupByResult();
         groupByResult.setGroup(Arrays.asList(groupKeys));
-        groupByResult.setValue(AggregationFunctionUtils.formatValue(groupKeyResultPair._result));
+        groupByResult.setValue(AggregationFunctionUtils.getSerializableValue(groupKeyResultPair._result));
 
         // Add to head to reverse the order
         dest.addFirst(groupByResult);

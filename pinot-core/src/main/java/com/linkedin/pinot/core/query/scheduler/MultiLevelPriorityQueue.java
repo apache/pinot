@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -86,7 +85,7 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
   }
 
   @Override
-  public void put(@Nonnull SchedulerQueryContext query) throws OutOfCapacityError {
+  public void put(@Nonnull SchedulerQueryContext query) throws OutOfCapacityException {
     Preconditions.checkNotNull(query);
     queueLock.lock();
     String groupName = groupSelector.getSchedulerGroupName(query);
@@ -205,10 +204,10 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     return query;
   }
 
-  private void checkGroupHasCapacity(SchedulerGroup groupContext) throws OutOfCapacityError {
+  private void checkGroupHasCapacity(SchedulerGroup groupContext) throws OutOfCapacityException {
     if (groupContext.numPending() >= maxPendingPerGroup &&
         groupContext.totalReservedThreads() >= resourceManager.getTableThreadsHardLimit()) {
-      throw new OutOfCapacityError(
+      throw new OutOfCapacityException(
           String.format("SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d threadsHardLimit: %d",
               groupContext.name(),
               groupContext.numPending(), maxPendingPerGroup,

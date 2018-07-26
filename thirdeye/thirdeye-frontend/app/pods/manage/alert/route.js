@@ -8,13 +8,15 @@ import fetch from 'fetch';
 import moment from 'moment';
 import { isPresent } from "@ember/utils";
 import Route from '@ember/routing/route';
+import { inject as service } from '@ember/service';
+import config from 'thirdeye-frontend/config/environment';
 import { checkStatus, buildDateEod } from 'thirdeye-frontend/utils/utils';
-import { setDuration } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 
 // Setup for query param behavior
 const queryParamsConfig = {
   refreshModel: true,
-  replace: true
+  replace: false
 };
 
 export default Route.extend({
@@ -22,25 +24,28 @@ export default Route.extend({
     jobId: queryParamsConfig
   },
 
+  durationCache: service('services/duration'),
+
   beforeModel(transition) {
     const id = transition.params['manage.alert'].alert_id;
     const { jobId, functionName } = transition.queryParams;
-    const durationDefault = '3m';
-    const startDateDefault = buildDateEod(3, 'month').valueOf();
-    const endDateDefault = moment().utc().valueOf();
+    const duration = '3m';
+    const startDate = buildDateEod(3, 'month').valueOf();
+    const endDate = moment().utc().valueOf();
 
     // Enter default 'explore' route with defaults loaded in URI
     // An alert Id of 0 means there is an alert creation error to display
     if (transition.targetName === 'manage.alert.index' && Number(id) !== -1) {
       this.transitionTo('manage.alert.explore', id, { queryParams: {
-        duration: durationDefault,
-        startDate: startDateDefault,
-        endDate: endDateDefault,
+        duration,
+        startDate,
+        endDate,
         functionName: null,
         jobId
       }});
-      // Save duration to sessionStorage for guaranteed availability
-      setDuration(durationDefault, startDateDefault, endDateDefault);
+
+      // Save duration to service object for session availability
+      this.get('durationCache').setDuration({ duration, startDate, endDate });
     }
   },
 
@@ -56,10 +61,10 @@ export default Route.extend({
       functionName: functionName || 'Unknown',
       isLoadError: Number(id) === -1,
       destination: transition.targetName,
-      alertData: fetch(`/onboard/function/${id}`).then(checkStatus),
-      email: fetch(`/thirdeye/email/function/${id}`).then(checkStatus),
-      allConfigGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
-      allAppNames: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
+      alertData: fetch(selfServeApiCommon.alertById(id)).then(checkStatus),
+      email: fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus),
+      allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(res => res.json()),
+      allAppNames: fetch(selfServeApiCommon.allApplications).then(res => res.json())
     });
   },
 
@@ -107,7 +112,7 @@ export default Route.extend({
     // We do not have a valid alertId. Set error state.
     if (isLoadError) {
       Object.assign(newAlertData, { functionName, isActive: false });
-      errorText = `${functionName.toUpperCase()} has failed to create. Please try again or email ask_thirdeye@linkedin.com`;
+      errorText = `${functionName.toUpperCase()} has failed to create. Please try again or email ${config.email}`;
     }
 
     controller.setProperties({
@@ -149,7 +154,7 @@ export default Route.extend({
         isOverViewModeActive: false,
         isEditModeActive: true
       });
-      this.transitionTo('manage.alert.edit', alertId);
+      this.transitionTo('manage.alert.edit', alertId, { queryParams: { refresh: true }});
     },
 
     /**

@@ -1,0 +1,51 @@
+{{#shared/common-tabs selection=activeSubTabs.dimensions activeTab=activeSubTabs.dimensions as |subtab|}}
+  {{#subtab.tablist as |subtablist|}}
+    {{#subtablist.tab name="heatmap"}}Heatmap{{/subtablist.tab}}
+    {{#subtablist.tab name="table"}}Table{{/subtablist.tab}}
+    {{#subtablist.tab name="algorithm"}}Algorithm{{/subtablist.tab}}
+  {{/subtab.tablist}}
+
+  {{#subtab.tabpanel name="heatmap"}}
+    {{#if isLoadingBreakdowns}}
+      <div class="spinner-wrapper spinner-wrapper--card">
+        {{ember-spinner}}
+      </div>
+    {{/if}}
+    {{rootcause-heatmap
+      entities=entities
+      breakdowns=breakdowns
+      selectedUrn=metricUrn
+      sizeMetricUrn=sizeMetricUrn
+      isLoadingBreakdowns=isLoadingBreakdowns
+      onSelection=(action "onPrimaryChange")
+      onSizeMetric=(action "heatmapOnSizeMetric")
+    }}
+  {{/subtab.tabpanel}}
+
+  {{#subtab.tabpanel name="table"}}
+    {{#if isLoadingBreakdowns}}
+      <div class="spinner-wrapper spinner-wrapper--card">
+        {{ember-spinner}}
+      </div>
+    {{/if}}
+    {{rootcause-dimensions-table
+      entities=entities
+      breakdowns=breakdowns
+      metricUrn=metricUrn
+      selectedUrns=selectedUrns
+      onSelection=(action "onSelection")
+    }}
+  {{/subtab.tabpanel}}
+
+  {{#subtab.tabpanel name="algorithm"}}
+    {{rootcause-dimensions-algorithm
+      entities=entities
+      metricUrn=metricUrn
+      range=context.anomalyRange
+      mode=context.compareMode
+      selectedUrns=selectedUrns
+      onSelection=(action "onSelection")
+    }}
+  {{/subtab.tabpanel}}
+
+{{/shared/common-tabs}}

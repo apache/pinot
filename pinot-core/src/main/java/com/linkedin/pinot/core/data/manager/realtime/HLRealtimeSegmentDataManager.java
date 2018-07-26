@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,15 +29,16 @@ import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegment;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.linkedin.pinot.core.realtime.StreamProviderFactory;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
@@ -62,6 +63,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String tableName;
   private final String segmentName;
   private final Schema schema;
+  private final String timeColumnName;
   private final PlainFieldExtractor extractor;
   private final RealtimeSegmentZKMetadata segmentMetatdaZk;
 
@@ -69,7 +71,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final StreamProvider kafkaStreamProvider;
   private final File resourceDir;
   private final File resourceTmpDir;
-  private final RealtimeSegmentImpl realtimeSegment;
+  private final MutableSegmentImpl realtimeSegment;
   private final String tableStreamName;
 
   private final long start = System.currentTimeMillis();
@@ -104,6 +106,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     this.serverMetrics =serverMetrics;
     this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
+    this.timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
 
     List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
     if (sortedColumns.isEmpty()) {
@@ -186,7 +189,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             serverMetrics))
         .setStatsHistory(realtimeTableDataManager.getStatsHistory())
         .build();
-    realtimeSegment = new RealtimeSegmentImpl(realtimeSegmentConfig);
+    realtimeSegment = new MutableSegmentImpl(realtimeSegmentConfig);
 
     notifier = realtimeTableDataManager;
 
@@ -278,7 +281,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  realtimeSegmentZKMetadata.getTableName(), realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
+                  realtimeSegmentZKMetadata.getTableName(), timeColumnName, realtimeSegmentZKMetadata.getSegmentName(), sortedColumn,
                   HLRealtimeSegmentDataManager.this.invertedIndexColumns,
                   noDictionaryColumns, null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
 
@@ -297,8 +300,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           long segEndTime = realtimeSegment.getMaxTime();
 
           TimeUnit timeUnit = schema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType();
-          IndexSegment segment =
-              ColumnarSegmentLoader.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), indexLoadingConfig);
+          ImmutableSegment segment =
+              ImmutableSegmentLoader.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), indexLoadingConfig);
 
           segmentLogger.info("Committing Kafka offsets");
           boolean commitSuccessful = false;
@@ -398,7 +401,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   @Override
-  public IndexSegment getSegment() {
+  public MutableSegment getSegment() {
     return realtimeSegment;
   }
 

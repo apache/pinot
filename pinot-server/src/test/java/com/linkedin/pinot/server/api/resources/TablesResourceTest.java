@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.server.api.resources;
 
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.List;
 import javax.ws.rs.core.Response;
@@ -132,16 +132,16 @@ public class TablesResourceTest extends BaseResourceTest {
     String segmentsCrcPath = "/tables/" + TABLE_NAME + "/segments/crc";
 
     // Upload segments
-    List<IndexSegment> indexSegments = setUpSegments(2);
+    List<ImmutableSegment> immutableSegments = setUpSegments(2);
 
     // Trigger crc api to fetch crc information
     String response = _webTarget.path(segmentsCrcPath).request().get(String.class);
     JSONObject segmentsCrc = new JSONObject(response);
 
     // Check that crc info is correct
-    for (IndexSegment indexSegment : indexSegments) {
-      String segmentName = indexSegment.getSegmentName();
-      String crc = indexSegment.getSegmentMetadata().getCrc();
+    for (ImmutableSegment immutableSegment : immutableSegments) {
+      String segmentName = immutableSegment.getSegmentName();
+      String crc = immutableSegment.getSegmentMetadata().getCrc();
       Assert.assertEquals(segmentsCrc.getString(segmentName), crc);
     }
   }

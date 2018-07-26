@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,17 +42,19 @@ import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.concurrent.Callable;
+import java.io.OutputStream;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
-import org.apache.helix.PreConnectCallback;
+import org.apache.helix.HelixManager;
+import org.apache.helix.task.TaskDriver;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
@@ -87,8 +89,8 @@ public class ControllerStarter {
     _metricsRegistry = new MetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager);
-    _executorService = Executors.newCachedThreadPool(
-        new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
+    _executorService =
+        Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
     _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
   }
@@ -119,149 +121,125 @@ public class ControllerStarter {
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
 
     // Start all components
+    LOGGER.info("Initializing SegmentFetcherFactory");
     try {
-      LOGGER.info("initializing segment fetchers for all protocols");
       SegmentFetcherFactory.getInstance()
           .init(_config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
-
-      LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
-      _helixResourceManager.start();
-
-      LOGGER.info("Starting task resource manager");
-      _helixTaskResourceManager = new PinotHelixTaskResourceManager(_helixResourceManager.getHelixZkManager());
-
-      LOGGER.info("Starting task manager");
-      _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
-      int taskManagerFrequencyInSeconds = _config.getTaskManagerFrequencyInSeconds();
-      if (taskManagerFrequencyInSeconds > 0) {
-        LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);
-        _taskManager.startScheduler(taskManagerFrequencyInSeconds);
-      }
-
-      LOGGER.info("Starting retention manager");
-      _retentionManager.start();
-
-      LOGGER.info("Starting validation manager");
-      // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
-      PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
-      ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-      _validationManager = new ValidationManager(validationMetrics, _helixResourceManager, _config,
-          PinotLLCRealtimeSegmentManager.getInstance());
-      _validationManager.start();
-
-      LOGGER.info("Starting realtime segment manager");
-      _realtimeSegmentsManager.start(_controllerMetrics);
-      PinotLLCRealtimeSegmentManager.getInstance().start();
-
-      LOGGER.info("Starting segment status manager");
-      _segmentStatusChecker.start();
-
-      LOGGER.info("Starting realtime segment relocation manager");
-      _realtimeSegmentRelocator.start();
-
-      LOGGER.info("Creating rebalance segments factory");
-      RebalanceSegmentStrategyFactory.createInstance(_helixResourceManager.getHelixZkManager());
-
-      String accessControlFactoryClass = _config.getAccessControlFactoryClass();
-      LOGGER.info("Use class: {} as the access control factory", accessControlFactoryClass);
-      final AccessControlFactory accessControlFactory =
-          (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
-
-      final MetadataEventNotifierFactory metadataEventNotifierFactory = MetadataEventNotifierFactory.loadFactory(
-          _config.subset(METADATA_EVENT_NOTIFIER_PREFIX));
-
-      int jerseyPort = Integer.parseInt(_config.getControllerPort());
-
-      LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
-      LOGGER.info("Injecting configuration and resource managers to the API context");
-      final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-      connectionManager.getParams().setConnectionTimeout(_config.getServerAdminRequestTimeoutSeconds());
-      // register all the controller objects for injection to jersey resources
-      _adminApp.registerBinder(new AbstractBinder() {
-        @Override
-        protected void configure() {
-          bind(_config).to(ControllerConf.class);
-          bind(_helixResourceManager).to(PinotHelixResourceManager.class);
-          bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
-          bind(_taskManager).to(PinotTaskManager.class);
-          bind(connectionManager).to(HttpConnectionManager.class);
-          bind(_executorService).to(Executor.class);
-          bind(_controllerMetrics).to(ControllerMetrics.class);
-          bind(accessControlFactory).to(AccessControlFactory.class);
-          bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
-        }
-      });
-
-      _adminApp.start(jerseyPort);
-      LOGGER.info("Started Jersey API on port {}", jerseyPort);
-      LOGGER.info("Pinot controller ready and listening on port {} for API requests", _config.getControllerPort());
-      LOGGER.info("Controller services available at http://{}:{}/", _config.getControllerHost(),
-          _config.getControllerPort());
-    } catch (final Exception e) {
-      LOGGER.error("Caught exception while starting controller", e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
     }
 
-    _controllerMetrics.addCallbackGauge(
-            "helix.connected",
-            new Callable<Long>() {
-              @Override
-              public Long call() throws Exception {
-                return _helixResourceManager.getHelixZkManager().isConnected() ? 1L : 0L;
-              }
-            });
+    LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
+    _helixResourceManager.start();
+    final HelixManager helixManager = _helixResourceManager.getHelixZkManager();
 
-    _controllerMetrics.addCallbackGauge(
-        "helix.leader", new Callable<Long>() {
-              @Override
-              public Long call() throws Exception {
-                return _helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L;
-              }
-            });
+    LOGGER.info("Starting task resource manager");
+    _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixManager));
 
-    _controllerMetrics.addCallbackGauge("dataDir.exists", new Callable<Long>() {
+    LOGGER.info("Starting task manager");
+    _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
+    int taskManagerFrequencyInSeconds = _config.getTaskManagerFrequencyInSeconds();
+    if (taskManagerFrequencyInSeconds > 0) {
+      LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);
+      _taskManager.startScheduler(taskManagerFrequencyInSeconds);
+    }
+
+    LOGGER.info("Starting retention manager");
+    _retentionManager.start();
+
+    LOGGER.info("Starting validation manager");
+    // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
+    PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
+    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
+    _validationManager = new ValidationManager(validationMetrics, _helixResourceManager, _config,
+        PinotLLCRealtimeSegmentManager.getInstance());
+    _validationManager.start();
+
+    LOGGER.info("Starting realtime segment manager");
+    _realtimeSegmentsManager.start(_controllerMetrics);
+    PinotLLCRealtimeSegmentManager.getInstance().start();
+
+    LOGGER.info("Starting segment status manager");
+    _segmentStatusChecker.start();
+
+    LOGGER.info("Starting realtime segment relocation manager");
+    _realtimeSegmentRelocator.start();
+
+    LOGGER.info("Creating rebalance segments factory");
+    RebalanceSegmentStrategyFactory.createInstance(helixManager);
+
+    String accessControlFactoryClass = _config.getAccessControlFactoryClass();
+    LOGGER.info("Use class: {} as the AccessControlFactory", accessControlFactoryClass);
+    final AccessControlFactory accessControlFactory;
+    try {
+      accessControlFactory = (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while creating new AccessControlFactory instance", e);
+    }
+
+    final MetadataEventNotifierFactory metadataEventNotifierFactory =
+        MetadataEventNotifierFactory.loadFactory(_config.subset(METADATA_EVENT_NOTIFIER_PREFIX));
+
+    int jerseyPort = Integer.parseInt(_config.getControllerPort());
+
+    LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
+    LOGGER.info("Injecting configuration and resource managers to the API context");
+    final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
+    connectionManager.getParams().setConnectionTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000);
+    // register all the controller objects for injection to jersey resources
+    _adminApp.registerBinder(new AbstractBinder() {
       @Override
-      public Long call() throws Exception {
-        return new File(_config.getDataDir()).exists() ? 1L : 0L;
+      protected void configure() {
+        bind(_config).to(ControllerConf.class);
+        bind(_helixResourceManager).to(PinotHelixResourceManager.class);
+        bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
+        bind(_taskManager).to(PinotTaskManager.class);
+        bind(connectionManager).to(HttpConnectionManager.class);
+        bind(_executorService).to(Executor.class);
+        bind(_controllerMetrics).to(ControllerMetrics.class);
+        bind(accessControlFactory).to(AccessControlFactory.class);
+        bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
       }
     });
 
-    _controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", new Callable<Long>() {
-      @Override
-      public Long call() throws Exception {
-        File dataDir = new File(_config.getDataDir());
+    _adminApp.start(jerseyPort);
+    LOGGER.info("Started Jersey API on port {}", jerseyPort);
+    LOGGER.info("Pinot controller ready and listening on port {} for API requests", _config.getControllerPort());
+    LOGGER.info("Controller services available at http://{}:{}/", _config.getControllerHost(),
+        _config.getControllerPort());
 
-        if (dataDir.exists()) {
-          try {
-            long startTime = System.currentTimeMillis();
-            final File testFile = new File(dataDir, _config.getControllerHost());
-            FileOutputStream outputStream = new FileOutputStream(testFile, false);
+    _controllerMetrics.addCallbackGauge("helix.connected", () -> helixManager.isConnected() ? 1L : 0L);
+    _controllerMetrics.addCallbackGauge("helix.leader", () -> helixManager.isLeader() ? 1L : 0L);
+    _controllerMetrics.addCallbackGauge("dataDir.exists", () -> new File(_config.getDataDir()).exists() ? 1L : 0L);
+    _controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", () -> {
+      File dataDir = new File(_config.getDataDir());
+      if (dataDir.exists()) {
+        try {
+          long startTime = System.currentTimeMillis();
+          File testFile = new File(dataDir, _config.getControllerHost());
+          try (OutputStream outputStream = new FileOutputStream(testFile, false)) {
             outputStream.write(Longs.toByteArray(System.currentTimeMillis()));
-            outputStream.flush();
-            outputStream.close();
-            FileUtils.deleteQuietly(testFile);
-            long endTime = System.currentTimeMillis();
-
-            return endTime - startTime;
-          } catch (IOException e) {
-            LOGGER.warn("Caught exception while checking the data directory operation latency", e);
-            return DATA_DIRECTORY_EXCEPTION_VALUE;
           }
-        } else {
-          return DATA_DIRECTORY_MISSING_VALUE;
+          FileUtils.deleteQuietly(testFile);
+          return System.currentTimeMillis() - startTime;
+        } catch (IOException e) {
+          LOGGER.warn("Caught exception while checking the data directory operation latency", e);
+          return DATA_DIRECTORY_EXCEPTION_VALUE;
         }
+      } else {
+        return DATA_DIRECTORY_MISSING_VALUE;
       }
     });
 
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.ServiceStatusCallback() {
       private boolean _isStarted = false;
       private String _statusDescription = "Helix ZK Not connected";
+
       @Override
       public ServiceStatus.Status getServiceStatus() {
-        if(_isStarted) {
+        if (_isStarted) {
           // If we've connected to Helix at some point, the instance status depends on being connected to ZK
-          if (_helixResourceManager.getHelixZkManager().isConnected()) {
+          if (helixManager.isConnected()) {
             return ServiceStatus.Status.GOOD;
           } else {
             return ServiceStatus.Status.BAD;
@@ -269,7 +247,7 @@ public class ControllerStarter {
         }
 
         // Return starting until zk is connected
-        if (!_helixResourceManager.getHelixZkManager().isConnected()) {
+        if (!helixManager.isConnected()) {
           return ServiceStatus.Status.STARTING;
         } else {
           _isStarted = true;
@@ -277,18 +255,15 @@ public class ControllerStarter {
           return ServiceStatus.Status.GOOD;
         }
       }
+
       @Override
       public String getStatusDescription() {
         return _statusDescription;
       }
     });
 
-    _helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
-      @Override
-      public void onPreConnect() {
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
-      }
-    });
+    helixManager.addPreConnectCallback(
+        () -> _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));
     _controllerMetrics.initializeGlobalMeters();
   }
 
@@ -353,9 +328,9 @@ public class ControllerStarter {
     conf.setControllerVipProtocol("http");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
-    conf.setStatusCheckerFrequencyInSeconds(5*60);
+    conf.setStatusCheckerFrequencyInSeconds(5 * 60);
     conf.setRealtimeSegmentRelocatorFrequency("1h");
-    conf.setStatusCheckerWaitForPushTimeInSeconds(10*60);
+    conf.setStatusCheckerWaitForPushTimeInSeconds(10 * 60);
     conf.setTenantIsolationEnabled(true);
     final ControllerStarter starter = new ControllerStarter(conf);
 
@@ -363,7 +338,7 @@ public class ControllerStarter {
     return starter;
   }
 
-  public static void main(String[] args) throws InterruptedException {
+  public static void main(String[] args) {
     startDefault();
   }
 }

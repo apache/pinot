@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,22 +19,35 @@ import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import java.util.List;
 import javax.annotation.Nonnull;
+import org.apache.helix.task.JobConfig;
 
 
 /**
  * The interface <code>PinotTaskGenerator</code> defines the APIs for task generators.
  */
 public interface PinotTaskGenerator {
+  int DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE = JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
 
   /**
-   * The type of tasks to generate. Should match the task type in task executor.
+   * Returns the task type of the generator.
+   *
+   * @return Task type of the generator
    */
   @Nonnull
   String getTaskType();
 
   /**
-   * Given a list of table configs, generate a list of new tasks to be scheduled.
+   * Generates a list of tasks to schedule based on the given table configs.
+   *
+   * @return List of tasks to schedule
    */
   @Nonnull
   List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs);
+
+  /**
+   * Returns the maximum number of concurrent tasks allowed per instance.
+   *
+   * @return Maximum number of concurrent tasks allowed per instance
+   */
+  int getNumConcurrentTasksPerInstance();
 }

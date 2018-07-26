@@ -65,6 +65,7 @@ public class DetectionTaskRunner implements TaskRunner {
   private List<String> collectionDimensions;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private BaseAnomalyFunction anomalyFunction;
+  private List<BaseAnomalyFunction> secondaryAnomalyFunctions;
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
     detectionTaskCounter.inc();
@@ -89,6 +90,7 @@ public class DetectionTaskRunner implements TaskRunner {
     jobExecutionId = detectionTaskInfo.getJobExecutionId();
     anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    secondaryAnomalyFunctions = anomalyFunctionFactory.getSecondaryAnomalyFunctions(anomalyFunctionSpec);
     detectionJobType = detectionTaskInfo.getDetectionJobType();
 
     String dataset = anomalyFunctionSpec.getCollection();
@@ -263,6 +265,12 @@ public class DetectionTaskRunner implements TaskRunner {
     } else {
       resultsOfAnEntry =
           anomalyFunction.analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
+    }
+    if (secondaryAnomalyFunctions != null) {
+      for (BaseAnomalyFunction secondaryAnomalyFunction : secondaryAnomalyFunctions) {
+        resultsOfAnEntry.addAll(secondaryAnomalyFunction.analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd,
+            historyMergedAnomalies));
+      }
     }
 
     // Clean up duplicate and overlapped raw anomalies

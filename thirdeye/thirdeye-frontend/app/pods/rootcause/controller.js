@@ -6,13 +6,13 @@ import Controller from '@ember/controller';
 import {
   filterObject,
   filterPrefix,
-  hasPrefix,
   toBaselineUrn,
   toCurrentUrn,
   toOffsetUrn,
-  toFilters,
-  appendFilters,
-  dateFormatFull
+  dateFormatFull,
+  appendTail,
+  stripTail,
+  extractTail
 } from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/shared/eventTableColumns';
 import filterBarConfig from 'thirdeye-frontend/shared/filterBarConfig';
@@ -39,8 +39,10 @@ const ROOTCAUSE_SERVICE_TIMESERIES = 'timeseries';
 const ROOTCAUSE_SERVICE_AGGREGATES = 'aggregates';
 const ROOTCAUSE_SERVICE_BREAKDOWNS = 'breakdowns';
 const ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS = 'anomalyFunctions';
+const ROOTCAUSE_SERVICE_ALL = 'all';
 
 const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
+const ROOTCAUSE_SESSION_DEBOUNCE_INTERVAL = 5000;
 
 const ROOTCAUSE_SESSION_PERMISSIONS_READ = 'READ';
 const ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE = 'READ_WRITE';
@@ -137,11 +139,21 @@ export default Controller.extend({
    */
   filteredUrns: null,
 
+  secondaryUrns: null,
+
   /**
    * displayed investigation tab ('metrics', 'dimensions', ...)
    * @type {string}
    */
   activeTab: ROOTCAUSE_TAB_METRICS,
+
+  /**
+   * displayed investigation sub-tabs
+   * @type {Object}
+   */
+  activeSubTabs: {
+    dimensions: 'heatmap'
+  },
 
   /**
    * display mode for timeseries chart
@@ -160,6 +172,12 @@ export default Controller.extend({
    * @type {boolean}
    */
   setupMode: ROOTCAUSE_SETUP_MODE_NONE,
+
+  /**
+   * toggle for displaying verbose error messages
+   * @type {boolean}
+   */
+  verbose: false,
 
   //
   // session data
@@ -201,6 +219,20 @@ export default Controller.extend({
    */
   sessionOwner: null,
 
+  /**
+   * anomaly feedback type. To be overridden by manual update
+   * @type {string}
+   */
+  anomalyFeedback: computed('anomalyUrn', 'entities', function () {
+    const { anomalyUrn, entities } = this.getProperties('anomalyUrn', 'entities');
+
+    try {
+      return entities[anomalyUrn].attributes.status[0];
+    } catch (ignore) {
+      return 'NO_FEEDBACK';
+    }
+  }),
+
   //
   // static component config
   //
@@ -225,9 +257,9 @@ export default Controller.extend({
     this.setProperties({
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
-      filteredUrns: new Set()
+      filteredUrns: new Set(),
+      secondaryUrns: new Set()
     });
-
     // This is a flag for the acceptance test for rootcause to prevent it from timing out because of this run loop
     if (config.environment !== 'test') {
       later(this, this._onCheckSessionTimer, ROOTCAUSE_SESSION_TIMER_INTERVAL);
@@ -263,11 +295,11 @@ export default Controller.extend({
     'context',
     'entities',
     'selectedUrns',
+    'sizeMetricUrns',
     'activeTab',
     function () {
-      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, activeTab, setupMode } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
-
+      const { context, selectedUrns, sizeMetricUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, activeTab, setupMode } =
+        this.getProperties('context', 'selectedUrns', 'sizeMetricUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
       if (!context || !selectedUrns) {
         return;
       }
@@ -324,7 +356,8 @@ export default Controller.extend({
         const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
         const currentUrns = [...metricUrns].map(toCurrentUrn);
         const baselineUrns = [...metricUrns].map(toBaselineUrn);
-        breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns)));
+        const sizeMetricCurrentUrns = [...sizeMetricUrns].map(toCurrentUrn);
+        breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns).concat(sizeMetricCurrentUrns)));
       }
 
       //
@@ -385,11 +418,13 @@ export default Controller.extend({
 
   /**
    * Subscribed entities cache
+   * @type {object}
    */
   entities: reads('entitiesService.entities'),
 
   /**
    * Subscribed timeseries cache (metrics, anomaly baselines)
+   * @type {object}
    */
   timeseries: computed(
     'timeseriesService.timeseries',
@@ -419,36 +454,70 @@ export default Controller.extend({
 
   /**
    * Subscribed aggregates cache
+   * @type {object}
    */
   aggregates: reads('aggregatesService.aggregates'),
 
   /**
    * Subscribed breakdowns cache
+   * @type {object}
    */
   breakdowns: reads('breakdownsService.breakdowns'),
 
   /**
    * Subscribed scores cache
+   * @type {object}
    */
   scores: reads('scoresService.scores'),
 
   /**
    * Primary metric urn for rootcause search
+   * @type {string}
    */
   metricUrn: computed(
     'context',
     function () {
       const { context } = this.getProperties('context');
       const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
-
       if (!metricUrns) { return false; }
-
       return metricUrns[0];
     }
   ),
 
   /**
+   * Primary metric urn for rootcause search
+   * @type {string}
+   */
+  sizeMetricUrn: computed(
+    'sizeMetricUrns',
+    function () {
+      const { sizeMetricUrns } = this.getProperties('sizeMetricUrns');
+      const metricUrns = filterPrefix(sizeMetricUrns, 'thirdeye:metric:');
+      if (!metricUrns) { return false; }
+      return metricUrns[0];
+    }
+  ),
+
+  /**
+   * Primary anomaly urn for anomaly header
+   * @type {string}
+   */
+  anomalyUrn: computed(
+    'anomalyUrns',
+    function () {
+      const { context } = this.getProperties('context');
+
+      const anomalyEventUrn = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly:');
+
+      if (!anomalyEventUrn) { return; }
+
+      return anomalyEventUrn[0];
+    }
+  ),
+
+  /**
    * Visible series and events in timeseries chart
+   * @type {array}
    */
   chartSelectedUrns: computed(
     'entities',
@@ -467,6 +536,7 @@ export default Controller.extend({
 
   /**
    * (Event) entities for event table as filtered by the side bar
+   * @type {object}
    */
   eventTableEntities: computed(
     'entities',
@@ -479,11 +549,13 @@ export default Controller.extend({
 
   /**
    * Columns config for event table
+   * @type {object}
    */
   eventTableColumns: EVENT_TABLE_COLUMNS,
 
   /**
    * (Event) entities for filtering in the side bar
+   * @type {object}
    */
   eventFilterEntities: computed(
     'entities',
@@ -495,6 +567,7 @@ export default Controller.extend({
 
   /**
    * Visible entities for tooltip
+   * @type {object}
    */
   tooltipEntities: computed(
     'entities',
@@ -688,6 +761,32 @@ export default Controller.extend({
     this._checkSession();
   },
 
+  /**
+   * Updates anomaly feedback without session
+   *
+   * @private
+   */
+  _updateAnomalyFeedback() {
+    debounce(this, this._updateAnomalyFeedbackDebounce, ROOTCAUSE_SESSION_DEBOUNCE_INTERVAL);
+  },
+
+  /**
+   * Debounced implementation for updating anomaly feedback without session
+   *
+   * @private
+   */
+  _updateAnomalyFeedbackDebounce() {
+    const { anomalyUrn, anomalyFeedback, sessionText } =
+      this.getProperties('anomalyUrn', 'anomalyFeedback', 'sessionText');
+
+    // debounce: do not run if destroyed
+    if (this.isDestroyed) { return; }
+
+    const id = anomalyUrn.split(':')[3];
+    const jsonString = JSON.stringify({ feedbackType: anomalyFeedback, comment: sessionText });
+    fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
+  },
+
   //
   // default selection
   //
@@ -780,11 +879,12 @@ export default Controller.extend({
       const { selectedUrns } = this.getProperties('selectedUrns');
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
-
       this.setProperties({
         selectedUrns: new Set(selectedUrns),
         sessionModified: true
       });
+
+
     },
 
     /**
@@ -794,8 +894,6 @@ export default Controller.extend({
      * @param {Array} urns
      */
     onLegendHover(urns) {
-      const { context } = this.getProperties('context');
-
       const focusUrns = new Set(urns);
 
       filterPrefix(focusUrns, 'thirdeye:metric:').forEach(urn => {
@@ -877,6 +975,7 @@ export default Controller.extend({
         sessionText: text,
         sessionModified: true
       });
+      this._updateAnomalyFeedback();
     },
 
     /**
@@ -930,17 +1029,14 @@ export default Controller.extend({
     },
 
     /**
-     * Saves the anomaly feedback o the backend. Overrides existing feedback, if any.
+     * Saves the anomaly feedback to the backend. Overrides existing feedback, if any.
      *
      * @param {String} anomalyUrn anomaly entity urn
      * @param {String} feedback anomaly feedback type string
-     * @param {String} comment anomaly comment
      */
-    onFeedback(anomalyUrn, feedback, comment) {
-      const id = anomalyUrn.split(':')[3];
-      const jsonString = JSON.stringify({ feedbackType: feedback, comment });
-
-      return fetch(`/dashboard/anomaly-merged-result/feedback/${id}`, { method: 'POST', body: jsonString });
+    onFeedback(anomalyUrn, feedback) {
+      this.set('anomalyFeedback', feedback);
+      this._updateAnomalyFeedback();
     },
 
     /**
@@ -950,13 +1046,38 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onPrimaryChange(updates) {
-      const { context } = this.getProperties('context');
+      const { context, sizeMetricUrns } = this.getProperties('context', 'sizeMetricUrns');
 
-      const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
-      const nonMetricUrns = [...context.urns].filter(urn => !urn.startsWith('thirdeye:metric:'));
+      // NOTE: updates here do not conform to standard. Only newly selected urns are passed in, removed are omitted.
 
-      const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...metricUrns]) });
+      const addedUrns = Object.keys(updates).filter(urn => updates[urn]);
+      const removedUrns = [...context.urns].filter(urn => !addedUrns.includes(urn));
 
+      // primary metrics
+      const urns = new Set(context.urns);
+      addedUrns.forEach(urn => urns.add(urn));
+      removedUrns.forEach(urn => urns.delete(urn));
+
+      // secondary metrics
+      const newSizeMetricUrns = new Set();
+      const addedBaseUrns = filterPrefix(addedUrns, 'thirdeye:metric:').map(urn => stripTail(urn));
+      const removedBaseUrns = filterPrefix(removedUrns, 'thirdeye:metric:').map(urn => stripTail(urn));
+
+      const metricUrns = filterPrefix(addedUrns, 'thirdeye:metric:');
+
+      if (_.isEqual(addedBaseUrns, removedBaseUrns)) {
+        // only filter changed
+        const tails = metricUrns.map(urn => extractTail(urn));
+        tails.forEach(tail => {
+          sizeMetricUrns.forEach(urn => newSizeMetricUrns.add(appendTail(stripTail(urn), tail)));
+        });
+      } else {
+        metricUrns.forEach(urn => newSizeMetricUrns.add(urn));
+      }
+
+      this.set('sizeMetricUrns', newSizeMetricUrns);
+
+      const newContext = Object.assign({}, context, { urns });
       this.send('onContext', newContext);
     },
 
@@ -995,7 +1116,7 @@ export default Controller.extend({
       if (analysisRange[0] >= start) {
         analysisRange[0] = moment(start).startOf('day').valueOf();
       }
-      if (analysisRange[1] <= end) {
+      if (analysisRange[1] <= end) {//not sure we need this now? -lohuynh
         analysisRange[1] = moment(end).startOf('day').add(1, 'days').valueOf();
       }
 
@@ -1008,25 +1129,9 @@ export default Controller.extend({
       this.send('onContext', newContext);
     },
 
-    /**
-     * Updates selected urns for the heatmap (appends selected filters as tail).
-     * @see onSelection(updates)
-     *
-     * @param {Object} updates
-     * @returns {undefined}
-     */
-    heatmapOnSelection(updates) {
-      const { context } = this.getProperties('context');
-
-      const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
-      const nonMetricUrns = [...context.urns].filter(urn => !urn.startsWith('thirdeye:metric:'));
-
-      const filters = toFilters(Object.keys(updates));
-      const newMetricUrns = metricUrns.map(urn => appendFilters(urn, filters));
-
-      const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...newMetricUrns]) });
-
-      this.send('onContext', newContext);
+    heatmapOnSizeMetric(sizeMetricUrn) {
+      // TODO make this multi metric with "updates"
+      this.set('sizeMetricUrns', new Set([sizeMetricUrn]));
     },
 
     /**
@@ -1059,6 +1164,14 @@ export default Controller.extend({
 
         case ROOTCAUSE_SERVICE_ROUTE:
           this.setProperties({ routeErrors: new Set() });
+          break;
+
+        case ROOTCAUSE_SERVICE_ALL:
+          entitiesService.clearErrors();
+          timeseriesService.clearErrors();
+          aggregatesService.clearErrors();
+          breakdownsService.clearErrors();
+          anomalyFunctionService.clearErrors();
           break;
 
       }

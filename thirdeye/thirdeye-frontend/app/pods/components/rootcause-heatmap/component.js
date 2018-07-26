@@ -1,11 +1,16 @@
 import Component from '@ember/component';
-import { getProperties, computed } from '@ember/object';
+import { observer, getProperties, computed } from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
   appendFilters,
   isInverse,
-  isAdditive
+  isAdditive,
+  filterPrefix,
+  toMetricLabel,
+  stripTail,
+  extractTail,
+  appendTail
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   humanizeChange,
@@ -33,19 +38,49 @@ const ROOTCAUSE_MODE_MAPPING = {
   'Contribution to Overall Change': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_TO_DIFF
 };
 
+
 export default Component.extend({
   //
   // external
   //
-  entities: null, // {}
 
-  breakdowns: null, // {}
+  /**
+   * RCA entities
+   * @type {object}
+   */
+  entities: null,
 
-  selectedUrn: null, // Set
+  /**
+   * Breakdowns
+   * @type {object}
+   */
+  breakdowns: null,
 
-  onSelection: null, // func (updates)
+  /**
+   * Selected metric urn
+   * @type String
+   */
+  selectedUrn: null,
 
-  isLoadingBreakdowns: null, // bool
+  /**
+   * Call back function for clicking heatmap
+   * @type {function}
+   */
+  onSelection: null,
+
+  /**
+   * Call back function for size metric selection
+   * @type {function}
+   */
+  onSizeMetric: null,
+
+  /**
+   * The urn for
+   * @type String
+   */
+  sizeMetricUrn: null,
+
+  isLoadingBreakdowns: null,
 
   //
   // internal
@@ -57,6 +92,27 @@ export default Component.extend({
   selectedMode: Object.keys(ROOTCAUSE_MODE_MAPPING)[1],
 
   /**
+   * Selected option for heatmap size
+   */
+  sizeOptionSelected: computed(
+    'sizeMetricUrn', 'sizeOptions',
+    function() {
+      const { sizeMetricUrn, sizeOptions } =
+        this.getProperties('sizeMetricUrn', 'sizeOptions');
+      return sizeOptions.find(opt => opt.urn === sizeMetricUrn);
+    }
+  ).readOnly(),
+
+  /**
+   * Options for heatmap size
+   */
+  sizeOptions: computed('entities', function () {
+    const entities = this.get('entities');
+    const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
+    return _.sortBy(metricUrns.map(urn => Object.assign({}, { urn, name: toMetricLabel(urn, entities) })), "name");
+  }),
+
+  /**
    * Lists out all heatmap mode options
    */
   modeOptions: Object.keys(ROOTCAUSE_MODE_MAPPING),
@@ -65,6 +121,7 @@ export default Component.extend({
    * Mapping of human readable to mode option
    */
   modeMapping: ROOTCAUSE_MODE_MAPPING,
+
 
   /**
    * Computes the correct mode option based on the
@@ -99,13 +156,32 @@ export default Component.extend({
     }
   ),
 
+  /**
+   * breakdown for size metric
+   */
+  sizeMetricCurrent: computed(
+    'breakdowns',
+    'sizeMetricUrn',
+    function () {
+      const { breakdowns, sizeMetricUrn } =
+        this.getProperties('breakdowns', 'sizeMetricUrn');
+      if (!sizeMetricUrn) {
+        return {};
+      }
+      const breakdown = breakdowns[toCurrentUrn(sizeMetricUrn)];
+      if (!breakdown) {
+        return {};
+      }
+      return breakdown;
+    }
+  ),
+
   baseline: computed(
     'breakdowns',
     'selectedUrn',
     function () {
       const { breakdowns, selectedUrn } =
         this.getProperties('breakdowns', 'selectedUrn');
-
       if (!selectedUrn) {
         return {};
       }
@@ -162,11 +238,15 @@ export default Component.extend({
   _dataRollup: computed(
     'current',
     'baseline',
+    'sizeMetricCurrent',
     'rollupRange',
     function () {
-      const { current, baseline } =
-        this.getProperties('current', 'baseline');
+      const { current, baseline, sizeMetricCurrent } =
+        this.getProperties('current', 'baseline', 'sizeMetricCurrent');
 
+      if (!sizeMetricCurrent) {
+        return;
+      }
       // collect all dimension names
       const dimNames = new Set(Object.keys(current).concat(Object.keys(baseline)));
 
@@ -179,18 +259,21 @@ export default Component.extend({
       const values = {};
       [...dimNames].forEach(n => {
         // order based on current contribution
-        const all = this._sortKeysByValue(current[n]).reverse();
+        const all = this._sortKeysByValue(sizeMetricCurrent[n]).reverse();
 
         const range = ROOTCAUSE_ROLLUP_RANGE;
         const head = _.slice(all, 0, range[0]);
+        if (!(n in sizeMetricCurrent)) {
+          return;
+        }
 
-        // select keys explaining ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION of total
+        // select keys explaining ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION of secondary total
         const visible = [];
-        const cutoff = this._sum(all.map(v => current[n][v])) * ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION;
-        let sum = this._sum(head.map(v => current[n][v]));
+        const cutoff = this._sum(all.map(v => sizeMetricCurrent[n][v])) * ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION;
+        let sum = this._sum(head.map(v => sizeMetricCurrent[n][v]));
         let i = range[0];
         while (i < range[1] && sum < cutoff) {
-          sum += current[n][all[i]];
+          sum += sizeMetricCurrent[n][all[i]];
           visible.push(all[i]);
           i++;
         }
@@ -199,6 +282,7 @@ export default Component.extend({
 
         const curr = this._makeRollup(current[n], head, visible, tail);
         const base = this._makeRollup(baseline[n], head, visible, tail);
+        const size = this._makeRollup(sizeMetricCurrent[n], head, visible, tail);
 
         values[n] = [ROOTCAUSE_ROLLUP_HEAD, ...visible, ROOTCAUSE_ROLLUP_TAIL].map(v => {
           return {
@@ -207,7 +291,8 @@ export default Component.extend({
             dimName: n,
             dimValue: v,
             current: curr[v],
-            baseline: base[v]
+            baseline: base[v],
+            size: size[v]
           };
         });
       });
@@ -223,9 +308,7 @@ export default Component.extend({
     function () {
       const { _dataRollup: values, mode, isInverse } =
         this.getProperties('_dataRollup', 'mode', 'isInverse');
-
       const transformation = this._makeTransformation(mode);
-
       const cells = {};
       Object.keys(values).forEach(n => {
         cells[n] = [];
@@ -233,15 +316,16 @@ export default Component.extend({
 
         const currTotal = this._makeSum(valid, (v) => v.current);
         const baseTotal = this._makeSum(valid, (v) => v.baseline);
+        const sizeTotal = this._makeSum(valid, (v) => v.size);
 
         valid.forEach((val, index) => {
           const curr = val.current;
           const base = val.baseline;
+          const size = val.size;
 
           const labelChange = transformation(curr, base, currTotal, baseTotal);
 
           const [value, labelValue] = this._makeValueLabel(val, labelChange);
-          const size = curr / currTotal;
 
           cells[n].push({
             index,
@@ -250,7 +334,7 @@ export default Component.extend({
             dimValue: val.dimValue,
             label: labelValue,
             value,
-            size,
+            size: size / sizeTotal,
             inverse: isInverse,
 
             currTotal: humanizeFloat(currTotal),
@@ -353,6 +437,16 @@ export default Component.extend({
         if (onSelection) {
           onSelection(updates);
         }
+      }
+    },
+
+    /**
+     * Load size metric
+     */
+    onSizeMetric(option) {
+      const { onSizeMetric } = this.getProperties('onSizeMetric');
+      if (onSizeMetric) {
+        onSizeMetric(option.urn);
       }
     }
   }

@@ -1016,6 +1016,13 @@ public class DataFrame {
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
+  public BooleanSeries map(Series.Conditional function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
   public BooleanSeries map(Series.DoubleConditional function, String... seriesNames) {
     return map(function, names2series(seriesNames));
   }
@@ -1140,6 +1147,13 @@ public class DataFrame {
    */
   public static ObjectSeries map(Series.ObjectFunction function, Series... series) {
     return (ObjectSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public static BooleanSeries map(Series.Conditional function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
@@ -1328,6 +1342,14 @@ public class DataFrame {
     return this.project(fromIndex);
   }
 
+  /**
+   * Returns a copy of the DataFrame with rows filtered by series values referenced by {@code seriesName}.
+   * If the value referenced by {@code seriesName} associated with a row is {@code true} the row is copied,
+   * otherwise it is set to {@code null}.
+   *
+   * @param seriesName filter series name
+   * @return filtered DataFrame copy
+   */
   public DataFrame filter(String seriesName) {
     return this.filter(this.getBooleans(seriesName));
   }
@@ -1358,6 +1380,21 @@ public class DataFrame {
 
   public DataFrame filterEquals(String seriesName, final Object value) {
     return this.filter(this.get(seriesName).getObjects().eq(value));
+  }
+
+  /**
+   * Sets the values of the series references by {@code seriesName} and masked by {@code mask}
+   * to the corresponding values in {@code values}. Uses a copy of the affected series.
+   *
+   * @see Series#set(BooleanSeries, Series)
+   *
+   * @param seriesName series name to set values of
+   * @param mask row mask (if {@code true} row is replaced by value)
+   * @param values values to replace row with
+   * @return DataFrame with values
+   */
+  public DataFrame set(String seriesName, BooleanSeries mask, Series values) {
+    return this.addSeries(seriesName, this.get(seriesName).set(mask, values));
   }
 
   /**
@@ -1563,6 +1600,17 @@ public class DataFrame {
   }
 
   /**
+   * Returns {@code true} if series {@code seriesName} value at {@code index} is null.
+   *
+   * @param seriesName series name
+   * @param index row index
+   * @return {@code true} is null, otherwise {@code false}
+   */
+  public boolean isNull(String seriesName, int index) {
+    return assertSeriesExists(seriesName).isNull(index);
+  }
+
+  /**
    * Returns a copy of the DataFrame omitting series that contain a {@code null} value.
    *
    * @return DataFrame copy without null series
@@ -1572,6 +1620,21 @@ public class DataFrame {
     df.series.clear();
     for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
       if(!e.getValue().hasNull())
+        df.addSeries(e.getKey(), e.getValue());
+    }
+    return df;
+  }
+
+  /**
+   * Returns a copy of the DataFrame omitting series that contain only {@code null} values.
+   *
+   * @return DataFrame copy without all-null series
+   */
+  public DataFrame dropAllNullColumns() {
+    DataFrame df = new DataFrame(this);
+    df.series.clear();
+    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
+      if(!e.getValue().allNull())
         df.addSeries(e.getKey(), e.getValue());
     }
     return df;
@@ -2074,6 +2137,43 @@ public class DataFrame {
     }
 
     return df;
+  }
+
+  /**
+   * Returns a new DataFrame concatenated from a list of given DataFrames.
+   * Returns an empty DataFrame on empty input, otherwise follows the conventions of {@code append()}.
+   *
+   * @see DataFrame#append(DataFrame...)
+   *
+   * @param dataframes DataFrames to concatenate in sequence
+   * @return concatenated DataFrame
+   */
+  public static DataFrame concatenate(DataFrame... dataframes) {
+    return concatenate(Arrays.asList(dataframes));
+  }
+
+  /**
+   * Returns a new DataFrame concatenated from a list of given DataFrames.
+   * Returns an empty DataFrame on empty input, otherwise follows the conventions of {@code append()}.
+   *
+   * @see DataFrame#append(List)
+   *
+   * @param dataframes DataFrames to concatenate in sequence
+   * @return concatenated DataFrame
+   */
+  public static DataFrame concatenate(List<DataFrame> dataframes) {
+    if (dataframes.isEmpty()) {
+      return new DataFrame();
+    }
+
+    if (dataframes.size() == 1) {
+      return dataframes.get(0);
+    }
+
+    DataFrame first = dataframes.get(0);
+    List<DataFrame> others = dataframes.subList(1, dataframes.size());
+
+    return first.append(others);
   }
 
   @Override

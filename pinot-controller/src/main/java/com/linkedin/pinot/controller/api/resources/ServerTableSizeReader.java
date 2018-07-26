@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,13 +65,14 @@ public class ServerTableSizeReader {
     }
 
     MultiGetRequest mget = new MultiGetRequest(executor, connectionManager);
-    LOGGER.info("Reading segment sizes from servers for table: {}, timeoutMsec: {}", table, timeoutMsec);
+    LOGGER.info("Reading segment sizes from {} servers for table: {}, timeoutMsec: {}", serverUrls.size(), table, timeoutMsec);
     CompletionService<GetMethod> completionService = mget.execute(serverUrls, timeoutMsec);
 
     Map<String, List<SegmentSizeInfo>> serverSegmentSizes = new HashMap<>(serverEndPoints.size());
 
     for (int i = 0; i < serverUrls.size(); i++) {
       GetMethod getMethod = null;
+      String url = serverUrls.get(i);
       try {
         getMethod = completionService.take().get();
         URI uri = getMethod.getURI();
@@ -83,19 +84,19 @@ public class ServerTableSizeReader {
         TableSizeInfo tableSizeInfo = new ObjectMapper().readValue(getMethod.getResponseBodyAsString(), TableSizeInfo.class);
         serverSegmentSizes.put(instance, tableSizeInfo.segments);
       } catch (InterruptedException e) {
-        LOGGER.warn("Interrupted exception while reading segment size for table: {}", table, e);
+        LOGGER.warn("Interrupted exception while reading segment size for table: {}. Server: {}", table, url, e);
       } catch (ExecutionException e) {
         if (Throwables.getRootCause(e) instanceof SocketTimeoutException) {
-          LOGGER.warn("Server request to read table size was timed out for table: {}", table, e);
+          LOGGER.warn("Server request to read table size was timed out for table: {}. Server: {}", table, url, e);
         } else if (Throwables.getRootCause(e) instanceof ConnectTimeoutException) {
-          LOGGER.warn("Server request to read table size timed out waiting for connection. table: {}", table, e);
+          LOGGER.warn("Server request to read table size timed out waiting for connection. table: {}. Server: {}", table, url, e);
         } else if (Throwables.getRootCause(e) instanceof ConnectionPoolTimeoutException) {
-          LOGGER.warn("Server request to read table size timed out on getting a connection from pool, table: {}", table, e);
+          LOGGER.warn("Server request to read table size timed out on getting a connection from pool, table: {}. Server: {}", table, url, e);
         } else {
-          LOGGER.warn("Execution exception while reading segment sizes for table: {}", table, e);
+          LOGGER.warn("Execution exception while reading segment sizes for table: {}. Server: {}", table, url, e);
         }
       } catch(Exception e) {
-        LOGGER.warn("Error while reading segment sizes for table: {}", table);
+        LOGGER.warn("Error while reading segment sizes for table: {}. Server: {}", table, url);
       } finally {
         if (getMethod != null) {
           getMethod.releaseConnection();

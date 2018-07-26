@@ -1,6 +1,14 @@
-{{#link-to 'rootcause' (query-params anomalyId=record.id)}}
-   {{moment-format record.start 'MMM D, hh:mm A'}}
-{{/link-to}}
+<p>
+  <label class="te-label te-label--small">
+    <span>
+      {{moment-format record.anomaly.start 'MMM D, hh:mm A'}}
+      {{#tooltip-on-element class="te-tooltip"}}
+        Start: {{moment-format record.anomaly.start 'MMM D, hh:mm A'}}<br />
+        End: {{moment-format record.anomaly.end 'MMM D, hh:mm A'}}
+      {{/tooltip-on-element}}
+    </span>
+  </label>
+</p>
 <p class="anomalies-table__duration">
   {{record.duration}}
 </p>

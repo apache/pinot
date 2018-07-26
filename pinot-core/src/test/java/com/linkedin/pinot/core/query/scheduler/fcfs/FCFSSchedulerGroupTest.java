@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,28 +29,27 @@ public class FCFSSchedulerGroupTest {
 
   @Test
   public void testCompare() {
+    // Both groups are null
+    assertEquals(FCFSSchedulerGroup.compare(null, null), 0);
+
     FCFSSchedulerGroup lhs = new FCFSSchedulerGroup("one");
     FCFSSchedulerGroup rhs = new FCFSSchedulerGroup("two");
+    assertEquals(FCFSSchedulerGroup.compare(lhs, lhs), 0);
 
-    // both groups are empty
+    // Both groups are empty
     assertNull(lhs.peekFirst());
     assertNull(rhs.peekFirst());
-    assertEquals(lhs.compareTo(lhs), 0);
     assertEquals(lhs.compareTo(rhs), 0);
     assertEquals(rhs.compareTo(lhs), 0);
-    SchedulerQueryContext firstRequest = createQueryRequest("groupOne", metrics);
-    firstRequest.getQueryRequest().getTimerContext().setQueryArrivalTimeNs(1000 * 1_000_000L);
-    lhs.addLast(firstRequest);
 
+    SchedulerQueryContext firstRequest = createQueryRequest("groupOne", metrics, 2000);
+    lhs.addLast(firstRequest);
     assertEquals(lhs.compareTo(rhs), 1);
     assertEquals(rhs.compareTo(lhs), -1);
-    SchedulerQueryContext secondRequest = createQueryRequest("groupTwo", metrics);
-    secondRequest.getQueryRequest().getTimerContext().setQueryArrivalTimeNs(2000 * 1_000_000L);
+
+    SchedulerQueryContext secondRequest = createQueryRequest("groupTwo", metrics, 3000);
     rhs.addLast(secondRequest);
     assertEquals(lhs.compareTo(rhs), 1);
     assertEquals(rhs.compareTo(lhs), -1);
-    secondRequest.getQueryRequest().getTimerContext().setQueryArrivalTimeNs(1 * 1_000_000L);
-    assertEquals(lhs.compareTo(rhs), -1);
-    assertEquals(rhs.compareTo(lhs), 1);
   }
 }

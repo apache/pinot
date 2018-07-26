@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,6 +56,11 @@ public final class SingleValueIterator extends BlockSingleValIterator {
   @Override
   public String nextStringVal() {
     return _reader.getString(_nextDocId++, _context);
+  }
+
+  @Override
+  public byte[] nextBytesVal() {
+    return _reader.getBytes(_nextDocId++, _context);
   }
 
   @Override

@@ -7,6 +7,7 @@ public class MergedAnomalyResultIndex extends AbstractIndexEntity {
 
 
   long functionId;
+  long detectionConfigId;
   long anomalyFeedbackId;
   long metricId;
   long startTime;
@@ -15,6 +16,14 @@ public class MergedAnomalyResultIndex extends AbstractIndexEntity {
   String metric;
   DimensionMap dimensions;
   boolean notified;
+
+  public long getDetectionConfigId() {
+    return detectionConfigId;
+  }
+
+  public void setDetectionConfigId(long detectionConfigId) {
+    this.detectionConfigId = detectionConfigId;
+  }
 
   public long getAnomalyFeedbackId() {
     return anomalyFeedbackId;

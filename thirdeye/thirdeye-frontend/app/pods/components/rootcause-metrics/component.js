@@ -1,4 +1,4 @@
-import { computed } from '@ember/object';
+import { computed, getProperties, set } from '@ember/object';
 import Component from '@ember/component';
 import {
   toCurrentUrn,
@@ -16,6 +16,7 @@ import {
   humanizeFloat,
   humanizeScore
 } from 'thirdeye-frontend/utils/utils';
+import METRICS_TABLE_COLUMNS from 'thirdeye-frontend/shared/metricsTableColumns';
 import _ from 'lodash';
 
 export default Component.extend({
@@ -26,71 +27,7 @@ export default Component.extend({
    * @type Object[]
    */
   // TODO move this to shared
-  metricsTableColumns: [
-    {
-      template: 'custom/table-checkbox',
-      className: 'metrics-table__column'
-    }, {
-      propertyName: 'label',
-      title: 'Metric',
-      className: 'metrics-table__column metrics-table__column--large'
-    }, {
-      propertyName: 'current',
-      template: 'custom/metrics-table-current',
-      sortedBy: 'sortable_current',
-      title: 'current',
-      disableFiltering: true,
-      disableSorting: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'baseline',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_baseline',
-      title: 'baseline',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'wo1w',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_wo1w',
-      title: 'WoW',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'wo2w',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_wo2w',
-      title: 'Wo2W',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'wo3w',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_wo3w',
-      title: 'Wo3W',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'wo4w',
-      template: 'custom/metrics-table-offset',
-      sortedBy: 'sortable_wo4w',
-      title: 'Wo4W',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      propertyName: 'score',
-      title: 'Outlier',
-      disableFiltering: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }, {
-      template: 'custom/rca-metric-links',
-      propertyName: 'links',
-      title: 'Links',
-      disableFiltering: true,
-      disableSorting: true,
-      className: 'metrics-table__column metrics-table__column--small'
-    }
-  ],
+  metricsTableColumns: METRICS_TABLE_COLUMNS,
 
   //
   // external properties
@@ -152,7 +89,7 @@ export default Component.extend({
   links: computed(
     'entities',
     function() {
-      const { entities } = this.getProperties('entities');
+      const { entities } = getProperties(this, 'entities');
       let metricUrlMapping = {};
 
       filterPrefix(Object.keys(entities), 'thirdeye:metric:')
@@ -188,7 +125,7 @@ export default Component.extend({
     'links',
     function() {
       const { selectedUrns, entities, aggregates, scores, links } =
-        this.getProperties('selectedUrns', 'entities', 'aggregates', 'scores', 'links');
+        getProperties(this, 'selectedUrns', 'entities', 'aggregates', 'scores', 'links');
 
       const rows = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
         .map(urn => {
@@ -213,7 +150,7 @@ export default Component.extend({
           };
         });
 
-      return _.sortBy(rows, (row) => -1 * scores[row.urn]);
+      return _.sortBy(rows, (row) => row.label);
     }
   ),
 
@@ -257,14 +194,7 @@ export default Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: computed(
-    'metricsTableData',
-    'selectedUrns',
-    function () {
-      const { metricsTableData, selectedUrns } = this.getProperties('metricsTableData', 'selectedUrns');
-      return [...selectedUrns].filter(urn => metricsTableData[urn]).map(urn => metricsTableData[urn]);
-    }
-  ),
+  preselectedItems: [], // FIXME: this is broken across all of RCA and works by accident only
 
   actions: {
     /**
@@ -275,7 +205,7 @@ export default Component.extend({
     displayDataChanged (e) {
       if (_.isEmpty(e.selectedItems)) { return; }
 
-      const { selectedUrns, onSelection } = this.getProperties('selectedUrns', 'onSelection');
+      const { selectedUrns, onSelection } = getProperties(this, 'selectedUrns', 'onSelection');
 
       if (!onSelection) { return; }
 
@@ -288,6 +218,7 @@ export default Component.extend({
         updates[toBaselineUrn(urn)] = state;
       }
 
+      set(this, 'preselectedItems', []);
       onSelection(updates);
     }
   }

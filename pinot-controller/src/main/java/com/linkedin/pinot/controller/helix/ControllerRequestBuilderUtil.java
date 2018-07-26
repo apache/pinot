@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.TenantRole;
 import java.util.HashMap;
 import java.util.Map;
@@ -59,8 +59,8 @@ public class ControllerRequestBuilderUtil {
       helixZkManager.connect();
       if (isSingleTenant) {
         helixZkManager.getClusterManagmentTool()
-            .addInstanceTag(helixClusterName, brokerId, ControllerTenantNameBuilder.getBrokerTenantNameForTenant(
-                ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+            .addInstanceTag(helixClusterName, brokerId,
+                TagNameUtils.getBrokerTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME));
       } else {
         helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, brokerId, UNTAGGED_BROKER_INSTANCE);
       }
@@ -112,10 +112,10 @@ public class ControllerRequestBuilderUtil {
     if (isSingleTenant) {
       helixZkManager.getClusterManagmentTool()
           .addInstanceTag(helixClusterName, instanceId,
-              TableNameBuilder.OFFLINE.tableNameWithType(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+              TableNameBuilder.OFFLINE.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
       helixZkManager.getClusterManagmentTool()
           .addInstanceTag(helixClusterName, instanceId,
-              TableNameBuilder.REALTIME.tableNameWithType(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+              TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
     } else {
       helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED_SERVER_INSTANCE);
     }

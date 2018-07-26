@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,6 +64,11 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
+  public void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public int[] getDictionaryIdsSV() {
     throw new UnsupportedOperationException();
   }
@@ -90,6 +95,11 @@ public abstract class BaseBlockValSet implements BlockValSet {
 
   @Override
   public String[] getStringValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public byte[][] getBytesValuesSV() {
     throw new UnsupportedOperationException();
   }
 

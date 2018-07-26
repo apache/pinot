@@ -1,21 +1,27 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.google.common.collect.SetMultimap;
+import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.text.StrSubstitutor;
@@ -24,13 +30,13 @@ import org.slf4j.LoggerFactory;
 
 
 public class ResourceUtils {
+
   private static final Logger LOG = LoggerFactory.getLogger(ResourceUtils.class);
   private static final Pattern PATTERN_UNMATCHED = Pattern.compile("\\$\\{");
 
   private ResourceUtils() {
     // left blank
   }
-
 
   /**
    * Return a list of parameters.
@@ -44,11 +50,70 @@ public class ResourceUtils {
 
   public static List<String> parseListParams(List<String> params) {
     if (params == null){
-      return new ArrayList<>();
+      return Collections.emptyList();
     }
     if(params.size() != 1)
       return params;
     return Arrays.asList(params.get(0).split(","));
+  }
+
+  /**
+   * Returns a filter multimap for a given anomaly, joining anomaly dimensions and function filters
+   *
+   * @param anomaly anomaly dto
+   * @param datasetDAO dataset config dao
+   * @return filter multimap
+   */
+  public static SetMultimap<String, String> getAnomalyFilters(MergedAnomalyResultDTO anomaly, DatasetConfigManager datasetDAO) {
+    SetMultimap<String, String> filters = TreeMultimap.create();
+
+    DatasetConfigDTO dataset = datasetDAO.findByDataset(anomaly.getCollection());
+    if (dataset == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s' for anomaly id %d", anomaly.getCollection(), anomaly.getId()));
+    }
+
+    AnomalyFunctionDTO function = anomaly.getFunction();
+    if (function != null) {
+      // anomaly function filters (does not apply to detector config!)
+      // NOTE: this should not need to be here. filters should be stored in the anomaly unconditionally
+      if (function.getFilters() != null) {
+        for (String filterString : function.getFilters().split(";")) {
+          try {
+            String[] filter = filterString.split("=", 2);
+            String dimName = filter[0];
+            String dimValue = filter[1];
+
+            if (!dataset.getDimensionsHaveNoPreAggregation().contains(dimName)
+                && Objects.equals(dimValue, dataset.getPreAggregatedKeyword())) {
+              // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
+              continue;
+            }
+
+            if (anomaly.getDimensions().containsKey(dimName)) {
+              // avoid duplication of explored dimensions
+              continue;
+            }
+
+            filters.put(dimName, dimValue);
+          } catch (Exception ignore) {
+            // left blank
+          }
+        }
+      }
+    }
+
+    // anomaly dimensions
+    for (Map.Entry<String, String> entry : anomaly.getDimensions().entrySet()) {
+      if (!dataset.getDimensionsHaveNoPreAggregation().contains(entry.getKey()) &&
+          Objects.equals(entry.getValue(), dataset.getPreAggregatedKeyword())) {
+        // NOTE: workaround for anomaly detection inserting pre-aggregated keyword as dimension
+        continue;
+      }
+
+      filters.put(entry.getKey(), entry.getValue());
+    }
+
+    return filters;
   }
 
   /**
@@ -222,5 +287,41 @@ public class ResourceUtils {
     }
   }
 
+  /**
+   * Resolves the (convoluted) anomaly feedback properties into a clear classification of
+   * {@code NONE, TRUE_POSITIVE, FALSE_POSITIVE, TRUE_NEGATIVE, FALSE_NEGATIVE}.
+   *
+   * @param anomaly anomaly dto
+   * @return feedback classification
+   */
+  public static AnomalyClassificationType getStatusClassification(MergedAnomalyResultDTO anomaly) {
+    if (anomaly.getAnomalyResultSource() != null) {
+      if (AnomalyResultSource.USER_LABELED_ANOMALY.equals(anomaly.getAnomalyResultSource())) {
+        if (anomaly.getFeedback() != null
+            && !AnomalyFeedbackType.NOT_ANOMALY.equals(anomaly.getFeedback().getFeedbackType())) {
+          return AnomalyClassificationType.TRUE_NEGATIVE;
+        }
 
+        // NOTE: includes user-created anomaly without feedback as false negative by default
+
+        return AnomalyClassificationType.FALSE_NEGATIVE;
+      }
+    }
+
+    if (anomaly.getFeedback() == null) {
+      return AnomalyClassificationType.NONE;
+    }
+
+    switch (anomaly.getFeedback().getFeedbackType()) {
+      case NO_FEEDBACK:
+        return AnomalyClassificationType.NONE;
+      case ANOMALY:
+      case ANOMALY_NEW_TREND:
+        return AnomalyClassificationType.TRUE_POSITIVE;
+      case NOT_ANOMALY:
+        return AnomalyClassificationType.TRUE_NEGATIVE;
+    }
+
+    throw new IllegalStateException(String.format("Could not classify feedback status of anomaly id %d", anomaly.getId()));
+  }
 }

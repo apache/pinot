@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.common.datatable;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataSchema;
@@ -62,8 +61,8 @@ public class DataTableSerDeTest {
     String emptyString = StringUtils.EMPTY;
     String[] emptyStringArray = {StringUtils.EMPTY};
 
-    DataSchema dataSchema =
-        new DataSchema(new String[]{"SV", "MV"}, new DataType[]{DataType.STRING, DataType.STRING_ARRAY});
+    DataSchema dataSchema = new DataSchema(new String[]{"SV", "MV"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING_ARRAY});
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       dataTableBuilder.startRow();
@@ -85,29 +84,22 @@ public class DataTableSerDeTest {
 
   @Test
   public void testAllDataTypes() throws IOException {
-    DataType[] columnTypes = DataType.values();
-    int numColumns = columnTypes.length;
+    DataSchema.ColumnDataType[] columnDataTypes = DataSchema.ColumnDataType.values();
+    int numColumns = columnDataTypes.length;
     String[] columnNames = new String[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      columnNames[i] = columnTypes[i].name();
+      columnNames[i] = columnDataTypes[i].name();
     }
-    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+    DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
 
-    boolean[] booleans = new boolean[NUM_ROWS];
-    byte[] bytes = new byte[NUM_ROWS];
-    char[] chars = new char[NUM_ROWS];
-    short[] shorts = new short[NUM_ROWS];
     int[] ints = new int[NUM_ROWS];
     long[] longs = new long[NUM_ROWS];
     float[] floats = new float[NUM_ROWS];
     double[] doubles = new double[NUM_ROWS];
     String[] strings = new String[NUM_ROWS];
     Object[] objects = new Object[NUM_ROWS];
-    byte[][] byteArrays = new byte[NUM_ROWS][];
-    char[][] charArrays = new char[NUM_ROWS][];
-    short[][] shortArrays = new short[NUM_ROWS][];
     int[][] intArrays = new int[NUM_ROWS][];
     long[][] longArrays = new long[NUM_ROWS][];
     float[][] floatArrays = new float[NUM_ROWS][];
@@ -117,23 +109,7 @@ public class DataTableSerDeTest {
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       dataTableBuilder.startRow();
       for (int colId = 0; colId < numColumns; colId++) {
-        switch (columnTypes[colId]) {
-          case BOOLEAN:
-            booleans[rowId] = RANDOM.nextBoolean();
-            dataTableBuilder.setColumn(colId, booleans[rowId]);
-            break;
-          case BYTE:
-            bytes[rowId] = (byte) RANDOM.nextInt();
-            dataTableBuilder.setColumn(colId, bytes[rowId]);
-            break;
-          case CHAR:
-            chars[rowId] = (char) RANDOM.nextInt();
-            dataTableBuilder.setColumn(colId, chars[rowId]);
-            break;
-          case SHORT:
-            shorts[rowId] = (short) RANDOM.nextInt();
-            dataTableBuilder.setColumn(colId, shorts[rowId]);
-            break;
+        switch (columnDataTypes[colId]) {
           case INT:
             ints[rowId] = RANDOM.nextInt();
             dataTableBuilder.setColumn(colId, ints[rowId]);
@@ -159,35 +135,8 @@ public class DataTableSerDeTest {
             objects[rowId] = RANDOM.nextDouble();
             dataTableBuilder.setColumn(colId, objects[rowId]);
             break;
-          case BYTE_ARRAY:
-            int length = RANDOM.nextInt(20);
-            byte[] byteArray = new byte[length];
-            for (int i = 0; i < length; i++) {
-              byteArray[i] = (byte) RANDOM.nextInt();
-            }
-            byteArrays[rowId] = byteArray;
-            dataTableBuilder.setColumn(colId, byteArray);
-            break;
-          case CHAR_ARRAY:
-            length = RANDOM.nextInt(20);
-            char[] charArray = new char[length];
-            for (int i = 0; i < length; i++) {
-              charArray[i] = (char) RANDOM.nextInt();
-            }
-            charArrays[rowId] = charArray;
-            dataTableBuilder.setColumn(colId, charArray);
-            break;
-          case SHORT_ARRAY:
-            length = RANDOM.nextInt(20);
-            short[] shortArray = new short[length];
-            for (int i = 0; i < length; i++) {
-              shortArray[i] = (short) RANDOM.nextInt();
-            }
-            shortArrays[rowId] = shortArray;
-            dataTableBuilder.setColumn(colId, shortArray);
-            break;
           case INT_ARRAY:
-            length = RANDOM.nextInt(20);
+            int length = RANDOM.nextInt(20);
             int[] intArray = new int[length];
             for (int i = 0; i < length; i++) {
               intArray[i] = RANDOM.nextInt();
@@ -243,19 +192,7 @@ public class DataTableSerDeTest {
 
     for (int rowId = 0; rowId < NUM_ROWS; rowId++) {
       for (int colId = 0; colId < numColumns; colId++) {
-        switch (columnTypes[colId]) {
-          case BOOLEAN:
-            Assert.assertEquals(newDataTable.getBoolean(rowId, colId), booleans[rowId], ERROR_MESSAGE);
-            break;
-          case BYTE:
-            Assert.assertEquals(newDataTable.getByte(rowId, colId), bytes[rowId], ERROR_MESSAGE);
-            break;
-          case CHAR:
-            Assert.assertEquals(newDataTable.getChar(rowId, colId), chars[rowId], ERROR_MESSAGE);
-            break;
-          case SHORT:
-            Assert.assertEquals(newDataTable.getShort(rowId, colId), shorts[rowId], ERROR_MESSAGE);
-            break;
+        switch (columnDataTypes[colId]) {
           case INT:
             Assert.assertEquals(newDataTable.getInt(rowId, colId), ints[rowId], ERROR_MESSAGE);
             break;
@@ -273,16 +210,6 @@ public class DataTableSerDeTest {
             break;
           case OBJECT:
             Assert.assertEquals(newDataTable.getObject(rowId, colId), objects[rowId], ERROR_MESSAGE);
-            break;
-          case BYTE_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getByteArray(rowId, colId), byteArrays[rowId]), ERROR_MESSAGE);
-            break;
-          case CHAR_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getCharArray(rowId, colId), charArrays[rowId]), ERROR_MESSAGE);
-            break;
-          case SHORT_ARRAY:
-            Assert.assertTrue(Arrays.equals(newDataTable.getShortArray(rowId, colId), shortArrays[rowId]),
-                ERROR_MESSAGE);
             break;
           case INT_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getIntArray(rowId, colId), intArrays[rowId]), ERROR_MESSAGE);

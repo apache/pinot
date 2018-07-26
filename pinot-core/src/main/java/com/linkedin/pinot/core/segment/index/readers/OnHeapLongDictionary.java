@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import java.util.Arrays;
@@ -42,7 +41,7 @@ public class OnHeapLongDictionary extends OnHeapDictionary {
    * @param length Length of the dictionary
    */
   public OnHeapLongDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, V1Constants.Numbers.LONG_SIZE, (byte) 0);
+    super(dataBuffer, length, Long.BYTES, (byte) 0);
 
     _valToDictId = new Long2IntOpenHashMap(length);
     _valToDictId.defaultReturnValue(-1);
@@ -84,11 +83,6 @@ public class OnHeapLongDictionary extends OnHeapDictionary {
   @Override
   public Long get(int dictId) {
     return _dictIdToVal[dictId];
-  }
-
-  @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

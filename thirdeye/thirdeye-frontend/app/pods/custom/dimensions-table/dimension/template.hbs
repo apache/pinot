@@ -1,0 +1,21 @@
+{{#if column.isFirstColumn}}
+  {{input
+    type="checkbox"
+    class="rootcause-dimensions-table__checkbox-cell"
+    checked=record.isSelected}}
+{{/if}}
+
+<div class="rootcause-dimensions-table__dimension-content {{if column.isFirstColumn "rootcause-dimensions-table__dimension-content--first"}}" title="{{dimensionValue}}">
+  {{#if isValueShown}}
+    {{#if excludedDimensions}}
+      <a class="te-anomaly-table__link" href="#">
+        {{dimensionValue}}
+        {{#tooltip-on-element}}
+          ALL EXCEPT => {{excludedDimensions}}
+        {{/tooltip-on-element}}
+      </a>
+    {{else}}
+      {{dimensionValue}}
+    {{/if}}
+  {{/if}}
+</div>

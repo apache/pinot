@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,13 @@ public interface ColumnStatistics {
 
     /**
      *
-     * @return For string objects, returns the length of the longest string value. For others, returns -1.
+     * @return For variable length objects, returns the length of the shortest value. For others, returns -1.
+     */
+    int getLengthOfShortestElement();
+
+    /**
+     *
+     * @return For variable length objects, returns the length of the longest value. For others, returns -1.
      */
     int getLengthOfLargestElement();
 

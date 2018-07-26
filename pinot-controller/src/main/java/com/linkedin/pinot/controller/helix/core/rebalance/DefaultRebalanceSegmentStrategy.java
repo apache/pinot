@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.OfflineTagConfig;
@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -90,8 +90,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
       StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-      if (streamMetadata.hasHighLevelKafkaConsumerType()) {
-        LOGGER.info("Table {} uses HLC and will have no partition assignment", tableNameWithType);
+      if (!streamMetadata.hasSimpleKafkaConsumerType()) {
+        LOGGER.info("Table {} does not have LLC and will have no partition assignment", tableNameWithType);
         return newPartitionAssignment;
       }
 
@@ -101,12 +101,9 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
           rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.INCLUDE_CONSUMING, DEFAULT_INCLUDE_CONSUMING);
       if (includeConsuming) {
 
-        PartitionAssignmentGenerator partitionAssignmentGenerator = new PartitionAssignmentGenerator(_helixManager);
-        PartitionAssignment partitionAssignmentFromIdealState =
-            partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
-        int numPartitions = partitionAssignmentFromIdealState.getNumPartitions();
-        newPartitionAssignment =
-            partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
+        StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator = getStreamPartitionAssignmentGenerator();
+        int numPartitions = streamPartitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
+        newPartitionAssignment = streamPartitionAssignmentGenerator.generateStreamPartitionAssignment(tableConfig, numPartitions);
 
       } else {
         LOGGER.info("includeConsuming = false. No need to rebalance partition assignment for {}",
@@ -114,6 +111,11 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       }
     }
     return newPartitionAssignment;
+  }
+
+  @VisibleForTesting
+  protected StreamPartitionAssignmentGenerator getStreamPartitionAssignmentGenerator() {
+    return new StreamPartitionAssignmentGenerator(_helixManager);
   }
 
   /**
@@ -361,10 +363,10 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       List<String> enabledServingInstances) {
     String tag;
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
-      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig, _helixManager);
+      RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
       tag = realtimeTagConfig.getCompletedServerTag();
     } else {
-      OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig, _helixManager);
+      OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
       tag = offlineTagConfig.getOfflineServerTag();
     }
     servingInstances.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tag));

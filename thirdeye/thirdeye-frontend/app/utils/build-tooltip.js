@@ -66,12 +66,12 @@ const getValues = (hoverUrns, hoverTimestamp, lookup, entities) => {
   metricUrns.forEach(urn => {
     // find first smaller or equal element
     const currentLookup = (lookup[toCurrentUrn(urn)] || []).reverse();
-    const currentTimeseries = currentLookup.find(t => t[0] <= hoverTimestamp && t[1] != null);
-    const current = currentTimeseries ? currentTimeseries[1] : parseFloat('NaN');
+    const currentTimeseries = currentLookup.find(t => t[0] <= hoverTimestamp);
+    const current = currentTimeseries && currentTimeseries[1] ? currentTimeseries[1] : Number.NaN;
 
     const baselineLookup = (lookup[toBaselineUrn(urn)] || []).reverse();
-    const baselineTimeseries = baselineLookup.find(t => t[0] <= hoverTimestamp && t[1] != null);
-    const baseline = baselineTimeseries ? baselineTimeseries[1] : parseFloat('NaN');
+    const baselineTimeseries = baselineLookup.find(t => t[0] <= hoverTimestamp);
+    const baseline = baselineTimeseries && baselineTimeseries[1] ? baselineTimeseries[1] : Number.NaN;
 
     const change = current / baseline - 1;
 

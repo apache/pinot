@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,13 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
-import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class MultiValueDictionaryTest {
@@ -50,11 +50,11 @@ public class MultiValueDictionaryTest {
     }
   }
 
-  private void testMultiValueIndexing(final long seed)
-      throws Exception {
+  private void testMultiValueIndexing(final long seed) throws Exception {
     final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
-        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8, new DirectMemoryManager("test"), "indexer");
+        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES / 2, NROWS / 3, Integer.BYTES,
+            new DirectMemoryManager("test"), "indexer");
 
     // Insert rows into the indexer and dictionary
     Random random = new Random(seed);

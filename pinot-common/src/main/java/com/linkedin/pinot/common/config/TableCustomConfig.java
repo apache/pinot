@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ public class TableCustomConfig {
 
   public static final String MESSAGE_BASED_REFRESH_KEY = "messageBasedRefresh";
 
+  @ConfigKey("customConfigs")
+  @UseChildKeyHandler(SimpleMapChildKeyHandler.class)
   private Map<String, String> _customConfigs;
 
   public Map<String, String> getCustomConfigs() {

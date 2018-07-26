@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.data.manager.offline;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.core.data.manager.TableDataManager;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import javax.annotation.Nonnull;
@@ -30,25 +32,19 @@ public class TableDataManagerProvider {
   private TableDataManagerProvider() {
   }
 
-  private static final String OFFLINE_TABLE_DATA_MANAGER_TYPE = "OFFLINE";
-  private static final String REALTIME_TABLE_DATA_MANAGER_TYPE = "REALTIME";
-
   public static TableDataManager getTableDataManager(@Nonnull TableDataManagerConfig tableDataManagerConfig,
       @Nonnull String instanceId, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
       @Nonnull ServerMetrics serverMetrics) {
-    String tableDataManagerType = tableDataManagerConfig.getTableDataManagerType().toUpperCase();
     TableDataManager tableDataManager;
-    switch (tableDataManagerType) {
-      case OFFLINE_TABLE_DATA_MANAGER_TYPE:
+    switch (CommonConstants.Helix.TableType.valueOf(tableDataManagerConfig.getTableDataManagerType())) {
+      case OFFLINE:
         tableDataManager = new OfflineTableDataManager();
         break;
-      case REALTIME_TABLE_DATA_MANAGER_TYPE:
+      case REALTIME:
         tableDataManager = new RealtimeTableDataManager();
         break;
       default:
-        throw new UnsupportedOperationException(
-            "Unsupported table data manager type: " + tableDataManagerType + " for table: "
-                + tableDataManagerConfig.getTableName());
+        throw new IllegalStateException();
     }
     tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics);
     return tableDataManager;

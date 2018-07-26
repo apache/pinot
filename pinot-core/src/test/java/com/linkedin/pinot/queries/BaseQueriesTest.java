@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;

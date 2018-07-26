@@ -1,9 +1,9 @@
 package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardExecutionContext;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTask;
-import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardTaskContext;
 import com.linkedin.thirdeye.anomaly.onboard.OnboardingTaskTestUtils;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardExecutionContext;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTask;
+import com.linkedin.thirdeye.anomaly.onboard.framework.DetectionOnboardTaskContext;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -99,9 +99,9 @@ public class TestOnboardingTasks {
     Assert.assertEquals(1, anomalyFunctionDAO.findAll().size());
     Assert.assertEquals(1, alertConfigDAO.findAll().size());
 
-    FunctionReplayOnboardingTask replayTask = new FunctionReplayOnboardingTask();
-    replayTask.setTaskContext(context);
-    replayTask.initDetectionJob();
+    FunctionReplayOnboardingTask DetectionOnboardTask = new FunctionReplayOnboardingTask();
+    DetectionOnboardTask.setTaskContext(context);
+    DetectionOnboardTask.initDetectionJob();
 
     Assert.assertEquals(1, jobDAO.findAll().size());
 

@@ -3,24 +3,27 @@ import moment from 'moment';
 import { module, test } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
 import { selfServeConst, selfServeSettings, optionsToString } from 'thirdeye-frontend/tests/utils/constants';
-import { visit, fillIn, click, currentURL, triggerKeyEvent, waitUntil } from '@ember/test-helpers';
+import { visit, fillIn, click, currentURL, triggerKeyEvent, waitFor } from '@ember/test-helpers';
 import { filters, dimensions, granularities } from 'thirdeye-frontend/mocks/metricPeripherals';
 import { selectChoose, clickTrigger } from 'thirdeye-frontend/tests/helpers/ember-power-select';
 
 module('Acceptance | create alert', function(hooks) {
   setupApplicationTest(hooks);
 
-  const selectedConfigGroup = 'test_alert_1';
-  const selectedMetric = 'test_collection_1::test_metric_1';
+  const id = '1';
+  const selectedConfigGroup = `test_alert_${id}`;
+  const selectedMetric = `test_collection_${id}::test_metric_${id}`;
   const groupRecipient = 'simba@disney.com';
   const newRecipient = 'duane@therock.com';
   const selectedApp = 'the-lion-king';
+  const alertNameGeneric = `test_function_${id}`;
   const alertName = 'theLionKing_testMetric1_upDown_5Minutes';
 
   // Flatten filter object in order to easily compare it to the list of options rendered
   const filterArray = Object.values(filters).map(filterGroup => [...Object.values(filterGroup)]);
 
   test(`visiting alert creation page to test onboarding flow for self-serve`, async (assert) => {
+    server.createList('alert', 2);
     await visit(`/self-serve/create-alert`);
     const $granularityDropdown = $(selfServeConst.GRANULARITY_SELECT);
     const $graphContainer = $(selfServeConst.GRAPH_CONTAINER);
@@ -37,10 +40,11 @@ module('Acceptance | create alert', function(hooks) {
       'Graph placeholder is visible. Data is not yet loaded.'
     );
 
-    // Select a metric
+    // Select a metric, wait for data to be loaded into graph
     await click(selfServeConst.METRIC_SELECT);
     await fillIn(selfServeConst.METRIC_INPUT, 'test');
     await click($(`${selfServeConst.OPTION_ITEM}:contains(${selectedMetric})`).get(0));
+    await waitFor(`${selfServeConst.GRANULARITY_SELECT} ${selfServeConst.SELECTED_ITEM}`, { timeout: 3000 });
 
     // Fields are now enabled with defaults and load correct options, graph is loaded
     assert.equal(
@@ -152,7 +156,7 @@ module('Acceptance | create alert', function(hooks) {
     await click(selfServeConst.SUBMIT_BUTTON);
 
     // Once sequence is complete (replay successful), verify transition to Alert Page
-    await waitUntil(() => document.querySelector(selfServeConst.ALERT_TITLE));
+    await waitFor(selfServeConst.ALERT_TITLE, { timeout: 3000 })
 
     assert.ok(
       currentURL().includes(`/manage/alert/1/explore?duration=3m`),
@@ -161,7 +165,7 @@ module('Acceptance | create alert', function(hooks) {
 
     assert.equal(
       $(selfServeConst.ALERT_TITLE).get(0).firstElementChild.innerText.trim(),
-      alertName,
+      alertNameGeneric,
       'Alert details header title is correct'
     );
 
@@ -171,7 +175,7 @@ module('Acceptance | create alert', function(hooks) {
       'Alert status label is set to active.'
     );
 
-    await waitUntil(() => document.querySelector(selfServeConst.ALERT_CARDS_CONTAINER));
+    await waitFor(selfServeConst.ALERT_CARDS_CONTAINER, { timeout: 3000 });
 
     assert.ok(
       $(selfServeConst.ALERT_CARDS_CONTAINER).length > 0,

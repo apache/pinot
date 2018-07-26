@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,45 +15,23 @@
  */
 package com.linkedin.pinot.core.data.extractors;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
 /**
  *  The <code>PinotDataType</code> enum represents the data type of a value in a row from recordReader and provides
  *  utility methods to convert value across types if applicable.
- *  <p>
- *  We don't use <code>PinotDataType</code> to maintain type information, but use it to help organize the data and use
- *  {@link com.linkedin.pinot.common.data.FieldSpec.DataType} to maintain type information separately across
- *  various readers.
+ *  <p>We don't use <code>PinotDataType</code> to maintain type information, but use it to help organize the data and
+ *  use {@link FieldSpec.DataType} to maintain type information separately across various readers.
  *  <p>NOTE:
- *  <p>- a. we will silently lose information if a conversion causes us to do so (e.g. Integer to Byte).
- *  <p>- b. We will throw exceptions if a conversion is not possible (e.g. Boolean to Byte).
- *  <p>- c. we will throw exceptions if the conversion throw exceptions (e.g. String -> Short, where parsing string
- *  throw exceptions)
+ *  <ul>
+ *    <li>We will silently lose information if a conversion causes us to do so (e.g. DOUBLE to INT)</li>
+ *    <li>We will throw exception if a conversion is not possible (e.g. BOOLEAN to INT).</li>
+ *    <li>We will throw exception if the conversion throws exception (e.g. "foo" -> INT)</li>
+ *  </ul>
  */
 public enum PinotDataType {
   BOOLEAN {
-    @Override
-    public Boolean toBoolean(Object value) {
-      return (Boolean) value;
-    }
-
-    @Override
-    public Byte toByte(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: BYTE");
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: CHARACTER");
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: SHORT");
-    }
-
     @Override
     public Integer toInteger(Object value) {
       throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: INTEGER");
@@ -76,26 +54,12 @@ public enum PinotDataType {
 
     @Override
     public Boolean convert(Object value, PinotDataType sourceType) {
-      return sourceType.toBoolean(value);
+      throw new UnsupportedOperationException(
+          "Cannot convert value: " + value + "from: " + sourceType + " to: BOOLEAN");
     }
   },
 
   BYTE {
-    @Override
-    public Byte toByte(Object value) {
-      return (Byte) value;
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      return (char) ((Byte) value).shortValue();
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      return ((Byte) value).shortValue();
-    }
-
     @Override
     public Integer toInteger(Object value) {
       return ((Byte) value).intValue();
@@ -118,26 +82,19 @@ public enum PinotDataType {
 
     @Override
     public Byte convert(Object value, PinotDataType sourceType) {
-      return sourceType.toByte(value);
+      throw new UnsupportedOperationException("Cannot convert value: " + value + "from: " + sourceType + " to: BYTE");
+    }
+  },
+
+  BYTES {
+    // TODO: Implement all other overrides.
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      return sourceType.toBytes(value);
     }
   },
 
   CHARACTER {
-    @Override
-    public Byte toByte(Object value) {
-      return (byte) ((Character) value).charValue();
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      return (Character) value;
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      return (short) ((Character) value).charValue();
-    }
-
     @Override
     public Integer toInteger(Object value) {
       return (int) ((Character) value);
@@ -160,26 +117,12 @@ public enum PinotDataType {
 
     @Override
     public Character convert(Object value, PinotDataType sourceType) {
-      return sourceType.toCharacter(value);
+      throw new UnsupportedOperationException(
+          "Cannot convert value: " + value + "from: " + sourceType + " to: CHARACTER");
     }
   },
 
   SHORT {
-    @Override
-    public Byte toByte(Object value) {
-      return ((Short) value).byteValue();
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      return (char) ((Short) value).shortValue();
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      return (Short) value;
-    }
-
     @Override
     public Integer toInteger(Object value) {
       return ((Short) value).intValue();
@@ -202,26 +145,11 @@ public enum PinotDataType {
 
     @Override
     public Short convert(Object value, PinotDataType sourceType) {
-      return sourceType.toShort(value);
+      throw new UnsupportedOperationException("Cannot convert value: " + value + "from: " + sourceType + " to: SHORT");
     }
   },
 
   INTEGER {
-    @Override
-    public Byte toByte(Object value) {
-      return ((Integer) value).byteValue();
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      return (char) ((Integer) value).shortValue();
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      return ((Integer) value).shortValue();
-    }
-
     @Override
     public Integer toInteger(Object value) {
       return (Integer) value;
@@ -250,21 +178,6 @@ public enum PinotDataType {
 
   LONG {
     @Override
-    public Byte toByte(Object value) {
-      return ((Long) value).byteValue();
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      return (char) ((Long) value).shortValue();
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      return ((Long) value).shortValue();
-    }
-
-    @Override
     public Integer toInteger(Object value) {
       return ((Long) value).intValue();
     }
@@ -291,21 +204,6 @@ public enum PinotDataType {
   },
 
   FLOAT {
-    @Override
-    public Byte toByte(Object value) {
-      return ((Float) value).byteValue();
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      return (char) ((Float) value).shortValue();
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      return ((Float) value).shortValue();
-    }
-
     @Override
     public Integer toInteger(Object value) {
       return ((Float) value).intValue();
@@ -334,21 +232,6 @@ public enum PinotDataType {
 
   DOUBLE {
     @Override
-    public Byte toByte(Object value) {
-      return ((Double) value).byteValue();
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      return (char) ((Double) value).shortValue();
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      return ((Double) value).shortValue();
-    }
-
-    @Override
     public Integer toInteger(Object value) {
       return ((Double) value).intValue();
     }
@@ -376,26 +259,6 @@ public enum PinotDataType {
 
   STRING {
     @Override
-    public Boolean toBoolean(Object value) {
-      return Boolean.parseBoolean((String) value);
-    }
-
-    @Override
-    public Byte toByte(Object value) {
-      return Byte.parseByte((String) value);
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      return ((String) value).charAt(0);
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      return Short.parseShort((String) value);
-    }
-
-    @Override
     public Integer toInteger(Object value) {
       return Integer.parseInt((String) value);
     }
@@ -422,21 +285,6 @@ public enum PinotDataType {
   },
 
   OBJECT {
-    @Override
-    public Byte toByte(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: OBJECT to: BYTE");
-    }
-
-    @Override
-    public Character toCharacter(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: OBJECT to: CHARACTER");
-    }
-
-    @Override
-    public Short toShort(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + " from: OBJECT to: SHORT");
-    }
-
     @Override
     public Integer toInteger(Object value) {
       throw new UnsupportedOperationException("Cannot convert value: " + value + " from: OBJECT to: INTEGER");
@@ -466,21 +314,24 @@ public enum PinotDataType {
   BYTE_ARRAY {
     @Override
     public Byte[] convert(Object value, PinotDataType sourceType) {
-      return sourceType.toByteArray(value);
+      throw new UnsupportedOperationException(
+          "Cannot convert value: " + value + "from: " + sourceType + " to: BYTE_ARRAY");
     }
   },
 
   CHARACTER_ARRAY {
     @Override
     public Character[] convert(Object value, PinotDataType sourceType) {
-      return sourceType.toCharacterArray(value);
+      throw new UnsupportedOperationException(
+          "Cannot convert value: " + value + "from: " + sourceType + " to: CHARACTER_ARRAY");
     }
   },
 
   SHORT_ARRAY {
     @Override
     public Short[] convert(Object value, PinotDataType sourceType) {
-      return sourceType.toShortArray(value);
+      throw new UnsupportedOperationException(
+          "Cannot convert value: " + value + "from: " + sourceType + " to: SHORT_ARRAY");
     }
   },
 
@@ -514,11 +365,6 @@ public enum PinotDataType {
 
   STRING_ARRAY {
     @Override
-    public Boolean toBoolean(Object value) {
-      return STRING.toBoolean(((Object[]) value)[0]);
-    }
-
-    @Override
     public String[] convert(Object value, PinotDataType sourceType) {
       return sourceType.toStringArray(value);
     }
@@ -531,22 +377,6 @@ public enum PinotDataType {
           "Cannot convert value: " + value + "from: " + sourceType + " to: OBJECT_ARRAY");
     }
   };
-
-  public Boolean toBoolean(Object value) {
-    throw new UnsupportedOperationException("Cannot convert value: " + value + " from: " + this + " to: BOOLEAN");
-  }
-
-  public Byte toByte(Object value) {
-    return getSingleValueType().toByte(((Object[]) value)[0]);
-  }
-
-  public Character toCharacter(Object value) {
-    return getSingleValueType().toCharacter(((Object[]) value)[0]);
-  }
-
-  public Short toShort(Object value) {
-    return getSingleValueType().toShort(((Object[]) value)[0]);
-  }
 
   public Integer toInteger(Object value) {
     return getSingleValueType().toInteger(((Object[]) value)[0]);
@@ -572,49 +402,9 @@ public enum PinotDataType {
     }
   }
 
-  public Byte[] toByteArray(Object value) {
-    if (isSingleValue()) {
-      return new Byte[]{toByte(value)};
-    } else {
-      Object[] valueArray = (Object[]) value;
-      int length = valueArray.length;
-      Byte[] byteArray = new Byte[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        byteArray[i] = singleValueType.toByte(valueArray[i]);
-      }
-      return byteArray;
-    }
-  }
-
-  public Character[] toCharacterArray(Object value) {
-    if (isSingleValue()) {
-      return new Character[]{toCharacter(value)};
-    } else {
-      Object[] valueArray = (Object[]) value;
-      int length = valueArray.length;
-      Character[] characterArray = new Character[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        characterArray[i] = singleValueType.toCharacter(valueArray[i]);
-      }
-      return characterArray;
-    }
-  }
-
-  public Short[] toShortArray(Object value) {
-    if (isSingleValue()) {
-      return new Short[]{toShort(value)};
-    } else {
-      Object[] valueArray = (Object[]) value;
-      int length = valueArray.length;
-      Short[] shortArray = new Short[length];
-      PinotDataType singleValueType = getSingleValueType();
-      for (int i = 0; i < length; i++) {
-        shortArray[i] = singleValueType.toShort(valueArray[i]);
-      }
-      return shortArray;
-    }
+  // TODO: Support toBytes for all data-types.
+  public byte[] toBytes(Object value) {
+    throw new UnsupportedOperationException();
   }
 
   public Integer[] toIntegerArray(Object value) {
@@ -695,7 +485,7 @@ public enum PinotDataType {
   public abstract Object convert(Object value, PinotDataType sourceType);
 
   public boolean isSingleValue() {
-    return this.ordinal() < BYTE_ARRAY.ordinal();
+    return this.ordinal() <= OBJECT.ordinal();
   }
 
   public PinotDataType getSingleValueType() {
@@ -726,15 +516,6 @@ public enum PinotDataType {
   public static PinotDataType getPinotDataType(FieldSpec fieldSpec) {
     FieldSpec.DataType dataType = fieldSpec.getDataType();
     switch (dataType) {
-      case BOOLEAN:
-        Preconditions.checkArgument(fieldSpec.isSingleValueField());
-        return PinotDataType.BOOLEAN;
-      case BYTE:
-        return fieldSpec.isSingleValueField() ? PinotDataType.BYTE : PinotDataType.BYTE_ARRAY;
-      case CHAR:
-        return fieldSpec.isSingleValueField() ? PinotDataType.CHARACTER : PinotDataType.CHARACTER_ARRAY;
-      case SHORT:
-        return fieldSpec.isSingleValueField() ? PinotDataType.SHORT : PinotDataType.SHORT_ARRAY;
       case INT:
         return fieldSpec.isSingleValueField() ? PinotDataType.INTEGER : PinotDataType.INTEGER_ARRAY;
       case LONG:
@@ -745,6 +526,12 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? PinotDataType.DOUBLE : PinotDataType.DOUBLE_ARRAY;
       case STRING:
         return fieldSpec.isSingleValueField() ? PinotDataType.STRING : PinotDataType.STRING_ARRAY;
+      case BYTES:
+        if (fieldSpec.isSingleValueField()) {
+          return PinotDataType.BYTES;
+        }  else {
+          throw new UnsupportedOperationException("Unsupported multi-valued type: BYTES");
+        }
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());

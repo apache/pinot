@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,11 @@ package com.linkedin.pinot.common.config;
 
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,8 +33,10 @@ public class RoutingConfig {
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  @ConfigKey("routingTableBuilderName")
   private String _routingTableBuilderName;
 
+  // TODO jfim: This seems unused, maybe remove it?
   private Map<String,String> _routingTableBuilderOptions = new HashMap<>();
 
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,9 +41,9 @@ public class SegmentUriPushJob extends Configured {
     super(new Configuration());
     _pushUriPrefix = properties.getProperty("uri.prefix", "");
     _pushUriSuffix = properties.getProperty("uri.suffix", "");
-    _segmentPath = properties.getProperty("path.to.output") + "/";
-    _hosts = properties.getProperty("push.to.hosts").split(",");
-    _port = Integer.parseInt(properties.getProperty("push.to.port"));
+    _segmentPath = properties.getProperty(JobConfigConstants.PATH_TO_OUTPUT) + "/";
+    _hosts = properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS).split(",");
+    _port = Integer.parseInt(properties.getProperty(JobConfigConstants.PUSH_TO_PORT));
   }
 
   public void run() throws Exception {
@@ -74,7 +74,7 @@ public class SegmentUriPushJob extends Configured {
 
   public void pushOneTarFile(FileSystem fs, Path path) throws Exception {
     String fileName = path.getName();
-    if (!fileName.endsWith(".tar.gz")) {
+    if (!fileName.endsWith(JobConfigConstants.TARGZ)) {
       return;
     }
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {

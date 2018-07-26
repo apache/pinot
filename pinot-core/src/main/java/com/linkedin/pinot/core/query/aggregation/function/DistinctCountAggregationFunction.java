@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.query.aggregation.function;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -26,18 +27,17 @@ import javax.annotation.Nonnull;
 
 
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.DISTINCTCOUNT.getName();
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.DISTINCTCOUNT;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.DISTINCTCOUNT.getName() + "_" + columns[0];
   }
 
   @Override
@@ -78,21 +78,21 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          valueSet.add(Long.valueOf(longValues[i]).hashCode());
+          valueSet.add(Long.hashCode(longValues[i]));
         }
         break;
 
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          valueSet.add(Float.valueOf(floatValues[i]).hashCode());
+          valueSet.add(Float.hashCode(floatValues[i]));
         }
         break;
 
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          valueSet.add(Double.valueOf(doubleValues[i]).hashCode());
+          valueSet.add(Double.hashCode(doubleValues[i]));
         }
         break;
 
@@ -111,13 +111,11 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
         int[] intValues = blockValSets[0].getIntValuesSV();
         for (int i = 0; i < length; i++) {
-          // Hashcode for int is the same as its value.
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], intValues[i]);
         }
         break;
@@ -125,32 +123,28 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = Long.valueOf(longValues[i]).hashCode();
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], hashCode);
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Long.hashCode(longValues[i]));
         }
         break;
 
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = Float.valueOf(floatValues[i]).hashCode();
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], hashCode);
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Float.hashCode(floatValues[i]));
         }
         break;
 
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = Double.valueOf(doubleValues[i]).hashCode();
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], hashCode);
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Double.hashCode(doubleValues[i]));
         }
         break;
 
       case STRING:
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = stringValues[i].hashCode();
-          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], hashCode);
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], stringValues[i].hashCode());
         }
         break;
 
@@ -174,32 +168,28 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = Long.valueOf(longValues[i]).hashCode();
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], hashCode);
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Long.hashCode(longValues[i]));
         }
         break;
 
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = Float.valueOf(floatValues[i]).hashCode();
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], hashCode);
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Float.hashCode(floatValues[i]));
         }
         break;
 
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = Double.valueOf(doubleValues[i]).hashCode();
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], hashCode);
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Double.hashCode(doubleValues[i]));
         }
         break;
 
       case STRING:
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          int hashCode = stringValues[i].hashCode();
-          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], hashCode);
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i].hashCode());
         }
         break;
 
@@ -245,8 +235,8 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getIntermediateResultDataType() {
-    return FieldSpec.DataType.OBJECT;
+  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Nonnull

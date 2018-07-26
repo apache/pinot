@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +19,27 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
  * AST node for identifiers (column names).
  */
 public class IdentifierAstNode extends BaseAstNode {
+  private String _expression;
   private String _name;
 
-  public IdentifierAstNode(String name) {
-    _name = name;
+  public IdentifierAstNode(String expression) {
+    _expression = expression;
+    if (
+      expression.charAt(0) == '`'
+      && expression.charAt(expression.length()-1) == '`'
+    ) {
+      _name = expression.substring(1, expression.length()-1);
+    } else {
+      _name = expression;
+    }
   }
 
   public String getName() {
     return _name;
+  }
+
+  public String getExpression() {
+    return _expression;
   }
 
   @Override

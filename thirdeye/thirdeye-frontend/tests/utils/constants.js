@@ -4,6 +4,10 @@ import { isPresent } from "@ember/utils";
  * General self-serve element selectors
  */
 export const selfServeConst = {
+  // Self-serve Nav Elements
+  NAV_MANAGE_ALERTS: '.te-nav__link:contains("Alerts")',
+
+  // Onboard Alert Elements
   ALERT_NAME_INPUT: '#anomaly-form-function-name',
   SUBSCRIPTION_GROUP: '#anomaly-form-app-name',
   STATUS: '.te-toggle--form span',
@@ -54,10 +58,18 @@ export const selfServeConst = {
   ALERT_CARDS_CONTAINER: '.te-horizontal-cards__container',
   ALERT_PAGE_HEADER_PROPS: '.te-search-results__list--details-block',
   ALERT_PAGE_HEADER_LINK: '.te-search-results__cta',
+  RANGE_PILL_SELECTOR_LIST: '.range-pill-selectors__list',
   RANGE_PILL_SELECTOR_ITEM: '.range-pill-selectors__item',
+  RANGE_PILL_SELECTOR_ACTIVE: '.range-pill-selectors__item--active',
   RANGE_PILL_SELECTOR_TRIGGER: '.range-pill-selectors__range-picker .daterangepicker-input',
   RANGE_PILL_PRESET_OPTION: '.daterangepicker:last .ranges li:contains("Last 1 month")',
+  RANGE_PICKER_INPUT: '.daterangepicker-input',
+  RANGE_PICKER_PRESETS: '.daterangepicker.show-calendar .ranges ul li',
   LINK_TUNE_ALERT: '.te-self-serve__side-link:contains("Customize sensitivity")',
+
+  // Tuning Page Elements
+  LINK_ALERT_PAGE: '.te-button:contains("Back to overview")',
+
 };
 
 /**
@@ -65,7 +77,7 @@ export const selfServeConst = {
  */
 export const rootCauseConst = {
   PLACEHOLDER: '.rootcause-placeholder',
-  TABS: '.rootcause-tabs',
+  TABS: '.common-tabs',
   LABEL: '.rootcause-legend__label',
   SELECTED_METRIC: '.rootcause-select-metric-dimension',
   ROOTCAUSE_HEADER: 'rootcause-header',

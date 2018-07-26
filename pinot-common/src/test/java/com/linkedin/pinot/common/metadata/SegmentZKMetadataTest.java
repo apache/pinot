@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import org.testng.annotations.Test;
 public class SegmentZKMetadataTest {
 
   @Test
-  public void realtimeSegmentZKMetadataConvertionTest() {
+  public void realtimeSegmentZKMetadataConversionTest() {
 
     ZNRecord inProgressZnRecord = getTestInProgressRealtimeSegmentZNRecord();
     ZNRecord doneZnRecord = getTestDoneRealtimeSegmentZNRecord();
@@ -119,6 +119,7 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.CRC, 1234);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
+    record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
     return record;
   }
 
@@ -136,6 +137,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setCrc(1234);
     realtimeSegmentMetadata.setCreationTime(3000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
+    realtimeSegmentMetadata.setTimeThresholdToFlushSegment("6h");
     return realtimeSegmentMetadata;
   }
 
@@ -154,6 +156,7 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.CRC, -1);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 1000);
     record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
+    record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
     return record;
   }
 
@@ -171,6 +174,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setCrc(-1);
     realtimeSegmentMetadata.setCreationTime(1000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
+    realtimeSegmentMetadata.setTimeThresholdToFlushSegment("6h");
     return realtimeSegmentMetadata;
   }
 

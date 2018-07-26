@@ -10,6 +10,10 @@ import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang.builder.ToStringStyle;
 
 
+/**
+ * Selector for time series and aggregate values of a specific metric, independent of
+ * data source.
+ */
 public final class MetricSlice {
   public static final TimeGranularity NATIVE_GRANULARITY = new TimeGranularity(0, TimeUnit.MILLISECONDS);
 

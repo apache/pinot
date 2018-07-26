@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
@@ -69,8 +69,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
 
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
       AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
-      AggregationFunctionFactory.AggregationFunctionType functionType =
-          AggregationFunctionFactory.AggregationFunctionType.valueOf(function.getName().toUpperCase());
+      AggregationFunctionType functionType = function.getType();
       String column = aggregationFunctionContext.getAggregationColumns()[0];
       Dictionary dictionary = _dictionaryMap.get(column);
       AggregationResultHolder resultHolder;
@@ -88,8 +87,8 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
           resultHolder.setValue(new MinMaxRangePair(min, max));
           break;
         default:
-          throw new UnsupportedOperationException(
-              "Dictionary based aggregation operator does not support function " + function.getName());
+          throw new IllegalStateException(
+              "Dictionary based aggregation operator does not support function type: " + functionType);
       }
       aggregationResults.add(function.extractAggregationResult(resultHolder));
     }

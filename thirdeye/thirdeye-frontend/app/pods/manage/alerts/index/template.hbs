@@ -68,7 +68,7 @@
 
       {{else if (eq selectedSearchMode 'Subscriber Groups')}}
         {{#power-select
-          onchange=(perform searchByDatasetName)
+          onchange=(perform searchByConfigGroup)
           selected=selectedsubscriberGroupNames
           options=subscriberGroupNames
           searchPlaceholder="Search for a dataset"
@@ -110,9 +110,7 @@
       </section>
     {{/if}}
     {{#if isLoading}}
-      <div class="spinner-wrapper">
-        {{ember-spinner}}
-      </div>
+      <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve--fixed">{{ember-spinner}}</div>
     {{/if}}
       {{#each paginatedSelectedAlerts as |alert|}}
         <section class="te-search-results">
@@ -122,9 +120,9 @@
                 <span class="te-search-results__tag te-search-results__tag--list {{if alert.isActive "te-search-results__tag--active"}}">
                   {{if alert.isActive "Active" "Inactive"}}
                 </span>
-                <a href="#" {{action "navigateToAlertPage" alert.id}}>
+                {{#link-to "manage.alert" alert.id}}
                   <div class="te-search-results__title-name" title={{alert.functionName}}>{{alert.functionName}}</div>
-                </a>
+                {{/link-to}}
               </div>
             </div>
               <div class="te-search-results__edit-button">

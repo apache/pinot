@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,7 +41,7 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
   @Override
   public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
       String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
-    String serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
+    String serverTenantName = TagNameUtils.getOfflineTagForTenant(tenantName);
     final Random random = new Random(System.currentTimeMillis());
 
     List<String> allInstanceList =

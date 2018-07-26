@@ -5,12 +5,15 @@
       <legend class="te-form__section-title">Select a metric to monitor</legend>
     </div>
     <div class="col-xs-12 col-sm-8">
-      <div class="te-page__right te-page__right--inside">
+      <label for="select-metric" class="control-label te-label te-label--taller required">Search for a metric, or
         {{#link-to "self-serve.import-metric" class="thirdeye-link-secondary thirdeye-link-secondary--inside"}}
           Import a Metric From InGraphs
         {{/link-to}}
+      </label>
+      <div class="te-form__sub-label te-form__sub-label--raised">
+        Please contact <a class="thirdeye-link-secondary" target="_blank" href="{{metricHelpMailto}}">ask_thirdeye</a>
+        if you need to onboard non-additive UMP or derived metrics
       </div>
-      <label for="select-metric" class="control-label te-label te-label--taller required">Search for a Metric</label>
       {{#power-select
         search=(perform searchMetricsList)
         selected=selectedMetricOption
@@ -27,7 +30,7 @@
       {{/power-select}}
     </div>
 
-    <div class="col-xs-6 col-sm-4">
+    <div class="te-form__custom-field te-form__custom-field--lower col-xs-6 col-sm-4">
       <label for="select-granularity" class="control-label te-label te-label--taller">Monitor at this data granularity</label>
       {{#power-select
         options=metricGranularityOptions
@@ -37,6 +40,7 @@
         searchPlaceholder="Type to filter..."
         triggerId="select-granularity"
         triggerClass="te-form__select te-form__select--granularity"
+        searchEnabled=false
         disabled=isGranularitySelectDisabled
         as |granularity|
       }}
@@ -90,50 +94,28 @@
       }}
     </div>
 
-    <div class="col-xs-12">
-      <div class="te-graph-alert {{if (not isMetricSelected) 'te-graph-alert--pending'}}">
-        {{#if (or isFetchingDimensions isDimensionFetchDone)}}
-          {{#if isDimensionError}}
-            <div class="te-form__super-label">... error loading subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
-          {{else}}
-            <div class="te-form__super-label">...{{if isDimensionFetchDone 'Displaying' 'Loading'}} top {{availableDimensions}} contributing subDimensions for <span class="stronger">{{selectedDimension}}</span></div>
-          {{/if}}
-        {{/if}}
-        {{#if isMetricDataLoading}}{{ember-spinner}}{{/if}}
-        {{#if isMetricSelected}}
-          {{anomaly-graph
-            primaryMetric=selectedMetric
-            selectedDimensions=selectedDimensions
-            dimensions=topDimensions
-            showDimensions=true
-            isLoading=loading
-            showSubchart=true
-            showLegend=true
-            enableZoom=true
-            legendText=legendText
-            componentId='create-alert'
-            showGraphLegend=false
-            onSelection=(action "onSelection")
-            onPrimaryMetricToggle=(action "onPrimaryMetricToggle")
-            height=400
-          }}
-          <div class="te-form__note">
-            NOTE: If you find the metric shown above is inconsistent, please email <a class="thirdeye-link-secondary" target="_blank" href="{{graphMailtoLink}}">ask_thirdeye</a>.
-          </div>
-        {{else}}
-          <div class="te-graph-alert__content">
-            <div class="glyphicon glyphicon-{{if isMetricDataInvalid 'alert' 'equalizer'}} te-graph-alert__icon{{if isMetricDataInvalid '--warning'}}"></div>
-            <p class="te-graph-alert__pre-text">{{graphMessageText}}</p>
-          </div>
-        {{/if}}
-      </div>
-    </div>
+    {{!-- Render metric graph --}}
+    {{self-serve-graph
+      removeGraphMargin=true
+      metricData=selectedMetric
+      componentId='create-alert'
+      topDimensions=topDimensions
+      graphMailtoLink=graphMailtoLink
+      selectedDimension=selectedDimension
+      selectedDimensions=selectedDimensions
+      isMetricSelected=isMetricSelected
+      isMetricDataLoading=isMetricDataLoading
+      isMetricDataInvalid=isMetricDataInvalid
+      isSecondaryDataLoading=isSecondaryDataLoading
+      isDimensionFetchDone=isDimensionFetchDone
+    }}
 
   </fieldset>
 
   <fieldset class="te-form__section row">
     <div class="col-xs-12">
-      <legend class="te-form__section-title">Define anomaly pattern</legend>
+      <legend class="te-form__section-title">Detection Settings</legend>
+      <div class="te-form__sub-label te-form__sub-label--raised">ThirdEye automatically selects an algorithm that learns from 1 month of data for "expected" behavior and detects anomalies when there's a deviation.</div>
     </div>
 
     {{!-- Field: Pattern --}}
@@ -159,62 +141,66 @@
 
     {{!-- Field: Sensitivity with mode option --}}
     <div class="te-form__vertical-block col-xs-12">
-      <label for="select-sensitivity" class="control-label te-label te-label--taller required">ThirdEye will determine anomaly by (optional)</label>
+      <label for="select-sensitivity" class="control-label te-label te-label--taller required">ThirdEye will further filter anomalies by</label>
       <div class="te-form__indent-block">
-        <ul class="te-form__list col-xs-12 col-sm-8">
+        <ul class="te-form__list col-xs-12">
           <li class="te-form__list-item">
             {{#radio-button value="current" groupValue=selectedTuneType}}
-              <div class="te-form__list-label">Automatically tune alert settings</div>
+              <div class="te-form__list-label">automatically tuning filter settings with reviewed anomalies</div>
+              <div class="te-form__radio-label">ThirdEye takes in reviewed anomalies to automatically filter for relevant anomalies</div>
             {{/radio-button}}
           </li>
           <li class="te-form__list-item">
             {{#radio-button value="custom" groupValue=selectedTuneType}}
-              <div class="te-form__list-label">Customize alert settings</div>
+              <div class="te-form__list-label">customize filter settings based on a minimum time to detect (MTTD) target</div>
+              <div class="te-form__radio-label">ThirdEye takes in reviewed anomalies AND customized target to automatically filter for relevant anomalies.<br/>Eg. minimum time to alert of 30% drop is 5 hours, more severe anomalies can be alerted faster than 5 hours.</div>
             {{/radio-button}}
            </li>
         </ul>
       </div>
-      <div class="te-form__indent-block te-form__indent-block--custom col-xs-12">
-        <label for="alert-tune-severity" class="te-form__list-label">When</label>
-        <div class="te-form__tune-field">
-          {{#power-select
-            triggerId="alert-tune-severity"
-            triggerClass="te-form__tune-field"
-            verticalPosition="below"
-            placeholder="Select detection option"
-            options=tuneSeverityOptions
-            searchEnabled=false
-            selected=selectedSeverityOption
-            onchange=(action (mut selectedSeverityOption))
-            disabled=isCustomFieldsDisabled
-            as |severity|
-          }}
-            {{severity}}
-          {{/power-select}}
+      {{#if (eq selectedTuneType "custom")}}
+        <div class="te-form__indent-block te-form__indent-block--custom col-xs-12">
+          <label for="alert-tune-severity" class="te-form__list-label">When</label>
+          <div class="te-form__tune-field">
+            {{#power-select
+              triggerId="alert-tune-severity"
+              triggerClass="te-form__tune-field"
+              verticalPosition="below"
+              placeholder="Select detection option"
+              options=tuneSeverityOptions
+              searchEnabled=false
+              selected=selectedSeverityOption
+              onchange=(action (mut selectedSeverityOption))
+              disabled=isCustomFieldsDisabled
+              as |severity|
+            }}
+              {{severity}}
+            {{/power-select}}
+          </div>
+          <label for="custom-tune-percent" class="te-form__list-label">is >=</label>
+          <div class="te-form__tune-field te-form__tune-field--amount">
+            {{input
+              type="text"
+              id="custom-tune-percent"
+              class="form-control te-input te-input"
+              value=customPercentChange
+              disabled=isCustomFieldsDisabled
+            }}
+          </div>
+          <span class="te-form__list-label--suffix">{{sensitivityUnits}}, </span>
+          <label for="custom-tune-mttd" class="te-form__list-label">MTTD is</label>
+          <div class="te-form__tune-field te-form__tune-field--amount">
+            {{input
+              type="text"
+              id="custom-tune-mttd"
+              class="form-control te-input"
+              value=customMttdChange
+              disabled=isCustomFieldsDisabled
+            }}
+          </div>
+          <span class="te-form__list-label">hours</span>
         </div>
-        <label for="custom-tune-percent" class="te-form__list-label">is >=</label>
-        <div class="te-form__tune-field te-form__tune-field--amount">
-          {{input
-            type="text"
-            id="custom-tune-percent"
-            class="form-control te-input te-input"
-            value=customPercentChange
-            disabled=isCustomFieldsDisabled
-          }}
-        </div>
-        <span class="te-form__list-label--suffix">{{sensitivityUnits}}, </span>
-        <label for="custom-tune-mttd" class="te-form__list-label">MTTD should be no more than</label>
-        <div class="te-form__tune-field te-form__tune-field--amount">
-          {{input
-            type="text"
-            id="custom-tune-mttd"
-            class="form-control te-input"
-            value=customMttdChange
-            disabled=isCustomFieldsDisabled
-          }}
-        </div>
-        <span class="te-form__list-label">hours</span>
-      </div>
+      {{/if}}
     </div>
 
     {{!-- Field: Weekly Effect --}}
@@ -231,7 +217,7 @@
         </label>
         {{#x-toggle
           value=selectedWeeklyEffect
-          classNames="te-toggle te-toggle--form te-toggle--left"
+          classNames="te-toggle te-toggle--lifted te-toggle--left"
           id="select-effect"
           theme='ios'
           showLabels=true
@@ -254,29 +240,13 @@
       <legend class="te-form__section-title">Notifications Settings</legend>
     </div>
 
-    {{!-- Field: Alert Name --}}
-    <div class="col-xs-12">
-      <label for="anomaly-form-function-name" class="control-label te-label te-label--taller required">
-        Name this alert
-        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">applicationName_metricName_dimensionName_other</span></div>
-      </label>
-      {{#if isAlertNameDuplicate}}
-        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
-      {{/if}}
-      {{input
-        type="text"
-        id="anomaly-form-function-name"
-        class="form-control te-input"
-        placeholder="Add a descriptive alert name"
-        value=alertFunctionName
-        key-up=(action "validateAlertName" alertFunctionName true)
-        disabled=(not generalFieldsEnabled)
-      }}
-    </div>
-
     {{!-- Field: App Name --}}
     <div class="col-xs-12">
       <label for="anomaly-form-app-name" class="control-label te-label te-label--taller required">Alert belongs to</label>
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element}}Changing the application team will load the team's notification/subscription groups below{{/tooltip-on-element}}
+      </span>
        {{#power-select
           options=allApplicationNames
           selected=selectedAppName
@@ -297,6 +267,26 @@
         {{#if isProcessingForm}}
           <div class="spinner-wrapper--self-serve">{{ember-spinner}}</div>
         {{/if}}
+    </div>
+
+    {{!-- Field: Alert Name --}}
+    <div class="col-xs-12">
+      <label for="anomaly-form-function-name" class="control-label te-label te-label--taller required">
+        Name this alert
+        <div class="te-form__sub-label">Please follow this naming convention: <span class="te-form__sub-label--strong">applicationName_metricName_dimensionName_other</span></div>
+      </label>
+      {{#if isAlertNameDuplicate}}
+        <div class="te-form__alert--warning alert-warning">Warning: <strong>{{alertFunctionName}}</strong> already exists. Please try another name.</div>
+      {{/if}}
+      {{input
+        type="text"
+        id="anomaly-form-function-name"
+        class="form-control te-input"
+        placeholder="Add a descriptive alert name"
+        value=alertFunctionName
+        key-up=(action "validateAlertName" alertFunctionName true)
+        disabled=(not generalFieldsEnabled)
+      }}
     </div>
 
     {{!-- Field: Select Existing Subscription Group --}}
@@ -322,6 +312,10 @@
     {{!--  Fields for new alert group creation --}}
     <div class="col-sm-6">
       <label for="config-group-new-name" class="control-label te-label te-label--taller"><strong>Or</strong> create new subscription group</label>
+      <span>
+        <i class="glyphicon glyphicon-question-sign"></i>
+        {{#tooltip-on-element}}Before creating a new group, please check if you can simply add recipients to an existing one.{{/tooltip-on-element}}
+      </span>
       {{#if isGroupNameDuplicate}}
         <div class="te-form__alert--warning alert-warning">Warning: <strong>{{newConfigGroupName}}</strong> already exists. Please try another name.</div>
       {{/if}}

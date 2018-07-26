@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -28,40 +28,22 @@ import javax.annotation.Nonnull;
 public class PercentileEstAggregationFunction implements AggregationFunction<QuantileDigest, Long> {
   public static final double DEFAULT_MAX_ERROR = 0.05;
 
-  private final String _name;
-  private final int _percentile;
+  protected final int _percentile;
 
   public PercentileEstAggregationFunction(int percentile) {
-    switch (percentile) {
-      case 50:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST50.getName();
-        break;
-      case 90:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST90.getName();
-        break;
-      case 95:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST95.getName();
-        break;
-      case 99:
-        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST99.getName();
-        break;
-      default:
-        throw new UnsupportedOperationException(
-            "Unsupported percentile for PercentileEstAggregationFunction: " + percentile);
-    }
     _percentile = percentile;
   }
 
   @Nonnull
   @Override
-  public String getName() {
-    return _name;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILEEST;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return _name + "_" + columns[0];
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "_" + columns[0];
   }
 
   @Override
@@ -164,8 +146,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getIntermediateResultDataType() {
-    return FieldSpec.DataType.OBJECT;
+  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Nonnull

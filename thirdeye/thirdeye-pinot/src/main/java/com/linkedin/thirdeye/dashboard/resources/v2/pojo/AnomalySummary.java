@@ -16,11 +16,15 @@ public class AnomalySummary {
   private double current;
   private double baseline;
   private AnomalyFeedbackType feedback;
+  private String comment;
   private String metricName;
+  private String metricUrn;
   private long metricId;
   private String functionName;
   private long functionId;
   private String dataset;
+  private AnomalyClassificationType classification;
+  private long detectionConfigId;
 
   public AnomalySummary() {
     // left blank
@@ -114,6 +118,14 @@ public class AnomalySummary {
     this.metricId = metricId;
   }
 
+  public String getMetricUrn() {
+    return metricUrn;
+  }
+
+  public void setMetricUrn(String metricUrn) {
+    this.metricUrn = metricUrn;
+  }
+
   public long getFunctionId() {
     return functionId;
   }
@@ -128,5 +140,29 @@ public class AnomalySummary {
 
   public void setDataset(String dataset) {
     this.dataset = dataset;
+  }
+
+  public String getComment() {
+    return comment;
+  }
+
+  public void setComment(String comment) {
+    this.comment = comment;
+  }
+
+  public AnomalyClassificationType getClassification() {
+    return classification;
+  }
+
+  public void setClassification(AnomalyClassificationType classification) {
+    this.classification = classification;
+  }
+
+  public long getDetectionConfigId() {
+    return detectionConfigId;
+  }
+
+  public void setDetectionConfigId(long detectionConfigId) {
+    this.detectionConfigId = detectionConfigId;
   }
 }

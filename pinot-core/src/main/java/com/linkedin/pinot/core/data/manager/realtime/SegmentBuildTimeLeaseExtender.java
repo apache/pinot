@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,20 +53,20 @@ public class SegmentBuildTimeLeaseExtender {
     return INSTANCE_TO_LEASE_EXTENDER.get(instanceId);
   }
 
-  public static synchronized  SegmentBuildTimeLeaseExtender create(final String instanceId) {
+  public static synchronized  SegmentBuildTimeLeaseExtender create(final String instanceId, ServerMetrics serverMetrics) {
     SegmentBuildTimeLeaseExtender leaseExtender = INSTANCE_TO_LEASE_EXTENDER.get(instanceId);
     if (leaseExtender != null) {
       LOGGER.warn("Instance already exists");
     } else {
-      leaseExtender = new SegmentBuildTimeLeaseExtender(instanceId);
+      leaseExtender = new SegmentBuildTimeLeaseExtender(instanceId, serverMetrics);
       INSTANCE_TO_LEASE_EXTENDER.put(instanceId, leaseExtender);
     }
     return leaseExtender;
   }
 
-  private SegmentBuildTimeLeaseExtender(String instanceId) {
+  private SegmentBuildTimeLeaseExtender(String instanceId, ServerMetrics serverMetrics) {
     _instanceId = instanceId;
-    _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instanceId);
+    _protocolHandler = new ServerSegmentCompletionProtocolHandler(serverMetrics);
     _executor = new ScheduledThreadPoolExecutor(1);
   }
 
@@ -89,7 +89,8 @@ public class SegmentBuildTimeLeaseExtender {
   public void addSegment(String segmentId, long initialBuildTimeMs, long offset) {
     final long initialDelayMs = initialBuildTimeMs * 9 / 10;
     final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
-    reqParams.withOffset(offset).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS);
+    reqParams.withOffset(offset).withSegmentName(segmentId).withExtraTimeSec(EXTRA_TIME_SECONDS)
+        .withInstanceId(_instanceId);
     Future future = _executor.scheduleWithFixedDelay(new LeaseExtender(reqParams), initialDelayMs,
         REPEAT_REQUEST_PERIOD_SEC * 1000L, TimeUnit.MILLISECONDS);
     _segmentToFutureMap.put(segmentId, future);

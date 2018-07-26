@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ public class MultiLevelPriorityQueueTest {
   }
 
   @Test
-  public void testSimplePutTake() throws OutOfCapacityError {
+  public void testSimplePutTake() throws OutOfCapacityException {
     MultiLevelPriorityQueue queue = createQueue();
     // NOTE: Timing matters here...running through debugger for
     // over 30 seconds can cause the query to expire
@@ -69,7 +69,7 @@ public class MultiLevelPriorityQueueTest {
   }
 
   @Test
-  public void testPutOutOfCapacity() throws OutOfCapacityError {
+  public void testPutOutOfCapacity() throws OutOfCapacityException {
     PropertiesConfiguration conf = new PropertiesConfiguration();
     conf.setProperty(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 2);
     ResourceManager rm = new UnboundedResourceManager(conf);
@@ -84,7 +84,7 @@ public class MultiLevelPriorityQueueTest {
     // it should throw now
     try {
       queue.put(createQueryRequest(groupOne, metrics));
-    } catch (OutOfCapacityError e) {
+    } catch (OutOfCapacityException e) {
       assertTrue(true);
       return;
     }
@@ -108,7 +108,7 @@ public class MultiLevelPriorityQueueTest {
   }
 
   @Test
-  public void testTakeWithLimits() throws OutOfCapacityError, BrokenBarrierException, InterruptedException {
+  public void testTakeWithLimits() throws OutOfCapacityException, BrokenBarrierException, InterruptedException {
     // Test that take() will not return query if that group is already using hardLimit resources
     PropertiesConfiguration conf = new PropertiesConfiguration();
     conf.setProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, 40);
@@ -177,15 +177,15 @@ public class MultiLevelPriorityQueueTest {
   }
 
   @Test
-  public void testNoPendingAfterTrim() throws OutOfCapacityError, BrokenBarrierException, InterruptedException {
+  public void testNoPendingAfterTrim() throws OutOfCapacityException, BrokenBarrierException, InterruptedException {
     MultiLevelPriorityQueue queue = createQueue();
-    queue.put(createQueryRequest(groupOne, metrics));
-    queue.put(createQueryRequest(groupTwo, metrics));
+    // Pick a query arrival time older than the query deadline of 30s
+    long queryArrivalTimeMs = System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(100);
+    queue.put(createQueryRequest(groupOne, metrics, queryArrivalTimeMs));
+    queue.put(createQueryRequest(groupTwo, metrics, queryArrivalTimeMs));
     // group one has higher priority but it's above soft thread limit
     TestSchedulerGroup testGroupOne = groupFactory.groupMap.get(groupOne);
     TestSchedulerGroup testGroupTwo = groupFactory.groupMap.get(groupTwo);
-    testGroupOne.peekFirst().getQueryRequest().getTimerContext().setQueryArrivalTimeNs(1000);
-    testGroupTwo.peekFirst().getQueryRequest().getTimerContext().setQueryArrivalTimeNs(1000);
     QueueReader reader = new QueueReader(queue);
     reader.startAndWaitForQueueWakeup();
     assertTrue(reader.readQueries.isEmpty());
@@ -197,7 +197,6 @@ public class MultiLevelPriorityQueueTest {
 
   private MultiLevelPriorityQueue createQueue() {
     PropertiesConfiguration conf = new PropertiesConfiguration();
-    conf.setProperty(MultiLevelPriorityQueue.QUERY_DEADLINE_SECONDS_KEY, 100000);
     return createQueue(conf, new UnboundedResourceManager(conf));
   }
 

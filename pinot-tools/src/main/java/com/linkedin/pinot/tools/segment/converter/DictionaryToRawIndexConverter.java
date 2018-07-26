@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,11 +22,11 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.io.IOException;
@@ -211,7 +211,7 @@ public class DictionaryToRawIndexConverter {
       FileUtils.copyDirectory(segmentDir, newSegment);
     }
 
-    IndexSegment segment = Loaders.IndexSegment.load(newSegment, ReadMode.mmap);
+    IndexSegment segment = ImmutableSegmentLoader.load(newSegment, ReadMode.mmap);
     for (String column : columns) {
       LOGGER.info("Converting column '{}' for segment '{}'.", column, segment.getSegmentName());
       convertOneColumn(segment, column, newSegment);

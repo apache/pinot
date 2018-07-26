@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.query.scheduler;
 
 import java.util.List;
@@ -30,11 +29,11 @@ public interface SchedulerPriorityQueue {
    * throws exception if the queues are out of capacity. This will never block for
    * resources to become available.
    * @param query query to add to the list of waiters
-   * @throws OutOfCapacityError if the internal query queues are full
+   * @throws OutOfCapacityException if the internal query queues are full
    */
   // TODO: throw OutOfCapacity or drop from the front of the queue ?
   // It may be more beneficial to drop oldest queries to move forward
-  void put(@Nonnull SchedulerQueryContext query) throws OutOfCapacityError;
+  void put(@Nonnull SchedulerQueryContext query) throws OutOfCapacityException;
 
   /**
    * Blocking call to select the query with highest priority to schedule for execution next.

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -29,6 +29,7 @@ import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.linkedin.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 import com.linkedin.pinot.util.TestUtils;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
@@ -45,7 +46,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
 
 public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegrationTest {
   private static final int NUM_KAFKA_PARTITIONS = 1;
@@ -94,7 +94,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
     // Add Helix tag to the server
     _serverHelixManager.getClusterManagmentTool()
         .addInstanceTag(_clusterName, _serverInstance,
-            TableNameBuilder.REALTIME.tableNameWithType(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+            TableNameBuilder.REALTIME.tableNameWithType(TagNameUtils.DEFAULT_TENANT_NAME));
 
     // Initialize controller leader locator
     ControllerLeaderLocator.create(_serverHelixManager);
@@ -127,9 +127,9 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
 
     // Now report to the controller that we had to stop consumption
     ServerSegmentCompletionProtocolHandler protocolHandler =
-        new ServerSegmentCompletionProtocolHandler(_serverInstance);
+        new ServerSegmentCompletionProtocolHandler(new ServerMetrics(new MetricsRegistry()));
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withOffset(45688L).withSegmentName(_currentSegment).withReason("RandomReason");
+    params.withOffset(45688L).withSegmentName(_currentSegment).withReason("RandomReason").withInstanceId(_serverInstance);
     SegmentCompletionProtocol.Response response = protocolHandler.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
 
@@ -196,6 +196,23 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
   @Test(enabled = false)
   @Override
   public void testSegmentFlushSize() throws Exception {
+    // Skipped
+  }
+
+  @Test(enabled = false)
+  @Override
+  public void testDictionaryBasedQueries() throws Exception {
+    // Skipped
+  }
+
+  @Test(enabled = false)
+  @Override
+  public void testQueryExceptions() throws Exception {
+    // Skipped
+  }
+
+  @Test(enabled = false)
+  public void testConsumerDirectoryExists() {
     // Skipped
   }
 

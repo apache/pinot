@@ -149,7 +149,13 @@ public class SearchFilters {
       }
       passed = passed && checkFilter(feedbackFilterMap, status);
       // check status filter
-      String functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
+      String functionName = "unknown";
+      if (mergedAnomalyResultDTO.getFunction() != null) {
+        functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
+      }
+      if (mergedAnomalyResultDTO.getDetectionConfigId() != null) {
+        functionName = String.format("DetectionConfig %d", mergedAnomalyResultDTO.getDetectionConfigId());
+      }
       passed = passed && checkFilter(functionFilterMap, functionName);
       // check datasetFilterMap
       String dataset = mergedAnomalyResultDTO.getCollection();
@@ -173,6 +179,9 @@ public class SearchFilters {
         String issueType = properties.get(ClassificationTaskRunner.ISSUE_TYPE_KEY);
         passed = passed && checkFilter(issueTypeFilterMap, issueType);
       }
+      // check isChild
+      passed = passed && !mergedAnomalyResultDTO.isChild(); // TODO configurable filter
+
       if (passed) {
         filteredAnomalies.add(mergedAnomalyResultDTO);
       }
@@ -207,9 +216,17 @@ public class SearchFilters {
         status = AnomalyFeedbackType.NO_FEEDBACK.getUserReadableName();
       }
       update(feedbackFilterMap, status, mergedAnomalyResultDTO.getId());
-      // update status filter
-      String functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
+
+      // update function filter
+      String functionName = "unknown";
+      if (mergedAnomalyResultDTO.getFunction() != null) {
+        functionName = mergedAnomalyResultDTO.getFunction().getFunctionName();
+      }
+      if (mergedAnomalyResultDTO.getDetectionConfigId() != null) {
+        functionName = String.format("DetectionConfig %d", mergedAnomalyResultDTO.getDetectionConfigId());
+      }
       update(functionFilterMap, functionName, mergedAnomalyResultDTO.getId());
+
       // update datasetFilterMap
       String dataset = mergedAnomalyResultDTO.getCollection();
       update(datasetFilterMap, dataset, mergedAnomalyResultDTO.getId());

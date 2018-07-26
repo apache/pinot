@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import org.apache.commons.configuration.Configuration;
 
 import java.io.File;
 
+
 public interface SegmentFetcher {
 
   void init(Configuration configs);
@@ -27,8 +28,9 @@ public interface SegmentFetcher {
   void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
 
   /**
-   * @return a list of config keys whose value should not be logged.
+   * Returns a list of config keys whose value should not be logged.
+   *
+   * @return List of protected config keys
    */
   Set<String> getProtectedConfigKeys();
-
 }

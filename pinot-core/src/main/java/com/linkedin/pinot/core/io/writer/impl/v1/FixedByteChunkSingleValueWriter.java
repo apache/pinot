@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,8 +64,7 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
    * @throws IOException
    */
   public FixedByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int sizeOfEntry)
-      throws IOException {
+      int totalDocs, int numDocsPerChunk, int sizeOfEntry) throws IOException {
 
     super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
         CURRENT_VERSION);
@@ -75,28 +74,35 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
   @Override
   public void setInt(int row, int value) {
     _chunkBuffer.putInt(value);
-    _chunkDataOffset += INT_SIZE;
+    _chunkDataOffset += Integer.BYTES;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setFloat(int row, float value) {
     _chunkBuffer.putFloat(value);
-    _chunkDataOffset += FLOAT_SIZE;
+    _chunkDataOffset += Float.BYTES;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setLong(int row, long value) {
     _chunkBuffer.putLong(value);
-    _chunkDataOffset += LONG_SIZE;
+    _chunkDataOffset += Long.BYTES;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setDouble(int row, double value) {
     _chunkBuffer.putDouble(value);
-    _chunkDataOffset += DOUBLE_SIZE;
+    _chunkDataOffset += Double.BYTES;
+    flushChunkIfNeeded();
+  }
+
+  @Override
+  public void setBytes(int row, byte[] bytes) {
+    _chunkBuffer.put(bytes);
+    _chunkDataOffset += bytes.length;
     flushChunkIfNeeded();
   }
 

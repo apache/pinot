@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.alert.v2;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedFactory;
 import com.linkedin.thirdeye.alert.commons.EmailContentFormatterFactory;
@@ -13,12 +15,12 @@ import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.DummyAlertGrouper;
-import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AuxiliaryAlertGroupInfo;
-import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
-import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupAuxiliaryInfoProvider;
 import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AlertGroupRecipientProviderFactory;
+import com.linkedin.thirdeye.anomaly.alert.grouping.auxiliary_info_provider.AuxiliaryAlertGroupInfo;
+import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
+import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
@@ -42,18 +44,16 @@ import com.linkedin.thirdeye.datalayer.dto.AlertSnapshotDTO;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailFormatterConfig;
-import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.AlertGroupConfig;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailFormatterConfig;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportConfigCollection;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportMetricConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
-
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -66,7 +66,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TimeZone;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
@@ -284,6 +283,11 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           emailContentFormatter.init(new Properties(), emailContemtFormatterConfig);
         }
 
+        // whitelisted recipients only
+        if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
+          recipientsForThisGroup = retainWhitelisted(recipientsForThisGroup, thirdeyeConfig.getEmailWhitelist());
+        }
+
         EmailEntity emailEntity = emailContentFormatter
             .getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectBuilder.toString(),
                 groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, new EmailContentFormatterContext());
@@ -342,6 +346,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
               ContributorViewResponse report = EmailHelper
                   .getContributorDataForDataReport(metricConfig.getDataset(),
                       metricConfig.getName(), Arrays.asList(dimension),
+                      makeFilters(reportMetricConfig.getFilters()),
                       reportMetricConfig.getCompareMode(),
                       alertConfig.getReportConfigCollection().getDelayOffsetMillis(),
                       alertConfig.getReportConfigCollection().isIntraDay());
@@ -392,6 +397,11 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           Template template = freemarkerConfig.getTemplate("data-report-by-metric-dimension.ftl");
           template.process(templateData, out);
 
+          String recipients = alertConfig.getRecipients();
+          if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
+            recipients = retainWhitelisted(recipients, thirdeyeConfig.getEmailWhitelist());
+          }
+
           // Send email
           HtmlEmail email = new HtmlEmail();
           String alertEmailSubject =
@@ -399,7 +409,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
           EmailHelper
               .sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
-                  alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getRecipients());
+                  alertEmailHtml, alertConfig.getFromAddress(), recipients);
 
         } catch (Exception e) {
           throw new JobExecutionException(e);
@@ -539,5 +549,44 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       }
     }
     return filteredGroupedAnomalies;
+  }
+
+  /**
+   * Retain whitelisted email addresses for email recipient string only.
+   *
+   * @param recipients email recipient string
+   * @param whitelist whitelisted recipients
+   * @return recipient string
+   */
+  private static String retainWhitelisted(String recipients, Collection<String> whitelist) {
+    if (recipients.isEmpty()) {
+      return recipients;
+    }
+
+    List<String> emails = new ArrayList<>(Arrays.asList(recipients.split(EmailHelper.EMAIL_ADDRESS_SEPARATOR)));
+
+    emails.retainAll(whitelist);
+
+    return StringUtils.join(emails, EmailHelper.EMAIL_ADDRESS_SEPARATOR);
+  }
+
+  /**
+   * Returns a filter multimap from a map of collections.
+   *
+   * @param filterMap map of collections (dimension name to dimension values)
+   * @return filter multimap
+   */
+  private static SetMultimap<String, String> makeFilters(Map<String, Collection<String>> filterMap) {
+    SetMultimap<String, String> filters = HashMultimap.create();
+
+    if (filterMap == null) {
+      return filters;
+    }
+
+    for (Map.Entry<String, Collection<String>> entry : filterMap.entrySet()) {
+      filters.putAll(entry.getKey(), entry.getValue());
+    }
+
+    return filters;
   }
 }

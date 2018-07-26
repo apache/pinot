@@ -5,7 +5,7 @@
     {{#if (not isDataLoadingError)}}<div class="te-alert-page-pending__loader"></div>{{/if}}
     <p class="te-alert-page-pending__text">
       {{#if isDataLoadingError}}
-        The performance data cannot be retrieved.
+        The performance data cannot be retrieved.<br/>{{errMsg}}
       {{else}}
         Fetching all app-related anomaly data for all alerts may take up to a minute. <br/>Hang in there!
       {{/if}}

@@ -24,11 +24,18 @@ import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSet;
 import com.linkedin.thirdeye.datasource.pinot.resultset.ThirdEyeResultSetGroup;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeFieldType;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Partial;
+import org.joda.time.Period;
+import org.joda.time.PeriodType;
 
 
 /**
@@ -94,6 +101,13 @@ public class DataFrameUtils {
       df.addSeries(mf.toString(), functionBuilders.get(j++).build());
     }
 
+    // compression
+    for (String name : df.getSeriesNames()) {
+      if (Series.SeriesType.STRING.equals(df.get(name).type())) {
+        df.addSeries(name, df.getStrings(name).compress());
+      }
+    }
+
     return df.sortedBy(COL_TIME);
   }
 
@@ -136,28 +150,20 @@ public class DataFrameUtils {
   }
 
   /**
-   * Returns the DataFrame with timestamps aligned to a start offset and an interval. Also, missing
-   * rows (between {@code start} and {@code end} in {@code interval} steps) are fill in with NULL
-   * values.
+   * Returns the DataFrame with timestamps aligned to a start offset and an interval.
    *
    * @param df thirdeye response dataframe
-   * @param start start offset
-   * @param end end offset
+   * @param origin start offset
    * @param interval timestep multiple
    * @return dataframe with modified timestamps
    */
-  public static DataFrame alignTimestamps(DataFrame df, final long start, final long end, final long interval) {
-    int count = (int)((end - start) / interval);
-    LongSeries timestamps = LongSeries.sequence(start, count, interval);
-    DataFrame dfTime = new DataFrame(COL_TIME, timestamps);
-    DataFrame dfOffset = new DataFrame(df).mapInPlace(new Series.LongFunction() {
+  public static DataFrame makeTimestamps(DataFrame df, final DateTime origin, final Period interval) {
+    return new DataFrame(df).mapInPlace(new Series.LongFunction() {
       @Override
       public long apply(long... values) {
-        return (values[0] * interval) + start;
+        return origin.plus(interval.multipliedBy((int) values[0])).getMillis();
       }
     }, COL_TIME);
-
-    return dfTime.joinLeft(dfOffset);
   }
 
   /**
@@ -188,9 +194,7 @@ public class DataFrameUtils {
    * @return response as dataframe
    */
   public static DataFrame evaluateResponse(ThirdEyeResponse response, TimeSeriesRequestContainer rc) throws Exception {
-    long start = ((rc.start + rc.interval - 1) / rc.interval) * rc.interval;
-    long end = ((rc.end + rc.interval - 1) / rc.interval) * rc.interval;
-    return alignTimestamps(evaluateExpressions(parseResponse(response), rc.getExpressions()), start, end, rc.getInterval());
+    return makeTimestamps(evaluateExpressions(parseResponse(response), rc.getExpressions()), rc.start, rc.getInterval());
   }
 
   /**
@@ -290,17 +294,19 @@ public class DataFrameUtils {
       granularity = slice.granularity;
     }
 
-    long timeGranularity = granularity.toMillis();
-    long start = (slice.start / timeGranularity) * timeGranularity;
-    long end = ((slice.end + timeGranularity - 1) / timeGranularity) * timeGranularity;
+    DateTimeZone timezone = DateTimeZone.forID(dataset.getTimezone());
+    Period period = granularity.toPeriod();
 
-    MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start, end, slice.filters, slice.granularity);
+    DateTime start = new DateTime(slice.start, timezone).withFields(makeOrigin(period.getPeriodType()));
+    DateTime end = new DateTime(slice.end, timezone).withFields(makeOrigin(period.getPeriodType()));
+
+    MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start.getMillis(), end.getMillis(), slice.filters, slice.granularity);
 
     ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, metric, dataset, expressions)
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
-    return new TimeSeriesRequestContainer(request, expressions, start, end, timeGranularity);
+    return new TimeSeriesRequestContainer(request, expressions, start, end, granularity.toPeriod());
   }
 
   /**
@@ -331,11 +337,17 @@ public class DataFrameUtils {
       granularity = slice.granularity;
     }
 
+    DateTimeZone timezone = DateTimeZone.forID(dataset.getTimezone());
+    Period period = granularity.toPeriod();
+
+    DateTime start = new DateTime(slice.start, timezone).withFields(makeOrigin(period.getPeriodType()));
+    DateTime end = new DateTime(slice.end, timezone).withFields(makeOrigin(period.getPeriodType()));
+
     ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions)
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
-    return new TimeSeriesRequestContainer(request, expressions, slice.start, slice.end, granularity.toMillis());
+    return new TimeSeriesRequestContainer(request, expressions, start, end, granularity.toPeriod());
   }
 
   /**
@@ -383,6 +395,62 @@ public class DataFrameUtils {
         .build(reference);
 
     return new RequestContainer(request, expressions);
+  }
+
+  /**
+   * Returns partial to zero out date fields based on period type
+   *
+   * @return partial
+   */
+  public static Partial makeOrigin(PeriodType type) {
+    List<DateTimeFieldType> fields = new ArrayList<>();
+
+    if (PeriodType.millis().equals(type)) {
+      // left blank
+
+    } else if (PeriodType.seconds().equals(type)) {
+      fields.add(DateTimeFieldType.millisOfSecond());
+
+    } else if (PeriodType.minutes().equals(type)) {
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
+
+    } else if (PeriodType.hours().equals(type)) {
+      fields.add(DateTimeFieldType.minuteOfHour());
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
+
+    } else if (PeriodType.days().equals(type)) {
+      fields.add(DateTimeFieldType.hourOfDay());
+      fields.add(DateTimeFieldType.minuteOfHour());
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
+
+    } else {
+      throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", type));
+    }
+
+    int[] zeros = new int[fields.size()];
+    Arrays.fill(zeros, 0);
+
+    return new Partial(fields.toArray(new DateTimeFieldType[fields.size()]), zeros);
+  }
+
+  /**
+   * Returns the series with the period added, given the timezone
+   *
+   * @param s series
+   * @param period time period
+   * @param timezone time zone
+   * @return offset time series
+   */
+  public static LongSeries addPeriod(Series s, final Period period, final DateTimeZone timezone) {
+    return s.map(new Series.LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return new DateTime(values[0], timezone).plus(period).getMillis();
+      }
+    });
   }
 
   /**

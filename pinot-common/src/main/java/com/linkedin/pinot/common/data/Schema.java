@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ import com.google.common.base.Preconditions;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.linkedin.pinot.common.config.ConfigKey;
+import com.linkedin.pinot.common.config.UseChildKeyHandler;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
@@ -56,10 +58,22 @@ public final class Schema {
   private static final Logger LOGGER = LoggerFactory.getLogger(Schema.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
+  @ConfigKey("schemaName")
   private String _schemaName;
+
+  @ConfigKey("dimensions")
+  @UseChildKeyHandler(DimensionFieldSpecChildKeyHandler.class)
   private final List<DimensionFieldSpec> _dimensionFieldSpecs = new ArrayList<>();
+
+  @ConfigKey("metrics")
+  @UseChildKeyHandler(MetricFieldSpecChildKeyHandler.class)
   private final List<MetricFieldSpec> _metricFieldSpecs = new ArrayList<>();
+
+  @ConfigKey("time")
   private TimeFieldSpec _timeFieldSpec;
+
+  @ConfigKey("dateTime")
+  @UseChildKeyHandler(DateTimeFieldSpecChildKeyHandler.class)
   private final List<DateTimeFieldSpec> _dateTimeFieldSpecs = new ArrayList<>();
 
   // Json ignored fields
@@ -390,6 +404,7 @@ public final class Schema {
             case FLOAT:
             case DOUBLE:
             case STRING:
+            case BYTES:
               break;
             default:
               ctxLogger.info("Unsupported data type: {} in DIMENSION/TIME field: {}", dataType, fieldName);
@@ -402,6 +417,7 @@ public final class Schema {
             case LONG:
             case FLOAT:
             case DOUBLE:
+            case BYTES:
               break;
             case STRING:
               MetricFieldSpec metricFieldSpec = (MetricFieldSpec) fieldSpec;
@@ -597,10 +613,12 @@ public final class Schema {
     }
 
     Schema that = (Schema) o;
-    return EqualityUtils.isEqual(_schemaName, that._schemaName) && EqualityUtils.isEqual(_dimensionFieldSpecs,
-        that._dimensionFieldSpecs) && EqualityUtils.isEqual(_metricFieldSpecs, that._metricFieldSpecs)
-        && EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec) && EqualityUtils.isEqual(_dateTimeFieldSpecs,
-        that._dateTimeFieldSpecs);
+
+    return EqualityUtils.isEqual(_schemaName, that._schemaName) &&
+        EqualityUtils.isEqualIgnoreOrder(_dimensionFieldSpecs, that._dimensionFieldSpecs) &&
+        EqualityUtils.isEqualIgnoreOrder(_metricFieldSpecs, that._metricFieldSpecs) &&
+        EqualityUtils.isEqual(_timeFieldSpec, that._timeFieldSpec) &&
+        EqualityUtils.isEqualIgnoreOrder(_dateTimeFieldSpecs, that._dateTimeFieldSpecs);
   }
 
   @Override

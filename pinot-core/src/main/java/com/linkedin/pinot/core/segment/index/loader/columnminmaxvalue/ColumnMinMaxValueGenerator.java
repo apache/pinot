@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ public class ColumnMinMaxValueGenerator {
   public ColumnMinMaxValueGenerator(SegmentMetadataImpl segmentMetadata, SegmentDirectory.Writer segmentWriter,
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode) {
     _segmentMetadata = segmentMetadata;
-    _segmentProperties = segmentMetadata.getSegmentMetadataPropertiesConfiguration();
+    _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(_segmentMetadata.getIndexDir());
     _segmentWriter = segmentWriter;
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
@@ -116,7 +116,7 @@ public class ColumnMinMaxValueGenerator {
         break;
       case STRING:
         try (StringDictionary stringDictionary = new StringDictionary(dictionaryBuffer, length,
-            columnMetadata.getStringColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter())) {
+            columnMetadata.getColumnMaxLength(), (byte) columnMetadata.getPaddingCharacter())) {
           SegmentColumnarIndexCreator.addColumnMinMaxValueInfo(_segmentProperties, columnName, stringDictionary.get(0),
               stringDictionary.get(length - 1));
         }

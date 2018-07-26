@@ -16,9 +16,15 @@ body {
     margin-top: 60px;
   }
 
-  &__custom {
+  &--custom {
     margin-left: -15px;
     margin-top: 214px;
+  }
+
+  &--fixed {
+    position: fixed;
+    top: 28%;
+    left: 55%;
   }
 }
 
@@ -35,7 +41,7 @@ body {
     &-title {
       border-bottom: none;
       font-weight: 600;
-      font-size: 17px;
+      font-size: $te-font-size-medium;
       color: app-shade(black, 0.85);
     }
 
@@ -52,10 +58,17 @@ body {
     }
   }
 
+  &__text-block {
+    &--faded {
+      color: $te-subtext;
+      font-weight: 600;
+    }
+  }
+
   &__title {
     border-bottom: none;
     font-weight: 600;
-    font-size: 17px;
+    font-size: $te-font-size-medium;
     color: app-shade(black, 0.85);
   }
 
@@ -68,8 +81,7 @@ body {
 
   &__sub-label,
   &__super-label {
-    color: rgba(0,0,0,0.45);
-    font-size: 14px;
+    color: $te-subtext;
     font-weight: normal;
     text-align: left;
     background: none;
@@ -79,6 +91,20 @@ body {
     &--strong {
       font-weight: 600;
     }
+
+    &--raised {
+      margin-top: -17px;
+    }
+
+    &--email {
+      line-height: normal;
+    }
+  }
+
+  &__radio-label {
+    margin-left: 25px;
+    font-weight: normal;
+    color: $te-subtext;
   }
 
   &__input {
@@ -101,6 +127,12 @@ body {
       padding: 1px 7px;
       border-radius: 3px;
       border: 1px solid #faebcc;
+    }
+  }
+
+  &__custom-field {
+    &--lower {
+      margin-top: 17px;
     }
   }
 
@@ -134,7 +166,7 @@ body {
   }
 
   &__banner-title {
-    font-size: 18px;
+    font-size: $te-font-size-medium;
     font-weight: 600;
     margin-bottom: 5px;
   }
@@ -169,7 +201,6 @@ body {
 
   // overriding bootstrap for create alert form
   .panel-title {
-    font-size: 15px;
     color: #369ece;
     font-weight: 600;
     letter-spacing: .1px;

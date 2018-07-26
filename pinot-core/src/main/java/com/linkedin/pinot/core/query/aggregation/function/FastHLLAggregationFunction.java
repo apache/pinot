@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,32 +17,30 @@ package com.linkedin.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.startree.hll.HllConstants;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import javax.annotation.Nonnull;
 
 
 public class FastHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.FASTHLL.getName();
-
-  protected int _log2m = HllConstants.DEFAULT_LOG2M;
+  private int _log2m = HllConstants.DEFAULT_LOG2M;
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.FASTHLL;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.FASTHLL.getName() + "_" + columns[0];
   }
 
   public void setLog2m(int log2m) {
@@ -164,8 +162,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getIntermediateResultDataType() {
-    return FieldSpec.DataType.OBJECT;
+  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Nonnull

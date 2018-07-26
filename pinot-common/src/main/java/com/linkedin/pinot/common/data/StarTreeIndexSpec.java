@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.data;
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.config.ConfigKey;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -37,16 +38,24 @@ public class StarTreeIndexSpec {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   /** The upper bound on the number of leaf records to be scanned for any query */
+  @ConfigKey("maxLeafRecords")
   private int _maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
 
   /** Dimension split order (if null or absent, descending w.r.t. dimension cardinality) */
+  @ConfigKey("dimensionsSplitOrder")
   private List<String> _dimensionsSplitOrder;
 
   /** Dimensions for which to exclude star nodes at split. */
+  @ConfigKey("skipStarNodeCreationForDimensions")
   private Set<String> _skipStarNodeCreationForDimensions;
+
+  @ConfigKey("skipMaterializationForDimensions")
   private Set<String> _skipMaterializationForDimensions;
+
+  @ConfigKey("skipMaterializationCardinalityThreshold")
   private int _skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
+  @ConfigKey("excludeSkipMaterializationDimensionsForStarTreeIndex")
   private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
 
   public int getMaxLeafRecords() {

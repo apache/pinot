@@ -46,14 +46,21 @@ const deleteAlert = functionId => `/dashboard/anomaly-function?id=${functionId}`
  * @param {String} metricName: metric name
  * @see {@link https://tinyurl.com/y7hhzm33|class DataResource}
  */
-const metricAutoComplete = metricName => `/data/autocomplete/metric?name=${metricName}`;
+const metricAutoComplete = metricName => `/data/autocomplete/metric?name=${encodeURIComponent(metricName)}`;
 
 /**
  * GET autocomplete request for alert by name
  * @param {String} functionName: alert name
  * @see {@link https://tinyurl.com/ybelagey|class DataResource}
  */
-const alertAutoComplete = functionName => `/data/autocomplete/functionByName?name=${functionName}`;
+const alertFunctionByName = functionName => `/data/autocomplete/functionByName?name=${encodeURIComponent(functionName)}`;
+
+/**
+ * GET autocomplete request for alert by app name
+ * @param {String} appName: application name
+ * @see {@link https://tinyurl.com/ybelagey|class DataResource}
+ */
+const alertFunctionByAppName = appName => `/data/autocomplete/functionByAppname?appname=${encodeURIComponent(appName)}`;
 
 /**
  * GET a single function record by id
@@ -61,6 +68,13 @@ const alertAutoComplete = functionName => `/data/autocomplete/functionByName?nam
  * @see {@link https://tinyurl.com/y76fu5vp|class OnboardResource}
  */
 const alertById = functionId => `/onboard/function/${functionId}`;
+
+/**
+ * GET config group records containing functionId in emailConfig property
+ * @param {String} id: alert function id
+ * @see {@link https://tinyurl.com/yc36oo2c|class EmailResource}
+ */
+const configGroupByAlertId = functionId => `/thirdeye/email/function/${functionId}`;
 
 /**
  * GET the timestamp for the end of the time range of available data for a given metric
@@ -119,12 +133,15 @@ const createNewDataset = '/onboard/create';
 
 /**
  * General self-serve endpoints
+ * TODO: rename these API utils according to entity, not UI features (self-serve, rca)
  */
 export const selfServeApiCommon = {
   alertById,
   allConfigGroups,
   allApplications,
-  alertAutoComplete,
+  alertFunctionByName,
+  configGroupByAlertId,
+  alertFunctionByAppName,
   metricAutoComplete
 };
 

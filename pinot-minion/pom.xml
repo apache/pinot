@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!--
 
-    Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+    Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -91,6 +91,14 @@
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-core</artifactId>
     </dependency>
   </dependencies>
 </project>

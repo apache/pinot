@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,21 +29,23 @@ import java.nio.ByteBuffer;
  */
 public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader {
 
+  // Thread local (reusable) byte[] to read bytes from data file.
+  private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[_lengthOfLongestEntry]);
+
   /**
    * Constructor for the class.
    *
    * @param pinotDataBuffer Data buffer to read from
    * @throws IOException
    */
-  public FixedByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer)
-      throws IOException {
+  public FixedByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer) throws IOException {
     super(pinotDataBuffer);
   }
 
   @Override
   public int getInt(int row) {
     if (!isCompressed()) {
-      return getRawData().getInt(row * INT_SIZE);
+      return getRawData().getInt(row * Integer.BYTES);
     } else {
       throw new UnsupportedOperationException("Read without context not supported for compressed data.");
     }
@@ -51,16 +53,16 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
 
   @Override
   public int getInt(int row, ChunkReaderContext context) {
-    assert _lengthOfLongestEntry == INT_SIZE;
+    assert _lengthOfLongestEntry == Integer.BYTES;
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
-    return chunkBuffer.getInt(chunkRowId * INT_SIZE);
+    return chunkBuffer.getInt(chunkRowId * Integer.BYTES);
   }
 
   @Override
   public float getFloat(int row) {
     if (!isCompressed()) {
-      return getRawData().getFloat(row * FLOAT_SIZE);
+      return getRawData().getFloat(row * Float.BYTES);
     } else {
       throw new UnsupportedOperationException("Read without context not supported for compressed data.");
     }
@@ -68,16 +70,16 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
 
   @Override
   public float getFloat(int row, ChunkReaderContext context) {
-    assert _lengthOfLongestEntry == FLOAT_SIZE;
+    assert _lengthOfLongestEntry == Float.BYTES;
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
-    return chunkBuffer.getFloat(chunkRowId * FLOAT_SIZE);
+    return chunkBuffer.getFloat(chunkRowId * Float.BYTES);
   }
 
   @Override
   public long getLong(int row) {
     if (!isCompressed()) {
-      return getRawData().getLong(row * LONG_SIZE);
+      return getRawData().getLong(row * Long.BYTES);
     } else {
       throw new UnsupportedOperationException("Read without context not supported for compressed data.");
     }
@@ -85,16 +87,16 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
 
   @Override
   public long getLong(int row, ChunkReaderContext context) {
-    assert _lengthOfLongestEntry == LONG_SIZE;
+    assert _lengthOfLongestEntry == Long.BYTES;
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
-    return chunkBuffer.getLong(chunkRowId * LONG_SIZE);
+    return chunkBuffer.getLong(chunkRowId * Long.BYTES);
   }
 
   @Override
   public double getDouble(int row) {
     if (!isCompressed()) {
-      return getRawData().getDouble(row * DOUBLE_SIZE);
+      return getRawData().getDouble(row * Double.BYTES);
     } else {
       throw new UnsupportedOperationException("Read without context not supported for compressed data.");
     }
@@ -102,10 +104,32 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
 
   @Override
   public double getDouble(int row, ChunkReaderContext context) {
-    assert _lengthOfLongestEntry == DOUBLE_SIZE;
+    assert _lengthOfLongestEntry == Double.BYTES;
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
-    return chunkBuffer.getDouble(chunkRowId * DOUBLE_SIZE);
+    return chunkBuffer.getDouble(chunkRowId * Double.BYTES);
+  }
+
+  @Override
+  public byte[] getBytes(int row) {
+    if (!isCompressed()) {
+      byte[] bytes = _reusableBytes.get();
+      getRawData().copyTo(row * _lengthOfLongestEntry, bytes, 0, _lengthOfLongestEntry);
+      return bytes;
+    } else {
+      throw new UnsupportedOperationException("Read without context not supported for compressed data.");
+    }
+  }
+
+  @Override
+  public byte[] getBytes(int row, ChunkReaderContext context) {
+    int chunkRowId = row % _numDocsPerChunk;
+    ByteBuffer chunkBuffer = getChunkForRow(row, context);
+
+    byte[] bytes = _reusableBytes.get();
+    chunkBuffer.position(chunkRowId * _lengthOfLongestEntry);
+    chunkBuffer.get(bytes);
+    return bytes;
   }
 
   @Override

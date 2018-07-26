@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.linkedin.pinot.server.starter;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
@@ -89,8 +89,7 @@ public class ServerBuilder {
     return _serverMetrics;
   }
 
-  public InstanceDataManager buildInstanceDataManager()
-      throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+  public InstanceDataManager buildInstanceDataManager() throws Exception {
     String className = _serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Building instance data manager of class: {}", className);
     InstanceDataManager instanceDataManager = (InstanceDataManager) Class.forName(className).newInstance();

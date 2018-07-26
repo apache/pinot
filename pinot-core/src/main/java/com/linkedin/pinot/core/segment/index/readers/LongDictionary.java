@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,9 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class LongDictionary extends ImmutableDictionaryReader {
-  private static final int LONG_SIZE_IN_BYTES = Long.SIZE / Byte.SIZE;
 
   public LongDictionary(PinotDataBuffer dataBuffer, int length) {
-    super(dataBuffer, length, LONG_SIZE_IN_BYTES, (byte) 0);
+    super(dataBuffer, length, Long.BYTES, (byte) 0);
   }
 
   @Override

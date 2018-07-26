@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,28 +48,7 @@ public class StringOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
     String valueToCompare = (String) get(dictIdToCompare);
-
-    if (includeLower) {
-      if (valueToCompare.compareTo(lower) < 0) {
-        return false;
-      }
-    } else {
-      if (valueToCompare.compareTo(lower) <= 0) {
-        return false;
-      }
-    }
-
-    if (includeUpper) {
-      if (valueToCompare.compareTo(upper) > 0) {
-        return false;
-      }
-    } else {
-      if (valueToCompare.compareTo(upper) >= 0) {
-        return false;
-      }
-    }
-
-    return true;
+    return valueInRange(lower, upper, includeLower, includeUpper, valueToCompare);
   }
 
   @Nonnull

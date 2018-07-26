@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.util.Arrays;
@@ -325,7 +325,7 @@ public class StarTreeQueryGenerator {
     File[] segments = segmentsDir.listFiles();
     Preconditions.checkNotNull(segments);
     File segment = segments[0];
-    IndexSegment indexSegment = Loaders.IndexSegment.load(segment, ReadMode.heap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(segment, ReadMode.heap);
     SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
     String tableName = segmentMetadata.getTableName();
 

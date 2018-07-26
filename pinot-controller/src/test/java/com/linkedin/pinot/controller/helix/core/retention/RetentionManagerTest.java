@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -236,6 +236,15 @@ public class RetentionManagerTest {
         // create consuming segment
         segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
         idealState.setPartitionState(segName, serverName, "CONSUMING");
+        allSegments.add(segmentMetadata);
+      } else if (seq == 1) {
+        // create IN_PROGRESS metadata absent from ideal state, older than 5 days
+        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+        allSegments.add(segmentMetadata);
+        segmentsToBeDeleted.add(segmentMetadata.getSegmentName());
+      } else if (seq == nSegments - 1) {
+        // create IN_PROGRESS metadata absent from ideal state, younger than 5 days
+        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
         allSegments.add(segmentMetadata);
       } else if (seq % 2 == 0) {
         // create ONLINE segment

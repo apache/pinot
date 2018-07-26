@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.realtime.converter.stats;
 
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
@@ -30,11 +29,11 @@ import java.util.Map;
  * Stats container for an in-memory realtime segment.
  */
 public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContainer {
-  private final RealtimeSegmentImpl _realtimeSegment;
+  private final MutableSegmentImpl _realtimeSegment;
   private final RealtimeSegmentRecordReader _realtimeSegmentRecordReader;
   private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
 
-  public RealtimeSegmentStatsContainer(RealtimeSegmentImpl realtimeSegment,
+  public RealtimeSegmentStatsContainer(MutableSegmentImpl realtimeSegment,
       RealtimeSegmentRecordReader realtimeSegmentRecordReader) {
     _realtimeSegment = realtimeSegment;
     _realtimeSegmentRecordReader = realtimeSegmentRecordReader;

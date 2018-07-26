@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,14 @@
  */
 package com.linkedin.pinot.core.operator.query;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -65,40 +60,12 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
   protected IntermediateResultsBlock getNextBlock() {
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     List<Object> aggregationResults = new ArrayList<>(numAggregationFunctions);
-    int totalRawDocs = _segmentMetadata.getTotalRawDocs();
-
+    long totalRawDocs = _segmentMetadata.getTotalRawDocs();
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
-      AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
-      AggregationFunctionFactory.AggregationFunctionType functionType =
-          AggregationFunctionFactory.AggregationFunctionType.valueOf(function.getName().toUpperCase());
-      String column = aggregationFunctionContext.getAggregationColumns()[0];
-
-      SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) _segmentMetadata;
-      AggregationResultHolder resultHolder;
-      switch (functionType) {
-        case COUNT:
-          resultHolder = new DoubleAggregationResultHolder(totalRawDocs);
-          break;
-        case MIN:
-          String minValue = segmentMetadata.getColumnMetadataFor(column).getMinValue().toString();
-          resultHolder = new DoubleAggregationResultHolder(Double.valueOf(minValue));
-          break;
-        case MAX:
-          String maxValue = segmentMetadata.getColumnMetadataFor(column).getMaxValue().toString();
-          resultHolder = new DoubleAggregationResultHolder(Double.valueOf(maxValue));
-          break;
-        case MINMAXRANGE:
-          String minValueRange = segmentMetadata.getColumnMetadataFor(column).getMinValue().toString();
-          String maxValueRange = segmentMetadata.getColumnMetadataFor(column).getMaxValue().toString();
-          resultHolder = new ObjectAggregationResultHolder();
-          resultHolder.setValue(new MinMaxRangePair(Double.valueOf(minValueRange), Double.valueOf(maxValueRange)));
-          break;
-
-        default:
-          throw new UnsupportedOperationException(
-              "Metadata based aggregation operator does not support function " + function.getName());
-      }
-      aggregationResults.add(function.extractAggregationResult(resultHolder));
+      AggregationFunctionType functionType = aggregationFunctionContext.getAggregationFunction().getType();
+      Preconditions.checkState(functionType == AggregationFunctionType.COUNT,
+          "Metadata based aggregation operator does not support function type: " + functionType);
+      aggregationResults.add(totalRawDocs);
     }
 
     // Create execution statistics. Set numDocsScanned to totalRawDocs for backward compatibility.

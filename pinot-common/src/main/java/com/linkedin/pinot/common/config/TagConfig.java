@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,17 @@
  */
 package com.linkedin.pinot.common.config;
 
-import org.apache.helix.HelixManager;
-
-
 /**
  * Abstract base class for tag configs
  */
 public class TagConfig {
 
   TableConfig _tableConfig;
-
   String _serverTenant;
 
-  public TagConfig(TableConfig tableConfig, HelixManager helixManager) {
+  public TagConfig(TableConfig tableConfig) {
 
     _tableConfig = tableConfig;
-
-    // TODO: we will introduce TENANTS config in property store, which should return the server tags
-    // once we have that, below code will change to fetching TENANT from property store and returning the consuming/completed values
     _serverTenant = tableConfig.getTenantConfig().getServer();
   }
 

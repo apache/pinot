@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ public class InvertedIndexHandler {
 
           FixedBitSingleValueReader svFwdIndex = (FixedBitSingleValueReader) fwdIndex;
           for (int i = 0; i < numDocs; i++) {
-            creator.addSV(i, svFwdIndex.getInt(i));
+            creator.add(svFwdIndex.getInt(i));
           }
         } else {
           // Multi-value column.
@@ -116,8 +116,8 @@ public class InvertedIndexHandler {
           SingleColumnMultiValueReader mvFwdIndex = (SingleColumnMultiValueReader) fwdIndex;
           int[] dictIds = new int[columnMetadata.getMaxNumberOfMultiValues()];
           for (int i = 0; i < numDocs; i++) {
-            int numDictIds = mvFwdIndex.getIntArray(i, dictIds);
-            creator.addMV(i, dictIds, numDictIds);
+            int length = mvFwdIndex.getIntArray(i, dictIds);
+            creator.add(dictIds, length);
           }
         }
         creator.seal();

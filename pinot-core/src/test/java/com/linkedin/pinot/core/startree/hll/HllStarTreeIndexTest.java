@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.startree.BaseStarTreeIndexTest;
 import com.linkedin.pinot.core.startree.StarTreeIndexTestSegmentHelper;
 import com.linkedin.pinot.startree.hll.HllConfig;
@@ -134,7 +134,7 @@ public class HllStarTreeIndexTest extends BaseStarTreeIndexTest {
 
   @Test
   public void testQueries() throws Exception {
-    _segment = ColumnarSegmentLoader.load(new File(DATA_DIR, SEGMENT_NAME), ReadMode.mmap);
+    _segment = ImmutableSegmentLoader.load(new File(DATA_DIR, SEGMENT_NAME), ReadMode.mmap);
     testHardCodedQueries();
     _segment.destroy();
   }

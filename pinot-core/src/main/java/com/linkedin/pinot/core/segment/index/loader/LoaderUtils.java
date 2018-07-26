@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ public class LoaderUtils {
         buffer = segmentWriter.newIndexFor(column, indexType, fileLength);
       }
 
-      buffer.readFrom(indexFile);
+      buffer.readFrom(0, indexFile, 0, fileLength);
     } finally {
       FileUtils.deleteQuietly(indexFile);
       if (buffer != null) {

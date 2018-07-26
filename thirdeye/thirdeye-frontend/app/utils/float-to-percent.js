@@ -5,5 +5,5 @@
  * @return {float} - percentage value of float
  */
 export default function floatToPercent(float) {
-  return (float * 100).toFixed(2);
+  return Number.isNaN(Number(float)) ? '-' : (float * 100).toFixed(2);
 }

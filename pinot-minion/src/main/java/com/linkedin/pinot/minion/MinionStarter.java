@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,9 +22,11 @@ import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.minion.events.EventObserverFactoryRegistry;
+import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
 import com.linkedin.pinot.minion.executor.BaseSegmentConversionExecutor;
-import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
-import com.linkedin.pinot.minion.executor.TaskExecutorRegistry;
+import com.linkedin.pinot.minion.executor.PinotTaskExecutorFactory;
+import com.linkedin.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import com.linkedin.pinot.minion.metrics.MinionMeter;
 import com.linkedin.pinot.minion.metrics.MinionMetrics;
 import com.linkedin.pinot.minion.taskfactory.TaskFactoryRegistry;
@@ -53,7 +55,8 @@ public class MinionStarter {
   private final Configuration _config;
   private final String _instanceId;
   private final HelixManager _helixManager;
-  private final TaskExecutorRegistry _taskExecutorRegistry;
+  private final TaskExecutorFactoryRegistry _taskExecutorFactoryRegistry;
+  private final EventObserverFactoryRegistry _eventObserverFactoryRegistry;
 
   private HelixAdmin _helixAdmin;
 
@@ -64,19 +67,32 @@ public class MinionStarter {
         CommonConstants.Minion.INSTANCE_PREFIX + NetUtil.getHostAddress() + "_"
             + CommonConstants.Minion.DEFAULT_HELIX_PORT);
     _helixManager = new ZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
-    _taskExecutorRegistry = new TaskExecutorRegistry();
+    _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry();
+    _eventObserverFactoryRegistry = new EventObserverFactoryRegistry();
   }
 
   /**
-   * Register a class of task executor.
-   * <p>This is for pluggable task executors.
+   * Registers a task executor factory.
+   * <p>This is for pluggable task executor factories.
    *
    * @param taskType Task type
-   * @param taskExecutorClass Class of task executor to be registered
+   * @param taskExecutorFactory Task executor factory associated with the task type
    */
-  public void registerTaskExecutorClass(@Nonnull String taskType,
-      @Nonnull Class<? extends PinotTaskExecutor> taskExecutorClass) {
-    _taskExecutorRegistry.registerTaskExecutorClass(taskType, taskExecutorClass);
+  public void registerTaskExecutorFactory(@Nonnull String taskType,
+      @Nonnull PinotTaskExecutorFactory taskExecutorFactory) {
+    _taskExecutorFactoryRegistry.registerTaskExecutorFactory(taskType, taskExecutorFactory);
+  }
+
+  /**
+   * Registers an event observer factory.
+   * <p>This is for pluggable event observer factories.
+   *
+   * @param taskType Task type
+   * @param eventObserverFactory Event observer factory associated with the task type
+   */
+  public void registerEventObserverFactory(@Nonnull String taskType,
+      @Nonnull MinionEventObserverFactory eventObserverFactory) {
+    _eventObserverFactoryRegistry.registerEventObserverFactory(taskType, eventObserverFactory);
   }
 
   /**
@@ -114,12 +130,14 @@ public class MinionStarter {
         .init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
 
     // Need to do this before we start receiving state transitions.
+    LOGGER.info("Initializing segment conversion executor");
     BaseSegmentConversionExecutor.init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
     _helixManager.getStateMachineEngine()
         .registerStateModelFactory("Task", new TaskStateModelFactory(_helixManager,
-            new TaskFactoryRegistry(_taskExecutorRegistry).getTaskFactoryRegistry()));
+            new TaskFactoryRegistry(_taskExecutorFactoryRegistry,
+                _eventObserverFactoryRegistry).getTaskFactoryRegistry()));
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded();
@@ -138,7 +156,6 @@ public class MinionStarter {
       public String getStatusDescription() {
         return ServiceStatus.STATUS_DESCRIPTION_NONE;
       }
-
     });
 
     LOGGER.info("Pinot minion started");

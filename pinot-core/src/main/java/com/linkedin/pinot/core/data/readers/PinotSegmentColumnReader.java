@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -32,12 +32,12 @@ public class PinotSegmentColumnReader {
   private final ReaderContext _readerContext;
   private final int[] _mvBuffer;
 
-  public PinotSegmentColumnReader(IndexSegmentImpl indexSegment, String columnName) {
-    _dictionary = indexSegment.getDictionaryFor(columnName);
-    _reader = indexSegment.getForwardIndexReaderFor(columnName);
+  public PinotSegmentColumnReader(ImmutableSegment immutableSegment, String column) {
+    _dictionary = immutableSegment.getDictionary(column);
+    _reader = immutableSegment.getForwardIndex(column);
     _readerContext = _reader.createContext();
-    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) indexSegment.getSegmentMetadata();
-    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
+    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) immutableSegment.getSegmentMetadata();
+    ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
     if (columnMetadata.isSingleValue()) {
       _mvBuffer = null;
     } else {
@@ -95,6 +95,16 @@ public class PinotSegmentColumnReader {
     }
   }
 
+  Object readBytes(int docId) {
+    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
+    if (_dictionary != null) {
+      int dictId = svReader.getInt(docId, _readerContext);
+      return _dictionary.get(dictId);
+    } else {
+      return svReader.getBytes(docId, _readerContext);
+    }
+  }
+
   Object[] readMV(int docId) {
     SingleColumnMultiValueReader mvReader = (SingleColumnMultiValueReader) _reader;
     int numValues = mvReader.getIntArray(docId, _mvBuffer, _readerContext);
@@ -103,5 +113,21 @@ public class PinotSegmentColumnReader {
       values[i] = _dictionary.get(_mvBuffer[i]);
     }
     return values;
+  }
+
+  public int getDictionaryId(int docId) {
+    if (_mvBuffer != null) {
+      throw new IllegalStateException("Multi value column is not supported");
+    }
+    SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
+    if (_dictionary != null) {
+      return svReader.getInt(docId, _readerContext);
+    } else {
+      throw new IllegalStateException("No dictionary column is not supported");
+    }
+  }
+
+  public boolean hasDictionary() {
+    return _dictionary != null;
   }
 }

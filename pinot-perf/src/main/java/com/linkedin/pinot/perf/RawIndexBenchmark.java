@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.operator.DocIdSetOperator;
 import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
@@ -32,7 +33,6 @@ import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.operator.filter.FilterOperatorTestUtils;
 import java.io.BufferedReader;
 import java.io.File;
@@ -97,7 +97,7 @@ public class RawIndexBenchmark {
     }
 
     File segmentFile = (_segmentDir == null) ? buildSegment() : new File(_segmentDir);
-    IndexSegment segment = Loaders.IndexSegment.load(segmentFile, ReadMode.valueOf(_loadMode));
+    IndexSegment segment = ImmutableSegmentLoader.load(segmentFile, ReadMode.valueOf(_loadMode));
     compareIndexSizes(segment, segmentFile, _fwdIndexColumn, _rawIndexColumn);
     compareLookups(segment);
 

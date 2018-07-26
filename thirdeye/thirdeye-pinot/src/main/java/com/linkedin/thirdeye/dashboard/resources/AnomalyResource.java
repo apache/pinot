@@ -17,6 +17,7 @@ import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
@@ -63,6 +64,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Days;
 import org.joda.time.Hours;
 import org.joda.time.Interval;
@@ -468,7 +470,7 @@ public class AnomalyResource {
    *      the Map that maps dimension string to the AnomalyTimelinesView
    * @throws Exception
    */
-  private static final Period DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD = Weeks.weeks(4).toPeriod();
+  private static final Period DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD = Weeks.weeks(8).toPeriod();
   @GET
   @Path(value = "/anomaly-function/{id}/baseline")
   @Produces(MediaType.APPLICATION_JSON)
@@ -507,13 +509,13 @@ public class AnomalyResource {
           mode = "ONLINE"; // There is no offline training in minute-level detection, use online in all cases
           break;
         case HOURS:
-          if (Hours.hoursBetween(startTime, endTime).getHours() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardHours()) {
-            startTime = startTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
+          if (Hours.hoursBetween(startTime, endTime).getHours() < DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardHours()) {
+            startTime = startTime.minus(DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD);
           }
           break;
         case DAYS:
-          if (Days.daysBetween(startTime, endTime).getDays() < DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardDays()) {
-            startTime = startTime.minus(DEFAULT_MINIMUN_REQUIRE_TRAINING_PERIOD);
+          if (Days.daysBetween(startTime, endTime).getDays() < DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD.toStandardDuration().getStandardDays()) {
+            startTime = startTime.minus(DEFAULT_MINIMUM_REQUIRE_TRAINING_PERIOD);
           }
           break;
       }
@@ -538,6 +540,7 @@ public class AnomalyResource {
         }
       }
     }
+    DateTimeZone timeZone = DateTimeZone.forID(datasetConfigDTO.getTimezone());
 
     DimensionMap dimensionsToBeEvaluated = new DimensionMap();
     if (anomalyFunctionSpec.getExploreDimensions() != null) {
@@ -576,10 +579,38 @@ public class AnomalyResource {
       // Return no content with empty time line view upon exception
       return Response.status(Response.Status.NO_CONTENT).entity(new AnomalyTimelinesView()).build();
     }
+
+    if (TimeUnit.DAYS.equals(anomalyFunctionSpec.getBucketUnit())) {
+      // align timestamp to the start of the day
+      List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();
+      for (int i = 0; i < timeBuckets.size(); i++) {
+        TimeBucket timeBucket = timeBuckets.get(i);
+        timeBucket.setCurrentStart(alignToStartOfTheDay(timeBucket.getCurrentStart(), timeZone).getMillis());
+        timeBucket.setCurrentEnd(alignToStartOfTheDay(timeBucket.getCurrentEnd(), timeZone).getMillis());
+        timeBucket.setBaselineStart(alignToStartOfTheDay(timeBucket.getBaselineStart(), timeZone).getMillis());
+        timeBucket.setBaselineEnd(alignToStartOfTheDay(timeBucket.getBaselineEnd(), timeZone).getMillis());
+      }
+    }
+
     anomalyTimelinesView = amendAnomalyTimelinesViewWithAnomalyResults(anomalyFunctionSpec, anomalyTimelinesView,
-        dimensionsToBeEvaluated);
+        dimensionsToBeEvaluated, timeZone);
 
     return Response.ok(anomalyTimelinesView).build();
+  }
+
+  public static DateTime alignToStartOfTheDay(long timestamp, DateTimeZone timeZone) {
+    DateTime dateTime = new DateTime(timestamp, timeZone);
+    DateTime startOfTheDay = dateTime.withTimeAtStartOfDay();
+    DateTime startOfNextDay = dateTime.plusDays(1).withTimeAtStartOfDay();
+    long diffBetweenStartOfTheDate = Math.abs(dateTime.getMillis() - startOfTheDay.getMillis());
+    long diffBetweenStartOfNextDate = Math.abs(dateTime.getMillis() - startOfNextDay.getMillis());
+    if (diffBetweenStartOfTheDate < diffBetweenStartOfNextDate) {
+      dateTime = startOfTheDay;
+    } else {
+      dateTime = startOfNextDay;
+    }
+
+    return dateTime;
   }
 
   /**
@@ -593,7 +624,7 @@ public class AnomalyResource {
    * @return
    */
   public AnomalyTimelinesView amendAnomalyTimelinesViewWithAnomalyResults(AnomalyFunctionDTO anomalyFunctionSpec,
-      AnomalyTimelinesView originalTimelinesView, DimensionMap dimensionMap) {
+      AnomalyTimelinesView originalTimelinesView, DimensionMap dimensionMap, DateTimeZone timeZone) {
     if (originalTimelinesView == null || anomalyFunctionSpec == null) {
       LOG.error("AnomalyTimelinesView or AnomalyFunctionDTO is null");
       return null;
@@ -632,15 +663,7 @@ public class AnomalyResource {
             // align timestamp to the begin of the day if Bucket is in DAYS
             long indexTimestamp = timestamp;
             if (TimeUnit.DAYS.toMillis(1l) == bucketMillis) {
-              DateTime timestampDateTime = new DateTime(timestamp);
-              // the timestamp shifts ahead of correct timestamp because of start of DST
-              if (timestampDateTime.minusHours(1).toLocalDate().equals(timestampDateTime.toLocalDate())) {
-                timestamp = timestampDateTime.minusHours(1).getMillis();
-              } else if (timestampDateTime.plusHours(1)
-                  .toLocalDate()
-                  .equals(timestampDateTime.plusDays(1).toLocalDate())) {
-                timestamp = (new DateTime(timestamp)).plusDays(1).withTimeAtStartOfDay().getMillis();
-              }
+              timestamp = alignToStartOfTheDay(timestamp, timeZone).getMillis();
             }
             if (timeSeriesInterval.contains(timestamp)) {
               observed.set(timestamp, anomalyObserved.get(indexTimestamp));
@@ -665,60 +688,6 @@ public class AnomalyResource {
       }
     }
     return TimeSeriesUtils.toAnomalyTimeLinesView(observed, expected, bucketMillis);
-  }
-
-  /**
-   * Enumerate all possible DimensionMap for a given anomaly detection function spec
-   * @param anomalyFunctionSpec
-   * @return
-   */
-  public List<DimensionMap> enumerateDimensionMapCombinations(AnomalyFunctionDTO anomalyFunctionSpec)
-      throws ExecutionException {
-    List<DimensionMap> dimensionMapEnumeration = new ArrayList<>();
-    if (StringUtils.isBlank(anomalyFunctionSpec.getExploreDimensions())) {
-      dimensionMapEnumeration.add(new DimensionMap());
-      return dimensionMapEnumeration;
-    }
-    String jsonFilters = dimensionFiltersCache.get(anomalyFunctionSpec.getCollection());
-    HashMap<String, List<String>> collectionFilters;
-    try {
-      collectionFilters = OBJECT_MAPPER.readValue(jsonFilters, HashMap.class);
-    } catch (Exception e) {
-      LOG.error("Unable to cast or parse json value: {}", jsonFilters, e);
-      dimensionMapEnumeration.add(new DimensionMap());
-      return dimensionMapEnumeration;
-    }
-    String[] exploreDimensions = anomalyFunctionSpec.getExploreDimensions().split(",");
-    Multimap<String, String> functionFilters = anomalyFunctionSpec.getFilterSet();
-
-    List<String> dimensionStringEnumeration = new ArrayList<>();
-    dimensionStringEnumeration.add("");
-    for (String exploreDimension : exploreDimensions) {
-      if (!collectionFilters.containsKey(exploreDimension)) {
-        continue;
-      }
-      // Get the full list of attributes from dataset metaData
-      List<String> possibleAttributes = collectionFilters.get(exploreDimension);
-      // If there is user pre-defined attributes, use user's definition
-      if (functionFilters.containsKey(exploreDimension)) {
-        possibleAttributes = new ArrayList<>(functionFilters.get(exploreDimension));
-      }
-
-      // Append new attribute to the dimension string
-      List<String> targetEnumerations = dimensionStringEnumeration;
-      dimensionStringEnumeration = new ArrayList<>();
-      for (String targetEntry : targetEnumerations) {
-        for (String attribute : possibleAttributes) {
-          dimensionStringEnumeration.add(targetEntry + "," + exploreDimension + "=" + attribute);
-        }
-      }
-    }
-
-    for (String dimensionString : dimensionStringEnumeration) {
-      // remove the first comma from the dimension string
-      dimensionMapEnumeration.add(new DimensionMap("{" + dimensionString.substring(1) + "}"));
-    }
-    return dimensionMapEnumeration;
   }
 
   /**
@@ -896,7 +865,9 @@ public class AnomalyResource {
         result.setFeedback(feedback);
       }
       feedback.setComment(feedbackRequest.getComment());
-      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+      if (feedbackRequest.getFeedbackType() != null){
+        feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+      }
       anomalyMergedResultDAO.updateAnomalyFeedback(result);
     } catch (IOException e) {
       throw new IllegalArgumentException("Invalid payload " + payload, e);

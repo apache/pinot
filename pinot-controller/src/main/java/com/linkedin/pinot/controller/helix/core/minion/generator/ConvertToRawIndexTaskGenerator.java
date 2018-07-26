@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,18 +19,17 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableTaskConfig;
+import com.linkedin.pinot.common.data.Segment;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import com.linkedin.pinot.core.common.MinionConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
-import org.apache.helix.task.TaskState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,19 +55,8 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
 
     // Get the segments that are being converted so that we don't submit them again
-    Set<String> runningSegments = new HashSet<>();
-    Map<String, TaskState> taskStates =
-        _clusterInfoProvider.getTaskStates(MinionConstants.ConvertToRawIndexTask.TASK_TYPE);
-    for (Map.Entry<String, TaskState> entry : taskStates.entrySet()) {
-      TaskState taskState = entry.getValue();
-      if (taskState == TaskState.NOT_STARTED || taskState == TaskState.IN_PROGRESS || taskState == TaskState.STOPPED) {
-        for (PinotTaskConfig pinotTaskConfig : _clusterInfoProvider.getTaskConfigs(entry.getKey())) {
-          Map<String, String> configs = pinotTaskConfig.getConfigs();
-          runningSegments.add(
-              configs.get(MinionConstants.TABLE_NAME_KEY) + "__" + configs.get(MinionConstants.SEGMENT_NAME_KEY));
-        }
-      }
-    }
+    Set<Segment> runningSegments =
+        TaskGeneratorUtils.getRunningSegments(MinionConstants.ConvertToRawIndexTask.TASK_TYPE, _clusterInfoProvider);
 
     for (TableConfig tableConfig : tableConfigs) {
       // Only generate tasks for OFFLINE tables
@@ -111,7 +99,7 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
 
         // Skip segments that are already submitted
         String segmentName = offlineSegmentZKMetadata.getSegmentName();
-        if (runningSegments.contains(offlineTableName + "__" + segmentName)) {
+        if (runningSegments.contains(new Segment(offlineTableName, segmentName))) {
           continue;
         }
 
@@ -135,5 +123,10 @@ public class ConvertToRawIndexTaskGenerator implements PinotTaskGenerator {
     }
 
     return pinotTaskConfigs;
+  }
+
+  @Override
+  public int getNumConcurrentTasksPerInstance() {
+    return DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
   }
 }

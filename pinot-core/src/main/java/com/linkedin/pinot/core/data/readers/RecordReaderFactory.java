@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ public class RecordReaderFactory {
       case JSON:
         return new JSONRecordReader(dataFile, schema);
       case PINOT:
-        return new PinotSegmentRecordReader(dataFile, schema);
+        return new PinotSegmentRecordReader(dataFile, schema, segmentGeneratorConfig.getColumnSortOrder());
       case THRIFT:
         return new ThriftRecordReader(dataFile, schema,(ThriftRecordReaderConfig)segmentGeneratorConfig.getReaderConfig());
       default:

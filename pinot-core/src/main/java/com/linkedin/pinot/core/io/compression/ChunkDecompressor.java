@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,11 +28,11 @@ public interface ChunkDecompressor {
    * This method decompresses chunk of data that was compressed using {@link ChunkCompressor}.
    * Assumes that size of output ByteBuffer is large enough to de-compress the input.
    *
-   * @param inCompressed Compressed data
-   * @param outDecompressed ByteBuffer where the decompressed data is put.
+   * @param compressedInput Compressed data
+   * @param decompressedOutput ByteBuffer where the decompressed data is put.
    * @return Size of decompressed data.
    * @throws IOException
    */
-  int decompress(ByteBuffer inCompressed, ByteBuffer outDecompressed)
+  int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput)
       throws IOException;
 }

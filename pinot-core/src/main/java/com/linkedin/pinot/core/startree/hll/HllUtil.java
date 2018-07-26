@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,12 +64,16 @@ public class HllUtil {
     return b.toString();
   }
 
-  public static String convertHllToString(HyperLogLog hll) {
+  public static byte[] toBytes(HyperLogLog hll) {
     try {
-      return new String(SerializationConverter.byteArrayToChars(hll.getBytes()));
+      return hll.getBytes();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static String convertHllToString(HyperLogLog hll) {
+    return new String(SerializationConverter.byteArrayToChars(toBytes(hll)));
   }
 
   public static HyperLogLog convertStringToHll(String s) {

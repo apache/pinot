@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.minion;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
@@ -68,37 +67,67 @@ public class SegmentPurger {
     LOGGER.info("Start purging table: {}, segment: {}", tableName, segmentName);
 
     try (PurgeRecordReader purgeRecordReader = new PurgeRecordReader()) {
+      // Make a first pass through the data to see if records need to be purged or modified
+      while (purgeRecordReader.hasNext()) {
+        purgeRecordReader.next();
+      }
+
+      if (_numRecordsModified == 0 && _numRecordsPurged == 0) {
+        // Returns null if no records to be modified or purged
+        return null;
+      }
+
       SegmentGeneratorConfig config = new SegmentGeneratorConfig(purgeRecordReader.getSchema());
       config.setOutDir(_workingDir.getPath());
       config.setTableName(tableName);
       config.setSegmentName(segmentName);
+
       // Keep index creation time the same as original segment because both segments use the same raw data.
       // This way, for REFRESH case, when new segment gets pushed to controller, we can use index creation time to
       // identify if the new pushed segment has newer data than the existing one.
       config.setCreationTime(String.valueOf(segmentMetadata.getIndexCreationTime()));
 
+      // The time column type info is not stored in the segment metadata.
+      // Keep segment start/end time to properly handle time column type other than EPOCH (e.g.SIMPLE_FORMAT).
+      if (segmentMetadata.getTimeInterval() != null) {
+        config.setTimeColumnName(segmentMetadata.getTimeColumn());
+        config.setStartTime(Long.toString(segmentMetadata.getStartTime()));
+        config.setEndTime(Long.toString(segmentMetadata.getEndTime()));
+        config.setSegmentTimeUnit(segmentMetadata.getTimeUnit());
+      }
+
+      // Generate star-tree if it exists in the original segment
       StarTreeMetadata starTreeMetadata = segmentMetadata.getStarTreeMetadata();
       if (starTreeMetadata != null) {
         config.enableStarTreeIndex(StarTreeIndexSpec.fromStarTreeMetadata(starTreeMetadata));
       }
 
+      // TODO: currently we don't generate inverted index
+
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      purgeRecordReader.rewind();
       driver.init(config, purgeRecordReader);
       driver.build();
-
-      LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableName,
-          segmentName, _numRecordsPurged, _numRecordsModified);
-      return new File(_workingDir, segmentName);
     }
+
+    LOGGER.info("Finish purging table: {}, segment: {}, purged {} records, modified {} records", tableName, segmentName,
+        _numRecordsPurged, _numRecordsModified);
+    return new File(_workingDir, segmentName);
   }
 
-  @VisibleForTesting
-  int getNumRecordsPurged() {
+  public RecordPurger getRecordPurger() {
+    return _recordPurger;
+  }
+
+  public RecordModifier getRecordModifier() {
+    return _recordModifier;
+  }
+
+  public int getNumRecordsPurged() {
     return _numRecordsPurged;
   }
 
-  @VisibleForTesting
-  int getNumRecordsModified() {
+  public int getNumRecordsModified() {
     return _numRecordsModified;
   }
 
@@ -150,15 +179,16 @@ public class SegmentPurger {
     }
 
     @Override
-    public GenericRow next() throws IOException {
+    public GenericRow next() {
       return next(new GenericRow());
     }
 
     @Override
-    public GenericRow next(GenericRow reuse) throws IOException {
+    public GenericRow next(GenericRow reuse) {
       if (_recordPurger == null) {
         reuse = _recordReader.next(reuse);
       } else {
+        Preconditions.checkState(!_nextRowReturned);
         for (Map.Entry<String, Object> entry : _nextRow.getEntrySet()) {
           reuse.putField(entry.getKey(), entry.getValue());
         }
@@ -175,7 +205,7 @@ public class SegmentPurger {
     }
 
     @Override
-    public void rewind() throws IOException {
+    public void rewind() {
       _recordReader.rewind();
       _nextRowReturned = true;
       _finished = false;
@@ -203,7 +233,7 @@ public class SegmentPurger {
     /**
      * Get the {@link RecordPurger} for the given table.
      */
-    RecordPurger getRecordPurger(@Nonnull String tableName);
+    RecordPurger getRecordPurger(@Nonnull String rawTableName);
   }
 
   /**
@@ -225,7 +255,7 @@ public class SegmentPurger {
     /**
      * Get the {@link RecordModifier} for the given table.
      */
-    RecordModifier getRecordModifier(@Nonnull String tableName);
+    RecordModifier getRecordModifier(@Nonnull String rawTableName);
   }
 
   /**

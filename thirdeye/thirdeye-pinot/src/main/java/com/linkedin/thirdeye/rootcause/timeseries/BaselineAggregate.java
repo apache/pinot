@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.rootcause.timeseries;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.Series;
+import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,9 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeFieldType;
 import org.joda.time.DateTimeZone;
-import org.joda.time.Partial;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
 
@@ -122,7 +122,7 @@ public class BaselineAggregate implements Baseline {
     String[] arrNames = colNames.toArray(new String[colNames.size()]);
 
     // aggregation
-    output.addSeries(COL_VALUE, output.map(this.type.function, arrNames));
+    output.addSeries(COL_VALUE, mapWithNull(output, this.type.function, arrNames));
 
     // alignment
     output.addSeries(COL_TIME, this.toTimestampSeries(slice.getStart(), output.getLongs(COL_TIME)));
@@ -131,16 +131,20 @@ public class BaselineAggregate implements Baseline {
     List<String> dropNames = new ArrayList<>(output.getSeriesNames());
     dropNames.removeAll(output.getIndexNames());
 
-    output = output.filter(new Series.LongConditional() {
-      @Override
-      public boolean apply(long... values) {
-        return values[0] >= slice.getStart() && values[0] < slice.getEnd();
-      }
-    }, COL_TIME).dropNull(output.getIndexNames());
+    output = output.filter(
+        output.getLongs(COL_TIME).gte(slice.getStart()).and(
+            output.getLongs(COL_TIME).lt(slice.getEnd())))
+        .dropNull(output.getIndexNames());
 
     return output;
   }
 
+  /**
+   * Helper to eliminate duplicate timestamps via averaging of values
+   *
+   * @param df timeseries dataframe
+   * @return de-duplicated dataframe
+   */
   private static DataFrame eliminateDuplicates(DataFrame df) {
     List<String> aggExpressions = new ArrayList<>();
     for (String seriesName : df.getIndexNames()) {
@@ -151,6 +155,40 @@ public class BaselineAggregate implements Baseline {
     DataFrame res = df.groupByValue(df.getIndexNames()).aggregate(aggExpressions).dropSeries(COL_KEY);
 
     return res.setIndex(df.getIndexNames());
+  }
+
+  /**
+   * Helper to apply map operation to partially incomplete row, i.e. a row
+   * that contains null values.
+   *
+   * @param df dataframe
+   * @param f function
+   * @param colNames column to apply function to
+   * @return double series
+   */
+  // TODO move this into DataFrame API?
+  private static DoubleSeries mapWithNull(DataFrame df, Series.DoubleFunction f, String[] colNames) {
+    double[] values = new double[df.size()];
+
+    double[] row = new double[colNames.length];
+    for (int i = 0; i < df.size(); i++) {
+      int offset = 0;
+      for (int j = 0; j < colNames.length; j++) {
+        if (!df.isNull(colNames[j], i)) {
+          row[offset++] = df.getDouble(colNames[j], i);
+        }
+      }
+
+      if (offset <= 0) {
+        values[i] = DoubleSeries.NULL;
+      } else if (offset >= colNames.length) {
+        values[i] = f.apply(row);
+      } else {
+        values[i] = f.apply(Arrays.copyOf(row, offset));
+      }
+    }
+
+    return DoubleSeries.buildFrom(values);
   }
 
   /**
@@ -248,7 +286,7 @@ public class BaselineAggregate implements Baseline {
    * @return day-time-of-day series
    */
   private LongSeries toVirtualSeries(long origin, LongSeries timestampSeries) {
-    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(makeOriginPartial());
+    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(DataFrameUtils.makeOrigin(this.periodType));
     return timestampSeries.map(this.makeTimestampToVirtualFunction(dateOrigin));
   }
 
@@ -260,47 +298,8 @@ public class BaselineAggregate implements Baseline {
    * @return utc timestamp series
    */
   private LongSeries toTimestampSeries(long origin, LongSeries virtualSeries) {
-    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(makeOriginPartial());
+    final DateTime dateOrigin = new DateTime(origin, this.timeZone).withFields(DataFrameUtils.makeOrigin(this.periodType));
     return virtualSeries.map(this.makeVirtualToTimestampFunction(dateOrigin));
-  }
-
-  /**
-   * Returns partial to zero out date fields based on period type
-   *
-   * @return partial
-   */
-  private Partial makeOriginPartial() {
-    List<DateTimeFieldType> fields = new ArrayList<>();
-
-    if (PeriodType.millis().equals(this.periodType)) {
-      // left blank
-
-    } else if (PeriodType.seconds().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.millisOfSecond());
-
-    } else if (PeriodType.minutes().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.secondOfMinute());
-      fields.add(DateTimeFieldType.millisOfSecond());
-
-    } else if (PeriodType.hours().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.minuteOfHour());
-      fields.add(DateTimeFieldType.secondOfMinute());
-      fields.add(DateTimeFieldType.millisOfSecond());
-
-    } else if (PeriodType.days().equals(this.periodType)) {
-      fields.add(DateTimeFieldType.hourOfDay());
-      fields.add(DateTimeFieldType.minuteOfHour());
-      fields.add(DateTimeFieldType.secondOfMinute());
-      fields.add(DateTimeFieldType.millisOfSecond());
-
-    } else {
-      throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", this.periodType));
-    }
-
-    int[] zeros = new int[fields.size()];
-    Arrays.fill(zeros, 0);
-
-    return new Partial(fields.toArray(new DateTimeFieldType[fields.size()]), zeros);
   }
 
   /**

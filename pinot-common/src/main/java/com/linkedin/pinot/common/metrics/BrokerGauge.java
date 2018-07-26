@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.Utils;
 *
 */
 public enum BrokerGauge implements AbstractMetrics.Gauge {
-  ;
+  QUERY_QUOTA_CAPACITY_UTILIZATION_RATE("tables", false);
 
   private final String brokerGaugeName;
   private final String unit;

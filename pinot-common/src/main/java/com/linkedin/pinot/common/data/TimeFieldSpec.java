@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonObject;
+import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
@@ -27,7 +28,10 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class TimeFieldSpec extends FieldSpec {
+  @ConfigKey("incoming")
   private TimeGranularitySpec _incomingGranularitySpec;
+
+  @ConfigKey("outgoing")
   private TimeGranularitySpec _outgoingGranularitySpec;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.

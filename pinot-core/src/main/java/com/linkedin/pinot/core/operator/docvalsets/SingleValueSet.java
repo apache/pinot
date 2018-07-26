@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -139,6 +139,19 @@ public final class SingleValueSet extends BaseBlockValSet {
     if (_dataType == DataType.STRING) {
       for (int i = inStartPos; i < inEndPos; i++) {
         outValues[outStartPos++] = _reader.getString(inDocIds[i], context);
+      }
+    } else {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  @Override
+  public void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos) {
+    int inEndPos = inStartPos + inDocIdsSize;
+    ReaderContext context = _reader.createContext();
+    if (_dataType.equals(DataType.BYTES)) {
+      for (int i = inStartPos; i < inEndPos; i++) {
+        outValues[outStartPos++] = _reader.getBytes(inDocIds[i], context);
       }
     } else {
       throw new UnsupportedOperationException();

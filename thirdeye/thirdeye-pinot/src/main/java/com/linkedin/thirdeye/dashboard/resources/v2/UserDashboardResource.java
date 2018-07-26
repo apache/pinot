@@ -1,20 +1,32 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
+import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
+import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detection.CurrentAndBaselineLoader;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -24,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -38,14 +51,32 @@ import javax.ws.rs.core.MediaType;
 @Path(value = "/userdashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class UserDashboardResource {
+  private static final int ANOMALIES_LIMIT_DEFAULT = 500;
+
   private final MergedAnomalyResultManager anomalyDAO;
   private final AnomalyFunctionManager functionDAO;
   private final MetricConfigManager metricDAO;
+  private final DatasetConfigManager datasetDAO;
+  private final DetectionConfigManager detectionDAO;
+  private final DetectionAlertConfigManager detectionAlertDAO;
+  private final AggregationLoader aggregationLoader;
+  private final CurrentAndBaselineLoader currentAndBaselineLoader;
 
-  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO, MetricConfigManager metricDAO) {
+
+  public UserDashboardResource(MergedAnomalyResultManager anomalyDAO, AnomalyFunctionManager functionDAO,
+      MetricConfigManager metricDAO, DatasetConfigManager datasetDAO, DetectionConfigManager detectionDAO,
+      DetectionAlertConfigManager detectionAlertDAO) {
     this.anomalyDAO = anomalyDAO;
     this.functionDAO = functionDAO;
     this.metricDAO = metricDAO;
+    this.datasetDAO = datasetDAO;
+    this.detectionDAO = detectionDAO;
+    this.detectionAlertDAO = detectionAlertDAO;
+
+    this.aggregationLoader =
+        new DefaultAggregationLoader(this.metricDAO, this.datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache(),
+            ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
+    this.currentAndBaselineLoader = new CurrentAndBaselineLoader(this.metricDAO, this.datasetDAO, this.aggregationLoader);
   }
 
   /**
@@ -63,8 +94,10 @@ public class UserDashboardResource {
    *     "current" : 1213.0,
    *     "baseline" : 550.0,
    *     "feedback" : "NO_FEEDBACK",
+   *     "comment": "",
    *     "metricId" : 12346
    *     "metric" : "page_views",
+   *     "metricUrn" : "thirdeye:metric:12345:country%3Dus"
    *     "functionId" : 12347
    *     "functionName" : "page_views_monitoring"
    *     },
@@ -94,11 +127,14 @@ public class UserDashboardResource {
       @ApiParam(value = "alert application/product/team")
       @QueryParam("application") String application,
       @ApiParam(value = "max number of results")
-      @QueryParam("limit") Integer limit) {
+      @QueryParam("limit") Integer limit) throws Exception {
 
     //
     // query params
     //
+    if (limit == null) {
+      limit = ANOMALIES_LIMIT_DEFAULT;
+    }
 
     // safety condition
     Preconditions.checkNotNull(start);
@@ -109,7 +145,6 @@ public class UserDashboardResource {
 //    predicates.add(Predicate.OR(
 //        Predicate.EQ("notified", true),
 //        Predicate.EQ("anomalyResultSource", AnomalyResultSource.USER_LABELED_ANOMALY)));
-
 
     // application (indirect)
     Set<Long> applicationFunctionIds = new HashSet<>();
@@ -167,6 +202,8 @@ public class UserDashboardResource {
       }
     }
 
+    anomalies.addAll(fetchAnomaliesOfDetectionPipelines(start, end, application));
+
     // sort descending by start time
     Collections.sort(anomalies, new Comparator<MergedAnomalyResultDTO>() {
       @Override
@@ -176,16 +213,16 @@ public class UserDashboardResource {
     });
 
     // limit result size
-    if (limit != null) {
-      anomalies = anomalies.subList(0, limit);
-    }
+    anomalies = anomalies.subList(0, Math.min(anomalies.size(), limit));
 
     //
     // fetch functions
     //
     Set<Long> anomalyFunctionIds = new HashSet<>();
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      anomalyFunctionIds.add(anomaly.getFunctionId());
+      if (anomaly.getFunctionId() != null) {
+        anomalyFunctionIds.add(anomaly.getFunctionId());
+      }
     }
 
     List<AnomalyFunctionDTO> functions = this.functionDAO.findByPredicate(Predicate.IN("baseId", anomalyFunctionIds.toArray()));
@@ -201,32 +238,92 @@ public class UserDashboardResource {
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       AnomalySummary summary = new AnomalySummary();
       summary.setId(anomaly.getId());
-      summary.setStart(anomaly.getEndTime());
+      summary.setStart(anomaly.getStartTime());
       summary.setEnd(anomaly.getEndTime());
       summary.setCurrent(anomaly.getAvgCurrentVal());
       summary.setBaseline(anomaly.getAvgBaselineVal());
       summary.setMetricId(getMetricId(anomaly));
+
+      summary.setFunctionId(-1);
+      if (anomaly.getFunctionId() != null) {
+        summary.setFunctionId(anomaly.getFunctionId());
+        if (id2function.get(anomaly.getFunctionId()) != null) {
+          summary.setFunctionName(id2function.get(anomaly.getFunctionId()).getFunctionName());
+        }
+      }
+
+      summary.setDetectionConfigId(-1);
+      if (anomaly.getDetectionConfigId() != null) {
+        long detectionConfigId = anomaly.getDetectionConfigId();
+        DetectionConfigDTO detectionDTO = this.detectionDAO.findById(detectionConfigId);
+        summary.setFunctionName(detectionDTO.getName());
+        summary.setDetectionConfigId(detectionConfigId);
+      }
+
       summary.setMetricName(anomaly.getMetric());
       summary.setDimensions(anomaly.getDimensions());
       summary.setDataset(anomaly.getCollection());
+//      summary.setMetricUrn(this.getMetricUrn(anomaly));
 
       // TODO use alert filter if necessary
       summary.setSeverity(Math.abs(anomaly.getWeight()));
 
-      summary.setFunctionId(anomaly.getFunctionId());
-      if (id2function.get(anomaly.getFunctionId()) != null) {
-        summary.setFunctionName(id2function.get(anomaly.getFunctionId()).getFunctionName());
-      }
 
       summary.setFeedback(AnomalyFeedbackType.NO_FEEDBACK);
+      summary.setComment("");
       if (anomaly.getFeedback() != null) {
         summary.setFeedback(anomaly.getFeedback().getFeedbackType());
+        summary.setComment(anomaly.getFeedback().getComment());
       }
+
+      summary.setClassification(ResourceUtils.getStatusClassification(anomaly));
 
       output.add(summary);
     }
 
     return output;
+  }
+
+  private Collection<MergedAnomalyResultDTO> fetchAnomaliesOfDetectionPipelines(Long start, Long end, String application)
+      throws Exception {
+    if (application == null) {
+      return Collections.emptyList();
+    }
+
+    List<DetectionAlertConfigDTO> alerts =
+        this.detectionAlertDAO.findByPredicate(Predicate.EQ("application", application));
+
+    List<Long> detectionConfigIds = new ArrayList<>();
+    for (DetectionAlertConfigDTO alertConfigDTO : alerts) {
+      detectionConfigIds.addAll(alertConfigDTO.getVectorClocks().keySet());
+    }
+
+    List<Predicate> predicates = new ArrayList<>();
+
+    // anomaly window start
+    if (start != null) {
+      predicates.add(Predicate.GT("endTime", start));
+    }
+
+    // anomaly window end
+    if (end != null) {
+      predicates.add(Predicate.LT("startTime", end));
+    }
+
+    predicates.add(Predicate.IN("detectionConfigId", detectionConfigIds.toArray()));
+
+    Collection<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(Predicate.AND(predicates.toArray(new Predicate[predicates.size()])));
+
+    anomalies = Collections2.filter(anomalies, new com.google.common.base.Predicate<MergedAnomalyResultDTO>() {
+      @Override
+      public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
+        return !mergedAnomalyResultDTO.isChild();
+      }
+    });
+
+    this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(anomalies);
+
+    return anomalies;
   }
 
   /**
@@ -236,7 +333,7 @@ public class UserDashboardResource {
    * @return metric id, or {@code -1} if the metric/dataset cannot be resolved
    */
   private long getMetricId(MergedAnomalyResultDTO anomaly) {
-    if (anomaly.getFunction().getMetricId() > 0) {
+    if (anomaly.getFunction() != null && anomaly.getFunction().getMetricId() > 0) {
       return anomaly.getFunction().getMetricId();
     }
     try {
@@ -244,5 +341,15 @@ public class UserDashboardResource {
     } catch (Exception e) {
       return -1;
     }
+  }
+
+  /**
+   * Returns an URN matching the anomalies associated metric (and dimensions)
+   *
+   * @param anomaly anomaly dto
+   * @return metric urn
+   */
+  private String getMetricUrn(MergedAnomalyResultDTO anomaly) {
+    return MetricEntity.fromMetric(1.0, this.getMetricId(anomaly), ResourceUtils.getAnomalyFilters(anomaly, this.datasetDAO)).getUrn();
   }
 }

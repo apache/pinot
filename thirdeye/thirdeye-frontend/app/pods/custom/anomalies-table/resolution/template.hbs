@@ -1,8 +1,8 @@
 <div class="anomalies-table__column-cell">
-  {{#if record.showResponseSaved}}
-    <i class="{{if record.showResponseSaved "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-ok-circle" ></i>
+  {{#if showResponseSaved}}
+    <i class="{{if showResponseSaved "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-ok-circle" ></i>
   {{else}}
-    <i class="{{if record.showResponseFailed "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-remove-circle" ></i>
+    <i class="{{if showResponseFailed "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-remove-circle" ></i>
   {{/if}}
 
   {{#if record.isUserReported}}
@@ -21,3 +21,8 @@
     {{/power-select}}
   {{/if}}
 </div>
+{{#if record.anomaly.comment}}
+  <div>
+    comment: {{markdown-to-html record.anomaly.comment}}
+  </div>
+{{/if}}

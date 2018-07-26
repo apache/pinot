@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!--
 
-    Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+    Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -174,6 +174,10 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-hadoop</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-minion</artifactId>
       <version>${project.version}</version>
       <type>test-jar</type>
@@ -217,6 +221,20 @@
         <exclusion>
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-math3</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-minicluster</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-lang</groupId>
+          <artifactId>commons-lang</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

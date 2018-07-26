@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 package com.linkedin.pinot.server.api.resources;
 
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import javax.ws.rs.core.Response;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -34,37 +34,37 @@ public class TableSizeResourceTest extends BaseResourceTest {
   @Test
   public void testTableSizeDetailed() {
     TableSizeInfo tableSizeInfo = _webTarget.path(TABLE_SIZE_PATH).request().get(TableSizeInfo.class);
-    IndexSegment defaultSegment = _indexSegments.get(0);
+    ImmutableSegment defaultSegment = _indexSegments.get(0);
 
     Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 1);
     Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, defaultSegment.getSegmentName());
-    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes, defaultSegment.getDiskSizeBytes());
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
   }
 
   @Test
   public void testTableSizeNoDetails() {
     TableSizeInfo tableSizeInfo =
         _webTarget.path(TABLE_SIZE_PATH).queryParam("detailed", "false").request().get(TableSizeInfo.class);
-    IndexSegment defaultSegment = _indexSegments.get(0);
+    ImmutableSegment defaultSegment = _indexSegments.get(0);
 
     Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 0);
   }
 
   @Test
   public void testTableSizeOld() {
     TableSizeInfo tableSizeInfo = _webTarget.path("/table/" + TABLE_NAME + "/size").request().get(TableSizeInfo.class);
-    IndexSegment defaultSegment = _indexSegments.get(0);
+    ImmutableSegment defaultSegment = _indexSegments.get(0);
 
     Assert.assertEquals(tableSizeInfo.tableName, TABLE_NAME);
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
     Assert.assertEquals(tableSizeInfo.segments.size(), 1);
     Assert.assertEquals(tableSizeInfo.segments.get(0).segmentName, defaultSegment.getSegmentName());
-    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes, defaultSegment.getDiskSizeBytes());
-    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getDiskSizeBytes());
+    Assert.assertEquals(tableSizeInfo.segments.get(0).diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
+    Assert.assertEquals(tableSizeInfo.diskSizeInBytes, defaultSegment.getSegmentSizeBytes());
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 package com.linkedin.pinot.core.common.datatable;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -49,8 +49,7 @@ public class ObjectCustomSerDe {
    */
   @SuppressWarnings("unchecked")
   @Nonnull
-  public static byte[] serialize(@Nonnull Object object)
-      throws IOException {
+  public static byte[] serialize(@Nonnull Object object) throws IOException {
     if (object instanceof String) {
       return ((String) object).getBytes("UTF-8");
     } else if (object instanceof Long) {
@@ -71,6 +70,8 @@ public class ObjectCustomSerDe {
       return serializeHashMap((HashMap<Object, Object>) object);
     } else if (object instanceof IntOpenHashSet) {
       return serializeIntOpenHashSet((IntOpenHashSet) object);
+    } else if (object instanceof TDigest) {
+      return serializeTDigest((TDigest) object);
     } else {
       throw new IllegalArgumentException("Illegal class for serialization: " + object.getClass().getName());
     }
@@ -81,8 +82,7 @@ public class ObjectCustomSerDe {
    */
   @SuppressWarnings("unchecked")
   @Nonnull
-  public static <T> T deserialize(@Nonnull byte[] bytes, @Nonnull ObjectType objectType)
-      throws IOException {
+  public static <T> T deserialize(@Nonnull byte[] bytes, @Nonnull ObjectType objectType) throws IOException {
     switch (objectType) {
       case String:
         return (T) new String(bytes, UTF_8);
@@ -104,6 +104,8 @@ public class ObjectCustomSerDe {
         return (T) deserializeHashMap(bytes);
       case IntOpenHashSet:
         return (T) deserializeIntOpenHashSet(bytes);
+      case TDigest:
+        return (T) TDigest.fromBytes(ByteBuffer.wrap(bytes));
       default:
         throw new IllegalArgumentException("Illegal object type for de-serialization: " + objectType);
     }
@@ -114,8 +116,7 @@ public class ObjectCustomSerDe {
    */
   @SuppressWarnings("unchecked")
   @Nonnull
-  public static <T> T deserialize(@Nonnull ByteBuffer byteBuffer, @Nonnull ObjectType objectType)
-      throws IOException {
+  public static <T> T deserialize(@Nonnull ByteBuffer byteBuffer, @Nonnull ObjectType objectType) throws IOException {
     switch (objectType) {
       case String:
         byte[] bytes = getBytesFromByteBuffer(byteBuffer);
@@ -140,6 +141,8 @@ public class ObjectCustomSerDe {
         return (T) deserializeHashMap(byteBuffer);
       case IntOpenHashSet:
         return (T) deserializeIntOpenHashSet(byteBuffer);
+      case TDigest:
+        return (T) TDigest.fromBytes(byteBuffer);
       default:
         throw new IllegalArgumentException("Illegal object type for de-serialization: " + objectType);
     }
@@ -182,6 +185,8 @@ public class ObjectCustomSerDe {
       return ObjectType.HashMap;
     } else if (object instanceof IntOpenHashSet) {
       return ObjectType.IntOpenHashSet;
+    } else if (object instanceof TDigest) {
+      return ObjectType.TDigest;
     } else {
       throw new IllegalArgumentException("No object type matches class: " + object.getClass().getName());
     }
@@ -191,7 +196,7 @@ public class ObjectCustomSerDe {
    * Helper method to serialize a {@link Long}.
    */
   private static byte[] serializeLong(Long value) {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(V1Constants.Numbers.LONG_SIZE);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Long.BYTES);
     byteBuffer.putLong(value);
     return byteBuffer.array();
   }
@@ -200,7 +205,7 @@ public class ObjectCustomSerDe {
    * Helper method to serialize a {@link Double}.
    */
   private static byte[] serializeDouble(Double value) {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(V1Constants.Numbers.DOUBLE_SIZE);
+    ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES);
     byteBuffer.putDouble(value);
     return byteBuffer.array();
   }
@@ -210,7 +215,7 @@ public class ObjectCustomSerDe {
    */
   private static byte[] serializeDoubleArrayList(DoubleArrayList doubleArray) {
     int size = doubleArray.size();
-    int byteBufferSize = V1Constants.Numbers.INTEGER_SIZE + (size * V1Constants.Numbers.DOUBLE_SIZE);
+    int byteBufferSize = Integer.BYTES + size * Double.BYTES;
 
     ByteBuffer byteBuffer = ByteBuffer.allocate(byteBufferSize);
     byteBuffer.putInt(size);
@@ -242,8 +247,7 @@ public class ObjectCustomSerDe {
   /**
    * Helper method to serialize a {@link HashMap}.
    */
-  private static byte[] serializeHashMap(HashMap<Object, Object> map)
-      throws IOException {
+  private static byte[] serializeHashMap(HashMap<Object, Object> map) throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
@@ -276,8 +280,7 @@ public class ObjectCustomSerDe {
   /**
    * Helper method to de-serialize a {@link HashMap} from a byte buffer.
    */
-  private static HashMap<Object, Object> deserializeHashMap(ByteBuffer byteBuffer)
-      throws IOException {
+  private static HashMap<Object, Object> deserializeHashMap(ByteBuffer byteBuffer) throws IOException {
     int size = byteBuffer.getInt();
     HashMap<Object, Object> hashMap = new HashMap<>(size);
     if (size == 0) {
@@ -319,16 +322,14 @@ public class ObjectCustomSerDe {
   /**
    * Helper method to de-serialize a {@link HashMap} from a byte[].
    */
-  private static HashMap<Object, Object> deserializeHashMap(byte[] bytes)
-      throws IOException {
+  private static HashMap<Object, Object> deserializeHashMap(byte[] bytes) throws IOException {
     return deserializeHashMap(ByteBuffer.wrap(bytes));
   }
 
   /**
    * Helper method to serialize a {@link QuantileDigest}.
    */
-  private static byte[] serializeQuantileDigest(QuantileDigest quantileDigest)
-      throws IOException {
+  private static byte[] serializeQuantileDigest(QuantileDigest quantileDigest) throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     quantileDigest.serialize(new DataOutputStream(byteArrayOutputStream));
     return byteArrayOutputStream.toByteArray();
@@ -337,16 +338,14 @@ public class ObjectCustomSerDe {
   /**
    * Helper method to de-serialize a {@link QuantileDigest}.
    */
-  private static QuantileDigest deserializeQuantileDigest(byte[] bytes)
-      throws IOException {
+  private static QuantileDigest deserializeQuantileDigest(byte[] bytes) throws IOException {
     return QuantileDigest.deserialize(new DataInputStream(new ByteArrayInputStream(bytes)));
   }
 
   /**
    * Helper method to serialize an {@link IntOpenHashSet}.
    */
-  private static byte[] serializeIntOpenHashSet(IntOpenHashSet intOpenHashSet)
-      throws IOException {
+  private static byte[] serializeIntOpenHashSet(IntOpenHashSet intOpenHashSet) throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
@@ -359,6 +358,12 @@ public class ObjectCustomSerDe {
     }
 
     return byteArrayOutputStream.toByteArray();
+  }
+
+  private static byte[] serializeTDigest(TDigest tDigest) {
+    ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
+    tDigest.asBytes(byteBuffer);
+    return byteBuffer.array(); // Only works since the byte-buffer is on-heap.
   }
 
   /**

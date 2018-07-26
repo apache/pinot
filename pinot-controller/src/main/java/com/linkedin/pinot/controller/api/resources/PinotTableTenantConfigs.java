@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import io.swagger.annotations.Api;
@@ -28,7 +30,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import org.json.JSONException;
+import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,15 +48,21 @@ public class PinotTableTenantConfigs {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebuildBrokerResourceFromHelixTags")
   @ApiOperation(value = "Rebuild broker resource for table", notes = "when new brokers are added")
-  @ApiResponses(value = {@ApiResponse(code=200, message = "Success"),
-      @ApiResponse(code = 404, message = "Table not found"),
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 400, message = "Bad request: table name has to be with table type"),
       @ApiResponse(code = 500, message = "Internal error rebuilding broker resource or serializing response")})
-  public String rebuildBrokerResource(
+  public SuccessResponse rebuildBrokerResource(
       @ApiParam(value = "Table name (with type)", required = true) @PathParam("tableName") String tableNameWithType
-  ) throws JSONException {
-    final PinotResourceManagerResponse pinotResourceManagerResponse =
-        _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
-
-    return pinotResourceManagerResponse.toJSON().toString();
+  ) {
+    try {
+      final PinotResourceManagerResponse pinotResourceManagerResponse =
+          _helixResourceManager.rebuildBrokerResourceFromHelixTags(tableNameWithType);
+      return new SuccessResponse(pinotResourceManagerResponse.getMessage());
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.io.compression;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 
@@ -26,9 +25,11 @@ import java.nio.ByteBuffer;
  */
 public class PassThroughDecompressor implements ChunkDecompressor {
   @Override
-  public int decompress(ByteBuffer inCompressed, ByteBuffer outDecompressed)
-      throws IOException {
-    outDecompressed.put(inCompressed);
-    return inCompressed.limit();
+  public int decompress(ByteBuffer compressedInput, ByteBuffer decompressedOutput) {
+    decompressedOutput.put(compressedInput);
+
+    // Flip the output ByteBuffer for reading.
+    decompressedOutput.flip();
+    return decompressedOutput.limit();
   }
 }

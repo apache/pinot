@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
@@ -25,19 +25,19 @@ import javax.annotation.Nonnull;
 
 
 public class CountAggregationFunction implements AggregationFunction<Long, Long> {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.COUNT.getName();
+  private static final String COLUMN_NAME = AggregationFunctionType.COUNT.getName() + "_star";
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.COUNT;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_star";
+    return COLUMN_NAME;
   }
 
   @Override
@@ -107,8 +107,8 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getIntermediateResultDataType() {
-    return FieldSpec.DataType.LONG;
+  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
+    return DataSchema.ColumnDataType.LONG;
   }
 
   @Nonnull

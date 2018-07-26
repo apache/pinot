@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,12 +31,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * Implementation of {@link InvertedIndexCreator} that uses on-heap memory.
  */
 public final class OnHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
-  private final String _columnName;
   private final File _invertedIndexFile;
   private final MutableRoaringBitmap[] _bitmaps;
+  private int _nextDocId;
 
   public OnHeapBitmapInvertedIndexCreator(File indexDir, String columnName, int cardinality) {
-    _columnName = columnName;
     _invertedIndexFile = new File(indexDir, columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
     _bitmaps = new MutableRoaringBitmap[cardinality];
     for (int i = 0; i < cardinality; i++) {
@@ -45,35 +44,32 @@ public final class OnHeapBitmapInvertedIndexCreator implements InvertedIndexCrea
   }
 
   @Override
-  public void addSV(int docId, int dictId) {
-    _bitmaps[dictId].add(docId);
+  public void add(int dictId) {
+    _bitmaps[dictId].add(_nextDocId++);
   }
 
   @Override
-  public void addMV(int docId, int[] dictIds) {
-    addMV(docId, dictIds, dictIds.length);
-  }
-
-  @Override
-  public void addMV(int docId, int[] dictIds, int numDictIds) {
-    for (int i = 0; i < numDictIds; i++) {
-      _bitmaps[dictIds[i]].add(docId);
+  public void add(int[] dictIds, int length) {
+    for (int i = 0; i < length; i++) {
+      _bitmaps[dictIds[i]].add(_nextDocId);
     }
+    _nextDocId++;
   }
 
   @Override
   public void seal() throws IOException {
     try (DataOutputStream out = new DataOutputStream(
         new BufferedOutputStream(new FileOutputStream(_invertedIndexFile)))) {
-      // Write all offsets
-      int offset = (_bitmaps.length + 1) * V1Constants.Numbers.INTEGER_SIZE;
-      out.writeInt(offset);
+      // Write bitmap offsets
+      int bitmapOffset = (_bitmaps.length + 1) * Integer.BYTES;
+      out.writeInt(bitmapOffset);
       for (MutableRoaringBitmap bitmap : _bitmaps) {
-        offset += bitmap.serializedSizeInBytes();
+        bitmapOffset += bitmap.serializedSizeInBytes();
         // Check for int overflow
-        Preconditions.checkState(offset > 0, "Inverted index file exceeds 2GB limit for column: %s", _columnName);
-        out.writeInt(offset);
+        Preconditions.checkState(bitmapOffset > 0, "Inverted index file: %s exceeds 2GB limit", _invertedIndexFile);
+        out.writeInt(bitmapOffset);
       }
+
       // Write bitmap data
       for (MutableRoaringBitmap bitmap : _bitmaps) {
         bitmap.serialize(out);

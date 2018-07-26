@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
@@ -27,6 +28,7 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 
 
 /**
@@ -62,32 +64,43 @@ public class SegmentPreProcessor implements AutoCloseable {
       return;
     }
 
+    // Remove all the existing inverted index temp files before loading segments.
+    // NOTE: This step fixes the issue of temporary files not getting deleted after creating new inverted indexes.
+    // In this, we look for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
+    File[] directoryListing = _indexDir.listFiles();
+    String tempFileExtension = V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION + ".tmp";
+    if (directoryListing != null) {
+      for (File child : directoryListing) {
+        if (child.getName().endsWith(tempFileExtension)) {
+          FileUtils.deleteQuietly(child);
+        }
+      }
+    }
+
     try (SegmentDirectory.Writer segmentWriter = _segmentDirectory.createWriter()) {
+      // Update default columns according to the schema.
+      if (_indexLoadingConfig.isEnableDefaultColumns() && (_schema != null)) {
+        DefaultColumnHandler defaultColumnHandler =
+            DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
+        defaultColumnHandler.updateDefaultColumns();
+        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+      }
+
       // Create column inverted indices according to the index config.
       InvertedIndexHandler invertedIndexHandler =
           new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
 
-      // Update default columns according to the schema.
-      // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
-      if (_indexLoadingConfig.isEnableDefaultColumns() && (_schema != null)) {
-        DefaultColumnHandler defaultColumnHandler =
-            DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
-        defaultColumnHandler.updateDefaultColumns();
-      }
-
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
-      // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =
           _indexLoadingConfig.getColumnMinMaxValueGeneratorMode();
       if (columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
-        // Reload the metadata.
-        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-
         ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
             new ColumnMinMaxValueGenerator(_segmentMetadata, segmentWriter, columnMinMaxValueGeneratorMode);
         columnMinMaxValueGenerator.addColumnMinMaxValue();
+        // NOTE: This step may modify the segment metadata. When adding new steps after this, un-comment the next line.
+//        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
       }
 
       segmentWriter.save();

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -121,10 +122,20 @@ public class AlertConfigBean extends AbstractBean {
     this.emailFormatterConfig = emailFormatterConfig;
   }
 
+
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class EmailConfig {
     long anomalyWatermark = 0l;
     List<Long> functionIds = new ArrayList<>();
+    List<Long> detectionConfigIds = new ArrayList<>();
+
+    public List<Long> getDetectionConfigIds() {
+      return detectionConfigIds;
+    }
+
+    public void setDetectionConfigIds(List<Long> detectionConfigIds) {
+      this.detectionConfigIds = detectionConfigIds;
+    }
 
     public List<Long> getFunctionIds() {
       return functionIds;
@@ -184,6 +195,7 @@ public class AlertConfigBean extends AbstractBean {
     COMPARE_MODE compareMode = COMPARE_MODE.Wo2W;
     Long metricId;
     List<String> dimensions = new ArrayList<>();
+    Map<String, Collection<String>> filters = new HashMap<>();
 
     public COMPARE_MODE getCompareMode() {
       return compareMode;
@@ -209,6 +221,13 @@ public class AlertConfigBean extends AbstractBean {
       this.metricId = metricId;
     }
 
+    public Map<String, Collection<String>> getFilters() {
+      return filters;
+    }
+
+    public void setFilters(Map<String, Collection<String>> filters) {
+      this.filters = filters;
+    }
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)

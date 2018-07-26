@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.utils.time;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 
+
 public class DefaultTimeConverter implements TimeConverter {
 
   TimeGranularitySpec incoming;
@@ -30,17 +31,16 @@ public class DefaultTimeConverter implements TimeConverter {
     this.outgoing = outgoing;
     conversionSupported = false;
     needConversion = true;
-    if(incoming.equals(outgoing)){
+    if (incoming.equals(outgoing)) {
       needConversion = false;
     }
-    if (TimeFormat.EPOCH.toString().equals(incoming.getTimeFormat())
-        && TimeFormat.EPOCH.toString().equals(outgoing.getTimeFormat())) {
+    if (TimeFormat.EPOCH.toString().equals(incoming.getTimeFormat()) && TimeFormat.EPOCH.toString()
+        .equals(outgoing.getTimeFormat())) {
       conversionSupported = true;
     }
     if (needConversion && !conversionSupported) {
       //TODO: Handle conversion between sdf <-> epoch
-      throw new RuntimeException(
-          "Conversion from Simple Date Format to epoch/simpleDateFormat is not supported");
+      throw new RuntimeException("Conversion from Simple Date Format to epoch/simpleDateFormat is not supported");
     }
   }
 
@@ -56,32 +56,28 @@ public class DefaultTimeConverter implements TimeConverter {
       duration = Long.parseLong(incomingTimeValue.toString());
     }
     if (conversionSupported) {
-      long outgoingTime = outgoing.getTimeType().convert(duration * incoming.getTimeUnitSize(),
-          incoming.getTimeType());
+      long outgoingTime = outgoing.getTimeType().convert(duration * incoming.getTimeUnitSize(), incoming.getTimeType());
       return convertToOutgoingDataType(outgoingTime / outgoing.getTimeUnitSize());
     } else {
       //TODO: Handle conversion between sdf <-> epoch
-      throw new RuntimeException(
-          "Conversion from Simple Date Format to epoch/simpleDateFormat is not supported");
+      throw new RuntimeException("Conversion from Simple Date Format to epoch/simpleDateFormat is not supported");
     }
   }
 
   private Object convertToOutgoingDataType(long outgoingTimeValue) {
     switch (outgoing.getDataType()) {
-    case LONG:
-      return outgoingTimeValue;
-    case STRING:
-      return new Long(outgoingTimeValue).toString();
-    case INT:
-      return new Long(outgoingTimeValue).intValue();
-    case SHORT:
-      return new Long(outgoingTimeValue).shortValue();
-    case FLOAT:
-      return new Long(outgoingTimeValue).floatValue();
-    case DOUBLE:
-      return new Long(outgoingTimeValue).doubleValue();
-    default:
-      return outgoingTimeValue;
+      case INT:
+        return (int) outgoingTimeValue;
+      case LONG:
+        return outgoingTimeValue;
+      case FLOAT:
+        return (float) outgoingTimeValue;
+      case DOUBLE:
+        return (double) outgoingTimeValue;
+      case STRING:
+        return Long.toString(outgoingTimeValue);
+      default:
+        return outgoingTimeValue;
     }
   }
 }

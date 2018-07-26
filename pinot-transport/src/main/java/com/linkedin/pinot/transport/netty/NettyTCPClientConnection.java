@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -193,7 +193,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
        * simultaneously. Netty does not provide guarantees around this. So in worst case, the thread that
        * is flushing request could block for sometime and gets executed after the response is obtained.
        * We should checkin the connection to the pool only after all outstanding callbacks are complete.
-       * We do this by trancking the connection state. If we detect that response/error is already obtained,
+       * We do this by tracking the connection state. If we detect that response/error is already obtained,
        * we then do the process of checking back the connection to the pool or destroying (if error)
        */
       synchronized(_handler)

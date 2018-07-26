@@ -23,7 +23,7 @@
     <tr>
       <td><b>
         <p>${reportCount} - <a
-            href="${dashboardHost}/dashboard#view=compare&dataset=${metricReport.dataset}&metrics=${metricReport.metricName}&dimensions=${metricReport.dimensionName}&compareMode=${metricReport.compareMode}&aggTimeGranularity=HOURS&currentStart=${metricReport.currentStartTime?c}&currentEnd=${metricReport.currentEndTime?c}&baselineStart=${metricReport.baselineStartTime?c}&baselineEnd=${metricReport.baselineEndTime?c}">
+            href="${dashboardHost}/app/#/rootcause?metricId=${metricReport.metricId?c}">
         ${metricReport.metricName} by ${metricReport.dimensionName}</a>  (baseline : ${metricReport.compareMode})
         </p>
       </b></td>

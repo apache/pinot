@@ -96,7 +96,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
   }
 
   @Override
-  public double loadAggregate(MetricSlice slice) throws Exception {
+  public DataFrame loadAggregate(MetricSlice slice, List<String> dimensions) throws Exception {
     final long metricId = slice.getMetricId();
 
     // fetch meta data
@@ -112,20 +112,22 @@ public class DefaultAggregationLoader implements AggregationLoader {
 
     LOG.info("Summarizing metric id {} with {} filters", metricId, slice.getFilters().size());
 
+    List<String> cols = new ArrayList<>();
+    for (String dimName : dimensions) {
+      cols.add(dimName + ":STRING");
+    }
+    cols.add(COL_VALUE + ":DOUBLE");
+
+    DataFrame dfEmpty = DataFrame.builder(cols).build().setIndex(dimensions);
+
     final long maxTime = this.maxTimeCache.get(dataset.getDataset());
     if (slice.getStart() > maxTime) {
-      return Double.NaN;
+      return dfEmpty;
     }
 
-    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.<String>emptyList(), "ref", this.metricDAO, this.datasetDAO);
+    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, new ArrayList<>(dimensions), "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
-    DataFrame df = DataFrameUtils.evaluateResponse(res, rc);
-
-    if (df.isEmpty() || df.get(COL_VALUE).isNull(0)) {
-      return Double.NaN;
-    }
-
-    return df.getDoubles(COL_VALUE).doubleValue();
+    return DataFrameUtils.evaluateResponse(res, rc);
   }
 
   private static long makeTimeout(long deadline) {

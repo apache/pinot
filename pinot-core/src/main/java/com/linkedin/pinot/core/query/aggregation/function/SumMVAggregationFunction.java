@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,18 +22,17 @@ import javax.annotation.Nonnull;
 
 
 public class SumMVAggregationFunction extends SumAggregationFunction {
-  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.SUMMV.getName();
 
   @Nonnull
   @Override
-  public String getName() {
-    return NAME;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.SUMMV;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return NAME + "_" + columns[0];
+    return AggregationFunctionType.SUMMV.getName() + "_" + columns[0];
   }
 
   @Override

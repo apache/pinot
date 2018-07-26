@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,8 @@ public interface Dictionary extends Closeable {
 
   String getStringValue(int dictId);
 
+  byte[] getBytesValue(int dictId);
+
   int length();
 
   boolean isSorted();
@@ -57,5 +59,7 @@ public interface Dictionary extends Closeable {
   void readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos);
 
   void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos);
+
+  void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos);
 
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -133,6 +133,11 @@ public class ControllerRequestURLBuilder {
 
   public String forUpdateTableConfig(String tableName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName);
+  }
+
+  public String forTableRebalance(String tableName, String tableType) {
+    String query = "rebalance?dryrun=false&type=" + tableType;
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, query);
   }
 
   public String forTableUpdateIndexingConfigs(String tableName) {

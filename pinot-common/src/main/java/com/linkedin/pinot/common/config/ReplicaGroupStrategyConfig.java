@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,8 +26,13 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ReplicaGroupStrategyConfig {
 
+  @ConfigKey(value = "partitionColumn")
   private String _partitionColumn;
+
+  @ConfigKey(value = "numInstancesPerPartition")
   private int _numInstancesPerPartition;
+
+  @ConfigKey(value = "mirrorAssignmentAcrossReplicaGroups")
   private boolean _mirrorAssignmentAcrossReplicaGroups;
 
   /**

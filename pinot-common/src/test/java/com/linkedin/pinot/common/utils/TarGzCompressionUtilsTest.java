@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,22 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import org.apache.commons.compress.archivers.ArchiveException;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-
 
 
 public class TarGzCompressionUtilsTest {
@@ -50,7 +55,6 @@ public class TarGzCompressionUtilsTest {
     FileUtils.forceMkdir(tarDir);
     FileUtils.forceMkdir(untarDir);
     FileUtils.forceMkdir(segmentDir);
-
   }
 
   @AfterMethod
@@ -121,5 +125,45 @@ public class TarGzCompressionUtilsTest {
     Assert.assertNotNull(segmentFiles);
     Assert.assertEquals(segmentFiles.length, 0);
 
+  }
+
+  @Test
+  public void testBadFilePath() throws Exception {
+    File metaFile = new File(segmentDir, "metadata.properties");
+    metaFile.createNewFile();
+
+    // We guarantee metaFile isn't a directory.
+    Assert.assertFalse(metaFile.isDirectory());
+
+    File tarGzPath = new File(tarDir, SEGMENT_NAME + ".tar.gz");
+    createInvalidTarFile(metaFile, tarGzPath);
+
+    try {
+      TarGzCompressionUtils.unTar(tarGzPath, untarDir);
+      Assert.fail("Did not get exception!!");
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof IOException);
+      Assert.assertTrue(e.getMessage().startsWith("Tar file must not"));
+    }
+  }
+
+  private void createInvalidTarFile(File nonDirFile, File tarGzPath) {
+    try (
+        FileOutputStream fOut = new FileOutputStream(new File(tarGzPath.getPath()));
+        BufferedOutputStream bOut = new BufferedOutputStream(fOut);
+        GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(bOut);
+        TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)
+    ) {
+      tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
+
+      // Mock the file that doesn't use the correct file name.
+      String badEntryName =  "../foo/bar";
+      TarArchiveEntry tarEntry = new TarArchiveEntry(nonDirFile, badEntryName);
+      tOut.putArchiveEntry(tarEntry);
+      IOUtils.copy(new FileInputStream(nonDirFile), tOut);
+      tOut.closeArchiveEntry();
+    } catch (IOException e) {
+      Assert.fail("Unexpected Exception!!");
+    }
   }
 }

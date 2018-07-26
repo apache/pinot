@@ -64,44 +64,26 @@ public class TarGzCompressionUtils {
    * @throws IOException
    *           If anything goes wrong
    */
-  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath)
-      throws IOException {
+  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath) throws IOException {
     return createTarGzOfDirectory(directoryPath, tarGzPath, "");
   }
 
-  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath, String entryPrefix) throws IOException {
-    FileOutputStream fOut = null;
-    BufferedOutputStream bOut = null;
-    GzipCompressorOutputStream gzOut = null;
-    TarArchiveOutputStream tOut = null;
+  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath, String entryPrefix)
+      throws IOException {
     if (!tarGzPath.endsWith(TAR_GZ_FILE_EXTENTION)) {
       tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENTION;
     }
-
-    try {
-      fOut = new FileOutputStream(new File(tarGzPath));
-      bOut = new BufferedOutputStream(fOut);
-      gzOut = new GzipCompressorOutputStream(bOut);
-      tOut = new TarArchiveOutputStream(gzOut);
+    try (
+        FileOutputStream fOut = new FileOutputStream(new File(tarGzPath));
+        BufferedOutputStream bOut = new BufferedOutputStream(fOut);
+        GzipCompressorOutputStream gzOut = new GzipCompressorOutputStream(bOut);
+        TarArchiveOutputStream tOut = new TarArchiveOutputStream(gzOut)
+    ) {
       tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
       addFileToTarGz(tOut, directoryPath, entryPrefix);
     } catch (IOException e) {
       LOGGER.error("Failed to create tar.gz file for {} at path: {}", directoryPath, tarGzPath, e);
       Utils.rethrowException(e);
-    } finally {
-      if (tOut != null) {
-        tOut.finish();
-        tOut.close();
-      }
-      if (gzOut != null) {
-        gzOut.close();
-      }
-      if (bOut != null) {
-        bOut.close();
-      }
-      if (fOut != null) {
-        fOut.close();
-      }
     }
     return tarGzPath;
   }
@@ -165,13 +147,14 @@ public class TarGzCompressionUtils {
    * @throws IOException
    * @throws FileNotFoundException
    *
-   * @return  The {@link List} of {@link File}s with the untared content.
+   * @return The {@link List} of {@link File}s with the untared content.
    * @throws ArchiveException
    */
-  public static List<File> unTar(final File inputFile, final File outputDir) throws FileNotFoundException, IOException,
-      ArchiveException {
+  public static List<File> unTar(final File inputFile, final File outputDir)
+      throws IOException, ArchiveException {
 
-    LOGGER.debug(String.format("Untaring %s to dir %s.", inputFile.getAbsolutePath(), outputDir.getAbsolutePath()));
+    String outputDirectoryPath = outputDir.getCanonicalPath();
+    LOGGER.debug("Untaring {} to dir {}.", inputFile.getAbsolutePath(), outputDirectoryPath);
     TarArchiveInputStream debInputStream = null;
     InputStream is = null;
     final List<File> untaredFiles = new LinkedList<File>();
@@ -181,13 +164,17 @@ public class TarGzCompressionUtils {
       TarArchiveEntry entry = null;
       while ((entry = (TarArchiveEntry) debInputStream.getNextEntry()) != null) {
         final File outputFile = new File(outputDir, entry.getName());
+        // Check whether the untarred file will be put outside of the target output directory.
+        if (!outputFile.getCanonicalPath().startsWith(outputDirectoryPath)) {
+          throw new IOException("Tar file must not be untarred outside of the target output directory!");
+        }
         if (entry.isDirectory()) {
           LOGGER.debug(String.format("Attempting to write output directory %s.", outputFile.getAbsolutePath()));
           if (!outputFile.exists()) {
             LOGGER.debug(String.format("Attempting to create output directory %s.", outputFile.getAbsolutePath()));
             if (!outputFile.mkdirs()) {
-              throw new IllegalStateException(String.format("Couldn't create directory %s.",
-                  outputFile.getAbsolutePath()));
+              throw new IllegalStateException(
+                  String.format("Couldn't create directory %s.", outputFile.getAbsolutePath()));
             }
           } else {
             LOGGER.error("The directory already there. Deleting - " + outputFile.getAbsolutePath());

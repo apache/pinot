@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.query.aggregation.function;
 
 /**
@@ -63,10 +62,6 @@ public class AggregationFunctionVisitorBase {
     visitFunction(function);
   }
 
-  public void visit(FastHLLMVAggregationFunction function) {
-    visitFunction(function);
-  }
-
   public void visit(MaxAggregationFunction function) {
     visitFunction(function);
   }
@@ -95,6 +90,10 @@ public class AggregationFunctionVisitorBase {
     visitFunction(function);
   }
 
+  public void visit(PercentileMVAggregationFunction function) {
+    visitFunction(function);
+  }
+
   public void visit(PercentileEstAggregationFunction function) {
     visitFunction(function);
   }
@@ -103,7 +102,7 @@ public class AggregationFunctionVisitorBase {
     visitFunction(function);
   }
 
-  public void visit(PercentileMVAggregationFunction function) {
+  public void visit(PercentileTDigestAggregationFunction function) {
     visitFunction(function);
   }
 

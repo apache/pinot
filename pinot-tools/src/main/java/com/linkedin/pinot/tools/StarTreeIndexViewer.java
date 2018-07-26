@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,8 +22,8 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.OffHeapStarTree;
@@ -92,10 +92,10 @@ public class StarTreeIndexViewer {
   private Map<String, BlockSingleValIterator> valueIterators;
 
   public StarTreeIndexViewer(File segmentDir) throws Exception {
-    IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.heap);
 
-    dictionaries = new HashMap<String, Dictionary>();
-    valueIterators = new HashMap<String, BlockSingleValIterator>();
+    dictionaries = new HashMap<>();
+    valueIterators = new HashMap<>();
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
 
     for (String columnName : metadata.getAllColumns()) {

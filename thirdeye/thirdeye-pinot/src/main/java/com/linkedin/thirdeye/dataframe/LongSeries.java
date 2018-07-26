@@ -491,6 +491,105 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     });
   }
 
+  public BooleanSeries gt(final long constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] > constant;
+      }
+    });
+  }
+
+  public BooleanSeries gt(Series other) {
+    if(other.size() == 1)
+      return this.gt(other.getLong(0));
+    return map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] > values[1];
+      }
+    }, this, other);
+  }
+
+  public BooleanSeries gte(final long constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] >= constant;
+      }
+    });
+  }
+
+  public BooleanSeries gte(Series other) {
+    if(other.size() == 1)
+      return this.gte(other.getLong(0));
+    return map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] >= values[1];
+      }
+    }, this, other);
+  }
+
+  public BooleanSeries lt(final long constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] < constant;
+      }
+    });
+  }
+
+  public BooleanSeries lt(Series other) {
+    if(other.size() == 1)
+      return this.lt(other.getLong(0));
+    return map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] < values[1];
+      }
+    }, this, other);
+  }
+
+  public BooleanSeries lte(final long constant) {
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] <= constant;
+      }
+    });
+  }
+
+  public BooleanSeries lte(Series other) {
+    if(other.size() == 1)
+      return this.lte(other.getLong(0));
+    return map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] <= values[1];
+      }
+    }, this, other);
+  }
+
+  public BooleanSeries between(final long startIncl, final long endExcl) {
+    if(isNull(startIncl) || isNull(endExcl))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] >= startIncl && values[0] < endExcl;
+      }
+    });
+  }
+
   @Override
   public LongSeries set(BooleanSeries mask, Series other) {
     if(other.size() == 1)

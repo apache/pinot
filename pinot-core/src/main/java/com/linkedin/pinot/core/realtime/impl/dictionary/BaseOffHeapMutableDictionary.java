@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -251,8 +248,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     doClose();
 
     _numEntries = 0;
@@ -279,7 +275,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
   }
 
   private long computeBBsize(long numRows) {
-    return numRows * NUM_COLUMNS * V1Constants.Numbers.INTEGER_SIZE;
+    return numRows * NUM_COLUMNS * Integer.BYTES;
   }
 
   // Assume prevNumRows is a valid value, and return it if the new one overflows.
@@ -309,7 +305,6 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     LOGGER.info("Allocating {} bytes for: {}", bbSize, _allocationContext);
     PinotDataBuffer buffer = _memoryManager.allocate(bbSize, _allocationContext);
     _pinotDataBuffers.add(buffer);
-    buffer.order(ByteOrder.nativeOrder());
     IntBuffer iBuf = buffer.toDirectByteBuffer(0L, bbSize).asIntBuffer();
     for (int i = 0; i < iBuf.capacity(); i++) {
       iBuf.put(i, NULL_VALUE_INDEX);
@@ -476,7 +471,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     ValueToDictId valueToDictId = _valueToDict;
     long size = 0;
     for (IntBuffer iBuf : valueToDictId._iBufList) {
-      size = size + iBuf.capacity() * V1Constants.Numbers.INTEGER_SIZE;
+      size = size + iBuf.capacity() * Integer.BYTES;
     }
     return size;
   }
@@ -495,8 +490,7 @@ public abstract class BaseOffHeapMutableDictionary extends MutableDictionary {
     return value.equals(get(dictId));
   }
 
-  public abstract void doClose()
-      throws IOException;
+  public abstract void doClose() throws IOException;
 
   protected abstract void setRawValueAt(int dictId, Object rawValue, byte[] serializedValue);
 }

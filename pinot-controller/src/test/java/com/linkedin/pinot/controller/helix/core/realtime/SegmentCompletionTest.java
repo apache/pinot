@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
@@ -1099,19 +1099,18 @@ public class SegmentCompletionTest {
     }
 
     @Override
-         public boolean commitSegmentMetadata(String rawTableName, String committingSegmentName, long nextOffset,
-        long memoryUsedBytes) {
+         public boolean commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
       _segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
-      _segmentMetadata.setEndOffset(nextOffset);
+      _segmentMetadata.setEndOffset(committingSegmentDescriptor.getNextOffset());
       _segmentMetadata.setDownloadUrl(
-          ControllerConf.constructDownloadUrl(rawTableName, committingSegmentName, CONTROLLER_CONF.generateVipUrl()));
+          ControllerConf.constructDownloadUrl(rawTableName, committingSegmentDescriptor.getSegmentName(), CONTROLLER_CONF.generateVipUrl()));
       _segmentMetadata.setEndTime(_segmentCompletionMgr.getCurrentTimeMs());
       return true;
     }
 
     @Override
-    public boolean commitSegmentFile(String rawTableName, String segmentLocation, String segmentName) {
-      if (segmentLocation.equals("doNotCommitMe")) {
+    public boolean commitSegmentFile(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+      if (committingSegmentDescriptor.getSegmentLocation().equals("doNotCommitMe")) {
         return false;
       } else {
         return true;

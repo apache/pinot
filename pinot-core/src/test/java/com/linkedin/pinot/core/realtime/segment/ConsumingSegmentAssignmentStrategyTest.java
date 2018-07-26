@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.realtime.segment;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
-import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -172,8 +170,8 @@ public class ConsumingSegmentAssignmentStrategyTest {
     IdealStateBuilderUtil idealStateBuilder = new IdealStateBuilderUtil(tableName);
 
     HelixManager _mockHelixManager = mock(HelixManager.class);
-    TestPartitionAssignmentGenerator partitionAssignmentGenerator =
-        new TestPartitionAssignmentGenerator(_mockHelixManager);
+    TestStreamPartitionAssignmentGenerator partitionAssignmentGenerator =
+        new TestStreamPartitionAssignmentGenerator(_mockHelixManager);
     partitionAssignmentGenerator.setConsumingInstances(consumingInstances);
     PartitionAssignment partitionAssignmentFromIdealState;
     ConsumingSegmentAssignmentStrategy consumingSegmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
@@ -185,7 +183,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
 
     // getPartitionsAssignmentFrom
     partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
     // assign
     List<String> segmentNames = new ArrayList<>(numPartitions);
@@ -200,14 +198,14 @@ public class ConsumingSegmentAssignmentStrategyTest {
 
     // 2) consuming segments moved to ONLINE, new set of consuming segments generated
 
-    idealState = idealStateBuilder.transitionToState(0, 0, "ONLINE")
-        .transitionToState(1, 0, "ONLINE")
-        .transitionToState(2, 0, "ONLINE")
+    idealState = idealStateBuilder.setSegmentState(0, 0, "ONLINE")
+        .setSegmentState(1, 0, "ONLINE")
+        .setSegmentState(2, 0, "ONLINE")
         .addConsumingSegments(numPartitions, 1, numReplicas, consumingInstances)
         .build();
 
     partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
     segmentNames = new ArrayList<>(numPartitions);
     for (int i = 0; i < numPartitions; i++) {
@@ -226,7 +224,7 @@ public class ConsumingSegmentAssignmentStrategyTest {
         .moveToServers(2, 0, completedInstances)
         .build();
     partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
     assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
@@ -235,12 +233,12 @@ public class ConsumingSegmentAssignmentStrategyTest {
 
     // 4) latest consuming segments became OFFLINE
 
-    idealState = idealStateBuilder.transitionToState(0, 1, "OFFLINE")
-        .transitionToState(1, 1, "OFFLINE")
-        .transitionToState(2, 1, "OFFLINE")
+    idealState = idealStateBuilder.setSegmentState(0, 1, "OFFLINE")
+        .setSegmentState(1, 1, "OFFLINE")
+        .setSegmentState(2, 1, "OFFLINE")
         .build();
     partitionAssignmentFromIdealState =
-        partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+        partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig, idealState);
 
     assignment = consumingSegmentAssignmentStrategy.assign(segmentNames, partitionAssignmentFromIdealState);
 
@@ -248,10 +246,10 @@ public class ConsumingSegmentAssignmentStrategyTest {
     verifyAssignmentIsFromLatest(partitionAssignmentGenerator, idealState, assignment);
   }
 
-  private void verifyAssignmentIsFromLatest(PartitionAssignmentGenerator partitionAssignmentGenerator,
+  private void verifyAssignmentIsFromLatest(StreamPartitionAssignmentGenerator streamPartitionAssignmentGenerator,
       IdealState idealState, Map<String, List<String>> assignment) {
     Map<String, LLCSegmentName> partitionToLatestSegments =
-        partitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
+        streamPartitionAssignmentGenerator.getPartitionToLatestSegments(idealState);
     for (Map.Entry<String, List<String>> entry : assignment.entrySet()) {
       String segmentName = entry.getKey();
       List<String> assignedInstances = entry.getValue();
@@ -264,20 +262,17 @@ public class ConsumingSegmentAssignmentStrategyTest {
     }
   }
 
-  private class TestPartitionAssignmentGenerator extends PartitionAssignmentGenerator {
+  private class TestStreamPartitionAssignmentGenerator extends StreamPartitionAssignmentGenerator {
 
-    private HelixManager _helixManager;
     private List<String> _consumingInstances;
-    private RealtimeTagConfig _realtimeTagConfig;
 
-    public TestPartitionAssignmentGenerator(HelixManager helixManager) {
+    public TestStreamPartitionAssignmentGenerator(HelixManager helixManager) {
       super(helixManager);
-      _helixManager = helixManager;
       _consumingInstances = new ArrayList<>();
     }
 
     @Override
-    protected List<String> getConsumingTaggedInstances(RealtimeTagConfig realtimeTagConfig) {
+    protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
       return _consumingInstances;
     }
 

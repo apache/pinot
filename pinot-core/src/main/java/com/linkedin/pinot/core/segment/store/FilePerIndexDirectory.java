@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
+import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -88,11 +88,10 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
 
   @Override
-  public void close() {
-    for (Map.Entry<IndexKey, PinotDataBuffer> keyBuffers : indexBuffers.entrySet()) {
-      keyBuffers.getValue().close();
+  public void close() throws IOException {
+    for (PinotDataBuffer dataBuffer : indexBuffers.values()) {
+      dataBuffer.close();
     }
-    indexBuffers = null;
   }
 
   @Override
@@ -106,28 +105,26 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return true;
   }
 
-  private PinotDataBuffer getReadBufferFor(IndexKey key)
-      throws IOException {
+  private PinotDataBuffer getReadBufferFor(IndexKey key) throws IOException {
     if (indexBuffers.containsKey(key)) {
-      return indexBuffers.get(key).duplicate();
+      return indexBuffers.get(key);
     }
 
     File filename = getFileFor(key.name, key.type);
     PinotDataBuffer buffer = mapForReads(filename, key.type.toString() + ".reader");
     indexBuffers.put(key, buffer);
-    return buffer.duplicate();
+    return buffer;
   }
 
-  private PinotDataBuffer getWriteBufferFor(IndexKey key, int sizeBytes)
-      throws IOException {
+  private PinotDataBuffer getWriteBufferFor(IndexKey key, int sizeBytes) throws IOException {
     if (indexBuffers.containsKey(key)) {
-      return indexBuffers.get(key).duplicate();
+      return indexBuffers.get(key);
     }
 
     File filename = getFileFor(key.name, key.type);
     PinotDataBuffer buffer = mapForWrites(filename, sizeBytes, key.type.toString() + ".writer");
     indexBuffers.put(key, buffer);
-    return buffer.duplicate();
+    return buffer;
   }
 
   @VisibleForTesting
@@ -149,28 +146,29 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return new File(segmentDirectory, filename);
   }
 
-  private PinotDataBuffer mapForWrites(File file, int sizeBytes, String context)
-      throws IOException {
+  private PinotDataBuffer mapForWrites(File file, int sizeBytes, String context) throws IOException {
     Preconditions.checkNotNull(file);
     Preconditions.checkArgument(sizeBytes >= 0 && sizeBytes < Integer.MAX_VALUE,
         "File size must be less than 2GB, file: " + file);
     Preconditions.checkState(!file.exists(), "File: " + file + " already exists");
-    String allocContext = allocationContext(file, context);
+    String allocationContext = allocationContext(file, context);
 
-    // always mmap for writes
-    return PinotDataBuffer.fromFile(file, 0, sizeBytes, ReadMode.mmap,
-        FileChannel.MapMode.READ_WRITE, allocContext);
+    // Backward-compatible: index file is always big-endian
+    return PinotDataBuffer.mapFile(file, false, 0, sizeBytes, ByteOrder.BIG_ENDIAN, allocationContext);
   }
 
-  private PinotDataBuffer mapForReads(File file, String context)
-      throws IOException {
+  private PinotDataBuffer mapForReads(File file, String context) throws IOException {
     Preconditions.checkNotNull(file);
     Preconditions.checkNotNull(context);
     Preconditions.checkArgument(file.exists(), "File: " + file + " must exist");
     Preconditions.checkArgument(file.isFile(), "File: " + file + " must be a regular file");
-
     String allocationContext = allocationContext(file, context);
-    return PinotDataBuffer
-        .fromFile(file, readMode, FileChannel.MapMode.READ_ONLY, allocationContext);
+
+    // Backward-compatible: index file is always big-endian
+    if (readMode == ReadMode.heap) {
+      return PinotDataBuffer.loadFile(file, 0, file.length(), ByteOrder.BIG_ENDIAN, allocationContext);
+    } else {
+      return PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, allocationContext);
+    }
   }
 }

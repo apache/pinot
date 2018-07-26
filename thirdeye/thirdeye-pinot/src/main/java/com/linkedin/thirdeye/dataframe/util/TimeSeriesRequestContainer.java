@@ -3,29 +3,32 @@ package com.linkedin.thirdeye.dataframe.util;
 import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import java.util.List;
+import org.joda.time.DateTime;
+import org.joda.time.Period;
 
 
 public class TimeSeriesRequestContainer extends RequestContainer {
-  final long start;
-  final long end;
-  final long interval;
+  final DateTime start;
+  final DateTime end;
+  final Period interval;
 
-  public TimeSeriesRequestContainer(ThirdEyeRequest request, List<MetricExpression> expressions, long start, long end, long interval) {
+  public TimeSeriesRequestContainer(ThirdEyeRequest request, List<MetricExpression> expressions, DateTime start,
+      DateTime end, Period interval) {
     super(request, expressions);
     this.start = start;
     this.end = end;
     this.interval = interval;
   }
 
-  public long getStart() {
+  public DateTime getStart() {
     return start;
   }
 
-  public long getEnd() {
+  public DateTime getEnd() {
     return end;
   }
 
-  public long getInterval() {
+  public Period getInterval() {
     return interval;
   }
 }

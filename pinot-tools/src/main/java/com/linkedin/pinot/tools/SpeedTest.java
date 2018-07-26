@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
  */
 package com.linkedin.pinot.tools;
 
-import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -52,7 +50,7 @@ public class SpeedTest {
     }
     out.close();
     RandomAccessFile raf = new RandomAccessFile(FILE_NAME, "rw");
-    mmappedByteBuffer = MmapUtils.mmapFile(raf, MapMode.READ_WRITE, 0L, raf.length(), new File(FILE_NAME), " Speed test mmappedByteBuffer");
+    mmappedByteBuffer = raf.getChannel().map(MapMode.READ_WRITE, 0L, raf.length());
     mmappedByteBuffer.load();
 
     int toSelect = (int) (SIZE * readPercentage);

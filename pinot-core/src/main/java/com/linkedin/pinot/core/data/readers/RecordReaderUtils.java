@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.data.readers;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
+import com.linkedin.pinot.core.data.GenericRow;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
@@ -28,6 +29,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 
@@ -132,5 +134,12 @@ public class RecordReaderUtils {
     }
 
     return value;
+  }
+
+  public static void copyRow(GenericRow source, GenericRow destination) {
+    destination.clear();
+    for (Map.Entry<String, Object> entry : source.getEntrySet()) {
+      destination.putField(entry.getKey(), entry.getValue());
+    }
   }
 }

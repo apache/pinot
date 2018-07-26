@@ -17,41 +17,47 @@ import { getWithDefault } from '@ember/object';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 import { set, setProperties } from '@ember/object';
 import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
+import { inject as service } from '@ember/service';
 
 export default Component.extend({
+  //store: service('store'),
+
   tagName: '',//using tagless so i can add my own in hbs
   anomalyResponseNames: anomalyUtil.anomalyResponseObj.mapBy('name'),
   anomalyDataUrl: getAnomalyDataUrl(),
+  showResponseSaved: false,
 
   actions: {
     /**
      * Handle dynamically saving anomaly feedback responses
      * @method onChangeAnomalyResponse
-     * @param {Object} anomalyRecord - the anomaly being responded to
+     * @param {Object} humanizedAnomaly - the humanized anomaly entity
      * @param {String} selectedResponse - user-selected anomaly feedback option
      * @param {Object} inputObj - the selection object
      */
-     onChangeAnomalyResponse: async function(anomalyRecord, selectedResponse, inputObj) {
+     onChangeAnomalyResponse: async function(humanizedAnomaly, selectedResponse, inputObj) {
       const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
 
       set(inputObj, 'selected', selectedResponse);
       let res;
       try {
+        const id = humanizedAnomaly.get('id');
         // Save anomaly feedback
-        res = await anomalyUtil.updateAnomalyFeedback(anomalyRecord.id, responseObj.value)
+        res = await anomalyUtil.updateAnomalyFeedback(id, responseObj.value);
         // We make a call to ensure our new response got saved
-        res = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.id, responseObj.status)
+        res = await anomalyUtil.verifyAnomalyFeedback(id, responseObj.status);
+        // TODO: right now we will update the union wrapper cached record for this anomaly
+        humanizedAnomaly.set('anomaly.feedback', responseObj.value);
+
         const filterMap = getWithDefault(res, 'searchFilters.statusFilterMap', null);
         if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
-          setProperties(anomalyRecord, {
-            anomalyFeedback: selectedResponse,
-            showResponseSaved: true
-          });
+          humanizedAnomaly.set('anomalyFeedback', selectedResponse);
+          this.set('showResponseSaved', true);
         } else {
           return Promise.reject(new Error('Response not saved'));
         }
       } catch (err) {
-        setProperties(anomalyRecord, {
+        this.setProperties({
           showResponseFailed: true,
           showResponseSaved: false
         });

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,11 +29,11 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.pruner.PartitionSegmentPruner;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.io.IOException;
@@ -321,6 +321,6 @@ public class SegmentPartitionTest {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows, schema));
     driver.build();
-    _segment = Loaders.IndexSegment.load(new File(SEGMENT_PATH), ReadMode.mmap);
+    _segment = ImmutableSegmentLoader.load(new File(SEGMENT_PATH), ReadMode.mmap);
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -31,10 +31,10 @@ import javax.annotation.Nonnull;
 public interface AggregationFunction<IntermediateResult, FinalResult extends Comparable> {
 
   /**
-   * Get the name of the aggregation function.
+   * Get the type of the aggregation function.
    */
   @Nonnull
-  String getName();
+  AggregationFunctionType getType();
 
   /**
    * Given the aggregation columns, get the column name for the results.
@@ -104,11 +104,11 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   boolean isIntermediateResultComparable();
 
   /**
-   * Get the {@link FieldSpec.DataType} of the intermediate result.
-   * <p>This data type is used for transferring data in data table.
+   * Get the {@link DataSchema.ColumnDataType} of the intermediate result.
+   * <p>This column data type is used for transferring data in data table.
    */
   @Nonnull
-  FieldSpec.DataType getIntermediateResultDataType();
+  DataSchema.ColumnDataType getIntermediateResultColumnType();
 
   /**
    * Extract the final result used in the broker response from the given intermediate result.

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.IOException;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
@@ -30,12 +28,12 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   private final FixedByteSingleColumnSingleValueReaderWriter _dictIdToValue;
 
-  public DoubleOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize, PinotDataBufferMemoryManager memoryManager,
-      String allocationContext) {
+  public DoubleOffHeapMutableDictionary(int estimatedCardinality, int maxOverflowSize,
+      PinotDataBufferMemoryManager memoryManager, String allocationContext) {
     super(estimatedCardinality, maxOverflowSize, memoryManager, allocationContext);
     final int initialEntryCount = nearestPowerOf2(estimatedCardinality);
-    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, V1Constants.Numbers.DOUBLE_SIZE,
-        memoryManager, allocationContext);
+    _dictIdToValue = new FixedByteSingleColumnSingleValueReaderWriter(initialEntryCount, Double.BYTES, memoryManager,
+        allocationContext);
   }
 
   public Object get(int dictionaryId) {
@@ -127,7 +125,7 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public int getAvgValueSize() {
-    return V1Constants.Numbers.DOUBLE_SIZE;
+    return Double.BYTES;
   }
 
   @Override
@@ -171,6 +169,6 @@ public class DoubleOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public long getTotalOffHeapMemUsed() {
-    return super.getTotalOffHeapMemUsed() + V1Constants.Numbers.DOUBLE_SIZE * length();
+    return super.getTotalOffHeapMemUsed() + Double.BYTES * length();
   }
 }

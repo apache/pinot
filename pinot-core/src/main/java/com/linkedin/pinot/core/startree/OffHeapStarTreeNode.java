@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,8 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.util.Iterator;
-import xerial.larray.buffer.LBufferAPI;
 
 
 public class OffHeapStarTreeNode implements StarTreeNode {
@@ -25,9 +24,9 @@ public class OffHeapStarTreeNode implements StarTreeNode {
 
   // Number of fields and serializable size of the node
   public static final int NUM_SERIALIZABLE_FIELDS = 7;
-  public static final int SERIALIZABLE_SIZE_IN_BYTES = V1Constants.Numbers.INTEGER_SIZE * NUM_SERIALIZABLE_FIELDS;
+  public static final int SERIALIZABLE_SIZE_IN_BYTES = Integer.BYTES * NUM_SERIALIZABLE_FIELDS;
 
-  private final LBufferAPI _dataBuffer;
+  private final PinotDataBuffer _dataBuffer;
   private final int _dimensionId;
   private final int _dimensionValue;
   private final int _startDocId;
@@ -37,27 +36,27 @@ public class OffHeapStarTreeNode implements StarTreeNode {
   // Inclusive
   private final int _childrenEndIndex;
 
-  public OffHeapStarTreeNode(LBufferAPI dataBuffer, int nodeId) {
+  public OffHeapStarTreeNode(PinotDataBuffer dataBuffer, int nodeId) {
     _dataBuffer = dataBuffer;
     long offset = nodeId * SERIALIZABLE_SIZE_IN_BYTES;
 
     _dimensionId = dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     _dimensionValue = dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     _startDocId = dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     _endDocId = dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     _aggregatedDocId = dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     _childrenStartIndex = dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     _childrenEndIndex = dataBuffer.getInt(offset);
   }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonObject;
+import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -33,10 +34,12 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 @SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MetricFieldSpec extends FieldSpec {
-  private static final int UNDEFINED_FIELD_SIZE = -1;
+  protected static final int UNDEFINED_METRIC_SIZE = -1;
 
   // These two fields are for derived metric fields.
-  private int _fieldSize = UNDEFINED_FIELD_SIZE;
+  private int _fieldSize = UNDEFINED_METRIC_SIZE;
+
+  @ConfigKey("derivedMetricType")
   private DerivedMetricType _derivedMetricType = null;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
@@ -104,7 +107,7 @@ public final class MetricFieldSpec extends FieldSpec {
   @Override
   public void setDataType(@Nonnull DataType dataType) {
     super.setDataType(dataType);
-    if (_dataType != DataType.STRING) {
+    if (_dataType != DataType.STRING && _dataType != DataType.BYTES) {
       _fieldSize = _dataType.size();
     }
   }
@@ -137,7 +140,7 @@ public final class MetricFieldSpec extends FieldSpec {
   @Override
   public JsonObject toJsonObject() {
     JsonObject jsonObject = super.toJsonObject();
-    if (_dataType == DataType.STRING && _fieldSize != UNDEFINED_FIELD_SIZE) {
+    if (_dataType == DataType.STRING && _fieldSize != UNDEFINED_METRIC_SIZE) {
       jsonObject.addProperty("fieldSize", _fieldSize);
     }
     if (_derivedMetricType != null) {
@@ -168,5 +171,11 @@ public final class MetricFieldSpec extends FieldSpec {
     int result = EqualityUtils.hashCodeOf(super.hashCode(), _fieldSize);
     result = EqualityUtils.hashCodeOf(result, _derivedMetricType);
     return result;
+  }
+
+  @Override
+  public void postInject() {
+    super.postInject();
+    _fieldSize = _dataType.size();
   }
 }

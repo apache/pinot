@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
-import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
+import java.util.HashMap;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCollector {
@@ -53,23 +51,28 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
       switch (spec.getDataType()) {
         case BOOLEAN:
         case STRING:
-          columnStatsCollectorMap.put(spec.getName(), new StringColumnPreIndexStatsCollector(column,
-              _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new StringColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case INT:
-          columnStatsCollectorMap.put(spec.getName(), new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case LONG:
-          columnStatsCollectorMap.put(spec.getName(), new LongColumnPreIndexStatsCollector(column,
-              _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new LongColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case FLOAT:
-          columnStatsCollectorMap.put(spec.getName(), new FloatColumnPreIndexStatsCollector(column,
-              _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new FloatColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case DOUBLE:
-          columnStatsCollectorMap.put(spec.getName(), new DoubleColumnPreIndexStatsCollector(column,
-              _statsCollectorConfig));
+          columnStatsCollectorMap.put(spec.getName(),
+              new DoubleColumnPreIndexStatsCollector(column, _statsCollectorConfig));
+          break;
+        case BYTES:
+          columnStatsCollectorMap.put(spec.getName(),
+              new BytesColumnPredIndexStatsCollector(column, _statsCollectorConfig));
           break;
         default:
           break;
@@ -90,12 +93,14 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   }
 
   @Override
-  public void collectRow(GenericRow row) throws Exception {
+  public void collectRow(GenericRow row)
+      throws Exception {
     collectRow(row, false);
   }
 
   @Override
-  public void collectRow(GenericRow row, boolean isAggregated) throws Exception {
+  public void collectRow(GenericRow row, boolean isAggregated)
+      throws Exception {
     for (Map.Entry<String, Object> columnNameAndValue : row.getEntrySet()) {
       final String columnName = columnNameAndValue.getKey();
       final Object value = columnNameAndValue.getValue();
@@ -155,6 +160,5 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
     } catch (final Exception e) {
       LOGGER.error("Caught exception while logging column stats", e);
     }
-
   }
 }

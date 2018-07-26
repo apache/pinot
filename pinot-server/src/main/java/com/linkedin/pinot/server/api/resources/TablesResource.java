@@ -1,5 +1,5 @@
- /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.server.api.resources;
 
-import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
-import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.TableDataManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import io.swagger.annotations.Api;
@@ -51,6 +49,7 @@ import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 @Api(tags = "Table")
 @Path("/")
 public class TablesResource {
@@ -59,14 +58,15 @@ public class TablesResource {
   @Inject
   ServerInstance serverInstance;
 
-
   @GET
   @Path("/tables")
   @Produces(MediaType.APPLICATION_JSON)
   //swagger annotations
   @ApiOperation(value = "List tables", notes = "List all the tables on this server")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TablesList.class),
-      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TablesList.class),
+      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
+  })
   public TablesList listTables() {
     InstanceDataManager dataManager = checkGetInstanceDataManager();
     Collection<TableDataManager> tableDataManagers = dataManager.getTableDataManagers();
@@ -97,51 +97,52 @@ public class TablesResource {
     }
     return tableDataManager;
   }
+
   @GET
   @Path("/tables/{tableName}/segments")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "List table segments", notes = "List segments of table hosted on this server")
-  @ApiResponses(value = {@ApiResponse(code = 200, message = "Success", response = TableSegments.class),
-      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)})
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TableSegments.class),
+      @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
+  })
   public TableSegments listTableSegments(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
-      @PathParam("tableName") String tableName) {
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
     TableDataManager tableDataManager = checkGetTableDataManager(tableName);
-    ImmutableList<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
-    List<String> segments = new ArrayList<>(segmentDataManagers.size());
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      segments.add(segmentDataManager.getSegmentName());
-      tableDataManager.releaseSegment(segmentDataManager);
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+    try {
+      List<String> segments = new ArrayList<>(segmentDataManagers.size());
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        segments.add(segmentDataManager.getSegmentName());
+      }
+      return new TableSegments(segments);
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
     }
-
-    return new TableSegments(segments);
   }
 
   @GET
   @Path("/tables/{tableName}/segments/{segmentName}/metadata")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment metadata", notes = "Provide segments metadata for the segment on server")
-  @ApiResponses( value = {
-      @ApiResponse(code=200, message = "Success"),
-      @ApiResponse(code=500, message = "Internal server error", response = ErrorInfo.class),
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
       @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getSegmentMetadata(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
-      @PathParam("tableName") String tableName,
-      @ApiParam(value = "Segment Name", required = true)
-      @PathParam("segmentName") String segmentName,
-      @ApiParam(value = "column name", required = false, allowMultiple = true, defaultValue = "")
-      @QueryParam("columns") @DefaultValue("") List<String> columns
-      ) {
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName,
+      @ApiParam(value = "Segment name", required = true) @PathParam("segmentName") String segmentName,
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("") List<String> columns) {
     TableDataManager tableDataManager = checkGetTableDataManager(tableName);
-    SegmentDataManager segmentDataManager = null;
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
+          Response.Status.NOT_FOUND);
+    }
     try {
-      segmentDataManager = tableDataManager.acquireSegment(segmentName);
-      if (segmentDataManager == null) {
-        throw new WebApplicationException(String.format("Table %s segments %s does not exist", tableName, segmentName),
-            Response.Status.NOT_FOUND);
-      }
       SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
       Set<String> columnSet;
       if (columns.size() == 1 && columns.get(0).equals("*")) {
@@ -153,12 +154,11 @@ public class TablesResource {
         return segmentMetadata.toJson(columnSet).toString();
       } catch (JSONException e) {
         LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentMetadata);
-        throw new WebApplicationException("Failed to convert segment metadata to json", Response.Status.INTERNAL_SERVER_ERROR);
+        throw new WebApplicationException("Failed to convert segment metadata to json",
+            Response.Status.INTERNAL_SERVER_ERROR);
       }
     } finally {
-      if (segmentDataManager != null) {
-        tableDataManager.releaseSegment(segmentDataManager);
-      }
+      tableDataManager.releaseSegment(segmentDataManager);
     }
   }
 
@@ -172,26 +172,25 @@ public class TablesResource {
       @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
   })
   public String getCrcMetadataForTable(
-      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
-      @PathParam("tableName") String tableName) {
-
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
     TableDataManager tableDataManager = checkGetTableDataManager(tableName);
-    ImmutableList<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
-    Map<String, String> segmentCrcForTable = new HashMap<>();
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
     try {
-      for(SegmentDataManager segmentDataManager : segmentDataManagers) {
-        SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
+      Map<String, String> segmentCrcForTable = new HashMap<>();
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        SegmentMetadataImpl segmentMetadata =
+            (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
         segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentMetadata.getCrc());
       }
       ObjectMapper mapper = new ObjectMapper();
       return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(segmentCrcForTable);
     } catch (Exception e) {
-      throw new WebApplicationException("Failed to convert crc information to json", Response.Status.INTERNAL_SERVER_ERROR);
+      throw new WebApplicationException("Failed to convert crc information to json",
+          Response.Status.INTERNAL_SERVER_ERROR);
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
   }
-
 }

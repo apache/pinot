@@ -51,7 +51,7 @@ public class SummaryResponse {
   @JsonProperty("loser")
   private List<SummaryGainerLoserResponseRow> loser = new ArrayList<>();
 
-  @JsonProperty("dimensinoCosts")
+  @JsonProperty("dimensionCosts")
   private List<Cube.DimensionCost> dimensionCosts = new ArrayList<>();
 
   public String getDataset() {

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -145,7 +144,7 @@ public class SelectionOperatorService {
           Serializable v2 = o2[i];
 
           // Only compare single-value columns.
-          switch (_dataSchema.getColumnType(i)) {
+          switch (_dataSchema.getColumnDataType(i)) {
             case INT:
               if (!selectionSort.isIsAsc()) {
                 ret = ((Integer) v1).compareTo((Integer) v2);
@@ -306,7 +305,7 @@ public class SelectionOperatorService {
   }
 
   /**
-   * Render the unformatted selection rows to a formatted {@link SelectionResults} object for selection queries with
+   * Render the selection rows to a {@link SelectionResults} object for selection queries with
    * <code>ORDER BY</code>. (Broker side)
    * <p>{@link SelectionResults} object will be used to build the broker response.
    * <p>Should be called after method "reduceWithOrdering()".
@@ -317,54 +316,11 @@ public class SelectionOperatorService {
   public SelectionResults renderSelectionResultsWithOrdering() {
     LinkedList<Serializable[]> rowsInSelectionResults = new LinkedList<>();
 
-    int[] columnIndices = getColumnIndices();
+    int[] columnIndices = SelectionOperatorUtils.getColumnIndicesWithOrdering(_selectionColumns, _dataSchema);
     while (_rows.size() > _selectionOffset) {
-      rowsInSelectionResults.addFirst(getFormattedRowWithOrdering(_rows.poll(), columnIndices));
+      rowsInSelectionResults.addFirst(SelectionOperatorUtils.extractColumns(_rows.poll(), columnIndices));
     }
 
     return new SelectionResults(_selectionColumns, rowsInSelectionResults);
-  }
-
-  /**
-   * Helper method to get each selection column index in data schema.
-   *
-   * @return column indices.
-   */
-  private int[] getColumnIndices() {
-    int numSelectionColumns = _selectionColumns.size();
-    int[] columnIndices = new int[numSelectionColumns];
-
-    int numColumnsInDataSchema = _dataSchema.size();
-    Map<String, Integer> dataSchemaIndices = new HashMap<>(numColumnsInDataSchema);
-    for (int i = 0; i < numColumnsInDataSchema; i++) {
-      dataSchemaIndices.put(_dataSchema.getColumnName(i), i);
-    }
-
-    for (int i = 0; i < numSelectionColumns; i++) {
-      columnIndices[i] = dataSchemaIndices.get(_selectionColumns.get(i));
-    }
-
-    return columnIndices;
-  }
-
-  /**
-   * Helper method to format a selection row, make all values string or string array type based on data schema passed in
-   * for selection queries with <code>ORDER BY</code>. (Broker side)
-   * <p>Formatted row is used to build the {@link SelectionResults}.
-   *
-   * @param row selection row to be formatted.
-   * @param columnIndices column indices of original rows.
-   * @return formatted selection row.
-   */
-  @Nonnull
-  private Serializable[] getFormattedRowWithOrdering(@Nonnull Serializable[] row, @Nonnull int[] columnIndices) {
-    int numColumns = columnIndices.length;
-    Serializable[] formattedRow = new Serializable[numColumns];
-    for (int i = 0; i < numColumns; i++) {
-      int columnIndex = columnIndices[i];
-      formattedRow[i] =
-          SelectionOperatorUtils.getFormattedValue(row[columnIndex], _dataSchema.getColumnType(columnIndex));
-    }
-    return formattedRow;
   }
 }

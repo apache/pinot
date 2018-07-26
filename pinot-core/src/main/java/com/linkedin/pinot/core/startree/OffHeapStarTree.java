@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,22 +18,16 @@ package com.linkedin.pinot.core.startree;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
+import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import xerial.larray.buffer.LBuffer;
-import xerial.larray.buffer.LBufferAPI;
-import xerial.larray.mmap.MMapBuffer;
-import xerial.larray.mmap.MMapMode;
 
 
 /**
@@ -45,9 +39,8 @@ public class OffHeapStarTree implements StarTree {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DIMENSION_NAME_MAX_LENGTH = 4096;
-  private static final int LOAD_FILE_BUFFER_SIZE = 10 * 1024 * 1024;
 
-  private final LBufferAPI _dataBuffer;
+  private final PinotDataBuffer _dataBuffer;
   private final OffHeapStarTreeNode _root;
   private final List<String> _dimensionNames;
 
@@ -57,37 +50,40 @@ public class OffHeapStarTree implements StarTree {
    * - Loads/MMap's the OffHeapStarTreeNode array.
    */
   public OffHeapStarTree(File starTreeFile, ReadMode readMode) throws IOException {
+    // Backward-compatible: star-tree file is always little-endian
     if (readMode.equals(ReadMode.mmap)) {
-      _dataBuffer = new MMapBuffer(starTreeFile, MMapMode.READ_ONLY);
+      _dataBuffer = PinotDataBuffer.mapFile(starTreeFile, true, 0, starTreeFile.length(), ByteOrder.LITTLE_ENDIAN,
+          "OffHeapStarTree");
     } else {
-      _dataBuffer = loadFrom(starTreeFile);
+      _dataBuffer =
+          PinotDataBuffer.loadFile(starTreeFile, 0, starTreeFile.length(), ByteOrder.LITTLE_ENDIAN, "OffHeapStarTree");
     }
 
     long offset = 0L;
     Preconditions.checkState(MAGIC_MARKER == _dataBuffer.getLong(offset), "Invalid magic marker in Star Tree file");
-    offset += V1Constants.Numbers.LONG_SIZE;
+    offset += Long.BYTES;
 
     Preconditions.checkState(VERSION == _dataBuffer.getInt(offset), "Invalid version in Star Tree file");
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     int rootNodeOffset = _dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     int numDimensions = _dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
 
     String[] dimensionNames = new String[numDimensions];
     byte[] dimensionNameBytes = new byte[DIMENSION_NAME_MAX_LENGTH];
     for (int i = 0; i < numDimensions; i++) {
       // NOTE: In old version, index might not be stored in order
       int dimensionId = _dataBuffer.getInt(offset);
-      offset += V1Constants.Numbers.INTEGER_SIZE;
+      offset += Integer.BYTES;
 
       int dimensionLength = _dataBuffer.getInt(offset);
       Preconditions.checkState(dimensionLength < DIMENSION_NAME_MAX_LENGTH);
-      offset += V1Constants.Numbers.INTEGER_SIZE;
+      offset += Integer.BYTES;
 
-      _dataBuffer.copyTo((int) offset, dimensionNameBytes, 0, dimensionLength);
+      _dataBuffer.copyTo(offset, dimensionNameBytes, 0, dimensionLength);
       offset += dimensionLength;
 
       String dimensionName = new String(dimensionNameBytes, 0, dimensionLength, UTF_8);
@@ -96,31 +92,13 @@ public class OffHeapStarTree implements StarTree {
     _dimensionNames = Arrays.asList(dimensionNames);
 
     int numNodes = _dataBuffer.getInt(offset);
-    offset += V1Constants.Numbers.INTEGER_SIZE;
+    offset += Integer.BYTES;
     Preconditions.checkState(offset == rootNodeOffset, "Error reading Star Tree file, header length mis-match");
     long fileLength = starTreeFile.length();
     Preconditions.checkState(offset + numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES == fileLength,
         "Error reading Star Tree file, file length mis-match");
 
     _root = new OffHeapStarTreeNode(_dataBuffer.view(rootNodeOffset, fileLength), 0);
-  }
-
-  /**
-   * Helper method to create an LBuffer from a given file.
-   */
-  private static LBuffer loadFrom(File file) throws IOException {
-    try (FileChannel fileChannel = new FileInputStream(file).getChannel()) {
-      ByteBuffer byteBuffer = ByteBuffer.allocate(LOAD_FILE_BUFFER_SIZE);
-      LBuffer lBuffer = new LBuffer(file.length());
-
-      long offset = 0;
-      int numBytesRead;
-      while ((numBytesRead = fileChannel.read(byteBuffer, offset)) > 0) {
-        lBuffer.readFrom(byteBuffer.array(), 0, offset, numBytesRead);
-        offset += numBytesRead;
-      }
-      return lBuffer;
-    }
   }
 
   @Override
@@ -187,10 +165,6 @@ public class OffHeapStarTree implements StarTree {
 
   @Override
   public void close() throws IOException {
-    if (_dataBuffer instanceof MMapBuffer) {
-      ((MMapBuffer) _dataBuffer).close();
-    } else {
-      _dataBuffer.release();
-    }
+    _dataBuffer.close();
   }
 }

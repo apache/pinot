@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 public abstract class SegmentZKMetadata implements ZKMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadata.class);
 
-  private static final String NULL = "null";
+  protected static final String NULL = "null";
 
   private String _segmentName;
   private String _tableName;

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -84,7 +84,7 @@ public class BitmapInvertedIndexTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
     indexLoadingConfig.setReadMode(readMode);
     indexLoadingConfig.setInvertedIndexColumns(INVERTED_INDEX_COLUMNS);
-    IndexSegment indexSegment = ColumnarSegmentLoader.load(_segmentDirectory, indexLoadingConfig);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, indexLoadingConfig);
 
     // Compare the loaded inverted index with the record in avro file
     try (DataFileStream<GenericRecord> reader = new DataFileStream<>(new FileInputStream(_avroFile),
