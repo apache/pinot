@@ -125,6 +125,7 @@
     <commons-lang.version>2.6</commons-lang.version>
     <!-- pinot-common, commons-validator, commons-configuration, hadoop-common, hadoop-client use commons-logging-->
     <commons-logging.version>1.2</commons-logging.version>
+    <snappy-java.version>1.1.1.7</snappy-java.version>
 
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g </argLine>
@@ -387,6 +388,11 @@
         <version>${avro.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.xerial.snappy</groupId>
+        <artifactId>snappy-java</artifactId>
+        <version>${snappy-java.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-compress</artifactId>
         <version>1.9</version>
@@ -401,6 +407,11 @@
         <artifactId>javax.servlet-api</artifactId>
         <version>3.0.1</version>
         <scope>compile</scope>
+      </dependency>
+      <dependency>
+        <groupId>javax.ws.rs</groupId>
+        <artifactId>javax.ws.rs-api</artifactId>
+        <version>2.0.1</version>
       </dependency>
       <dependency>
         <groupId>org.json</groupId>
@@ -663,6 +674,22 @@
         <groupId>org.glassfish.jersey.core</groupId>
         <artifactId>jersey-server</artifactId>
         <version>${jersey.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.javassist</groupId>
+            <artifactId>javassist</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.sun.jersey</groupId>
+        <artifactId>jersey-core</artifactId>
+        <version>1.19.2</version>
+      </dependency>
+      <dependency>
+        <groupId>org.javassist</groupId>
+        <artifactId>javassist</artifactId>
+        <version>3.19.0-GA</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jersey.core</groupId>
@@ -692,6 +719,11 @@
             <artifactId>jackson-annotations</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.module</groupId>
+        <artifactId>jackson-module-jaxb-annotations</artifactId>
+        <version>2.5.4</version>
       </dependency>
       <dependency>
         <groupId>com.sun.jersey</groupId>
@@ -729,7 +761,25 @@
             <groupId>com.fasterxml.jackson.jaxrs</groupId>
             <artifactId>jackson-jaxrs-json-provider</artifactId>
           </exclusion>
+          <exclusion>
+            <groupId>org.glassfish.hk2.external</groupId>
+            <artifactId>javax.inject</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.module</groupId>
+            <artifactId>ackson-module-jaxb-annotations</artifactId>
+          </exclusion>
         </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.jaxrs</groupId>
+        <artifactId>jackson-jaxrs-json-provider</artifactId>
+        <version>2.5.4</version>
+      </dependency>
+      <dependency>
+        <groupId>org.glassfish.hk2.external</groupId>
+        <artifactId>javax.inject</artifactId>
+        <version>2.4.0-b34</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
@@ -940,6 +990,14 @@
               <zookeeper.forceSync>no</zookeeper.forceSync>
             </systemPropertyVariables>
             <reportFormat>plain</reportFormat>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>1.4.1</version>
+          <configuration>
+            <rules><dependencyConvergence/></rules>
           </configuration>
         </plugin>
         <plugin>
