@@ -49,7 +49,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 
 
-public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
+public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements StarTreeV2Builder {
 
   // Segment
   private File _outDir;
@@ -117,10 +117,9 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // dimension split order.
     List<String> dimensionsSplitOrder = config.getDimensionsSplitOrder();
-    _dimensionsSplitOrder = OnHeapStarTreeV2BuilderHelper.enumerateDimensions(_dimensionsName, dimensionsSplitOrder);
+    _dimensionsSplitOrder = enumerateDimensions(_dimensionsName, dimensionsSplitOrder);
     List<String> dimensionsWithoutStarNode = config.getDimensionsWithoutStarNode();
-    _dimensionsWithoutStarNode =
-        OnHeapStarTreeV2BuilderHelper.enumerateDimensions(_dimensionsName, dimensionsWithoutStarNode);
+    _dimensionsWithoutStarNode = enumerateDimensions(_dimensionsName, dimensionsWithoutStarNode);
 
     // metric
     _aggFunColumnPairsString = "";
@@ -214,8 +213,7 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
 
     // calculating default split order in case null provided.
     if (_dimensionsSplitOrder.isEmpty() || _dimensionsSplitOrder == null) {
-      _dimensionsSplitOrder =
-          OnHeapStarTreeV2BuilderHelper.computeDefaultSplitOrder(_dimensionsCount, _dimensionsCardinalty);
+      _dimensionsSplitOrder = computeDefaultSplitOrder(_dimensionsCardinalty);
 
       // creating a string variable for meta data (dimensionSplitOrderString)
       List<String> dimensionSplitOrderStringList = new ArrayList<>();
@@ -500,32 +498,6 @@ public class OnHeapStarTreeV2Builder implements StarTreeV2Builder {
     rangeMap.put(currentValue, new Pairs.IntPair(groupStartDocId, endDocId));
 
     return rangeMap;
-  }
-
-  /**
-   * Helper function to read value of a doc in a column
-   *
-   * @param reader 'PinotSegmentColumnReader' to read data.
-   * @param dataType 'FieldSpec.DataType' of the data to be read.
-   * @param docId 'int' doc id to be read.
-   *
-   * @return Object
-   */
-  private Object readHelper(PinotSegmentColumnReader reader, FieldSpec.DataType dataType, int docId) {
-    switch (dataType) {
-      case INT:
-        return reader.readInt(docId);
-      case FLOAT:
-        return reader.readFloat(docId);
-      case LONG:
-        return reader.readLong(docId);
-      case DOUBLE:
-        return reader.readDouble(docId);
-      case STRING:
-        return reader.readString(docId);
-    }
-
-    return null;
   }
 
   /**

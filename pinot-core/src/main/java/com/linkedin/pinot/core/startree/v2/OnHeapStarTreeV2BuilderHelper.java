@@ -33,38 +33,7 @@ public class OnHeapStarTreeV2BuilderHelper {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
-  /**
-   * enumerate dimension set.
-   */
-  public static List<Integer> enumerateDimensions(List<String> dimensionNames, List<String> dimensionsOrder) {
-    List<Integer> enumeratedDimensions = new ArrayList<>();
-    if (dimensionsOrder != null) {
-      for (String dimensionName : dimensionsOrder) {
-        enumeratedDimensions.add(dimensionNames.indexOf(dimensionName));
-      }
-    }
 
-    return enumeratedDimensions;
-  }
-
-  /**
-   * compute a defualt split order.
-   */
-  public static List<Integer> computeDefaultSplitOrder(int dimensionsCount, List<Integer> dimensionCardinality) {
-    List<Integer> defaultSplitOrder = new ArrayList<>();
-    for (int i = 0; i < dimensionsCount; i++) {
-      defaultSplitOrder.add(i);
-    }
-
-    Collections.sort(defaultSplitOrder, new Comparator<Integer>() {
-      @Override
-      public int compare(Integer o1, Integer o2) {
-        return dimensionCardinality.get(o2) - dimensionCardinality.get(o1);
-      }
-    });
-
-    return defaultSplitOrder;
-  }
 
   /**
    * sort the star tree data.
