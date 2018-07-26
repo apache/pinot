@@ -65,10 +65,6 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-nop</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-filesystem</artifactId>
       <version>0.016</version>
