@@ -45,7 +45,7 @@
     <parsii.version>1.5</parsii.version>
     <handlebars.version>4.0.4</handlebars.version>
     <jfreechart.version>1.0.19</jfreechart.version>
-    <hadoop.version>2.6.4</hadoop.version>
+    <hadoop.version>2.7.0</hadoop.version>
     <avro.version>1.7.7</avro.version>
     <avro-mapred.version>1.7.4</avro-mapred.version>
     <testng.version>6.8</testng.version>
