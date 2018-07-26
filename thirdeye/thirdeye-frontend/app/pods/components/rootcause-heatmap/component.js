@@ -43,21 +43,44 @@ export default Component.extend({
   //
   // external
   //
-  entities: null, // {}
 
-  breakdowns: null, // {}
+  /**
+   * RCA entities
+   * @type {object}
+   */
+  entities: null,
 
-  selectedUrn: null, // ""
+  /**
+   * Breakdowns
+   * @type {object}
+   */
+  breakdowns: null,
 
-  selectedUrnCache: null, // ""
+  /**
+   * Selected metric urn
+   * @type String
+   */
+  selectedUrn: null,
 
-  onSelection: null, // func (updates)
+  /**
+   * Call back function for clicking heatmap
+   * @type {function}
+   */
+  onSelection: null,
 
-  onSizeMetric: null, // func (updates)
+  /**
+   * Call back function for size metric selection
+   * @type {function}
+   */
+  onSizeMetric: null,
 
-  sizeMetricUrn: null, // ""
+  /**
+   * The urn for
+   * @type String
+   */
+  sizeMetricUrn: null,
 
-  isLoadingBreakdowns: null, // bool
+  isLoadingBreakdowns: null,
 
   //
   // internal
@@ -71,16 +94,14 @@ export default Component.extend({
   /**
    * Selected option for heatmap size
    */
-  sizeOptionSelected: computed('sizeMetricUrn', 'sizeOptions', {
-    get () {
+  sizeOptionSelected: computed(
+    'sizeMetricUrn', 'sizeOptions',
+    function() {
       const { sizeMetricUrn, sizeOptions } =
         this.getProperties('sizeMetricUrn', 'sizeOptions');
       return sizeOptions.find(opt => opt.urn === sizeMetricUrn);
-    },
-    set () {
-      // left blank
     }
-  }),
+  ).readOnly(),
 
   /**
    * Options for heatmap size
