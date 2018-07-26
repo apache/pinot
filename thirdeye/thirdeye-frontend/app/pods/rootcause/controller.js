@@ -9,9 +9,10 @@ import {
   toBaselineUrn,
   toCurrentUrn,
   toOffsetUrn,
-  toFilters,
-  appendFilters,
-  dateFormatFull
+  dateFormatFull,
+  appendTail,
+  stripTail,
+  extractTail
 } from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/shared/eventTableColumns';
 import filterBarConfig from 'thirdeye-frontend/shared/filterBarConfig';
@@ -138,6 +139,8 @@ export default Controller.extend({
    */
   filteredUrns: null,
 
+  secondaryUrns: null,
+
   /**
    * displayed investigation tab ('metrics', 'dimensions', ...)
    * @type {string}
@@ -254,7 +257,8 @@ export default Controller.extend({
     this.setProperties({
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
-      filteredUrns: new Set()
+      filteredUrns: new Set(),
+      secondaryUrns: new Set()
     });
     // This is a flag for the acceptance test for rootcause to prevent it from timing out because of this run loop
     if (config.environment !== 'test') {
@@ -291,11 +295,11 @@ export default Controller.extend({
     'context',
     'entities',
     'selectedUrns',
+    'sizeMetricUrns',
     'activeTab',
     function () {
-      const { context, selectedUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, activeTab, setupMode } =
-        this.getProperties('context', 'selectedUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
-
+      const { context, selectedUrns, sizeMetricUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, activeTab, setupMode } =
+        this.getProperties('context', 'selectedUrns', 'sizeMetricUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
       if (!context || !selectedUrns) {
         return;
       }
@@ -352,7 +356,8 @@ export default Controller.extend({
         const metricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
         const currentUrns = [...metricUrns].map(toCurrentUrn);
         const baselineUrns = [...metricUrns].map(toBaselineUrn);
-        breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns)));
+        const sizeMetricCurrentUrns = [...sizeMetricUrns].map(toCurrentUrn);
+        breakdownsService.request(context, new Set(currentUrns.concat(baselineUrns).concat(sizeMetricCurrentUrns)));
       }
 
       //
@@ -474,9 +479,21 @@ export default Controller.extend({
     function () {
       const { context } = this.getProperties('context');
       const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
-
       if (!metricUrns) { return false; }
+      return metricUrns[0];
+    }
+  ),
 
+  /**
+   * Primary metric urn for rootcause search
+   * @type {string}
+   */
+  sizeMetricUrn: computed(
+    'sizeMetricUrns',
+    function () {
+      const { sizeMetricUrns } = this.getProperties('sizeMetricUrns');
+      const metricUrns = filterPrefix(sizeMetricUrns, 'thirdeye:metric:');
+      if (!metricUrns) { return false; }
       return metricUrns[0];
     }
   ),
@@ -862,11 +879,12 @@ export default Controller.extend({
       const { selectedUrns } = this.getProperties('selectedUrns');
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
-
       this.setProperties({
         selectedUrns: new Set(selectedUrns),
         sessionModified: true
       });
+
+
     },
 
     /**
@@ -1028,13 +1046,38 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onPrimaryChange(updates) {
-      const { context } = this.getProperties('context');
+      const { context, sizeMetricUrns } = this.getProperties('context', 'sizeMetricUrns');
 
-      const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
-      const nonMetricUrns = [...context.urns].filter(urn => !urn.startsWith('thirdeye:metric:'));
+      // NOTE: updates here do not conform to standard. Only newly selected urns are passed in, removed are omitted.
 
-      const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...metricUrns]) });
+      const addedUrns = Object.keys(updates).filter(urn => updates[urn]);
+      const removedUrns = [...context.urns].filter(urn => !addedUrns.includes(urn));
 
+      // primary metrics
+      const urns = new Set(context.urns);
+      addedUrns.forEach(urn => urns.add(urn));
+      removedUrns.forEach(urn => urns.delete(urn));
+
+      // secondary metrics
+      const newSizeMetricUrns = new Set();
+      const addedBaseUrns = filterPrefix(addedUrns, 'thirdeye:metric:').map(urn => stripTail(urn));
+      const removedBaseUrns = filterPrefix(removedUrns, 'thirdeye:metric:').map(urn => stripTail(urn));
+
+      const metricUrns = filterPrefix(addedUrns, 'thirdeye:metric:');
+
+      if (_.isEqual(addedBaseUrns, removedBaseUrns)) {
+        // only filter changed
+        const tails = metricUrns.map(urn => extractTail(urn));
+        tails.forEach(tail => {
+          sizeMetricUrns.forEach(urn => newSizeMetricUrns.add(appendTail(stripTail(urn), tail)));
+        });
+      } else {
+        metricUrns.forEach(urn => newSizeMetricUrns.add(urn));
+      }
+
+      this.set('sizeMetricUrns', newSizeMetricUrns);
+
+      const newContext = Object.assign({}, context, { urns });
       this.send('onContext', newContext);
     },
 
@@ -1086,25 +1129,9 @@ export default Controller.extend({
       this.send('onContext', newContext);
     },
 
-    /**
-     * Updates selected urns for the heatmap (appends selected filters as tail).
-     * @see onSelection(updates)
-     *
-     * @param {Object} updates
-     * @returns {undefined}
-     */
-    heatmapOnSelection(updates) {
-      const { context } = this.getProperties('context');
-
-      const metricUrns = filterPrefix(Object.keys(updates), 'thirdeye:metric:');
-      const nonMetricUrns = [...context.urns].filter(urn => !urn.startsWith('thirdeye:metric:'));
-
-      const filters = toFilters(Object.keys(updates));
-      const newMetricUrns = metricUrns.map(urn => appendFilters(urn, filters));
-
-      const newContext = Object.assign({}, context, { urns: new Set([...nonMetricUrns, ...newMetricUrns]) });
-
-      this.send('onContext', newContext);
+    heatmapOnSizeMetric(sizeMetricUrn) {
+      // TODO make this multi metric with "updates"
+      this.set('sizeMetricUrns', new Set([sizeMetricUrn]));
     },
 
     /**

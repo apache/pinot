@@ -9,7 +9,8 @@ import {
   toCurrentUrn,
   toBaselineUrn,
   dateFormatFull,
-  appendFilters
+  appendFilters,
+  filterPrefix
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
@@ -346,6 +347,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       }
     }
 
+    // update secondary metrics
+    const sizeMetricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
+
     controller.setProperties({
       routeErrors,
       anomalyId,
@@ -359,6 +363,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
       sessionUpdatedTime,
       sessionModified,
       selectedUrns,
+      sizeMetricUrns,
       setupMode,
       context
     });
