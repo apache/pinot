@@ -331,7 +331,7 @@ public class PinotSegmentUploadRestletResource {
       String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
       FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
 
-      SegmentMetadata segmentMetadataObject = null;
+      SegmentMetadata segmentMetadata = null;
       String downloadURI = null;
       switch (uploadType) {
         case JSON:
@@ -348,7 +348,7 @@ public class PinotSegmentUploadRestletResource {
             downloadSegment(tempTarredSegmentFile, downloadURI);
           } else {
             File segmentMetadataFile = getMetadataFile(multiPart);
-            segmentMetadataObject = new SegmentMetadataImpl(segmentMetadataFile);
+            segmentMetadata = new SegmentMetadataImpl(segmentMetadataFile);
           }
           break;
 
@@ -380,16 +380,16 @@ public class PinotSegmentUploadRestletResource {
         File[] files = tempSegmentDir.listFiles();
         Preconditions.checkState(files != null && files.length == 1);
         indexDir = files[0];
-        segmentMetadataObject = new SegmentMetadataImpl(indexDir);
+        segmentMetadata = new SegmentMetadataImpl(indexDir);
       }
 
       // For URI upload, user has the option to send us only metadata
-      String segmentName = segmentMetadataObject.getName();
-      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadataObject.getTableName());
+      String segmentName = segmentMetadata.getName();
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}", segmentName,
           offlineTableName, clientAddress);
-      uploadSegment(indexDir, segmentMetadataObject, tempTarredSegmentFile, downloadURI, provider,
+      uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider,
           enableParallelPushProtection, headers);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + offlineTableName);
