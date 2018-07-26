@@ -16,22 +16,67 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
+import java.io.File;
+import java.util.Map;
+import java.util.Set;
 import java.util.List;
-import java.io.IOException;
+import java.util.Queue;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.Comparator;
 import java.util.Collections;
-import java.io.BufferedOutputStream;
+import java.nio.charset.Charset;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.startree.DimensionBuffer;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import xerial.larray.mmap.MMapBuffer;
 
 
 public class StarTreeV2BaseClass {
 
+  // Segment
+  protected File _outDir;
+  protected SegmentMetadata _segmentMetadata;
+  protected ImmutableSegment _immutableSegment;
+  protected PropertiesConfiguration _properties;
+  protected IndexLoadingConfig _v3IndexLoadingConfig;
+
+
+  // Dimensions
   protected int _dimensionSize;
   protected int _dimensionsCount;
-  protected BufferedOutputStream _outputStream;
+  protected List<String> _dimensionsName;
+  protected String _dimensionSplitOrderString;
+  protected List<Integer> _dimensionsCardinality;
+  protected List<Integer> _dimensionsSplitOrder;
+  protected String _dimensionWithoutStarNodeString;
+  protected List<Integer> _dimensionsWithoutStarNode;
+  protected Map<String, DimensionFieldSpec> _dimensionsSpecMap;
+
+
+  // Metrics
+  protected int _metricsCount;
+  protected Set<String> _metricsName;
+  protected int _aggFunColumnPairsCount;
+  protected String _aggFunColumnPairsString;
+  protected List<AggregationFunctionColumnPair> _aggFunColumnPairs;
+  protected Map<String, MetricFieldSpec> _metricsSpecMap;
+
+
+  // General
+  protected int _nodesCount;
+  protected int _rawDocsCount;
+  protected TreeNode _rootNode;
+  protected int _maxNumLeafRecords;
+  protected AggregationFunctionFactory _aggregationFunctionFactory;
+
+  protected static final Charset UTF_8 = Charset.forName("UTF-8");
 
   /**
    * enumerate dimension set.
@@ -50,20 +95,39 @@ public class StarTreeV2BaseClass {
   /**
    * compute a defualt split order.
    */
-  protected List<Integer> computeDefaultSplitOrder(List<Integer> dimensionCardinality) {
-    List<Integer> defaultSplitOrder = new ArrayList<>();
-    for (int i = 0; i < _dimensionsCount; i++) {
-      defaultSplitOrder.add(i);
+  protected void computeDefaultSplitOrder(List<Integer> dimensionCardinality) {
+
+    if (_dimensionsSplitOrder.isEmpty() || _dimensionsSplitOrder == null) {
+
+      for (int i = 0; i < _dimensionsCount; i++) {
+        _dimensionsSplitOrder.add(i);
+      }
+
+      Collections.sort(_dimensionsSplitOrder, new Comparator<Integer>() {
+        @Override
+        public int compare(Integer o1, Integer o2) {
+          return dimensionCardinality.get(o2) - dimensionCardinality.get(o1);
+        }
+      });
     }
 
-    Collections.sort(defaultSplitOrder, new Comparator<Integer>() {
-      @Override
-      public int compare(Integer o1, Integer o2) {
-        return dimensionCardinality.get(o2) - dimensionCardinality.get(o1);
-      }
-    });
 
-    return defaultSplitOrder;
+    // creating a string variable for meta data (dimensionSplitOrderString)
+    List<String> dimensionSplitOrderStringList = new ArrayList<>();
+    for (int i = 0; i < _dimensionsSplitOrder.size(); i++) {
+      dimensionSplitOrderStringList.add(_dimensionsName.get(_dimensionsSplitOrder.get(i)));
+    }
+    _dimensionSplitOrderString = String.join(",", dimensionSplitOrderStringList);
+
+
+    // creating a string variable for meta data (dimensionWithoutStarNodeString)
+    List<String> dimensionWithoutStarNodeStringList = new ArrayList<>();
+    for (int i = 0; i < _dimensionsWithoutStarNode.size(); i++) {
+      dimensionWithoutStarNodeStringList.add(_dimensionsName.get(_dimensionsWithoutStarNode.get(i)));
+    }
+    _dimensionWithoutStarNodeString = String.join(",", dimensionWithoutStarNodeStringList);
+
+    return;
   }
 
   /**
@@ -87,25 +151,113 @@ public class StarTreeV2BaseClass {
   }
 
   /**
-   * compute a defualt split order.
+   * Helper method to compute size of the header of the star tree in bytes.
    */
-  protected void appendToRawBuffer(DimensionBuffer dimensions, AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer) throws IOException {
-    appendToBuffer(dimensions, aggregationFunctionColumnPairBuffer);
+  protected int computeHeaderSizeInBytes(List<String> dimensionsName) {
+    // Magic marker (8), version (4), size of header (4) and number of dimensions (4)
+    int headerSizeInBytes = 20;
+
+    for (String dimension : dimensionsName) {
+      headerSizeInBytes += Integer.BYTES;  // For dimension index
+      headerSizeInBytes += Integer.BYTES;  // For length of dimension name
+      headerSizeInBytes += dimension.getBytes(UTF_8).length; // For dimension name
+    }
+
+    headerSizeInBytes += Integer.BYTES; // For number of nodes.
+    return headerSizeInBytes;
   }
 
   /**
-   * compute a defualt split order.
+   * Helper method to write the header into the data buffer.
    */
-  protected void appendToAggBuffer(DimensionBuffer dimensions, AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer) throws IOException {
-    appendToBuffer(dimensions, aggregationFunctionColumnPairBuffer);
+  protected long writeHeader(MMapBuffer dataBuffer, int headerSizeInBytes, int dimensionCount,
+      List<String> dimensionsName, int nodesCount) {
+    long offset = 0L;
+    dataBuffer.putLong(offset, OffHeapStarTree.MAGIC_MARKER);
+    offset += Long.BYTES;
+
+    dataBuffer.putInt(offset, OffHeapStarTree.VERSION);
+    offset += Integer.BYTES;
+
+    dataBuffer.putInt(offset, headerSizeInBytes);
+    offset += Integer.BYTES;
+
+    dataBuffer.putInt(offset, dimensionCount);
+    offset += Integer.BYTES;
+
+    for (int i = 0; i < dimensionCount; i++) {
+      String dimensionName = dimensionsName.get(i);
+
+      dataBuffer.putInt(offset, i);
+      offset += Integer.BYTES;
+
+      byte[] dimensionBytes = dimensionName.getBytes(UTF_8);
+      int dimensionLength = dimensionBytes.length;
+      dataBuffer.putInt(offset, dimensionLength);
+      offset += Integer.BYTES;
+
+      dataBuffer.readFrom(dimensionBytes, offset);
+      offset += dimensionLength;
+    }
+
+    dataBuffer.putInt(offset, nodesCount);
+    offset += Integer.BYTES;
+
+    return offset;
   }
 
   /**
-   * compute a defualt split order.
+   * Helper method to write the star tree nodes into the data buffer.
    */
-  protected void appendToBuffer(DimensionBuffer dimensions, AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer) throws IOException {
-    _outputStream.write(dimensions.toBytes(), 0, _dimensionSize);
-    _outputStream.write(aggregationFunctionColumnPairBuffer.toBytes(), 0, aggregationFunctionColumnPairBuffer._totalBytes);
+  protected void writeNodes(MMapBuffer dataBuffer, long offset, TreeNode rootNode) {
+    int index = 0;
+    Queue<TreeNode> queue = new LinkedList<>();
+    queue.add(rootNode);
+
+    while (!queue.isEmpty()) {
+      TreeNode node = queue.remove();
+
+      if (node._children == null) {
+        offset =
+            writeNode(dataBuffer, node, offset, StarTreeV2Constant.INVALID_INDEX, StarTreeV2Constant.INVALID_INDEX);
+      } else {
+        int startChildrenIndex = index + queue.size() + 1;
+        int endChildrenIndex = startChildrenIndex + node._children.size() - 1;
+        offset = writeNode(dataBuffer, node, offset, startChildrenIndex, endChildrenIndex);
+
+        queue.addAll(node._children.values());
+      }
+
+      index++;
+    }
   }
 
+  /**
+   * Helper method to write one node into the data buffer.
+   */
+  private long writeNode(MMapBuffer dataBuffer, TreeNode node, long offset, int startChildrenIndex,
+      int endChildrenIndex) {
+    dataBuffer.putInt(offset, node._dimensionId);
+    offset += Integer.BYTES;
+
+    dataBuffer.putInt(offset, node._dimensionValue);
+    offset += Integer.BYTES;
+
+    dataBuffer.putInt(offset, node._startDocId);
+    offset += Integer.BYTES;
+
+    dataBuffer.putInt(offset, node._endDocId);
+    offset += Integer.BYTES;
+
+    dataBuffer.putInt(offset, node._aggDataDocumentId);
+    offset += Integer.BYTES;
+
+    dataBuffer.putInt(offset, startChildrenIndex);
+    offset += Integer.BYTES;
+
+    dataBuffer.putInt(offset, endChildrenIndex);
+    offset += Integer.BYTES;
+
+    return offset;
+  }
 }

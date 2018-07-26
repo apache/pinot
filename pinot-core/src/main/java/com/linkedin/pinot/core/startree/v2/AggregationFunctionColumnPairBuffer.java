@@ -53,16 +53,16 @@ public class AggregationFunctionColumnPairBuffer {
 
       switch (factory.getDataType()) {
         case INT:
-          buffer.putInt((Integer) _values[i]);
+          buffer.putInt(new Integer(_values[i].toString()));
           break;
         case LONG:
-          buffer.putLong((Long) _values[i]);
+          buffer.putLong(new Long(_values[i].toString()));
           break;
         case FLOAT:
-          buffer.putFloat((Float) _values[i]);
+          buffer.putFloat(new Float(_values[i].toString()));
           break;
         case DOUBLE:
-          buffer.putDouble((Double) _values[i]);
+          buffer.putDouble(new Double(_values[i].toString()));
           break;
         case BYTES:
           int size = getObjectSize(factory, _values[i]);
