@@ -43,7 +43,8 @@ public enum AggregationFunctionType {
   DISTINCTCOUNTMV("distinctCountMV"),
   DISTINCTCOUNTHLLMV("distinctCountHLLMV"),
   PERCENTILEMV("percentileMV"),
-  PERCENTILEESTMV("percentileEstMV");
+  PERCENTILEESTMV("percentileEstMV"),
+  PERCENTILETDIGESTMV("percentileTDigestMV");
 
   private final String _name;
 
@@ -84,6 +85,8 @@ public enum AggregationFunctionType {
           return PERCENTILEMV;
         } else if (remainingFunctionName.matches("EST\\d+MV")) {
           return PERCENTILEESTMV;
+        } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
+          return PERCENTILETDIGESTMV;
         } else {
           throw new IllegalArgumentException();
         }

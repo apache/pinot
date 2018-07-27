@@ -53,6 +53,10 @@ public class AggregationFunctionFactory {
           // PercentileEstMV
           return new PercentileEstMVAggregationFunction(
               parsePercentile(remainingFunctionName.substring(3, remainingFunctionName.length() - 2)));
+        } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
+          // PercentileTDigestMV
+          return new PercentileTDigestMVAggregationFunction(
+              parsePercentile(remainingFunctionName.substring(7, remainingFunctionName.length() - 2)));
         } else {
           throw new IllegalArgumentException();
         }
