@@ -60,8 +60,7 @@
     // needed to avoid unscrollable overflow
     max-height: 80vh;
     overflow-x: hidden;
-    overflow-y: scroll;
-    //overflow: auto;
+    overflow-y: auto;
   }
 
   &__footer {

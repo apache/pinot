@@ -99,7 +99,7 @@ export const rootCauseConst = {
 };
 
 /**
- * General root-cause element selectors
+ * General or global element selectors
  */
 export const generalConst = {
   MODAL: '.te-modal',

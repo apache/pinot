@@ -18,11 +18,11 @@
     {{/power-select-multiple}}
 
     <div class="te-form__sub-label te-form__sub-label--micro">Show only these dimensions</div>
-    {{input
+    {{!-- {{input
       type="checkbox"
       id="dimension-order"
       checked=true}}
-    <label for="dimension-order" class="control-label te-label te-label--small">Maintain this order</label>
+    <label for="dimension-order" class="control-label te-label te-label--small">Maintain this order</label> --}}
   </div>
 </fieldset>
 
@@ -89,7 +89,7 @@
     {{#power-select
       triggerId="dimension-select-error"
       triggerClass="te-form__select"
-      verticalPosition="below"
+      verticalPosition="above"
       placeholder="Select a dimension"
       renderInPlace=true
       options=errorOptions
@@ -100,6 +100,5 @@
     }}
       {{errorOption}}
     {{/power-select}}
-    <div class="te-form__sub-label te-form__sub-label--micro">description</div>
   </div>
 </fieldset>

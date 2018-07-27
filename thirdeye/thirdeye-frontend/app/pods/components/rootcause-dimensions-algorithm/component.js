@@ -1,35 +1,45 @@
 /**
- * Component for root cause dimensions table
- * @module components/rootcause-dimensions
+ * Component for root cause dimensions algorithm table
+ * @module components/rootcause-dimensions-algorithm
  * @property {Array} entities - library of currently loaded RCA entities (contains metric properties we depend on)
  * @property {String} metricUrn - URN of currently loaded metric
- * @property {Object} context - a representation of the current cached state of the RCA page (we only care about its 'analysisRange' and 'compareMode' for now)
+ * @property {String} metricId - current metric Id
+ * @property {Set} filters - current applied filters
+ * @property {Array} range - 'analysisRange' from current RCA context
+ * @property {String} mode - 'compareMode' from current RCA context
  * @property {Array} selectedUrns - the list of currently selected and graphed metrics. We sync this with the table's 'isSelecte' row property.
  * @example
-    {{rootcause-dimensions
+    {{rootcause-dimensions-algorithm
       entities=entities
       metricUrn=metricUrn
-      context=context
+      metricId=metricId
+      filters=filteredUrns
+      range=context.anomalyRange
+      mode=context.compareMode
       selectedUrns=selectedUrns
       onSelection=(action "onSelection")
     }}
- * @exports rootcause-dimensions
+ * @exports rootcause-dimensions-algorithm
  * @author smcclung
  */
 
 import fetch from 'fetch';
-import moment from 'moment';
 import Component from '@ember/component';
 import { isPresent, isEmpty } from '@ember/utils';
-import { task, timeout } from 'ember-concurrency';
+import { task } from 'ember-concurrency';
 import { inject as service } from '@ember/service';
 import { checkStatus, makeFilterString } from 'thirdeye-frontend/utils/utils';
 import { selfServeApiGraph } from 'thirdeye-frontend/utils/api/self-serve';
-import { computed, get, set, getProperties, setProperties } from '@ember/object';
+import {
+  get,
+  set,
+  computed,
+  getProperties,
+  setProperties
+} from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
-  toFilterMap,
   hasPrefix,
   toWidthNumber,
   toBaselineRange
@@ -72,7 +82,7 @@ export default Component.extend({
   metricUrn: '',
   filters: '',
 
-    /**
+  /**
    * Existing metric URN
    * @type {String}
    */
@@ -95,7 +105,6 @@ export default Component.extend({
    * @type {Boolean}
    */
   openSettingsModal: false,
-  renderModalContent: false,
 
   /**
    * These are defaults we want the modal to open with
@@ -173,9 +182,8 @@ export default Component.extend({
   dimensionTableData: computed(
     'dimensionsRawData.length',
     'selectedUrns',
-    'metricUrn',
     function () {
-      const { dimensionsRawData, selectedUrns, metricUrn } = this.getProperties('dimensionsRawData', 'selectedUrns', 'metricUrn');
+      const { dimensionsRawData, selectedUrns } = this.getProperties('dimensionsRawData', 'selectedUrns');
       const toFixedIfDecimal = (number) => (number % 1 !== 0) ? number.toFixed(2).toLocaleString() : number.toLocaleString();
       const dimensionNames = dimensionsRawData.dimensions || [];
       const dimensionRows = dimensionsRawData.responseRows || [];
@@ -188,7 +196,6 @@ export default Component.extend({
             dimensionArr, // Generate array of cell-specific objects for each dimension
             dimensionUrn // Generate URN for each record from dimension names/values
           } = this._generateDimensionMeta(dimensionNames, record);
-          let overallContribution = record.contributionToOverallChange;
 
           // New records of template-ready data
           newDimensionRows.push({
@@ -217,9 +224,8 @@ export default Component.extend({
    */
   dimensionTableColumns: computed(
     'dimensionsRawData.length',
-    'selectedUrns',
     function () {
-      const { dimensionsRawData, selectedUrns } = this.getProperties('dimensionsRawData', 'selectedUrns');
+      const dimensionsRawData = get(this, 'dimensionsRawData');
       const dimensionNamesArr = dimensionsRawData.dimensions || [];
       const tableBaseClass = 'rootcause-dimensions-table__column';
       let dimensionColumns = [];
@@ -235,7 +241,7 @@ export default Component.extend({
             title: dimension.capitalize(),
             isGrouped: !isLastDimension, // no label grouping logic on last dimension
             component: 'custom/dimensions-table/dimension',
-            className: `${tableBaseClass} ${tableBaseClass}--med-width ${tableBaseClass}--custom`,
+            className: `${tableBaseClass} ${tableBaseClass}--med-width ${tableBaseClass}--custom`
           });
         });
       }
@@ -362,7 +368,7 @@ export default Component.extend({
     return {
       positive: (contributionValue > 0) ? `${widthPercent + widthAdditivePositive}%` : '0%',
       negative: (contributionValue > 0) ? '0%' : `${widthPercent + widthAdditiveNegative}%`
-    }
+    };
   },
 
   /**
@@ -411,10 +417,9 @@ export default Component.extend({
     /**
      * Handle submission of custom settings from settings modal
      */
-    onSave(data) {
+    onSave() {
       set(this, 'isUserCustomizingRequest', true);
-      set(this, 'renderModalContent', false);
-      debugger;
+      set(this, 'openSettingsModal', false);
       this._fetchIfNewContext();
     },
 
@@ -422,7 +427,7 @@ export default Component.extend({
      * Handle custom settings modal cancel
      */
     onCancel() {
-      //set(this, 'renderModalContent', false);
+      set(this, 'openSettingsModal', false);
     },
 
     /**
@@ -430,7 +435,6 @@ export default Component.extend({
      */
     onClickDimensionOptions() {
       set(this, 'openSettingsModal', true);
-      set(this, 'renderModalContent', true);
     },
 
     /**
@@ -464,7 +468,8 @@ export default Component.extend({
    */
   fetchDimensionOptions: task(function * (metricId) {
     const dimensionList = yield fetch(selfServeApiGraph.metricDimensions(metricId)).then(checkStatus);
-    set(this, 'dimensionOptions', dimensionList);
+    const filteredDimensionList = dimensionList.filter(item => item.toLowerCase() !== 'all');
+    set(this, 'dimensionOptions', filteredDimensionList);
   }).drop(),
 
   /**
