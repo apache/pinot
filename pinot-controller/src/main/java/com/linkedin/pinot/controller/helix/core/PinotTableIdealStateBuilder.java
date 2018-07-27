@@ -25,10 +25,10 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -243,12 +243,12 @@ public class PinotTableIdealStateBuilder {
           LOGGER.info("Successfully retrieved partition count as {} for topic {}", _partitionCount, kafkaTopicName);
         }
         return Boolean.TRUE;
-      } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        LOGGER.warn("Could not get Kafka partition count for topic {}:{}", kafkaTopicName, e);
+      } catch (TransientConsumerException e) {
+        LOGGER.warn("Could not get partition count for topic {}:{}", kafkaTopicName, e);
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
-        LOGGER.warn("Could not get Kafka partition count for topic {}:{}", kafkaTopicName, e);
+        LOGGER.warn("Could not get partition count for topic {}:{}", kafkaTopicName, e);
         _exception = e;
         throw e;
       } finally {

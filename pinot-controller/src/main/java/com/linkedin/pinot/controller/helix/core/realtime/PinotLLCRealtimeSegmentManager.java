@@ -47,16 +47,16 @@ import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdateManager;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
-import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
 import com.linkedin.pinot.core.realtime.segment.RealtimeSegmentAssignmentStrategy;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -1356,7 +1356,7 @@ public class PinotLLCRealtimeSegmentManager {
           LOGGER.info("Successfully retrieved offset({}) for stream topic {} partition {}", _offset, _topicName, _partitionId);
         }
         return Boolean.TRUE;
-      } catch (SimpleConsumerWrapper.TransientConsumerException e) {
+      } catch (TransientConsumerException e) {
         LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId, e.getMessage());
         _exception = e;
         return Boolean.FALSE;
