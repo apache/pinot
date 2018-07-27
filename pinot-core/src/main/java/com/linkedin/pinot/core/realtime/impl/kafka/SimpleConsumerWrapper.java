@@ -83,7 +83,25 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
   private String _currentHost;
   private int _currentPort;
 
+  /**
+   * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
+   * example, no such topic or offset out of range).
+   */
+  public static class KafkaPermanentConsumerException extends RuntimeException {
+    public KafkaPermanentConsumerException(Errors error) {
+      super(error.exception());
+    }
+  }
 
+  /**
+   * A Kafka protocol error that indicates a situation that is likely to be transient (for example, network error or
+   * broker not available).
+   */
+  public static class KafkaTransientConsumerException extends RuntimeException {
+    public KafkaTransientConsumerException(Errors error) {
+      super(error.exception());
+    }
+  }
   public SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
@@ -466,7 +484,7 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
       case UNKNOWN_MEMBER_ID:
       case INVALID_SESSION_TIMEOUT:
       case INVALID_COMMIT_OFFSET_SIZE:
-        return new PermanentConsumerException(kafkaError.exception());
+        return new PermanentConsumerException(new KafkaPermanentConsumerException(kafkaError));
       case UNKNOWN_TOPIC_OR_PARTITION:
       case LEADER_NOT_AVAILABLE:
       case NOT_LEADER_FOR_PARTITION:
@@ -484,7 +502,7 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
       case TOPIC_AUTHORIZATION_FAILED:
       case GROUP_AUTHORIZATION_FAILED:
       case CLUSTER_AUTHORIZATION_FAILED:
-        return new TransientConsumerException(kafkaError.exception());
+        return new TransientConsumerException(new KafkaTransientConsumerException(kafkaError));
       case NONE:
       default:
         return new RuntimeException("Unhandled error " + kafkaError);
