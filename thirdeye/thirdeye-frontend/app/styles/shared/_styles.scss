@@ -296,6 +296,10 @@ body {
       margin-top: -5px;
     }
 
+    &--tall {
+      line-height: 40px;
+    }
+
     &--active {
       border-bottom: 1px dashed;
     }
