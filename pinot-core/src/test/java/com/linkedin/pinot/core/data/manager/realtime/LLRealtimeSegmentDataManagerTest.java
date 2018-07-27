@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
@@ -720,7 +720,7 @@ public class LLRealtimeSegmentDataManagerTest {
     @Override
     protected boolean consumeLoop() throws Exception {
       if (_throwExceptionFromConsume) {
-        throw new SimpleConsumerWrapper.KafkaPermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE);
+        throw new PermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE.exception());
       }
       setCurrentOffset(_consumeOffsets.remove());
       terminateLoopIfNecessary();

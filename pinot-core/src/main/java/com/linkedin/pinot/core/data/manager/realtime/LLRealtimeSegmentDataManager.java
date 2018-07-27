@@ -46,11 +46,12 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
+import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamConsumerExceptions;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.yammer.metrics.core.Meter;
@@ -341,10 +342,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
         continue;
-      } catch (StreamConsumerExceptions.TransientConsumerException e) {
+      } catch (TransientConsumerException e) {
         handleTransientStreamErrors(e);
         continue;
-      } catch (StreamConsumerExceptions.PermanentConsumerException e) {
+      } catch (PermanentConsumerException e) {
         segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
