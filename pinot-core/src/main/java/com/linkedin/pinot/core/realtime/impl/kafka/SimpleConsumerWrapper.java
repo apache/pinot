@@ -87,7 +87,7 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
    * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
    * example, no such topic or offset out of range).
    */
-  public static class KafkaPermanentConsumerException extends RuntimeException {
+  private class KafkaPermanentConsumerException extends RuntimeException {
     public KafkaPermanentConsumerException(Errors error) {
       super(error.exception());
     }
@@ -97,7 +97,7 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
    * A Kafka protocol error that indicates a situation that is likely to be transient (for example, network error or
    * broker not available).
    */
-  public static class KafkaTransientConsumerException extends RuntimeException {
+  private class KafkaTransientConsumerException extends RuntimeException {
     public KafkaTransientConsumerException(Errors error) {
       super(error.exception());
     }
