@@ -31,12 +31,15 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Assign balanced number of segments to each server.
  */
 public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BalancedRandomRoutingTableBuilder.class);
   private static final int DEFAULT_NUM_ROUTING_TABLES = 10;
   private static final String NUM_ROUTING_TABLES_KEY = "numOfRoutingTables";
 
@@ -122,6 +125,9 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
 
   public void computeRoutingTableFromLastUpdate()
   {
+
+    LOGGER.info("Within function to apply new interference status! lastRoutingTablesize: {}, lastSegment2ServerMapSize: {}",getLastRoutingTable().size(), getLastSegment2ServerMap().size());
+
     List<Map<String, List<String>>> routingTables = new ArrayList<>(_numRoutingTables);
     for (int i = 0; i < _numRoutingTables; i++) {
       routingTables.add(new HashMap<String, List<String>>());

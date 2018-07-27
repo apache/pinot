@@ -58,7 +58,7 @@ public class IAwareLBControllerDaemon implements  Runnable{
         long newTimeStamp = _workerWeightListFile.lastModified();
         if(newTimeStamp != _pastTimeStamp)
         {
-             LOGGER.info("EventType: Interference Status Change, EventTime: {}",System.currentTimeMillis());
+             LOGGER.info("EventType: Interference Status Change, EventTime:{}, calling change function!",System.currentTimeMillis());
             _pastTimeStamp = newTimeStamp;
             _routingTableBuilder.computeRoutingTableFromLastUpdate();
 
