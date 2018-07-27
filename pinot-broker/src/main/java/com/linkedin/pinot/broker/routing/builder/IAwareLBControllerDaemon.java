@@ -19,14 +19,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 public class IAwareLBControllerDaemon implements  Runnable{
     private static final Logger LOGGER = LoggerFactory.getLogger(IAwareLBControllerDaemon.class);
     public static final String Worker_Weight_List_Path = "pinot-broker/src/main/resources/worker_weights.config";
-    public static final String Replica_Wise_Worker_Weight_Path = "pinot-broker/src/main/resources/replica_wise_worker_weights.config";
+    public static final String Replica_Wise_Worker_Weigth_Path = "pinot-broker/src/main/resources/replica_wise_worker_weights.config";
 
     BalancedRandomRoutingTableBuilder _routingTableBuilder;
     private long _pastTimeStamp;
@@ -49,8 +46,7 @@ public class IAwareLBControllerDaemon implements  Runnable{
         }
 
         //String workerWeightFilePath = pinotHome + Worker_Weight_List_Path;
-
-         String workerWeightFilePath = pinotHome + Replica_Wise_Worker_Weight_Path;
+         String workerWeightFilePath = pinotHome + Replica_Wise_Worker_Weigth_Path;
 
         _workerWeightListFile = new File(workerWeightFilePath);
         _pastTimeStamp = _workerWeightListFile.lastModified();

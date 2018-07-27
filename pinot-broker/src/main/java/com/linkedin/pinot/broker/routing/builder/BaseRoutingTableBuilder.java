@@ -35,6 +35,11 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   // Set variable as volatile so all threads can get the up-to-date routing tables
   private volatile List<Map<String, List<String>>> _routingTables;
 
+
+  private volatile List<Map<String, List<String>>> _lastRoutingTables;
+  private volatile Map<String, List<String>> _lastSegment2ServerMap;
+
+
   protected static String getServerWithLeastSegmentsAssigned(List<String> servers,
       Map<String, List<String>> routingTable) {
     Collections.shuffle(servers);
@@ -73,5 +78,26 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   @Override
   public List<Map<String, List<String>>> getRoutingTables() {
     return _routingTables;
+  }
+
+
+  protected void setLastRoutingTable(List<Map<String, List<String>>> lastRoutingTables)
+  {
+    _lastRoutingTables = lastRoutingTables;
+  }
+
+  protected List<Map<String, List<String>>> getLastRoutingTable()
+  {
+    return _lastRoutingTables;
+  }
+
+  protected void setLastSegment2ServerMap(Map<String, List<String>> lastSegment2ServerMap)
+  {
+    _lastSegment2ServerMap = lastSegment2ServerMap;
+  }
+
+  protected Map<String, List<String>> getLastSegment2ServerMap()
+  {
+    return _lastSegment2ServerMap;
   }
 }
