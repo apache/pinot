@@ -64,6 +64,27 @@
           <repositoryName>lib</repositoryName>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>1.4.1</version>
+        <executions>
+          <execution>
+            <id>enforcer-rules-warning</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <phase>validate</phase>
+            <configuration>
+              <fail>false</fail>
+              <skip>true</skip>
+              <rules>
+                <dependencyConvergence/>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
   <profiles>
@@ -241,16 +262,16 @@
           <groupId>org.apache.zookeeper</groupId>
           <artifactId>zookeeper</artifactId>
         </exclusion>
-        <exclusion>
+        <!--<exclusion>
           <groupId>com.sun.jersey</groupId>
           <artifactId>jersey-core</artifactId>
-        </exclusion>
+        </exclusion>-->
       </exclusions>
     </dependency>
-    <dependency>
+    <!--<dependency>
       <groupId>com.sun.jersey</groupId>
       <artifactId>jersey-core</artifactId>
-    </dependency>
+    </dependency>-->
     <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>

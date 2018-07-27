@@ -681,11 +681,11 @@
           </exclusion>
         </exclusions>
       </dependency>
-      <dependency>
+      <!--<dependency>
         <groupId>com.sun.jersey</groupId>
         <artifactId>jersey-core</artifactId>
         <version>1.19.2</version>
-      </dependency>
+      </dependency>-->
       <dependency>
         <groupId>org.javassist</groupId>
         <artifactId>javassist</artifactId>
@@ -997,7 +997,9 @@
           <artifactId>maven-enforcer-plugin</artifactId>
           <version>1.4.1</version>
           <configuration>
-            <rules><dependencyConvergence/></rules>
+            <rules>
+              <dependencyConvergence/>
+            </rules>
           </configuration>
         </plugin>
         <plugin>
