@@ -26,7 +26,7 @@ public class IAwareLBControllerDaemon implements  Runnable{
     public static final String Replica_Wise_Worker_Weigth_Path = "pinot-broker/src/main/resources/replica_wise_worker_weights.config";
 
     BalancedRandomRoutingTableBuilder _routingTableBuilder;
-    private long _pastTimeStamp;
+    private volatile long _pastTimeStamp;
     private File _workerWeightListFile;
 
 
@@ -58,6 +58,7 @@ public class IAwareLBControllerDaemon implements  Runnable{
         long newTimeStamp = _workerWeightListFile.lastModified();
         if(newTimeStamp != _pastTimeStamp)
         {
+             LOGGER.info("EventType: Interference Status Change, EventTime: {}",System.currentTimeMillis());
             _pastTimeStamp = newTimeStamp;
             _routingTableBuilder.computeRoutingTableFromLastUpdate();
 
