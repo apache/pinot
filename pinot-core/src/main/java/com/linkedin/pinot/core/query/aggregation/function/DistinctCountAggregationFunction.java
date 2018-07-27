@@ -60,11 +60,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
-    IntOpenHashSet valueSet = aggregationResultHolder.getResult();
-    if (valueSet == null) {
-      valueSet = new IntOpenHashSet();
-      aggregationResultHolder.setValue(valueSet);
-    }
+    IntOpenHashSet valueSet = getValueSet(aggregationResultHolder);
 
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
@@ -74,37 +70,32 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
           valueSet.add(intValues[i]);
         }
         break;
-
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
           valueSet.add(Long.hashCode(longValues[i]));
         }
         break;
-
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
           valueSet.add(Float.hashCode(floatValues[i]));
         }
         break;
-
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           valueSet.add(Double.hashCode(doubleValues[i]));
         }
         break;
-
       case STRING:
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
           valueSet.add(stringValues[i].hashCode());
         }
         break;
-
       default:
-        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
     }
   }
 
@@ -119,37 +110,32 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], intValues[i]);
         }
         break;
-
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Long.hashCode(longValues[i]));
         }
         break;
-
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Float.hashCode(floatValues[i]));
         }
         break;
-
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], Double.hashCode(doubleValues[i]));
         }
         break;
-
       case STRING:
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], stringValues[i].hashCode());
         }
         break;
-
       default:
-        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
     }
   }
 
@@ -164,37 +150,32 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
         }
         break;
-
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Long.hashCode(longValues[i]));
         }
         break;
-
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Float.hashCode(floatValues[i]));
         }
         break;
-
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], Double.hashCode(doubleValues[i]));
         }
         break;
-
       case STRING:
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i].hashCode());
         }
         break;
-
       default:
-        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT aggregation function: " + valueType);
     }
   }
 
@@ -253,11 +234,7 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
    * @param value Value for the group key
    */
   private void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey, int value) {
-    IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
-    if (valueSet == null) {
-      valueSet = new IntOpenHashSet();
-      groupByResultHolder.setValueForKey(groupKey, valueSet);
-    }
+    IntOpenHashSet valueSet = getValueSet(groupByResultHolder, groupKey);
     valueSet.add(value);
   }
 
@@ -272,5 +249,36 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
     for (int groupKey : groupKeys) {
       setValueForGroupKey(groupByResultHolder, groupKey, value);
     }
+  }
+
+  /**
+   * Returns the value set from the result holder or creates a new one if it does not exist.
+   *
+   * @param aggregationResultHolder Result holder
+   * @return Value set from the result holder
+   */
+  protected static IntOpenHashSet getValueSet(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    IntOpenHashSet valueSet = aggregationResultHolder.getResult();
+    if (valueSet == null) {
+      valueSet = new IntOpenHashSet();
+      aggregationResultHolder.setValue(valueSet);
+    }
+    return valueSet;
+  }
+
+  /**
+   * Returns the value set for the given group key. If one does not exist, creates a new one and returns that.
+   *
+   * @param groupByResultHolder Result holder
+   * @param groupKey Group key for which to return the value set
+   * @return Value set for the group key
+   */
+  protected static IntOpenHashSet getValueSet(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
+    if (valueSet == null) {
+      valueSet = new IntOpenHashSet();
+      groupByResultHolder.setValueForKey(groupKey, valueSet);
+    }
+    return valueSet;
   }
 }

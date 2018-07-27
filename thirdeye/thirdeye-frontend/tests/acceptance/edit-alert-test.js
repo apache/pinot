@@ -28,15 +28,12 @@ module('Acceptance | edit alert', function(hooks) {
       'Subscription group button renders ok');
 
 /*  TODO: Test completion needed for new notification settings modal
-
     await fillIn(selfServeConst.ALERT_NAME_INPUT, selfServeConst.NEW_FUNC_NAME);
     await click(selfServeConst.STATUS_TOGGLER);
     await click(selfServeConst.SUBMIT_BUTTON);
-
     assert.ok(
       $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.includes(editSuccessMsg),
       'after edit, alert is saved successfully');
 */
-
   });
 });

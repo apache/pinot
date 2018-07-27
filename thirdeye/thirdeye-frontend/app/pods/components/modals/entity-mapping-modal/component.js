@@ -116,6 +116,18 @@ export default Component.extend({
   user: reads('session.data.authenticated.name'),
 
   /**
+   * Header text of modal
+   * @type {string}
+   */
+  headerText: computed('metric', function () {
+    const metric = get(this, 'metric');
+    if (_.isEmpty(metric)) {
+      return 'Configure Filters';
+    }
+    return `Configure Filters for analyzing ${metric.label}`;
+  }),
+
+  /**
    * Primary metric urn
    */
   metricUrn: computed('_cachedMetric', function() {

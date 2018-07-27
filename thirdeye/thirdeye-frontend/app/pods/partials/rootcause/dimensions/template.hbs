@@ -15,8 +15,10 @@
       entities=entities
       breakdowns=breakdowns
       selectedUrn=metricUrn
+      sizeMetricUrn=sizeMetricUrn
       isLoadingBreakdowns=isLoadingBreakdowns
-      onSelection=(action "heatmapOnSelection")
+      onSelection=(action "onPrimaryChange")
+      onSizeMetric=(action "heatmapOnSizeMetric")
     }}
   {{/subtab.tabpanel}}
 
