@@ -126,7 +126,6 @@ public class KafkaConnectionProvider {
         Lists.newArrayList(Splitter.on(',').trimResults().omitEmptyStrings().split(bootstrapNodes));
 
     final int bootstrapHostCount = hostsAndPorts.size();
-
     if (bootstrapHostCount < 1) {
       throw new IllegalArgumentException("Need at least one bootstrap host");
     }
@@ -136,19 +135,18 @@ public class KafkaConnectionProvider {
 
     for (int i = 0; i < bootstrapHostCount; i++) {
       String hostAndPort = hostsAndPorts.get(i);
-      String[] splittedHostAndPort = hostAndPort.split(":");
-
-      if (splittedHostAndPort.length != 2) {
+      String[] splitHostAndPort = hostAndPort.split(":");
+      if (splitHostAndPort.length != 2) {
         throw new IllegalArgumentException("Unable to parse host:port combination for " + hostAndPort);
       }
 
-      _bootstrapHosts[i] = splittedHostAndPort[0];
+      _bootstrapHosts[i] = splitHostAndPort[0];
 
       try {
-        _bootstrapPorts[i] = Integer.parseInt(splittedHostAndPort[1]);
+        _bootstrapPorts[i] = Integer.parseInt(splitHostAndPort[1]);
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException(
-            "Could not parse port number " + splittedHostAndPort[1] + " for host:port combination " + hostAndPort);
+            "Could not parse port number " + splitHostAndPort[1] + " for host:port combination " + hostAndPort);
       }
     }
   }
