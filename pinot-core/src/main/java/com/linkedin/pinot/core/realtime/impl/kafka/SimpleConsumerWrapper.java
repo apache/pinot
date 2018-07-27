@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerExceptions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -85,8 +86,8 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
    * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
    * example, no such topic or offset out of range).
    */
-  public static class PermanentConsumerException extends RuntimeException {
-    public PermanentConsumerException(Errors error) {
+  public static class KafkaPermanentConsumerException extends StreamConsumerExceptions.PermanentConsumerException {
+    public KafkaPermanentConsumerException(Errors error) {
       super(error.exception());
     }
   }
@@ -95,8 +96,8 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
    * A Kafka protocol error that indicates a situation that is likely to be transient (for example, network error or
    * broker not available).
    */
-  public static class TransientConsumerException extends RuntimeException {
-    public TransientConsumerException(Errors error) {
+  public static class KafkaTransientConsumerException extends StreamConsumerExceptions.TransientConsumerException {
+    public KafkaTransientConsumerException(Errors error) {
       super(error.exception());
     }
   }
@@ -483,7 +484,7 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
       case UNKNOWN_MEMBER_ID:
       case INVALID_SESSION_TIMEOUT:
       case INVALID_COMMIT_OFFSET_SIZE:
-        return new PermanentConsumerException(kafkaError);
+        return new KafkaPermanentConsumerException(kafkaError);
       case UNKNOWN_TOPIC_OR_PARTITION:
       case LEADER_NOT_AVAILABLE:
       case NOT_LEADER_FOR_PARTITION:
@@ -501,7 +502,7 @@ public class SimpleConsumerWrapper implements PinotStreamConsumer {
       case TOPIC_AUTHORIZATION_FAILED:
       case GROUP_AUTHORIZATION_FAILED:
       case CLUSTER_AUTHORIZATION_FAILED:
-        return new TransientConsumerException(kafkaError);
+        return new KafkaTransientConsumerException(kafkaError);
       case NONE:
       default:
         return new RuntimeException("Unhandled error " + kafkaError);

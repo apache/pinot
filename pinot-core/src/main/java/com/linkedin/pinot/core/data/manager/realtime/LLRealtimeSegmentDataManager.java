@@ -45,10 +45,10 @@ import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerExceptions;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -341,11 +341,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
         continue;
-      } catch (SimpleConsumerWrapper.TransientConsumerException e) {
+      } catch (StreamConsumerExceptions.TransientConsumerException e) {
         handleTransientStreamErrors(e);
         continue;
-      } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
-        segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
+      } catch (StreamConsumerExceptions.PermanentConsumerException e) {
+        segmentLogger.warn("Permanent exception from stream when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
         // Unknown exception from stream. Treat as a transient exception.

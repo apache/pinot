@@ -720,7 +720,7 @@ public class LLRealtimeSegmentDataManagerTest {
     @Override
     protected boolean consumeLoop() throws Exception {
       if (_throwExceptionFromConsume) {
-        throw new SimpleConsumerWrapper.PermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE);
+        throw new SimpleConsumerWrapper.KafkaPermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE);
       }
       setCurrentOffset(_consumeOffsets.remove());
       terminateLoopIfNecessary();
