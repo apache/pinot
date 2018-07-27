@@ -5,7 +5,7 @@
     targetAttachment=targetAttachment
     animatable=true}}
 
-    <div class="container">
+    <div class="container {{if isMicroModal "te-modal-micro"}}">
       {{!-- modal header --}}
       {{#if hasHeader}}
         <div class="row te-modal__header">
@@ -18,7 +18,7 @@
               <button {{action "onCancel"}} class="thirdeye-link thirdeye-link--tertiary thirdeye-link--muted" title="cancel">
                 <span class="thirdeye-link__icon">
                   <i class="glyphicon glyphicon-remove"></i>
-              < </span>
+                </span>
               </button>
             </div>
           {{/if}}

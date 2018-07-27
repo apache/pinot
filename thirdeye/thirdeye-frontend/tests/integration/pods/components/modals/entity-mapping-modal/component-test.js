@@ -32,7 +32,7 @@ module('Integration | Component | modals/entity mapping modal', function(hooks) 
     `);
 
     const $modalBody = $('.te-modal__body');
-    assert.equal($('.te-modal__header').text().trim(), `Configure Filters for analyzing ${metric.label}`);
+    assert.equal($('.te-modal__header').text().trim(), `Configure Filters for analyzing`);
     assert.ok($modalBody.find('.te-modal__table').length, 'component should have a table');
 
     clickTrigger('#select-mapping-type');
