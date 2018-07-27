@@ -3,6 +3,11 @@
   margin-top: 12px;
   border: 1px solid app-shade(black, 1);
 
+  &__comment {
+    word-wrap: break-word;
+    width: 220px;
+  }
+
   &__wrapper {
     height: 500px;
     overflow-y: scroll;
