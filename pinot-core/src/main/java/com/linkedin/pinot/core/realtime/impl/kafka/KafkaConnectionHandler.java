@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Provides the kafka connection after ensuring that we're connected to the appropriate broker for consumption.
  */
-public class KafkaConnectionProvider {
-  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConnectionProvider.class);
+public class KafkaConnectionHandler {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConnectionHandler.class);
   private static final int SOCKET_TIMEOUT_MILLIS = 10000;
   private static final int SOCKET_BUFFER_SIZE = 512000;
 
@@ -91,7 +91,7 @@ public class KafkaConnectionProvider {
     }
   }
 
-  public KafkaConnectionProvider(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
+  public KafkaConnectionHandler(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
@@ -107,7 +107,7 @@ public class KafkaConnectionProvider {
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
-  public KafkaConnectionProvider(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
+  public KafkaConnectionHandler(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId, String topic, int partition, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;

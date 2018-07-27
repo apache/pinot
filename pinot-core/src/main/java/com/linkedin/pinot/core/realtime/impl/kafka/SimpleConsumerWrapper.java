@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
-public class SimpleConsumerWrapper extends KafkaConnectionProvider implements PinotStreamConsumer {
+public class SimpleConsumerWrapper extends KafkaConnectionHandler implements PinotStreamConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleConsumerWrapper.class);
 
   public SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
@@ -136,11 +136,11 @@ public class SimpleConsumerWrapper extends KafkaConnectionProvider implements Pi
     // TODO Improve error handling
 
     final long connectEndTime = System.currentTimeMillis() + _connectTimeoutMillis;
-    while(_currentState.getStateValue() != KafkaConnectionProvider.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
+    while(_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
         System.currentTimeMillis() < connectEndTime) {
       _currentState.process();
     }
-    if (_currentState.getStateValue() != KafkaConnectionProvider.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
+    if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
         connectEndTime <= System.currentTimeMillis()) {
       throw new java.util.concurrent.TimeoutException();
     }
@@ -193,12 +193,12 @@ public class SimpleConsumerWrapper extends KafkaConnectionProvider implements Pi
 
     while(System.currentTimeMillis() < endTime) {
       // Try to get into a state where we're connected to Kafka
-      while (_currentState.getStateValue() != KafkaConnectionProvider.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
+      while (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
           System.currentTimeMillis() < endTime) {
         _currentState.process();
       }
 
-      if (_currentState.getStateValue() != KafkaConnectionProvider.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
+      if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
           endTime <= System.currentTimeMillis()) {
         throw new TimeoutException();
       }
