@@ -85,6 +85,11 @@ public class RegexpLikePredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingDictIds() {
+      return getMatchingDictIds().length;
+    }
+
+    @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
         IntList matchingDictIds = new IntArrayList();

@@ -23,9 +23,15 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
   }
 
   @Override
+  public final int getNumMatchingDictIds() { throw new UnsupportedOperationException();}
+
+  @Override
   public final int[] getMatchingDictIds() {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public final int getNumNonMatchingDictIds() { throw new UnsupportedOperationException();}
 
   @Override
   public final int[] getNonMatchingDictIds() {

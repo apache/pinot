@@ -54,7 +54,7 @@ public class FilterPlanNode implements PlanNode {
     if (RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), _brokerRequest, rootFilterNode)) {
       return new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode);
     } else {
-      return constructPhysicalOperator(rootFilterNode, _segment);
+      return constructPhysicalOperator(rootFilterNode, _segment, _brokerRequest);
     }
   }
 
@@ -66,7 +66,8 @@ public class FilterPlanNode implements PlanNode {
    * @return Filter Operator created
    */
   @VisibleForTesting
-  public static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree, IndexSegment segment) {
+  public static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree,
+      IndexSegment segment, BrokerRequest request) {
     if (filterQueryTree == null) {
       return new MatchEntireSegmentOperator(segment.getSegmentMetadata().getTotalRawDocs());
     }
@@ -78,17 +79,18 @@ public class FilterPlanNode implements PlanNode {
       List<BaseFilterOperator> childFilterOperators = new ArrayList<>(childFilters.size());
       if (filterType == FilterOperator.AND) {
         for (FilterQueryTree childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment);
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment,
+              request);
           if (childFilterOperator.isResultEmpty()) {
             return EmptyFilterOperator.getInstance();
           }
           childFilterOperators.add(childFilterOperator);
         }
-        FilterOperatorUtils.reOrderFilterOperators(childFilterOperators);
+        FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, request);
         return new AndOperator(childFilterOperators);
       } else {
         for (FilterQueryTree childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment);
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment, request);
           if (!childFilterOperator.isResultEmpty()) {
             childFilterOperators.add(childFilterOperator);
           }

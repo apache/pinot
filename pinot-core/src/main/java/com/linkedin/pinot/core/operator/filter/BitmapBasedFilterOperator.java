@@ -37,8 +37,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private final int _endDocId;
   private final boolean _exclusive;
 
-  private PredicateEvaluator _predicateEvaluator;
-  private DataSource _dataSource;
   private ImmutableRoaringBitmap[] _bitmaps;
 
   public BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,

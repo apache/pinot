@@ -120,11 +120,13 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
   // Set of group-by columns
   private final Set<String> _groupByColumns;
 
+  private final BrokerRequest _brokerRequest;
   boolean _resultEmpty = false;
 
   public StarTreeIndexBasedFilterOperator(IndexSegment indexSegment, BrokerRequest brokerRequest,
       FilterQueryTree rootFilterNode) {
     _indexSegment = indexSegment;
+    _brokerRequest = brokerRequest;
     _groupByColumns = RequestUtils.getAllGroupByColumns(brokerRequest.getGroupBy());
 
     if (rootFilterNode != null) {
@@ -202,7 +204,7 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
     } else if (childFilterOperators.size() == 1) {
       return childFilterOperators.get(0).nextBlock();
     } else {
-      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators);
+      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, _brokerRequest);
       return new AndOperator(childFilterOperators).nextBlock();
     }
   }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
@@ -22,9 +23,14 @@ import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-
+import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 public class FilterOperatorUtils {
+
+  // Debug option to enable or disable multi-value optimization
+  private static final String USE_MV_OPT = "useMVOpt";
+
   private FilterOperatorUtils() {
   }
 
@@ -58,7 +64,7 @@ public class FilterOperatorUtils {
    * <p>Special filter operators such as {@link MatchEntireSegmentOperator} and {@link EmptyFilterOperator} should be
    * removed from the list before calling this method.
    */
-  public static void reOrderFilterOperators(List<BaseFilterOperator> filterOperators) {
+  public static void reOrderFilterOperators(List<BaseFilterOperator> filterOperators, BrokerRequest request) {
     Collections.sort(filterOperators, new Comparator<BaseFilterOperator>() {
       @Override
       public int compare(BaseFilterOperator o1, BaseFilterOperator o2) {
@@ -79,11 +85,38 @@ public class FilterOperatorUtils {
           return 3;
         }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return 4;
+          return getScanBasedFilterPriority(filterOperator, 4, request);
         }
         throw new IllegalStateException(filterOperator.getClass().getSimpleName()
             + " should not be re-ordered, remove it from the list before calling this method");
       }
     });
+  }
+
+  /**
+   * Returns the priority for scan based filtering. Multivalue column evaluation is costly, so
+   * reorder such that multivalue columns are evaluated after single value columns.
+   *
+   * TODO: additional cost based prioritization to be                         added
+   *
+   * @param filterOperator the filter operator to prioritize
+   * @return the priority to be associated with the filter
+   */
+  private static int getScanBasedFilterPriority(BaseFilterOperator filterOperator,
+      int basePriority, BrokerRequest request) {
+
+    boolean disabled = false;
+    Map<String, String> debugOptions = request.getDebugOptions();
+    if (debugOptions != null &&
+        StringUtils.compareIgnoreCase(debugOptions.get(USE_MV_OPT), "false") == 0) {
+      disabled = true;
+    }
+    DataSourceMetadata metadata = filterOperator.getDataSourceMetadata();
+    if (disabled ||metadata == null || metadata.isSingleValue()) {
+      return basePriority;
+    }
+
+    // lower priority for multivalue
+    return basePriority + 1;
   }
 }
