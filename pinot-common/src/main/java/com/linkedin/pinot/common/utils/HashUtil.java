@@ -20,6 +20,22 @@ import java.nio.IntBuffer;
 
 
 public class HashUtil {
+
+  /** Tests show that even for smaller set sizes, setting the hash size to this min value
+   * improves performance at an insignificant increase of memory footprint.
+   */
+  public static int MIN_FASTUTIL_HASHSET_SIZE = 25;
+
+  /**
+   * Returns the min size for the fast-util hash-set given the expected size of
+   * values stored in the hash-set.
+   * @param expected the expected/actual number of values to be stored
+   * @return the optimal min value
+   */
+  public static int getMinHashSetSize(int expected) {
+    return Math.min(MIN_FASTUTIL_HASHSET_SIZE, expected);
+  }
+
   public static long compute(IntBuffer buff) {
     buff.rewind();
     ByteBuffer bBuff = ByteBuffer.allocate(buff.array().length * 4);
