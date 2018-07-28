@@ -31,8 +31,8 @@ public class MinMVAggregationFunction extends MinAggregationFunction {
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.MINMV.getName() + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.MINMV.getName() + "_" + column;
   }
 
   @Override

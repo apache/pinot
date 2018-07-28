@@ -35,8 +35,8 @@ public class MaxAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.MAX.getName() + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.MAX.getName() + "_" + column;
   }
 
   @Override

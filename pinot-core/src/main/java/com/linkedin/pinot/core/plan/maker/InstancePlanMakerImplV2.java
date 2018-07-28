@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.plan.maker;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.AggregationGroupByPlanNode;
@@ -30,6 +31,7 @@ import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.plan.SelectionPlanNode;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
@@ -186,9 +188,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
     if (functionType.isOfType(AggregationFunctionType.MIN, AggregationFunctionType.MAX,
         AggregationFunctionType.MINMAXRANGE)) {
-      String column = aggregationInfo.getAggregationParams().get("column");
-      Dictionary dictionary = indexSegment.getDataSource(column).getDictionary();
-      return dictionary != null && dictionary.isSorted();
+      String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
+      if (TransformExpressionTree.compileToExpressionTree(expression).getExpressionType()
+          == TransformExpressionTree.ExpressionType.IDENTIFIER) {
+        Dictionary dictionary = indexSegment.getDataSource(expression).getDictionary();
+        return dictionary != null && dictionary.isSorted();
+      }
     }
     return false;
   }

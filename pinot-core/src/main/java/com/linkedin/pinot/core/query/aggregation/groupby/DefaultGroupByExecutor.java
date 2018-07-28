@@ -83,8 +83,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       _functions[i] = function;
       // TODO: currently only support single argument aggregation
       if (function.getType() != AggregationFunctionType.COUNT) {
-        _aggregationExpressions[i] =
-            TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
+        _aggregationExpressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumn());
       }
     }
 

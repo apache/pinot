@@ -38,8 +38,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.DISTINCTCOUNTHLL.getName() + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.DISTINCTCOUNTHLL.getName() + "_" + column;
   }
 
   @Override

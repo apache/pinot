@@ -37,10 +37,10 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   AggregationFunctionType getType();
 
   /**
-   * Given the aggregation columns, get the column name for the results.
+   * Given the aggregation column, get the column name for the results.
    */
   @Nonnull
-  String getColumnName(@Nonnull String[] columns);
+  String getColumnName(@Nonnull String column);
 
   /**
    * Accept an aggregation function visitor to visit.

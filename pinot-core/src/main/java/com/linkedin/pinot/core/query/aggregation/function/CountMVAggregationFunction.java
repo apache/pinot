@@ -31,8 +31,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.COUNTMV.getName() + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.COUNTMV.getName() + "_" + column;
   }
 
   @Override
