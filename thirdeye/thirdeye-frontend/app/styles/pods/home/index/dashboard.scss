@@ -1,4 +1,13 @@
 .dashboard-container {
+  header {
+    .range-pill-selectors {
+      display: inline-flex;
+    }
+    .te-button {
+      margin-top: 15px;
+    }
+  }
+
   &__body {
     background-color: #FFF;
     margin-bottom: $te-default-element-spacing;

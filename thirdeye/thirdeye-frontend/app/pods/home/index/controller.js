@@ -1,6 +1,6 @@
 import Controller from '@ember/controller';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
-import { computed, set } from '@ember/object';
+import { computed, set, get } from '@ember/object';
 import { isBlank } from '@ember/utils';
 import moment from 'moment';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
@@ -13,13 +13,7 @@ const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently acro
 const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
 
 export default Controller.extend({
-  queryParams: ['appName', 'startDate', 'endDate', 'duration'],
-  appName: null,
-  startDate: null,
-  endDate: null,
-  duration: null,
   anomalyResponseObj: anomalyUtil.anomalyResponseObj,
-  feedbackType: 'All Resolutions',
   toggleCollapsed: false, /* hide/show accordians */
 
   /**
@@ -31,7 +25,7 @@ export default Controller.extend({
 
   init() {
     this._super(...arguments);
-    this.get('anomalyResponseObj').push({
+    get(this, 'anomalyResponseObj').push({
       name: 'All Resolutions',
       value: 'ALL',
       status: 'All Resolutions'
@@ -44,25 +38,26 @@ export default Controller.extend({
       return anomalyUtil.anomalyResponseObj.mapBy('name');
     }
   ),
+
   filteredAnomalyMapping: computed(
-    'model.anomalyMapping', 'feedbackType',
+    'model.{anomalyMapping,feedbackType}',
     function() {
-      let filteredAnomalyMapping = this.get('model.anomalyMapping');
-      const feedbackType = this.get('feedbackType');
+      let filteredAnomalyMapping = get(this, 'model.anomalyMapping');
+      const feedbackType = get(this, 'model.feedbackType');
       const feedbackItem = this._checkFeedback(feedbackType);
 
       if (feedbackItem.value !== 'ALL' && !isBlank(filteredAnomalyMapping)) {
         let map = {};
-          // Iterate through each anomaly
+        // Iterate through each anomaly
         Object.keys(filteredAnomalyMapping).some(function(key) {
-            filteredAnomalyMapping[key].forEach(attr => {
-              if (attr.anomaly.data.feedback === feedbackItem.value) {
-                if (!map[key]) {
-                  map[key] = [];
-                }
-                map[key].push(attr);
+          filteredAnomalyMapping[key].forEach(attr => {
+            if (attr.anomaly.data.feedback === feedbackItem.value) {
+              if (!map[key]) {
+                map[key] = [];
               }
-            });
+              map[key].push(attr);
+            }
+          });
         });
         return map;
       } else {
@@ -79,10 +74,10 @@ export default Controller.extend({
   pill: computed(
     'model.{appName,startDate,endDate,duration}',
     function() {
-      const appName = this.get('model.appName');
-      const startDate = Number(this.get('model.startDate'));
-      const endDate = Number(this.get('model.endDate'));
-      const duration = this.get('model.duration') || DEFAULT_ACTIVE_DURATION;
+      const appName = get(this, 'model.appName');
+      const startDate = Number(get(this, 'model.startDate'));
+      const endDate = Number(get(this, 'model.endDate'));
+      const duration = get(this, 'model.duration') || DEFAULT_ACTIVE_DURATION;
       const predefinedRanges = {
         'Today': [moment().startOf('day'), moment()],
         'Last 24 hours': [moment().subtract(1, 'day'), moment()],
@@ -109,18 +104,18 @@ export default Controller.extend({
   stats: computed(
     'model.anomalyPerformance',
     function() {
-      if (!this.get('model.anomalyPerformance')) {
+      if (!get(this, 'model.anomalyPerformance')) {
         return {};
       }
 
-      const { responseRate, precision, recall } = this.get('model.anomalyPerformance').getProperties('responseRate', 'precision', 'recall');
+      const { responseRate, precision, recall } = get(this, 'model.anomalyPerformance').getProperties('responseRate', 'precision', 'recall');
       const totalAlertsDescription = 'Total number of anomalies that occured over a period of time';
       const responseRateDescription = '% of anomalies that are reviewed';
       const precisionDescription = '% of all anomalies detected by the system that are true';
       const recallDescription = '% of all anomalies detected by the system';
       //TODO: Since totalAlerts is not correct here. We will use anomaliesCount for now till backend api is fixed. - lohuynh
       const statsArray = [
-        ['Number of anomalies', totalAlertsDescription, this.get('anomaliesCount'), 'digit'],
+        ['Number of anomalies', totalAlertsDescription, get(this, 'anomaliesCount'), 'digit'],
         ['Response Rate', responseRateDescription, floatToPercent(responseRate), 'percent'],
         ['Precision', precisionDescription, floatToPercent(precision), 'percent'],
         ['Recall', recallDescription, floatToPercent(recall), 'percent']
@@ -136,14 +131,17 @@ export default Controller.extend({
    * @return {string}
    */
   _checkFeedback: function(selected) {
-    return this.get('anomalyResponseObj').find((type) => {
-       return type.name === selected;
-     });
+    return get(this, 'anomalyResponseObj').find((type) => {
+      return type.name === selected;
+    });
   },
 
   actions: {
+    /**
+     * Toggles the show/hide of the metric tables
+     */
     toggleAllAccordions() {
-      this.toggleProperty('toggleCollapsed')
+      this.toggleProperty('toggleCollapsed');
     },
 
     /**
@@ -169,7 +167,7 @@ export default Controller.extend({
 
       const startDate = moment(start).valueOf();
       const endDate = moment(end).valueOf();
-      const appName = this.get('appName');
+      const appName = get(this, 'appName');
       //Update the time range option selected
       this.set('timeRangeOptions', setUpTimeRangeOptions(TIME_RANGE_OPTIONS, duration));
       this.transitionToRoute({ queryParams: { appName, duration, startDate, endDate }});
@@ -181,9 +179,9 @@ export default Controller.extend({
      * @param {String} feedbackType - the current feedback type
      * @param {String} selected - the selection item
      */
-     onFilterBy(feedbackType, selected) {
-       const feedbackItem = this._checkFeedback(selected);
-       this.set('feedbackType', feedbackItem.name);
+    onFilterBy(feedbackType, selected) {
+      const feedbackItem = this._checkFeedback(selected);
+      set(this, 'feedbackType', feedbackItem.name);
     }
   }
 });
