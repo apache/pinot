@@ -162,6 +162,7 @@ public class PinotSegmentUploadRestletResource {
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @ApiParam(value = "Segment version", required = false) @QueryParam("version") @Encoded String versionString,
       @Context HttpHeaders httpHeaders) {
     // Validate data access
     boolean hasDataAccess;
@@ -189,7 +190,10 @@ public class PinotSegmentUploadRestletResource {
       String errStr = "Could not decode segment name '" + segmentName + "'";
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST);
     }
-    final File dataFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
+    File dataFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName));
+    if (versionString != null && !versionString.isEmpty()) {
+      dataFile = new File(provider.getBaseDataDir(), StringUtil.join("/", tableName, segmentName, versionString));
+    }
     if (!dataFile.exists()) {
       throw new ControllerApplicationException(LOGGER,
           "Segment " + segmentName + " or table " + tableName + " not found", Response.Status.NOT_FOUND);

@@ -90,9 +90,9 @@ public abstract class PinotFS {
    * Copies a file from a remote filesystem to the local one. Keeps the original file.
    * @param srcUri location of current file on remote filesystem
    * @param dstUri location of destination on local filesystem
-   * @throws IOException IO Failures
+   * @throws Exception for IO failures and retry failures
    */
-  public abstract void copyToLocalFile(URI srcUri, URI dstUri) throws IOException;
+  public abstract void copyToLocalFile(URI srcUri, URI dstUri) throws Exception;
 
   /**
    * The src file is on the local disk. Add it to filesystem at the given dst name and the source is kept intact
@@ -102,4 +102,11 @@ public abstract class PinotFS {
    * @throws IOException for IO Error
    */
   public abstract void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException;
+
+  /**
+   * This method will determine whether files can be moved from the srcUri to the dstUri without
+   * copying the file locally first. We will handle move and copy inside the fs even if
+   * a copyToLocal needs to be done.
+   */
+  public abstract boolean canMoveBetweenLocations(URI srcUri, URI dstUri);
 }

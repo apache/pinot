@@ -107,12 +107,20 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
+  public void copyToLocalFile(URI srcUri, URI dstUri) throws Exception {
     copy(srcUri, dstUri);
   }
 
   @Override
   public void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException {
     copy(srcUri, dstUri);
+  }
+
+  /**
+   * Only allows moving files locally where both src and dst are file
+   */
+  @Override
+  public boolean canMoveBetweenLocations(URI srcUri, URI dstUri) {
+    return srcUri.getScheme().equals("file") && srcUri.getScheme().equals(dstUri.getScheme());
   }
 }

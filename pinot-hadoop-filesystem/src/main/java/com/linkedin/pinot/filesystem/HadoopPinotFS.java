@@ -16,6 +16,9 @@
 package com.linkedin.pinot.filesystem;
 
 import com.google.common.base.Strings;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -119,13 +122,45 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
-    hadoopFS.copyToLocalFile(new Path(srcUri), new Path(dstUri));
+  public void copyToLocalFile(URI srcUri, URI dstUri) throws Exception {
+    LOGGER.debug("starting to fetch segment from hdfs");
+    final String tempFilePath = dstUri.getPath();
+    try {
+      final Path remoteFile = new Path(srcUri);
+      final Path localFile = new Path(dstUri);
+
+      RetryPolicy fixDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(retryCount, retryWaitMs);
+      fixDelayRetryPolicy.attempt(() -> {
+        try {
+          if (hadoopFS == null) {
+            throw new RuntimeException("hadoopFS client is not initialized when trying to copy files");
+          }
+          long startMs = System.currentTimeMillis();
+          hadoopFS.copyToLocalFile(remoteFile, localFile);
+          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri.getPath(), tempFilePath,
+              new File(dstUri).length(), System.currentTimeMillis() - startMs);
+          return true;
+        } catch (IOException ex) {
+          LOGGER.warn(String.format("failed to fetch segment %s from hdfs, might retry", srcUri.getPath()), ex);
+          return false;
+        }
+      });
+    } catch (Exception ex) {
+      LOGGER.error(String.format("failed to fetch %s from hdfs to local %s", srcUri.getPath(), tempFilePath), ex);
+      throw ex;
+    }
   }
 
   @Override
   public void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException {
     hadoopFS.copyFromLocalFile(new Path(srcUri), new Path(dstUri));
+  }
+
+  @Override
+  public boolean canMoveBetweenLocations(URI srcUri, URI dstUri) {
+    return srcUri.getScheme().equals("hdfs")
+        && dstUri.getScheme().equals("hdfs")
+        && srcUri.getHost().equals(dstUri.getHost());
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {
