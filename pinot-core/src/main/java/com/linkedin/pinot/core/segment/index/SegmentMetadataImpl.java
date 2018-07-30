@@ -96,7 +96,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _segmentStartTime;
   private long _segmentEndTime;
 
- 
+
   /**
    * For segments on disk.
    * <p>Index directory passed in should be top level segment directory.
@@ -305,11 +305,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     // Build star tree v2 metadata.
-    String starTreeCount = _segmentMetadataPropertiesConfiguration.getString(StarTreeV2Constant.STAR_TREE_V2_COUNT);
+    String starTreeCount = segmentMetadataPropertiesConfiguration.getString(StarTreeV2Constant.STAR_TREE_V2_COUNT);
     _starTreesV2Count = starTreeCount != null ? Integer.parseInt(starTreeCount) : 0;
 
     if (_starTreesV2Count > 0) {
-      initStarTreeV2Metadata(_starTreesV2Count);
+      initStarTreeV2Metadata(_starTreesV2Count, segmentMetadataPropertiesConfiguration);
     }
   }
 
@@ -369,14 +369,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   /**
    * Reads and initializes the star tree v2 metadata from segment metadata properties.
    */
-  private void initStarTreeV2Metadata(int starTreesCount) {
+  private void initStarTreeV2Metadata(int starTreesCount, PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
 
     _starTreeV2MetadataList = new ArrayList<>();
     for ( int i = 0; i < starTreesCount;  i++ ) {
 
       // met2agg func pairs
       String met2agg = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
-      Iterator<String> iterator = _segmentMetadataPropertiesConfiguration.getList(met2agg).iterator();
+      Iterator<String> iterator = segmentMetadataPropertiesConfiguration.getList(met2agg).iterator();
       Set<AggregationFunctionColumnPair> aggFunColPairs = new HashSet<>();
       while (iterator.hasNext()) {
         final String sPair = iterator.next();
@@ -388,7 +388,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
       // dimension split order
       String splitOrder = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
-      iterator = _segmentMetadataPropertiesConfiguration.getList(splitOrder).iterator();
+      iterator = segmentMetadataPropertiesConfiguration.getList(splitOrder).iterator();
       List<String> dimensionsSplitOrder = new ArrayList<>();
       while (iterator.hasNext()) {
         final String splitColumn = iterator.next();
@@ -397,7 +397,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
       // dimension split order
       String withoutStarNode = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
-      iterator = _segmentMetadataPropertiesConfiguration.getList(withoutStarNode).iterator();
+      iterator = segmentMetadataPropertiesConfiguration.getList(withoutStarNode).iterator();
       Set<String> dimensionWithoutStarNode = new HashSet<>();
       while (iterator.hasNext()) {
         final String splitColumn = iterator.next();
@@ -406,11 +406,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
       // number of aggregated docs.
       String aggregatedDocsCount = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
-      String docsCount = _segmentMetadataPropertiesConfiguration.getString(aggregatedDocsCount);
+      String docsCount = segmentMetadataPropertiesConfiguration.getString(aggregatedDocsCount);
 
       // max number of records in leaf.
       String maxLeafRecordString = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
-      String maxLeafRecord = _segmentMetadataPropertiesConfiguration.getString(maxLeafRecordString);
+      String maxLeafRecord = segmentMetadataPropertiesConfiguration.getString(maxLeafRecordString);
 
 
       StarTreeV2Metadata metadata = new StarTreeV2Metadata(Integer.parseInt(docsCount), dimensionsSplitOrder, aggFunColPairs, Integer.parseInt(maxLeafRecord), dimensionWithoutStarNode);

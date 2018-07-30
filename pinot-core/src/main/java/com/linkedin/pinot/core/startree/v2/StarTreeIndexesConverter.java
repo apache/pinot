@@ -17,6 +17,7 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.File;
+import java.util.Set;
 import java.util.List;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -28,7 +29,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.nio.channels.FileChannel;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 

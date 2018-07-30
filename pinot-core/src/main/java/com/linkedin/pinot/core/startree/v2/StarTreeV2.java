@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import java.io.Closeable;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.startree.StarTree;
-import java.io.Closeable;
 
 
 /**
