@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.query.aggregation.function;
 
 import com.clearspring.analytics.stream.quantile.TDigest;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
@@ -23,6 +24,7 @@ import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import javax.annotation.Nonnull;
 
 
@@ -32,7 +34,7 @@ import javax.annotation.Nonnull;
 public class PercentileTDigestAggregationFunction implements AggregationFunction<TDigest, Double> {
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
-  private final int _percentile;
+  protected final int _percentile;
 
   public PercentileTDigestAggregationFunction(int percentile) {
     _percentile = percentile;
@@ -70,53 +72,89 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
-    byte[][] valueArray = blockValSets[0].getBytesValuesSV();
-    TDigest tDigest = aggregationResultHolder.getResult();
-    if (tDigest == null) {
-      tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
-      aggregationResultHolder.setValue(tDigest);
-    }
+    TDigest tDigest = getTDigest(aggregationResultHolder);
 
-    for (int i = 0; i < length; i++) {
-      tDigest.add(TDigest.fromBytes(ByteBuffer.wrap(valueArray[i])));
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          tDigest.add(valueArray[i]);
+        }
+        break;
+      case BYTES:
+        // Serialized TDigest
+        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          tDigest.add(TDigest.fromBytes(ByteBuffer.wrap(bytesValues[i])));
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for PERCENTILE_TDIGEST aggregation function: " + valueType);
     }
   }
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    byte[][] valueArray = blockValSets[0].getBytesValuesSV();
-
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-
-      TDigest tDigest = groupByResultHolder.getResult(groupKey);
-      if (tDigest == null) {
-        tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
-        groupByResultHolder.setValueForKey(groupKey, tDigest);
-      }
-
-      tDigest.add(TDigest.fromBytes(ByteBuffer.wrap(valueArray[i])));
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
+          tDigest.add(valueArray[i]);
+        }
+        break;
+      case BYTES:
+        // Serialized TDigest
+        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
+          tDigest.add(TDigest.fromBytes(ByteBuffer.wrap(bytesValues[i])));
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for PERCENTILE_TDIGEST aggregation function: " + valueType);
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    byte[][] valueArray = blockValSets[0].getBytesValuesSV();
-
-    for (int i = 0; i < length; i++) {
-      byte[] value = valueArray[i];
-
-      for (int groupKey : groupKeysArray[i]) {
-        TDigest tDigest = groupByResultHolder.getResult(groupKey);
-        if (tDigest == null) {
-          tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
-          groupByResultHolder.setValueForKey(groupKey, tDigest);
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+        double[] valueArray = blockValSets[0].getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          double value = valueArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
+            tDigest.add(value);
+          }
         }
-
-        tDigest.add(TDigest.fromBytes(ByteBuffer.wrap(value)));
-      }
+      case BYTES:
+        // Serialized QuantileDigest
+        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+        for (int i = 0; i < length; i++) {
+          TDigest value = TDigest.fromBytes(ByteBuffer.wrap(bytesValues[i]));
+          for (int groupKey : groupKeysArray[i]) {
+            TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
+            tDigest.add(value);
+          }
+        }
+        break;
+      default:
+        throw new IllegalStateException("Illegal data type for PERCENTILE_TDIGEST aggregation function: " + valueType);
     }
   }
 
@@ -164,5 +202,36 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   @Override
   public Double extractFinalResult(@Nonnull TDigest intermediateResult) {
     return intermediateResult.quantile(_percentile / 100.0);
+  }
+
+  /**
+   * Returns the TDigest from the result holder or creates a new one if it does not exist.
+   *
+   * @param aggregationResultHolder Result holder
+   * @return TDigest from the result holder
+   */
+  protected static TDigest getTDigest(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    TDigest tDigest = aggregationResultHolder.getResult();
+    if (tDigest == null) {
+      tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
+      aggregationResultHolder.setValue(tDigest);
+    }
+    return tDigest;
+  }
+
+  /**
+   * Returns the TDigest for the given group key. If one does not exist, creates a new one and returns that.
+   *
+   * @param groupByResultHolder Result holder
+   * @param groupKey Group key for which to return the TDigest
+   * @return TDigest for the group key
+   */
+  protected static TDigest getTDigest(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    TDigest tDigest = groupByResultHolder.getResult(groupKey);
+    if (tDigest == null) {
+      tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
+      groupByResultHolder.setValueForKey(groupKey, tDigest);
+    }
+    return tDigest;
   }
 }

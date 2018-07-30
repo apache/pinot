@@ -119,7 +119,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
     _starTreeCount++;
     _aggregationFunctionFactory = new AggregationFunctionFactory();
 
-    File metadataFile = StarTreeV2Util.findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    File metadataFile = StarTreeV2BaseClass.findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     _properties = new PropertiesConfiguration(metadataFile);
   }
 
@@ -267,8 +267,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
     MMapBuffer dataBuffer = new MMapBuffer(starTreeFile, 0, totalSizeInBytes, MMapMode.READ_WRITE);
 
     try {
-      long offset = writeHeader(dataBuffer, headerSizeInBytes, _dimensionsCount, _dimensionsName,
-              _nodesCount);
+      long offset = writeHeader(dataBuffer, headerSizeInBytes, _dimensionsCount, _dimensionsName, _nodesCount);
       writeNodes(dataBuffer, offset, _rootNode);
     } finally {
       dataBuffer.flush();
@@ -403,7 +402,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
     _nodesCount++;
 
     List<Record> sortedFilteredData = filterData(startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder,
-            _starTreeData);
+        _starTreeData);
     List<Record> condensedData = condenseData(sortedFilteredData, _aggFunColumnPairs,
         !StarTreeV2Constant.IS_RAW_DATA);
     _starTreeData.addAll(condensedData);
@@ -496,7 +495,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
       }
     }
     List<Object> aggregatedValues = aggregateMetrics(0, chilAggRecordsList.size(), chilAggRecordsList,
-            _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
+        _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
     int aggDocId = appendAggregatedDocuments(aggregatedValues, parent);
 
     return aggDocId;
@@ -513,7 +512,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
   private List<Object> getAggregatedDocument(int startDocId, int endDocId) {
 
     List<Object> aggregatedValues = aggregateMetrics(startDocId, endDocId, _starTreeData, _aggFunColumnPairs,
-            !StarTreeV2Constant.IS_RAW_DATA);
+        !StarTreeV2Constant.IS_RAW_DATA);
 
     return aggregatedValues;
   }
@@ -546,8 +545,8 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
   /**
    * sort the star tree data.
    */
-  private List<Record> sortStarTreeData(int startDocId, int endDocId, List<Integer> sortOrder, List<Record> starTreeData) {
 
+  protected List<Record> sortStarTreeData(int startDocId, int endDocId, List<Integer> sortOrder, List<Record> starTreeData) {
     List<Record> newData = new ArrayList<>();
     for (int i = startDocId; i < endDocId; i++) {
       newData.add(starTreeData.get(i));
@@ -573,8 +572,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
   /**
    * Filter data by removing the dimension we don't need.
    */
-  private List<Record> filterData(int startDocId, int endDocId, int dimensionIdToRemove, List<Integer> sortOrder,
-      List<Record> starTreeData) {
+  protected List<Record> filterData(int startDocId, int endDocId, int dimensionIdToRemove, List<Integer> sortOrder, List<Record> starTreeData) {
 
     List<Record> newData = new ArrayList<>();
 
@@ -596,8 +594,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
   /**
    * function to condense documents according to sorted order.
    */
-  private List<Record> condenseData(List<Record> starTreeData, List<AggregationFunctionColumnPair> aggfunColumnPairs,
-      boolean isRawData) {
+  protected List<Record> condenseData(List<Record> starTreeData, List<AggregationFunctionColumnPair> aggfunColumnPairs, boolean isRawData) {
     int start = 0;
     List<Record> newData = new ArrayList<>();
     Record prevRecord = starTreeData.get(0);
@@ -607,7 +604,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
       int[] prevDimensions = prevRecord.getDimensionValues();
       int[] nextDimensions = nextRecord.getDimensionValues();
 
-      if (!RecordUtil.compareDimensions(prevDimensions, nextDimensions)) {
+      if (!Record.compareDimensions(prevDimensions, nextDimensions)) {
         List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, aggfunColumnPairs, isRawData);
         Record newRecord = new Record();
         newRecord.setMetricValues(aggregatedMetricsValue);

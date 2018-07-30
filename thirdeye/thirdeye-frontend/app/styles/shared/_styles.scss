@@ -80,6 +80,12 @@ body {
     &--two-share {
       width: 49%;
     }
+
+    &--hz-micro {
+      width: 50%;
+      float: left;
+      clear: right;
+    }
   }
 
   &__list {
@@ -288,6 +294,10 @@ body {
 
     &--low {
       margin-top: -5px;
+    }
+
+    &--tall {
+      line-height: 40px;
     }
 
     &--active {

@@ -164,49 +164,6 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
     }
   }
 
-  public StarTreeIndexBasedFilterOperator(IndexSegment indexSegment, BrokerRequest brokerRequest,
-      FilterQueryTree rootFilterNode, int starTreeId) {
-    _indexSegment = indexSegment;
-    _groupByColumns = RequestUtils.getAllGroupByColumns(brokerRequest.getGroupBy());
-    OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
-
-//    loadTest.init(_indexSegment.);
-
-    if (rootFilterNode != null) {
-      Map<String, List<Predicate>> predicatesMap = processFilterTree(rootFilterNode);
-
-      // Remove columns with predicates from group-by columns because we won't use star node for that column
-      _groupByColumns.removeAll(predicatesMap.keySet());
-
-      int numColumns = predicatesMap.size();
-      _predicateEvaluatorsMap = new HashMap<>(numColumns);
-      _matchingDictIdsMap = new HashMap<>(numColumns);
-
-      // Initialize the predicate evaluators map
-      for (Map.Entry<String, List<Predicate>> entry : predicatesMap.entrySet()) {
-        String columnName = entry.getKey();
-        List<Predicate> predicates = entry.getValue();
-        List<PredicateEvaluator> predicateEvaluators = new ArrayList<>(predicates.size());
-
-        DataSource dataSource = _indexSegment.getDataSource(columnName);
-        for (Predicate predicate : predicates) {
-          PredicateEvaluator predicateEvaluator =
-              PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource);
-          // If predicate is always evaluated false, the result for the filter operator will be empty, early terminate
-          if (predicateEvaluator.isAlwaysFalse()) {
-            _resultEmpty = true;
-            return;
-          }
-          predicateEvaluators.add(predicateEvaluator);
-        }
-        _predicateEvaluatorsMap.put(columnName, predicateEvaluators);
-      }
-    } else {
-      _predicateEvaluatorsMap = Collections.emptyMap();
-      _matchingDictIdsMap = Collections.emptyMap();
-    }
-  }
-
   /**
    * Helper method to process the filter tree and get a map from column to a list of predicates applied to it.
    */

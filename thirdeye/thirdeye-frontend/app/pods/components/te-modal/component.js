@@ -41,6 +41,7 @@ export default Component.extend({
   isInvalid: false,
   hasHeader: true,
   hasFooter: true,
+  isMicroModal: false,
   cancelButtonText: 'Cancel',
   submitButtonText: 'Save',
   isShowingModal: true,

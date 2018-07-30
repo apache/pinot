@@ -16,18 +16,19 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.BufferedReader;
+
 import java.io.File;
-import java.io.FileReader;
+import java.util.Set;
 import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
 import java.nio.ByteOrder;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.channels.FileChannel;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.startree.StarTree;
@@ -57,11 +58,11 @@ public class StarTreeV2DataSource {
 
   public StarTreeV2DataSource(SegmentMetadataImpl segmentMetadataImpl, StarTreeV2Metadata metadata, File indexDir) {
 
-    _starTreeIndexMapFile = StarTreeV2Util.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
+    _starTreeIndexMapFile = StarTreeV2BaseClass.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
     _columnIndexInfoMap = readMetaData(_starTreeIndexMapFile);
 
     _starTreeFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_TEMP_FILE);
-    _indexDataFile = StarTreeV2Util.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);
+    _indexDataFile = StarTreeV2BaseClass.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);
     ;
 
     _docsCount = metadata.getNumDocs();

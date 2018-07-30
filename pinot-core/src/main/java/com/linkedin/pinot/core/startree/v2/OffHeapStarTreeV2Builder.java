@@ -125,7 +125,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     _starTreeCount++;
     _aggregationFunctionFactory = new AggregationFunctionFactory();
 
-    File metadataFile = StarTreeV2Util.findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    File metadataFile = StarTreeV2BaseClass.findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     _properties = new PropertiesConfiguration(metadataFile);
   }
 

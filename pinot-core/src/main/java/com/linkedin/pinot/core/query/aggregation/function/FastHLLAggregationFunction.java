@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
@@ -68,17 +67,13 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
     String[] valueArray = blockValSets[0].getStringValuesSV();
-    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
-    if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(_log2m);
-      aggregationResultHolder.setValue(hyperLogLog);
-    }
-    for (int i = 0; i < length; i++) {
-      try {
+    HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
+    try {
+      for (int i = 0; i < length; i++) {
         hyperLogLog.addAll(HllUtil.convertStringToHll(valueArray[i]));
-      } catch (CardinalityMergeException e) {
-        throw new RuntimeException("Caught exception while aggregating HyperLogLog.", e);
       }
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
     }
   }
 
@@ -86,18 +81,13 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
     String[] valueArray = blockValSets[0].getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-      if (hyperLogLog == null) {
-        hyperLogLog = new HyperLogLog(_log2m);
-        groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
-      }
-      try {
+    try {
+      for (int i = 0; i < length; i++) {
+        HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKeyArray[i]);
         hyperLogLog.addAll(HllUtil.convertStringToHll(valueArray[i]));
-      } catch (CardinalityMergeException e) {
-        throw new RuntimeException("Caught exception while aggregating HyperLogLog.", e);
       }
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
     }
   }
 
@@ -105,20 +95,16 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
     String[] valueArray = blockValSets[0].getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      String value = valueArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
-        if (hyperLogLog == null) {
-          hyperLogLog = new HyperLogLog(_log2m);
-          groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
-        }
-        try {
-          hyperLogLog.addAll(HllUtil.convertStringToHll(value));
-        } catch (CardinalityMergeException e) {
-          throw new RuntimeException("Caught exception while aggregating HyperLogLog.", e);
+    try {
+      for (int i = 0; i < length; i++) {
+        HyperLogLog value = HllUtil.convertStringToHll(valueArray[i]);
+        for (int groupKey : groupKeysArray[i]) {
+          HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+          hyperLogLog.addAll(value);
         }
       }
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
     }
   }
 
@@ -149,8 +135,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   public HyperLogLog merge(@Nonnull HyperLogLog intermediateResult1, @Nonnull HyperLogLog intermediateResult2) {
     try {
       intermediateResult1.addAll(intermediateResult2);
-    } catch (CardinalityMergeException e) {
-      throw new RuntimeException("Caught exception while merging HyperLogLog.", e);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while merging HyperLogLog", e);
     }
     return intermediateResult1;
   }
@@ -170,5 +156,36 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
   @Override
   public Long extractFinalResult(@Nonnull HyperLogLog intermediateResult) {
     return intermediateResult.cardinality();
+  }
+
+  /**
+   * Returns the HyperLogLog from the result holder or creates a new one if it does not exist.
+   *
+   * @param aggregationResultHolder Result holder
+   * @return HyperLogLog from the result holder
+   */
+  private HyperLogLog getHyperLogLog(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
+    if (hyperLogLog == null) {
+      hyperLogLog = new HyperLogLog(_log2m);
+      aggregationResultHolder.setValue(hyperLogLog);
+    }
+    return hyperLogLog;
+  }
+
+  /**
+   * Returns the HyperLogLog for the given group key. If one does not exist, creates a new one and returns that.
+   *
+   * @param groupByResultHolder Result holder
+   * @param groupKey Group key for which to return the HyperLogLog
+   * @return HyperLogLog for the group key
+   */
+  private HyperLogLog getHyperLogLog(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+    if (hyperLogLog == null) {
+      hyperLogLog = new HyperLogLog(_log2m);
+      groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
+    }
+    return hyperLogLog;
   }
 }

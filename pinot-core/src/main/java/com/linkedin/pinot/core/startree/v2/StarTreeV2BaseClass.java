@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.Comparator;
 import java.util.Collections;
 import java.nio.charset.Charset;
+import xerial.larray.mmap.MMapBuffer;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.core.startree.OffHeapStarTree;
@@ -35,7 +36,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import xerial.larray.mmap.MMapBuffer;
 
 
 public class StarTreeV2BaseClass {
@@ -259,5 +259,23 @@ public class StarTreeV2BaseClass {
     offset += Integer.BYTES;
 
     return offset;
+  }
+
+  public static File findFormatFile(File indexDir, String fileName) {
+
+    // Try to find v3 file first
+    File v3Dir = new File(indexDir, "v3");
+    File v3File = new File(v3Dir, fileName);
+    if (v3File.exists()) {
+      return v3File;
+    }
+
+    // If cannot find v3 file, try to find v1 file instead
+    File v1File = new File(indexDir, fileName);
+    if (v1File.exists()) {
+      return v1File;
+    }
+
+    return null;
   }
 }

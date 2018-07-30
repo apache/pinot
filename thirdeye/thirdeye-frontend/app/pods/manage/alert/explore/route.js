@@ -18,11 +18,12 @@ import {
   getWithDefault
 } from '@ember/object';
 import { isPresent, isNone, isBlank } from '@ember/utils';
-import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import {
-  splitFilterFragment,
-  toFilterMap
-} from 'thirdeye-frontend/utils/rca-utils';
+  checkStatus,
+  buildDateEod,
+  makeFilterString,
+  toIso
+} from 'thirdeye-frontend/utils/utils';
 import {
   enhanceAnomalies,
   toIdGroups,
@@ -211,8 +212,6 @@ export default Route.extend({
       bucketUnit
     } = alertData;
 
-    const filters = this._makeFilterString(filtersRaw);
-
     // Derive start/end time ranges based on querystring input with fallback on default '1 month'
     const {
       startStamp,
@@ -223,14 +222,14 @@ export default Route.extend({
 
     // Set initial value for metricId for early transition cases
     const config = {
-      filters,
       startStamp,
       endStamp,
       bucketSize,
       bucketUnit,
       baseEnd,
       baseStart,
-      exploreDimensions
+      exploreDimensions,
+      filters: filtersRaw ? makeFilterString(filtersRaw) : ''
     };
 
     // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
@@ -395,14 +394,6 @@ export default Route.extend({
       return (metric.name === alertData.metric) && (metric.dataset === alertData.collection);
     }) || { id: 0 };
     return isBlank(metricList) ? 0 : metricId.id;
-  },
-
-  _makeFilterString(filtersRaw) {
-    try {
-      return JSON.stringify(toFilterMap(filtersRaw.split(';').map(splitFilterFragment)));
-    } catch (ignore) {
-      return '';
-    }
   },
 
   /**

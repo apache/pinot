@@ -58,4 +58,24 @@ public class Record {
   public void setDimensionValues(int[] dimensionValues) {
     _dimensionValues = dimensionValues;
   }
+
+  /**
+   * Check if two dimensions data is same or not.
+   *
+   * @param aD dimension a data.
+   * @param bD dimension b data.
+   *
+   * @return boolean if two dimensions are same or not.
+   */
+  public static boolean compareDimensions(int[] aD, int[] bD) {
+    if (aD.length != bD.length) {
+      return false;
+    }
+    for (int i = 0; i < aD.length; i++) {
+      if (aD[i] != bD[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

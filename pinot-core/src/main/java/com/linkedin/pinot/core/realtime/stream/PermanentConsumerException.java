@@ -13,29 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.linkedin.pinot.core.realtime.stream;
 
-package com.linkedin.pinot.core.startree.v2;
-
-import java.io.File;
-
-
-public class StarTreeV2Util {
-
-  public static File findFormatFile(File indexDir, String fileName) {
-
-    // Try to find v3 file first
-    File v3Dir = new File(indexDir, "v3");
-    File v3File = new File(v3Dir, fileName);
-    if (v3File.exists()) {
-      return v3File;
-    }
-
-    // If cannot find v3 file, try to find v1 file instead
-    File v1File = new File(indexDir, fileName);
-    if (v1File.exists()) {
-      return v1File;
-    }
-
-    return null;
+/**
+ * A stream subsystem error that indicates a situation that is not likely to clear up by retrying the request (for
+ * example, no such topic or offset out of range).
+ */
+public class PermanentConsumerException extends RuntimeException {
+  public PermanentConsumerException(Throwable cause) {
+    super(cause);
   }
 }

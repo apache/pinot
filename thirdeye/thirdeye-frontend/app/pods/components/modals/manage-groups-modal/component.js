@@ -219,7 +219,7 @@ export default Component.extend({
    */
   groupOptions: computed('application', 'groupOptionsRaw', function () {
     const { application, groupOptionsRaw } = getProperties(this, 'application', 'groupOptionsRaw');
-    const options = groupOptionsRaw.filter(opt => opt.application === null || opt.application === application);
+    const options = groupOptionsRaw.filter(opt => opt.application === null || opt.application === application || opt.id === null);
     options[0].application = application; // set application for "new" template
     return options;
   }),

@@ -13,24 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.startree.v2;
-
-import java.io.Closeable;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.startree.StarTree;
-
+package com.linkedin.pinot.core.realtime.stream;
 
 /**
- * The class <code>StarTreeV2</code> is a wrapper on top of star-tree, its metadata, and the data sources associated
- * with it.
+ * A stream subsystem error that indicates a situation that is likely to be transient (for example, network error or
+ * broker not available).
  */
-public interface StarTreeV2 extends Closeable {
-
-  StarTree getStarTree();
-
-  StarTreeV2Metadata getMetadata();
-
-  DataSource getDataSource(String dimensionName);
-
-  DataSource getDataSource(AggregationFunctionColumnPair aggregationFunctionColumnPair);
+public class TransientConsumerException extends RuntimeException {
+  public TransientConsumerException(Throwable cause) {
+    super(cause);
+  }
 }
