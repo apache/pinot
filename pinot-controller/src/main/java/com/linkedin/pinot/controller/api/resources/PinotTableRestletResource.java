@@ -238,6 +238,17 @@ public class PinotTableRestletResource {
   public SuccessResponse deleteTable(
       @ApiParam(value = "Name of the table to delete", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "realtime|offline", required = false) @QueryParam("type") String tableTypeStr) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType != null) {
+      if (tableTypeStr == null) {
+        tableTypeStr = tableType.name();
+      } else if (!tableTypeStr.equalsIgnoreCase(tableType.name())) {
+        String message =
+            String.format("Table types don't match! Table name: %s, Input table type: %s", tableName, tableTypeStr);
+        throw new ControllerApplicationException(LOGGER, message, Response.Status.BAD_REQUEST);
+      }
+    }
+
     List<String> tablesDeleted = new LinkedList<>();
     try {
       if (tableTypeStr == null || tableTypeStr.equalsIgnoreCase(CommonConstants.Helix.TableType.OFFLINE.name())) {
