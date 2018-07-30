@@ -62,11 +62,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
-    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
-    if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
-      aggregationResultHolder.setValue(hyperLogLog);
-    }
+    HyperLogLog hyperLogLog = getHyperLogLog(aggregationResultHolder);
 
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
@@ -76,44 +72,49 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
           hyperLogLog.offer(intValues[i]);
         }
         break;
-
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
           hyperLogLog.offer(longValues[i]);
         }
         break;
-
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
           hyperLogLog.offer(floatValues[i]);
         }
         break;
-
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           hyperLogLog.offer(doubleValues[i]);
         }
         break;
-
       case STRING:
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
           hyperLogLog.offer(stringValues[i]);
         }
         break;
-
+      case BYTES:
+        // Serialized HyperLogLog
+        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+        try {
+          for (int i = 0; i < length; i++) {
+            hyperLogLog.addAll(HyperLogLog.Builder.build(bytesValues[i]));
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
+        }
+        break;
       default:
-        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + valueType);
     }
   }
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -122,46 +123,49 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], intValues[i]);
         }
         break;
-
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], longValues[i]);
         }
         break;
-
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKey(groupByResultHolder, groupKeyArray[i], floatValues[i]);
         }
         break;
-
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          setValueForGroupKey(groupByResultHolder, groupKey, doubleValues[i]);
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], doubleValues[i]);
         }
         break;
-
       case STRING:
         String[] stringValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          setValueForGroupKey(groupByResultHolder, groupKey, stringValues[i]);
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], stringValues[i]);
         }
         break;
-
+      case BYTES:
+        // Serialized HyperLogLog
+        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+        try {
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKey(groupByResultHolder, groupKeyArray[i], HyperLogLog.Builder.build(bytesValues[i]));
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
+        }
+        break;
       default:
-        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + valueType);
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-
     FieldSpec.DataType valueType = blockValSets[0].getValueType();
     switch (valueType) {
       case INT:
@@ -170,37 +174,43 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
         }
         break;
-
       case LONG:
         long[] longValues = blockValSets[0].getLongValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
         }
         break;
-
       case FLOAT:
         float[] floatValues = blockValSets[0].getFloatValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
         }
         break;
-
       case DOUBLE:
         double[] doubleValues = blockValSets[0].getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
         }
         break;
-
       case STRING:
         String[] singleValues = blockValSets[0].getStringValuesSV();
         for (int i = 0; i < length; i++) {
           setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], singleValues[i]);
         }
         break;
-
+      case BYTES:
+        // Serialized HyperLogLog
+        byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
+        try {
+          for (int i = 0; i < length; i++) {
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], HyperLogLog.Builder.build(bytesValues[i]));
+          }
+        } catch (Exception e) {
+          throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
+        }
+        break;
       default:
-        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+        throw new IllegalStateException("Illegal data type for DISTINCT_COUNT_HLL aggregation function: " + valueType);
     }
   }
 
@@ -231,8 +241,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   public HyperLogLog merge(@Nonnull HyperLogLog intermediateResult1, @Nonnull HyperLogLog intermediateResult2) {
     try {
       intermediateResult1.addAll(intermediateResult2);
-    } catch (CardinalityMergeException e) {
-      throw new RuntimeException("Caught exception while merging HyperLogLog.", e);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while merging HyperLogLog", e);
     }
     return intermediateResult1;
   }
@@ -261,24 +271,81 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
    * @param groupKey Group-key for which to set the value
    * @param value Value for the group key
    */
-  private void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey, Object value) {
+  private static void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey,
+      Object value) {
+    HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+    hyperLogLog.offer(value);
+  }
+
+  /**
+   * Helper method to set HyperLogLog value for a groupKey into the result holder.
+   *
+   * @param groupByResultHolder Result holder
+   * @param groupKey Group-key for which to set the value
+   * @param value HyperLogLog value for the group key
+   */
+  private static void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey,
+      HyperLogLog value) throws CardinalityMergeException {
+    HyperLogLog hyperLogLog = getHyperLogLog(groupByResultHolder, groupKey);
+    hyperLogLog.addAll(value);
+  }
+
+  /**
+   * Helper method to set value for a given array of group keys.
+   *
+   * @param groupByResultHolder Result Holder
+   * @param groupKeys Group keys for which to set the value
+   * @param value Value to set
+   */
+  private static void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys,
+      Object value) {
+    for (int groupKey : groupKeys) {
+      setValueForGroupKey(groupByResultHolder, groupKey, value);
+    }
+  }
+
+  /**
+   * Helper method to set HyperLogLog value for a given array of group keys.
+   *
+   * @param groupByResultHolder Result Holder
+   * @param groupKeys Group keys for which to set the value
+   * @param value HyperLogLog value to set
+   */
+  private static void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys,
+      HyperLogLog value) throws CardinalityMergeException {
+    for (int groupKey : groupKeys) {
+      setValueForGroupKey(groupByResultHolder, groupKey, value);
+    }
+  }
+
+  /**
+   * Returns the HyperLogLog from the result holder or creates a new one if it does not exist.
+   *
+   * @param aggregationResultHolder Result holder
+   * @return HyperLogLog from the result holder
+   */
+  protected static HyperLogLog getHyperLogLog(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
+    if (hyperLogLog == null) {
+      hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      aggregationResultHolder.setValue(hyperLogLog);
+    }
+    return hyperLogLog;
+  }
+
+  /**
+   * Returns the HyperLogLog for the given group key. If one does not exist, creates a new one and returns that.
+   *
+   * @param groupByResultHolder Result holder
+   * @param groupKey Group key for which to return the HyperLogLog
+   * @return HyperLogLog for the group key
+   */
+  protected static HyperLogLog getHyperLogLog(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
       groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
     }
-    hyperLogLog.offer(value);
-  }
-
-  /**
-   * Helper method to set value for a given array of group keys.
-   * @param groupByResultHolder Result Holder
-   * @param groupKeys Group keys for which to set the value
-   * @param value Value to set
-   */
-  private void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys, Object value) {
-    for (int groupKey : groupKeys) {
-      setValueForGroupKey(groupByResultHolder, groupKey, value);
-    }
+    return hyperLogLog;
   }
 }

@@ -44,14 +44,10 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
-    if (doubleArrayList == null) {
-      doubleArrayList = new DoubleArrayList();
-      aggregationResultHolder.setValue(doubleArrayList);
-    }
+    DoubleArrayList valueList = getValueList(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
       for (double value : valuesArray[i]) {
-        doubleArrayList.add(value);
+        valueList.add(value);
       }
     }
   }
@@ -61,14 +57,9 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-      if (doubleArrayList == null) {
-        doubleArrayList = new DoubleArrayList();
-        groupByResultHolder.setValueForKey(groupKey, doubleArrayList);
-      }
+      DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
       for (double value : valuesArray[i]) {
-        doubleArrayList.add(value);
+        valueList.add(value);
       }
     }
   }
@@ -80,13 +71,9 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-        if (doubleArrayList == null) {
-          doubleArrayList = new DoubleArrayList();
-          groupByResultHolder.setValueForKey(groupKey, doubleArrayList);
-        }
+        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
         for (double value : values) {
-          doubleArrayList.add(value);
+          valueList.add(value);
         }
       }
     }

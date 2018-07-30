@@ -1,5 +1,5 @@
 <div class="card-container__row--flex row">
-  <div class="col-xs-8">
+  <div class="col-xs-4">
     {{#unless isAdditive}}
       <div class="rootcause-message rootcause-message__warning">Dataset is not marked additive. Heatmap may not be proportional.</div>
     {{/unless}}
@@ -23,6 +23,20 @@
       {{mode}}
     {{/power-select}}
   </div>
+  <div class="col-xs-4 pull-right">
+    <label class="te-label te-label--small" for="select-heatmap-size">Set the size of heatmap by: </label>
+    {{#power-select
+      triggerId="select-heatmap-size"
+      selected=sizeOptionSelected
+      options=sizeOptions
+      searchEnabled=true
+      searchField="name"
+      onchange=(action 'onSizeMetric')
+    as |option|}}
+      {{option.name}}
+    {{/power-select}}
+  </div>
+
 </div>
 
 <div>

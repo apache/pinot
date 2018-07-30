@@ -60,7 +60,7 @@
     // needed to avoid unscrollable overflow
     max-height: 80vh;
     overflow-x: hidden;
-    overflow-y: scroll;
+    overflow-y: auto;
   }
 
   &__footer {
@@ -159,4 +159,8 @@
   &__settings {
     margin: $te-spacing--lg;
   }
+}
+
+.te-modal-micro {
+  width: 560px;
 }

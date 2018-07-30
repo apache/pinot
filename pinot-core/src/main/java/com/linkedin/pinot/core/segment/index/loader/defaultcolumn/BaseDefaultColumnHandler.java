@@ -70,7 +70,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _indexDir = indexDir;
     _schema = schema;
     _segmentMetadata = segmentMetadata;
-    _segmentProperties = segmentMetadata.getSegmentMetadataPropertiesConfiguration();
+    _segmentProperties = SegmentMetadataImpl.getPropertiesConfiguration(indexDir);
   }
 
   /**

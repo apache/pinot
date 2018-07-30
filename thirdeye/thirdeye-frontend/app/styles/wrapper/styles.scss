@@ -56,6 +56,11 @@ body {
     &--graph {
       margin-top: -55px;
     }
+
+    &--micro {
+      margin-top: 0;
+      margin-bottom: 15px;
+    }
   }
 
   &__text-block {
@@ -98,6 +103,10 @@ body {
 
     &--email {
       line-height: normal;
+    }
+
+    &--micro {
+      line-height: 23px;
     }
   }
 
