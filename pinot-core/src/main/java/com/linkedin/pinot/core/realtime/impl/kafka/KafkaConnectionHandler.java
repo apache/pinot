@@ -91,6 +91,7 @@ public class KafkaConnectionHandler {
     }
   }
 
+  // TODO: change this constructor to accept only streamMetadata (and partition) after we have refactored SimpleConsumer
   public KafkaConnectionHandler(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId, String topic, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;

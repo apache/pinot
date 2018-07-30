@@ -20,18 +20,22 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import javax.annotation.Nonnull;
 
 
-public abstract class PinotStreamConsumerFactory {
-  public static PinotStreamConsumerFactory create(StreamMetadata streamMetadata) {
-    PinotStreamConsumerFactory factory = null;
+public abstract class StreamConsumerFactory {
+  protected StreamMetadata _streamMetadata;
+
+  public static StreamConsumerFactory create(StreamMetadata streamMetadata) {
+    StreamConsumerFactory factory = null;
     try {
-      factory = (PinotStreamConsumerFactory) Class.forName(streamMetadata.getConsumerFactoryName()).newInstance();
+      factory = (StreamConsumerFactory) Class.forName(streamMetadata.getConsumerFactoryName()).newInstance();
     } catch (Exception e) {
       Utils.rethrowException(e);
     }
     return factory;
   }
 
-  // TODO: introduce init which takes stream config, helix config and server config.
+  public void init(StreamMetadata streamMetadata) {
+    _streamMetadata = streamMetadata;
+  }
 
   public abstract PinotStreamConsumer buildConsumer(@Nonnull String clientId, int partition,
       StreamMetadata streamMetadata);
@@ -41,23 +45,16 @@ public abstract class PinotStreamConsumerFactory {
 
   /**
    * Creates a metadata provider which provides partition specific metadata
-   * @param clientId
    * @param partition
-   * @param streamMetadata
    * @return
    */
-  // TODO: start using createMetadataProvider instead of buildMetadataFetcher once StreamMetadataProvider impl is done
-  public abstract StreamMetadataProvider createPartitionMetadataProvider(@Nonnull String clientId, int partition,
-      StreamMetadata streamMetadata);
+  public abstract StreamMetadataProvider createPartitionMetadataProvider(int partition);
 
   /**
    * Creates a metadata provider which provides stream specific metadata
-   * @param clientId
-   * @param streamMetadata
    * @return
    */
-  public abstract StreamMetadataProvider createStreamMetadataProvider(@Nonnull String clientId,
-      StreamMetadata streamMetadata);
+  public abstract StreamMetadataProvider createStreamMetadataProvider();
 
   // TODO First split KafkaLowLevelStreamProviderConfig to be kafka agnostic and kafka-specific and then rename.
   public StreamMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception {

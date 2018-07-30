@@ -15,15 +15,14 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import javax.annotation.Nonnull;
 
 
-public class SimpleConsumerFactory extends PinotStreamConsumerFactory {
-  // TODO: once we introduce init for this factory, the parameters of these methods will change
+public class SimpleConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public PinotStreamConsumer buildConsumer(String clientId, int partition, StreamMetadata streamMetadata) {
@@ -40,18 +39,12 @@ public class SimpleConsumerFactory extends PinotStreamConsumerFactory {
   }
 
   @Override
-  public StreamMetadataProvider createPartitionMetadataProvider(@Nonnull String clientId, int partition,
-      StreamMetadata streamMetadata) {
-    KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new KafkaSimpleStreamMetadataProvider(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(),
-        clientId, streamMetadata.getKafkaTopicName(), partition,
-        streamMetadata.getKafkaConnectionTimeoutMillis());
+  public StreamMetadataProvider createPartitionMetadataProvider(int partition) {
+    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, partition);
   }
 
   @Override
-  public StreamMetadataProvider createStreamMetadataProvider(@Nonnull String clientId, StreamMetadata streamMetadata) {
-    KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new KafkaSimpleStreamMetadataProvider(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(),
-        clientId, streamMetadata.getKafkaTopicName(), streamMetadata.getKafkaConnectionTimeoutMillis());
+  public StreamMetadataProvider createStreamMetadataProvider() {
+    return new KafkaSimpleStreamMetadataProvider(_streamMetadata);
   }
 }
