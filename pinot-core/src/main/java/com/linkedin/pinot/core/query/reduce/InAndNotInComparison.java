@@ -25,6 +25,7 @@ public class InAndNotInComparison extends ComparisonFunction {
   private boolean _isItNotIn;
 
   public InAndNotInComparison(String values, boolean isItNotIn, AggregationInfo aggregationInfo) {
+    super(aggregationInfo);
     String[] splitedValues = values.split("\\t\\t");
     int size = splitedValues.length;
     this._values = new double[size];
@@ -34,13 +35,6 @@ public class InAndNotInComparison extends ComparisonFunction {
       } catch (Exception e) {
         LOGGER.info("Exception in creating HAVING clause IN/NOT-IN predicate", e);
       }
-    }
-    this._isItNotIn = isItNotIn;
-    if (!aggregationInfo.getAggregationParams().get("column").equals("*")) {
-      this._functionExpression =
-          aggregationInfo.getAggregationType() + "_" + aggregationInfo.getAggregationParams().get("column");
-    } else {
-      this._functionExpression = aggregationInfo.getAggregationType() + "_star";
     }
   }
 

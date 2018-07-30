@@ -15,13 +15,6 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -29,6 +22,11 @@ import com.linkedin.pinot.core.operator.query.DictionaryBasedAggregationOperator
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -55,8 +53,7 @@ public class DictionaryBasedAggregationPlanNode implements PlanNode {
         AggregationFunctionUtils.getAggregationFunctionContexts(aggregationInfos, indexSegment.getSegmentMetadata());
 
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
-      String column = aggregationFunctionContext.getAggregationColumns()[0];
-
+      String column = aggregationFunctionContext.getColumn();
       if (!_dictionaryMap.containsKey(column)) {
           _dictionaryMap.put(column, _indexSegment.getDataSource(column).getDictionary());
       }

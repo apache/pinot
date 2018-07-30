@@ -25,17 +25,12 @@ public class BetweenComparison extends ComparisonFunction {
   private double _leftValue;
 
   public BetweenComparison(String leftValue, String rightValue, AggregationInfo aggregationInfo) {
+    super(aggregationInfo);
     try {
       this._leftValue = Double.parseDouble(leftValue);
       this._rightValue = Double.parseDouble(rightValue);
     } catch (Exception e) {
       LOGGER.info("Exception in creating HAVING clause BETWEEN predicate", e);
-    }
-    if (!aggregationInfo.getAggregationParams().get("column").equals("*")) {
-      this._functionExpression =
-          aggregationInfo.getAggregationType() + "_" + aggregationInfo.getAggregationParams().get("column");
-    } else {
-      this._functionExpression = aggregationInfo.getAggregationType() + "_star";
     }
   }
 

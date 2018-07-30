@@ -35,8 +35,8 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.SUM.getName() + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.SUM.getName() + "_" + column;
   }
 
   @Override

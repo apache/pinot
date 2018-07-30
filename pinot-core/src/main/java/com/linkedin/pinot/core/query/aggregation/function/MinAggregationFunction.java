@@ -35,8 +35,8 @@ public class MinAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.MIN.getName() + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.MIN.getName() + "_" + column;
   }
 
   @Override

@@ -37,6 +37,7 @@ import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationExecutor;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
 import java.util.ArrayList;
@@ -142,7 +143,7 @@ public class DefaultAggregationExecutorTest {
         new AggregationFunctionInitializer(_indexSegment.getSegmentMetadata());
     for (int i = 0; i < numAggFuncs; i++) {
       AggregationInfo aggregationInfo = _aggregationInfoList.get(i);
-      aggrFuncContextArray[i] = AggregationFunctionContext.instantiate(aggregationInfo);
+      aggrFuncContextArray[i] = AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo);
       aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
     }
     AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggrFuncContextArray);

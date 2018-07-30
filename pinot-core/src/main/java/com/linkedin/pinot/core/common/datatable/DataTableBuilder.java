@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -293,7 +294,7 @@ public class DataTableBuilder {
     int numAggregations = aggregationsInfo.size();
     AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregations];
     for (int i = 0; i < numAggregations; i++) {
-      aggregationFunctionContexts[i] = AggregationFunctionContext.instantiate(aggregationsInfo.get(i));
+      aggregationFunctionContexts[i] = AggregationFunctionUtils.getAggregationFunctionContext(aggregationsInfo.get(i));
     }
     if (brokerRequest.isSetGroupBy()) {
       // Aggregation group-by query.
