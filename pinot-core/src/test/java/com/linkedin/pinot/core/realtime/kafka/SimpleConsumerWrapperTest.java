@@ -16,11 +16,8 @@
 package com.linkedin.pinot.core.realtime.kafka;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
-
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import kafka.api.FetchRequest;
@@ -41,12 +38,11 @@ import org.apache.kafka.common.protocol.Errors;
 import org.testng.annotations.Test;
 import scala.Some;
 import scala.Tuple2;
-import scala.collection.Iterable;
 import scala.collection.JavaConversions;
 import scala.collection.Seq;
 import scala.collection.immutable.List;
 
-import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.*;
 
 
 /**
@@ -223,7 +219,7 @@ public class SimpleConsumerWrapperTest {
         "theTopic"
     );
     SimpleConsumerWrapper consumerWrapper = new SimpleConsumerWrapper(
-        simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", 10000L);
+        simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 10000L);
     assertEquals(consumerWrapper.getPartitionCount("theTopic", 10000L), 2);
   }
 

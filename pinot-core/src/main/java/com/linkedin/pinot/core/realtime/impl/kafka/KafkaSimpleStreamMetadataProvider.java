@@ -16,26 +16,18 @@
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.core.realtime.stream.MessageBatch;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
-import kafka.api.FetchRequestBuilder;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.TopicAndPartition;
-import kafka.javaapi.FetchResponse;
 import kafka.javaapi.OffsetRequest;
 import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.TopicMetadataResponse;
-import kafka.javaapi.message.ByteBufferMessageSet;
-import kafka.message.MessageAndOffset;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.protocol.Errors;
 import org.slf4j.Logger;
@@ -45,20 +37,23 @@ import org.slf4j.LoggerFactory;
 /**
  * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
-public class SimpleConsumerWrapper extends KafkaConnectionHandler implements PinotStreamConsumer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleConsumerWrapper.class);
+public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler implements StreamMetadataProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamMetadataProvider.class);
 
-  public SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId, String topic, long connectTimeoutMillis) {
-    super(simpleConsumerFactory, bootstrapNodes, clientId, topic, connectTimeoutMillis);
-  }
-
-  public SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
+  public KafkaSimpleStreamMetadataProvider(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId, String topic, int partition, long connectTimeoutMillis) {
     super(simpleConsumerFactory, bootstrapNodes, clientId, topic, partition, connectTimeoutMillis);
   }
 
-  public synchronized int getPartitionCount(String topic, long timeoutMillis) {
+  public KafkaSimpleStreamMetadataProvider(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
+      String clientId, String topic, long connectTimeoutMillis) {
+    super(simpleConsumerFactory, bootstrapNodes, clientId, topic, connectTimeoutMillis);
+  }
+
+  // TODO: this will replace metadata related methods called from SimpleConsumerWrapper
+  // TODO: make sure this code is equivalent to the methods in SimpleConsumerWrapper before starting to use this
+  @Override
+  public synchronized int fetchPartitionCount(String topic, long timeoutMillis) {
     int unknownTopicReplyCount = 0;
     final int MAX_UNKNOWN_TOPIC_REPLY_COUNT = 10;
     int kafkaErrorCount = 0;
@@ -120,49 +115,6 @@ public class SimpleConsumerWrapper extends KafkaConnectionHandler implements Pin
   }
 
   /**
-   * Fetch messages and the per-partition high watermark from Kafka between the specified offsets.
-   *
-   * @param startOffset The offset of the first message desired, inclusive
-   * @param endOffset The offset of the last message desired, exclusive, or {@link Long#MAX_VALUE} for no end offset.
-   * @param timeoutMillis Timeout in milliseconds
-   * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
-   * milliseconds
-   * @return An iterable containing messages fetched from Kafka and their offsets, as well as the high watermark for
-   * this partition.
-   */
-  public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(_isPartitionMetadata, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
-    // Ensure that we're connected to the leader
-    // TODO Improve error handling
-
-    final long connectEndTime = System.currentTimeMillis() + _connectTimeoutMillis;
-    while(_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-        System.currentTimeMillis() < connectEndTime) {
-      _currentState.process();
-    }
-    if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-        connectEndTime <= System.currentTimeMillis()) {
-      throw new java.util.concurrent.TimeoutException();
-    }
-
-    FetchResponse fetchResponse = _simpleConsumer.fetch(new FetchRequestBuilder()
-        .minBytes(100000)
-        .maxWait(timeoutMillis)
-        .addFetch(_topic, _partition, startOffset, 500000)
-        .build());
-
-    if (!fetchResponse.hasError()) {
-      final Iterable<MessageAndOffset> messageAndOffsetIterable =
-          buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
-
-      // TODO: Instantiate with factory
-      return new SimpleConsumerMessageBatch(messageAndOffsetIterable);
-    } else {
-      throw exceptionForKafkaErrorCode(fetchResponse.errorCode(_topic, _partition));
-    }
-  }
-
-  /**
    * Fetches the numeric Kafka offset for this partition for a symbolic name ("largest" or "smallest").
    *
    * @param requestedOffset Either "largest" or "smallest"
@@ -171,8 +123,10 @@ public class SimpleConsumerWrapper extends KafkaConnectionHandler implements Pin
    * milliseconds
    * @return An offset
    */
+  @Override
   public synchronized long fetchPartitionOffset(String requestedOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
+    Preconditions.checkState(_isPartitionMetadata, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
     Preconditions.checkNotNull(requestedOffset);
 
     final long offsetRequestTime;
@@ -241,32 +195,9 @@ public class SimpleConsumerWrapper extends KafkaConnectionHandler implements Pin
     throw new TimeoutException();
   }
 
-  private Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets, final long startOffset, final long endOffset) {
-    return Iterables.filter(messageAndOffsets, new Predicate<MessageAndOffset>() {
-      @Override
-      public boolean apply(@Nullable MessageAndOffset input) {
-        // Filter messages that are either null or have an offset ∉ [startOffset; endOffset[
-        if(input == null || input.offset() < startOffset || (endOffset <= input.offset() && endOffset != -1)) {
-          return false;
-        }
-
-        // Check the message's checksum
-        // TODO We might want to have better handling of this situation, maybe try to fetch the message again?
-        if(!input.message().isValid()) {
-          LOGGER.warn("Discarded message with invalid checksum in partition {} of topic {}", _partition, _topic);
-          return false;
-        }
-
-        return true;
-      }
-    });
-  }
-
   @Override
-  /**
-   * Closes this consumer.
-   */
   public void close() throws IOException {
     super.close();
   }
+
 }

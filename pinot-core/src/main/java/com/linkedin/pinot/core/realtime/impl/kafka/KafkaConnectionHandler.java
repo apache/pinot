@@ -69,7 +69,7 @@ public class KafkaConnectionHandler {
 
   final Random _random = new Random();
 
-  boolean _metadataOnlyConsumer;
+  boolean _isPartitionMetadata;
 
   /**
    * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
@@ -92,16 +92,15 @@ public class KafkaConnectionHandler {
   }
 
   public KafkaConnectionHandler(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId, long connectTimeoutMillis) {
+      String clientId, String topic, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
+    _topic = topic;
     _connectTimeoutMillis = connectTimeoutMillis;
     _simpleConsumer = null;
 
-    // Topic and partition are ignored for metadata-only consumers
-    _topic = null;
+    _isPartitionMetadata = false;
     _partition = Integer.MIN_VALUE;
-    _metadataOnlyConsumer = true;
 
     initializeBootstrapNodeList(bootstrapNodes);
     setCurrentState(new ConnectingToBootstrapNode());
@@ -112,10 +111,11 @@ public class KafkaConnectionHandler {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
     _topic = topic;
-    _partition = partition;
     _connectTimeoutMillis = connectTimeoutMillis;
-    _metadataOnlyConsumer = false;
     _simpleConsumer = null;
+
+    _isPartitionMetadata = true;
+    _partition = partition;
 
     initializeBootstrapNodeList(bootstrapNodes);
     setCurrentState(new ConnectingToBootstrapNode());
@@ -221,9 +221,7 @@ public class KafkaConnectionHandler {
 
     @Override
     void process() {
-      if (_metadataOnlyConsumer) {
-        // Nothing to do
-      } else {
+      if (_isPartitionMetadata) {
         // If we're consuming from a partition, we need to find the leader so that we can consume from it. By design,
         // Kafka only allows consumption from the leader and not one of the in-sync replicas.
         setCurrentState(new FetchingLeaderInformation());
