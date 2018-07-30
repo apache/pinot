@@ -23,6 +23,8 @@ import javax.annotation.Nonnull;
 
 
 public class SimpleConsumerFactory extends PinotStreamConsumerFactory {
+  // TODO: once we introduce init for this factory, the parameters of these methods will change
+
   @Override
   public PinotStreamConsumer buildConsumer(String clientId, int partition, StreamMetadata streamMetadata) {
     KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
