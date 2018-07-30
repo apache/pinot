@@ -31,9 +31,33 @@ public abstract class PinotStreamConsumerFactory {
     return factory;
   }
 
-  public abstract PinotStreamConsumer buildConsumer(@Nonnull String clientId, int partition, StreamMetadata streamMetadata);
+  // TODO: introduce init which takes stream config, helix config and server config.
 
+  public abstract PinotStreamConsumer buildConsumer(@Nonnull String clientId, int partition,
+      StreamMetadata streamMetadata);
+
+  // TODO: start using createMetadataProvider instead of buildMetadataFetcher once StreamMetadataProvider impl is done
   public abstract PinotStreamConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata);
+
+  /**
+   * Creates a metadata provider which provides partition specific metadata
+   * @param clientId
+   * @param partition
+   * @param streamMetadata
+   * @return
+   */
+  // TODO: start using createMetadataProvider instead of buildMetadataFetcher once StreamMetadataProvider impl is done
+  public abstract StreamMetadataProvider createPartitionMetadataProvider(@Nonnull String clientId, int partition,
+      StreamMetadata streamMetadata);
+
+  /**
+   * Creates a metadata provider which provides stream specific metadata
+   * @param clientId
+   * @param streamMetadata
+   * @return
+   */
+  public abstract StreamMetadataProvider createStreamMetadataProvider(@Nonnull String clientId,
+      StreamMetadata streamMetadata);
 
   // TODO First split KafkaLowLevelStreamProviderConfig to be kafka agnostic and kafka-specific and then rename.
   public StreamMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception {
