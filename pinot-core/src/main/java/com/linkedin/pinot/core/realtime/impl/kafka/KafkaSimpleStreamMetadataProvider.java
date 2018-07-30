@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
+ * Implementation of a stream metadata provider for a kafka simple stream
  */
 public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamMetadataProvider.class);
@@ -61,15 +61,15 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
 
     final long endTime = System.currentTimeMillis() + timeoutMillis;
 
-    while(System.currentTimeMillis() < endTime) {
+    while (System.currentTimeMillis() < endTime) {
       // Try to get into a state where we're connected to Kafka
       while (!_currentState.isConnectedToKafkaBroker() && System.currentTimeMillis() < endTime) {
         _currentState.process();
       }
 
       if (endTime <= System.currentTimeMillis() && !_currentState.isConnectedToKafkaBroker()) {
-        throw new TimeoutException("Failed to get the partition count for topic " + topic + " within " + timeoutMillis
-            + " ms");
+        throw new TimeoutException(
+            "Failed to get the partition count for topic " + topic + " within " + timeoutMillis + " ms");
       }
 
       // Send the metadata request to Kafka
@@ -126,7 +126,8 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
   @Override
   public synchronized long fetchPartitionOffset(String requestedOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(_isPartitionMetadata, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
+    Preconditions.checkState(_isPartitionMetadata,
+        "Cannot fetch messages from a non partition specific SimpleConsumerWrapper");
     Preconditions.checkNotNull(requestedOffset);
 
     final long offsetRequestTime;
@@ -145,15 +146,15 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
 
     final long endTime = System.currentTimeMillis() + timeoutMillis;
 
-    while(System.currentTimeMillis() < endTime) {
+    while (System.currentTimeMillis() < endTime) {
       // Try to get into a state where we're connected to Kafka
-      while (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-          System.currentTimeMillis() < endTime) {
+      while (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER
+          && System.currentTimeMillis() < endTime) {
         _currentState.process();
       }
 
-      if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-          endTime <= System.currentTimeMillis()) {
+      if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER
+          && endTime <= System.currentTimeMillis()) {
         throw new TimeoutException();
       }
 
@@ -199,5 +200,4 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
   public void close() throws IOException {
     super.close();
   }
-
 }
