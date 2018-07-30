@@ -27,9 +27,14 @@ import java.util.Random;
 
 public class ProfileViewQueryTask extends QueryTask {
     List<GenericRow> _profileTable;
+    List<GenericRow> _jobTable;
+    List<GenericRow> _companyTable;
+
     ZipfRandom _zipfRandom;
     final static int HourSecond = 3600;
     Random _profileIndexGenerator;
+    Random _jobIndexGenerator;
+    Random _companyIndexGenerator;
 
     public ProfileViewQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
         setConfig(config);
@@ -46,9 +51,15 @@ public class ProfileViewQueryTask extends QueryTask {
         _zipfRandom = new ZipfRandom(zipfS,hourCount);
 
         _profileIndexGenerator = new Random(System.currentTimeMillis());
+        _jobIndexGenerator = new Random(System.currentTimeMillis());
+        _companyIndexGenerator = new Random(System.currentTimeMillis());
+
         try
         {
             _profileTable = eventTableGenerator.readProfileTable();
+            _jobTable = eventTableGenerator.readJobTable();
+            _companyTable = eventTableGenerator.readCompanyTable();
+
         }catch (Exception e)
         {
             e.printStackTrace();
@@ -90,8 +101,12 @@ public class ProfileViewQueryTask extends QueryTask {
 
 
         GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(_profileTable, _profileIndexGenerator);
+        GenericRow randomJob = eventTableGenerator.getRandomGenericRow(_jobTable,_jobIndexGenerator);
+        GenericRow randomCompany = eventTableGenerator.getRandomGenericRow(_companyTable,_companyIndexGenerator);
+
         String query = "";
         switch (queryId) {
+            /*
             case 0:
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong());
                 runQuery(query);
@@ -100,25 +115,34 @@ public class ProfileViewQueryTask extends QueryTask {
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"), selectLimit);
                 runQuery(query);
                 break;
-            case 2:
+                */
+            case 0:
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"));
                 runQuery(query);
                 break;
 
-            case 3:
+            case 1:
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"), groupByLimit);
                 runQuery(query);
                 break;
-            case 4:
+            case 2:
                 query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"), groupByLimit);
                 runQuery(query);
                 break;
-	    case 5:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
+	        case 3:
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomJob.getValue("Position"),groupByLimit);
                 runQuery(query);
                 break;
-	    case 6:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
+	        case 4:
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomJob.getValue("Position"),groupByLimit);
+                runQuery(query);
+                break;
+            case 5:
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomCompany.getValue("Location"),groupByLimit);
+                runQuery(query);
+                break;
+            case 6:
+                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomCompany.getValue("Location"),groupByLimit);
                 runQuery(query);
                 break;
 
