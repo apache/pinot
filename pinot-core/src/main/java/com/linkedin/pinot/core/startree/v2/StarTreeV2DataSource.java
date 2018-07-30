@@ -16,7 +16,9 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
@@ -56,7 +58,7 @@ public class StarTreeV2DataSource {
   public StarTreeV2DataSource(SegmentMetadataImpl segmentMetadataImpl, StarTreeV2Metadata metadata, File indexDir) {
 
     _starTreeIndexMapFile = StarTreeV2Util.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
-    _columnIndexInfoMap = OnHeapStarTreeV2LoaderHelper.readMetaData(_starTreeIndexMapFile);
+    _columnIndexInfoMap = readMetaData(_starTreeIndexMapFile);
 
     _starTreeFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_TEMP_FILE);
     _indexDataFile = StarTreeV2Util.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_COlUMN_FILE);
@@ -146,5 +148,28 @@ public class StarTreeV2DataSource {
 
   public Map<String, StarTreeV2AggfunColumnPairDataSource> getMetricRawIndexReader() {
     return _metricRawIndexReader;
+  }
+
+  /**
+   * read meta data for star tree indexes.
+   */
+  private Map<String, Integer> readMetaData(File indexMapFile) {
+
+    Map<String, Integer> metadata = new HashMap<>();
+    try {
+      FileReader fileReader = new FileReader(indexMapFile);
+      BufferedReader bufferedReader = new BufferedReader(fileReader);
+      String line;
+
+      while ((line = bufferedReader.readLine()) != null) {
+        String s = line.toString();
+        String[] parts = s.split(":");
+        metadata.put(parts[0], Integer.parseInt(parts[1]));
+      }
+      fileReader.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return metadata;
   }
 }

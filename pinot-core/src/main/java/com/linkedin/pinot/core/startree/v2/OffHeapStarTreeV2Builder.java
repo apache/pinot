@@ -16,7 +16,10 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
+import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.File;
+import java.io.FileReader;
 import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
@@ -42,7 +45,7 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
-public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements StarTreeV2Builder {
+public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements StarTreeV2Builder, Closeable {
 
   // general stuff
   private int _fileSize;
@@ -158,8 +161,9 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       DimensionBuffer dimensions = new DimensionBuffer(_dimensionsCount);
       for (int j = 0; j < dimensionColumnReaders.size(); j++) {
         Integer dictId = dimensionColumnReaders.get(j).getDictionaryId(i);
-        dimensions.setDictId(j,dictId);
+        dimensions.setDictId(j, dictId);
       }
+
       Object[] metricValues = new Object[_aggFunColumnPairsCount];
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
         String metricName = _aggFunColumnPairs.get(j).getColumnName();
@@ -175,6 +179,12 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer = new AggregationFunctionColumnPairBuffer(metricValues, _aggFunColumnPairs);
       appendToRawBuffer(i, dimensions, aggregationFunctionColumnPairBuffer);
     }
+    PrintWriter outFileObject = new PrintWriter(new BufferedWriter(new FileWriter(_metricOffsetFile.getPath(), true)));
+    outFileObject.println(Integer.toString(_rawDocsCount) + " " + Integer.toString(_fileSize));
+    outFileObject.close();
+
+    _outputStream.flush();
+    computeDefaultSplitOrder(_dimensionsCardinality);
 
     _sortOrder = new int[_dimensionsCount];
     for (int i = 0; i < _dimensionsCount; i++) {
@@ -184,18 +194,27 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     // Sort the documents
     try (StarTreeV2DataTable dataTable = new StarTreeV2DataTable(
         PinotDataBuffer.mapFile(_dataFile, false, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
-            "OffHeapStarTreeV2Builder#build: data buffer"), _dimensionSize, 0, 0)) {
-      //dataTable.sort(0, _rawDocsCount, _sortOrder);
+            "OffHeapStarTreeV2Builder#build: data buffer"), _dimensionSize, 0)) {
+
+      List<Long> docSizeIndex = new ArrayList<>();
+      FileReader fileReader = new FileReader(_metricOffsetFile);
+      BufferedReader bufferedReader = new BufferedReader(fileReader);
+      String line;
+      while ((line = bufferedReader.readLine()) != null) {
+        String s = line.toString();
+        String[] parts = s.split(" ");
+        docSizeIndex.add(Long.parseLong(parts[1]));
+      }
+      fileReader.close();
+
+      dataTable.sort(0, _rawDocsCount, _sortOrder, docSizeIndex);
+
+      //condenseData(rawSortedStarTreeData, _aggFunColumnPairs, StarTreeV2Constant.IS_RAW_DATA);
     }
 
-
-//    // sorting the data as per the sort order.
-//    List<Record> rawSortedStarTreeData = OnHeapStarTreeV2BuilderHelper.sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
-//    _starTreeData = OnHeapStarTreeV2BuilderHelper.condenseData(rawSortedStarTreeData, _aggFunColumnPairs, StarTreeV2Constant.IS_RAW_DATA);
-
-//    // Recursively construct the star tree
-//    _rootNode._startDocId = 0;
-//    _rootNode._endDocId = _starTreeData.size();
+    // Recursively construct the star tree
+    _rootNode._startDocId = 0;
+ //   _rootNode._endDocId = _starTreeData.size();
 //    constructStarTree(_rootNode, 0, _starTreeData.size(), 0);
 //
 //    // create aggregated doc for all nodes.
@@ -240,5 +259,10 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     outFileObject.println(Integer.toString(docId) + " " + Integer.toString(_fileSize));
     outFileObject.close();
     _fileSize += _dimensionSize + aggregationFunctionColumnPairBuffer._totalBytes;
+  }
+
+  @Override
+  public void close() throws IOException {
+    _outputStream.close();
   }
 }

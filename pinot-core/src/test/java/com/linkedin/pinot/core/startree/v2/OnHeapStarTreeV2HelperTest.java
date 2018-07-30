@@ -169,37 +169,37 @@ public class OnHeapStarTreeV2HelperTest {
     return data;
   }
 
-  @Test
-  public void testSortStarTreeData() {
-    List<Record> data = createData();
-    List<Record> actualData = OnHeapStarTreeV2BuilderHelper.sortStarTreeData(2, 6, Arrays.asList(0, 1, 2), data);
-
-    List<Record> expected = expectedSortedData();
-    assertRecordsList(expected, actualData);
-  }
-
-  @Test
-  public void testFilterData() {
-    List<Record> data = createData();
-    List<Record> actualData = OnHeapStarTreeV2BuilderHelper.filterData(1, 5, 1, Arrays.asList(0, 1, 2), data);
-
-    List<Record> expected = expectedFilteredData();
-    printRecordsList(expected);
-    assertRecordsList(expected, actualData);
-  }
-
-  @Test
-  public void testCondenseData() {
-    List<Record> data = expectedFilteredData();
-    List<AggregationFunctionColumnPair> metric2aggFuncPairs = createMet2AggfuncPairs();
-    List<Record> actual =
-        OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs, StarTreeV2Constant.IS_RAW_DATA);
-
-    List<Record> expected = expectedCondensedData();
-    printRecordsList(actual);
-    printRecordsList(expected);
-    assertRecordsList(expected, actual);
-  }
+  //@Test
+//  public void testSortStarTreeData() {
+//    List<Record> data = createData();
+//    List<Record> actualData = OnHeapStarTreeV2BuilderHelper.sortStarTreeData(2, 6, Arrays.asList(0, 1, 2), data);
+//
+//    List<Record> expected = expectedSortedData();
+//    assertRecordsList(expected, actualData);
+//  }
+//
+//  @Test
+//  public void testFilterData() {
+//    List<Record> data = createData();
+//    List<Record> actualData = OnHeapStarTreeV2BuilderHelper.filterData(1, 5, 1, Arrays.asList(0, 1, 2), data);
+//
+//    List<Record> expected = expectedFilteredData();
+//    printRecordsList(expected);
+//    assertRecordsList(expected, actualData);
+//  }
+//
+//  @Test
+//  public void testCondenseData() {
+//    List<Record> data = expectedFilteredData();
+//    List<AggregationFunctionColumnPair> metric2aggFuncPairs = createMet2AggfuncPairs();
+//    List<Record> actual =
+//        OnHeapStarTreeV2BuilderHelper.condenseData(data, metric2aggFuncPairs, StarTreeV2Constant.IS_RAW_DATA);
+//
+//    List<Record> expected = expectedCondensedData();
+//    printRecordsList(actual);
+//    printRecordsList(expected);
+//    assertRecordsList(expected, actual);
+//  }
 
   @Test
   public void testTDigest() throws IOException {
