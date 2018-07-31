@@ -43,6 +43,15 @@ public class TransformExpressionTree {
     return COMPILER.compileToExpressionTree(expression);
   }
 
+  /**
+   * Compiles the expression and serializes it back to standard format.
+   * <p>E.g. "  foo\t  ( bar  ('a'\t ,foobar(  b,  'c'\t, 123)  )   ,d  )\t" -> "foo(bar('a',foobar(b,'c','123')),d)"
+   * <p>The standard format expressions will be used in the broker response.
+   */
+  public static String standardizeExpression(String expression) {
+    return compileToExpressionTree(expression).toString();
+  }
+
   // Enum for expression represented by the tree.
   public enum ExpressionType {
     FUNCTION, IDENTIFIER, LITERAL

@@ -36,7 +36,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
+  public String getColumnName(@Nonnull String column) {
     return COLUMN_NAME;
   }
 

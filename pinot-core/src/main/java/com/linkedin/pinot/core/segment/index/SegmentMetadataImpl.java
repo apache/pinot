@@ -307,6 +307,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // Build star tree v2 metadata.
     String starTreeCount = segmentMetadataPropertiesConfiguration.getString(StarTreeV2Constant.STAR_TREE_V2_COUNT);
     _starTreesV2Count = starTreeCount != null ? Integer.parseInt(starTreeCount) : 0;
+    _starTreeV2MetadataList = new ArrayList<>();
 
     if (_starTreesV2Count > 0) {
       initStarTreeV2Metadata(_starTreesV2Count, segmentMetadataPropertiesConfiguration);
@@ -371,7 +372,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   private void initStarTreeV2Metadata(int starTreesCount, PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
 
-    _starTreeV2MetadataList = new ArrayList<>();
     for ( int i = 0; i < starTreesCount;  i++ ) {
       // met2agg func pairs
       String met2agg = "startree_" + Integer.toString(i) + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
@@ -581,7 +581,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _starTreeV2MetadataList;
   }
 
-  @Override
   public int getStarTreeV2Count() {
     return _starTreesV2Count;
   }

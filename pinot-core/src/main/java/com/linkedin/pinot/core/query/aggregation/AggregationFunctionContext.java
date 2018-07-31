@@ -15,9 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 
 
 /**
@@ -25,40 +23,32 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFac
  */
 public class AggregationFunctionContext {
   private final AggregationFunction _aggregationFunction;
-  private final String[] _aggrColumns;
+  private final String _column;
 
-  public static AggregationFunctionContext instantiate(AggregationInfo aggregationInfo) {
-    String[] aggrColumns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-    String functionName = aggregationInfo.getAggregationType();
-    AggregationFunction aggregationFunction = AggregationFunctionFactory.getAggregationFunction(functionName);
-    return new AggregationFunctionContext(aggrColumns, aggregationFunction);
-  }
-
-  public AggregationFunctionContext(String[] aggrColumns, AggregationFunction aggregationFunction) {
-    _aggrColumns = aggrColumns;
+  public AggregationFunctionContext(AggregationFunction aggregationFunction, String column) {
     _aggregationFunction = aggregationFunction;
+    _column = column;
   }
 
   /**
-   * Returns the aggregation function object.
-   * @return
+   * Returns the aggregation function.
    */
   public AggregationFunction getAggregationFunction() {
     return _aggregationFunction;
   }
 
   /**
-   * Returns an array of aggregation column names.
-   * @return
+   * Returns the aggregation column (could be column name or UDF expression).
    */
-  public String[] getAggregationColumns() {
-    return _aggrColumns;
+  public String getColumn() {
+    return _column;
   }
 
   /**
    * Returns the aggregation column name for the results.
+   * <p>E.g. AVG(foo) -> avg_foo
    */
   public String getAggregationColumnName() {
-    return _aggregationFunction.getColumnName(_aggrColumns);
+    return _aggregationFunction.getColumnName(_column);
   }
 }

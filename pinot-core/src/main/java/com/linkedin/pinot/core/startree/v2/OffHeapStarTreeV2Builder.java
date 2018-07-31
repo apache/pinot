@@ -128,8 +128,8 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     _aggFunColumnPairsCount = _aggFunColumnPairs.size();
     List<String> aggFunColumnPairsStringList = new ArrayList<>();
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-      _metricsName.add(pair.getColumnName());
-      aggFunColumnPairsStringList.add(pair.getFunctionType().getName() + '_' + pair.getColumnName());
+      _metricsName.add(pair.getColumn());
+      aggFunColumnPairsStringList.add(pair.getFunctionType().getName() + '_' + pair.getColumn());
     }
     _aggFunColumnPairsString = String.join(", ", aggFunColumnPairsStringList);
     _metricsCount = _metricsName.size();
@@ -193,7 +193,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
       Object[] metricValues = new Object[_aggFunColumnPairsCount];
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
-        String metricName = _aggFunColumnPairs.get(j).getColumnName();
+        String metricName = _aggFunColumnPairs.get(j).getColumn();
         String aggfunc = _aggFunColumnPairs.get(j).getFunctionType().getName();
         if (aggfunc.equals(StarTreeV2Constant.AggregateFunctions.COUNT)) {
           metricValues[j] = 1L;

@@ -15,16 +15,19 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import org.apache.commons.configuration.Configuration;
-
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.SelectionSort;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import java.util.HashSet;
+import java.util.Set;
+import org.apache.commons.configuration.Configuration;
 
 
 /**
@@ -47,26 +50,36 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
         brokerRequest.getFilterSubQueryMap())) {
       return true;
     }
-    // Check aggregation function columns.
-    if (brokerRequest.getAggregationsInfo() != null) {
+
+    // Aggregation queries
+    if (brokerRequest.isSetAggregationsInfo()) {
+      Set<String> columns = new HashSet<>();
+
+      // Add expressions in aggregation functions
       for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        if (aggregationInfo.getAggregationParams().containsKey(COLUMN_KEY)) {
-          String columnName = aggregationInfo.getAggregationParams().get(COLUMN_KEY);
-          if ((!aggregationInfo.getAggregationType().toLowerCase().equals("count")) && (!schema.hasColumn(columnName))) {
-            return true;
-          }
+        if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
+          String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
+          TransformExpressionTree.compileToExpressionTree(expression).getColumns(columns);
         }
       }
-      // Check groupBy columns.
-      if ((brokerRequest.getGroupBy() != null) && (brokerRequest.getGroupBy().getColumns() != null)) {
-        for (String columnName : brokerRequest.getGroupBy().getColumns()) {
-          if (!schema.hasColumn(columnName)) {
-            return true;
-          }
+
+      // Add expressions in group-by clause
+      if (brokerRequest.isSetGroupBy()) {
+        for (String expression : brokerRequest.getGroupBy().getExpressions()) {
+          TransformExpressionTree.compileToExpressionTree(expression).getColumns(columns);
         }
       }
+
+      // Check whether schema contains all columns
+      for (String column : columns) {
+        if (!schema.hasColumn(column)) {
+          return true;
+        }
+      }
+
       return false;
     }
+
     // Check selection columns
     if (brokerRequest.getSelections() != null) {
       if (brokerRequest.getSelections().getSelectionColumns() != null) {

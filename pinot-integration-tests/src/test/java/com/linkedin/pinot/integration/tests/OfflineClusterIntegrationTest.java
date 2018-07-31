@@ -410,6 +410,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertEquals(groupByEntry.getInt("value"), 336);
     Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), "ORD");
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "valuein(DivAirports,'DFW','ORD')");
+
+    pqlQuery = "SELECT MAX(timeConvert(DaysSinceEpoch,'DAYS','SECONDS')) FROM mytable";
+    response = postQuery(pqlQuery);
+    JSONObject aggregationResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    Assert.assertEquals(aggregationResult.get("function"), "max_timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
+    Assert.assertEquals(aggregationResult.getDouble("value"), 16435.0 * 24 * 3600, 1e-5);
+
+    pqlQuery = "SELECT MIN(div(DaysSinceEpoch,2)) FROM mytable";
+    response = postQuery(pqlQuery);
+    aggregationResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    Assert.assertEquals(aggregationResult.get("function"), "min_div(DaysSinceEpoch,'2')");
+    Assert.assertEquals(aggregationResult.getDouble("value"), 16071.0 / 2, 1e-5);
   }
 
   @AfterClass

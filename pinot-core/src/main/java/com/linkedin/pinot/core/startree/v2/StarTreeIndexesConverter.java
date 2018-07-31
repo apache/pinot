@@ -94,7 +94,7 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
     }
 
     for (AggregationFunctionColumnPair pair : aggregationFunctionColumnPair) {
-      String column = pair.getFunctionType().getName() + "_" + pair.getColumnName();
+      String column = pair.getFunctionType().getName() + "_" + pair.getColumn();
       appendToFile(v2Directory, column, "METRIC", starTreeId);
     }
 

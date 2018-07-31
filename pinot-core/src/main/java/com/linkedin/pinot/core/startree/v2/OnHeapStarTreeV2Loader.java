@@ -29,7 +29,6 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 public class OnHeapStarTreeV2Loader {
 
   // segment
-  private static IndexLoadingConfig _v3IndexLoadingConfig;
   private static SegmentMetadataImpl _segmentMetadataImpl;
 
   // star tree

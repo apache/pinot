@@ -118,15 +118,11 @@ public class ImmutableSegmentLoader {
       starTree = new OffHeapStarTree(segmentReader.getStarTreeFile(), readMode);
     }
 
-    if (segmentMetadata.getStarTreeV2Count() > 0) {
-      OnHeapStarTreeV2Loader loader = new OnHeapStarTreeV2Loader();
-      ImmutableSegment immutableSegment = new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
-      List<StarTreeV2> starTreeV2List = loader.load(indexDir, immutableSegment);
-      ((ImmutableSegmentImpl) immutableSegment).setStarTreeV2List(starTreeV2List);
+    ImmutableSegment immutableSegment = new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
+    OnHeapStarTreeV2Loader loader = new OnHeapStarTreeV2Loader();
+    List<StarTreeV2> starTreeV2List = loader.load(indexDir, immutableSegment);
+    ((ImmutableSegmentImpl) immutableSegment).setStarTrees(starTreeV2List);
 
-      return immutableSegment;
-    }
-
-    return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
+    return immutableSegment;
   }
 }

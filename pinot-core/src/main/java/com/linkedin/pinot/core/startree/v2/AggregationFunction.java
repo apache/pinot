@@ -43,18 +43,17 @@ public interface AggregationFunction<R, A> {
   /**
    * Get length of longest Entry
    */
-  @Nonnull
-  int getLongestEntrySize();
+  int getResultMaxByteSize();
 
   /**
    * Perform aggregation on the given raw data.
    */
-  A aggregateRaw(List<R> data);
+  A convert(R data);
 
   /**
    * Perform aggregation on the pre aggregated data.
    */
-  A aggregatePreAggregated(List<A> data);
+  A aggregate(A obj1, A obj2);
 
   /**
    * Perform serialization of a object

@@ -60,13 +60,13 @@ public class OnHeapStarTreeV2IntegrationTest {
     List<AggregationFunctionColumnPair> metric2aggFuncPairs2 = new ArrayList<>();
 
 
-    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("SUM"), "salary");
-    AggregationFunctionColumnPair pair2 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("MAX"), "salary");
-    AggregationFunctionColumnPair pair3 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("MIN"), "salary");
-    AggregationFunctionColumnPair pair4 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("DISTINCTCOUNTHLL"), "salary");
-    AggregationFunctionColumnPair pair5 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("PERCENTILETDIGEST"), "salary");
-    AggregationFunctionColumnPair pair6 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("PERCENTILEEST"), "salary");
-    AggregationFunctionColumnPair pair7 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("COUNT"), "star");
+    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "salary");
+    AggregationFunctionColumnPair pair2 = new AggregationFunctionColumnPair(AggregationFunctionType.MAX, "salary");
+    AggregationFunctionColumnPair pair3 = new AggregationFunctionColumnPair(AggregationFunctionType.MIN, "salary");
+    AggregationFunctionColumnPair pair4 = new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "salary");
+    AggregationFunctionColumnPair pair5 = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
+    AggregationFunctionColumnPair pair6 = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILEEST, "salary");
+    AggregationFunctionColumnPair pair7 = new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "star");
 
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
@@ -135,8 +135,8 @@ public class OnHeapStarTreeV2IntegrationTest {
         }
 
         for (AggregationFunctionColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
-          String metpair = pair.getFunctionType().getName() + "_" + pair.getColumnName();
-          DataSource source = impl.getDataSource(pair);
+          String metpair = pair.getFunctionType().getName() + "_" + pair.getColumn();
+          DataSource source = impl.getDataSource(metpair);
           System.out.println("Printing for Met2AggPair : " + metpair);
           StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getFunctionType().getName());
         }

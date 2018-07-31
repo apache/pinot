@@ -87,6 +87,10 @@ public enum AggregationFunctionType {
           return PERCENTILEESTMV;
         } else if (remainingFunctionName.matches("TDIGEST\\d+MV")) {
           return PERCENTILETDIGESTMV;
+        } else if (remainingFunctionName.matches("TDIGEST")) {
+          return PERCENTILETDIGEST;
+        } else if (remainingFunctionName.matches("EST")) {
+          return PERCENTILEEST;
         } else {
           throw new IllegalArgumentException();
         }

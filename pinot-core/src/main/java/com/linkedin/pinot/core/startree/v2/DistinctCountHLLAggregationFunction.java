@@ -16,10 +16,8 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
-import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import com.linkedin.pinot.core.common.datatable.ObjectType;
@@ -46,38 +44,35 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Nonnull
   @Override
-  public int getLongestEntrySize() {
+  public int getResultMaxByteSize() {
     return _maxLength;
   }
 
   @Override
-  public HyperLogLog aggregateRaw(List<Object> data) {
+  public HyperLogLog convert(Object data) {
     HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
-    for (Object obj : data) {
-      try {
-        hyperLogLog.offer(obj);
-        _maxLength = Math.max(_maxLength, hyperLogLog.getBytes().length);
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
+    hyperLogLog.offer(data);
+    try {
+      _maxLength = Math.max(_maxLength, hyperLogLog.getBytes().length);
+    } catch (IOException e) {
+      e.printStackTrace();
     }
+
     return hyperLogLog;
   }
 
   @Override
-  public HyperLogLog aggregatePreAggregated(List<HyperLogLog> data) {
-    HyperLogLog hyperLogLog = data.get(0);
-    for (int i = 1; i < data.size(); i++) {
-      try {
-        hyperLogLog.addAll(data.get(i));
-        _maxLength = Math.max(_maxLength, hyperLogLog.getBytes().length);
-      } catch (CardinalityMergeException e) {
-        Utils.rethrowException(e);
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
+  public HyperLogLog aggregate(HyperLogLog obj1, HyperLogLog obj2) {
+    try {
+      obj1.addAll(obj2);
+      _maxLength = Math.max(_maxLength, obj1.getBytes().length);
+    } catch (CardinalityMergeException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
     }
-    return hyperLogLog;
+
+    return obj1;
   }
 
   @Override

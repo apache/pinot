@@ -96,8 +96,8 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
     _aggFunColumnPairsCount = _aggFunColumnPairs.size();
     List<String> aggFunColumnPairsStringList = new ArrayList<>();
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-      _metricsName.add(pair.getColumnName());
-      aggFunColumnPairsStringList.add(pair.getFunctionType().getName() + '_' + pair.getColumnName());
+      _metricsName.add(pair.getColumn());
+      aggFunColumnPairsStringList.add(pair.getFunctionType().getName() + '_' + pair.getColumn());
     }
     _aggFunColumnPairsString = String.join(", ", aggFunColumnPairsStringList);
     _metricsCount = _metricsName.size();
@@ -165,7 +165,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
       Record record = _rawStarTreeData.get(i);
       List<Object> metricRawValues = new ArrayList<>();
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
-        String metricName = _aggFunColumnPairs.get(j).getColumnName();
+        String metricName = _aggFunColumnPairs.get(j).getColumn();
         String aggfunc = _aggFunColumnPairs.get(j).getFunctionType().getName();
         if (aggfunc.equals(StarTreeV2Constant.AggregateFunctions.COUNT)) {
           metricRawValues.add(1L);
@@ -297,12 +297,12 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
 
     // 'SingleValueRawIndexCreator' for metrics
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-      String columnName = pair.getFunctionType().getName() + '_' + pair.getColumnName();
+      String columnName = pair.getFunctionType().getName() + '_' + pair.getColumn();
       AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
           ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _starTreeData.size(),
-          function.getLongestEntrySize());
+          function.getResultMaxByteSize());
       _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
     }
 
@@ -629,42 +629,30 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
    */
   private List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData,
       List<AggregationFunctionColumnPair> aggfunColumnPairs, boolean isRawData) {
+
     List<Object> aggregatedMetricsValue = new ArrayList<>();
-
-    List<List<Object>> metricValues = new ArrayList<>();
-    for (int i = 0; i < aggfunColumnPairs.size(); i++) {
-      List<Object> l = new ArrayList<>();
-      metricValues.add(l);
-    }
-
-    for (int i = start; i < end; i++) {
-      Record r = starTreeData.get(i);
-      List<Object> metric = r.getMetricValues();
-      for (int j = 0; j < aggfunColumnPairs.size(); j++) {
-        metricValues.get(j).add(metric.get(j));
-      }
-    }
 
     AggregationFunctionFactory functionFactory = new AggregationFunctionFactory();
     for (int i = 0; i < aggfunColumnPairs.size(); i++) {
       AggregationFunctionColumnPair pair = aggfunColumnPairs.get(i);
       String aggFunc = pair.getFunctionType().getName();
-      List<Object> data = metricValues.get(i);
       AggregationFunction function = functionFactory.getAggregationFunction(aggFunc);
-      aggregatedMetricsValue.add(aggregate(function, isRawData, data));
+
+      Object obj1  = starTreeData.get(start).getMetricValues().get(i);
+      if (isRawData) {
+        obj1 = function.convert(obj1);
+      }
+
+      for ( int j = start + 1; j < end; j++) {
+        Object obj2  = starTreeData.get(j).getMetricValues().get(i);
+        if (isRawData) {
+          obj2 = function.convert(obj2);
+        }
+        obj1 = function.aggregate(obj1, obj2);
+      }
+      aggregatedMetricsValue.add(obj1);
     }
 
     return aggregatedMetricsValue;
-  }
-
-  /**
-   * aggregate raw or pre aggregated data.
-   */
-  private Object aggregate(AggregationFunction function, boolean isRawData, List<Object> data) {
-    if (isRawData) {
-      return function.aggregateRaw(data);
-    } else {
-      return function.aggregatePreAggregated(data);
-    }
   }
 }

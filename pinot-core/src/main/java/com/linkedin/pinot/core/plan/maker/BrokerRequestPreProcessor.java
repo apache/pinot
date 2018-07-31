@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import java.util.List;
 import java.util.Objects;
 
@@ -61,7 +62,7 @@ public class BrokerRequestPreProcessor {
     // Consistent check.
     for (AggregationInfo aggregationInfo : aggregationsInfo) {
       if (aggregationInfo.getAggregationType().equalsIgnoreCase("fasthll")) {
-        String column = aggregationInfo.getAggregationParams().get("column").trim();
+        String column = AggregationFunctionUtils.getColumn(aggregationInfo);
         boolean isFirstSegment = true;
         String firstSegmentName = null;
         String hllDerivedColumn = null;
@@ -73,7 +74,7 @@ public class BrokerRequestPreProcessor {
             firstSegmentName = segmentMetadata.getName();
             hllDerivedColumn = segmentMetadata.getDerivedColumn(column, MetricFieldSpec.DerivedMetricType.HLL);
             if (hllDerivedColumn != null) {
-              aggregationInfo.getAggregationParams().put("column", hllDerivedColumn);
+              aggregationInfo.putToAggregationParams(AggregationFunctionUtils.COLUMN_KEY, hllDerivedColumn);
             }
           } else {
             // Perform consistency check on other index segments.
