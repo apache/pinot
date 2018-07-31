@@ -33,16 +33,16 @@ public class V1DefaultColumnHandler extends BaseDefaultColumnHandler {
    * {@inheritDoc}
    */
   @Override
-  protected void updateDefaultColumn(String column, DefaultColumnAction action)
-      throws Exception {
+  protected void updateDefaultColumn(String column, DefaultColumnAction action) throws Exception {
     LOGGER.info("Starting default column action: {} on column: {}", action, column);
 
-    // Delete existing dictionary and forward index for the column.
-    removeColumnV1Indices(column);
+    // For UPDATE and REMOVE action, delete existing dictionary and forward index, and remove column metadata
+    if (action.isUpdateAction() || action.isRemoveAction()) {
+      removeColumnV1Indices(column);
+    }
 
-    // Now we finished all the work needed for REMOVE action.
-    // For ADD and UPDATE action, need to create new dictionary and forward index, and update column metadata.
-    if (!action.isRemoveAction()) {
+    // For ADD and UPDATE action, create new dictionary and forward index, and update column metadata
+    if (action.isAddAction() || action.isUpdateAction()) {
       createColumnV1Indices(column);
     }
   }
