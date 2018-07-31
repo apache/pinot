@@ -80,7 +80,7 @@ export default Service.extend({
     const [ start, end ] = requestContext.anomalyRange;
     const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
     const urns = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[1]);
-    const timezone = moment.tz.guess();
+    const timezone = 'America/Los_Angeles';
 
     const url = `/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
     try {
