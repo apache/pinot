@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +55,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Present in segment but not in schema, auto-generated.
     REMOVE_DIMENSION,
     REMOVE_METRIC;
+
+    boolean isAddAction() {
+      return this == ADD_DIMENSION || this == ADD_METRIC;
+    }
+
+    boolean isUpdateAction() {
+      return this == UPDATE_DIMENSION || this == UPDATE_METRIC;
+    }
 
     boolean isRemoveAction() {
       return this == REMOVE_DIMENSION || this == REMOVE_METRIC;
@@ -235,13 +244,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *
    * @param column column name.
    */
-  protected void removeColumnV1Indices(String column) {
-    // Delete existing dictionary and forward index for the column.
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION));
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION));
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
+  protected void removeColumnV1Indices(String column) throws IOException {
+    // Delete existing dictionary and forward index
+    FileUtils.forceDelete(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION));
+    File svFwdIndex = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+    if (svFwdIndex.exists()) {
+      FileUtils.forceDelete(svFwdIndex);
+    } else {
+      FileUtils.forceDelete(new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
+    }
 
-    // Remove the column metadata information if exists.
+    // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
   }
 
