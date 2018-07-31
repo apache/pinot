@@ -280,7 +280,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
     // Backward-compatible: index file is always big-endian
     PinotDataBuffer buffer;
-    if (readMode == ReadMode.mmap) {
+    if (readMode == ReadMode.heap) {
       buffer = PinotDataBuffer.loadFile(indexFile, fromFilePos, size, ByteOrder.BIG_ENDIAN, context);
     } else {
       buffer = PinotDataBuffer.mapFile(indexFile, true, fromFilePos, size, ByteOrder.BIG_ENDIAN, context);
