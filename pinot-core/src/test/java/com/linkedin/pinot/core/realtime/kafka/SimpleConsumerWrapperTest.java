@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.realtime.kafka;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleStreamConsumer;
 import java.util.Collections;
 import java.util.HashMap;
 import kafka.api.FetchRequest;
@@ -46,7 +46,7 @@ import static org.testng.Assert.*;
 
 
 /**
- * Tests for the SimpleConsumerWrapper.
+ * Tests for the KafkaSimpleStreamConsumer.
  */
 public class SimpleConsumerWrapperTest {
   public class MockKafkaSimpleConsumerFactory implements KafkaSimpleConsumerFactory {
@@ -218,7 +218,7 @@ public class SimpleConsumerWrapperTest {
         new int[] { 0, 1 },
         "theTopic"
     );
-    SimpleConsumerWrapper consumerWrapper = new SimpleConsumerWrapper(
+    KafkaSimpleStreamConsumer consumerWrapper = new KafkaSimpleStreamConsumer(
         simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 10000L);
     assertEquals(consumerWrapper.getPartitionCount("theTopic", 10000L), 2);
   }
@@ -233,7 +233,8 @@ public class SimpleConsumerWrapperTest {
         new int[] { 0, 1 },
         "theTopic"
     );
-    SimpleConsumerWrapper consumerWrapper = new SimpleConsumerWrapper(simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0, 10000L);
+    KafkaSimpleStreamConsumer
+        consumerWrapper = new KafkaSimpleStreamConsumer(simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0, 10000L);
     consumerWrapper.fetchMessages(12345L, 23456L, 10000);
   }
 
@@ -247,7 +248,8 @@ public class SimpleConsumerWrapperTest {
         new int[] { 0, 1 },
         "theTopic"
     );
-    SimpleConsumerWrapper consumerWrapper = new SimpleConsumerWrapper(simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0, 10000L);
+    KafkaSimpleStreamConsumer
+        consumerWrapper = new KafkaSimpleStreamConsumer(simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0, 10000L);
     consumerWrapper.fetchPartitionOffset("smallest", 10000);
 
   }

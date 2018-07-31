@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.realtime.stream;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import javax.annotation.Nonnull;
 
 
 public abstract class StreamConsumerFactory {
@@ -37,11 +36,12 @@ public abstract class StreamConsumerFactory {
     _streamMetadata = streamMetadata;
   }
 
-  public abstract PinotStreamConsumer buildConsumer(@Nonnull String clientId, int partition,
-      StreamMetadata streamMetadata);
-
-  // TODO: start using createMetadataProvider instead of buildMetadataFetcher once StreamMetadataProvider impl is done
-  public abstract PinotStreamConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata);
+  /**
+   * Creates a stream consumer which can fetch stream messages
+   * @param partition
+   * @return
+   */
+  public abstract StreamConsumer createStreamConsumer(int partition);
 
   /**
    * Creates a metadata provider which provides partition specific metadata

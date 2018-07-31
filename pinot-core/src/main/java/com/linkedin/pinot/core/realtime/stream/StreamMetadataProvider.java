@@ -25,11 +25,10 @@ import javax.annotation.Nonnull;
 public interface StreamMetadataProvider extends Closeable {
   /**
    * Fetches the number of partitions for a topic given the stream configs
-   * @param  topic
    * @param timeoutMillis
    * @return
    */
-  int fetchPartitionCount(String topic, long timeoutMillis);
+  int fetchPartitionCount(long timeoutMillis);
 
   /**
    * Fetches the offset for a given partition and offset criteria
@@ -38,7 +37,7 @@ public interface StreamMetadataProvider extends Closeable {
    * @return
    * @throws java.util.concurrent.TimeoutException
    */
-  long fetchPartitionOffset(@Nonnull String requestedOffset, int timeoutMillis)
+  long fetchPartitionOffset(@Nonnull String requestedOffset, long timeoutMillis)
       throws java.util.concurrent.TimeoutException;
 
 }

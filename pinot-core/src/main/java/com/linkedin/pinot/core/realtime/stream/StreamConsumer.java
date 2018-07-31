@@ -16,28 +16,13 @@
 package com.linkedin.pinot.core.realtime.stream;
 
 import java.io.Closeable;
-import java.io.IOException;
-import javax.annotation.Nonnull;
 
 
 /**
- * Interface that allows us to plugin different Kafka consumers. The default implementation is SimpleConsumerWrapper.
+ * Interface that allows us to plugin different Kafka consumers. The default implementation is KafkaSimpleStreamConsumer.
  */
-public interface PinotStreamConsumer extends Closeable {
-  int getPartitionCount(String topic, long timeoutMillis);
+public interface StreamConsumer extends Closeable {
 
   MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
         throws java.util.concurrent.TimeoutException;
-
-  /**
-   *
-   * @param requestedOffset nonnull
-   * @param timeoutMillis
-   * @return
-   * @throws java.util.concurrent.TimeoutException
-   */
-  long fetchPartitionOffset(@Nonnull String requestedOffset, int timeoutMillis)
-        throws java.util.concurrent.TimeoutException;
-
-  void close() throws IOException;
 }

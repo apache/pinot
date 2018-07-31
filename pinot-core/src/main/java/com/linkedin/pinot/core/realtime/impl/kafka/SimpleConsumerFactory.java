@@ -15,27 +15,19 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.core.realtime.stream.StreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
-import javax.annotation.Nonnull;
 
 
+/**
+ * A StreamConsumerFactory implementation for Kafka's Simple Consumer
+ */
 public class SimpleConsumerFactory extends StreamConsumerFactory {
 
   @Override
-  public PinotStreamConsumer buildConsumer(String clientId, int partition, StreamMetadata streamMetadata) {
-    KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(), clientId,
-        streamMetadata.getKafkaTopicName(), partition, streamMetadata.getKafkaConnectionTimeoutMillis());
-  }
-
-  @Override
-  public PinotStreamConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata) {
-    KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(), clientId,
-        streamMetadata.getKafkaTopicName(), streamMetadata.getKafkaConnectionTimeoutMillis());
+  public StreamConsumer createStreamConsumer(int partition) {
+    return new KafkaSimpleStreamConsumer(_streamMetadata, partition);
   }
 
   @Override

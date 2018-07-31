@@ -25,9 +25,9 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import java.util.List;
 import java.util.Map;
@@ -235,10 +235,9 @@ public class PinotTableIdealStateBuilder {
       }
       StreamConsumerFactory streamConsumerFactory = StreamConsumerFactory.create(_streamMetadata);
       streamConsumerFactory.init(_streamMetadata);
-      PinotStreamConsumer consumerWrapper = streamConsumerFactory.buildMetadataFetcher(
-          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, _streamMetadata);
+      StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider();
       try {
-        _partitionCount = consumerWrapper.getPartitionCount(kafkaTopicName, /*maxWaitTimeMs=*/5000L);
+        _partitionCount = streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
         if (_exception != null) {
           // We had at least one failure, but succeeded now. Log an info
           LOGGER.info("Successfully retrieved partition count as {} for topic {}", _partitionCount, kafkaTopicName);
@@ -253,7 +252,7 @@ public class PinotTableIdealStateBuilder {
         _exception = e;
         throw e;
       } finally {
-        IOUtils.closeQuietly(consumerWrapper);
+        IOUtils.closeQuietly(streamMetadataProvider);
       }
     }
   }
