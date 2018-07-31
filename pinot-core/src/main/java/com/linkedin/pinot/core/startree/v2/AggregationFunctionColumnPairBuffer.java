@@ -26,7 +26,6 @@ import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 
 
 public class AggregationFunctionColumnPairBuffer {
@@ -136,39 +135,12 @@ public class AggregationFunctionColumnPairBuffer {
   /**
    * NOTE: pass in byte size for performance. Byte size can be calculated by adding up field size for all metrics.
    */
-  public void aggregate( AggregationFunctionColumnPairBuffer buffer) {
+  public void aggregate(AggregationFunctionColumnPairBuffer buffer) {
     int numValues = _values.length;
     for (int i = 0; i < numValues; i++) {
       AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
       AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
-
-
-
-      switch (factory.getName()) {
-        case StarTreeV2Constant.AggregateFunctions.MAX:
-          _values[i] = (Integer) _values[i] + (Integer) buffer._values[i];
-          break;
-        case StarTreeV2Constant.AggregateFunctions.MIN:
-          _values[i] = (Long) _values[i] + (Long) buffer._values[i];
-          break;
-        case StarTreeV2Constant.AggregateFunctions.COUNT:
-          _values[i] = (Float) _values[i] + (Float) buffer._values[i];
-          break;
-        case StarTreeV2Constant.AggregateFunctions.SUM:
-          _values[i] = (Double) _values[i] + (Double) buffer._values[i];
-          break;
-        case StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL:
-         ((HyperLogLog) _values[i]).offer(buffer._values[i]);
-          break;
-        case StarTreeV2Constant.AggregateFunctions.PERCENTILEEST:
-          ((QuantileDigest) _values[i]).merge((QuantileDigest) buffer._values[i]);
-          break;
-        case StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST:
-          ((TDigest) _values[i]).add((TDigest) buffer._values[i]);
-          break;
-        default:
-            throw new IllegalStateException();
-      }
+      _values[i] = factory.aggregate(_values[i], buffer._values[i]);
     }
   }
 

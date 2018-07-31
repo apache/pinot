@@ -55,11 +55,14 @@ public class OffHeapStarTreeV2IntegrationTest {
 
     AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("SUM"), "salary");
     AggregationFunctionColumnPair pair2 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("MAX"), "salary");
+    AggregationFunctionColumnPair pair3 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("COUNT"), "star");
 
 
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
+    metric2aggFuncPairs1.add(pair3);
     metric2aggFuncPairs2.add(pair1);
+
 
     StarTreeV2Config _starTreeV2Config1 = new StarTreeV2Config();
     _starTreeV2Config1.setOutDir(_filepath);
