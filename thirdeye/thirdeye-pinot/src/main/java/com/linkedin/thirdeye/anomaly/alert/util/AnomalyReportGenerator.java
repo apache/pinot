@@ -140,6 +140,10 @@ public class AnomalyReportGenerator {
         recipients, emailSubjectName, alertConfig, false);
   }
 
+  //
+  // TODO WARNING! REMOVE THIS CODE
+  // it is not being used by the alerter, and only hooked up to certain end points
+  //
   public void buildReport(long startTime, long endTime, Long groupId, String groupName,
       List<MergedAnomalyResultDTO> anomalies, String subject, ThirdEyeAnomalyConfiguration configuration,
       boolean includeSentAnomaliesOnly, String emailRecipients, String emailSubjectName, AlertConfigDTO alertConfig,
@@ -296,6 +300,7 @@ public class AnomalyReportGenerator {
       }
       templateData.put("cid", cid);
 
+      // TODO remove this code. It is dead (minus certain endpoints).
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
           emailRecipients, alertConfig.getFromAddress(), email);
 
