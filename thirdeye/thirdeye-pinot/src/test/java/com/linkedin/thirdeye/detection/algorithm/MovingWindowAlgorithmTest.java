@@ -242,25 +242,30 @@ public class MovingWindowAlgorithmTest {
 
   @Test
   public void testKernelMin() throws Exception {
-    this.properties.put(PROP_KERNEL_MIN, -1.0);
+    this.properties.put(PROP_KERNEL_MIN, -1.25);
     this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
     DetectionPipelineResult res = this.algorithm.run();
 
-    Assert.assertEquals(res.getAnomalies().size(), 2);
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2224800000L, 2228400000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2404800000L, 2412000000L)));
+    Assert.assertEquals(res.getAnomalies().size(), 3);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1771200000L, 1792800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2217600000L, 2235600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2397600000L, 2412000000L)));
   }
 
   @Test
   public void testKernelMax() throws Exception {
-    this.properties.put(PROP_KERNEL_MAX, 1.0);
+    this.properties.put(PROP_KERNEL_MAX, 1.25);
     this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
     DetectionPipelineResult res = this.algorithm.run();
 
-    Assert.assertEquals(res.getAnomalies().size(), 1);
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1278000000L, 1285200000L)));
+    Assert.assertEquals(res.getAnomalies().size(), 5);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1274400000L, 1296000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1544400000L, 1576800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1756800000L, 1767600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1796400000L, 1810800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2379600000L, 2386800000L)));
   }
 
   //
@@ -368,34 +373,6 @@ public class MovingWindowAlgorithmTest {
 
     Assert.assertEquals(res.getAnomalies().size(), 0);
   }
-
-  //
-  // helper tests
-  //
-
-//  @Test
-//  public void testWindow() {
-//    this.properties.put(PROP_WINDOW_SIZE, "2hours");
-//    this.properties.put(PROP_QUANTILE_MIN, 0.25);
-//    this.properties.put(PROP_QUANTILE_MAX, 0.75);
-//    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 3600000L, 9999999L);
-//
-//    DataFrame input = new DataFrame(COL_TIME, LongSeries.buildFrom(0L, 3600000L, 7200000L, 14400000L))
-//        .addSeries(COL_VALUE, 1, 2, 3, 5)
-//        .addSeries(COL_OUTLIER, false, false, false, false);
-//
-//    DataFrame output = new DataFrame(COL_TIME, LongSeries.buildFrom(0L, 3600000L, 7200000L, 14400000L))
-//        .addSeries(COL_VALUE, 1, 2, 3, 5)
-//        .addSeries(COL_STD, Double.NaN, Double.NaN, 0.7071067811865476, Double.NaN) // TODO avoid exact double compare
-//        .addSeries(COL_MEAN, Double.NaN, 1, 1.5, Double.NaN)
-//        .addSeries(COL_QUANTILE_MIN, Double.NaN, 1, 1.25, Double.NaN)
-//        .addSeries(COL_QUANTILE_MAX, Double.NaN, 1, 1.75, Double.NaN)
-//        .addSeries(COL_OUTLIER, false, false, false, false);
-//
-//    DataFrame window = this.algorithm.applyMovingWindow(input, new TreeSet<Long>());
-//
-//    Assert.assertEquals(window, output);
-//  }
 
   //
   // utils
