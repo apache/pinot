@@ -16,15 +16,17 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.clearspring.analytics.stream.quantile.QDigest;
-import com.clearspring.analytics.stream.quantile.TDigest;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.util.List;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.clearspring.analytics.stream.quantile.QDigest;
+import com.clearspring.analytics.stream.quantile.TDigest;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 
 
 public class AggregationFunctionColumnPairBuffer {
@@ -81,6 +83,95 @@ public class AggregationFunctionColumnPairBuffer {
     return bytes;
   }
 
+  /**
+   * NOTE: pass in byte size for performance. Byte size can be calculated by adding up field size for all metrics.
+   */
+  public static AggregationFunctionColumnPairBuffer fromBytes(byte[] bytes, List<AggregationFunctionColumnPair> aggFunColumnPairs) {
+
+    int numMetrics = aggFunColumnPairs.size();
+    Object[] values = new Object[numMetrics];
+
+    ByteBuffer buffer = ByteBuffer.wrap(bytes).order(PinotDataBuffer.NATIVE_ORDER);
+    for (int i = 0; i < numMetrics; i++) {
+      AggregationFunctionColumnPair pair = aggFunColumnPairs.get(i);
+      AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+
+      switch (factory.getDataType()) {
+        case INT:
+          values[i] = buffer.getInt();
+          break;
+        case LONG:
+          values[i] = buffer.getLong();
+          break;
+        case FLOAT:
+          values[i] = buffer.getFloat();
+          break;
+        case DOUBLE:
+          values[i] = buffer.getDouble();
+          break;
+        case BYTES:
+          int objLength = buffer.getInt();
+          byte[] objBytes = new byte[objLength];
+          buffer.get(objBytes);
+          try {
+            if (pair.getFunctionType().getName().equals(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL)) {
+              values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.HyperLogLog);
+            } else if (pair.getFunctionType().getName().equals(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST)) {
+              values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.QuantileDigest);
+            } else if (pair.getFunctionType().getName().equals(StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST)) {
+              values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.TDigest);
+            }
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+
+    return new AggregationFunctionColumnPairBuffer(values, aggFunColumnPairs);
+  }
+
+  /**
+   * NOTE: pass in byte size for performance. Byte size can be calculated by adding up field size for all metrics.
+   */
+  public void aggregate( AggregationFunctionColumnPairBuffer buffer) {
+    int numValues = _values.length;
+    for (int i = 0; i < numValues; i++) {
+      AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
+      AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+
+
+
+      switch (factory.getName()) {
+        case StarTreeV2Constant.AggregateFunctions.MAX:
+          _values[i] = (Integer) _values[i] + (Integer) buffer._values[i];
+          break;
+        case StarTreeV2Constant.AggregateFunctions.MIN:
+          _values[i] = (Long) _values[i] + (Long) buffer._values[i];
+          break;
+        case StarTreeV2Constant.AggregateFunctions.COUNT:
+          _values[i] = (Float) _values[i] + (Float) buffer._values[i];
+          break;
+        case StarTreeV2Constant.AggregateFunctions.SUM:
+          _values[i] = (Double) _values[i] + (Double) buffer._values[i];
+          break;
+        case StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL:
+         ((HyperLogLog) _values[i]).offer(buffer._values[i]);
+          break;
+        case StarTreeV2Constant.AggregateFunctions.PERCENTILEEST:
+          ((QuantileDigest) _values[i]).merge((QuantileDigest) buffer._values[i]);
+          break;
+        case StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST:
+          ((TDigest) _values[i]).add((TDigest) buffer._values[i]);
+          break;
+        default:
+            throw new IllegalStateException();
+      }
+    }
+  }
+
   private void calculateBytesRequired() {
     for (int i = 0; i < _aggFunColumnPairs.size(); i++) {
       AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
@@ -108,7 +199,7 @@ public class AggregationFunctionColumnPairBuffer {
         else if (obj instanceof QDigest)
           return ((HyperLogLog) obj).sizeof();
       default:
-        throw new IllegalStateException();
+          throw new IllegalStateException();
     }
   }
 }

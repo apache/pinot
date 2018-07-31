@@ -17,10 +17,10 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.File;
-import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Arrays;
 import org.testng.Assert;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.io.IOException;
 import com.google.common.io.Files;

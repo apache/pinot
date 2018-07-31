@@ -22,16 +22,18 @@ import it.unimi.dsi.fastutil.ints.IntComparator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.io.Closeable;
 import java.io.IOException;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 
 
 public class StarTreeV2DataTable implements Closeable {
 
-  private final int _startDocId;
   private final int _dimensionSize;
   private final PinotDataBuffer _dataBuffer;
 
@@ -40,14 +42,12 @@ public class StarTreeV2DataTable implements Closeable {
    *
    * @param dataBuffer Data buffer
    * @param dimensionSize Size of all dimensions in bytes
-   * @param startDocId Start document id of the data buffer
    */
-  public StarTreeV2DataTable(PinotDataBuffer dataBuffer, int dimensionSize, int startDocId) {
+  public StarTreeV2DataTable(PinotDataBuffer dataBuffer, int dimensionSize) {
     Preconditions.checkState(dataBuffer.size() > 0);
 
     _dataBuffer = dataBuffer;
     _dimensionSize = dimensionSize;
-    _startDocId = startDocId;
   }
 
   /**
@@ -60,18 +60,9 @@ public class StarTreeV2DataTable implements Closeable {
    * @param endDocId End document id (exclusive) of the range to be sorted
    * @param sortOrder Sort order of dimensions
    */
-  public void sort(int startDocId, int endDocId, final int[] sortOrder, List<Long> docSizeIndex) {
+  public int[] sort(int startDocId, int endDocId, final int[] sortOrder, List<Long> docSizeIndex) {
 
     Preconditions.checkState(startDocId < endDocId);
-
-
-    // read the buffer for sanity check.
-    for ( int i = 0; i < 6; i++) {
-      for ( int j = 0; j < 3; j++) {
-        System.out.print(_dataBuffer.getInt(docSizeIndex.get(i) + j * Integer.BYTES));
-      }
-      System.out.println();
-    }
 
     int numDocs = endDocId - startDocId;
     final int[] sortedDocIds = new int[numDocs];
@@ -79,13 +70,11 @@ public class StarTreeV2DataTable implements Closeable {
       sortedDocIds[i] = i;
     }
 
-
     IntComparator comparator = new IntComparator() {
       @Override
       public int compare(int i1, int i2) {
         long offset1 = docSizeIndex.get(sortedDocIds[i1]);
         long offset2 = docSizeIndex.get(sortedDocIds[i2]);
-
         for (int index : sortOrder) {
           int v1 = _dataBuffer.getInt(offset1 + index * Integer.BYTES);
           int v2 = _dataBuffer.getInt(offset2 + index * Integer.BYTES);
@@ -109,18 +98,47 @@ public class StarTreeV2DataTable implements Closeable {
     };
     Arrays.quickSort(0, numDocs, comparator, swapper);
 
-
-    for ( int i: sortedDocIds) {
-      for ( int j = 0; j < 3; j++) {
-        System.out.print(_dataBuffer.getInt(docSizeIndex.get(i) + j * Integer.BYTES));
-      }
-      System.out.println();
-    }
-
-    return;
+    return sortedDocIds;
   }
 
 
+  /**
+   * Gets the iterator to iterate over the documents inside the data buffer.
+   *
+   * @param startDocId Start document id of the range to iterate
+   * @param endDocId End document id (exclusive) of the range to iterate
+   * @return Iterator for pair of dimension bytes and metric bytes
+   */
+  public Iterator<Pair<byte[], byte[]>> iterator(int startDocId, int endDocId, List<Long> docSizeIndex, int [] sortedDocsId) {
+    Preconditions.checkState(startDocId < endDocId);
+
+    return new Iterator<Pair<byte[], byte[]>>() {
+      private int _currentIndex = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _currentIndex < sortedDocsId.length;
+      }
+
+      @Override
+      public Pair<byte[], byte[]> next() {
+        long totalBytes =  docSizeIndex.get(sortedDocsId[_currentIndex] + 1) - docSizeIndex.get(sortedDocsId[_currentIndex]);
+        int metricSize = (int) (totalBytes - _dimensionSize);
+        byte[] dimensionBytes = new byte[_dimensionSize];
+        byte[] metricBytes = new byte[metricSize];
+        long dimensionOffset = docSizeIndex.get(sortedDocsId[_currentIndex]);
+        _currentIndex++;
+        _dataBuffer.copyTo(dimensionOffset, dimensionBytes, 0, _dimensionSize);
+        _dataBuffer.copyTo(dimensionOffset + _dimensionSize, metricBytes, 0, metricSize);
+        return new ImmutablePair<>(dimensionBytes, metricBytes);
+      }
+
+      @Override
+      public void remove() {
+        throw new UnsupportedOperationException();
+      }
+    };
+  }
   @Override
   public void close() throws IOException {
     _dataBuffer.close();

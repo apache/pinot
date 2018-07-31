@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-
 import java.io.File;
 import java.util.Set;
 import java.util.Map;
