@@ -33,8 +33,8 @@ public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggre
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.DISTINCTCOUNTHLLMV.getName() + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.DISTINCTCOUNTHLLMV.getName() + "_" + column;
   }
 
   @Override

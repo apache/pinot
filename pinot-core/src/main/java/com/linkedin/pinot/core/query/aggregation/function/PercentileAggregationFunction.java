@@ -43,8 +43,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + column;
   }
 
   @Override

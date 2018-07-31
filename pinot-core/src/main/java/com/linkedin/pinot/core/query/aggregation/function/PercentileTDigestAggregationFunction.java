@@ -24,7 +24,6 @@ import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import java.nio.ByteBuffer;
-import java.util.Random;
 import javax.annotation.Nonnull;
 
 
@@ -48,8 +47,8 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.PERCENTILETDIGEST.getName() + _percentile + "_" + column;
   }
 
   @Override

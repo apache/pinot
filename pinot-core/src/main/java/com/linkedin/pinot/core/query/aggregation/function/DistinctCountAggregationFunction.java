@@ -36,8 +36,8 @@ public class DistinctCountAggregationFunction implements AggregationFunction<Int
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.DISTINCTCOUNT.getName() + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.DISTINCTCOUNT.getName() + "_" + column;
   }
 
   @Override

@@ -21,12 +21,14 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
 
 
 public class AggregationFunctionColumnPair {
-  private final AggregationFunctionType _functionType;
-  private final String _columnName;
+  public static final String DELIMITER = "__";
 
-  public AggregationFunctionColumnPair(@Nonnull AggregationFunctionType functionType, @Nonnull String columnName) {
+  private final AggregationFunctionType _functionType;
+  private final String _column;
+
+  public AggregationFunctionColumnPair(@Nonnull AggregationFunctionType functionType, @Nonnull String column) {
     _functionType = functionType;
-    _columnName = columnName;
+    _column = column;
   }
 
   @Nonnull
@@ -35,13 +37,24 @@ public class AggregationFunctionColumnPair {
   }
 
   @Nonnull
-  public String getColumnName() {
-    return _columnName;
+  public String getColumn() {
+    return _column;
+  }
+
+  @Nonnull
+  public String toColumnName() {
+    return _functionType.getName() + DELIMITER + _column;
+  }
+
+  @Nonnull
+  public static AggregationFunctionColumnPair fromColumnName(@Nonnull String columnName) {
+    String[] parts = columnName.split(DELIMITER, 2);
+    return new AggregationFunctionColumnPair(AggregationFunctionType.getAggregationFunctionType(parts[0]), parts[1]);
   }
 
   @Override
   public int hashCode() {
-    return 31 * _functionType.hashCode() + _columnName.hashCode();
+    return 31 * _functionType.hashCode() + _column.hashCode();
   }
 
   @Override
@@ -51,7 +64,7 @@ public class AggregationFunctionColumnPair {
     }
     if (obj instanceof AggregationFunctionColumnPair) {
       AggregationFunctionColumnPair anotherPair = (AggregationFunctionColumnPair) obj;
-      return _functionType == anotherPair._functionType && _columnName.equals(anotherPair._columnName);
+      return _functionType == anotherPair._functionType && _column.equals(anotherPair._column);
     }
     return false;
   }

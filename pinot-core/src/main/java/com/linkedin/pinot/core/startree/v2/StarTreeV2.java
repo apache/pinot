@@ -26,11 +26,19 @@ import com.linkedin.pinot.core.startree.StarTree;
  */
 public interface StarTreeV2 extends Closeable {
 
+  /**
+   * Returns the {@link StarTree} data structure.
+   */
   StarTree getStarTree();
 
+  /**
+   * Returns the metadata of the star-tree.
+   */
   StarTreeV2Metadata getMetadata();
 
-  DataSource getDataSource(String dimensionName);
-
-  DataSource getDataSource(AggregationFunctionColumnPair aggregationFunctionColumnPair);
+  /**
+   * Returns the data source for the given column name, where the column name could be dimension name or from
+   * {@link AggregationFunctionColumnPair#toColumnName()}.
+   */
+  DataSource getDataSource(String columnName);
 }

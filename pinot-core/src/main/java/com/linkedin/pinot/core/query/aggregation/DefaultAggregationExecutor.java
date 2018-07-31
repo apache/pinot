@@ -45,8 +45,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       _resultHolders[i] = _functions[i].createAggregationResultHolder();
       // TODO: currently only support single argument aggregation
       if (function.getType() != AggregationFunctionType.COUNT) {
-        _expressions[i] =
-            TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
+        _expressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumn());
       }
     }
   }
