@@ -90,25 +90,6 @@ export default Controller.extend({
         }
       }
     };
-
-    // const diagnosticsSeries = get(this, 'diagnosticsSeries');
-    // if (_.isEmpty(diagnosticsSeries)) {
-    //   base = Object.assign({
-    //     y2: {
-    //       show: false,
-    //       min: 0,
-    //       max: 1
-    //     }
-    //   });
-    //
-    // } else {
-    //   base = Object.assign({
-    //     y2: {
-    //       show: false
-    //     }
-    //   });
-    // }
-
     return base;
   }),
 
