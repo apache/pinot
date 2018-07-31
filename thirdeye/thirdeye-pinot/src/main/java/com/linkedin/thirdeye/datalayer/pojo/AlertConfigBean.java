@@ -13,6 +13,12 @@ import org.eclipse.jetty.util.StringUtil;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertConfigBean extends AbstractBean {
+  public enum SubjectType {
+    ALERT,
+    METRICS,
+    DATASETS
+  }
+
   String name;
   String application;
   String cronExpression;
@@ -25,6 +31,7 @@ public class AlertConfigBean extends AbstractBean {
   EmailFormatterConfig emailFormatterConfig;
   String recipients;
   String fromAddress;
+  SubjectType subjectType = SubjectType.ALERT;
 
   public String getApplication() {
     return application;
@@ -122,6 +129,13 @@ public class AlertConfigBean extends AbstractBean {
     this.emailFormatterConfig = emailFormatterConfig;
   }
 
+  public SubjectType getSubjectType() {
+    return subjectType;
+  }
+
+  public void setSubjectType(SubjectType subjectType) {
+    this.subjectType = subjectType;
+  }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class EmailConfig {

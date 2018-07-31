@@ -135,9 +135,30 @@
         type="checkbox"
         id="active"
         checked={{group.active}}
-        disabled={{cannotEdit}}
+          disabled={{cannotEdit}}
       />
       <label for="active">Enabled</label>
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Email subject</span>
+    </div>
+    <div class="col-md-10">
+      {{#power-select
+        triggerClass="te-modal__filter-select te-modal__filter-select--flushed"
+        selected=subjectTypeOptionSelected
+        options=subjectTypeOptions
+        renderInPlace=true
+        searchEnabled=false
+        triggerId="subject-type-selection"
+        disabled=cannotEdit
+        onchange=(action "onSubjectType")
+      as |option|
+      }}
+        {{option.name}}
+      {{/power-select}}
     </div>
   </div>
 
@@ -163,6 +184,7 @@
     <div class="col-md-10">
       {{textarea-autosize
         cols=80
+        rows=3
         type="text"
         id="recipients"
         value=groupRecipients
