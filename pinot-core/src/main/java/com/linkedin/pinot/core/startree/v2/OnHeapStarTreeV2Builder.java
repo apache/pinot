@@ -635,60 +635,27 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
 
     List<Object> aggregatedMetricsValue = new ArrayList<>();
 
-    //
-//    AggregationFunctionFactory functionFactory = new AggregationFunctionFactory();
-//    for (int i = 0; i < aggfunColumnPairs.size(); i++) {
-//      AggregationFunctionColumnPair pair = aggfunColumnPairs.get(i);
-//      String aggFunc = pair.getFunctionType().getName();
-//      AggregationFunction function = functionFactory.getAggregationFunction(aggFunc);
-//
-//      Object obj1  = starTreeData.get(start).getMetricValues().get(i);
-//      for ( int j = start + 1; j < end; j++) {
-//        Object obj2  = starTreeData.get(j).getMetricValues().get(i);
-//        if (isRawData) {
-//          obj1 = function.aggregateRaw(obj1, obj2);
-//        } else {
-//          obj1 = function.aggregatePreAggregated(obj1, obj2);
-//        }
-//      }
-//
-//    }
-
-    //
-    List<List<Object>> metricValues = new ArrayList<>();
-    for (int i = 0; i < aggfunColumnPairs.size(); i++) {
-      List<Object> l = new ArrayList<>();
-      metricValues.add(l);
-    }
-
-    for (int i = start; i < end; i++) {
-      Record r = starTreeData.get(i);
-      List<Object> metric = r.getMetricValues();
-      for (int j = 0; j < aggfunColumnPairs.size(); j++) {
-        metricValues.get(j).add(metric.get(j));
-      }
-    }
-
     AggregationFunctionFactory functionFactory = new AggregationFunctionFactory();
     for (int i = 0; i < aggfunColumnPairs.size(); i++) {
       AggregationFunctionColumnPair pair = aggfunColumnPairs.get(i);
       String aggFunc = pair.getFunctionType().getName();
-      List<Object> data = metricValues.get(i);
       AggregationFunction function = functionFactory.getAggregationFunction(aggFunc);
-      aggregatedMetricsValue.add(aggregate(function, isRawData, data));
+
+      Object obj1  = starTreeData.get(start).getMetricValues().get(i);
+      if (isRawData) {
+        obj1 = function.convert(obj1);
+      }
+
+      for ( int j = start + 1; j < end; j++) {
+        Object obj2  = starTreeData.get(j).getMetricValues().get(i);
+        if (isRawData) {
+          obj2 = function.convert(obj2);
+        }
+        obj1 = function.aggregate(obj1, obj2);
+      }
+      aggregatedMetricsValue.add(obj1);
     }
 
     return aggregatedMetricsValue;
-  }
-
-  /**
-   * aggregate raw or pre aggregated data.
-   */
-  private Object aggregate(AggregationFunction function, boolean isRawData, List<Object> data) {
-    if (isRawData) {
-      return function.aggregateRaw(data);
-    } else {
-      return function.aggregatePreAggregated(data);
-    }
   }
 }

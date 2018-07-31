@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -48,23 +47,20 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   }
 
   @Override
-  public TDigest aggregateRaw(List<Number> data) {
+  public TDigest convert(Number data) {
     TDigest tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
-    for (Number obj : data) {
-      tDigest.add(obj.doubleValue());
-      _maxLength = Math.max(tDigest.byteSize(), _maxLength);
-    }
+    tDigest.add(data.doubleValue());
+    _maxLength = Math.max(tDigest.byteSize(), _maxLength);
+
     return tDigest;
   }
 
   @Override
-  public TDigest aggregatePreAggregated(List<TDigest> data) {
-    TDigest tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
-    for (TDigest obj : data) {
-      tDigest.add(obj);
-      _maxLength = Math.max(tDigest.byteSize(), _maxLength);
-    }
-    return tDigest;
+  public TDigest aggregate(TDigest obj1, TDigest obj2) {
+    obj1.add(obj2);
+    _maxLength = Math.max(obj1.byteSize(), _maxLength);
+
+    return obj1;
   }
 
   @Override

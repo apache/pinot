@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -49,24 +48,20 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Num
   }
 
   @Override
-  public QuantileDigest aggregateRaw(List<Number> data) {
+  public QuantileDigest convert(Number data) {
     QuantileDigest qDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+    qDigest.add(data.longValue());
+    _maxLength = Math.max(qDigest.estimatedSerializedSizeInBytes(), _maxLength);
 
-    for (Number obj : data) {
-      qDigest.add(obj.longValue());
-      _maxLength = Math.max(qDigest.estimatedSerializedSizeInBytes(), _maxLength);
-    }
     return qDigest;
   }
 
   @Override
-  public QuantileDigest aggregatePreAggregated(List<QuantileDigest> data) {
-    QuantileDigest qDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
-    for (QuantileDigest obj : data) {
-      qDigest.merge(obj);
-      _maxLength = Math.max(qDigest.estimatedSerializedSizeInBytes(), _maxLength);
-    }
-    return qDigest;
+  public QuantileDigest aggregate(QuantileDigest obj1, QuantileDigest obj2) {
+    obj1.merge(obj2);
+    _maxLength = Math.max(obj1.estimatedSerializedSizeInBytes(), _maxLength);
+
+    return obj1;
   }
 
   @Override

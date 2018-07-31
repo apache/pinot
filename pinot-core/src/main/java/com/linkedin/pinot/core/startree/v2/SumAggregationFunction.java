@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -43,21 +42,13 @@ public class SumAggregationFunction implements AggregationFunction<Number, Doubl
   }
 
   @Override
-  public Double aggregateRaw(List<Number> data) {
-    double sum = 0;
-    for (Number number : data) {
-      sum = sum + number.doubleValue();
-    }
-    return sum;
+  public Double convert(Number data) {
+    return data.doubleValue();
   }
 
   @Override
-  public Double aggregatePreAggregated(List<Double> data) {
-    double sum = 0;
-    for (double number : data) {
-      sum = sum + number;
-    }
-    return sum;
+  public Double aggregate(Double obj1, Double obj2) {
+    return obj1 + obj2;
   }
 
   @Override

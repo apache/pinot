@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-import java.util.List;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -43,21 +42,13 @@ public class MinAggregationFunction implements AggregationFunction<Number, Doubl
   }
 
   @Override
-  public Double aggregateRaw(List<Number> data) {
-    double max = Double.POSITIVE_INFINITY;
-    for (Number number : data) {
-      max = Math.min(max, number.doubleValue());
-    }
-    return max;
+  public Double convert(Number data) {
+    return data.doubleValue();
   }
 
   @Override
-  public Double aggregatePreAggregated(List<Double> data) {
-    double max = Double.POSITIVE_INFINITY;
-    for (Double number : data) {
-      max = Math.min(max, number);
-    }
-    return max;
+  public Double aggregate(Double obj1, Double obj2) {
+    return Math.min(obj1, obj2);
   }
 
   @Override
