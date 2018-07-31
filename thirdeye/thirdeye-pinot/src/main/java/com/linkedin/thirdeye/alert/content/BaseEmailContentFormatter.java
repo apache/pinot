@@ -150,10 +150,10 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
         return baseSubject;
 
       case METRICS:
-        return baseSubject + " - " + StringUtils.join((Collection<String>) templateData.get("metrics"), ", ");
+        return baseSubject + " - " + templateData.get("metrics");
 
       case DATASETS:
-        return baseSubject + " - " + StringUtils.join((Collection<String>) templateData.get("datasets"), ", ");
+        return baseSubject + " - " + templateData.get("datasets");
 
       default:
         throw new IllegalArgumentException(String.format("Unknown type '%s'", type));
