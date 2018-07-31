@@ -119,6 +119,16 @@ public class TableQueryQuotaManagerTest {
       ((FakeHelixManager) _helixManager).closeZkClient();
     }
     ZkStarter.stopLocalZkServer(_zookeeperInstance);
+
+    Enumeration<Logger> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+    while (loggers.hasMoreElements()) {
+      Logger logger = loggers.nextElement();
+      if (logger.getName().startsWith("com.linkedin.pinot.common.utils") ||
+          logger.getName().startsWith("org.I0Itec.zkclient") ||
+          logger.getName().startsWith("org.apache.zookeeper.server")) {
+        logger.setLevel(Level.WARN);
+      }
+    }
   }
 
   @Test
