@@ -118,7 +118,7 @@ public class StarTreeV2DataSource {
 
     AggregationFunction function;
     for (AggregationFunctionColumnPair pair : _aggFunColPairs) {
-      String column = pair.getFunctionType().getName() + "_" + pair.getColumnName();
+      String column = pair.getFunctionType().getName() + "_" + pair.getColumn();
       String a = "startree" + starTreeId + "." + column + ".start";
       String b = "startree" + starTreeId + "." + column + ".size";
       int start = _columnIndexInfoMap.get(a);

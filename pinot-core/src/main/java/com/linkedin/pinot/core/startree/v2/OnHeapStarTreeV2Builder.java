@@ -96,8 +96,8 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
     _aggFunColumnPairsCount = _aggFunColumnPairs.size();
     List<String> aggFunColumnPairsStringList = new ArrayList<>();
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-      _metricsName.add(pair.getColumnName());
-      aggFunColumnPairsStringList.add(pair.getFunctionType().getName() + '_' + pair.getColumnName());
+      _metricsName.add(pair.getColumn());
+      aggFunColumnPairsStringList.add(pair.getFunctionType().getName() + '_' + pair.getColumn());
     }
     _aggFunColumnPairsString = String.join(", ", aggFunColumnPairsStringList);
     _metricsCount = _metricsName.size();
@@ -165,7 +165,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
       Record record = _rawStarTreeData.get(i);
       List<Object> metricRawValues = new ArrayList<>();
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
-        String metricName = _aggFunColumnPairs.get(j).getColumnName();
+        String metricName = _aggFunColumnPairs.get(j).getColumn();
         String aggfunc = _aggFunColumnPairs.get(j).getFunctionType().getName();
         if (aggfunc.equals(StarTreeV2Constant.AggregateFunctions.COUNT)) {
           metricRawValues.add(1L);
@@ -298,12 +298,12 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
 
     // 'SingleValueRawIndexCreator' for metrics
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-      String columnName = pair.getFunctionType().getName() + '_' + pair.getColumnName();
+      String columnName = pair.getFunctionType().getName() + '_' + pair.getColumn();
       AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
           ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _starTreeData.size(),
-          function.getLongestEntrySize());
+          function.getResultMaxByteSize());
       _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
     }
 
@@ -632,8 +632,29 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
    */
   private List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData,
       List<AggregationFunctionColumnPair> aggfunColumnPairs, boolean isRawData) {
+
     List<Object> aggregatedMetricsValue = new ArrayList<>();
 
+    //
+//    AggregationFunctionFactory functionFactory = new AggregationFunctionFactory();
+//    for (int i = 0; i < aggfunColumnPairs.size(); i++) {
+//      AggregationFunctionColumnPair pair = aggfunColumnPairs.get(i);
+//      String aggFunc = pair.getFunctionType().getName();
+//      AggregationFunction function = functionFactory.getAggregationFunction(aggFunc);
+//
+//      Object obj1  = starTreeData.get(start).getMetricValues().get(i);
+//      for ( int j = start + 1; j < end; j++) {
+//        Object obj2  = starTreeData.get(j).getMetricValues().get(i);
+//        if (isRawData) {
+//          obj1 = function.aggregateRaw(obj1, obj2);
+//        } else {
+//          obj1 = function.aggregatePreAggregated(obj1, obj2);
+//        }
+//      }
+//
+//    }
+
+    //
     List<List<Object>> metricValues = new ArrayList<>();
     for (int i = 0; i < aggfunColumnPairs.size(); i++) {
       List<Object> l = new ArrayList<>();

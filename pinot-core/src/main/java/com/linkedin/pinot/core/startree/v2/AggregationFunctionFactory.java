@@ -17,54 +17,37 @@
 package com.linkedin.pinot.core.startree.v2;
 
 
+import javax.annotation.Nonnull;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+
 /**
  * Factory class to create instances of aggregation function of the given name.
  */
 public class AggregationFunctionFactory {
 
-  private static SumAggregationFunction _sumFunction;
-  private static MinAggregationFunction _minFunction;
-  private static MaxAggregationFunction _maxFunction;
-  private static CountAggregationFunction _countFunction;
-  private static PercentileEstAggregationFunction _percentileEstFunction;
-  private static DistinctCountHLLAggregationFunction _distinctCountHLLFunction;
-  private static PercentileTDigestAggregationFunction _percentileTDigestFunction;
-
   public AggregationFunctionFactory() {
-    _sumFunction = new SumAggregationFunction();
-    _minFunction = new MinAggregationFunction();
-    _maxFunction = new MaxAggregationFunction();
-    _countFunction = new CountAggregationFunction();
-
-    _distinctCountHLLFunction = new DistinctCountHLLAggregationFunction();
-    _percentileTDigestFunction = new PercentileTDigestAggregationFunction();
-    _percentileEstFunction = new PercentileEstAggregationFunction();
   }
 
   /**
-   * Given the name of aggregation function, return an instance of the corresponding aggregation function.
-   *
-   * @param functionName 'String' function Name
-   *
-   * @return 'AggregationFunction' aggregate function instance.
+   * Given the name of the aggregation function, returns a new instance of the corresponding aggregation function.
    */
-  public static AggregationFunction getAggregationFunction(String functionName) {
+  public static AggregationFunction getAggregationFunction(@Nonnull String functionName) {
 
-    switch (functionName) {
-      case StarTreeV2Constant.AggregateFunctions.SUM:
-        return _sumFunction;
-      case StarTreeV2Constant.AggregateFunctions.MIN:
-        return _minFunction;
-      case StarTreeV2Constant.AggregateFunctions.MAX:
-        return _maxFunction;
-      case StarTreeV2Constant.AggregateFunctions.COUNT:
-        return _countFunction;
-      case StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL:
-        return _distinctCountHLLFunction;
-      case StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST:
-        return _percentileTDigestFunction;
-      case StarTreeV2Constant.AggregateFunctions.PERCENTILEEST:
-        return _percentileEstFunction;
+    switch (AggregationFunctionType.getAggregationFunctionType(functionName)) {
+      case SUM:
+        return new SumAggregationFunction();
+      case MIN:
+        return new MinAggregationFunction();
+      case MAX:
+        return new MaxAggregationFunction();
+      case COUNT:
+        return new CountAggregationFunction();
+      case DISTINCTCOUNTHLL:
+        return new DistinctCountHLLAggregationFunction();
+      case PERCENTILETDIGEST:
+        return new PercentileTDigestAggregationFunction();
+      case PERCENTILEEST:
+        return new PercentileEstAggregationFunction();
       default:
         throw new UnsupportedOperationException();
     }

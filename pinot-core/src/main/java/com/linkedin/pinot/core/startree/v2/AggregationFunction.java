@@ -43,8 +43,7 @@ public interface AggregationFunction<R, A> {
   /**
    * Get length of longest Entry
    */
-  @Nonnull
-  int getLongestEntrySize();
+  int getResultMaxByteSize();
 
   /**
    * Perform aggregation on the given raw data.

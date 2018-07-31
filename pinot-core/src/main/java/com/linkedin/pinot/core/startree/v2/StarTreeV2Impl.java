@@ -50,13 +50,11 @@ public class StarTreeV2Impl implements StarTreeV2 {
 
   @Override
   public DataSource getDataSource(String column) {
+    if (_dimensionDataSources.containsKey(column)) {
       return _dimensionDataSources.get(column);
-  }
-
-  @Override
-  public DataSource getDataSource(AggregationFunctionColumnPair aggregationFunctionColumnPair) {
-    String pair = aggregationFunctionColumnPair.getFunctionType().getName() + "_" + aggregationFunctionColumnPair.getColumnName();
-    return _aggFuncColumnPairSources.get(pair);
+    } else {
+      return _aggFuncColumnPairSources.get(column);
+    }
   }
 
   @Override

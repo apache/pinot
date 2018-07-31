@@ -136,18 +136,16 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       }
     }
 
-    if (_starTreeV2List.size() > 0) {
-      for (StarTreeV2 starTreeV2: _starTreeV2List) {
-        try {
-          starTreeV2.close();
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
+    for (StarTreeV2 starTreeV2: _starTreeV2List) {
+      try {
+        starTreeV2.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close star-tree-v2. Continuing with error.", e);
       }
     }
   }
 
-  public void setStarTreeV2List(List<StarTreeV2> starTreeV2List) {
+  public void setStarTrees(List<StarTreeV2> starTreeV2List) {
     _starTreeV2List =  starTreeV2List;
     return;
   }
@@ -159,7 +157,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
   @Override
   public List<StarTreeV2> getStarTrees() {
-    // TODO: to be added
     return _starTreeV2List;
   }
 

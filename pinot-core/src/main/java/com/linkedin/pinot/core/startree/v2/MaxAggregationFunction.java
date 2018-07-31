@@ -38,7 +38,7 @@ public class MaxAggregationFunction implements AggregationFunction<Number, Doubl
 
   @Nonnull
   @Override
-  public int getLongestEntrySize() {
+  public int getResultMaxByteSize() {
     return Double.BYTES;
   }
 

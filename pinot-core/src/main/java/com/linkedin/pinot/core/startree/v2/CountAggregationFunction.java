@@ -38,7 +38,7 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
 
   @Nonnull
   @Override
-  public int getLongestEntrySize() {
+  public int getResultMaxByteSize() {
     return Long.BYTES;
   }
 

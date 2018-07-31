@@ -46,7 +46,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Nonnull
   @Override
-  public int getLongestEntrySize() {
+  public int getResultMaxByteSize() {
     return _maxLength;
   }
 
