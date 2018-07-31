@@ -10,14 +10,14 @@ export default [
   {
     propertyName: 'dimensions',
     template: 'custom/anomalies-table/dimensions',
-    title: 'Alert/Dimensions',
+    title: 'Dimensions',
     className: 'anomalies-table__column anomalies-table__column--large-width',
     disableFiltering: true
   },
   {
     propertyName: 'baseline',
     template: 'custom/anomalies-table/current-wow',
-    title: 'Current/Predicted',
+    title: 'Current/WoW',
     className: 'anomalies-table__column anomalies-table__column--small-width',
     disableFiltering: true
   },
@@ -27,12 +27,5 @@ export default [
     title: 'Resolution',
     className: 'anomalies-table__column anomalies-table__column--med-width',
     disableFiltering: true
-  },
-  {
-    propertyName: 'link',
-    template: 'custom/anomalies-table/investigation-link',
-    title: 'Investigation',
-    className: 'anomalies-table__column anomalies-table__column--small-width',
-    disableFiltering: true
-   }
+  }
 ];

@@ -58,6 +58,8 @@ module.exports = function(defaults) {
   });
   app.import('node_modules/ion-rangeslider/css/ion.rangeSlider.css');
 
+  // jspdf and html2canvas assets for PDF
+  app.import('node_modules/jspdf/dist/jspdf.min.js');
 
   // Use `app.import` to add additional libraries to the generated
   // output files.

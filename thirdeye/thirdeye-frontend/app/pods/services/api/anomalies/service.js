@@ -137,8 +137,6 @@ export default Service.extend({
     const query = { application: appName, start, end };
     const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
     return anomalies;
-    //const url = anomalyApiUrls.getAnomaliesByAppNameUrl(appName, startTime);//TODO: remove from the utils/api/anomaly.js - lohuynh
-    //return fetch(url).then(checkStatus).catch(() => {});//TODO: leave to document in RFC. Will remove. - lohuynh
   },
 
   /**
