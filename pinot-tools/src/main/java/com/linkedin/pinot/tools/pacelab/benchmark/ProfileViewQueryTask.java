@@ -130,19 +130,19 @@ public class ProfileViewQueryTask extends QueryTask {
                 runQuery(query);
                 break;
 	        case 3:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomJob.getValue("Position"),groupByLimit);
+                query = String.format(queries[queryId], randomJob.getValue("Position"),groupByLimit);
                 runQuery(query);
                 break;
 	        case 4:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomJob.getValue("Position"),groupByLimit);
+                query = String.format(queries[queryId], randomJob.getValue("Position"),groupByLimit);
                 runQuery(query);
                 break;
             case 5:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomCompany.getValue("Location"),groupByLimit);
+                query = String.format(queries[queryId], randomCompany.getValue("Location"),groupByLimit);
                 runQuery(query);
                 break;
             case 6:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomCompany.getValue("Location"),groupByLimit);
+                query = String.format(queries[queryId], randomCompany.getValue("Location"),groupByLimit);
                 runQuery(query);
                 break;
 
