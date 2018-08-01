@@ -87,7 +87,7 @@ export default Service.extend({
     const metricUrn = toMetricUrn(urn);
     const range = context.anomalyRange;
     const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
-    const timezone = moment.tz.guess();
+    const timezone = 'America/Los_Angeles';
 
     const url = `/rootcause/metric/breakdown?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}`;
     return fetch(url)

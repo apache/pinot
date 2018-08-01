@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.ArrayList;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 
 
@@ -54,7 +53,8 @@ public class OnHeapStarTreeV2Loader {
       Map<String, StarTreeV2AggfunColumnPairDataSource> metricAggfuncPairDataSourceMap =
           dataSource.getMetricRawIndexReader();
 
-      StarTreeV2Impl impl = new StarTreeV2Impl(starTree, metaData, dimensionDataSourceMap, metricAggfuncPairDataSourceMap);
+      StarTreeV2Impl impl =
+          new StarTreeV2Impl(starTree, metaData, dimensionDataSourceMap, metricAggfuncPairDataSourceMap);
       _starTreeV2DataSources.add(impl);
       starTreeId += 1;
     }

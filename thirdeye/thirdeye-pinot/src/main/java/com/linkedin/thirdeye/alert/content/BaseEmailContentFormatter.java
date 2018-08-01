@@ -25,6 +25,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
@@ -51,7 +52,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeSet;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -121,13 +124,40 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   @Override
   public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, String recipients, String subject,
       Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
-    Map<String, Object> templateData =
-        getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
+    Map<String, Object> templateData = getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
+
     updateTemplateDataByAnomalyResults(templateData, anomalies, context);
-    if (org.apache.commons.lang3.StringUtils.isNotBlank(groupName)) {
-      subject = subject + " - " + groupName;
+
+    String outputSubject = makeSubject(subject, groupName, alertConfigDTO.getSubjectType(), templateData);
+
+    return buildEmailEntity(templateData, outputSubject, recipients, alertConfigDTO.getFromAddress(), emailTemplate);
+  }
+
+  /**
+   * Generate subject based on configuration.
+   * @param baseSubject
+   * @param groupName
+   * @param type
+   * @param templateData
+   * @return
+   */
+  private static String makeSubject(String baseSubject, String groupName, AlertConfigBean.SubjectType type, Map<String, Object> templateData) {
+    switch (type) {
+      case ALERT:
+        if (StringUtils.isNotBlank(groupName)) {
+          return baseSubject + " - " + groupName;
+        }
+        return baseSubject;
+
+      case METRICS:
+        return baseSubject + " - " + templateData.get("metrics");
+
+      case DATASETS:
+        return baseSubject + " - " + templateData.get("datasets");
+
+      default:
+        throw new IllegalArgumentException(String.format("Unknown type '%s'", type));
     }
-    return buildEmailEntity(templateData, subject, recipients, alertConfigDTO.getFromAddress(), emailTemplate);
   }
 
   /**
@@ -151,9 +181,9 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     Map<String, Object> templateData = new HashMap<>();
 
     DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
-    Set<String> metrics = new HashSet<>();
 
-    Set<String> datasets = new HashSet<>();
+    Set<String> metrics = new TreeSet<>();
+    Set<String> datasets = new TreeSet<>();
     List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>();
 
     // Calculate start and end time of the anomalies
@@ -174,16 +204,17 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       }
     }
 
-    PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(new DummyAlertFilter(),
-        mergedAnomalyResults);
+    PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(new DummyAlertFilter(), mergedAnomalyResults);
 
-    templateData.put("datasets", Joiner.on(", ").join(datasets));
-    templateData.put("timeZone", getTimezoneString(dateTimeZone));
-    templateData.put("dateFormat", new DataReportHelper.DateFormatMethod(timeZone));
+    templateData.put("datasetsCount", datasets.size());
+    templateData.put("datasets", StringUtils.join(datasets, ", "));
+    templateData.put("metricsCount", metrics.size());
+    templateData.put("metrics", StringUtils.join(metrics, ", "));
+    templateData.put("anomalyCount", anomalies.size());
     templateData.put("startTime", getDateString(startTime));
     templateData.put("endTime", getDateString(endTime));
-    templateData.put("anomalyCount", anomalies.size());
-    templateData.put("metricsCount", metrics.size());
+    templateData.put("timeZone", getTimezoneString(dateTimeZone));
+    templateData.put("dateFormat", new DataReportHelper.DateFormatMethod(timeZone));
     templateData.put("notifiedCount", precisionRecallEvaluator.getTotalAlerts());
     templateData.put("feedbackCount", precisionRecallEvaluator.getTotalResponses());
     templateData.put("trueAlertCount", precisionRecallEvaluator.getTrueAnomalies());

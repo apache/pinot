@@ -16,9 +16,9 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+
 
 /**
  * Factory class to create instances of aggregation function of the given name.
@@ -33,7 +33,7 @@ public class AggregationFunctionFactory {
    */
   public static AggregationFunction getAggregationFunction(@Nonnull String functionName) {
 
-    switch (AggregationFunctionType.getAggregationFunctionType(functionName)) {
+    switch (AggregationFunctionType.valueOf(functionName.toUpperCase())) {
       case SUM:
         return new SumAggregationFunction();
       case MIN:

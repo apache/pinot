@@ -110,7 +110,7 @@ public class OnHeapStarTreeV2IntegrationTest {
   }
 
   @Test
-  public void testLoaderAndExecutor() throws Exception {
+  public void testLoader() throws Exception {
     OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
     IndexLoadingConfig v3IndexLoadingConfig = new IndexLoadingConfig();
     v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
@@ -135,17 +135,13 @@ public class OnHeapStarTreeV2IntegrationTest {
         }
 
         for (AggregationFunctionColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
-          String metpair = pair.getFunctionType().getName() + "_" + pair.getColumn();
-          DataSource source = impl.getDataSource(metpair);
-          System.out.println("Printing for Met2AggPair : " + metpair);
+          String metPair = pair.toColumnName();
+          DataSource source = impl.getDataSource(metPair);
+          System.out.println("Printing for Met2AggPair : " + metPair);
           StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getFunctionType().getName());
         }
         starTreeId += 1;
       }
-//      StarTreeV2ExecutorHelper.loadSegment(_filepath);
-//      for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
-//        StarTreeV2ExecutorHelper.execute(_starTreeV2ConfigList, _starTreeDataSourcesList, i);
-//      }
     } catch (Exception e) {
       e.printStackTrace();
     }

@@ -47,7 +47,8 @@ public class StarTreeV2DimensionDataSource extends DataSource {
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-  public StarTreeV2DimensionDataSource(PinotDataBuffer buffer, String columnName, ImmutableSegment obj, ColumnMetadata columnMetadata, int numDocs, int bits) throws IOException {
+  public StarTreeV2DimensionDataSource(PinotDataBuffer buffer, String columnName, ImmutableSegment obj,
+      ColumnMetadata columnMetadata, int numDocs, int bits) throws IOException {
     _operatorName = "ColumnDataSource [" + columnName + "]";
     _forwardIndex = new FixedBitSingleValueReader(buffer, numDocs, bits);
 

@@ -11,7 +11,11 @@ Router.map(function() {
   this.route('logout');
   //this.route('error'); disable for now
 
-  this.route('home');
+  this.route('home', function() {
+    this.route('index', { path: '/' });
+    this.route('share-dashboard');
+  });
+
 
   this.route('manage', function() {
     this.route('alert', { path: 'alert/:alert_id' }, function() {
