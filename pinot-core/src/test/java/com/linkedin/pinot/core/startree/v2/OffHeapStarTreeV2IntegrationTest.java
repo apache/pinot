@@ -16,6 +16,13 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.startree.StarTree;
 import java.io.File;
 import java.util.List;
 import java.util.ArrayList;
@@ -88,6 +95,44 @@ public class OffHeapStarTreeV2IntegrationTest {
       buildTest.init(_indexDir, _starTreeV2ConfigList.get(i));
       buildTest.build();
       buildTest.serialize();
+    }
+  }
+
+  @Test
+  public void testLoaderAndExecutor() throws Exception {
+    OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
+    IndexLoadingConfig v3IndexLoadingConfig = new IndexLoadingConfig();
+    v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
+    v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
+
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, v3IndexLoadingConfig);
+
+    try {
+      List<StarTreeV2> starTreeImplList = loadTest.load(_filepath, immutableSegment);
+
+      int starTreeId = 0;
+      for (StarTreeV2 impl : starTreeImplList) {
+        System.out.println("Working on star tree " + Integer.toString(starTreeId + 1));
+
+        StarTree s = impl.getStarTree();
+        StarTreeV2LoaderHelper.printStarTree(s);
+
+        for (String dimension : _starTreeV2ConfigList.get(starTreeId).getDimensions()) {
+          DataSource source = impl.getDataSource(dimension);
+          System.out.println("Printing for dimension : " + dimension);
+          StarTreeV2LoaderHelper.printDimensionDataFromDataSource(source);
+        }
+
+        for (AggregationFunctionColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
+          String metpair = pair.getFunctionType().getName() + "_" + pair.getColumn();
+          DataSource source = impl.getDataSource(metpair);
+          System.out.println("Printing for Met2AggPair : " + metpair);
+          StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getFunctionType().getName());
+        }
+        starTreeId += 1;
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
     }
   }
 }

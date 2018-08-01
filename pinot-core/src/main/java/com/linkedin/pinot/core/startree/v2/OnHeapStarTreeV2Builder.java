@@ -254,28 +254,6 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
   }
 
   /**
-   * Helper method to serialize the start tree into a file.
-   *
-   * @param starTreeFile 'File' in which star tree would be saved.
-   *
-   * @return void.
-   */
-  private void serializeTree(File starTreeFile) throws IOException {
-    int headerSizeInBytes = computeHeaderSizeInBytes(_dimensionsName);
-    long totalSizeInBytes = headerSizeInBytes + _nodesCount * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
-
-    MMapBuffer dataBuffer = new MMapBuffer(starTreeFile, 0, totalSizeInBytes, MMapMode.READ_WRITE);
-
-    try {
-      long offset = writeHeader(dataBuffer, headerSizeInBytes, _dimensionsCount, _dimensionsName, _nodesCount);
-      writeNodes(dataBuffer, offset, _rootNode);
-    } finally {
-      dataBuffer.flush();
-      dataBuffer.close();
-    }
-  }
-
-  /**
    * Helper function to create indexes and index values.
    *
    * @return void.

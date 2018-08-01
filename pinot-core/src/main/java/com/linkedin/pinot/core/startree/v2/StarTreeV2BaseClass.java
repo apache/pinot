@@ -21,17 +21,20 @@ import java.util.Map;
 import java.util.Set;
 import java.util.List;
 import java.util.Queue;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Comparator;
 import java.util.Collections;
 import java.nio.charset.Charset;
+import xerial.larray.mmap.MMapMode;
 import xerial.larray.mmap.MMapBuffer;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.core.startree.OffHeapStarTree;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -148,6 +151,24 @@ public class StarTreeV2BaseClass {
     }
 
     return null;
+  }
+
+  /**
+   * Helper method to serialize the start tree into a file.
+   */
+  protected void serializeTree(File starTreeFile) throws IOException {
+    int headerSizeInBytes = computeHeaderSizeInBytes(_dimensionsName);
+    long totalSizeInBytes = headerSizeInBytes + _nodesCount * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
+
+    MMapBuffer dataBuffer = new MMapBuffer(starTreeFile, 0, totalSizeInBytes, MMapMode.READ_WRITE);
+
+    try {
+      long offset = writeHeader(dataBuffer, headerSizeInBytes, _dimensionsCount, _dimensionsName, _nodesCount);
+      writeNodes(dataBuffer, offset, _rootNode);
+    } finally {
+      dataBuffer.flush();
+      dataBuffer.close();
+    }
   }
 
   /**

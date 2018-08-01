@@ -28,15 +28,18 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.io.PrintWriter;
+import java.nio.ByteBuffer;
 import java.io.BufferedWriter;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
 import java.nio.channels.FileChannel;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.common.data.FieldSpec;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import com.linkedin.pinot.common.segment.ReadMode;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -47,11 +50,17 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 
 
 public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements StarTreeV2Builder, Closeable {
@@ -71,6 +80,9 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
   private File _tempDataFile;
   private File _metricOffsetFile;
   private File _tempMetricOffsetFile;
+  private List<ForwardIndexCreator> _dimensionForwardIndexCreatorList;
+  private List<ForwardIndexCreator> _aggFunColumnPairForwardIndexCreatorList;
+
 
   private int _starTreeCount = 0;
   private int _aggregatedDocCount;
@@ -84,12 +96,15 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     _fileSize = 0;
     _tempFileSize = 0;
     _aggregatedDocCount = 0;
-    _dataFile = new File(indexDir, "star-tree.buf");
-    _tempDataFile = new File(indexDir, "star-tree-temp.buf");
-    _metricOffsetFile = new File(indexDir, "metric-offset-file.txt");
-    _tempMetricOffsetFile = new File(indexDir, "temp-metric-offset-file.txt");
 
+    _outDir = config.getOutDir();
+    _dataFile = new File(_outDir, "star-tree.buf");
+    _tempDataFile = new File(_outDir, "star-tree-temp.buf");
+    _metricOffsetFile = new File(_outDir, "metric-offset-file.txt");
+    _tempMetricOffsetFile = new File(_outDir, "temp-metric-offset-file.txt");
 
+    _metricOffsetFile.createNewFile();
+    _tempMetricOffsetFile.createNewFile();
     _outputStream = new BufferedOutputStream(new FileOutputStream(_dataFile));
     _tempOutputStream = new BufferedOutputStream(new FileOutputStream(_tempDataFile));
 
@@ -146,7 +161,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
     // other initialisation
     _starTreeId = StarTreeV2Constant.STAR_TREE + '_' + Integer.toString(_starTreeCount);
-    _outDir = config.getOutDir();
+
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
     _rootNode = new TreeNode();
     _rootNode._dimensionId = StarTreeV2Constant.STAR_NODE;
@@ -154,15 +169,12 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     _starTreeCount++;
     _aggregationFunctionFactory = new AggregationFunctionFactory();
 
-    File metadataFile = StarTreeV2BaseClass.findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+    File metadataFile = findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     _properties = new PropertiesConfiguration(metadataFile);
   }
 
   @Override
   public void build() throws IOException {
-
-    _metricOffsetFile.createNewFile();
-    _tempMetricOffsetFile.createNewFile();
 
     // storing dimension cardinality for calculating default sorting order.
     _dimensionsCardinality = new ArrayList<>();
@@ -246,20 +258,171 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
     // create aggregated doc for all nodes.
     createAggregatedDocForAllNodes();
+    FileUtils.deleteQuietly(_tempDataFile);
+    FileUtils.deleteQuietly(_tempMetricOffsetFile);
 
     return;
   }
 
   @Override
   public void serialize() throws Exception {
+    createIndexes();
+    serializeTree(new File(_outDir, _starTreeId));
 
+    // updating segment metadata by adding star tree meta data.
+    Map<String, String> metadata = getMetaData();
+    for (String key : metadata.keySet()) {
+      String value = metadata.get(key);
+      _properties.setProperty(key, value);
+    }
+    _properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, _starTreeCount);
+    _properties.save();
+
+    // combining all the indexes and star tree in one file.
+    combineIndexesFiles(_starTreeCount - 1);
+
+    return;
   }
 
   @Override
   public Map<String, String> getMetaData() {
-    return null;
+    Map<String, String> metadata = new HashMap<>();
+
+    String starTreeDocsCount = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
+    metadata.put(starTreeDocsCount, Integer.toString(_aggregatedDocCount));
+
+    String startTreeSplitOrder = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
+    metadata.put(startTreeSplitOrder, _dimensionSplitOrderString);
+
+    String withoutStarNode = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
+    metadata.put(withoutStarNode, _dimensionWithoutStarNodeString);
+
+    String startTreeMet2aggfuncPairs = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
+    metadata.put(startTreeMet2aggfuncPairs, _aggFunColumnPairsString);
+
+    String maxNumLeafRecords = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
+    metadata.put(maxNumLeafRecords, Integer.toString(_maxNumLeafRecords));
+
+    return metadata;
   }
 
+  /**
+   * Helper function to create indexes and index values.
+   *
+   * @return void.
+   */
+  private void createIndexes() throws Exception {
+
+    System.out.println(_dataFile.length());
+
+    _dimensionForwardIndexCreatorList = new ArrayList<>();
+    _aggFunColumnPairForwardIndexCreatorList = new ArrayList<>();
+
+    // 'SingleValueForwardIndexCreator' for dimensions.
+    for (String dimensionName : _dimensionsName) {
+      DimensionFieldSpec spec = _dimensionsSpecMap.get(dimensionName);
+      int cardinality = _immutableSegment.getDictionary(dimensionName).length();
+      _dimensionForwardIndexCreatorList.add(new SingleValueUnsortedForwardIndexCreator(spec, _outDir, cardinality, _aggregatedDocCount, _aggregatedDocCount, false));
+    }
+
+    // 'SingleValueRawIndexCreator' for metrics
+    for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
+      String columnName = pair.getFunctionType().getName() + '_' + pair.getColumn();
+      AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+
+      SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
+          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _aggregatedDocCount,
+          function.getResultMaxByteSize());
+      _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
+    }
+
+    PinotDataBuffer tempBuffer;
+    long tempBufferSize = _docSizeIndex.get(_aggregatedDocCount);
+
+    if (tempBufferSize > MMAP_SIZE_THRESHOLD) {
+      File tempFile = new File(_outDir, 0 + "_" + _aggregatedDocCount + ".unique.tmp");
+      try (FileChannel src = new RandomAccessFile(_dataFile, "r").getChannel();
+          FileChannel dest = new RandomAccessFile(tempFile, "rw").getChannel()) {
+        long numBytesTransferred = src.transferTo(_docSizeIndex.get(0), tempBufferSize, dest);
+        Preconditions.checkState(numBytesTransferred == tempBufferSize, "Error transferring data from data file to temp file, transfer size mis-match");
+        dest.force(false);
+      } catch (FileNotFoundException e) {
+        e.printStackTrace();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      tempBuffer = PinotDataBuffer.mapFile(tempFile, false, _docSizeIndex.get(0), tempBufferSize, PinotDataBuffer.NATIVE_ORDER, "OffHeapStarTreeBuilder#getUniqueCombinations: temp buffer");
+
+    } else {
+      tempBuffer = PinotDataBuffer.loadFile(_dataFile, _docSizeIndex.get(0), tempBufferSize, PinotDataBuffer.NATIVE_ORDER,"OffHeapStarTreeBuilder#getUniqueCombinations: temp buffer");
+    }
+
+    final StarTreeV2DataTable dataTable = new StarTreeV2DataTable(tempBuffer, _dimensionSize, 0);
+    _dataTablesToClose.add(dataTable);
+
+    int sortedDocsId [] = new int[_aggregatedDocCount];
+    for ( int i = 0; i < _aggregatedDocCount; i++) {
+      sortedDocsId[i] = i;
+    }
+
+    final Iterator<Pair<byte[], byte[]>> _iterator = dataTable.iterator(0, _aggregatedDocCount, _docSizeIndex, sortedDocsId);
+
+
+    int docId = 0;
+    while(_iterator.hasNext()) {
+
+      Pair<byte[], byte[]> next = _iterator.next();
+      byte[] dimensionBytes = next.getLeft();
+
+      // indexing dimensions.
+      ByteBuffer buffer = ByteBuffer.wrap(dimensionBytes).order(PinotDataBuffer.NATIVE_ORDER);
+      for (int j = 0; j < _dimensionsCount; j++) {
+        int val = buffer.getInt();
+        val = (val == StarTreeV2Constant.SKIP_VALUE) ? StarTreeV2Constant.VALID_INDEX_VALUE : val;
+        ((SingleValueForwardIndexCreator) _dimensionForwardIndexCreatorList.get(j)).index(docId, val);
+      }
+
+      // indexing AggFunColumn Pair data.
+      AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer = AggregationFunctionColumnPairBuffer.fromBytes(next.getRight(), _aggFunColumnPairs);
+      Object[] values = aggregationFunctionColumnPairBuffer._values;
+      for (int j = 0; j < _aggFunColumnPairsCount; j++) {
+        AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(j);
+        AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+
+        if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
+          ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, function.serialize(values[j]));
+        } else {
+          ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, values[j]);
+        }
+      }
+      docId++;
+    }
+
+    // closing all the opened index creator.
+    for (int i = 0; i < _dimensionForwardIndexCreatorList.size(); i++) {
+      _dimensionForwardIndexCreatorList.get(i).close();
+    }
+
+    for (int i = 0; i < _aggFunColumnPairForwardIndexCreatorList.size(); i++) {
+      _aggFunColumnPairForwardIndexCreatorList.get(i).close();
+    }
+
+    return;
+  }
+
+  /**
+   * Helper method to combine all the files to one
+   *
+   * @param starTreeId 'int'  star tree id which has to be converted into single file.
+   *
+   * @return void.
+   */
+  private void combineIndexesFiles(int starTreeId) throws Exception {
+    StarTreeIndexesConverter converter = new StarTreeIndexesConverter();
+    converter.convert(_outDir, starTreeId);
+
+    return;
+  }
 
   /**
    * Helper function to construct a star tree.
@@ -473,6 +636,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     }
     node._aggDataDocumentId = _aggregatedDocCount;
     appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
+    _docSizeIndex.add(_fileSize);
 
     return aggregatedMetrics;
   }

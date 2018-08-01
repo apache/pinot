@@ -31,7 +31,7 @@ import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
 public class AggregationFunctionColumnPairBuffer {
 
   int _totalBytes;
-  private final Object[] _values;
+  protected final Object[] _values;
   private final List<AggregationFunctionColumnPair> _aggFunColumnPairs;
 
   public AggregationFunctionColumnPairBuffer(Object[] values, List<AggregationFunctionColumnPair> aggFunColumnPairs) {
