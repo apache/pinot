@@ -60,14 +60,21 @@ public class OffHeapStarTreeV2IntegrationTest {
     List<AggregationFunctionColumnPair> metric2aggFuncPairs2 = new ArrayList<>();
 
 
-    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("SUM"), "salary");
-    AggregationFunctionColumnPair pair2 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("MAX"), "salary");
-    AggregationFunctionColumnPair pair3 = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf("COUNT"), "star");
-
+    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "salary");
+    AggregationFunctionColumnPair pair2 = new AggregationFunctionColumnPair(AggregationFunctionType.MAX, "salary");
+    AggregationFunctionColumnPair pair3 = new AggregationFunctionColumnPair(AggregationFunctionType.MIN, "salary");
+    AggregationFunctionColumnPair pair4 = new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "salary");
+    AggregationFunctionColumnPair pair5 = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
+    AggregationFunctionColumnPair pair6 = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILEEST, "salary");
+    AggregationFunctionColumnPair pair7 = new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "star");
 
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
-    metric2aggFuncPairs1.add(pair3);
+    metric2aggFuncPairs1.add(pair4);
+    metric2aggFuncPairs1.add(pair5);
+    metric2aggFuncPairs1.add(pair6);
+    metric2aggFuncPairs1.add(pair7);
+
     metric2aggFuncPairs2.add(pair1);
 
 
