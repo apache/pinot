@@ -260,22 +260,6 @@ public class SegmentPreProcessorTest {
     }
   }
 
-  @Test
-  public void testV3UpdateDefaultColumns() throws Exception {
-    constructV3Segment();
-    checkUpdateDefaultColumns();
-
-    // Try to use the third schema and update default value again.
-    // For the third schema, we changed the default value for column 'newStringMVDimension' to 'notSameLength', which
-    // is not the same length as before. This should throw exception for segment format v3.
-    try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, _newColumnsSchema3)) {
-      processor.process();
-      Assert.fail("For segment format v3, should throw exception when trying to update with different length index");
-    } catch (Exception e) {
-      // PASS.
-    }
-  }
-
   private void checkUpdateDefaultColumns() throws Exception {
     // Update default value.
     try (SegmentPreProcessor processor = new SegmentPreProcessor(_indexDir, _indexLoadingConfig, _newColumnsSchema1)) {

@@ -1,14 +1,21 @@
 import DS from 'ember-data';
+import { inject as service } from '@ember/service';
 
-/*
+/**
  * @summary This base supports the standard advanced configurations needed for making the requests.
  */
 export default DS.RESTAdapter.extend({
+  shareDashboardApiService: service('services/api/share-dashboard'),
   headers: {
     'Accept': '*/*'
   },
   ajaxOptions() {
     let ajaxOptions = this._super(...arguments);
+
+    //TODO: update this to use another hook - lohuynh
+    if (ajaxOptions.data.shareId) {
+      delete ajaxOptions.data.shareId;//remove from query as not needed for actual request
+    }
     // when server returns an empty response, we'll make it valid by replacing with {}
     ajaxOptions.converters = {
       'text json': function(data) {
@@ -32,23 +39,51 @@ export default DS.RESTAdapter.extend({
     return response;
   },
 
-  // TODO: Will keep for reference - lohuynh
-  // query: function query(store, type, query) {
-  //   const url = `${this.get('namespace')}/${query.appName}`;
-  //   delete query.appName;//remove from query as not needed for actual request
-  //   return this.ajax(url, 'GET', { data: query });
-  // },
-  
-  // The urlForQuery works like the `query` hook above. Both allow mutating the request url.
+  /**
+   * @summary The urlForQuery (called with query) works like the `query` hook above. Both allow mutating the request url.
+   */
   urlForQuery (query, modelName) {
     /* The switch allows for adding more model names that needs custom request url */
     switch(modelName) {
-      case 'performance':
+      case 'performance': {
         return `${this.get('namespace')}/${query.appName}`;
-      case 'dimensions':
+      }
+      case 'dimensions': {
         return `${this.get('namespace')}`;
-      default:
+      }
+      case 'shareDashboard': {
+        return `${this.get('namespace')}/${query.key}`;
+      }
+      case 'share': {
+        const shareId = query.shareId;
+        return `${this.get('namespace')}/${shareId}`;
+      }
+      default: {
         return this._super(...arguments);
+      }
     }
+  },
+
+  /**
+   * @summary Builds a URL for a record.save() call when the record has been deleted locally.
+   * @param {string} modelName
+   * @param {DS.Snapshot} snapshot
+   * @return {string} url
+   */
+  urlForCreateRecord (modelName/*, snapshot*/) {
+    /* The switch allows for adding more model names that needs custom request url */
+    switch(modelName) {
+      case 'share': {
+        const hashKey = this.get('shareDashboardApiService').getHashKey();
+        return `${this.get('namespace')}/${hashKey}`;
+      }
+      default: {
+        return this._super(...arguments);
+      }
+    }
+  },
+
+  urlForUpdateRecord: function(id, modelName/*, snapshot*/) {
+    return this._buildURL(modelName, id);
   }
 });

@@ -47,31 +47,11 @@ public class LoaderUtils {
    * @throws IOException
    */
   public static void writeIndexToV3Format(SegmentDirectory.Writer segmentWriter, String column, File indexFile,
-      ColumnIndexType indexType)
-      throws IOException {
+      ColumnIndexType indexType) throws IOException {
     int fileLength = (int) indexFile.length();
-    PinotDataBuffer buffer = null;
-    try {
-      if (segmentWriter.hasIndexFor(column, indexType)) {
-        // Index already exists, try to reuse it.
-        buffer = segmentWriter.getIndexFor(column, indexType);
-        if (buffer.size() != fileLength) {
-          // Existed index size is not equal to index file size.
-          // Throw exception to drop and re-download the segment.
-          throw new V3RemoveIndexException(
-              "V3 format segment already has " + indexType + " for column: " + column + " that cannot be reused.");
-        }
-      } else {
-        // Index does not exist, create a new buffer for that.
-        buffer = segmentWriter.newIndexFor(column, indexType, fileLength);
-      }
-
+    try (PinotDataBuffer buffer = segmentWriter.newIndexFor(column, indexType, fileLength)) {
       buffer.readFrom(0, indexFile, 0, fileLength);
-    } finally {
-      FileUtils.deleteQuietly(indexFile);
-      if (buffer != null) {
-        buffer.close();
-      }
+      FileUtils.forceDelete(indexFile);
     }
   }
 
@@ -126,8 +106,7 @@ public class LoaderUtils {
    * </ul>
    * <p>Should be called before trying to load the segment or metadata from index directory.
    */
-  public static void reloadFailureRecovery(@Nonnull File indexDir)
-      throws IOException {
+  public static void reloadFailureRecovery(@Nonnull File indexDir) throws IOException {
     File parentDir = indexDir.getParentFile();
 
     // Recover index directory from segment backup directory if the segment backup directory exists

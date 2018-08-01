@@ -20,8 +20,6 @@ import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
 import { inject as service } from '@ember/service';
 
 export default Component.extend({
-  //store: service('store'),
-
   tagName: '',//using tagless so i can add my own in hbs
   anomalyResponseNames: anomalyUtil.anomalyResponseObj.mapBy('name'),
   anomalyDataUrl: getAnomalyDataUrl(),

@@ -257,16 +257,11 @@ export default Component.extend({
    * Currently selected application option
    * @type {object}
    */
-  applicationOptionSelected: computed('application', {
-    get () {
-      const { applicationOptions, application } = getProperties(this, 'applicationOptions', 'application');
-      if (_.isEmpty(application)) { return; }
-      return applicationOptions.find(opt => opt.application === application);
-    },
-    set () {
-      // left blank to prevent property override
-    }
-  }),
+  applicationOptionSelected: computed('application', function () {
+    const { applicationOptions, application } = getProperties(this, 'applicationOptions', 'application');
+    if (_.isEmpty(application)) { return; }
+    return applicationOptions.find(opt => opt.application === application);
+  }).readOnly(),
 
   /**
    * Cron options available for selection
@@ -302,16 +297,31 @@ export default Component.extend({
    * Currently selected cron option
    * @type {object}
    */
-  cronOptionSelected: computed('group.cronExpression', {
-    get () {
-      const { cronOptions, group } = getProperties(this, 'cronOptions', 'group');
-      if (_.isEmpty(group)) { return; }
-      return cronOptions.find(opt => opt.cron === group.cronExpression);
-    },
-    set () {
-      // left blank to prevent property override
-    }
-  }),
+  cronOptionSelected: computed('group.cronExpression', function () {
+    const { cronOptions, group } = getProperties(this, 'cronOptions', 'group');
+    if (_.isEmpty(group)) { return; }
+    return cronOptions.find(opt => opt.cron === group.cronExpression);
+  }).readOnly(),
+
+  /**
+   * SubjectType options available for selection
+   * @type {Array}
+   */
+  subjectTypeOptions: [
+    { name: 'group name only', subjectType: 'ALERT' },
+    { name: 'with metric name', subjectType: 'METRICS' },
+    { name: 'with dataset name', subjectType: 'DATASETS' }
+  ],
+
+  /**
+   * Currently selected subjectType option
+   * @type {object}
+   */
+  subjectTypeOptionSelected: computed('group.subjectType', function () {
+    const { subjectTypeOptions, group } = getProperties(this, 'subjectTypeOptions', 'group');
+    if (_.isEmpty(group)) { return; }
+    return subjectTypeOptions.find(opt => opt.subjectType === group.subjectType);
+  }).readOnly(),
 
   /**
    * Function options available for selection (and search)
@@ -333,16 +343,11 @@ export default Component.extend({
    * Currently selected function ids
    * @type {Array}
    */
-  functionOptionsSelected: computed('functionOptionsSelectedIds', {
-    get () {
-      const { functionOptions, functionOptionsSelectedIds } = getProperties(this, 'functionOptions', 'functionOptionsSelectedIds');
-      if (_.isEmpty(functionOptionsSelectedIds)) { return []; }
-      return functionOptions.filter(opt => functionOptionsSelectedIds.has(opt.id));
-    },
-    set () {
-      // left blank to prevent property override
-    }
-  }),
+  functionOptionsSelected: computed('functionOptionsSelectedIds', function () {
+    const { functionOptions, functionOptionsSelectedIds } = getProperties(this, 'functionOptions', 'functionOptionsSelectedIds');
+    if (_.isEmpty(functionOptionsSelectedIds)) { return []; }
+    return functionOptions.filter(opt => functionOptionsSelectedIds.has(opt.id));
+  }).readOnly(),
 
   /**
    * Parses application entities into power-select options
@@ -369,6 +374,7 @@ export default Component.extend({
       active: true,
       application: null,
       cronExpression: get(this, 'cronOptions')[0].cron,
+      subjectType: get(this, 'subjectTypeOptions')[0].subjectType,
       emailConfig: {
         functionIds: []
       }
@@ -601,6 +607,14 @@ export default Component.extend({
      */
     onCron (cronOption) {
       set(this, 'group.cronExpression', cronOption.cron);
+    },
+
+    /**
+     * Handles subjectType selection
+     * @param subjectOption {object} subjectType option
+     */
+    onSubjectType (subjectOption) {
+      set(this, 'group.subjectType', subjectOption.subjectType);
     },
 
     /**
