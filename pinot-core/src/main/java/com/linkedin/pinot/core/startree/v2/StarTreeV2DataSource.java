@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-
 import java.io.File;
 import java.util.Set;
 import java.util.Map;
@@ -58,7 +57,8 @@ public class StarTreeV2DataSource {
 
   public StarTreeV2DataSource(SegmentMetadataImpl segmentMetadataImpl, StarTreeV2Metadata metadata, File indexDir) {
 
-    _starTreeIndexMapFile = StarTreeV2BaseClass.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
+    _starTreeIndexMapFile =
+        StarTreeV2BaseClass.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
     _columnIndexInfoMap = readMetaData(_starTreeIndexMapFile);
 
     _starTreeFile = new File(indexDir, StarTreeV2Constant.STAR_TREE_V2_TEMP_FILE);
@@ -109,8 +109,7 @@ public class StarTreeV2DataSource {
       ColumnMetadata columnMetadata = _segmentMetadataImpl.getColumnMetadataFor(dimension);
       int maxNumberOfBits = columnMetadata.getBitsPerElement();
       PinotDataBuffer buffer =
-          PinotDataBuffer.mapFile(_indexDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
-              "Star Tree V2");
+          PinotDataBuffer.mapFile(_indexDataFile, false, start, size, ByteOrder.BIG_ENDIAN, "Star Tree V2");
       StarTreeV2DimensionDataSource starTreeV2DimensionDataSource =
           new StarTreeV2DimensionDataSource(buffer, dimension, obj, columnMetadata, _docsCount, maxNumberOfBits);
       _dimensionIndexReader.put(dimension, starTreeV2DimensionDataSource);
@@ -118,7 +117,7 @@ public class StarTreeV2DataSource {
 
     AggregationFunction function;
     for (AggregationFunctionColumnPair pair : _aggFunColPairs) {
-      String column = pair.getFunctionType().getName() + "_" + pair.getColumn();
+      String column = pair.toColumnName();
       String a = "startree" + starTreeId + "." + column + ".start";
       String b = "startree" + starTreeId + "." + column + ".size";
       int start = _columnIndexInfoMap.get(a);
@@ -128,11 +127,9 @@ public class StarTreeV2DataSource {
 
       PinotDataBuffer buffer;
       if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
-        buffer = PinotByteBuffer.mapFile(_indexDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
-                "star tree v2");
+        buffer = PinotByteBuffer.mapFile(_indexDataFile, false, start, size, ByteOrder.BIG_ENDIAN, "star tree v2");
       } else {
-        buffer = PinotDataBuffer.mapFile(_indexDataFile, false, start, size, ByteOrder.BIG_ENDIAN,
-                "star tree v2");
+        buffer = PinotDataBuffer.mapFile(_indexDataFile, false, start, size, ByteOrder.BIG_ENDIAN, "star tree v2");
       }
       StarTreeV2AggfunColumnPairDataSource starTreeV2AggfunColumnPairDataSource =
           new StarTreeV2AggfunColumnPairDataSource(buffer, column, _docsCount, function.getDataType());

@@ -47,7 +47,6 @@ public class StarTreeV2BaseClass {
   protected PropertiesConfiguration _properties;
   protected IndexLoadingConfig _v3IndexLoadingConfig;
 
-
   // Dimensions
   protected int _dimensionSize;
   protected int _dimensionsCount;
@@ -59,7 +58,6 @@ public class StarTreeV2BaseClass {
   protected List<Integer> _dimensionsWithoutStarNode;
   protected Map<String, DimensionFieldSpec> _dimensionsSpecMap;
 
-
   // Metrics
   protected int _metricsCount;
   protected Set<String> _metricsName;
@@ -67,7 +65,6 @@ public class StarTreeV2BaseClass {
   protected String _aggFunColumnPairsString;
   protected List<AggregationFunctionColumnPair> _aggFunColumnPairs;
   protected Map<String, MetricFieldSpec> _metricsSpecMap;
-
 
   // General
   protected int _nodesCount;
@@ -111,14 +108,12 @@ public class StarTreeV2BaseClass {
       });
     }
 
-
     // creating a string variable for meta data (dimensionSplitOrderString)
     List<String> dimensionSplitOrderStringList = new ArrayList<>();
     for (int i = 0; i < _dimensionsSplitOrder.size(); i++) {
       dimensionSplitOrderStringList.add(_dimensionsName.get(_dimensionsSplitOrder.get(i)));
     }
     _dimensionSplitOrderString = String.join(",", dimensionSplitOrderStringList);
-
 
     // creating a string variable for meta data (dimensionWithoutStarNodeString)
     List<String> dimensionWithoutStarNodeStringList = new ArrayList<>();

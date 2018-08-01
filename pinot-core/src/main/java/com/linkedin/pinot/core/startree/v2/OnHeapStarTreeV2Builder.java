@@ -48,7 +48,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 
 
-public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements StarTreeV2Builder {
+public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements StarTreeV2Builder {
 
   // Star Tree
   private int _starTreeCount = 0;
@@ -97,7 +97,7 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
     List<String> aggFunColumnPairsStringList = new ArrayList<>();
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
       _metricsName.add(pair.getColumn());
-      aggFunColumnPairsStringList.add(pair.getFunctionType().getName() + '_' + pair.getColumn());
+      aggFunColumnPairsStringList.add(pair.toColumnName());
     }
     _aggFunColumnPairsString = String.join(", ", aggFunColumnPairsStringList);
     _metricsCount = _metricsName.size();
@@ -180,11 +180,9 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
 
     computeDefaultSplitOrder(_dimensionsCardinality);
 
-
     // sorting the data as per the sort order.
     List<Record> rawSortedStarTreeData = sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
-    _starTreeData = condenseData(rawSortedStarTreeData, _aggFunColumnPairs,
-        StarTreeV2Constant.IS_RAW_DATA);
+    _starTreeData = condenseData(rawSortedStarTreeData, _aggFunColumnPairs, StarTreeV2Constant.IS_RAW_DATA);
 
     // Recursively construct the star tree
     _rootNode._startDocId = 0;
@@ -227,121 +225,18 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
     String startTreeSplitOrder = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
     metadata.put(startTreeSplitOrder, _dimensionSplitOrderString);
 
-    String withoutStarNode = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
+    String withoutStarNode =
+        _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
     metadata.put(withoutStarNode, _dimensionWithoutStarNodeString);
 
-    String startTreeMet2aggfuncPairs = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
+    String startTreeMet2aggfuncPairs =
+        _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
     metadata.put(startTreeMet2aggfuncPairs, _aggFunColumnPairsString);
 
     String maxNumLeafRecords = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
     metadata.put(maxNumLeafRecords, Integer.toString(_maxNumLeafRecords));
 
     return metadata;
-  }
-
-  /**
-   * Helper method to combine all the files to one
-   *
-   * @param starTreeId 'int'  star tree id which has to be converted into single file.
-   *
-   * @return void.
-   */
-  private void combineIndexesFiles(int starTreeId) throws Exception {
-    StarTreeIndexesConverter converter = new StarTreeIndexesConverter();
-    converter.convert(_outDir, starTreeId);
-
-    return;
-  }
-
-  /**
-   * Helper method to serialize the start tree into a file.
-   *
-   * @param starTreeFile 'File' in which star tree would be saved.
-   *
-   * @return void.
-   */
-  private void serializeTree(File starTreeFile) throws IOException {
-    int headerSizeInBytes = computeHeaderSizeInBytes(_dimensionsName);
-    long totalSizeInBytes = headerSizeInBytes + _nodesCount * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
-
-    MMapBuffer dataBuffer = new MMapBuffer(starTreeFile, 0, totalSizeInBytes, MMapMode.READ_WRITE);
-
-    try {
-      long offset = writeHeader(dataBuffer, headerSizeInBytes, _dimensionsCount, _dimensionsName,
-          _nodesCount);
-      writeNodes(dataBuffer, offset, _rootNode);
-    } finally {
-      dataBuffer.flush();
-      dataBuffer.close();
-    }
-  }
-
-  /**
-   * Helper function to create indexes and index values.
-   *
-   * @return void.
-   */
-  private void createIndexes() throws Exception {
-
-    _dimensionForwardIndexCreatorList = new ArrayList<>();
-    _aggFunColumnPairForwardIndexCreatorList = new ArrayList<>();
-
-    // 'SingleValueForwardIndexCreator' for dimensions.
-    for (String dimensionName : _dimensionsName) {
-      DimensionFieldSpec spec = _dimensionsSpecMap.get(dimensionName);
-      int cardinality = _immutableSegment.getDictionary(dimensionName).length();
-
-      _dimensionForwardIndexCreatorList.add(
-          new SingleValueUnsortedForwardIndexCreator(spec, _outDir, cardinality, _starTreeData.size(),
-              _starTreeData.size(), false));
-    }
-
-    // 'SingleValueRawIndexCreator' for metrics
-    for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-      String columnName = pair.getFunctionType().getName() + '_' + pair.getColumn();
-      AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
-
-      SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
-          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _starTreeData.size(),
-          function.getResultMaxByteSize());
-      _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
-    }
-
-    // indexing each record.
-    for (int i = 0; i < _starTreeData.size(); i++) {
-      Record row = _starTreeData.get(i);
-      int[] dimension = row.getDimensionValues();
-      List<Object> metric = row.getMetricValues();
-
-      // indexing dimension data.
-      for (int j = 0; j < dimension.length; j++) {
-        int val = (dimension[j] == StarTreeV2Constant.SKIP_VALUE) ? StarTreeV2Constant.VALID_INDEX_VALUE : dimension[j];
-        ((SingleValueForwardIndexCreator) _dimensionForwardIndexCreatorList.get(j)).index(i, val);
-      }
-
-      // indexing AggfunColumn Pair data.
-      for (int j = 0; j < metric.size(); j++) {
-        AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(j);
-        AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
-        if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
-          ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(i,
-              function.serialize(metric.get(j)));
-        } else {
-          ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(i, metric.get(j));
-        }
-      }
-    }
-
-    // closing all the opened index creator.
-    for (int i = 0; i < _dimensionForwardIndexCreatorList.size(); i++) {
-      _dimensionForwardIndexCreatorList.get(i).close();
-    }
-
-    for (int i = 0; i < _aggFunColumnPairForwardIndexCreatorList.size(); i++) {
-      _aggFunColumnPairForwardIndexCreatorList.get(i).close();
-    }
-
-    return;
   }
 
   /**
@@ -402,10 +297,9 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
     children.put(StarTreeV2Constant.STAR_NODE, starChild);
     _nodesCount++;
 
-    List<Record> sortedFilteredData = filterData(startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder,
-        _starTreeData);
-    List<Record> condensedData = condenseData(sortedFilteredData, _aggFunColumnPairs,
-        !StarTreeV2Constant.IS_RAW_DATA);
+    List<Record> sortedFilteredData =
+        filterData(startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder, _starTreeData);
+    List<Record> condensedData = condenseData(sortedFilteredData, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
     _starTreeData.addAll(condensedData);
 
     int starChildEndDocId = _starTreeData.size();
@@ -495,8 +389,9 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
         chilAggRecordsList.add(_starTreeData.get(child._aggDataDocumentId));
       }
     }
-    List<Object> aggregatedValues = aggregateMetrics(0, chilAggRecordsList.size(), chilAggRecordsList,
-        _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
+    List<Object> aggregatedValues =
+        aggregateMetrics(0, chilAggRecordsList.size(), chilAggRecordsList, _aggFunColumnPairs,
+            !StarTreeV2Constant.IS_RAW_DATA);
     int aggDocId = appendAggregatedDocuments(aggregatedValues, parent);
 
     return aggDocId;
@@ -512,8 +407,8 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
    */
   private List<Object> getAggregatedDocument(int startDocId, int endDocId) {
 
-    List<Object> aggregatedValues = aggregateMetrics(startDocId, endDocId, _starTreeData, _aggFunColumnPairs,
-        !StarTreeV2Constant.IS_RAW_DATA);
+    List<Object> aggregatedValues =
+        aggregateMetrics(startDocId, endDocId, _starTreeData, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
 
     return aggregatedValues;
   }
@@ -544,9 +439,106 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
   }
 
   /**
+   * Helper method to combine all the files to one
+   */
+  private void combineIndexesFiles(int starTreeId) throws Exception {
+    StarTreeIndexesConverter converter = new StarTreeIndexesConverter();
+    converter.convert(_outDir, starTreeId);
+
+    return;
+  }
+
+  /**
+   * Helper method to serialize the start tree into a file.
+   */
+  private void serializeTree(File starTreeFile) throws IOException {
+    int headerSizeInBytes = computeHeaderSizeInBytes(_dimensionsName);
+    long totalSizeInBytes = headerSizeInBytes + _nodesCount * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
+
+    MMapBuffer dataBuffer = new MMapBuffer(starTreeFile, 0, totalSizeInBytes, MMapMode.READ_WRITE);
+
+    try {
+      long offset = writeHeader(dataBuffer, headerSizeInBytes, _dimensionsCount, _dimensionsName, _nodesCount);
+      writeNodes(dataBuffer, offset, _rootNode);
+    } finally {
+      dataBuffer.flush();
+      dataBuffer.close();
+    }
+  }
+
+  /**
+   * Helper function to create indexes and index values.
+   */
+  private void createIndexes() throws Exception {
+
+    _dimensionForwardIndexCreatorList = new ArrayList<>();
+    _aggFunColumnPairForwardIndexCreatorList = new ArrayList<>();
+
+    // 'SingleValueForwardIndexCreator' for dimensions.
+    for (String dimensionName : _dimensionsName) {
+      DimensionFieldSpec spec = _dimensionsSpecMap.get(dimensionName);
+      int cardinality = _immutableSegment.getDictionary(dimensionName).length();
+
+      _dimensionForwardIndexCreatorList.add(
+          new SingleValueUnsortedForwardIndexCreator(spec, _outDir, cardinality, _starTreeData.size(),
+              _starTreeData.size(), false));
+    }
+
+    // 'SingleValueRawIndexCreator' for metrics
+    for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
+      String columnName = pair.toColumnName();
+      AggregationFunction function =
+          _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+
+      SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
+          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _starTreeData.size(),
+          function.getResultMaxByteSize());
+      _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
+    }
+
+    // indexing each record.
+    for (int i = 0; i < _starTreeData.size(); i++) {
+      Record row = _starTreeData.get(i);
+      int[] dimension = row.getDimensionValues();
+      List<Object> metric = row.getMetricValues();
+
+      // indexing dimension data.
+      for (int j = 0; j < dimension.length; j++) {
+        int val = (dimension[j] == StarTreeV2Constant.SKIP_VALUE) ? StarTreeV2Constant.VALID_INDEX_VALUE : dimension[j];
+        ((SingleValueForwardIndexCreator) _dimensionForwardIndexCreatorList.get(j)).index(i, val);
+      }
+
+      // indexing AggfunColumn Pair data.
+      for (int j = 0; j < metric.size(); j++) {
+        AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(j);
+        AggregationFunction function =
+            _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+        if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
+          ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(i,
+              function.serialize(metric.get(j)));
+        } else {
+          ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(i, metric.get(j));
+        }
+      }
+    }
+
+    // closing all the opened index creator.
+    for (int i = 0; i < _dimensionForwardIndexCreatorList.size(); i++) {
+      _dimensionForwardIndexCreatorList.get(i).close();
+    }
+
+    for (int i = 0; i < _aggFunColumnPairForwardIndexCreatorList.size(); i++) {
+      _aggFunColumnPairForwardIndexCreatorList.get(i).close();
+    }
+
+    return;
+  }
+
+  /**
    * sort the star tree data.
    */
-  protected List<Record> sortStarTreeData(int startDocId, int endDocId, List<Integer> sortOrder, List<Record> starTreeData) {
+  protected List<Record> sortStarTreeData(int startDocId, int endDocId, List<Integer> sortOrder,
+      List<Record> starTreeData) {
 
     List<Record> newData = new ArrayList<>();
     for (int i = startDocId; i < endDocId; i++) {
@@ -641,13 +633,13 @@ public class OnHeapStarTreeV2Builder extends  StarTreeV2BaseClass implements Sta
       String aggFunc = pair.getFunctionType().getName();
       AggregationFunction function = functionFactory.getAggregationFunction(aggFunc);
 
-      Object obj1  = starTreeData.get(start).getMetricValues().get(i);
+      Object obj1 = starTreeData.get(start).getMetricValues().get(i);
       if (isRawData) {
         obj1 = function.convert(obj1);
       }
 
-      for ( int j = start + 1; j < end; j++) {
-        Object obj2  = starTreeData.get(j).getMetricValues().get(i);
+      for (int j = start + 1; j < end; j++) {
+        Object obj2 = starTreeData.get(j).getMetricValues().get(i);
         if (isRawData) {
           obj2 = function.convert(obj2);
         }

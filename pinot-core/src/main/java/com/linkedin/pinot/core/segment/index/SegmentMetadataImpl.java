@@ -380,8 +380,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       Set<AggregationFunctionColumnPair> aggFunColPairs = new HashSet<>();
       while (iterator.hasNext()) {
         final String sPair = iterator.next();
-        String[] parts = sPair.split("_");
-        AggregationFunctionColumnPair pair = new AggregationFunctionColumnPair(AggregationFunctionType.valueOf(parts[0].toUpperCase()) , parts[1]);
+        AggregationFunctionColumnPair pair = AggregationFunctionColumnPair.fromColumnName(sPair);
         aggFunColPairs.add(pair);
       }
 

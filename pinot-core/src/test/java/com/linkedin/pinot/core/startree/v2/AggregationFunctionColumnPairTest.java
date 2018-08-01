@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 public class AggregationFunctionColumnPairTest {

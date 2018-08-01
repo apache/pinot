@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-
 public class StarTreeV2Constant {
 
   // final strings
@@ -50,7 +49,7 @@ public class StarTreeV2Constant {
   public static class StarTreeMetadata {
     public static final String STAR_TREE_DOCS_COUNT = "docs.count";
     public static final String STAR_TREE_SPLIT_ORDER = "split.order";
-    public static final String STAR_TREE_AGG_FUN_COL_PAIR = "met2func.map";
+    public static final String STAR_TREE_AGG_FUN_COL_PAIR = "Agg.fun.col.pair.map";
     public static final String STAR_TREE_MAX_LEAF_RECORD = "max.leaf.record";
     public static final String STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS =
         "skip.star.node.creation.for.dimensions";

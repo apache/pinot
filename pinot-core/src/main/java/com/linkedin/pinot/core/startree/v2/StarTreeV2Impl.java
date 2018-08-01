@@ -29,7 +29,8 @@ public class StarTreeV2Impl implements StarTreeV2 {
   private final Map<String, StarTreeV2DimensionDataSource> _dimensionDataSources;
   private final Map<String, StarTreeV2AggfunColumnPairDataSource> _aggFuncColumnPairSources;
 
-  public StarTreeV2Impl(StarTree starTree, StarTreeV2Metadata starTreeV2Metadata, Map<String, StarTreeV2DimensionDataSource> dimensionDataSources,
+  public StarTreeV2Impl(StarTree starTree, StarTreeV2Metadata starTreeV2Metadata,
+      Map<String, StarTreeV2DimensionDataSource> dimensionDataSources,
       Map<String, StarTreeV2AggfunColumnPairDataSource> aggFuncColumnPairSources) {
 
     _starTree = starTree;
@@ -64,7 +65,7 @@ public class StarTreeV2Impl implements StarTreeV2 {
     }
 
     if (_dimensionDataSources.size() > 0) {
-      for (String dimension: _dimensionDataSources.keySet()) {
+      for (String dimension : _dimensionDataSources.keySet()) {
         StarTreeV2DimensionDataSource source = _dimensionDataSources.get(dimension);
         source.getForwardIndex().close();
         source.getDictionary().close();
@@ -72,7 +73,7 @@ public class StarTreeV2Impl implements StarTreeV2 {
     }
 
     if (_aggFuncColumnPairSources.size() > 0) {
-      for (String pair: _aggFuncColumnPairSources.keySet()) {
+      for (String pair : _aggFuncColumnPairSources.keySet()) {
         StarTreeV2AggfunColumnPairDataSource source = _aggFuncColumnPairSources.get(pair);
         source.getForwardIndex().close();
       }

@@ -42,7 +42,8 @@ public class StarTreeV2AggfunColumnPairDataSource extends DataSource {
   private DataFileReader _forwardIndex;
   private DataSourceMetadata _metadata;
 
-  public StarTreeV2AggfunColumnPairDataSource(PinotDataBuffer buffer, String columnName, int numDocs, FieldSpec.DataType dataType) throws IOException {
+  public StarTreeV2AggfunColumnPairDataSource(PinotDataBuffer buffer, String columnName, int numDocs,
+      FieldSpec.DataType dataType) throws IOException {
     _operatorName = "ColumnDataSource [" + columnName + "]";
 
     if (dataType.equals(FieldSpec.DataType.BYTES)) {
