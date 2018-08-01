@@ -21,9 +21,10 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.common.utils.LogUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
-import java.util.Enumeration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
@@ -34,7 +35,6 @@ import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
@@ -48,16 +48,9 @@ public class TimeBoundaryServiceTest {
 
   @BeforeTest
   public void beforeTest() {
-    Enumeration<Logger> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
-    while (loggers.hasMoreElements()) {
-      Logger logger = loggers.nextElement();
-      System.out.println("Log name: " + logger.getName());
-      if (logger.getName().startsWith("com.linkedin.pinot.common.utils") ||
-          logger.getName().startsWith("org.I0Itec.zkclient") ||
-          logger.getName().startsWith("org.apache.zookeeper.server")) {
-        logger.setLevel(Level.INFO);
-      }
-    }
+    LogUtils.setLogLevel(
+        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
+        Level.INFO);
     _zookeeperInstance = ZkStarter.startLocalZkServer();
 
     _zkClient = new ZkClient(StringUtil.join("/", StringUtils.chomp(ZkStarter.DEFAULT_ZK_STR, "/")),
@@ -74,15 +67,9 @@ public class TimeBoundaryServiceTest {
     _zkClient.close();
     ZkStarter.stopLocalZkServer(_zookeeperInstance);
 
-    Enumeration<Logger> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
-    while (loggers.hasMoreElements()) {
-      Logger logger = loggers.nextElement();
-      if (logger.getName().startsWith("com.linkedin.pinot.common.utils") ||
-          logger.getName().startsWith("org.I0Itec.zkclient") ||
-          logger.getName().startsWith("org.apache.zookeeper.server")) {
-        logger.setLevel(Level.WARN);
-      }
-    }
+    LogUtils.setLogLevel(
+        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
+        Level.WARN);
   }
 
   @Test
