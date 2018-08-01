@@ -20,11 +20,8 @@ import java.util.List;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.clearspring.analytics.stream.quantile.QDigest;
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
 
 
@@ -66,7 +63,12 @@ public class AggregationFunctionColumnPairBuffer {
           buffer.putDouble(new Double(_values[i].toString()));
           break;
         case BYTES:
-          int size = getObjectSize(factory, _values[i]);
+          int size = 0;
+          try {
+            size = getObjectSize(factory, _values[i]);
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
           buffer.putInt(size);
           try {
             buffer.put(ObjectCustomSerDe.serialize(_values[i]));
@@ -137,23 +139,41 @@ public class AggregationFunctionColumnPairBuffer {
    */
   public void aggregate(AggregationFunctionColumnPairBuffer buffer) {
     int numValues = _values.length;
+
+    int aggregatedByteSize = 0;
     for (int i = 0; i < numValues; i++) {
       AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
       AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
       _values[i] = factory.aggregate(_values[i], buffer._values[i]);
+      try {
+        aggregatedByteSize += getObjectSize(factory, _values[i]);
+        if (factory.getDataType().equals(FieldSpec.DataType.BYTES)) {
+          aggregatedByteSize += Integer.BYTES;
+        }
+
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
+    _totalBytes = aggregatedByteSize;
   }
 
   private void calculateBytesRequired() {
     for (int i = 0; i < _aggFunColumnPairs.size(); i++) {
       AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
       AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
-      int size = getObjectSize(factory, _values[i]);
-      _totalBytes += factory.getDataType().equals(FieldSpec.DataType.BYTES) ? size + Integer.BYTES : size;
+      int size = 0;
+      try {
+        size = getObjectSize(factory, _values[i]);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      _totalBytes += factory.getDataType().equals(FieldSpec.DataType.BYTES) ? (size + Integer.BYTES) : size;
     }
   }
 
-  private int getObjectSize(AggregationFunction factory, Object obj) {
+  private int getObjectSize(AggregationFunction factory, Object obj) throws IOException {
+
     switch (factory.getDataType()) {
       case INT:
         return Integer.BYTES;
@@ -164,14 +184,9 @@ public class AggregationFunctionColumnPairBuffer {
       case DOUBLE:
         return Double.BYTES;
       case BYTES:
-        if (obj instanceof HyperLogLog)
-          return ((HyperLogLog) obj).sizeof();
-        else if (obj instanceof TDigest)
-          return ((TDigest) obj).byteSize();
-        else if (obj instanceof QDigest)
-          return ((HyperLogLog) obj).sizeof();
+        return ObjectCustomSerDe.serialize(obj).length;
       default:
-          throw new IllegalStateException();
+        throw new IllegalStateException();
     }
   }
 }

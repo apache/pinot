@@ -147,7 +147,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     List<String> aggFunColumnPairsStringList = new ArrayList<>();
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
       _metricsName.add(pair.getColumn());
-      aggFunColumnPairsStringList.add(pair.getFunctionType().getName() + '_' + pair.getColumn());
+      aggFunColumnPairsStringList.add(pair.toColumnName());
     }
     _aggFunColumnPairsString = String.join(", ", aggFunColumnPairsStringList);
     _metricsCount = _metricsName.size();
@@ -208,14 +208,17 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
       Object[] metricValues = new Object[_aggFunColumnPairsCount];
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
-        String metricName = _aggFunColumnPairs.get(j).getColumn();
-        String aggfunc = _aggFunColumnPairs.get(j).getFunctionType().getName();
+        AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(j);
+        String metricName = pair.getColumn();
+        String aggfunc = pair.getFunctionType().getName();
+        AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+
         if (aggfunc.equals(StarTreeV2Constant.AggregateFunctions.COUNT)) {
-          metricValues[j] = 1L;
+          metricValues[j] = function.convert(1);
         } else {
           MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(metricName);
           Object val = readHelper(metricColumnReaders.get(metricName), metricFieldSpec.getDataType(), i);
-          metricValues[j] = val;
+          metricValues[j] = function.convert(val);
         }
       }
       AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer = new AggregationFunctionColumnPairBuffer(metricValues, _aggFunColumnPairs);
@@ -327,7 +330,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
     // 'SingleValueRawIndexCreator' for metrics
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-      String columnName = pair.getFunctionType().getName() + '_' + pair.getColumn();
+      String columnName = pair.toColumnName();
       AggregationFunction function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,

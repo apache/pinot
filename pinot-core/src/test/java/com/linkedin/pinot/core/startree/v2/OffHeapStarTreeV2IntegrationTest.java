@@ -16,13 +16,6 @@
 
 package com.linkedin.pinot.core.startree.v2;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.core.startree.StarTree;
 import java.io.File;
 import java.util.List;
 import java.util.ArrayList;
@@ -31,8 +24,15 @@ import org.testng.annotations.Test;
 import org.testng.annotations.BeforeTest;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
@@ -70,6 +70,7 @@ public class OffHeapStarTreeV2IntegrationTest {
 
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
+    metric2aggFuncPairs1.add(pair3);
     metric2aggFuncPairs1.add(pair4);
     metric2aggFuncPairs1.add(pair5);
     metric2aggFuncPairs1.add(pair6);
@@ -131,7 +132,7 @@ public class OffHeapStarTreeV2IntegrationTest {
         }
 
         for (AggregationFunctionColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
-          String metpair = pair.getFunctionType().getName() + "_" + pair.getColumn();
+          String metpair =pair.toColumnName();
           DataSource source = impl.getDataSource(metpair);
           System.out.println("Printing for Met2AggPair : " + metpair);
           StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getFunctionType().getName());
