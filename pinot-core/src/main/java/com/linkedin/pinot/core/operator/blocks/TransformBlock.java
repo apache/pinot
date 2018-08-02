@@ -46,7 +46,7 @@ public class TransformBlock implements Block {
   }
 
   public BlockValSet getBlockValueSet(TransformExpressionTree expression) {
-    if (expression.getExpressionType() == TransformExpressionTree.ExpressionType.IDENTIFIER) {
+    if (expression.isColumn()) {
       return _projectionBlock.getBlockValueSet(expression.getValue());
     } else {
       return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expression));

@@ -16,11 +16,13 @@
 package com.linkedin.pinot.common.request.transform;
 
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.FunctionCallAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.IdentifierAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.LiteralAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.StringLiteralAstNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -50,6 +52,25 @@ public class TransformExpressionTree {
    */
   public static String standardizeExpression(String expression) {
     return compileToExpressionTree(expression).toString();
+  }
+
+  /**
+   * Converts an {@link AstNode} into a standard expression.
+   */
+  public static String getStandardExpression(AstNode astNode) {
+    if (astNode instanceof IdentifierAstNode) {
+      // Column name
+      return ((IdentifierAstNode) astNode).getName();
+    } else if (astNode instanceof FunctionCallAstNode) {
+      // UDF expression
+      return standardizeExpression(((FunctionCallAstNode) astNode).getExpression());
+    } else if (astNode instanceof StringLiteralAstNode) {
+      // Treat string as column name
+      // NOTE: this is for backward-compatibility
+      return ((StringLiteralAstNode) astNode).getText();
+    } else {
+      throw new IllegalStateException("Cannot get standard expression from " + astNode.getClass().getSimpleName());
+    }
   }
 
   // Enum for expression represented by the tree.
