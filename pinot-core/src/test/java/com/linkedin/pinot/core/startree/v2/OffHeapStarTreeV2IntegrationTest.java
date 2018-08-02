@@ -70,10 +70,10 @@ public class OffHeapStarTreeV2IntegrationTest {
 
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
-    metric2aggFuncPairs1.add(pair3);
-    metric2aggFuncPairs1.add(pair4);
-    metric2aggFuncPairs1.add(pair5);
-    metric2aggFuncPairs1.add(pair6);
+    //metric2aggFuncPairs1.add(pair3);
+    //metric2aggFuncPairs1.add(pair4);
+    //metric2aggFuncPairs1.add(pair5);
+    //metric2aggFuncPairs1.add(pair6);
     metric2aggFuncPairs1.add(pair7);
 
     metric2aggFuncPairs2.add(pair1);
