@@ -34,7 +34,6 @@ import com.linkedin.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndex
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
-import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import com.linkedin.pinot.core.util.FixedIntArray;
 import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
@@ -366,11 +365,6 @@ public class MutableSegmentImpl implements MutableSegment {
   public ColumnDataSource getDataSource(String columnName) {
     return new ColumnDataSource(_schema.getFieldSpecFor(columnName), _numDocsIndexed, _maxNumValuesMap.get(columnName),
         _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName));
-  }
-
-  @Override
-  public StarTree getStarTree() {
-    return null;
   }
 
   @Override
