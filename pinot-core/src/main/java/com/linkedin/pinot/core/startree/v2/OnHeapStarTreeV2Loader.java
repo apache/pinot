@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.File;
@@ -28,14 +27,15 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 public class OnHeapStarTreeV2Loader {
 
   // segment
-  private static SegmentMetadataImpl _segmentMetadataImpl;
+  private SegmentMetadataImpl _segmentMetadataImpl;
 
   // star tree
-  private static File _indexDir;
-  private static List<StarTreeV2Metadata> _starTreeV2MetadataList;
-  private static List<StarTreeV2> _starTreeV2DataSources;
+  private File _indexDir;
+  private List<StarTreeV2Metadata> _starTreeV2MetadataList;
+  private List<StarTreeV2> _starTreeV2DataSources;
 
-  public static List<StarTreeV2> load(File indexDir, ImmutableSegment obj) throws Exception {
+
+  public List<StarTreeV2> load(File indexDir, ImmutableSegment obj) throws Exception {
     // segment
     _indexDir = indexDir;
     _segmentMetadataImpl = new SegmentMetadataImpl(indexDir);

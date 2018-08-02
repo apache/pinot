@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import com.linkedin.pinot.core.startree.v2.AggregationFunction;
-import com.linkedin.pinot.core.startree.v2.AggregationFunctionFactory;
-import com.linkedin.pinot.core.startree.v2.StarTreeV2Constant;
 import java.util.List;
 import java.io.IOException;
 import com.linkedin.pinot.core.common.Block;
