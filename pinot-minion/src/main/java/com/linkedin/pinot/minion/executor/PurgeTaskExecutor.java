@@ -26,7 +26,7 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 
 
-public class PurgeTaskExecutor extends BaseSegmentConversionExecutor {
+public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
   public static final String RECORD_PURGER_KEY = "recordPurger";
   public static final String RECORD_MODIFIER_KEY = "recordModifier";
   public static final String NUM_RECORDS_PURGED_KEY = "numRecordsPurged";
