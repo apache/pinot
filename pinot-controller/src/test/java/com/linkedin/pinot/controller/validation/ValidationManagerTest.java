@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.LogUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
@@ -30,6 +31,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
@@ -37,6 +39,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.log4j.Level;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -60,7 +63,6 @@ public class ValidationManagerTest {
   private static final String TEST_SEGMENT_NAME = "testSegment";
 
   private ZkClient _zkClient;
-
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private TableConfig _offlineTableConfig;
@@ -68,6 +70,9 @@ public class ValidationManagerTest {
 
   @BeforeClass
   public void setUp() throws Exception {
+    LogUtils.setLogLevel(
+        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
+        Level.INFO);
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
     Thread.sleep(1000);
@@ -191,6 +196,10 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager.stop();
     _zkClient.close();
     ZkStarter.stopLocalZkServer(_zookeeperInstance);
+
+    LogUtils.setLogLevel(
+        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
+        Level.INFO);
   }
 
   @Test
