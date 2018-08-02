@@ -30,7 +30,7 @@
                   on metrics
                 </#if>
                 <#list metricsMap?keys as id>
-                  <strong><a href="${dashboardHost}/app/#/rootcause?metricId=${id}">${metricsMap[id].name}</a></strong><#sep>, </#sep>
+                  <strong><a style="color: rgba(0,0,0,0.75)" href="${dashboardHost}/app/#/rootcause?metricId=${id}">${metricsMap[id].name}</a></strong><#sep>, </#sep>
                 </#list>
             </p>
             <p style="margin-top: 0px; font-size:14px;  margin-bottom: 25px;">
