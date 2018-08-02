@@ -22,11 +22,12 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.filter.StarTreeIndexBasedFilterOperator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.testng.Assert;
@@ -89,10 +90,14 @@ public abstract class BaseStarTreeIndexTest {
    * Helper method to compute the result using raw docs.
    */
   private Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    Operator filterOperator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _segment);
-    Assert.assertFalse(filterOperator instanceof StarTreeIndexBasedFilterOperator);
-
+    FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
+    Operator filterOperator;
+    if (_numGroupByColumns > 0) {
+      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
+          new HashSet<>(_brokerRequest.getGroupBy().getColumns())).run();
+    } else {
+      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode, null).run();
+    }
     return compute(filterOperator);
   }
 
@@ -101,8 +106,6 @@ public abstract class BaseStarTreeIndexTest {
    */
   private Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
     Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
-    Assert.assertTrue(filterOperator instanceof StarTreeIndexBasedFilterOperator);
-
     return compute(filterOperator);
   }
 

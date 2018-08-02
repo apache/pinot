@@ -29,7 +29,6 @@ import com.linkedin.pinot.core.operator.filter.EmptyFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
-import com.linkedin.pinot.core.operator.filter.StarTreeIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import java.util.ArrayList;
@@ -51,11 +50,7 @@ public class FilterPlanNode implements PlanNode {
   @Override
   public BaseFilterOperator run() {
     FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    if (RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), _brokerRequest, rootFilterNode)) {
-      return new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode);
-    } else {
-      return constructPhysicalOperator(rootFilterNode, _segment);
-    }
+    return constructPhysicalOperator(rootFilterNode, _segment);
   }
 
   /**

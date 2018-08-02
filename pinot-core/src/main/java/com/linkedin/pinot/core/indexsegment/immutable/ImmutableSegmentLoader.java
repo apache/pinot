@@ -121,7 +121,7 @@ public class ImmutableSegmentLoader {
     ImmutableSegment immutableSegment = new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
     OnHeapStarTreeV2Loader loader = new OnHeapStarTreeV2Loader();
     List<StarTreeV2> starTreeV2List = loader.load(indexDir, immutableSegment);
-    ((ImmutableSegmentImpl) immutableSegment).setStarTrees(starTreeV2List);
+    ((ImmutableSegmentImpl) immutableSegment).appendStarTrees(starTreeV2List);
 
     return immutableSegment;
   }

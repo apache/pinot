@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.linkedin.pinot.core.startree.operator.StarTreeFilterOperator;
 import java.io.File;
 import java.util.Map;
 import java.util.List;
@@ -36,7 +37,6 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.operator.filter.StarTreeIndexBasedFilterOperator;
 
 
 public abstract class StarTreeV2ExecutorHelper {
@@ -112,14 +112,14 @@ public abstract class StarTreeV2ExecutorHelper {
   private static Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
     Operator filterOperator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _segment);
-    Assert.assertFalse(filterOperator instanceof StarTreeIndexBasedFilterOperator);
+    Assert.assertFalse(filterOperator instanceof StarTreeFilterOperator);
 
     return compute(filterOperator);
   }
 
   private static Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
     Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
-    Assert.assertTrue(filterOperator instanceof StarTreeIndexBasedFilterOperator);
+    Assert.assertTrue(filterOperator instanceof StarTreeFilterOperator);
 
     return compute(filterOperator);
   }
