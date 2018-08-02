@@ -403,49 +403,48 @@ public class PinotTableRestletResource {
   /**
    * Verify table configs if it's a hybrid table, i.e. having both offline and real-time sub-tables.
    */
-  private void verifyTableConfigs(TableConfig tableConfig) {
-    String rawTableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-    TableConfig offlineTableConfig = null;
-    TableConfig realtimeTableConfig = null;
-    if (tableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
-      realtimeTableConfig = tableConfig;
+  private void verifyTableConfigs(TableConfig newTableConfig) {
+    String rawTableName = TableNameBuilder.extractRawTableName(newTableConfig.getTableName());
+    LOGGER.info("Validating table configs for Table: {}", rawTableName);
+
+    TableConfig tableConfigToCompare = null;
+    if (newTableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
       if (_pinotHelixResourceManager.hasOfflineTable(rawTableName)) {
-        offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
+        tableConfigToCompare = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
       }
     } else {
-      offlineTableConfig = tableConfig;
       if (_pinotHelixResourceManager.hasRealtimeTable(rawTableName)) {
-        realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName);
+        tableConfigToCompare = _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName);
       }
     }
 
     // Check if it is a hybrid table or not. If not, there's no need to verify anything.
-    if (offlineTableConfig == null || realtimeTableConfig == null) {
+    if (tableConfigToCompare == null) {
+      LOGGER.info("Table: {} is not a hybrid table. Skip validating table configs.", rawTableName);
       return;
     }
 
-    SegmentsValidationAndRetentionConfig realTimeSegmentsValidationAndRetentionConfig =
-        realtimeTableConfig.getValidationConfig();
-    SegmentsValidationAndRetentionConfig offlineSegmentsValidationAndRetentionConfig =
-        offlineTableConfig.getValidationConfig();
+    SegmentsValidationAndRetentionConfig newSegmentConfig = newTableConfig.getValidationConfig();
+    SegmentsValidationAndRetentionConfig SegmentConfigToCompare = tableConfigToCompare.getValidationConfig();
 
-    String realtimeTimeColumnName = realTimeSegmentsValidationAndRetentionConfig.getTimeColumnName();
-    String offlineTimeColumnName = offlineSegmentsValidationAndRetentionConfig.getTimeColumnName();
-    if (!realtimeTimeColumnName.equalsIgnoreCase(offlineTimeColumnName)) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(String.format(
-          "Time column names are different! Real-time table time column name: %s. Offline table time column name: %s",
-          realtimeTimeColumnName, offlineTimeColumnName));
+    String newTimeColumnName = newSegmentConfig.getTimeColumnName();
+    String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
+    if (!existingTimeColumnName.equalsIgnoreCase(newTimeColumnName)) {
+      throw new PinotHelixResourceManager.InvalidTableConfigException(
+          String.format("Time column names are different! Existing time column name: %s. New time column name: %s",
+              existingTimeColumnName, newTimeColumnName));
     }
 
-    String realtimeTableTimeColumnType = realTimeSegmentsValidationAndRetentionConfig.getTimeType();
-    String offlineTableTimeColumnType = offlineSegmentsValidationAndRetentionConfig.getTimeType();
-    if (!realtimeTableTimeColumnType.equalsIgnoreCase(offlineTableTimeColumnType)) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException(String.format(
-          "Time column types are different! Real-time table time column type: %s. Offline table time column type: %s",
-          realtimeTableTimeColumnType, offlineTableTimeColumnType));
+    String newTimeColumnType = newSegmentConfig.getTimeType();
+    String existingTimeColumnType = SegmentConfigToCompare.getTimeType();
+    if (!existingTimeColumnType.equalsIgnoreCase(newTimeColumnType)) {
+      throw new PinotHelixResourceManager.InvalidTableConfigException(
+          String.format("Time column types are different! Existing time column type: %s. New time column type: %s",
+              existingTimeColumnType, newTimeColumnType));
     }
 
     // TODO: validate time unit size but now there's no metadata for that in table config.
+    LOGGER.info("Finished validating tables config for Table: {}", rawTableName);
   }
 
   @POST
