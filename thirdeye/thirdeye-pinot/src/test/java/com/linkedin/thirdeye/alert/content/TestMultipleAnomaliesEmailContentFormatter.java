@@ -10,9 +10,11 @@ import com.linkedin.thirdeye.datalayer.DaoTestUtils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -37,18 +39,22 @@ public class TestMultipleAnomaliesEmailContentFormatter {
   private DAOTestBase testDAOProvider;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private MetricConfigManager metricDAO;
+
   @BeforeClass
   public void beforeClass(){
     testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
+    metricDAO = daoRegistry.getMetricConfigDAO();
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() {
     testDAOProvider.cleanup();
   }
+
   @Test
   public void testGetEmailEntity() throws Exception {
     DateTimeZone dateTimeZone = DateTimeZone.forID("America/Los_Angeles");
@@ -87,6 +93,12 @@ public class TestMultipleAnomaliesEmailContentFormatter {
     anomaly.setAvgBaselineVal(1.0);
     mergedAnomalyResultDAO.save(anomaly);
     anomalies.add(anomaly);
+
+    MetricConfigDTO metric = new MetricConfigDTO();
+    metric.setName(TEST);
+    metric.setDataset(TEST);
+    metric.setAlias(TEST + "::" + TEST);
+    metricDAO.save(metric);
 
     AlertConfigDTO alertConfigDTO = DaoTestUtils.getTestAlertConfiguration("Test Config");
 

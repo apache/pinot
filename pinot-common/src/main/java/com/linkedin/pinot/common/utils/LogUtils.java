@@ -13,15 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.startree.v2;
+package com.linkedin.pinot.common.utils;
 
-import java.io.File;
+import java.util.Enumeration;
+import java.util.List;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 
-/**
- * Interface to be implemented by star tree converted to combine all star tree files into one.
- */
-public interface StarTreeFormatConverter {
-
-  void convert(File indexSegmentDir, int starTreeId) throws Exception;
+public class LogUtils {
+  public static void setLogLevel(List<String> packagePrefixes, Level level) {
+    Enumeration<Logger> loggers = Logger.getRootLogger().getLoggerRepository().getCurrentLoggers();
+    while (loggers.hasMoreElements()) {
+      Logger logger = loggers.nextElement();
+      for (String prefix : packagePrefixes) {
+        if (logger.getName().startsWith(prefix)) {
+          logger.setLevel(level);
+          break;
+        }
+      }
+    }
+  }
 }

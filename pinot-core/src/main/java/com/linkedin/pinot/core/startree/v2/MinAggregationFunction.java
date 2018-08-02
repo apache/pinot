@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.IOException;
@@ -35,7 +34,6 @@ public class MinAggregationFunction implements AggregationFunction<Number, Doubl
     return FieldSpec.DataType.DOUBLE;
   }
 
-  @Nonnull
   @Override
   public int getResultMaxByteSize() {
     return Double.BYTES;

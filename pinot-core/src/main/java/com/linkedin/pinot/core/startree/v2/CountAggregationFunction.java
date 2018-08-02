@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.IOException;
@@ -35,7 +34,6 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
     return FieldSpec.DataType.LONG;
   }
 
-  @Nonnull
   @Override
   public int getResultMaxByteSize() {
     return Long.BYTES;

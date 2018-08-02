@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.IOException;
@@ -25,7 +24,7 @@ import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
 
 
 public class PercentileTDigestAggregationFunction implements AggregationFunction<Number, TDigest> {
-  public static int _maxLength = 0;
+  protected int _maxLength = 0;
   public final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   @Nonnull
@@ -40,7 +39,6 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
     return FieldSpec.DataType.BYTES;
   }
 
-  @Nonnull
   @Override
   public int getResultMaxByteSize() {
     return _maxLength;

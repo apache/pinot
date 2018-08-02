@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.File;
@@ -21,20 +20,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.List;
 import java.util.Queue;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Comparator;
 import java.util.Collections;
 import java.nio.charset.Charset;
-import xerial.larray.mmap.MMapMode;
-import xerial.larray.mmap.MMapBuffer;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.core.startree.OffHeapStarTree;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
@@ -76,7 +72,7 @@ public class StarTreeV2BaseClass {
   protected int _maxNumLeafRecords;
   protected AggregationFunctionFactory _aggregationFunctionFactory;
 
-  protected static final Charset UTF_8 = Charset.forName("UTF-8");
+  protected final Charset UTF_8 = Charset.forName("UTF-8");
 
   /**
    * enumerate dimension set.
@@ -149,24 +145,6 @@ public class StarTreeV2BaseClass {
   }
 
   /**
-   * Helper method to serialize the start tree into a file.
-   */
-  protected void serializeTree(File starTreeFile) throws IOException {
-    int headerSizeInBytes = computeHeaderSizeInBytes(_dimensionsName);
-    long totalSizeInBytes = headerSizeInBytes + _nodesCount * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
-
-    MMapBuffer dataBuffer = new MMapBuffer(starTreeFile, 0, totalSizeInBytes, MMapMode.READ_WRITE);
-
-    try {
-      long offset = writeHeader(dataBuffer, headerSizeInBytes, _dimensionsCount, _dimensionsName, _nodesCount);
-      writeNodes(dataBuffer, offset, _rootNode);
-    } finally {
-      dataBuffer.flush();
-      dataBuffer.close();
-    }
-  }
-
-  /**
    * Helper method to compute size of the header of the star tree in bytes.
    */
   protected int computeHeaderSizeInBytes(List<String> dimensionsName) {
@@ -186,7 +164,7 @@ public class StarTreeV2BaseClass {
   /**
    * Helper method to write the header into the data buffer.
    */
-  protected long writeHeader(MMapBuffer dataBuffer, int headerSizeInBytes, int dimensionCount,
+  protected long writeHeader(PinotDataBuffer dataBuffer, int headerSizeInBytes, int dimensionCount,
       List<String> dimensionsName, int nodesCount) {
     long offset = 0L;
     dataBuffer.putLong(offset, OffHeapStarTree.MAGIC_MARKER);
@@ -212,7 +190,7 @@ public class StarTreeV2BaseClass {
       dataBuffer.putInt(offset, dimensionLength);
       offset += Integer.BYTES;
 
-      dataBuffer.readFrom(dimensionBytes, offset);
+      dataBuffer.readFrom(offset, dimensionBytes, 0, dimensionLength);
       offset += dimensionLength;
     }
 
@@ -225,7 +203,7 @@ public class StarTreeV2BaseClass {
   /**
    * Helper method to write the star tree nodes into the data buffer.
    */
-  protected void writeNodes(MMapBuffer dataBuffer, long offset, TreeNode rootNode) {
+  protected void writeNodes(PinotDataBuffer dataBuffer, long offset, TreeNode rootNode) {
     int index = 0;
     Queue<TreeNode> queue = new LinkedList<>();
     queue.add(rootNode);
@@ -251,7 +229,7 @@ public class StarTreeV2BaseClass {
   /**
    * Helper method to write one node into the data buffer.
    */
-  private long writeNode(MMapBuffer dataBuffer, TreeNode node, long offset, int startChildrenIndex,
+  private long writeNode(PinotDataBuffer dataBuffer, TreeNode node, long offset, int startChildrenIndex,
       int endChildrenIndex) {
     dataBuffer.putInt(offset, node._dimensionId);
     offset += Integer.BYTES;

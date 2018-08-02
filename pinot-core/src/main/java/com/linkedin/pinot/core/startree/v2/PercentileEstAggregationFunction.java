@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.IOException;
@@ -26,7 +25,7 @@ import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileD
 
 public class PercentileEstAggregationFunction implements AggregationFunction<Number, QuantileDigest> {
 
-  public static int _maxLength = 0;
+  protected int _maxLength = 0;
   public final double DEFAULT_MAX_ERROR = 0.05;
 
   @Nonnull
@@ -41,7 +40,6 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Num
     return FieldSpec.DataType.BYTES;
   }
 
-  @Nonnull
   @Override
   public int getResultMaxByteSize() {
     return _maxLength;

@@ -317,7 +317,7 @@ export default Controller.extend({
       const shareResponse = get(this, 'shareDashboardApiService').saveShareDashboard(treeView);
       const hashKey = get(this, 'shareDashboardApiService').getHashKey();
       //ADD to helper method
-      let currentUrl = `/#/home/share-dashboard?`;
+      let currentUrl = `/app/#/home/share-dashboard?`;
       if(get(this, 'model.appName')){
         currentUrl = currentUrl.concat(`appName=${get(this, 'model.appName')}`);
       }

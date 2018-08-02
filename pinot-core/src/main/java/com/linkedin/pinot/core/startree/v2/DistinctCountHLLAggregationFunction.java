@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.IOException;
@@ -28,7 +27,7 @@ import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<Object, HyperLogLog> {
 
-  public static int _maxLength = 0;
+  protected int _maxLength = 182;
 
   @Nonnull
   @Override
@@ -52,11 +51,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   public HyperLogLog convert(Object data) {
     HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
     hyperLogLog.offer(data);
-    try {
-      _maxLength = Math.max(_maxLength, hyperLogLog.getBytes().length);
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    _maxLength = Math.max(_maxLength, hyperLogLog.sizeof());
 
     return hyperLogLog;
   }
@@ -65,10 +60,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   public HyperLogLog aggregate(HyperLogLog obj1, HyperLogLog obj2) {
     try {
       obj1.addAll(obj2);
-      _maxLength = Math.max(_maxLength, obj1.getBytes().length);
+      _maxLength = Math.max(_maxLength, obj1.sizeof());
     } catch (CardinalityMergeException e) {
-      e.printStackTrace();
-    } catch (IOException e) {
       e.printStackTrace();
     }
 
