@@ -73,6 +73,7 @@ public class SegmentGeneratorConfig {
   private Map<String, ChunkCompressorFactory.CompressionType> _rawIndexCompressionType = new HashMap<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private List<String> _columnSortOrder = new ArrayList<>();
+  private List<String> _mergeCoveredSegments = new ArrayList<>();
   private String _dataDir = null;
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
@@ -231,6 +232,10 @@ public class SegmentGeneratorConfig {
     return _columnSortOrder;
   }
 
+  public List<String> getMergeCoveredSegments() {
+    return _mergeCoveredSegments;
+  }
+
   public void setRawIndexCreationColumns(List<String> rawIndexCreationColumns) {
     Preconditions.checkNotNull(rawIndexCreationColumns);
     _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
@@ -244,6 +249,10 @@ public class SegmentGeneratorConfig {
   public void setColumnSortOrder(List<String> sortOrder) {
     Preconditions.checkNotNull(sortOrder);
     _columnSortOrder.addAll(sortOrder);
+  }
+
+  public void setMergeCoveredSegments(List<String> mergeCoveredSegments) {
+    _mergeCoveredSegments = mergeCoveredSegments;
   }
 
   public void createInvertedIndexForColumn(String column) {

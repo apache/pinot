@@ -20,12 +20,14 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +55,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private SegmentPartitionMetadata _partitionMetadata;
   private long _segmentUploadStartTime = -1;
   private Map<String, String> _customMap;
+  private List<String> _mergeCoveredSegments;
 
   public SegmentZKMetadata() {
   }
@@ -84,6 +87,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
     _segmentUploadStartTime = znRecord.getLongField(CommonConstants.Segment.SEGMENT_UPLOAD_START_TIME, -1);
     _customMap = znRecord.getMapField(CommonConstants.Segment.CUSTOM_MAP);
+    _mergeCoveredSegments = znRecord.getListField(CommonConstants.Segment.MERGE_COVER);
   }
 
   public String getSegmentName() {
@@ -206,6 +210,14 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _customMap = customMap;
   }
 
+  public List<String> getMergeCoveredSegments() {
+    return _mergeCoveredSegments;
+  }
+
+  public void setMergeCoveredSegments(List<String> mergeCoveredSegments) {
+    _mergeCoveredSegments = mergeCoveredSegments;
+  }
+
   @Override
   public boolean equals(Object segmentMetadata) {
     if (isSameReference(this, segmentMetadata)) {
@@ -222,7 +234,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
         metadata._startTime) && isEqual(_endTime, metadata._endTime) && isEqual(_segmentType, metadata._segmentType)
         && isEqual(_totalRawDocs, metadata._totalRawDocs) && isEqual(_crc, metadata._crc) && isEqual(_creationTime,
         metadata._creationTime) && isEqual(_partitionMetadata, metadata._partitionMetadata) && isEqual(
-        _segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(_customMap, metadata._customMap);
+        _segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(_customMap, metadata._customMap)
+        && isEqual(_mergeCoveredSegments, metadata._mergeCoveredSegments);
   }
 
   @Override
@@ -240,6 +253,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     result = hashCodeOf(result, _partitionMetadata);
     result = hashCodeOf(result, _segmentUploadStartTime);
     result = hashCodeOf(result, _customMap);
+    result = hashCodeOf(result, _mergeCoveredSegments);
     return result;
   }
 
@@ -277,6 +291,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
     if (_customMap != null) {
       znRecord.setMapField(CommonConstants.Segment.CUSTOM_MAP, _customMap);
+    }
+    if (_mergeCoveredSegments != null) {
+      znRecord.setListField(CommonConstants.Segment.MERGE_COVER, _mergeCoveredSegments);
     }
     return znRecord;
   }
@@ -319,6 +336,13 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     } else {
       JSONObject jsonObject = new JSONObject(_customMap);
       configMap.put(CommonConstants.Segment.CUSTOM_MAP, jsonObject.toString());
+    }
+
+    if (_mergeCoveredSegments == null) {
+      configMap.put(CommonConstants.Segment.MERGE_COVER, null);
+    } else {
+      JSONArray jsonArray = new JSONArray(_mergeCoveredSegments);
+      configMap.put(CommonConstants.Segment.MERGE_COVER, jsonArray.toString());
     }
 
     return configMap;

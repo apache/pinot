@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -157,6 +158,7 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 1000);
     record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
     record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
+    record.setListField(CommonConstants.Segment.MERGE_COVER, Arrays.asList(new String[] {"test1", "test2"}));
     return record;
   }
 
@@ -175,6 +177,7 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setCreationTime(1000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
     realtimeSegmentMetadata.setTimeThresholdToFlushSegment("6h");
+    realtimeSegmentMetadata.setMergeCoveredSegments(Arrays.asList(new String[] {"test1", "test2"}));
     return realtimeSegmentMetadata;
   }
 
@@ -194,6 +197,7 @@ public class SegmentZKMetadataTest {
     record.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/testTable_O_3000_4000");
     record.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, 4000);
     record.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, 8000);
+    record.setListField(CommonConstants.Segment.MERGE_COVER, Arrays.asList(new String[] {"test1", "test2"}));
     return record;
   }
 
@@ -212,6 +216,7 @@ public class SegmentZKMetadataTest {
     offlineSegmentMetadata.setDownloadUrl("http://localhost:8000/testTable_O_3000_4000");
     offlineSegmentMetadata.setPushTime(4000);
     offlineSegmentMetadata.setRefreshTime(8000);
+    offlineSegmentMetadata.setMergeCoveredSegments(Arrays.asList(new String[] {"test1", "test2"}));
     return offlineSegmentMetadata;
   }
 }

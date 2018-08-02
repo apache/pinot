@@ -23,6 +23,8 @@ import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import junit.framework.Assert;
 import org.apache.commons.configuration.ConfigurationException;
@@ -48,12 +50,16 @@ public class SegmentMetadataImplTest {
     final String filePath =
         TestUtils.getFileFromResourceUrl(SegmentMetadataImplTest.class.getClassLoader().getResource(AVRO_DATA));
 
+    // Generate dummy merge covered segments
+    List<String> mergeCoveredSegments = Arrays.asList(new String[] {"test1", "test2"});
+
     // intentionally changed this to TimeUnit.Hours to make it non-default for testing
     final SegmentGeneratorConfig config = SegmentTestUtils
         .getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch", TimeUnit.HOURS,
             "testTable");
     config.setSegmentNamePostfix("1");
     config.setTimeColumnName("daysSinceEpoch");
+    config.setMergeCoveredSegments(mergeCoveredSegments);
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
@@ -80,6 +86,13 @@ public class SegmentMetadataImplTest {
     Assert.assertEquals(jsonMeta.get("endTimeMillis"), metadata.getTimeInterval().getEndMillis());
     Assert.assertEquals(jsonMeta.get("pushTimeMillis"), metadata.getPushTime());
     Assert.assertEquals(jsonMeta.get("refreshTimeMillis"), metadata.getPushTime());
+
+    JSONArray jsonMergeCoveredSegments = jsonMeta.getJSONArray("mergeCoveredSegments");
+    Assert.assertEquals(jsonMergeCoveredSegments.length(), metadata.getMergeCoveredSegments().size());
+    for (int i = 0; i < jsonMergeCoveredSegments.length(); i++) {
+      Assert.assertEquals(jsonMergeCoveredSegments.get(i), metadata.getMergeCoveredSegments().get(i));
+    }
+
     JSONArray jsonColumnList = jsonMeta.getJSONArray("columns");
     Assert.assertEquals(jsonColumnList.length(), metadata.getAllColumns().size());
     for (int i = 0; i < jsonColumnList.length(); i++) {
@@ -93,6 +106,5 @@ public class SegmentMetadataImplTest {
       Assert.assertEquals(jsonColumn.get("containsNulls"), colMeta.hasNulls());
       Assert.assertEquals(jsonColumn.getBoolean("hasDictionary"), colMeta.hasDictionary());
     }
-
   }
 }

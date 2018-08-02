@@ -89,8 +89,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private int _totalRawDocs;
   private long _segmentStartTime;
   private long _segmentEndTime;
+  private List<String> _mergeCoveredSegments;
 
- 
+
   /**
    * For segments on disk.
    * <p>Index directory passed in should be top level segment directory.
@@ -102,6 +103,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _columnMetadataMap = new HashMap<>();
     _allColumns = new HashSet<>();
     _schema = new Schema();
+    _mergeCoveredSegments = new ArrayList<>();
 
     init(segmentMetadataPropertiesConfiguration);
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
@@ -146,6 +148,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _creationTime = segmentMetadata.getCreationTime();
     setTimeInfo(segmentMetadataPropertiesConfiguration);
     _columnMetadataMap = null;
+    _mergeCoveredSegments = null;
     _tableName = segmentMetadata.getTableName();
     _segmentName = segmentMetadata.getSegmentName();
     _allColumns = schema.getColumnNames();
@@ -297,6 +300,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     if (_hasStarTree) {
       initStarTreeMetadata(segmentMetadataPropertiesConfiguration);
     }
+
+    // Build covered segments
+    Iterator<String> iterator = segmentMetadataPropertiesConfiguration.getList(Segment.SEGMENT_MERGE_COVER).iterator();
+    while (iterator.hasNext()) {
+      final String coveredSegment = iterator.next();
+      _mergeCoveredSegments.add(coveredSegment);
+    }
+
   }
 
   /**
@@ -357,6 +368,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   public Map<String, ColumnMetadata> getColumnMetadataMap() {
     return _columnMetadataMap;
+  }
+
+  public List<String> getMergeCoveredSegments() {
+    return _mergeCoveredSegments;
   }
 
   @Override
@@ -621,6 +636,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         ColumnMetadata columnMetadata = _columnMetadataMap.get(column);
         JSONObject columnJson = new JSONObject(mapper.writeValueAsString(columnMetadata));
         columnsJson.put(columnJson);
+      }
+
+      if (_mergeCoveredSegments != null) {
+        JSONArray mergeCoveredSegmentsJsonArray = new JSONArray(_mergeCoveredSegments);
+        rootMeta.put("mergeCoveredSegments", mergeCoveredSegmentsJsonArray);
       }
 
       rootMeta.put("columns", columnsJson);

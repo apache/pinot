@@ -354,6 +354,7 @@ public class CommonConstants {
     public static final String SEGMENT_UPLOAD_START_TIME = "segment.upload.start.time";
 
     public static final String CUSTOM_MAP = "custom.map";
+    public static final String MERGE_COVER = "segment.merge.cover";
 
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";

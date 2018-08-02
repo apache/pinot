@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.minion.segment.RecordPartitioner;
 import com.linkedin.pinot.core.minion.segment.RecordTransformer;
 import com.linkedin.pinot.core.minion.segment.ReducerRecordReader;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -86,6 +87,13 @@ public class SegmentConverter {
   }
 
   public List<File> convertSegment() throws Exception {
+    // Fetch the list of covered segments
+    List<String> coveredSegments = new ArrayList<>();
+    for (File indexDir : _inputIndexDirs) {
+      SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
+      coveredSegments.add(metadata.getName());
+    }
+
     List<File> resultFiles = new ArrayList<>();
     for (int currentPartition = 0; currentPartition < _totalNumPartition; currentPartition++) {
       // Mapping stage
@@ -93,7 +101,7 @@ public class SegmentConverter {
       String mapperOutputPath = _workingDir.getPath() + File.separator + MAPPER_PREFIX + currentPartition;
       try (MapperRecordReader mapperRecordReader = new MapperRecordReader(_inputIndexDirs, _recordTransformer,
           _recordPartitioner, _totalNumPartition, currentPartition)) {
-        buildSegment(mapperOutputPath, _tableName, _segmentName, mapperRecordReader, null);
+        buildSegment(mapperOutputPath, _tableName, _segmentName, mapperRecordReader, null, coveredSegments);
       }
       File outputSegment = new File(mapperOutputPath + File.separator + _segmentName);
 
@@ -102,7 +110,7 @@ public class SegmentConverter {
         String reducerOutputPath = _workingDir.getPath() + File.separator + REDUCER_PREFIX + currentPartition;
         try (ReducerRecordReader reducerRecordReader = new ReducerRecordReader(outputSegment, _recordAggregator,
             _groupByColumns)) {
-          buildSegment(reducerOutputPath, _tableName, _segmentName, reducerRecordReader, null);
+          buildSegment(reducerOutputPath, _tableName, _segmentName, reducerRecordReader, null, coveredSegments);
         }
         outputSegment = new File(reducerOutputPath + File.separator + _segmentName);
       }
@@ -119,7 +127,7 @@ public class SegmentConverter {
           String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
           try (
               PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(outputSegment, null, sortedColumn)) {
-            buildSegment(indexGenerationOutputPath, _tableName, _segmentName, recordReader, _indexingConfig);
+            buildSegment(indexGenerationOutputPath, _tableName, _segmentName, recordReader, _indexingConfig, coveredSegments);
           }
           outputSegment = new File(indexGenerationOutputPath + File.separator + _segmentName);
         }
@@ -136,7 +144,7 @@ public class SegmentConverter {
    * TODO: Support all kinds of indexing (no dictionary)
    */
   private void buildSegment(String outputPath, String tableName, String segmentName, RecordReader recordReader,
-      IndexingConfig indexingConfig) throws Exception {
+      IndexingConfig indexingConfig, List<String> coveredSegments) throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(recordReader.getSchema());
     segmentGeneratorConfig.setOutDir(outputPath);
     segmentGeneratorConfig.setTableName(tableName);
@@ -146,6 +154,10 @@ public class SegmentConverter {
       if (indexingConfig.getStarTreeIndexSpec() != null) {
         segmentGeneratorConfig.enableStarTreeIndex(indexingConfig.getStarTreeIndexSpec());
       }
+    }
+
+    if (coveredSegments != null && !coveredSegments.isEmpty()) {
+      segmentGeneratorConfig.setMergeCoveredSegments(coveredSegments);
     }
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, recordReader);

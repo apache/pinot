@@ -316,6 +316,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(SEGMENT_TOTAL_NULLS, String.valueOf(totalNulls));
     properties.setProperty(SEGMENT_TOTAL_CONVERSIONS, String.valueOf(totalConversions));
     properties.setProperty(SEGMENT_TOTAL_NULL_COLS, String.valueOf(totalNullCols));
+    properties.setProperty(SEGMENT_MERGE_COVER, config.getMergeCoveredSegments());
 
     StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();
     if (starTreeIndexSpec != null) {
