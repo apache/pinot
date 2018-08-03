@@ -61,7 +61,7 @@ public abstract class ControllerTest {
 
   private static final int DEFAULT_CONTROLLER_PORT = 8998;
   private static final String DEFAULT_DATA_DIR =
-      FileUtils.getTempDirectoryPath() + File.separator + "test-controller-" + System.currentTimeMillis();
+      new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
 
   protected int _controllerPort;
   protected String _controllerBaseApiUrl;
@@ -110,6 +110,9 @@ public abstract class ControllerTest {
     config.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT));
     config.setDataDir(DEFAULT_DATA_DIR);
     config.setZkStr(ZkStarter.DEFAULT_ZK_STR);
+
+    // Includes default local PinotFS class
+    config.setPinotFSFactoryClasses(null);
     return config;
   }
 
