@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.startree.v2;
 
 import java.io.File;
 import java.util.List;
+import java.util.Random;
 import java.util.HashMap;
 import java.util.ArrayList;
 import com.linkedin.pinot.common.data.Schema;
@@ -31,12 +32,20 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 
 public class StarTreeV2SegmentHelper {
 
-  private static final int numRows = 6;
+  private static final int smallNumRows = 6;
+  private static final int largeNumRows = 5000;
+
   private static final String[] names = {"Rahul", "Rahul", "Rahul", "Zackie", "Zackie", "Zackie"};
   private static final String[] country = {"IN", "IN", "CH", "CH", "CH", "US"};
   private static final String[] language = {"Hin", "Hin", "Eng", "Eng", "Eng", "Eng"};
 
   private static final int[] metricValues = {3, 5, 2, 8, 9, 1};
+
+  private static final int DIM_MAX_VALUE = 2000;
+  private static final int METRIC_MAX_VALUE = 10000;
+  private static final Random RANDOM = new Random();
+
+
 
   public static Schema createSegmentSchema() {
 
@@ -63,10 +72,10 @@ public class StarTreeV2SegmentHelper {
     return schema;
   }
 
-  public static List<GenericRow> createSegmentData(Schema schema) throws Exception {
+  public static List<GenericRow> createSegmentSmallData(Schema schema) throws Exception {
 
-    List<GenericRow> rows = new ArrayList<>(numRows);
-    for (int rowId = 0; rowId < numRows; rowId++) {
+    List<GenericRow> rows = new ArrayList<>(smallNumRows);
+    for (int rowId = 0; rowId < smallNumRows; rowId++) {
       HashMap<String, Object> map = new HashMap<>();
 
       // dimension
@@ -80,6 +89,32 @@ public class StarTreeV2SegmentHelper {
       // metric
       String metName = schema.getMetricFieldSpecs().get(0).getName();
       map.put(metName, metricValues[rowId]);
+
+      GenericRow genericRow = new GenericRow();
+      genericRow.init(map);
+      rows.add(genericRow);
+    }
+
+    return rows;
+  }
+
+  public static List<GenericRow> createSegmentLargeData(Schema schema) throws Exception {
+
+    List<GenericRow> rows = new ArrayList<>(largeNumRows);
+    for (int rowId = 0; rowId < largeNumRows; rowId++) {
+      HashMap<String, Object> map = new HashMap<>();
+
+      // Dim columns.
+      for (int i = 0; i < 3; i++) {
+        String dimName = schema.getDimensionFieldSpecs().get(i).getName();
+        map.put(dimName, dimName + "-v" + RANDOM.nextInt(DIM_MAX_VALUE));
+      }
+
+      // Metric columns.
+      for (int i = 0; i < 1; i++) {
+        String metName = schema.getMetricFieldSpecs().get(i).getName();
+        map.put(metName, RANDOM.nextInt(METRIC_MAX_VALUE));
+      }
 
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);

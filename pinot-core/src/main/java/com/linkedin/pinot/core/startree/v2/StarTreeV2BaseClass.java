@@ -47,7 +47,6 @@ public class StarTreeV2BaseClass {
   protected IndexLoadingConfig _v3IndexLoadingConfig;
 
   // Dimensions
-  protected int _dimensionSize;
   protected int _dimensionsCount;
   protected List<String> _dimensionsName;
   protected String _dimensionSplitOrderString;

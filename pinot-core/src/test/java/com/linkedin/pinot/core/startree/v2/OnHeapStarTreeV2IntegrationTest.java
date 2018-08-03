@@ -15,7 +15,15 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.plan.FilterPlanNode;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import java.io.File;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.List;
 import java.util.HashMap;
@@ -46,7 +54,20 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
-public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
+public class OnHeapStarTreeV2IntegrationTest {
+
+
+
+  protected IndexSegment _segment;
+  protected BrokerRequest _brokerRequest;
+  protected int _numMetricColumns;
+  protected Dictionary[] _metricDictionaries;
+  protected BlockSingleValIterator[] _metricValIterators;
+  protected int _numGroupByColumns;
+  protected BlockSingleValIterator[] _groupByValIterators;
+
+
+
 
   private File _filepath;
   private File _indexDir;
@@ -72,7 +93,11 @@ public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
     String _segmentName = "starTreeV2BuilderTest";
     _segmentOutputDir = Files.createTempDir().toString();
-    _rows = StarTreeV2SegmentHelper.createSegmentData(schema);
+
+    _rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+
+    //_rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+
     _recordReader = new GenericRowRecordReader(_rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, _segmentName, _segmentOutputDir, _recordReader);
     _filepath = new File(_indexDir, "v3");
@@ -90,14 +115,14 @@ public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
     AggregationFunctionColumnPair pair7 = new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "star");
 
     metric2aggFuncPairs1.add(pair1);
-//    metric2aggFuncPairs1.add(pair2);
-//    metric2aggFuncPairs1.add(pair4);
-//    metric2aggFuncPairs1.add(pair5);
-//    metric2aggFuncPairs1.add(pair6);
-//    metric2aggFuncPairs1.add(pair7);
-//
+    metric2aggFuncPairs1.add(pair2);
+    metric2aggFuncPairs1.add(pair4);
+    metric2aggFuncPairs1.add(pair5);
+    metric2aggFuncPairs1.add(pair6);
+    metric2aggFuncPairs1.add(pair7);
+
     metric2aggFuncPairs2.add(pair3);
-//    metric2aggFuncPairs2.add(pair1);
+    metric2aggFuncPairs2.add(pair1);
 
     StarTreeV2Config _starTreeV2Config1 = new StarTreeV2Config();
     _starTreeV2Config1.setOutDir(_filepath);
@@ -130,43 +155,43 @@ public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
     }
   }
 
-//  @Test
-//  public void testLoader() throws Exception {
-//    OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
-//    IndexLoadingConfig v3IndexLoadingConfig = new IndexLoadingConfig();
-//    v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
-//    v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
-//
-//    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, v3IndexLoadingConfig);
-//
-//    try {
-//      List<StarTreeV2> starTreeImplList = loadTest.load(_filepath, immutableSegment);
-//
-//      int starTreeId = 0;
-//      for (StarTreeV2 impl : starTreeImplList) {
-//        System.out.println("Working on star tree " + Integer.toString(starTreeId + 1));
-//
-//        StarTree s = impl.getStarTree();
-//        StarTreeV2LoaderHelper.printStarTree(s);
-//
-//        for (String dimension : _starTreeV2ConfigList.get(starTreeId).getDimensions()) {
-//          DataSource source = impl.getDataSource(dimension);
-//          System.out.println("Printing for dimension : " + dimension);
-//          StarTreeV2LoaderHelper.printDimensionDataFromDataSource(source);
-//        }
-//
-//        for (AggregationFunctionColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
-//          String metPair = pair.toColumnName();
-//          DataSource source = impl.getDataSource(metPair);
-//          System.out.println("Printing for Met2AggPair : " + metPair);
-//          StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getFunctionType().getName());
-//        }
-//        starTreeId += 1;
-//      }
-//    } catch (Exception e) {
-//      e.printStackTrace();
-//    }
-//  }
+  @Test
+  public void testLoader() throws Exception {
+    OnHeapStarTreeV2Loader loadTest = new OnHeapStarTreeV2Loader();
+    IndexLoadingConfig v3IndexLoadingConfig = new IndexLoadingConfig();
+    v3IndexLoadingConfig.setReadMode(ReadMode.mmap);
+    v3IndexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
+
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, v3IndexLoadingConfig);
+
+    try {
+      List<StarTreeV2> starTreeImplList = loadTest.load(_filepath, immutableSegment);
+
+      int starTreeId = 0;
+      for (StarTreeV2 impl : starTreeImplList) {
+        System.out.println("Working on star tree " + Integer.toString(starTreeId + 1));
+
+        StarTree s = impl.getStarTree();
+        StarTreeV2LoaderHelper.printStarTree(s);
+
+        for (String dimension : _starTreeV2ConfigList.get(starTreeId).getDimensions()) {
+          DataSource source = impl.getDataSource(dimension);
+          System.out.println("Printing for dimension : " + dimension);
+          StarTreeV2LoaderHelper.printDimensionDataFromDataSource(source);
+        }
+
+        for (AggregationFunctionColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
+          String metPair = pair.toColumnName();
+          DataSource source = impl.getDataSource(metPair);
+          System.out.println("Printing for Met2AggPair : " + metPair);
+          StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getFunctionType().getName());
+        }
+        starTreeId += 1;
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
 
   @Test
   public void testExecutor() throws Exception {
@@ -183,12 +208,10 @@ public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
     }
   }
 
-  @Override
   protected String[] getHardCodedQueries() {
     return STAR_TREE1_HARD_CODED_QUERIES;
   }
 
-  @Override
   protected List<String> getMetricColumns() {
 
     List<String> pairs = new ArrayList<>();
@@ -204,8 +227,7 @@ public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
     return pairs;
   }
 
-  @Override
-  protected Map<List<Integer>, List<Double>> compute(Operator filterOperator) throws Exception {
+  protected Map<List<Integer>, List<Double>> computeAggregated(Operator filterOperator) throws Exception {
     BlockDocIdIterator docIdIterator = filterOperator.nextBlock().getBlockDocIdSet().iterator();
 
     Map<List<Integer>, List<Double>> results = new HashMap<>();
@@ -229,12 +251,46 @@ public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
 
       for (int i = 0; i < _numMetricColumns; i++) {
         if (_metricDataType.get(i).equals(FieldSpec.DataType.DOUBLE)) {
-          sums.set(i, sums.get(i) + _metricValIterators[i].nextDoubleVal());
+          double abc = _metricValIterators[i].nextDoubleVal();
+          System.out.println(abc);
+          sums.set(i, sums.get(i) + abc);
         }
       }
     }
     return results;
   }
+
+  protected Map<List<Integer>, List<Double>> compute(Operator filterOperator) {
+    BlockDocIdIterator docIdIterator = filterOperator.nextBlock().getBlockDocIdSet().iterator();
+
+    Map<List<Integer>, List<Double>> results = new HashMap<>();
+    int docId;
+    while ((docId = docIdIterator.next()) != Constants.EOF) {
+
+      List<Integer> groupKeys = new ArrayList<>(_numGroupByColumns);
+      for (int i = 0; i < _numGroupByColumns; i++) {
+        _groupByValIterators[i].skipTo(docId);
+        groupKeys.add(_groupByValIterators[i].nextIntVal());
+      }
+
+      List<Double> sums = results.get(groupKeys);
+      if (sums == null) {
+        sums = new ArrayList<>(_numMetricColumns);
+        for (int i = 0; i < _numMetricColumns; i++) {
+          sums.add(0.0);
+        }
+        results.put(groupKeys, sums);
+      }
+      for (int i = 0; i < _numMetricColumns; i++) {
+        _metricValIterators[i].skipTo(docId);
+        int dictId = _metricValIterators[i].nextIntVal();
+        sums.set(i, sums.get(i) + _metricDictionaries[i].getDoubleValue(dictId));
+      }
+    }
+
+    return results;
+  }
+
 
   protected void testQueries(int starTreeId) throws Exception {
     Assert.assertNotNull(_segment);
@@ -261,5 +317,28 @@ public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
 
       Assert.assertEquals(computeUsingAggregatedDocs(), computeUsingRawDocs(), "Comparison failed for query: " + query);
     }
+  }
+
+  /**
+   * Helper method to compute the result using raw docs.
+   */
+  protected Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
+    FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
+    Operator filterOperator;
+    if (_numGroupByColumns > 0) {
+      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
+          new HashSet<>(_brokerRequest.getGroupBy().getColumns())).run();
+    } else {
+      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode, null).run();
+    }
+    return compute(filterOperator);
+  }
+
+  /**
+   * Helper method to compute the result using aggregated docs.
+   */
+  protected Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
+    Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
+    return computeAggregated(filterOperator);
   }
 }

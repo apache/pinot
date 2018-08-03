@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.startree.v2;
 import java.io.File;
 import java.util.Map;
 import java.util.List;
+import org.slf4j.Logger;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.nio.ByteOrder;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.Collections;
+import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -59,6 +61,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
   private List<ForwardIndexCreator> _dimensionForwardIndexCreatorList;
   private List<ForwardIndexCreator> _aggFunColumnPairForwardIndexCreatorList;
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapStarTreeV2Builder.class);
+
   @Override
   public void init(File indexDir, StarTreeV2Config config) throws Exception {
 
@@ -89,6 +93,10 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     List<String> dimensionsWithoutStarNode = config.getDimensionsWithoutStarNode();
     _dimensionsWithoutStarNode = enumerateDimensions(_dimensionsName, dimensionsWithoutStarNode);
 
+    LOGGER.info("Dimensions Split Order: {}", _dimensionsSplitOrder);
+    LOGGER.info("Dimensions without star node: {}", dimensionsWithoutStarNode);
+
+
     // metric
     _aggFunColumnPairsString = "";
     _metricsName = new HashSet<>();
@@ -109,6 +117,9 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
         _metricsSpecMap.put(metric.getName(), metric);
       }
     }
+
+    LOGGER.info("Dimensions Name: {}", _dimensionsName);
+    LOGGER.info("AggFun Column Pairs String: {}", _aggFunColumnPairsString);
 
     // other initialisation
     _starTreeId = StarTreeV2Constant.STAR_TREE + '_' + Integer.toString(_starTreeCount);
@@ -190,6 +201,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     computeDefaultSplitOrder(_dimensionsCardinality);
 
+    long start = System.currentTimeMillis();
+
     // sorting the data as per the sort order.
     List<Record> rawSortedStarTreeData = sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
     _starTreeData = condenseData(rawSortedStarTreeData, _aggFunColumnPairs, StarTreeV2Constant.IS_RAW_DATA);
@@ -201,6 +214,10 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     // create aggregated doc for all nodes.
     createAggregatedDocForAllNodes(_rootNode, null);
+
+    long end = System.currentTimeMillis();
+    LOGGER.info("Took {}ms to build star tree index with {} aggregated documents", (end - start),
+        _starTreeData.size());
 
     return;
   }
