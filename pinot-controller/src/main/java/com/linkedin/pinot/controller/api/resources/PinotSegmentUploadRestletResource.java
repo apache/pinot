@@ -275,11 +275,20 @@ public class PinotSegmentUploadRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segmentmetadata")
-  @ApiOperation(value = "Upload a segment by sending metadata", notes = "Does not download segment file")
+  @ApiOperation(value = "Upload a segment by sending metadata", notes = "Sends segment metadata as binary")
   public void uploadSegmentAsMultiPartWithMetadata(FormDataMultiPart multiPart,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
+      if (multiPart == null) {
+        throw new ControllerApplicationException(LOGGER, "Segment metadata upload requires segment metadata", Response.Status.BAD_REQUEST);
+      }
+      if (headers == null) {
+        throw new ControllerApplicationException(LOGGER, "Segment upload type needs to be URI for metadata upload", Response.Status.BAD_REQUEST);
+      }
+      if (headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI) == null) {
+        throw new ControllerApplicationException(LOGGER, "Download URI needs to be set for metadata upload", Response.Status.BAD_REQUEST);
+      }
       String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
       FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
       if (uploadType != FileUploadDownloadClient.FileUploadType.URI) {
@@ -310,7 +319,7 @@ public class PinotSegmentUploadRestletResource {
 
   private SuccessResponse uploadSegmentInternal(FormDataMultiPart multiPart, String segmentJsonStr,
       boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean isSegmentMetadataUpload) {
-    File tempTarredSegmentFile = null;
+    File tempTarredFile = null;
     File tempSegmentDir = null;
 
     if (headers != null) {
@@ -323,9 +332,11 @@ public class PinotSegmentUploadRestletResource {
 
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-      String tempSegmentName = "tmp-" + System.nanoTime();
-      tempTarredSegmentFile = new File(provider.getFileUploadTmpDir(), tempSegmentName);
-      tempSegmentDir = new File(provider.getTmpUntarredPath(), tempSegmentName);
+      // Note that these files could be either the segment file or the segment metadata zip containing only
+      // creation.meta and metadata.properties
+      String tempFileName = "tmp-" + System.nanoTime();
+      tempTarredFile = new File(provider.getFileUploadTmpDir(), tempFileName);
+      tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
 
       // Get upload type
       String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
@@ -345,43 +356,27 @@ public class PinotSegmentUploadRestletResource {
           }
           if (!isSegmentMetadataUpload) {
             // Get segment fetcher based on the download URI
-            downloadSegment(tempTarredSegmentFile, downloadURI);
+            downloadSegment(tempTarredFile, downloadURI);
           } else {
-            File segmentMetadataFile = getMetadataFile(multiPart);
-            segmentMetadata = new SegmentMetadataImpl(segmentMetadataFile);
+            getFileFromMultipart(multiPart, tempTarredFile);
           }
           break;
 
         case TAR:
-          try {
-            Map<String, List<FormDataBodyPart>> map = multiPart.getFields();
-            if (!validateMultiPart(map, null)) {
-              throw new ControllerApplicationException(LOGGER, "Invalid multi-part form", Response.Status.BAD_REQUEST);
-            }
-            FormDataBodyPart bodyPart = map.values().iterator().next().get(0);
-            try (InputStream inputStream = bodyPart.getValueAs(InputStream.class);
-                OutputStream outputStream = new FileOutputStream(tempTarredSegmentFile)) {
-              IOUtils.copyLarge(inputStream, outputStream);
-            }
-          } finally {
-            multiPart.cleanup();
-          }
+          getFileFromMultipart(multiPart, tempTarredFile);
           break;
 
         default:
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
 
-      File indexDir = null;
       // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files
       // in the segment in order to ensure the segment is not corrupted
-      if (tempTarredSegmentFile != null) {
-        TarGzCompressionUtils.unTar(tempTarredSegmentFile, tempSegmentDir);
-        File[] files = tempSegmentDir.listFiles();
-        Preconditions.checkState(files != null && files.length == 1);
-        indexDir = files[0];
-        segmentMetadata = new SegmentMetadataImpl(indexDir);
-      }
+      TarGzCompressionUtils.unTar(tempTarredFile, tempSegmentDir);
+      File[] files = tempSegmentDir.listFiles();
+      Preconditions.checkState(files != null && files.length == 1);
+      File indexDir = files[0];
+      segmentMetadata = new SegmentMetadataImpl(indexDir);
 
       // For URI upload, user has the option to send us only metadata
       String segmentName = segmentMetadata.getName();
@@ -389,8 +384,8 @@ public class PinotSegmentUploadRestletResource {
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}", segmentName,
           offlineTableName, clientAddress);
-      uploadSegment(indexDir, segmentMetadata, tempTarredSegmentFile, downloadURI, provider,
-          enableParallelPushProtection, headers);
+      uploadSegment(indexDir, segmentMetadata, tempTarredFile, downloadURI, provider,
+          enableParallelPushProtection, headers, isSegmentMetadataUpload);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + offlineTableName);
     } catch (WebApplicationException e) {
@@ -400,27 +395,26 @@ public class PinotSegmentUploadRestletResource {
       throw new ControllerApplicationException(LOGGER, "Caught internal server exception while uploading segment",
           Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {
-      FileUtils.deleteQuietly(tempTarredSegmentFile);
+      FileUtils.deleteQuietly(tempTarredFile);
       FileUtils.deleteQuietly(tempSegmentDir);
     }
   }
 
-  private File getMetadataFile(FormDataMultiPart multiPart) throws IOException {
+  private File getFileFromMultipart(FormDataMultiPart multiPart, File dstFile) throws IOException {
     // Read segment metadata file and directly use that information to update zk
     Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();
     if (!validateMultiPart(segmentMetadataMap, null)) {
       throw new ControllerApplicationException(LOGGER, "Invalid multi-part form for segment metadata", Response.Status.BAD_REQUEST);
     }
-    File segmentMetadataFile = null;
     FormDataBodyPart segmentMetadataBodyPart = segmentMetadataMap.values().iterator().next().get(0);
     try (InputStream inputStream = segmentMetadataBodyPart.getValueAs(InputStream.class);
-        OutputStream outputStream = new FileOutputStream(segmentMetadataFile)) {
+        OutputStream outputStream = new FileOutputStream(dstFile)) {
         IOUtils.copyLarge(inputStream, outputStream);
     }
     finally {
       multiPart.cleanup();
     }
-    return segmentMetadataFile;
+    return dstFile;
   }
 
   private void downloadSegment(File tempTarredSegmentFile, String downloadURI) throws Exception {
@@ -464,7 +458,7 @@ public class PinotSegmentUploadRestletResource {
    * </ul>
    */
   private void uploadSegment(File indexDir, SegmentMetadata segmentMetadata, File tempTarredSegmentFile,
-      String downloadUrl, FileUploadPathProvider provider, boolean enableParallelPushProtection, HttpHeaders headers)
+      String downloadUrl, FileUploadPathProvider provider, boolean enableParallelPushProtection, HttpHeaders headers, boolean isSegmentMetadataUpload)
       throws Exception {
     String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -483,7 +477,7 @@ public class PinotSegmentUploadRestletResource {
     // Check quota when segment file is locally downloaded
     // For metadata-only upload, we have no way to check quota because we don't send the file itself and
     // we can't access length of zipped files in a remote filesystem
-    if (indexDir != null) {
+    if (isSegmentMetadataUpload) {
       StorageQuotaChecker.QuotaCheckerResponse quotaResponse;
       try {
         quotaResponse = checkStorageQuota(indexDir, segmentMetadata, offlineTableConfig);

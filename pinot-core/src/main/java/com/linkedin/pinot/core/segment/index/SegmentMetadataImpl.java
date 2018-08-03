@@ -90,7 +90,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _segmentStartTime;
   private long _segmentEndTime;
 
- 
+
   /**
    * For segments on disk.
    * <p>Index directory passed in should be top level segment directory.

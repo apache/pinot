@@ -669,7 +669,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       if (forCommit) {
         return new SegmentBuildDescriptor(
-            destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENTION, _currentOffset,
+            destDir.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION, _currentOffset,
             null, buildTimeMillis, waitTimeMillis, segmentSizeBytes);
       }
       return new SegmentBuildDescriptor( null, _currentOffset, destDir.getAbsolutePath(),
