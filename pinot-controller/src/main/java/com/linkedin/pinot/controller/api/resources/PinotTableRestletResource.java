@@ -420,7 +420,9 @@ public class PinotTableRestletResource {
 
     // Check if it is a hybrid table or not. If not, there's no need to verify anything.
     if (tableConfigToCompare == null) {
-      LOGGER.info("Table: {} is not a hybrid table. Skip validating table configs.", rawTableName);
+      LOGGER.info(
+          "Table: {} is not a hybrid table. Skipping consistency check across realtime and offline parts of the table.",
+          rawTableName);
       return;
     }
 
@@ -429,7 +431,7 @@ public class PinotTableRestletResource {
 
     String newTimeColumnName = newSegmentConfig.getTimeColumnName();
     String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
-    if (!existingTimeColumnName.equalsIgnoreCase(newTimeColumnName)) {
+    if (!existingTimeColumnName.equals(newTimeColumnName)) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(
           String.format("Time column names are different! Existing time column name: %s. New time column name: %s",
               existingTimeColumnName, newTimeColumnName));
@@ -437,7 +439,7 @@ public class PinotTableRestletResource {
 
     String newTimeColumnType = newSegmentConfig.getTimeType();
     String existingTimeColumnType = SegmentConfigToCompare.getTimeType();
-    if (!existingTimeColumnType.equalsIgnoreCase(newTimeColumnType)) {
+    if (!existingTimeColumnType.equals(newTimeColumnType)) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(
           String.format("Time column types are different! Existing time column type: %s. New time column type: %s",
               existingTimeColumnType, newTimeColumnType));
