@@ -505,7 +505,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       AggregationFunction function = _aggregationFunctions.get(index);
       index++;
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
-          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _starTreeData.size(),
+          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getResultDataType(), _starTreeData.size(),
           function.getResultMaxByteSize());
       _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
     }
@@ -526,7 +526,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       for (int j = 0; j < metric.size(); j++) {
         AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(j);
         AggregationFunction function = _aggregationFunctions.get(j);
-        if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
+        if (function.getResultDataType().equals(FieldSpec.DataType.BYTES)) {
           ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(i,
               function.serialize(metric.get(j)));
         } else {

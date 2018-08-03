@@ -18,19 +18,20 @@ package com.linkedin.pinot.core.startree.v2;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 public class SumAggregationFunction implements AggregationFunction<Number, Double> {
 
   @Nonnull
   @Override
-  public String getName() {
-    return StarTreeV2Constant.AggregateFunctions.SUM;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.SUM;
   }
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDataType() {
+  public FieldSpec.DataType getResultDataType() {
     return FieldSpec.DataType.DOUBLE;
   }
 

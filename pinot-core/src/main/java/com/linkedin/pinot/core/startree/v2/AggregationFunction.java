@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.startree.v2;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 /**
@@ -30,13 +31,13 @@ public interface AggregationFunction<R, A> {
    * Get the name of an aggregation function.
    */
   @Nonnull
-  String getName();
+  AggregationFunctionType getType();
 
   /**
    * Get the return datatype of an aggregation function.
    */
   @Nonnull
-  FieldSpec.DataType getDataType();
+  FieldSpec.DataType getResultDataType();
 
   /**
    * Get length of longest Entry

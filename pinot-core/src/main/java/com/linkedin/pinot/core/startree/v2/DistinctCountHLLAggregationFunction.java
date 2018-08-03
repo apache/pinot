@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<Object, HyperLogLog> {
@@ -31,13 +32,13 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
 
   @Nonnull
   @Override
-  public String getName() {
-    return StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.DISTINCTCOUNTHLL;
   }
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDataType() {
+  public FieldSpec.DataType getResultDataType() {
     return FieldSpec.DataType.BYTES;
   }
 

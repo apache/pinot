@@ -199,7 +199,7 @@ public class OnHeapStarTreeV2IntegrationTest extends BaseStarTreeIndexTest {
       String s = pair.toColumnName();
       pairs.add(s);
       AggregationFunction function = factory.getAggregationFunction(pair.getFunctionType().getName());
-      _metricDataType.add(function.getDataType());
+      _metricDataType.add(function.getResultDataType());
     }
     return pairs;
   }

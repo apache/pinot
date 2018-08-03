@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.io.IOException;
 import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -24,13 +25,13 @@ public class CountAggregationFunction implements AggregationFunction<Number, Lon
 
   @Nonnull
   @Override
-  public String getName() {
-    return StarTreeV2Constant.AggregateFunctions.COUNT;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.COUNT;
   }
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDataType() {
+  public FieldSpec.DataType getResultDataType() {
     return FieldSpec.DataType.LONG;
   }
 

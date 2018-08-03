@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 public class PercentileTDigestAggregationFunction implements AggregationFunction<Number, TDigest> {
@@ -29,13 +30,13 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
 
   @Nonnull
   @Override
-  public String getName() {
-    return StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILETDIGEST;
   }
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDataType() {
+  public FieldSpec.DataType getResultDataType() {
     return FieldSpec.DataType.BYTES;
   }
 
