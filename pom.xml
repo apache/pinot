@@ -307,6 +307,11 @@
         <version>19.0</version>
       </dependency>
       <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>azure-data-lake-store-sdk</artifactId>
+        <version>2.1.5</version>
+      </dependency>
+      <dependency>
         <groupId>com.yammer.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>2.2.0</version>
