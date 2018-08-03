@@ -164,7 +164,6 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     // collecting all aggFunColObjects
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-        String columnName = pair.toColumnName();
         AggregationFunction function =
             _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 

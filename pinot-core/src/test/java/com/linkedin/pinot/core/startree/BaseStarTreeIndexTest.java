@@ -89,7 +89,7 @@ public abstract class BaseStarTreeIndexTest {
   /**
    * Helper method to compute the result using raw docs.
    */
-  private Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
+  protected Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
     FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
     Operator filterOperator;
     if (_numGroupByColumns > 0) {
@@ -104,7 +104,7 @@ public abstract class BaseStarTreeIndexTest {
   /**
    * Helper method to compute the result using aggregated docs.
    */
-  private Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
+  protected Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
     Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
     return compute(filterOperator);
   }
