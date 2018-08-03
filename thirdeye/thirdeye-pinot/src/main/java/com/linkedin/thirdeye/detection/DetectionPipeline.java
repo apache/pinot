@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -79,6 +80,7 @@ public abstract class DetectionPipeline {
     anomaly.setEndTime(slice.getEnd());
     anomaly.setMetric(metric.getName());
     anomaly.setCollection(metric.getDataset());
+    anomaly.setMetricUrn(MetricEntity.fromSlice(slice, 1.0).getUrn());
     anomaly.setDimensions(toFilterMap(slice.getFilters()));
     anomaly.setDetectionConfigId(this.config.getId());
     anomaly.setChildren(new HashSet<MergedAnomalyResultDTO>());

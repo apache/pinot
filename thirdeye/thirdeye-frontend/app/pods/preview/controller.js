@@ -1,4 +1,4 @@
-import { observer, computed, set, get } from '@ember/object';
+import { observer, computed, set, get, getProperties } from '@ember/object';
 import { later, debounce } from '@ember/runloop';
 import { reads, gt, or } from '@ember/object/computed';
 import { inject as service } from '@ember/service';
@@ -15,7 +15,10 @@ import {
   toFilterMap,
   appendFilters,
   dateFormatFull,
-  colorMapping
+  colorMapping,
+  stripTail,
+  extractTail,
+  toColor
 } from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/shared/eventTableColumns';
 import filterBarConfig from 'thirdeye-frontend/shared/filterBarConfig';
@@ -74,54 +77,86 @@ export default Controller.extend({
 
   colorMapping: colorMapping,
 
-  axis: computed('diagnosticsSeries', function () {
-    let base = {
-      y: {
-        show: true
-      },
-      y2: {
-        show: true
-      },
-      x: {
-        type: 'timeseries',
-        show: true,
-        tick: {
-          fit: false
-        }
+  axis: {
+    y: {
+      show: true
+    },
+    y2: {
+      show: false
+    },
+    x: {
+      type: 'timeseries',
+      show: true,
+      tick: {
+        fit: false
       }
-    };
-    return base;
-  }),
+    }
+  },
 
   zoom: {
     enabled: true,
     rescale: true
   },
 
-  anomaliesGrouped: computed('anomalies', function () {
-    const anomalies = get(this, 'anomalies');
-    if (_.isEmpty(anomalies)) {
-      return {};
-    }
+  legend: {
+    show: false
+  },
 
-    return this._groupByDimensions(anomalies);
+  anomalyMetricUrns: computed('anomalies', function () {
+    const anomalies = get(this, 'anomalies') || [];
+    const metricUrns = new Set(anomalies.map(anomaly => stripTail(anomaly.metricUrn)));
+
+    // TODO refactor this side-effect
+    this._fetchEntities(metricUrns)
+      .then(res => set(this, 'metricEntities', res));
+
+    return metricUrns;
   }),
 
-  anomaliesGroupedFormatted: computed('anomaliesGrouped', function () {
-    const output = {};
-    const anomaliesGrouped = get(this, 'anomaliesGrouped');
-    Object.keys(anomaliesGrouped).forEach(key => {
-      const anomalies = anomaliesGrouped[key];
-      const outputKey = `${key} (${anomalies.length})`;
-      let outputValue = anomalies.map(anomaly => this._formatAnomaly(anomaly)).sort();
+  metricEntities: null,
 
-      if (outputValue.length > 7) {
-        outputValue = _.slice(outputValue, 0, 3).concat(['...'], _.slice(outputValue, -3));
-      }
+  anomalyMetricEntities: computed('anomalyMetricUrns', 'metricEntities', function () {
+    const { anomalyMetricUrns, metricEntities } = getProperties(this, 'anomalyMetricUrns', 'metricEntities');
+    if (_.isEmpty(anomalyMetricUrns) || _.isEmpty(metricEntities)) { return []; }
+    return [...anomalyMetricUrns].filter(urn => urn in metricEntities).map(urn => metricEntities[urn]).sortBy('name');
+  }),
 
-      output[outputKey] = outputValue;
+  anomalyMetricUrnDimensions: computed('anomalies', function () {
+    const anomalies = get(this, 'anomalies');
+    const urn2dimensions = {};
+    anomalies.forEach(anomaly => {
+      const baseUrn = stripTail(anomaly.metricUrn);
+      urn2dimensions[baseUrn] = urn2dimensions[baseUrn] || new Set();
+      urn2dimensions[baseUrn].add(anomaly.metricUrn);
     });
-    return output;
+    return urn2dimensions;
+  }),
+
+  anomalyMetricUrnDimensionLabels: computed('anomalies', function () {
+    const anomalies = get(this, 'anomalies');
+    const metricUrns = new Set(anomalies.map(anomaly => anomaly.metricUrn));
+
+    const urn2count = {};
+    [...anomalies].forEach(anomaly => {
+      const urn = anomaly.metricUrn;
+      urn2count[urn] = (urn2count[urn] || 0) + 1;
+    });
+
+    const urn2labels = {};
+    [...metricUrns].forEach(urn => {
+      urn2labels[urn] = toFilters(urn).map(arr => arr[1]).join(", ") + ` (${urn2count[urn]})`;
+    });
+    return urn2labels;
+  }),
+
+  anomaliesByMetricUrn: computed('anomalies', function () {
+    const anomalies = get(this, 'anomalies');
+    const urn2anomalies = {};
+    anomalies.forEach(anomaly => {
+      const urn = anomaly.metricUrn;
+      urn2anomalies[urn] = (urn2anomalies[urn] || []).concat([anomaly]);
+    });
+    return urn2anomalies;
   }),
 
   series: computed(
@@ -132,50 +167,47 @@ export default Controller.extend({
     function () {
       const metricUrn = get(this, 'metricUrn');
       const anomalies = get(this, 'anomalies');
-      const anomaliesGrouped = get(this, 'anomaliesGrouped');
       const timeseries = get(this, 'timeseries');
       const baseline = get(this, 'baseline');
       const diagnosticsSeries = get(this, 'diagnosticsSeries');
 
       const series = {};
 
-      if (!_.isEmpty(anomaliesGrouped)) {
-        const filters = toFilters(metricUrn);
-        const key = this._makeKey(toFilterMap(filters));
+      if (!_.isEmpty(anomalies)) {
 
-        let anomaliesList = [];
-        if (_.isEmpty(key)) {
-          anomaliesList = anomalies;
-        } else if (!_.isEmpty(anomaliesGrouped[key])) {
-          anomaliesList = anomaliesGrouped[key];
-        }
-
-        anomaliesList.forEach(anomaly => {
-          series[this._formatAnomaly(anomaly)] = {
-            timestamps: [anomaly.startTime, anomaly.endTime],
-            values: [1, 1],
-            type: 'line',
-            color: 'teal',
-            axis: 'y2'
-          }
-        });
+        anomalies
+          .filter(anomaly => anomaly.metricUrn === metricUrn)
+          .forEach(anomaly => {
+            const key = this._formatAnomaly(anomaly);
+            series[key] = {
+              timestamps: [anomaly.startTime, anomaly.endTime],
+              values: [1, 1],
+              type: 'line',
+              color: 'teal',
+              axis: 'y2'
+            };
+            series[key + '-region'] = Object.assign({}, series[key], {
+              type: 'region',
+              color: 'orange'
+            });
+          });
       }
 
-      if (!_.isEmpty(timeseries)) {
+      if (timeseries && !_.isEmpty(timeseries.value)) {
         series['current'] = {
           timestamps: timeseries.timestamp,
           values: timeseries.value,
           type: 'line',
-          color: 'blue'
+          color: toColor(metricUrn)
         };
       }
 
-      if (!_.isEmpty(baseline)) {
+      if (baseline && !_.isEmpty(baseline.value)) {
         series['baseline'] = {
           timestamps: baseline.timestamp,
           values: baseline.value,
           type: 'line',
-          color: 'light-blue'
+          color: 'light-' + toColor(metricUrn)
         };
       }
 
@@ -219,15 +251,6 @@ export default Controller.extend({
 
   _filterAnomalies(rows) {
     return rows.filter(row => (row.startTime && row.endTime && !row.child));
-  },
-
-  _groupByDimensions(anomalies) {
-    const grouping = {};
-    anomalies.forEach(anomaly => {
-      const key = this._makeKey(anomaly.dimensions);
-      grouping[key] = (grouping[key] || []).concat([anomaly]);
-    });
-    return grouping;
   },
 
   _makeDiagnosticsSeries(path, key) {
@@ -315,6 +338,17 @@ export default Controller.extend({
       .catch(err => set(this, 'errorAnomalies', err));
   },
 
+  _fetchEntities(urns) {
+    const urnString = [...urns].join(',');
+    const url = `/rootcause/raw?framework=identity&urns=${urnString}`;
+    return fetch(url)
+      .then(checkStatus)
+      .then(res => res.reduce((agg, entity) => {
+        agg[entity.urn] = entity;
+        return agg;
+      }, {}));
+  },
+
   _writeDetectionConfig() {
     const detectionConfigBean = {
       name: get(this, 'detectionConfigName'),
@@ -349,6 +383,11 @@ export default Controller.extend({
 
       set(this, 'metricUrn', metricUrn);
 
+      this._fetchTimeseries();
+    },
+
+    onMetricLink(metricUrn) {
+      set(this, 'metricUrn', metricUrn);
       this._fetchTimeseries();
     },
 

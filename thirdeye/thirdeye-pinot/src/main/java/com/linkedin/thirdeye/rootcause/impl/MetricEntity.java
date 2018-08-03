@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
+import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
@@ -74,5 +75,9 @@ public class MetricEntity extends Entity {
     ParsedUrn parsedUrn = EntityUtils.parseUrnString(urn, TYPE, 3);
     long id = Long.parseLong(parsedUrn.getPrefixes().get(2));
     return new MetricEntity(urn, score, Collections.<Entity>emptyList(), id, parsedUrn.toFilters());
+  }
+
+  public static MetricEntity fromSlice(MetricSlice slice, double score) {
+    return fromMetric(score, slice.getMetricId(), slice.getFilters());
   }
 }

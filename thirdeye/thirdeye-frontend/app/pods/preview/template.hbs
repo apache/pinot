@@ -39,6 +39,7 @@
         colorMapping=colorMapping
         axis=axis
         zoom=zoom
+        legend=legend
       }}
     </div>
   </div>
@@ -73,14 +74,16 @@
       <p>{{errorTimeseries}}</p>
       <p>{{errorBaseline}}</p>
       <p>{{errorAnomalies}}</p>
-      {{#each-in anomaliesGroupedFormatted as | key anomalies |}}
-        <p>{{key}}</p>
-        <ul>
-        {{#each anomalies as | anomaly |}}
-          <li>{{anomaly}}</li>
-        {{/each}}
-        </ul>
-      {{/each-in}}
+      {{#each anomalyMetricEntities as | baseMetric |}}
+        <p>
+          <a {{action "onMetricLink" baseMetric.urn}}>{{baseMetric.label}}</a>
+          <ol>
+          {{#each (get-safe anomalyMetricUrnDimensions baseMetric.urn) as | metric |}}
+            <li><a {{action "onMetricLink" metric}}>{{get-safe anomalyMetricUrnDimensionLabels metric}}</a></li>
+          {{/each}}
+          </ol>
+        </p>
+      {{/each}}
     </div>
   </div>
 </div>
