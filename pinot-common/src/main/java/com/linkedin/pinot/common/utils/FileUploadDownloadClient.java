@@ -359,11 +359,11 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   /**
-   * Upload segment with segment file.
+   * Upload segment by sending a zip of creation.meta and metadata.properties.
    *
    * @param uri URI
    * @param segmentName Segment name
-   * @param segmentFile Segment file
+   * @param segmentMetadataFile Segment metadata file
    * @param headers Optional http headers
    * @param parameters Optional query parameters
    * @param socketTimeoutMs Socket timeout in milliseconds
@@ -371,9 +371,9 @@ public class FileUploadDownloadClient implements Closeable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SimpleHttpResponse uploadSegmentMetadata(URI uri, String segmentName, File segmentFile, @Nullable List<Header> headers,
+  public SimpleHttpResponse uploadSegmentMetadata(URI uri, String segmentName, File segmentMetadataFile, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
-    return sendRequest(getUploadSegmentMetadataRequest(uri, segmentName, segmentFile, headers, parameters, socketTimeoutMs));
+    return sendRequest(getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs));
   }
 
 

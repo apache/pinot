@@ -263,7 +263,7 @@ public class PinotSegmentUploadRestletResource {
   /**
    * Will upload a Pinot segment without sending the file through the controller. If data is stored on a separate
    * filesystem, eg: HDFS or Azure, and the segment file is already in its final location, users can call this method
-   * to change the state in zk.
+   * to change the state in zk. Note that the multipart file will be a zip of metadata.properties and creation.meta.
    * @param multiPart
    * @param enableParallelPushProtection
    * @param headers
@@ -401,7 +401,7 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private File getFileFromMultipart(FormDataMultiPart multiPart, File dstFile) throws IOException {
-    // Read segment metadata file and directly use that information to update zk
+    // Read segment file or segment metadata file and directly use that information to update zk
     Map<String, List<FormDataBodyPart>> segmentMetadataMap = multiPart.getFields();
     if (!validateMultiPart(segmentMetadataMap, null)) {
       throw new ControllerApplicationException(LOGGER, "Invalid multi-part form for segment metadata", Response.Status.BAD_REQUEST);
@@ -506,7 +506,7 @@ public class PinotSegmentUploadRestletResource {
       LOGGER.info("Adding new segment: {}", segmentName);
       if (downloadUrl == null) {
         try {
-          // Current segment URI has been copied to local
+          // Assumes local implementation because downloadUrl should be set in a header for non-local implementations
           downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile.toURI());
         } catch (Exception e) {
           LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, rawTableName);
@@ -622,6 +622,7 @@ public class PinotSegmentUploadRestletResource {
     PinotFS pinotFS = new PinotFSFactory(_controllerConf).create(srcUri);
     // The move will overwrite current segment file
     pinotFS.move(srcUri, tarredSegmentFile.toURI());
+    LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, srcUri.getPath(), tarredSegmentFile.getAbsolutePath());
     return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
   }
 
