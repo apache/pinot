@@ -555,7 +555,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     JSONArray routingTableSnapshot = new JSONArray();
 
     for (String currentTable : _routingTableBuilderMap.keySet()) {
-      if (tableName == null || currentTable.startsWith(tableName)) {
+      if (tableName == null || tableName.equals(TableNameBuilder.extractRawTableName(currentTable))) {
         JSONObject tableEntry = new JSONObject();
         tableEntry.put("tableName", currentTable);
 
