@@ -132,10 +132,7 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
       GenericRow currentRow = genericRowComparable.getRow();
 
       // Fill reuse with the information from the currentRow
-      reuse.clear();
-      for (Map.Entry<String, Object> entry : currentRow.getEntrySet()) {
-        reuse.putField(entry.getKey(), entry.getValue());
-      }
+      RecordReaderUtils.copyRow(currentRow, reuse);
 
       // If the record reader has more rows left, put back the next minimum value to the queue
       PinotSegmentRecordReader recordReader = genericRowComparable.getRecordReader();
