@@ -67,7 +67,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>1.4.1</version>
+        <version>3.0.0-M2</version>
         <executions>
           <execution>
             <id>enforcer-rules-warning</id>
@@ -76,8 +76,7 @@
             </goals>
             <phase>validate</phase>
             <configuration>
-              <fail>false</fail>
-              <skip>true</skip>
+              <skip>false</skip>
               <rules>
                 <dependencyConvergence/>
               </rules>
