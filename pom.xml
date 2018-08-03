@@ -726,12 +726,6 @@
         <version>2.5.4</version>
       </dependency>
       <dependency>
-        <groupId>com.sun.jersey</groupId>
-        <artifactId>jersey-client</artifactId>
-        <version>1.19.2</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
         <groupId>io.swagger</groupId>
         <artifactId>swagger-jaxrs</artifactId>
         <version>${swagger.version}</version>
