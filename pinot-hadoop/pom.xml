@@ -59,29 +59,6 @@
               </execution>
             </executions>
           </plugin>
-          <!--<plugin>
-            <artifactId>maven-clean-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>post-integration-test</phase>
-                <goals>
-                  <goal>clean</goal>
-                </goals>
-                <configuration>
-                  <excludeDefaultDirectories>true</excludeDefaultDirectories>
-                  <filesets>
-                    <fileset>
-                      <directory>target/</directory>
-                      <followSymlinks>false</followSymlinks>
-                      <includes>
-                        <include>*shaded.jar</include>
-                      </includes>
-                    </fileset>
-                  </filesets>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>-->
         </plugins>
       </build>
     </profile>
@@ -105,7 +82,7 @@
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
-      <classifier>shaded</classifier>
+      <!--<classifier>shaded</classifier>-->
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>

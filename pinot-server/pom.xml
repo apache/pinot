@@ -265,12 +265,6 @@
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>com.sun.jersey</groupId>
-      <artifactId>jersey-client</artifactId>
-      <version>1.19.2</version>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
   <build>
     <plugins>
