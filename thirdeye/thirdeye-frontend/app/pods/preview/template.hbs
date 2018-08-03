@@ -44,9 +44,30 @@
     </div>
   </div>
   <div class="row">
-    <div class="col-xs-12">
-      <label>diagnostics path</label>{{input value=diagnosticsPath}}
-      <label>value key</label>{{input value=diagnosticsKey}}
+    <div class="col-xs-4">
+      <label>diagnostics path</label>
+      {{#power-select
+        selected=diagnosticsPath
+        options=diagnosticsPathOptions
+        searchEnabled=false
+        triggerId="select-diagnostics-path"
+        onchange=(action "onDiagnosticsPath")
+      as |path|
+      }}
+        {{path}}
+      {{/power-select}}
+    </div>
+    <div class="col-xs-4">
+      <label>value key</label>
+      {{#power-select-multiple
+        selected=diagnosticsValues
+        options=diagnosticsValueOptions
+        triggerId="select-diagnostics-values"
+        onchange=(action "onDiagnosticsValues")
+      as |value|
+      }}
+        {{value}}
+      {{/power-select-multiple}}
     </div>
 
   </div>

@@ -47,7 +47,7 @@ export default Controller.extend({
 
   diagnosticsPath: null,
 
-  diagnosticsValue: null,
+  diagnosticsValues: null,
 
   timeseries: null,
 
@@ -218,17 +218,17 @@ export default Controller.extend({
   diagnosticsSeries: computed(
     'diagnostics',
     'diagnosticsPath',
-    'diagnosticsKey',
+    'diagnosticsValues',
     function () {
       const diagnosticsPath = get(this, 'diagnosticsPath');
-      const diagnosticsKeys = (get(this, 'diagnosticsKey') || '').split(',');
+      const diagnosticsValues = get(this, 'diagnosticsValues') || [];
 
       const series = {};
 
-      diagnosticsKeys.forEach(key => {
-        const diagnostics = this._makeDiagnosticsSeries(diagnosticsPath, key);
+      diagnosticsValues.forEach(value => {
+        const diagnostics = this._makeDiagnosticsSeries(diagnosticsPath, value);
         if (!_.isEmpty(diagnostics)) {
-          series[`diagnostics-${key}`] = diagnostics;
+          series[`diagnostics-${value}`] = diagnostics;
         }
       });
 
@@ -240,6 +240,33 @@ export default Controller.extend({
       return series;
     }
   ),
+
+  diagnosticsPathOptions: computed('diagnostics', function () {
+    const diagnostics = get(this, 'diagnostics');
+    return this._makePaths('', diagnostics);
+  }),
+
+  diagnosticsValueOptions: computed('diagnostics', 'diagnosticsPath', function () {
+    const diagnosticsPath = get(this, 'diagnosticsPath');
+    const diagnostics = get(this, 'diagnostics.' + diagnosticsPath);
+    if (_.isEmpty(diagnostics)) { return []; }
+    return Object.keys(diagnostics.data);
+  }),
+
+  _makePaths(prefix, diagnostics) {
+    if (_.isEmpty(diagnostics)) { return []; }
+
+    const directPaths = Object.keys(diagnostics)
+      .filter(key => key.startsWith('thirdeye:metric:'))
+      .map(key => prefix + `${key}`);
+
+    const nestedPaths = Object.keys(diagnostics)
+      .filter(key => !key.startsWith('thirdeye:metric:'))
+      .map(key => this._makePaths(`${prefix}${key}.`, diagnostics[key]))
+      .reduce((agg, paths) => agg.concat(paths), []);
+
+    return directPaths.concat(nestedPaths);
+  },
 
   _makeKey(dimensions) {
     return Object.values(dimensions).join(', ')
@@ -279,12 +306,21 @@ export default Controller.extend({
 
       const out = {};
       changepoints.forEach((p, i) => {
-        out[i] = {
+        out[`changepoint-${i}`] = {
+          timestamps: [p, p + 1],
+          values: [1, 0],
+          type: 'line',
+          color: 'red',
+          axis: 'y2'
+        };
+
+        out[`changepoint-${i}-region`] = {
           timestamps: [p, p + 3600000 * 24],
           values: [1, 1],
           type: 'region',
-          color: 'red'
-        }
+          color: 'red',
+          axis: 'y2'
+        };
       });
 
       return out;
@@ -389,6 +425,13 @@ export default Controller.extend({
     onMetricLink(metricUrn) {
       set(this, 'metricUrn', metricUrn);
       this._fetchTimeseries();
+
+      // select matching diagnostics
+      const diagnosticsPathOptions = get(this, 'diagnosticsPathOptions');
+      const candidate = diagnosticsPathOptions.find(path => path.includes(metricUrn));
+      if (!_.isEmpty(candidate)) {
+        set(this, 'diagnosticsPath', candidate);
+      }
     },
 
     onCompareMode(compareMode) {
@@ -397,6 +440,14 @@ export default Controller.extend({
       set(this, 'compareMode', compareMode);
 
       this._fetchTimeseries();
+    },
+
+    onDiagnosticsPath(diagnosticsPath) {
+      set(this, 'diagnosticsPath', diagnosticsPath);
+    },
+
+    onDiagnosticsValues(diagnosticsValues) {
+      set(this, 'diagnosticsValues', diagnosticsValues);
     },
 
     onSave() {

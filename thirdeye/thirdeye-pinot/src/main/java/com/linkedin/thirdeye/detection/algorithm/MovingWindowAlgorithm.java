@@ -247,26 +247,26 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
         if (!Double.isNaN(this.kernelMin)) {
           BooleanSeries violations = smooth.lt(this.kernelMin).append(smoothPadding);
-          BooleanSeries halfViolations = smooth.lt(this.kernelMin / 2).append(smoothPadding);
-          anomalyRangeHelper(df, violations, halfViolations);
+          BooleanSeries partialViolations = smooth.lt(this.kernelMin / 3).append(smoothPadding);
+          anomalyRangeHelper(df, violations, partialViolations);
         }
 
         if (!Double.isNaN(this.kernelMax)) {
           BooleanSeries violations = smooth.gt(this.kernelMax).append(smoothPadding);
-          BooleanSeries halfViolations = smooth.gt(this.kernelMax / 2).append(smoothPadding);
-          anomalyRangeHelper(df, violations, halfViolations);
+          BooleanSeries partialViolations = smooth.gt(this.kernelMax / 3).append(smoothPadding);
+          anomalyRangeHelper(df, violations, partialViolations);
         }
 
         if (!Double.isNaN(this.kernelSumMin)) {
           BooleanSeries violations = kernelSum.lt(this.kernelSumMin);
-          BooleanSeries halfViolations = kernelSum.lt(this.kernelSumMin / 2);
-          anomalyRangeHelper(df, violations, halfViolations);
+          BooleanSeries partialViolations = kernelSum.lt(this.kernelSumMin / 3);
+          anomalyRangeHelper(df, violations, partialViolations);
         }
 
         if (!Double.isNaN(this.kernelSumMax)) {
           BooleanSeries violations = kernelSum.gt(this.kernelSumMax);
-          BooleanSeries halfViolations = kernelSum.gt(this.kernelSumMax / 2);
-          anomalyRangeHelper(df, violations, halfViolations);
+          BooleanSeries partialViolations = kernelSum.gt(this.kernelSumMax / 3);
+          anomalyRangeHelper(df, violations, partialViolations);
         }
 
         sAnomaly = df.getBooleans(COL_ANOMALY).values();
@@ -292,11 +292,11 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
    *
    * @param df data frame
    * @param violations boolean series of violations
-   * @param halfViolations boolean series of half violations for expansion
+   * @param partialViolations boolean series of partial violations for expansion
    * @return modified data frame
    */
-  static DataFrame anomalyRangeHelper(DataFrame df, BooleanSeries violations, BooleanSeries halfViolations) {
-    df.addSeries(COL_VIOLATION, expandViolation(violations, halfViolations).fillNull());
+  static DataFrame anomalyRangeHelper(DataFrame df, BooleanSeries violations, BooleanSeries partialViolations) {
+    df.addSeries(COL_VIOLATION, expandViolation(violations, partialViolations).fillNull());
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_ANOMALY, COL_VIOLATION);
     df.dropSeries(COL_VIOLATION);
     return df;
