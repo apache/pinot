@@ -439,7 +439,7 @@ public class PinotTableRestletResource {
 
     String newTimeColumnType = newSegmentConfig.getTimeType();
     String existingTimeColumnType = SegmentConfigToCompare.getTimeType();
-    if (!existingTimeColumnType.equals(newTimeColumnType)) {
+    if (!existingTimeColumnType.equalsIgnoreCase(newTimeColumnType)) {
       throw new PinotHelixResourceManager.InvalidTableConfigException(
           String.format("Time column types are different! Existing time column type: %s. New time column type: %s",
               existingTimeColumnType, newTimeColumnType));
