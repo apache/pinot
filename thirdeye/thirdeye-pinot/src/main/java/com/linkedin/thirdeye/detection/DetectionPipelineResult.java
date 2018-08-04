@@ -7,6 +7,9 @@ import java.util.Map;
 
 
 public class DetectionPipelineResult {
+  public static String DIAGNOSTICS_DATA = "data";
+  public static String DIAGNOSTICS_CHANGE_POINTS = "changepoints";
+
   Map<String, Object> diagnostics;
   List<MergedAnomalyResultDTO> anomalies;
   long lastTimestamp;

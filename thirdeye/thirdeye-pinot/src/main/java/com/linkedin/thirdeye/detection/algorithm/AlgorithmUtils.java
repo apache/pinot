@@ -183,6 +183,58 @@ public class AlgorithmUtils {
   }
 
   /**
+   * Determines change points based on robust mean window
+   *
+   * @param df time series
+   * @param windowSize robust mean window size
+   * @param minDuration time series
+   * @return change points
+   */
+  public static TreeSet<Long> getChangePointsRobustMean(DataFrame df, int windowSize, Duration minDuration) {
+    if (df.isEmpty()) {
+      return new TreeSet<>();
+    }
+
+    LongSeries time = df.getLongs(COL_TIME);
+    DoubleSeries value = robustMean(df.getDoubles(COL_VALUE), windowSize);
+
+    TreeSet<Long> changePoints = new TreeSet<>();
+
+    int lastChange = 0;
+    int runStart = 0;
+    int runSide = 0;
+    for (int i = 0; i < df.size(); i++) {
+      if (!value.isNull(i) && lastChange < i) {
+        DoubleSeries medianSeries = value.slice(lastChange, i).median();
+
+        if (medianSeries.allNull()) {
+          continue;
+        }
+
+        double median = medianSeries.doubleValue();
+        double val = value.getDouble(i);
+
+        int side = Double.compare(val, median);
+
+        // run side changed or last run
+        if (runSide != side || i >= df.size() - 1) {
+          long past = time.getLong(runStart);
+          long now = time.getLong(i);
+          long runDuration = now - past;
+          if (runDuration >= minDuration.getMillis()) {
+            lastChange = runStart;
+            changePoints.add(past);
+          }
+          runStart = i;
+          runSide = side;
+        }
+      }
+    }
+
+    return changePoints;
+  }
+
+  /**
    * Helper for simulating B-spline with moving averages.
    *
    * @param s double series
@@ -263,9 +315,10 @@ public class AlgorithmUtils {
    *
    * @param dfTimeseries time series dataframe
    * @param changePoints set of change points
+   * @param lookForward look forward period for segment adjustment
    * @return re-scaled time series
    */
-  public static DataFrame getRescaledSeries(DataFrame dfTimeseries, Collection<Long> changePoints) {
+  public static DataFrame getRescaledSeries(DataFrame dfTimeseries, Collection<Long> changePoints, long lookForward) {
     if (dfTimeseries.isEmpty()) {
       return dfTimeseries;
     }
@@ -290,7 +343,8 @@ public class AlgorithmUtils {
     // compute median
     List<Double> medians = new ArrayList<>();
     for (DataFrame segment : segments) {
-      medians.add(segment.getDoubles(COL_VALUE).median().doubleValue());
+      long start = segment.getLong(COL_TIME, 0);
+      medians.add(segment.filter(segment.getLongs(COL_TIME).lt(start + lookForward)).dropNull(COL_TIME).getDoubles(COL_VALUE).median().doubleValue());
     }
 
     // rescale time series

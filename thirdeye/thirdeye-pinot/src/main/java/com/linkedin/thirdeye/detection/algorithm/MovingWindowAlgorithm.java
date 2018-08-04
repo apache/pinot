@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -27,6 +28,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +39,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
+import sun.reflect.generics.tree.Tree;
 
 
 public class MovingWindowAlgorithm extends StaticDetectionPipeline {
@@ -77,6 +80,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private final Baseline baseline;
   private final DateTimeZone timezone;
   private final Period changeDuration;
+  private final double changeFraction;
 
   private final long effectiveStartTime;
 
@@ -103,6 +107,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.windowSize = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "windowSize", "1week"));
     this.minLookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "minLookback", "1day"));
     this.changeDuration = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "5days"));
+    this.changeFraction = MapUtils.getDoubleValue(config.getProperties(), "changeFraction", 0.666);
 
     int baselineWeeks = MapUtils.getIntValue(config.getProperties(), "baselineWeeks", 0);
     BaselineAggregateType baselineType = BaselineAggregateType.valueOf(MapUtils.getString(config.getProperties(), "baselineType", "MEDIAN"));
@@ -152,33 +157,97 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
     Collection<MergedAnomalyResultDTO> existingAnomalies = data.getAnomalies().get(this.anomalySlice);
 
-    // change point rescaling
-    TreeSet<Long> changePoints = getChangePoints(df, existingAnomalies);
-    df = AlgorithmUtils.getRescaledSeries(df, changePoints);
+    // pre-detection change points
+    TreeSet<Long> changePoints = getChangePoints(df, this.effectiveStartTime, existingAnomalies);
+
+    // populate pre-existing anomalies
+    DataFrame dfInput = applyExistingAnomalies(df, existingAnomalies);
+
+    // write-through arrays
+    dfInput.addSeries(COL_MEAN, DoubleSeries.nulls(df.size()));
+    dfInput.addSeries(COL_STD, DoubleSeries.nulls(df.size()));
+    dfInput.addSeries(COL_ZSCORE, DoubleSeries.nulls(df.size()));
+    dfInput.addSeries(COL_QUANTILE_MIN, DoubleSeries.nulls(df.size()));
+    dfInput.addSeries(COL_QUANTILE_MAX, DoubleSeries.nulls(df.size()));
+    dfInput.addSeries(COL_KERNEL, DoubleSeries.nulls(df.size()));
+    dfInput.addSeries(COL_KERNEL_SUM, DoubleSeries.zeros(df.size()));
+    dfInput.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
+    dfInput.addSeries(COL_OUTLIER, BooleanSeries.fillValues(df.size(), false));
+
+    // generate detection time series
+    Result result = this.run(dfInput, this.effectiveStartTime, changePoints);
+
+    List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.sliceDetection, result.data, COL_ANOMALY);
+
+    Map<String, Object> diagnostics = new HashMap<>();
+    diagnostics.put(DetectionPipelineResult.DIAGNOSTICS_DATA, result.data.dropAllNullColumns());
+    diagnostics.put(DetectionPipelineResult.DIAGNOSTICS_CHANGE_POINTS, result.changePoints);
+
+    return new DetectionPipelineResult(anomalies)
+        .setDiagnostics(diagnostics);
+  }
+
+  /**
+   * Run anomaly detection from a given start timestamp
+   *
+   * @param df raw input data
+   * @param start start time stamp
+   * @param changePoints set of change points
+   * @return detection result
+   * @throws Exception
+   */
+  private Result run(DataFrame df, long start, TreeSet<Long> changePoints) throws Exception {
+    DoubleSeries originalValue = df.getDoubles(COL_VALUE);
+
+    DataFrame dfValue = AlgorithmUtils.getRescaledSeries(df, changePoints, this.changeDuration.toStandardDuration().getMillis());
 
     // relative baseline
     if (this.baseline != null) {
-      df = makeRelativeTimeseries(df, this.baseline, this.sliceData);
+      dfValue = makeRelativeTimeseries(dfValue, this.baseline, this.sliceData);
     }
 
-    // populate pre-existing anomalies
-    df = applyExistingAnomalies(df, existingAnomalies);
+    df.addSeries(dfValue, COL_VALUE);
 
     // write-through arrays
-    double[] sMean = df.addSeries(COL_MEAN, DoubleSeries.nulls(df.size())).getDoubles(COL_MEAN).values();
-    double[] sStd = df.addSeries(COL_STD, DoubleSeries.nulls(df.size())).getDoubles(COL_STD).values();
-    double[] sZscore = df.addSeries(COL_ZSCORE, DoubleSeries.nulls(df.size())).getDoubles(COL_ZSCORE).values();
-    double[] sQuantileMin = df.addSeries(COL_QUANTILE_MIN, DoubleSeries.nulls(df.size())).getDoubles(COL_QUANTILE_MIN).values();
-    double[] sQuantileMax = df.addSeries(COL_QUANTILE_MAX, DoubleSeries.nulls(df.size())).getDoubles(COL_QUANTILE_MAX).values();
-    double[] sKernel = df.addSeries(COL_KERNEL, DoubleSeries.nulls(df.size())).getDoubles(COL_KERNEL).values();
-    double[] sKernelSum = df.addSeries(COL_KERNEL_SUM, DoubleSeries.zeros(df.size())).getDoubles(COL_KERNEL_SUM).values();
-    byte[] sAnomaly = df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false)).getBooleans(COL_ANOMALY).values();
-    byte[] sOutlier = df.addSeries(COL_OUTLIER, BooleanSeries.fillValues(df.size(), false)).getBooleans(COL_OUTLIER).values();
+    double[] sMean = df.getDoubles(COL_MEAN).values();
+    double[] sStd = df.getDoubles(COL_STD).values();
+    double[] sZscore = df.getDoubles(COL_ZSCORE).values();
+    double[] sQuantileMin = df.getDoubles(COL_QUANTILE_MIN).values();
+    double[] sQuantileMax = df.getDoubles(COL_QUANTILE_MAX).values();
+    double[] sKernel = df.getDoubles(COL_KERNEL).values();
+    double[] sKernelSum = df.getDoubles(COL_KERNEL_SUM).values();
+    byte[] sAnomaly = df.getBooleans(COL_ANOMALY).values();
+    byte[] sOutlier = df.getBooleans(COL_OUTLIER).values();
 
-    List<Long> timestamps = df.getLongs(COL_TIME).filter(df.getLongs(COL_TIME).between(this.effectiveStartTime, this.endTime)).dropNull().toList();
+    // scan
+    List<Long> timestamps = df.getLongs(COL_TIME).filter(df.getLongs(COL_TIME).between(start, this.endTime)).dropNull().toList();
     for (long timestamp : timestamps) {
 
-      // variable window size. manual iteration required.
+      //
+      // test for intra-detection change points
+      //
+      long candidateTimestamp = new DateTime(timestamp, this.timezone).minus(this.changeDuration).getMillis();
+      Long latestChangePoint = changePoints.floor(timestamp);
+
+      DataFrame changePointWindow = df.filter(df.getLongs(COL_TIME).between(candidateTimestamp, timestamp)).dropNull(COL_TIME);
+
+      long minChangePoint = latestChangePoint == null ? candidateTimestamp : new DateTime(latestChangePoint, this.timezone).plus(this.changeDuration).getMillis();
+      double anomalyFraction = extractAnomalyFraction(changePointWindow, candidateTimestamp);
+
+      if (anomalyFraction >= this.changeFraction && candidateTimestamp >= minChangePoint) {
+        // TODO only inject non-processed values for next run
+        DataFrame dfNew = new DataFrame(df).addSeries(COL_VALUE, originalValue);
+
+        TreeSet<Long> changePointsNew = new TreeSet<>(changePoints);
+        changePointsNew.add(candidateTimestamp);
+        System.out.println("change point during execution at " + timestamp + " for " + this.sliceData);
+
+        return this.run(dfNew, timestamp, changePointsNew);
+      }
+
+      //
+      // variable look back window size. manual iteration required.
+      //
       DataFrame window = this.makeWindow(df, timestamp, changePoints);
       if (window.size() <= 1) {
         continue;
@@ -277,14 +346,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       sOutlier = df.getBooleans(COL_OUTLIER).values();
     }
 
-    List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.sliceDetection, df, COL_ANOMALY);
-
-    Map<String, Object> diagnostics = new HashMap<>();
-    diagnostics.put("data", df.dropAllNullColumns());
-    diagnostics.put("changepoints", changePoints);
-
-    return new DetectionPipelineResult(anomalies)
-        .setDiagnostics(diagnostics);
+    return new Result(df, changePoints);
   }
 
   /**
@@ -303,40 +365,40 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   }
 
   /**
-   * Expand violation ranges via the half-violation threshold.
+   * Expand violation ranges via the partial-violation threshold.
    *
    * @param violation boolean series of violations
-   * @param halfViolation boolean series of half violations
+   * @param partialViolation boolean series of partial violations
    * @return boolean series of expanded violations
    */
-  static BooleanSeries expandViolation(BooleanSeries violation, BooleanSeries halfViolation) {
-    if (violation.size() != halfViolation.size()) {
+  static BooleanSeries expandViolation(BooleanSeries violation, BooleanSeries partialViolation) {
+    if (violation.size() != partialViolation.size()) {
       throw new IllegalArgumentException("Series must be of equal size");
     }
 
     // TODO max lookback/forward range for performance
 
     byte[] full = violation.values();
-    byte[] half = halfViolation.values();
+    byte[] partial = partialViolation.values();
     byte[] output = new byte[full.length];
 
-    int lastHalf = -1;
+    int lastPartial = -1;
     for (int i = 0; i < violation.size(); i++) {
-      if (lastHalf >= 0 && BooleanSeries.isFalse(half[i])) {
-        lastHalf = -1;
+      if (lastPartial >= 0 && BooleanSeries.isFalse(partial[i])) {
+        lastPartial = -1;
       }
 
-      if (lastHalf < 0 && BooleanSeries.isTrue(half[i])) {
-        lastHalf = i;
+      if (lastPartial < 0 && BooleanSeries.isTrue(partial[i])) {
+        lastPartial = i;
       }
 
       if (full[i] > 0) {
         // half[i] must be 1 here
 
-        int j = lastHalf;
+        int j = lastPartial;
 
-        for (; j < full.length && !BooleanSeries.isFalse(half[j]); j++) {
-          if (!BooleanSeries.isNull(half[j])) {
+        for (; j < full.length && !BooleanSeries.isFalse(partial[j]); j++) {
+          if (!BooleanSeries.isNull(partial[j])) {
             output[j] = 1;
           }
         }
@@ -347,6 +409,33 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     }
 
     return BooleanSeries.buildFrom(output);
+  }
+
+  /**
+   * Extract the anomaly fraction for a given time range
+   *
+   * @param window data frame
+   * @param minTimestamp minimum timestamp to consider
+   * @return fraction of anomaly period compared to overall period
+   */
+  static double extractAnomalyFraction(DataFrame window, long minTimestamp) {
+    long[] timestamp = window.getLongs(COL_TIME).values();
+    byte[] anomaly = window.getBooleans(COL_ANOMALY).values();
+
+    int total = 0;
+    int count = 0;
+    for (int i = window.size() - 1; i >= 0; i--) {
+      if (!LongSeries.isNull(timestamp[i]) && !BooleanSeries.isNull(anomaly[i])) {
+        if (timestamp[i] < minTimestamp) {
+          break;
+        }
+
+        total += 1;
+        count += BooleanSeries.isTrue(anomaly[i]) ? 1 : 0;
+      }
+    }
+
+    return count / (double) total;
   }
 
   /**
@@ -386,7 +475,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     joined.addSeries(dfBase, COL_BASE);
     joined.addSeries(COL_VALUE, joined.getDoubles(COL_CURR).subtract(joined.get(COL_BASE)));
 
-    return joined.dropNull();
+    return joined.dropNull(COL_TIME, COL_VALUE);
   }
 
   /**
@@ -395,7 +484,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
    * @param df data
    * @return set of change points
    */
-  TreeSet<Long> getChangePoints(DataFrame df, Collection<MergedAnomalyResultDTO> anomalies) {
+  TreeSet<Long> getChangePoints(DataFrame df, long start, Collection<MergedAnomalyResultDTO> anomalies) {
     TreeSet<Long> changePoints = new TreeSet<>();
 
     // from time series
@@ -404,12 +493,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       Baseline baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, 1, this.timezone);
       DataFrame diffSeries = makeRelativeTimeseries(df, baseline, this.sliceData);
 
-      final int kernelOffset = -1 * this.kernelSize / 2;
-
-      DataFrame smooth = new DataFrame(diffSeries)
-        .addSeries(COL_VALUE, AlgorithmUtils.robustMean(diffSeries.getDoubles(COL_VALUE), this.kernelSize).fillNullBackward().shift(kernelOffset));
-
-      changePoints.addAll(AlgorithmUtils.getChangePoints(smooth, this.changeDuration.toStandardDuration()));
+      // less than or equal to start only
+      changePoints.addAll(AlgorithmUtils.getChangePointsRobustMean(diffSeries, this.kernelSize, this.changeDuration.toStandardDuration()).headSet(start, true));
     }
 
     // from anomalies
@@ -479,5 +564,15 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     Set<String> names = new HashSet<>(Arrays.asList(seriesNames));
     names.retainAll(df.getSeriesNames());
     return names.toArray(new String[names.size()]);
+  }
+
+  final class Result {
+    final DataFrame data;
+    final TreeSet<Long> changePoints;
+
+    public Result(DataFrame data, TreeSet<Long> changePoints) {
+      this.data = data;
+      this.changePoints = changePoints;
+    }
   }
 }

@@ -69,6 +69,6 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
     return new DetectionPipelineResult(anomalies)
-        .setDiagnostics(Collections.singletonMap("data", (Object) df.dropAllNullColumns()));
+        .setDiagnostics(Collections.singletonMap(DetectionPipelineResult.DIAGNOSTICS_DATA, (Object) df.dropAllNullColumns()));
   }
 }

@@ -76,21 +76,21 @@ public class AlgorithmUtilsTest {
     Assert.assertNotNull(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).higher(86400000L * 2));
   }
 
-  @Test
-  public void testRescaleNoData() {
-    Assert.assertTrue(AlgorithmUtils.getRescaledSeries(new DataFrame(), new HashSet<Long>()).isEmpty());
-  }
-
-  @Test
-  public void testRescaleNone() {
-    Assert.assertEquals(AlgorithmUtils.getRescaledSeries(this.data, new HashSet<Long>()), this.data);
-  }
-
-  @Test
-  public void testRescale() {
-    Set<Long> changePoints = new HashSet<>(Arrays.asList(86400000L, 86400000L * 3));
-    Assert.assertTrue(equals(AlgorithmUtils.getRescaledSeries(this.outlierData, changePoints), this.data, 50));
-  }
+//  @Test
+//  public void testRescaleNoData() {
+//    Assert.assertTrue(AlgorithmUtils.getRescaledSeries(new DataFrame(), new HashSet<Long>()).isEmpty());
+//  }
+//
+//  @Test
+//  public void testRescaleNone() {
+//    Assert.assertEquals(AlgorithmUtils.getRescaledSeries(this.data, new HashSet<Long>()), this.data);
+//  }
+//
+//  @Test
+//  public void testRescale() {
+//    Set<Long> changePoints = new HashSet<>(Arrays.asList(86400000L, 86400000L * 3));
+//    Assert.assertTrue(equals(AlgorithmUtils.getRescaledSeries(this.outlierData, changePoints), this.data, 50));
+//  }
 
   @Test
   public void testFastBSplineNoData() {
