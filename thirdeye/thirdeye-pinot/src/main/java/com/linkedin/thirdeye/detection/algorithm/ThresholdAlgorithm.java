@@ -36,7 +36,7 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
     this.max = MapUtils.getDoubleValue(config.getProperties(), "max", Double.NaN);
 
     String metricUrn = MapUtils.getString(config.getProperties(), "metricUrn");
-    MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
     this.slice = MetricSlice.from(me.getId(), this.startTime, this.endTime, me.getFilters());
   }
 

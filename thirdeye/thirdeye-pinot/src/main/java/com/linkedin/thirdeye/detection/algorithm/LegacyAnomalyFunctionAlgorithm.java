@@ -74,7 +74,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
     anomalyFunction.init(OBJECT_MAPPER.readValue(specs, AnomalyFunctionDTO.class));
     dataFilter = DataFilterFactory.fromSpec(anomalyFunction.getSpec().getDataFilter());
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    metricEntity = MetricEntity.fromURN(metricUrn, 1.0);
+    this.metricEntity = MetricEntity.fromURN(this.metricUrn);
   }
 
   @Override

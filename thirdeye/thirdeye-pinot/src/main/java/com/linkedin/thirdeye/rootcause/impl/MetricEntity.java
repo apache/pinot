@@ -77,6 +77,10 @@ public class MetricEntity extends Entity {
     return new MetricEntity(urn, score, Collections.<Entity>emptyList(), id, parsedUrn.toFilters());
   }
 
+  public static MetricEntity fromURN(String urn) {
+    return fromURN(urn, 1.0);
+  }
+
   public static MetricEntity fromSlice(MetricSlice slice, double score) {
     return fromMetric(score, slice.getMetricId(), slice.getFilters());
   }

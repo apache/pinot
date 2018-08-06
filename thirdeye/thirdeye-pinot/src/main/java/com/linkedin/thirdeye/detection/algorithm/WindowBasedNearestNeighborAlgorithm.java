@@ -56,7 +56,7 @@ public class WindowBasedNearestNeighborAlgorithm extends StaticDetectionPipeline
     Preconditions.checkArgument(config.getProperties().containsKey(PROP_METRIC_URN));
 
     String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
     this.slice = MetricSlice.from(me.getId(), this.startTime, this.endTime, me.getFilters());
 
     // window size in terms of number of data points

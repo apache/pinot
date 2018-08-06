@@ -90,7 +90,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     Preconditions.checkArgument(config.getProperties().containsKey(PROP_METRIC_URN));
 
     String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
 
     this.quantileMin = MapUtils.getDoubleValue(config.getProperties(), "quantileMin", Double.NaN);
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), "quantileMax", Double.NaN);
