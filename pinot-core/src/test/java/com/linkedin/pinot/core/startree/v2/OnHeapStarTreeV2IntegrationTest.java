@@ -39,9 +39,6 @@ public class OnHeapStarTreeV2IntegrationTest {
 
   private File _filepath;
   private static File _indexDir;
-  private List<GenericRow> _rows;
-  private String _segmentOutputDir;
-  private RecordReader _recordReader;
   private static List<StarTreeV2Config> _starTreeV2ConfigList = new ArrayList<>();
 
   @BeforeTest
@@ -49,10 +46,11 @@ public class OnHeapStarTreeV2IntegrationTest {
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
     String segmentName = "starTreeV2BuilderTest";
-    _segmentOutputDir = Files.createTempDir().toString();
-    _rows = StarTreeV2SegmentHelper.createSegmentData(schema);
-    _recordReader = new GenericRowRecordReader(_rows, schema);
-    _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, _segmentOutputDir, _recordReader);
+    String segmentOutputDir = Files.createTempDir().toString();
+    List<GenericRow> _rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+
+    RecordReader recordReader = new GenericRowRecordReader(_rows, schema);
+    _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
     _filepath = new File(_indexDir, "v3");
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
@@ -69,13 +67,14 @@ public class OnHeapStarTreeV2IntegrationTest {
 
     metric2aggFuncPairs1.add(pair1);
     metric2aggFuncPairs1.add(pair2);
+    metric2aggFuncPairs1.add(pair3);
     metric2aggFuncPairs1.add(pair4);
     metric2aggFuncPairs1.add(pair5);
     metric2aggFuncPairs1.add(pair6);
     metric2aggFuncPairs1.add(pair7);
 
-    metric2aggFuncPairs2.add(pair3);
     metric2aggFuncPairs2.add(pair1);
+
 
     StarTreeV2Config _starTreeV2Config1 = new StarTreeV2Config();
     _starTreeV2Config1.setOutDir(_filepath);
@@ -96,15 +95,11 @@ public class OnHeapStarTreeV2IntegrationTest {
 
   @Test
   public void testBuilder() throws Exception {
-    OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
-    try {
-      for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
-        buildTest.init(_indexDir, _starTreeV2ConfigList.get(i));
-        buildTest.build();
-        buildTest.serialize();
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
+    OffHeapStarTreeV2Builder buildTest = new OffHeapStarTreeV2Builder();
+    for (int i = 0; i < _starTreeV2ConfigList.size(); i++) {
+      buildTest.init(_indexDir, _starTreeV2ConfigList.get(i));
+      buildTest.build();
+      buildTest.serialize();
     }
   }
 
@@ -134,22 +129,13 @@ public class OnHeapStarTreeV2IntegrationTest {
         }
 
         for (AggregationFunctionColumnPair pair : _starTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
-          String metPair = pair.toColumnName();
-          DataSource source = impl.getDataSource(metPair);
-          System.out.println("Printing for Met2AggPair : " + metPair);
+          String metpair =pair.toColumnName();
+          DataSource source = impl.getDataSource(metpair);
+          System.out.println("Printing for Met2AggPair : " + metpair);
           StarTreeV2LoaderHelper.printMetricAggfuncDataFromDataSource(source, pair.getFunctionType().getName());
         }
         starTreeId += 1;
       }
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-  }
-
-  @Test
-  public void testExecutor() throws Exception {
-    try {
-      // to be filled.
     } catch (Exception e) {
       e.printStackTrace();
     }

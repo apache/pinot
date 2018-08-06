@@ -40,44 +40,43 @@ import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 public class StarTreeV2BaseClass {
 
   // Segment
-  protected File _outDir;
+  File _outDir;
+  ImmutableSegment _immutableSegment;
+  PropertiesConfiguration _properties;
+  IndexLoadingConfig _v3IndexLoadingConfig;
   protected SegmentMetadata _segmentMetadata;
-  protected ImmutableSegment _immutableSegment;
-  protected PropertiesConfiguration _properties;
-  protected IndexLoadingConfig _v3IndexLoadingConfig;
 
   // Dimensions
-  protected int _dimensionSize;
-  protected int _dimensionsCount;
-  protected List<String> _dimensionsName;
-  protected String _dimensionSplitOrderString;
-  protected List<Integer> _dimensionsCardinality;
-  protected List<Integer> _dimensionsSplitOrder;
-  protected String _dimensionWithoutStarNodeString;
-  protected List<Integer> _dimensionsWithoutStarNode;
-  protected Map<String, DimensionFieldSpec> _dimensionsSpecMap;
+  int _dimensionsCount;
+  List<String> _dimensionsName;
+  String _dimensionSplitOrderString;
+  List<Integer> _dimensionsCardinality;
+  List<Integer> _dimensionsSplitOrder;
+  String _dimensionWithoutStarNodeString;
+  List<Integer> _dimensionsWithoutStarNode;
+  Map<String, DimensionFieldSpec> _dimensionsSpecMap;
 
   // Metrics
-  protected int _metricsCount;
-  protected Set<String> _metricsName;
-  protected int _aggFunColumnPairsCount;
-  protected String _aggFunColumnPairsString;
-  protected List<AggregationFunctionColumnPair> _aggFunColumnPairs;
-  protected Map<String, MetricFieldSpec> _metricsSpecMap;
+  int _metricsCount;
+  Set<String> _metricsName;
+  int _aggFunColumnPairsCount;
+  String _aggFunColumnPairsString;
+  List<AggregationFunctionColumnPair> _aggFunColumnPairs;
+  Map<String, MetricFieldSpec> _metricsSpecMap;
 
   // General
-  protected int _nodesCount;
-  protected int _rawDocsCount;
-  protected TreeNode _rootNode;
-  protected int _maxNumLeafRecords;
-  protected AggregationFunctionFactory _aggregationFunctionFactory;
+  int _nodesCount;
+  int _rawDocsCount;
+  TreeNode _rootNode;
+  int _maxNumLeafRecords;
+  AggregationFunctionFactory _aggregationFunctionFactory;
 
   protected final Charset UTF_8 = Charset.forName("UTF-8");
 
   /**
    * enumerate dimension set.
    */
-  protected List<Integer> enumerateDimensions(List<String> dimensionNames, List<String> dimensionsOrder) {
+  List<Integer> enumerateDimensions(List<String> dimensionNames, List<String> dimensionsOrder) {
     List<Integer> enumeratedDimensions = new ArrayList<>();
     if (dimensionsOrder != null) {
       for (String dimensionName : dimensionsOrder) {
@@ -91,7 +90,7 @@ public class StarTreeV2BaseClass {
   /**
    * compute a defualt split order.
    */
-  protected void computeDefaultSplitOrder(List<Integer> dimensionCardinality) {
+  void computeDefaultSplitOrder(List<Integer> dimensionCardinality) {
 
     if (_dimensionsSplitOrder.isEmpty() || _dimensionsSplitOrder == null) {
 
@@ -120,14 +119,12 @@ public class StarTreeV2BaseClass {
       dimensionWithoutStarNodeStringList.add(_dimensionsName.get(_dimensionsWithoutStarNode.get(i)));
     }
     _dimensionWithoutStarNodeString = String.join(",", dimensionWithoutStarNodeStringList);
-
-    return;
   }
 
   /**
    * compute a defualt split order.
    */
-  protected Object readHelper(PinotSegmentColumnReader reader, FieldSpec.DataType dataType, int docId) {
+  Object readHelper(PinotSegmentColumnReader reader, FieldSpec.DataType dataType, int docId) {
     switch (dataType) {
       case INT:
         return reader.readInt(docId);
@@ -147,7 +144,7 @@ public class StarTreeV2BaseClass {
   /**
    * Helper method to compute size of the header of the star tree in bytes.
    */
-  protected int computeHeaderSizeInBytes(List<String> dimensionsName) {
+  int computeHeaderSizeInBytes(List<String> dimensionsName) {
     // Magic marker (8), version (4), size of header (4) and number of dimensions (4)
     int headerSizeInBytes = 20;
 
@@ -164,8 +161,8 @@ public class StarTreeV2BaseClass {
   /**
    * Helper method to write the header into the data buffer.
    */
-  protected long writeHeader(PinotDataBuffer dataBuffer, int headerSizeInBytes, int dimensionCount,
-      List<String> dimensionsName, int nodesCount) {
+  long writeHeader(PinotDataBuffer dataBuffer, int headerSizeInBytes, int dimensionCount, List<String> dimensionsName,
+      int nodesCount) {
     long offset = 0L;
     dataBuffer.putLong(offset, OffHeapStarTree.MAGIC_MARKER);
     offset += Long.BYTES;
@@ -203,7 +200,7 @@ public class StarTreeV2BaseClass {
   /**
    * Helper method to write the star tree nodes into the data buffer.
    */
-  protected void writeNodes(PinotDataBuffer dataBuffer, long offset, TreeNode rootNode) {
+  void writeNodes(PinotDataBuffer dataBuffer, long offset, TreeNode rootNode) {
     int index = 0;
     Queue<TreeNode> queue = new LinkedList<>();
     queue.add(rootNode);
@@ -255,7 +252,7 @@ public class StarTreeV2BaseClass {
     return offset;
   }
 
-  public static File findFormatFile(File indexDir, String fileName) {
+  static File findFormatFile(File indexDir, String fileName) {
 
     // Try to find v3 file first
     File v3Dir = new File(indexDir, "v3");

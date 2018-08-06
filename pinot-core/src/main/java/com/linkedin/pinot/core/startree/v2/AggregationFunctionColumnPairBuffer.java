@@ -48,7 +48,7 @@ public class AggregationFunctionColumnPairBuffer {
       AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
       AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
-      switch (factory.getDataType()) {
+      switch (factory.getResultDataType()) {
         case INT:
           buffer.putInt(new Integer(_values[i].toString()));
           break;
@@ -96,7 +96,7 @@ public class AggregationFunctionColumnPairBuffer {
       AggregationFunctionColumnPair pair = aggFunColumnPairs.get(i);
       AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
-      switch (factory.getDataType()) {
+      switch (factory.getResultDataType()) {
         case INT:
           values[i] = buffer.getInt();
           break;
@@ -146,7 +146,7 @@ public class AggregationFunctionColumnPairBuffer {
       _values[i] = factory.aggregate(_values[i], buffer._values[i]);
       try {
         aggregatedByteSize += getObjectSize(factory, _values[i]);
-        if (factory.getDataType().equals(FieldSpec.DataType.BYTES)) {
+        if (factory.getResultDataType().equals(FieldSpec.DataType.BYTES)) {
           aggregatedByteSize += Integer.BYTES;
         }
 
@@ -167,13 +167,13 @@ public class AggregationFunctionColumnPairBuffer {
       } catch (IOException e) {
         e.printStackTrace();
       }
-      _totalBytes += factory.getDataType().equals(FieldSpec.DataType.BYTES) ? (size + Integer.BYTES) : size;
+      _totalBytes += factory.getResultDataType().equals(FieldSpec.DataType.BYTES) ? (size + Integer.BYTES) : size;
     }
   }
 
   private int getObjectSize(AggregationFunction factory, Object obj) throws IOException {
 
-    switch (factory.getDataType()) {
+    switch (factory.getResultDataType()) {
       case INT:
         return Integer.BYTES;
       case LONG:

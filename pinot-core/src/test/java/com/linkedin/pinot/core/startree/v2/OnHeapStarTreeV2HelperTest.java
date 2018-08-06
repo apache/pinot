@@ -190,20 +190,6 @@ public class OnHeapStarTreeV2HelperTest {
   }
 
   @Test
-  public void testCondenseData() {
-    List<Record> data = expectedFilteredData();
-    OnHeapStarTreeV2Builder obj = new OnHeapStarTreeV2Builder();
-    List<AggregationFunctionColumnPair> metric2aggFuncPairs = createMet2AggfuncPairs();
-    List<Record> actual =
-        obj.condenseData(data, metric2aggFuncPairs, StarTreeV2Constant.IS_RAW_DATA);
-
-    List<Record> expected = expectedCondensedData();
-    printRecordsList(actual);
-    printRecordsList(expected);
-    assertRecordsList(expected, actual);
-  }
-
-  @Test
   public void testTDigest() throws IOException {
     int a = 10;
     byte[] dest;

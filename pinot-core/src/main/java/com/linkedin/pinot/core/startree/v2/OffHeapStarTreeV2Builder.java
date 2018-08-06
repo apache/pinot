@@ -79,6 +79,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
   // star tree.
   private File _dataFile;
   private File _tempDataFile;
+  private int _dimensionSize;
   private File _metricOffsetFile;
   private File _tempMetricOffsetFile;
   private List<AggregationFunction> _aggregationFunctions;
@@ -427,7 +428,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       AggregationFunction function = _aggregationFunctions.get(index);
       index++;
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
-          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getDataType(), _aggregatedDocCount,
+          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getResultDataType(), _aggregatedDocCount,
           function.getResultMaxByteSize());
       _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
     }
@@ -483,7 +484,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       Object[] values = aggregationFunctionColumnPairBuffer._values;
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
         AggregationFunction function = _aggregationFunctions.get(j);
-        if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
+        if (function.getResultDataType().equals(FieldSpec.DataType.BYTES)) {
           ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, function.serialize(values[j]));
         } else {
           ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, values[j]);

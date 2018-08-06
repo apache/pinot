@@ -52,11 +52,10 @@ public class StarTreeV2DataSource {
   private Map<String, StarTreeV2AggfunColumnPairDataSource> _metricRawIndexReader;
 
   private File _starTreeFile;
-  private File _starTreeIndexMapFile;
 
   public StarTreeV2DataSource(SegmentMetadataImpl segmentMetadataImpl, StarTreeV2Metadata metadata, File indexDir) {
 
-    _starTreeIndexMapFile =
+    File _starTreeIndexMapFile =
         StarTreeV2BaseClass.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
     _columnIndexInfoMap = readMetaData(_starTreeIndexMapFile);
 
@@ -125,18 +124,16 @@ public class StarTreeV2DataSource {
       function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
       PinotDataBuffer buffer;
-      if (function.getDataType().equals(FieldSpec.DataType.BYTES)) {
+      if (function.getResultDataType().equals(FieldSpec.DataType.BYTES)) {
         buffer = PinotByteBuffer.mapFile(_indexDataFile, false, start, size, ByteOrder.BIG_ENDIAN, "star tree v2");
       } else {
         buffer = PinotDataBuffer.mapFile(_indexDataFile, false, start, size, ByteOrder.BIG_ENDIAN, "star tree v2");
       }
       StarTreeV2AggfunColumnPairDataSource starTreeV2AggfunColumnPairDataSource =
-          new StarTreeV2AggfunColumnPairDataSource(buffer, column, _docsCount, function.getDataType());
+          new StarTreeV2AggfunColumnPairDataSource(buffer, column, _docsCount, function.getResultDataType());
 
       _metricRawIndexReader.put(column, starTreeV2AggfunColumnPairDataSource);
     }
-
-    return;
   }
 
   public Map<String, StarTreeV2DimensionDataSource> getDimensionForwardIndexReader() {

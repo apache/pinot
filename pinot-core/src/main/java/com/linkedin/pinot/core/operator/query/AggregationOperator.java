@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationExecutor;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import com.linkedin.pinot.core.startree.executor.StarTreeAggregationExecutor;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -36,14 +37,16 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
   private final AggregationFunctionContext[] _functionContexts;
   private final TransformOperator _transformOperator;
   private final long _numTotalRawDocs;
+  private final boolean _useStarTree;
 
   private ExecutionStatistics _executionStatistics;
 
   public AggregationOperator(@Nonnull AggregationFunctionContext[] functionContexts,
-      @Nonnull TransformOperator transformOperator, long numTotalRawDocs) {
+      @Nonnull TransformOperator transformOperator, long numTotalRawDocs, boolean useStarTree) {
     _functionContexts = functionContexts;
     _transformOperator = transformOperator;
     _numTotalRawDocs = numTotalRawDocs;
+    _useStarTree = useStarTree;
   }
 
   @Override
@@ -51,7 +54,12 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     int numDocsScanned = 0;
 
     // Perform aggregation on all the transform blocks
-    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(_functionContexts);
+    AggregationExecutor aggregationExecutor;
+    if (_useStarTree) {
+      aggregationExecutor = new StarTreeAggregationExecutor(_functionContexts);
+    } else {
+      aggregationExecutor = new DefaultAggregationExecutor(_functionContexts);
+    }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       numDocsScanned += transformBlock.getNumDocs();

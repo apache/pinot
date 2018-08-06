@@ -22,8 +22,8 @@ import java.util.List;
  * Utility class to mimic behavior of 'generic row'.
  */
 public class Record {
-  protected int[] _dimensionValues;
-  protected List<Object> _metricValues;
+  private int[] _dimensionValues;
+  private List<Object> _metricValues;
 
   /**
    * Return the metric values for the record.

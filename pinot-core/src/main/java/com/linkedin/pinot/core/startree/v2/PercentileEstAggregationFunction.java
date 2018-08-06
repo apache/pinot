@@ -20,6 +20,7 @@ import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 
 
@@ -30,13 +31,13 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Num
 
   @Nonnull
   @Override
-  public String getName() {
-    return StarTreeV2Constant.AggregateFunctions.PERCENTILEEST;
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.PERCENTILEEST;
   }
 
   @Nonnull
   @Override
-  public FieldSpec.DataType getDataType() {
+  public FieldSpec.DataType getResultDataType() {
     return FieldSpec.DataType.BYTES;
   }
 
