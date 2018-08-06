@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
 
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<Object, HyperLogLog> {
 
-  protected int _maxLength = 182;
+  private int _maxLength = 182;
 
   @Nonnull
   @Override

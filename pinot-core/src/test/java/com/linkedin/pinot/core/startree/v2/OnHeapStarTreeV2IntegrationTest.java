@@ -15,17 +15,10 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.FilterPlanNode;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import java.io.File;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.List;
+import java.util.HashSet;
 import java.util.HashMap;
 import org.testng.Assert;
 import java.util.ArrayList;
@@ -42,11 +35,18 @@ import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import com.linkedin.pinot.core.plan.FilterPlanNode;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.startree.BaseStarTreeIndexTest;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -56,26 +56,18 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
 
 public class OnHeapStarTreeV2IntegrationTest {
 
-
-
-  protected IndexSegment _segment;
-  protected BrokerRequest _brokerRequest;
-  protected int _numMetricColumns;
-  protected Dictionary[] _metricDictionaries;
-  protected BlockSingleValIterator[] _metricValIterators;
-  protected int _numGroupByColumns;
-  protected BlockSingleValIterator[] _groupByValIterators;
-
-
+  private IndexSegment _segment;
+  private BrokerRequest _brokerRequest;
+  private int _numMetricColumns;
+  private Dictionary[] _metricDictionaries;
+  private BlockSingleValIterator[] _metricValIterators;
+  private int _numGroupByColumns;
+  private BlockSingleValIterator[] _groupByValIterators;
 
 
   private File _filepath;
   private File _indexDir;
   private int _starTreeId;
-  private String _segmentName;
-  private List<GenericRow> _rows;
-  private String _segmentOutputDir;
-  private RecordReader _recordReader;
   private List<FieldSpec.DataType> _metricDataType;
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private List<StarTreeV2Config> _starTreeV2ConfigList = new ArrayList<>();
@@ -92,13 +84,13 @@ public class OnHeapStarTreeV2IntegrationTest {
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
     String _segmentName = "starTreeV2BuilderTest";
-    _segmentOutputDir = Files.createTempDir().toString();
+    String _segmentOutputDir = Files.createTempDir().toString();
 
-    _rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+    List<GenericRow> _rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
 
-    //_rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    //List<GenericRow> _rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
 
-    _recordReader = new GenericRowRecordReader(_rows, schema);
+    RecordReader _recordReader = new GenericRowRecordReader(_rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, _segmentName, _segmentOutputDir, _recordReader);
     _filepath = new File(_indexDir, "v3");
 
@@ -193,20 +185,20 @@ public class OnHeapStarTreeV2IntegrationTest {
     }
   }
 
-  @Test
-  public void testExecutor() throws Exception {
-    try {
-      _segment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
-      for ( int i = 0; i < _starTreeV2ConfigList.size(); i++) {
-        _starTreeId = i;
-        testQueries(i);
-      }
-      _segment.destroy();
-
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-  }
+//  @Test
+//  public void testExecutor() throws Exception {
+//    try {
+//      _segment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
+//      for ( int i = 0; i < _starTreeV2ConfigList.size(); i++) {
+//        _starTreeId = i;
+//        testQueries(i);
+//      }
+//      _segment.destroy();
+//
+//    } catch (Exception e) {
+//      e.printStackTrace();
+//    }
+//  }
 
   protected String[] getHardCodedQueries() {
     return STAR_TREE1_HARD_CODED_QUERIES;

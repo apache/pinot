@@ -26,27 +26,18 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 
 public class OnHeapStarTreeV2Loader {
 
-  // segment
-  private SegmentMetadataImpl _segmentMetadataImpl;
-
-  // star tree
-  private File _indexDir;
-  private List<StarTreeV2Metadata> _starTreeV2MetadataList;
-  private List<StarTreeV2> _starTreeV2DataSources;
-
-
   public List<StarTreeV2> load(File indexDir, ImmutableSegment obj) throws Exception {
+
     // segment
-    _indexDir = indexDir;
-    _segmentMetadataImpl = new SegmentMetadataImpl(indexDir);
+    SegmentMetadataImpl _segmentMetadataImpl = new SegmentMetadataImpl(indexDir);
 
     // star tree
-    _starTreeV2MetadataList = _segmentMetadataImpl.getStarTreeV2Metadata();
-    _starTreeV2DataSources = new ArrayList<>();
+    List<StarTreeV2Metadata> _starTreeV2MetadataList = _segmentMetadataImpl.getStarTreeV2Metadata();
+    List<StarTreeV2> _starTreeV2DataSources = new ArrayList<>();
 
     int starTreeId = 0;
     for (StarTreeV2Metadata metaData : _starTreeV2MetadataList) {
-      StarTreeV2DataSource dataSource = new StarTreeV2DataSource(_segmentMetadataImpl, metaData, _indexDir);
+      StarTreeV2DataSource dataSource = new StarTreeV2DataSource(_segmentMetadataImpl, metaData, indexDir);
       StarTree starTree = dataSource.loadStarTree(starTreeId);
       dataSource.loadColumnsDataSource(starTreeId, obj);
       Map<String, StarTreeV2DimensionDataSource> dimensionDataSourceMap = dataSource.getDimensionForwardIndexReader();

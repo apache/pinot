@@ -52,11 +52,10 @@ public class StarTreeV2DataSource {
   private Map<String, StarTreeV2AggfunColumnPairDataSource> _metricRawIndexReader;
 
   private File _starTreeFile;
-  private File _starTreeIndexMapFile;
 
   public StarTreeV2DataSource(SegmentMetadataImpl segmentMetadataImpl, StarTreeV2Metadata metadata, File indexDir) {
 
-    _starTreeIndexMapFile =
+    File _starTreeIndexMapFile =
         StarTreeV2BaseClass.findFormatFile(indexDir, StarTreeV2Constant.STAR_TREE_V2_INDEX_MAP_FILE);
     _columnIndexInfoMap = readMetaData(_starTreeIndexMapFile);
 
@@ -135,8 +134,6 @@ public class StarTreeV2DataSource {
 
       _metricRawIndexReader.put(column, starTreeV2AggfunColumnPairDataSource);
     }
-
-    return;
   }
 
   public Map<String, StarTreeV2DimensionDataSource> getDimensionForwardIndexReader() {

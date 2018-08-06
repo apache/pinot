@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
 public interface AggregationFunction<R, A> {
 
   /**
-   * Get the name of an aggregation function.
+   * Get the type of an aggregation function.
    */
   @Nonnull
   AggregationFunctionType getType();

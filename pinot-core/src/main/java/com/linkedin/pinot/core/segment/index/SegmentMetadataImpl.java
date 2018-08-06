@@ -305,10 +305,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     // Build star tree v2 metadata.
-    String starTreeCount = segmentMetadataPropertiesConfiguration.getString(StarTreeV2Constant.STAR_TREE_V2_COUNT);
-    _starTreesV2Count = starTreeCount != null ? Integer.parseInt(starTreeCount) : 0;
+    _starTreesV2Count = segmentMetadataPropertiesConfiguration.getInt(StarTreeV2Constant.STAR_TREE_V2_COUNT, 0);
     _starTreeV2MetadataList = new ArrayList<>();
-
     if (_starTreesV2Count > 0) {
       initStarTreeV2Metadata(_starTreesV2Count, segmentMetadataPropertiesConfiguration);
     }

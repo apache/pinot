@@ -34,9 +34,6 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 public class StarTreeIndexesConverter implements StarTreeFormatConverter {
 
-  private int _docsCount = 0;
-  private List<StarTreeV2Metadata> _starTreeV2MetadataList;
-
   @Override
   public void convert(File indexStarTreeDir, int starTreeId) throws Exception {
 
@@ -44,8 +41,6 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
     createFilesIfNotExist(indexStarTreeDir);
     copyIndexData(indexStarTreeDir, v2Metadata, starTreeId);
     copyStarTreeData(indexStarTreeDir, starTreeId);
-
-    return;
   }
 
   /**
@@ -66,8 +61,6 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
     if (!data_file.exists()) {
       data_file.createNewFile();
     }
-
-    return;
   }
 
   /**
@@ -81,12 +74,11 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
    */
   private void copyIndexData(File v2Directory, SegmentMetadataImpl v2Metadata, int starTreeId) throws Exception {
 
-    _starTreeV2MetadataList = v2Metadata.getStarTreeV2Metadata();
+    List<StarTreeV2Metadata> _starTreeV2MetadataList = v2Metadata.getStarTreeV2Metadata();
     StarTreeV2Metadata metaData = _starTreeV2MetadataList.get(starTreeId);
 
     List<String> dimensionsSplitOrder = metaData.getDimensionsSplitOrder();
     Set<AggregationFunctionColumnPair> aggregationFunctionColumnPair = metaData.getAggregationFunctionColumnPairs();
-    _docsCount = metaData.getNumDocs();
 
     for (String dimension : dimensionsSplitOrder) {
       appendToFile(v2Directory, dimension, "DIMENSION", starTreeId);
@@ -96,8 +88,6 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
       String column = pair.toColumnName();
       appendToFile(v2Directory, column, "METRIC", starTreeId);
     }
-
-    return;
   }
 
   /**
@@ -110,7 +100,6 @@ public class StarTreeIndexesConverter implements StarTreeFormatConverter {
    */
   private void copyStarTreeData(File v2Directory, int starTreeId) throws Exception {
     appendToFile(v2Directory, "root", "STARTREE", starTreeId);
-    return;
   }
 
   /**
