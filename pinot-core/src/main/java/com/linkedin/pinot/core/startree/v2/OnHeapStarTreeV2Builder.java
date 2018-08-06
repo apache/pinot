@@ -166,6 +166,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       _rawStarTreeData.add(record);
     }
 
+    LOGGER.info("Number of raw documents in the segment: {}", _rawStarTreeData.size());
+
     // gathering metric column reader
     Map<String, PinotSegmentColumnReader> metricColumnReaders = new HashMap<>();
     for (String metricName : _metricsSpecMap.keySet()) {
