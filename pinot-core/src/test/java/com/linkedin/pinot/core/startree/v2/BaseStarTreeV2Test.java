@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.plan.PlanNode;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
@@ -54,6 +55,7 @@ import org.testng.Assert;
  */
 public abstract class BaseStarTreeV2Test<R, A> {
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private static final Long NON_STAR_TREE_COUNT_VALUE = 1L;
 
   // Set up index segment and star-tree before running tests
   protected IndexSegment _indexSegment;
@@ -113,10 +115,15 @@ public abstract class BaseStarTreeV2Test<R, A> {
     List<BlockSingleValIterator> nonStarTreeAggregationColumnValueIterators = new ArrayList<>(numAggregations);
     List<Dictionary> nonStarTreeAggregationColumnDictionaries = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      DataSource dataSource = _indexSegment.getDataSource(aggregationFunctionColumnPair.getColumn());
-      nonStarTreeAggregationColumnValueIterators.add(
-          (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator());
-      nonStarTreeAggregationColumnDictionaries.add(dataSource.getDictionary());
+      if (aggregationFunctionColumnPair.getFunctionType() == AggregationFunctionType.COUNT) {
+        nonStarTreeAggregationColumnValueIterators.add(null);
+        nonStarTreeAggregationColumnDictionaries.add(null);
+      } else {
+        DataSource dataSource = _indexSegment.getDataSource(aggregationFunctionColumnPair.getColumn());
+        nonStarTreeAggregationColumnValueIterators.add(
+            (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator());
+        nonStarTreeAggregationColumnDictionaries.add(dataSource.getDictionary());
+      }
     }
     List<BlockSingleValIterator> nonStarTreeGroupByColumnValueIterators = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
@@ -165,9 +172,17 @@ public abstract class BaseStarTreeV2Test<R, A> {
       });
       for (int i = 0; i < numAggregations; i++) {
         BlockSingleValIterator valueIterator = aggregationColumnValueIterators.get(i);
-        valueIterator.skipTo(docId);
-        Dictionary dictionary = aggregationColumnDictionaries != null ? aggregationColumnDictionaries.get(i) : null;
-        R value = getNextValue(valueIterator, dictionary);
+
+        R value;
+        if (valueIterator == null) {
+          // COUNT aggregation function
+          // noinspection unchecked
+          value = (R) NON_STAR_TREE_COUNT_VALUE;
+        } else {
+          valueIterator.skipTo(docId);
+          Dictionary dictionary = aggregationColumnDictionaries != null ? aggregationColumnDictionaries.get(i) : null;
+          value = getNextValue(valueIterator, dictionary);
+        }
         values.get(i).add(value);
       }
     }
