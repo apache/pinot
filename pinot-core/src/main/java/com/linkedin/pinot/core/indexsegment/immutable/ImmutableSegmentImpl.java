@@ -53,13 +53,15 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final SegmentDirectory _segmentDirectory;
   private final SegmentMetadataImpl _segmentMetadata;
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
-  private final List<StarTreeV2> _starTrees;
+  private List<StarTreeV2> _starTrees;
+
 
   public ImmutableSegmentImpl(@Nonnull SegmentDirectory segmentDirectory, @Nonnull SegmentMetadataImpl segmentMetadata,
       @Nonnull Map<String, ColumnIndexContainer> columnIndexContainerMap, @Nullable StarTree starTree) {
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
+
     if (starTree != null) {
       _starTrees = convertToStarTrees(starTree);
     } else {
@@ -209,6 +211,13 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         }
       }
     }
+  }
+
+  public void appendStarTrees(List<StarTreeV2> starTreeV2List) {
+    if (_starTrees == null) {
+      _starTrees = new ArrayList<>();
+    }
+    _starTrees.addAll(starTreeV2List);
   }
 
   @Override

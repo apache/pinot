@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
+
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
@@ -41,11 +42,18 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   }
 
   @Override
+  public void index(int docId, byte [] valueToIndex) {
+    _indexWriter.setBytes(docId, valueToIndex);
+  }
+
+  @Override
   public void index(int docId, Object valueToIndex) {
     if (valueToIndex instanceof String) {
       _indexWriter.setString(docId, (String) valueToIndex);
     } else if (valueToIndex instanceof ByteArray) {
       _indexWriter.setBytes(docId, ((ByteArray) valueToIndex).getBytes());
+    } else if (valueToIndex instanceof byte[]) {
+      _indexWriter.setBytes(docId, (byte []) valueToIndex);
     } else {
       throw new IllegalArgumentException(
           "Illegal data type for variable length indexing: " + valueToIndex.getClass().getName());

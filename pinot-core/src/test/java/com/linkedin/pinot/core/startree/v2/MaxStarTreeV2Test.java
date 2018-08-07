@@ -35,12 +35,10 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
+public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
-  private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[] {
-      "SELECT SUM(salary) FROM T",
-      "SELECT SUM(salary) FROM T GROUP BY Name",
-      "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"
+  private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
+      "SELECT MAX(salary) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"
   };
 
   @BeforeClass
@@ -61,7 +59,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
-    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "salary");
+    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.MAX, "salary");
     metric2aggFuncPairs1.add(pair1);
 
     StarTreeV2Config starTreeV2Config = new StarTreeV2Config();
@@ -99,11 +97,11 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
   @Override
   protected Double aggregate(@Nonnull List<Double> values) {
-    double sumVal = 0;
+    double maxVal = Double.NEGATIVE_INFINITY;
     for (Double value : values) {
-      sumVal += value;
+      maxVal = Math.max(maxVal, value);
     }
-    return sumVal;
+    return maxVal;
   }
 
   @Override

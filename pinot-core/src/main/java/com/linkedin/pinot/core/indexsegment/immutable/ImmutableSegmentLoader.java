@@ -30,8 +30,11 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.OffHeapStarTree;
 import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.v2.OnHeapStarTreeV2Loader;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -115,6 +118,11 @@ public class ImmutableSegmentLoader {
       starTree = new OffHeapStarTree(segmentReader.getStarTreeFile(), readMode);
     }
 
-    return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
+    ImmutableSegment immutableSegment = new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
+    OnHeapStarTreeV2Loader loader = new OnHeapStarTreeV2Loader();
+    List<StarTreeV2> starTreeV2List = loader.load(indexDir, immutableSegment);
+    ((ImmutableSegmentImpl) immutableSegment).appendStarTrees(starTreeV2List);
+
+    return immutableSegment;
   }
 }

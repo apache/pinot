@@ -15,34 +15,33 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.plan.FilterPlanNode;
-import com.linkedin.pinot.core.plan.PlanNode;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
+import org.testng.Assert;
+import java.util.ArrayList;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.testng.Assert;
-
+import com.linkedin.pinot.core.plan.PlanNode;
+import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.plan.FilterPlanNode;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 
 /**
  * Base class to test star-tree index by scanning and aggregating records filtered out from the

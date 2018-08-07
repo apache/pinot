@@ -15,30 +15,31 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.Closeable;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.startree.StarTree;
+import java.io.File;
+import java.util.Map;
+import java.io.IOException;
 
 
-/**
- * The class <code>StarTreeV2</code> is a wrapper on top of star-tree, its metadata, and the data sources associated
- * with it.
- */
-public interface StarTreeV2 extends Closeable {
+public interface StarTreeV2Builder {
 
   /**
-   * Returns the {@link StarTree} data structure.
+   * Initialize the builder.
    */
-  StarTree getStarTree();
+  void init(File indexDir, StarTreeV2Config config) throws Exception;
 
   /**
-   * Returns the metadata of the star-tree.
+   * Build the StarTree
    */
-  StarTreeV2Metadata getMetadata();
+  void build() throws IOException;
 
   /**
-   * Returns the data source for the given column name, where the column name could be dimension name or from
-   * {@link AggregationFunctionColumnPair#toColumnName()}.
+   * Serialize the star tree into a file.
    */
-  DataSource getDataSource(String columnName);
+  void serialize() throws Exception;
+
+  /**
+   * Returns the Meta Data of the Star tree.
+   */
+  Map<String, String> getMetaData();
 }
+
