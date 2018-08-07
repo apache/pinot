@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.LogUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
@@ -34,7 +33,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Arrays;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -47,7 +45,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.log4j.Level;
 import org.json.JSONException;
 import org.testng.Assert;
 
@@ -82,9 +79,6 @@ public abstract class ControllerTest {
   }
 
   protected void startZk() {
-    LogUtils.setLogLevel(
-        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
-        Level.INFO);
     _zookeeperInstance = ZkStarter.startLocalZkServer();
   }
 
@@ -95,10 +89,6 @@ public abstract class ControllerTest {
   protected void stopZk() {
     try {
       ZkStarter.stopLocalZkServer(_zookeeperInstance);
-
-      LogUtils.setLogLevel(
-          Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
-          Level.WARN);
     } catch (Exception e) {
       // Swallow exceptions
     }

@@ -27,8 +27,6 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.kafka.common.security.JaasUtils.*;
-
 
 public class ZkStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ZkStarter.class);
@@ -93,7 +91,7 @@ public class ZkStarter {
           tickTime = getTickTime();
           minSessionTimeout = getMinSessionTimeout();
           maxSessionTimeout = getMaxSessionTimeout();
-          maxClientCnxns = 60;
+          maxClientCnxns = 0;
           return 0;
         }
 
@@ -139,26 +137,19 @@ public class ZkStarter {
    * @param dataDirPath The path for the Zk data directory
    */
   public synchronized static ZookeeperInstance startLocalZkServer(final int port, final String dataDirPath) {
-    // Disable SASL-authenticated for starting local zk server
-    String isSaslEnable = System.setProperty(ZK_SASL_CLIENT, "false");
     // Start the local ZK server
     try {
-      long startTime = System.currentTimeMillis();
       final PublicZooKeeperServerMain zookeeperServerMain = new PublicZooKeeperServerMain();
       final String[] args = new String[] { Integer.toString(port), dataDirPath };
       new Thread() {
         @Override
         public void run() {
           try {
-            long zookeeperStartTime = System.currentTimeMillis();
             zookeeperServerMain.initializeAndRun(args);
-            long zookeeperEndTime = System.currentTimeMillis();
-            if (isSaslEnable != null) {
-              System.setProperty(ZK_SASL_CLIENT, isSaslEnable);
-            }
-            LOGGER.info("Total run time for zookeeper is: " + (zookeeperEndTime - zookeeperStartTime) + "ms. dataDirPath: " + dataDirPath);
-          } catch (QuorumPeerConfig.ConfigException | IOException e) {
-            LOGGER.warn("Caught exception while starting ZK ", e);
+          } catch (QuorumPeerConfig.ConfigException e) {
+            LOGGER.warn("Caught exception while starting ZK", e);
+          } catch (IOException e) {
+            LOGGER.warn("Caught exception while starting ZK", e);
           }
         }
       }.start();
@@ -166,12 +157,11 @@ public class ZkStarter {
       // Wait until the ZK server is started
       ZkClient client = new ZkClient("localhost:" + port, 10000);
       client.waitUntilConnected(10L, TimeUnit.SECONDS);
-      long endTime = System.currentTimeMillis();
-      LOGGER.info("Initialized zk connection successfully! Duration: " + (endTime - startTime));
       client.close();
+
       return new ZookeeperInstance(zookeeperServerMain, dataDirPath);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while starting ZK ", e);
+      LOGGER.warn("Caught exception while starting ZK", e);
       throw new RuntimeException(e);
     }
   }
@@ -190,7 +180,6 @@ public class ZkStarter {
   public synchronized static void stopLocalZkServer(final ZookeeperInstance instance, final boolean deleteDataDir) {
     if (instance._serverMain != null) {
       try {
-        long startTime = System.currentTimeMillis();
         // Shut down ZK
         instance._serverMain.shutdown();
         instance._serverMain = null;
@@ -199,8 +188,6 @@ public class ZkStarter {
         if (deleteDataDir) {
           org.apache.commons.io.FileUtils.deleteDirectory(new File(instance._dataDirPath));
         }
-        long endTime = System.currentTimeMillis();
-        LOGGER.info("Shut down zk connection successfully! Duration: " + (endTime - startTime));
       } catch (Exception e) {
         LOGGER.warn("Caught exception while stopping ZK server", e);
         throw new RuntimeException(e);
