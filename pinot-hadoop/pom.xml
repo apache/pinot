@@ -82,7 +82,7 @@
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-common</artifactId>
       <version>${project.version}</version>
-      <!--<classifier>shaded</classifier>-->
+      <classifier>shaded</classifier>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
