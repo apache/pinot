@@ -137,6 +137,12 @@ public class SegmentCompletionProtocol {
   public static final Response RESP_NOT_SENT = new Response(new Response.Params().withStatus(
       ControllerResponseStatus.NOT_SENT));
 
+  private static final long MEMORY_USED_BYTES_DEFAULT = -1L;
+  private static final int NUM_ROWS_DEFAULT = -1;
+  private static final long SEGMENT_SIZE_BYTES_DEFAULT = -1L;
+  private static final long BUILD_TIME_MILLIS_DEFAULT = -1L;
+  private static final long WAIT_TIME_MILLIS_DEFAULT = -1L;
+
   public static long getMaxSegmentCommitTimeMs() {
     return MAX_SEGMENT_COMMIT_TIME_MS;
   }
@@ -190,13 +196,13 @@ public class SegmentCompletionProtocol {
         _offset = -1L;
         _segmentName = "UNKNOWN_SEGMENT";
         _instanceId = "UNKNOWN_INSTANCE";
-        _numRows = -1;
-        _buildTimeMillis = -1;
-        _waitTimeMillis = -1;
+        _numRows = NUM_ROWS_DEFAULT;
+        _buildTimeMillis = BUILD_TIME_MILLIS_DEFAULT;
+        _waitTimeMillis = WAIT_TIME_MILLIS_DEFAULT;
         _extraTimeSec = -1;
         _segmentLocation = null;
-        _memoryUsedBytes = -1;
-        _segmentSizeBytes = -1;
+        _memoryUsedBytes = MEMORY_USED_BYTES_DEFAULT;
+        _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
       }
 
       public Params withOffset(long offset) {
