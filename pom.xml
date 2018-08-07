@@ -136,7 +136,10 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g -Dlog4j.configuration=log4j-nooutput.properties</argLine>
+        <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g
+          -Dlog4j.configuration=log4j-fatal-only.properties
+          -Djava.util.logging.config.file=logging-severe-only.properties
+        </argLine>
       </properties>
     </profile>
     <!-- jfim: this profile is overridden in pinot-integration-tests -->
