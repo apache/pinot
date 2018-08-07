@@ -15,65 +15,60 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.pql.parsers.pql2.ast.TopAstNode;
+import java.util.Collections;
+import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import java.util.Collections;
 
 
 /**
  * Some tests for the PQL 2 compiler.
  */
 public class Pql2CompilerTest {
+  private static final Pql2Compiler COMPILER = new Pql2Compiler();
+
   @Test
   public void testQuotedStrings() {
-    Pql2Compiler compiler = new Pql2Compiler();
-
-    // Two single quotes in a single quoted string
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
-        "select * from vegetables where origin = 'Martha''s Vineyard'");
+    BrokerRequest brokerRequest =
+        COMPILER.compileToBrokerRequest("select * from vegetables where origin = 'Martha''s Vineyard'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha's Vineyard");
 
-    brokerRequest = compiler.compileToBrokerRequest(
-        "select * from vegetables where origin = 'Martha\"\"s Vineyard'");
+    brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = 'Martha\"\"s Vineyard'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha\"\"s Vineyard");
 
-    brokerRequest = compiler.compileToBrokerRequest(
-        "select * from vegetables where origin = \"Martha\"\"s Vineyard\"");
+    brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = \"Martha\"\"s Vineyard\"");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha\"s Vineyard");
 
-    brokerRequest = compiler.compileToBrokerRequest(
-        "select * from vegetables where origin = \"Martha''s Vineyard\"");
+    brokerRequest = COMPILER.compileToBrokerRequest("select * from vegetables where origin = \"Martha''s Vineyard\"");
     Assert.assertEquals(brokerRequest.getFilterQuery().getValue().get(0), "Martha''s Vineyard");
   }
 
   @Test
   public void testDuplicateClauses() {
-    Pql2Compiler compiler = new Pql2Compiler();
-    assertCompilationFails(compiler, "select top 5 count(*) from a top 8");
-    assertCompilationFails(compiler, "select count(*) from a where a = 1 limit 5 where b = 2");
-    assertCompilationFails(compiler, "select count(*) from a group by b limit 5 group by b");
-    assertCompilationFails(compiler, "select count(*) from a having sum(a) = 8 limit 5 having sum(a) = 9");
-    assertCompilationFails(compiler, "select count(*) from a order by b limit 5 order by c");
-    assertCompilationFails(compiler, "select count(*) from a limit 5 limit 5");
+    assertCompilationFails("select top 5 count(*) from a top 8");
+    assertCompilationFails("select count(*) from a where a = 1 limit 5 where b = 2");
+    assertCompilationFails("select count(*) from a group by b limit 5 group by b");
+    assertCompilationFails("select count(*) from a having sum(a) = 8 limit 5 having sum(a) = 9");
+    assertCompilationFails("select count(*) from a order by b limit 5 order by c");
+    assertCompilationFails("select count(*) from a limit 5 limit 5");
   }
 
   @Test
-  public void testTopZero() throws Exception {
-    Pql2Compiler compiler  = new Pql2Compiler();
-    testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top 0", TopAstNode.DEFAULT_TOP_N, false);
-    testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top 1", 1, false);
-    testTopZeroFor(compiler, "select count(*) from someTable where c = 5 group by X top -1", TopAstNode.DEFAULT_TOP_N, true);
+  public void testTopZero() {
+    testTopZeroFor("select count(*) from someTable where c = 5 group by X top 0", TopAstNode.DEFAULT_TOP_N, false);
+    testTopZeroFor("select count(*) from someTable where c = 5 group by X top 1", 1, false);
+    testTopZeroFor("select count(*) from someTable where c = 5 group by X top -1", TopAstNode.DEFAULT_TOP_N, true);
   }
 
-  private void assertCompilationFails(Pql2Compiler compiler, String query) {
+  private void assertCompilationFails(String query) {
     try {
-      compiler.compileToBrokerRequest(query);
+      COMPILER.compileToBrokerRequest(query);
     } catch (Pql2CompilationException e) {
       // Expected
       return;
@@ -82,10 +77,10 @@ public class Pql2CompilerTest {
     Assert.fail("Query " + query + " compiled successfully but was expected to fail compilation");
   }
 
-  private void testTopZeroFor(Pql2Compiler compiler, String s, final int expectedTopN, boolean parseException) throws Exception {
+  private void testTopZeroFor(String s, final int expectedTopN, boolean parseException) {
     BrokerRequest req;
     try {
-      req = compiler.compileToBrokerRequest(s);
+      req = COMPILER.compileToBrokerRequest(s);
     } catch (Pql2CompilationException e) {
       if (parseException) {
         return;
@@ -100,26 +95,27 @@ public class Pql2CompilerTest {
 
   @Test
   public void testRejectInvalidLexerToken() {
-    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz ?= 2");
-    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz =! 2");
+    assertCompilationFails("select foo from bar where baz ?= 2");
+    assertCompilationFails("select foo from bar where baz =! 2");
   }
 
   @Test
   public void testRejectInvalidParses() {
-    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz < > 2");
-    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz ! = 2");
+    assertCompilationFails("select foo from bar where baz < > 2");
+    assertCompilationFails("select foo from bar where baz ! = 2");
   }
 
   @Test
   public void testParseExceptionHasCharacterPosition() {
-    Pql2Compiler compiler = new Pql2Compiler();
     final String query = "select foo from bar where baz ? 2";
 
     try {
-      compiler.compileToBrokerRequest(query);
+      COMPILER.compileToBrokerRequest(query);
     } catch (Pql2CompilationException e) {
       // Expected
-      Assert.assertTrue(e.getMessage().startsWith("1:30: "), "Compilation exception should contain line and character for error message. Error message is " + e.getMessage());
+      Assert.assertTrue(e.getMessage().startsWith("1:30: "),
+          "Compilation exception should contain line and character for error message. Error message is "
+              + e.getMessage());
       return;
     }
 
@@ -128,32 +124,30 @@ public class Pql2CompilerTest {
 
   @Test
   public void testCStyleInequalityOperator() {
-    Pql2Compiler compiler = new Pql2Compiler();
 
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
-        "select * from vegetables where name != 'Brussels sprouts'");
+    BrokerRequest brokerRequest =
+        COMPILER.compileToBrokerRequest("select * from vegetables where name != 'Brussels sprouts'");
     Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.NOT);
   }
 
   @Test
   public void testCompilationWithHaving() {
-    Pql2Compiler compiler = new Pql2Compiler();
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(
         "select avg(age) as avg_age from person group by address_city having avg(age)=20");
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.EQUALITY);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationType(), "avg");
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"),
         "age");
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0), "20");
-    brokerRequest = compiler.compileToBrokerRequest(
+    brokerRequest = COMPILER.compileToBrokerRequest(
         "select count(*) as count from sell group by price having count(*) > 100 AND count(*)<200");
     Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 3);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.AND);
-    brokerRequest = compiler.compileToBrokerRequest(
+    brokerRequest = COMPILER.compileToBrokerRequest(
         "select count(*) as count, avg(price) as avgprice from sell having count(*) > 0 OR (avg(price) < 45 AND count(*) > 22)");
     Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 5);
 
-    brokerRequest = compiler.compileToBrokerRequest(
+    brokerRequest = COMPILER.compileToBrokerRequest(
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch >= 16312 group by Carrier having count(*) in (375,5005,1099)");
     Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 1);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.IN);
@@ -161,7 +155,7 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("375"), true);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("5005"), true);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("1099"), true);
-    brokerRequest = compiler.compileToBrokerRequest(
+    brokerRequest = COMPILER.compileToBrokerRequest(
         "SELECT count(*) FROM mytable WHERE DaysSinceEpoch >= 16312 group by Carrier having count(*) not in (375,5005,1099)");
     Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 1);
     Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.NOT_IN);
@@ -169,19 +163,18 @@ public class Pql2CompilerTest {
 
   @Test
   public void testQueryOptions() {
-    Pql2Compiler compiler = new Pql2Compiler();
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
-        "select * from vegetables where name != 'Brussels sprouts'");
+    BrokerRequest brokerRequest =
+        COMPILER.compileToBrokerRequest("select * from vegetables where name != 'Brussels sprouts'");
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 0);
     Assert.assertNull(brokerRequest.getQueryOptions());
 
-    brokerRequest = compiler.compileToBrokerRequest(
+    brokerRequest = COMPILER.compileToBrokerRequest(
         "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes)");
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
     Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
     Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");
 
-    brokerRequest = compiler.compileToBrokerRequest(
+    brokerRequest = COMPILER.compileToBrokerRequest(
         "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes, foo=1234, bar='potato')");
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 3);
     Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
@@ -189,7 +182,7 @@ public class Pql2CompilerTest {
     Assert.assertEquals(brokerRequest.getQueryOptions().get("foo"), "1234");
     Assert.assertEquals(brokerRequest.getQueryOptions().get("bar"), "potato");
 
-    brokerRequest = compiler.compileToBrokerRequest(
+    brokerRequest = COMPILER.compileToBrokerRequest(
         "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes) option(foo=1234) option(bar='potato')");
     Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 3);
     Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
@@ -200,17 +193,46 @@ public class Pql2CompilerTest {
 
   @Test
   public void testIdentifierQuoteCharacter() {
-    Pql2Compiler compiler = new Pql2Compiler();
-
-    TransformExpressionTree expTree = compiler.compileToExpressionTree("`a.b.c`");
+    TransformExpressionTree expTree = COMPILER.compileToExpressionTree("`a.b.c`");
     Assert.assertEquals(expTree.getExpressionType(), TransformExpressionTree.ExpressionType.IDENTIFIER);
     Assert.assertEquals(expTree.getValue(), "a.b.c");
 
-    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
-            "select avg(`attributes.age`) as `avg_age` from `person` group by `attributes.address_city` having avg(`attributes.age`)=20");
+    BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(
+        "select avg(`attributes.age`) as `avg_age` from `person` group by `attributes.address_city` having avg(`attributes.age`)=20");
 
-    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"),"attributes.age");
-    Assert.assertEquals(brokerRequest.getGroupBy().getColumns(), Collections.singletonList("attributes.address_city"));
-    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"),"attributes.age");
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"),
+        "attributes.age");
+    Assert.assertEquals(brokerRequest.getGroupBy().getExpressions(),
+        Collections.singletonList("attributes.address_city"));
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"),
+        "attributes.age");
+  }
+
+  @Test
+  public void testStringLiteral() {
+    // Do not allow string literal column in selection query
+    assertCompilationFails("SELECT 'foo' FROM table");
+
+    // Allow string literal column in aggregation and group-by query
+    BrokerRequest brokerRequest =
+        COMPILER.compileToBrokerRequest("SELECT SUM('foo'), MAX(\"bar\") FROM table GROUP BY 'foo', \"bar\"");
+    List<AggregationInfo> aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 2);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationParams().get("column"), "foo");
+    Assert.assertEquals(aggregationInfos.get(1).getAggregationParams().get("column"), "bar");
+    List<String> expressions = brokerRequest.getGroupBy().getExpressions();
+    Assert.assertEquals(expressions.size(), 2);
+    Assert.assertEquals(expressions.get(0), "foo");
+    Assert.assertEquals(expressions.get(1), "bar");
+
+    // For UDF, string literal won't be treated as column but as LITERAL
+    brokerRequest =
+        COMPILER.compileToBrokerRequest("SELECT SUM(ADD(foo, 'bar')) FROM table GROUP BY SUB(\"foo\", bar)");
+    aggregationInfos = brokerRequest.getAggregationsInfo();
+    Assert.assertEquals(aggregationInfos.size(), 1);
+    Assert.assertEquals(aggregationInfos.get(0).getAggregationParams().get("column"), "add(foo,'bar')");
+    expressions = brokerRequest.getGroupBy().getExpressions();
+    Assert.assertEquals(expressions.size(), 1);
+    Assert.assertEquals(expressions.get(0), "sub('foo',bar)");
   }
 }

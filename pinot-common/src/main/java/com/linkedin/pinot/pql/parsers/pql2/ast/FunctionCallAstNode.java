@@ -82,19 +82,7 @@ public class FunctionCallAstNode extends BaseAstNode {
       if (children == null || children.size() != 1) {
         throw new Pql2CompilationException("Aggregation function expects exact 1 argument");
       }
-      AstNode astNode = children.get(0);
-      if (astNode instanceof IdentifierAstNode) {
-        // Column name
-        expression = ((IdentifierAstNode) astNode).getName();
-      } else if (astNode instanceof FunctionCallAstNode) {
-        // UDF
-        expression = TransformExpressionTree.standardizeExpression(((FunctionCallAstNode) astNode).getExpression());
-      } else if (astNode instanceof StringLiteralAstNode) {
-        // Try to parse string as expression
-        expression = TransformExpressionTree.standardizeExpression(((StringLiteralAstNode) astNode).getText());
-      } else {
-        throw new Pql2CompilationException("Aggregation function argument is not a column or UDF");
-      }
+      expression = TransformExpressionTree.getStandardExpression(children.get(0));
     }
 
     AggregationInfo aggregationInfo = new AggregationInfo();

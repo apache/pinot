@@ -91,20 +91,22 @@ public class SegmentConverter {
       // Mapping stage
       Preconditions.checkNotNull(_recordTransformer);
       String mapperOutputPath = _workingDir.getPath() + File.separator + MAPPER_PREFIX + currentPartition;
+      String outputSegmentName = (_totalNumPartition <= 1) ? _segmentName : _segmentName + "_" + currentPartition;
+
       try (MapperRecordReader mapperRecordReader = new MapperRecordReader(_inputIndexDirs, _recordTransformer,
           _recordPartitioner, _totalNumPartition, currentPartition)) {
-        buildSegment(mapperOutputPath, _tableName, _segmentName, mapperRecordReader, null);
+        buildSegment(mapperOutputPath, _tableName, outputSegmentName, mapperRecordReader, null);
       }
-      File outputSegment = new File(mapperOutputPath + File.separator + _segmentName);
+      File outputSegment = new File(mapperOutputPath + File.separator + outputSegmentName);
 
       // Sorting on group-by columns & Reduce stage
       if (_recordAggregator != null && _groupByColumns != null && _groupByColumns.size() > 0) {
         String reducerOutputPath = _workingDir.getPath() + File.separator + REDUCER_PREFIX + currentPartition;
         try (ReducerRecordReader reducerRecordReader = new ReducerRecordReader(outputSegment, _recordAggregator,
             _groupByColumns)) {
-          buildSegment(reducerOutputPath, _tableName, _segmentName, reducerRecordReader, null);
+          buildSegment(reducerOutputPath, _tableName, outputSegmentName, reducerRecordReader, null);
         }
-        outputSegment = new File(reducerOutputPath + File.separator + _segmentName);
+        outputSegment = new File(reducerOutputPath + File.separator + outputSegmentName);
       }
 
       // Sorting on sorted column and creating indices
@@ -119,9 +121,9 @@ public class SegmentConverter {
           String indexGenerationOutputPath = _workingDir.getPath() + File.separator + INDEX_PREFIX + currentPartition;
           try (
               PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(outputSegment, null, sortedColumn)) {
-            buildSegment(indexGenerationOutputPath, _tableName, _segmentName, recordReader, _indexingConfig);
+            buildSegment(indexGenerationOutputPath, _tableName, outputSegmentName, recordReader, _indexingConfig);
           }
-          outputSegment = new File(indexGenerationOutputPath + File.separator + _segmentName);
+          outputSegment = new File(indexGenerationOutputPath + File.separator + outputSegmentName);
         }
       }
 

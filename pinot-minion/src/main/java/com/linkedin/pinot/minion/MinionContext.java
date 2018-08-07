@@ -18,6 +18,7 @@ package com.linkedin.pinot.minion;
 import com.linkedin.pinot.core.minion.SegmentPurger;
 import com.linkedin.pinot.minion.metrics.MinionMetrics;
 import java.io.File;
+import javax.net.ssl.SSLContext;
 
 
 /**
@@ -36,6 +37,9 @@ public class MinionContext {
   private File _dataDir;
   private MinionMetrics _minionMetrics;
   private String _minionVersion;
+
+  // For segment upload
+  private SSLContext _sslContext;
 
   // For PurgeTask
   private SegmentPurger.RecordPurgerFactory _recordPurgerFactory;
@@ -63,6 +67,14 @@ public class MinionContext {
 
   public void setMinionVersion(String minionVersion) {
     _minionVersion = minionVersion;
+  }
+
+  public SSLContext getSSLContext() {
+    return _sslContext;
+  }
+
+  public void setSSLContext(SSLContext sslContext) {
+    _sslContext = sslContext;
   }
 
   public SegmentPurger.RecordPurgerFactory getRecordPurgerFactory() {
