@@ -544,13 +544,15 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     }
 
     // use non-outlier period, unless not enough history (anomalies are outliers too)
-    // TODO make lookback configurable
-    BooleanSeries filter = df.getBooleans(COL_OUTLIER).not().and(df.getLongs(COL_TIME).between(tStart, tCurrent));
-    if (filter.sum().longValue() <= 24) {
-      filter = BooleanSeries.fillValues(filter.size(), true);
+    BooleanSeries timeFilter = df.getLongs(COL_TIME).between(tStart, tCurrent);
+    BooleanSeries outlierAndTimeFilter = df.getBooleans(COL_OUTLIER).not().and(timeFilter);
+
+    // TODO make threshold for fallback to outlier period configurable
+    if (outlierAndTimeFilter.sum().longValue() <= timeFilter.sum().longValue() / 3) {
+      return df.filter(timeFilter).dropNull(COL_TIME, COL_VALUE);
     }
 
-    return df.filter(df.getLongs(COL_TIME).between(tStart, tCurrent).and(filter)).dropNull(COL_TIME, COL_VALUE);
+    return df.filter(outlierAndTimeFilter).dropNull(COL_TIME, COL_VALUE);
   }
 
   /**
