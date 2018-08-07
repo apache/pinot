@@ -195,6 +195,7 @@ public class PerfBenchmarkDriver {
     conf.setTenantIsolationEnabled(false);
     conf.setControllerVipHost("localhost");
     conf.setControllerVipProtocol("http");
+    conf.setPinotFSFactoryClasses(null);
     return conf;
   }
 
