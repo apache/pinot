@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import org.testng.Assert;
 import java.util.ArrayList;
@@ -27,6 +30,7 @@ import org.testng.annotations.BeforeClass;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -35,12 +39,10 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
+public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDigest> {
 
-  private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[] {
-      "SELECT SUM(salary) FROM T",
-      "SELECT SUM(salary) FROM T GROUP BY Name",
-      "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"
+  private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
+      "SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"
   };
 
   @BeforeClass
@@ -61,7 +63,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
-    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "salary");
+    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
     metric2aggFuncPairs1.add(pair1);
 
     StarTreeV2Config starTreeV2Config = new StarTreeV2Config();
@@ -89,25 +91,29 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   }
 
   @Override
-  protected Double getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
+  protected byte[] getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
     if (dictionary == null) {
-      return valueIterator.nextDoubleVal();
+      return valueIterator.nextBytesVal();
     } else {
-      return dictionary.getDoubleValue(valueIterator.nextIntVal());
+      return dictionary.getBytesValue(valueIterator.nextIntVal());
     }
   }
 
   @Override
-  protected Double aggregate(@Nonnull List<Double> values) {
-    double sumVal = 0;
-    for (Double value : values) {
-      sumVal += value;
+  protected TDigest aggregate(@Nonnull List<byte[]> values) {
+    TDigest tDigest = new TDigest(100);
+    for (byte [] obj: values) {
+      try {
+        tDigest.add(ObjectCustomSerDe.deserialize(obj, ObjectType.TDigest));
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
-    return sumVal;
+    return tDigest;
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  protected void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
+    Assert.assertEquals(starTreeResult instanceof TDigest, nonStarTreeResult instanceof TDigest);
   }
 }

@@ -35,7 +35,7 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
-public class CountStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
+public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
 
   private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
       "SELECT COUNT(*) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"
@@ -87,25 +87,25 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   }
 
   @Override
-  protected Double getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
+  protected Long getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
     if (dictionary == null) {
-      return valueIterator.nextDoubleVal();
+      return valueIterator.nextLongVal();
     } else {
-      return dictionary.getDoubleValue(valueIterator.nextIntVal());
+      return dictionary.getLongValue(valueIterator.nextIntVal());
     }
   }
 
   @Override
-  protected Double aggregate(@Nonnull List<Double> values) {
-    double countVal = 0;
-    for (Double value : values) {
+  protected Long aggregate(@Nonnull List<Long> values) {
+    long countVal = 0;
+    for (Long value : values) {
       countVal = countVal + value;
     }
     return countVal;
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
+  protected void assertAggregatedValue(Long starTreeResult, Long nonStarTreeResult) {
     Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
   }
 }
