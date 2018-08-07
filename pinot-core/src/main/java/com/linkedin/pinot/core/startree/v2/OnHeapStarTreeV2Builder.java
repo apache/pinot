@@ -369,8 +369,6 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
    * Helper function to create aggregated document for all nodes
    *
    * @param node 'TreeNode' to start creating aggregated documents from.
-   *
-   * @return void.
    */
   private void createAggregatedDocForAllNodes(TreeNode node, TreeNode parent) {
 
