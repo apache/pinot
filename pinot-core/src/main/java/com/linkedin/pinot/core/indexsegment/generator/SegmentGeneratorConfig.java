@@ -182,7 +182,7 @@ public class SegmentGeneratorConfig {
     if (starTreeIndexSpec != null) {
       enableStarTreeIndex(starTreeIndexSpec);
     }
-    if (indexingConfig.isAddInvertedIndexDuringDataGeneration()) {
+    if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
       _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
     }
 
