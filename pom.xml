@@ -191,12 +191,6 @@
   <dependencyManagement>
     <dependencies>
       <dependency>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.0.0-M2</version>
-        <type>maven-plugin</type>
-      </dependency>
-      <dependency>
         <groupId>org.apache.httpcomponents</groupId>
         <artifactId>httpmime</artifactId>
         <version>4.5.3</version>
@@ -996,6 +990,7 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-enforcer-plugin</artifactId>
+          <version>3.0.0-M2</version>
           <executions>
             <execution>
               <id>enforce-dependency-convergence</id>
