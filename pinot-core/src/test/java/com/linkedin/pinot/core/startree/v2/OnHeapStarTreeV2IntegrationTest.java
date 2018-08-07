@@ -42,7 +42,6 @@ import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.startree.BaseStarTreeIndexTest;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;

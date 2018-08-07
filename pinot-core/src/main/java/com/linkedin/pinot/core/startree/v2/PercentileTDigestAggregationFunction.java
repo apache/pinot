@@ -25,8 +25,8 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
 
 
 public class PercentileTDigestAggregationFunction implements AggregationFunction<Number, TDigest> {
-  protected int _maxLength = 0;
-  public final int DEFAULT_TDIGEST_COMPRESSION = 100;
+  private int _maxLength = 0;
+  private final int DEFAULT_TDIGEST_COMPRESSION = 100;
 
   @Nonnull
   @Override
