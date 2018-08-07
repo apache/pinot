@@ -94,7 +94,7 @@ public class TablesResourceTest extends BaseResourceTest {
     JSONObject jsonResponse = new JSONObject(_webTarget.path(segmentMetadataPath).request().get(String.class));
     SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
     Assert.assertEquals(jsonResponse.getString("segmentName"), segmentMetadata.getName());
-    Assert.assertEquals(jsonResponse.getString("crc"), segmentMetadata.getCrc());
+    Assert.assertEquals(String.valueOf(jsonResponse.getLong("crc")), segmentMetadata.getCrc());
     Assert.assertEquals(jsonResponse.getLong("creationTimeMillis"), segmentMetadata.getIndexCreationTime());
     Assert.assertEquals(jsonResponse.getString("paddingCharacter"),
         String.valueOf(segmentMetadata.getPaddingCharacter()));
