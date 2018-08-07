@@ -126,8 +126,10 @@ export default Controller.extend({
     const urn2dimensions = {};
     anomalies.forEach(anomaly => {
       const baseUrn = stripTail(anomaly.metricUrn);
-      urn2dimensions[baseUrn] = urn2dimensions[baseUrn] || new Set();
-      urn2dimensions[baseUrn].add(anomaly.metricUrn);
+      if (!_.isEqual(baseUrn, anomaly.metricUrn)) {
+        urn2dimensions[baseUrn] = urn2dimensions[baseUrn] || new Set();
+        urn2dimensions[baseUrn].add(anomaly.metricUrn);
+      }
     });
     return urn2dimensions;
   }),
@@ -144,7 +146,8 @@ export default Controller.extend({
 
     const urn2labels = {};
     [...metricUrns].forEach(urn => {
-      urn2labels[urn] = toFilters(urn).map(arr => arr[1]).join(", ") + ` (${urn2count[urn]})`;
+      const filters = toFilters(urn);
+      urn2labels[urn] = filters.map(arr => arr[1]).join(", ") + ` (${urn2count[urn]})`;
     });
     return urn2labels;
   }),
@@ -343,7 +346,7 @@ export default Controller.extend({
       .then(checkStatus)
       .then(res => set(this, 'timeseries', res))
       .then(res => set(this, 'output', 'got timeseries'))
-      .catch(err => set(this, 'errorTimeseries', err));
+      // .catch(err => set(this, 'errorTimeseries', err));
 
     set(this, 'errorBaseline', null);
 
@@ -353,7 +356,7 @@ export default Controller.extend({
       .then(checkStatus)
       .then(res => set(this, 'baseline', res))
       .then(res => set(this, 'output', 'got baseline'))
-      .catch(err => set(this, 'errorBaseline', err));
+      // .catch(err => set(this, 'errorBaseline', err));
   },
 
   _fetchAnomalies() {
@@ -371,7 +374,7 @@ export default Controller.extend({
         set(this, 'diagnostics', res.diagnostics);
       })
       .then(res => set(this, 'output', 'got anomalies'))
-      .catch(err => set(this, 'errorAnomalies', err));
+      // .catch(err => set(this, 'errorAnomalies', err));
   },
 
   _fetchEntities(urns) {

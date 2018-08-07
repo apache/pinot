@@ -97,7 +97,7 @@
       <p>{{errorAnomalies}}</p>
       {{#each anomalyMetricEntities as | baseMetric |}}
         <p>
-          <a {{action "onMetricLink" baseMetric.urn}}>{{baseMetric.label}}</a>
+          <a {{action "onMetricLink" baseMetric.urn}}>{{baseMetric.label}}{{get-safe anomalyMetricUrnDimensionLabels baseMetric.urn}}</a>
           <ol>
           {{#each (get-safe anomalyMetricUrnDimensions baseMetric.urn) as | metric |}}
             <li><a {{action "onMetricLink" metric}}>{{get-safe anomalyMetricUrnDimensionLabels metric}}</a></li>
