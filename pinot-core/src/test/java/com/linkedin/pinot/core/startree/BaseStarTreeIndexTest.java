@@ -85,14 +85,14 @@ public abstract class BaseStarTreeIndexTest {
             (BlockSingleValIterator) _segment.getDataSource(groupByColumn).nextBlock().getBlockValueSet().iterator();
       }
 
-      Assert.assertEquals(computeUsingAggregatedDocs(), computeUsingRawDocs(), "Comparison failed for query: " + query);
+      Assert.assertEquals(computeWithoutStarTree(), computeWithStarTree(), "Comparison failed for query: " + query);
     }
   }
 
   /**
    * Helper method to compute the result using raw docs.
    */
-  private Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
+  private Map<List<Integer>, List<Double>> computeWithStarTree() throws Exception {
     FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
     Operator filterOperator;
     if (_numGroupByColumns > 0) {
@@ -107,7 +107,7 @@ public abstract class BaseStarTreeIndexTest {
   /**
    * Helper method to compute the result using aggregated docs.
    */
-  private Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
+  private Map<List<Integer>, List<Double>> computeWithoutStarTree() throws Exception {
     Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
     return compute(filterOperator);
   }
