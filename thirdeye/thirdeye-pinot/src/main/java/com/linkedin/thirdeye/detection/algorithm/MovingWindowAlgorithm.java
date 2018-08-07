@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,7 +38,6 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
-import sun.reflect.generics.tree.Tree;
 
 
 public class MovingWindowAlgorithm extends StaticDetectionPipeline {
@@ -74,6 +72,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private final double kernelSumMin;
   private final double kernelSumMax;
   private final double kernelDecay;
+  private final double kernelExpansion;
   private final int kernelSize;
   private final double quantileMin;
   private final double quantileMax;
@@ -102,6 +101,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.kernelSumMin = MapUtils.getDoubleValue(config.getProperties(), "kernelSumMin", Double.NaN);
     this.kernelSumMax = MapUtils.getDoubleValue(config.getProperties(), "kernelSumMax", Double.NaN);
     this.kernelDecay = MapUtils.getDoubleValue(config.getProperties(), "kernelDecay", 0.5);
+    this.kernelExpansion = MapUtils.getDoubleValue(config.getProperties(), "kernelExpansion", 0.5);
     this.kernelSize = MapUtils.getIntValue(config.getProperties(), "kernelSize", 5);
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "UTC"));
     this.windowSize = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "windowSize", "1week"));
@@ -199,6 +199,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private Result run(DataFrame df, long start, TreeSet<Long> changePoints) throws Exception {
     DoubleSeries originalValue = df.getDoubles(COL_VALUE);
 
+    // TODO support rescaling on trending time series
     DataFrame dfValue = AlgorithmUtils.getRescaledSeries(df, changePoints, this.changeDuration.toStandardDuration().getMillis());
 
     // relative baseline
@@ -226,20 +227,20 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       //
       // test for intra-detection change points
       //
-      long candidateTimestamp = new DateTime(timestamp, this.timezone).minus(this.changeDuration).getMillis();
+      long fractionRangeStart = new DateTime(timestamp, this.timezone).minus(this.changeDuration).getMillis();
+      DataFrame changePointWindow = df.filter(df.getLongs(COL_TIME).between(fractionRangeStart, timestamp)).dropNull(COL_TIME);
+
       Long latestChangePoint = changePoints.floor(timestamp);
+      long minChangePoint = latestChangePoint == null ? fractionRangeStart : new DateTime(latestChangePoint, this.timezone).plus(this.changeDuration).getMillis();
 
-      DataFrame changePointWindow = df.filter(df.getLongs(COL_TIME).between(candidateTimestamp, timestamp)).dropNull(COL_TIME);
+      long fractionChangePoint = extractAnomalyFractionChangePoint(changePointWindow, this.changeFraction);
 
-      long minChangePoint = latestChangePoint == null ? candidateTimestamp : new DateTime(latestChangePoint, this.timezone).plus(this.changeDuration).getMillis();
-      double anomalyFraction = extractAnomalyFraction(changePointWindow, candidateTimestamp);
-
-      if (anomalyFraction >= this.changeFraction && candidateTimestamp >= minChangePoint) {
+      if (fractionChangePoint >= 0 && fractionChangePoint >= minChangePoint) {
         // TODO only inject non-processed values for next run
         DataFrame dfNew = new DataFrame(df).addSeries(COL_VALUE, originalValue);
 
         TreeSet<Long> changePointsNew = new TreeSet<>(changePoints);
-        changePointsNew.add(candidateTimestamp);
+        changePointsNew.add(fractionChangePoint);
         System.out.println("change point during execution at " + timestamp + " for " + this.sliceData);
 
         return this.run(dfNew, timestamp, changePointsNew);
@@ -316,25 +317,25 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
         if (!Double.isNaN(this.kernelMin)) {
           BooleanSeries violations = smooth.lt(this.kernelMin).append(smoothPadding);
-          BooleanSeries partialViolations = smooth.lt(this.kernelMin / 3).append(smoothPadding);
+          BooleanSeries partialViolations = smooth.lt(this.kernelMin * this.kernelExpansion).append(smoothPadding);
           anomalyRangeHelper(df, violations, partialViolations);
         }
 
         if (!Double.isNaN(this.kernelMax)) {
           BooleanSeries violations = smooth.gt(this.kernelMax).append(smoothPadding);
-          BooleanSeries partialViolations = smooth.gt(this.kernelMax / 3).append(smoothPadding);
+          BooleanSeries partialViolations = smooth.gt(this.kernelMax * this.kernelExpansion).append(smoothPadding);
           anomalyRangeHelper(df, violations, partialViolations);
         }
 
         if (!Double.isNaN(this.kernelSumMin)) {
           BooleanSeries violations = kernelSum.lt(this.kernelSumMin);
-          BooleanSeries partialViolations = kernelSum.lt(this.kernelSumMin / 3);
+          BooleanSeries partialViolations = kernelSum.lt(this.kernelSumMin * this.kernelExpansion);
           anomalyRangeHelper(df, violations, partialViolations);
         }
 
         if (!Double.isNaN(this.kernelSumMax)) {
           BooleanSeries violations = kernelSum.gt(this.kernelSumMax);
-          BooleanSeries partialViolations = kernelSum.gt(this.kernelSumMax / 3);
+          BooleanSeries partialViolations = kernelSum.gt(this.kernelSumMax * this.kernelExpansion);
           anomalyRangeHelper(df, violations, partialViolations);
         }
 
@@ -412,30 +413,29 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   }
 
   /**
-   * Extract the anomaly fraction for a given time range
+   * Find change points within window via anomaly fraction
    *
    * @param window data frame
-   * @param minTimestamp minimum timestamp to consider
+   * @param fraction anomaly range fraction of total window
    * @return fraction of anomaly period compared to overall period
    */
-  static double extractAnomalyFraction(DataFrame window, long minTimestamp) {
+  static long extractAnomalyFractionChangePoint(DataFrame window, double fraction) {
     long[] timestamp = window.getLongs(COL_TIME).values();
     byte[] anomaly = window.getBooleans(COL_ANOMALY).values();
 
-    int total = 0;
+    int max = window.get(COL_TIME).count();
     int count = 0;
     for (int i = window.size() - 1; i >= 0; i--) {
       if (!LongSeries.isNull(timestamp[i]) && !BooleanSeries.isNull(anomaly[i])) {
-        if (timestamp[i] < minTimestamp) {
-          break;
-        }
-
-        total += 1;
         count += BooleanSeries.isTrue(anomaly[i]) ? 1 : 0;
+      }
+
+      if (count / (double) max >= fraction) {
+        return timestamp[i];
       }
     }
 
-    return count / (double) total;
+    return -1;
   }
 
   /**
@@ -449,7 +449,10 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     DataFrame res = new DataFrame(df);
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
-      res.set(COL_ANOMALY, res.getLongs(COL_TIME).between(anomaly.getStartTime(), anomaly.getEndTime()), BooleanSeries.fillValues(df.size(), true));
+      if (anomaly.getFeedback() == null ||
+          !anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
+        res.set(COL_ANOMALY, res.getLongs(COL_TIME).between(anomaly.getStartTime(), anomaly.getEndTime()), BooleanSeries.fillValues(df.size(), true));
+      }
     }
 
     return res;
@@ -536,11 +539,11 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   DataFrame makeWindow(DataFrame df, long tCurrent, TreeSet<Long> changePoints) {
     long tStart = new DateTime(tCurrent, this.timezone).minus(this.windowSize).getMillis();
 
-    // truncate history at change point but leave at least 1 week
+    // truncate history at change point but leave at least a window equal to changeDuration
     Long changePoint = changePoints.lower(tCurrent);
     if (changePoint != null) {
-      // TODO make minimum configurable
-      tStart = Math.min(Math.max(tStart, changePoint), tCurrent - TimeUnit.DAYS.toMillis(7));
+      long tCurrentMin = new DateTime(tCurrent, this.timezone).minus(this.changeDuration).getMillis();
+      tStart = Math.min(Math.max(tStart, changePoint), tCurrentMin);
     }
 
     // use non-outlier period, unless not enough history (anomalies are outliers too)
