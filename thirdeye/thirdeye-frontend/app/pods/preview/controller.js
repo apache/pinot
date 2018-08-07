@@ -55,6 +55,8 @@ export default Controller.extend({
 
   analysisRange: [moment().subtract(1.5, 'month').valueOf(), moment().valueOf()],
 
+  displayRange: [moment().subtract(2.5, 'month').valueOf(), moment().valueOf()],
+
   compareMode: 'wo1w',
 
   compareModeOptions: [
@@ -335,7 +337,7 @@ export default Controller.extend({
 
   _fetchTimeseries() {
     const metricUrn = get(this, 'metricUrn');
-    const range = get(this, 'analysisRange');
+    const range = get(this, 'displayRange');
     const granularity = '15_MINUTES';
     const timezone = moment.tz.guess();
 
