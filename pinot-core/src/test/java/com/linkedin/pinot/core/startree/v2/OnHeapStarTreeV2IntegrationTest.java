@@ -16,36 +16,18 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.File;
-import java.util.Map;
 import java.util.List;
-import java.util.HashSet;
-import java.util.HashMap;
-import org.testng.Assert;
 import java.util.ArrayList;
-import java.util.Collections;
 import com.google.common.io.Files;
 import org.testng.annotations.Test;
 import org.testng.annotations.BeforeTest;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.core.plan.FilterPlanNode;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
-import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -55,28 +37,9 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
 
 public class OnHeapStarTreeV2IntegrationTest {
 
-  private IndexSegment _segment;
-  private BrokerRequest _brokerRequest;
-  private int _numMetricColumns;
-  private Dictionary[] _metricDictionaries;
-  private BlockSingleValIterator[] _metricValIterators;
-  private int _numGroupByColumns;
-  private BlockSingleValIterator[] _groupByValIterators;
-
-
   private File _filepath;
   private File _indexDir;
-  private int _starTreeId;
-  private List<FieldSpec.DataType> _metricDataType;
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private List<StarTreeV2Config> _starTreeV2ConfigList = new ArrayList<>();
-
-  private final String[] STAR_TREE1_HARD_CODED_QUERIES =
-      new String[]{
-          "SELECT SUM(salary) FROM T GROUP BY Name",
-          "SELECT MAX(m1) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"
-  };
-
 
   @BeforeTest
   void setUp() throws Exception {
@@ -182,154 +145,5 @@ public class OnHeapStarTreeV2IntegrationTest {
     } catch (Exception e) {
       e.printStackTrace();
     }
-  }
-
-//  @Test
-//  public void testExecutor() throws Exception {
-//    try {
-//      _segment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
-//      for ( int i = 0; i < _starTreeV2ConfigList.size(); i++) {
-//        _starTreeId = i;
-//        testQueries(i);
-//      }
-//      _segment.destroy();
-//
-//    } catch (Exception e) {
-//      e.printStackTrace();
-//    }
-//  }
-
-  protected String[] getHardCodedQueries() {
-    return STAR_TREE1_HARD_CODED_QUERIES;
-  }
-
-  protected List<String> getMetricColumns() {
-
-    List<String> pairs = new ArrayList<>();
-    _metricDataType = new ArrayList<>();
-    AggregationFunctionFactory factory = new AggregationFunctionFactory();
-
-    for (AggregationFunctionColumnPair pair : _starTreeV2ConfigList.get(_starTreeId).getMetric2aggFuncPairs()) {
-      String s = pair.toColumnName();
-      pairs.add(s);
-      AggregationFunction function = factory.getAggregationFunction(pair.getFunctionType().getName());
-      _metricDataType.add(function.getResultDataType());
-    }
-    return pairs;
-  }
-
-  protected Map<List<Integer>, List<Double>> computeAggregated(Operator filterOperator) throws Exception {
-    BlockDocIdIterator docIdIterator = filterOperator.nextBlock().getBlockDocIdSet().iterator();
-
-    Map<List<Integer>, List<Double>> results = new HashMap<>();
-    int docId;
-    while ((docId = docIdIterator.next()) != Constants.EOF) {
-
-      List<Integer> groupKeys = new ArrayList<>(_numGroupByColumns);
-      for (int i = 0; i < _numGroupByColumns; i++) {
-        _groupByValIterators[i].skipTo(docId);
-        groupKeys.add(_groupByValIterators[i].nextIntVal());
-      }
-
-      List<Double> sums = results.get(groupKeys);
-      if (sums == null) {
-        sums = new ArrayList<>(_numMetricColumns);
-        for (int i = 0; i < _numMetricColumns; i++) {
-          sums.add(0.0);
-        }
-        results.put(groupKeys, sums);
-      }
-
-      for (int i = 0; i < _numMetricColumns; i++) {
-        if (_metricDataType.get(i).equals(FieldSpec.DataType.DOUBLE)) {
-          double abc = _metricValIterators[i].nextDoubleVal();
-          System.out.println(abc);
-          sums.set(i, sums.get(i) + abc);
-        }
-      }
-    }
-    return results;
-  }
-
-  protected Map<List<Integer>, List<Double>> compute(Operator filterOperator) {
-    BlockDocIdIterator docIdIterator = filterOperator.nextBlock().getBlockDocIdSet().iterator();
-
-    Map<List<Integer>, List<Double>> results = new HashMap<>();
-    int docId;
-    while ((docId = docIdIterator.next()) != Constants.EOF) {
-
-      List<Integer> groupKeys = new ArrayList<>(_numGroupByColumns);
-      for (int i = 0; i < _numGroupByColumns; i++) {
-        _groupByValIterators[i].skipTo(docId);
-        groupKeys.add(_groupByValIterators[i].nextIntVal());
-      }
-
-      List<Double> sums = results.get(groupKeys);
-      if (sums == null) {
-        sums = new ArrayList<>(_numMetricColumns);
-        for (int i = 0; i < _numMetricColumns; i++) {
-          sums.add(0.0);
-        }
-        results.put(groupKeys, sums);
-      }
-      for (int i = 0; i < _numMetricColumns; i++) {
-        _metricValIterators[i].skipTo(docId);
-        int dictId = _metricValIterators[i].nextIntVal();
-        sums.set(i, sums.get(i) + _metricDictionaries[i].getDoubleValue(dictId));
-      }
-    }
-
-    return results;
-  }
-
-
-  protected void testQueries(int starTreeId) throws Exception {
-    Assert.assertNotNull(_segment);
-    List<StarTreeV2> starTrees = _segment.getStarTrees();
-
-    List<String> metricColumns = getMetricColumns();
-    _numMetricColumns = metricColumns.size();
-    _metricValIterators = new BlockSingleValIterator[_numMetricColumns];
-    for (int i = 0; i < metricColumns.size(); i++) {
-      DataSource dataSource = starTrees.get(starTreeId).getDataSource(metricColumns.get(i));
-      _metricValIterators[i] = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
-    }
-
-    for (String query : getHardCodedQueries()) {
-      _brokerRequest = COMPILER.compileToBrokerRequest(query);
-      List<String> groupByColumns = _brokerRequest.isSetGroupBy() ? _brokerRequest.getGroupBy().getColumns() : Collections.emptyList();
-      _numGroupByColumns = groupByColumns.size();
-      _groupByValIterators = new BlockSingleValIterator[_numGroupByColumns];
-
-      for (int i = 0; i < _numGroupByColumns; i++) {
-        DataSource dataSource = starTrees.get(starTreeId).getDataSource(groupByColumns.get(i));
-        _groupByValIterators[i] = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
-      }
-
-      Assert.assertEquals(computeUsingAggregatedDocs(), computeUsingRawDocs(), "Comparison failed for query: " + query);
-    }
-  }
-
-  /**
-   * Helper method to compute the result using raw docs.
-   */
-  protected Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
-    FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    Operator filterOperator;
-    if (_numGroupByColumns > 0) {
-      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
-          new HashSet<>(_brokerRequest.getGroupBy().getColumns())).run();
-    } else {
-      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode, null).run();
-    }
-    return compute(filterOperator);
-  }
-
-  /**
-   * Helper method to compute the result using aggregated docs.
-   */
-  protected Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
-    Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
-    return computeAggregated(filterOperator);
   }
 }

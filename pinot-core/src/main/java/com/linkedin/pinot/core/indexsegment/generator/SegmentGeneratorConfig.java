@@ -148,6 +148,12 @@ public class SegmentGeneratorConfig {
     _onHeap = config._onHeap;
   }
 
+  /**
+   * This constructor is used during offline data generation. Note that it has an option that will generate inverted
+   * index.
+   * @param tableConfig
+   * @param schema
+   */
   public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(schema);
     _schema = schema;
@@ -176,7 +182,9 @@ public class SegmentGeneratorConfig {
     if (starTreeIndexSpec != null) {
       enableStarTreeIndex(starTreeIndexSpec);
     }
-    _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+    if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+      _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+    }
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();

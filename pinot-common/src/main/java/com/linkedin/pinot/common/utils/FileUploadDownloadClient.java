@@ -89,6 +89,7 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String HTTPS = "https";
   private static final String SCHEMA_PATH = "/schemas";
   private static final String SEGMENT_PATH = "/segments";
+  private static final String SEGMENT_METADATA_PATH = "/segmentmetadata";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "?type=";
   private static final String SLASH = "/";
@@ -137,6 +138,14 @@ public class FileUploadDownloadClient implements Closeable {
     return getURI(HTTP, host, port, SEGMENT_PATH);
   }
 
+  public static URI getUploadSegmentMetadataHttpURI(String host, int port) throws URISyntaxException {
+    return getURI(HTTP, host, port, SEGMENT_METADATA_PATH);
+  }
+
+  public static URI getUploadSegmentMetadataHttpsURI(String host, int port) throws URISyntaxException {
+    return getURI(HTTPS, host, port, SEGMENT_METADATA_PATH);
+  }
+
   public static URI getUploadSegmentHttpsURI(String host, int port) throws URISyntaxException {
     return getURI(HTTPS, host, port, SEGMENT_PATH);
   }
@@ -183,6 +192,12 @@ public class FileUploadDownloadClient implements Closeable {
   private static HttpUriRequest getUploadSegmentRequest(URI uri, String segmentName, InputStream inputStream,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
     return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, inputStream), headers,
+        parameters, socketTimeoutMs);
+  }
+
+  private static HttpUriRequest getUploadSegmentMetadataRequest(URI uri, String segmentName, File segmentFile,
+      @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters, int socketTimeoutMs) {
+    return getUploadFileRequest(HttpPost.METHOD_NAME, uri, getContentBody(segmentName, segmentFile), headers,
         parameters, socketTimeoutMs);
   }
 
@@ -342,6 +357,25 @@ public class FileUploadDownloadClient implements Closeable {
       throws IOException, HttpErrorStatusException {
     return sendRequest(getUpdateSchemaRequest(uri, schemaName, schemaFile));
   }
+
+  /**
+   * Upload segment by sending a zip of creation.meta and metadata.properties.
+   *
+   * @param uri URI
+   * @param segmentName Segment name
+   * @param segmentMetadataFile Segment metadata file
+   * @param headers Optional http headers
+   * @param parameters Optional query parameters
+   * @param socketTimeoutMs Socket timeout in milliseconds
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse uploadSegmentMetadata(URI uri, String segmentName, File segmentMetadataFile, @Nullable List<Header> headers,
+      @Nullable List<NameValuePair> parameters, int socketTimeoutMs) throws IOException, HttpErrorStatusException {
+    return sendRequest(getUploadSegmentMetadataRequest(uri, segmentName, segmentMetadataFile, headers, parameters, socketTimeoutMs));
+  }
+
 
   /**
    * Upload segment with segment file.
