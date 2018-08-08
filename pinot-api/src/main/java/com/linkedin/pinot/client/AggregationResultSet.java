@@ -61,7 +61,7 @@ class AggregationResultSet extends AbstractResultSet {
     }
 
     try {
-      return _jsonObject.getString("value");
+      return _jsonObject.get("value").toString();
     } catch (Exception e) {
       throw new PinotClientException(e);
     }

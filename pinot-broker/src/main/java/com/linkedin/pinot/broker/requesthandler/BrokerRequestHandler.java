@@ -230,7 +230,7 @@ public class BrokerRequestHandler {
     }
 
     // Set extra settings into broker request
-    if (request.has(TRACE) && Boolean.parseBoolean(request.getString(TRACE))) {
+    if (request.has(TRACE) && request.getBoolean(TRACE)) {
       LOGGER.debug("Enable trace for requestId {}: {}", requestId, query);
       brokerRequest.setEnableTrace(true);
     }
