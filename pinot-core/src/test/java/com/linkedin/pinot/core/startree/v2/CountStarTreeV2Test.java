@@ -23,7 +23,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import com.google.common.io.Files;
 import org.testng.annotations.Test;
-import org.testng.annotations.BeforeClass;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -37,24 +36,26 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
 
 public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
 
+  private File _indexDir;
+  private StarTreeV2Config _starTreeV2Config;
+
   private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
       "SELECT COUNT(*) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"
   };
 
-  @BeforeClass
-  void setUp() throws Exception {
+  private void setUp() throws Exception {
 
-    String _segmentName = "starTreeV2BuilderTest";
-    String _segmentOutputDir = Files.createTempDir().toString();
+    String segmentName = "starTreeV2BuilderTest";
+    String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    List<GenericRow> _rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
 
-    //List<GenericRow> _rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
 
-    RecordReader _recordReader = new GenericRowRecordReader(_rows, schema);
-    File _indexDir = StarTreeV2SegmentHelper.createSegment(schema, _segmentName, _segmentOutputDir, _recordReader);
-    File _filepath = new File(_indexDir, "v3");
+    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+    _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
+    File filepath = new File(_indexDir, "v3");
 
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
@@ -62,15 +63,28 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
     AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "*");
     metric2aggFuncPairs1.add(pair1);
 
-    StarTreeV2Config starTreeV2Config = new StarTreeV2Config();
-    starTreeV2Config.setOutDir(_filepath);
-    starTreeV2Config.setMaxNumLeafRecords(1);
-    starTreeV2Config.setDimensions(schema.getDimensionNames());
-    starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
+    _starTreeV2Config = new StarTreeV2Config();
+    _starTreeV2Config.setOutDir(filepath);
+    _starTreeV2Config.setMaxNumLeafRecords(1);
+    _starTreeV2Config.setDimensions(schema.getDimensionNames());
+    _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
+  }
 
-
+  private void onHeapSetUp() throws Exception {
+    setUp();
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
-    buildTest.init(_indexDir, starTreeV2Config);
+    buildTest.init(_indexDir, _starTreeV2Config);
+    buildTest.build();
+    buildTest.serialize();
+
+    _indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
+    _starTreeV2 = _indexSegment.getStarTrees().get(0);
+  }
+
+  private void offHeapSetUp() throws Exception {
+    setUp();
+    OffHeapStarTreeV2Builder buildTest = new OffHeapStarTreeV2Builder();
+    buildTest.init(_indexDir, _starTreeV2Config);
     buildTest.build();
     buildTest.serialize();
 
@@ -79,7 +93,17 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
   }
 
   @Test
-  public void testQueries() {
+  public void testQueries() throws Exception {
+    onHeapSetUp();
+    System.out.println("Testing On-Heap Version");
+    for (String s: STAR_TREE1_HARD_CODED_QUERIES) {
+      testQuery(s);
+      System.out.println("Passed Query : " + s);
+    }
+    System.out.println();
+
+    offHeapSetUp();
+    System.out.println("Testing Off-Heap Version");
     for (String s: STAR_TREE1_HARD_CODED_QUERIES) {
       testQuery(s);
       System.out.println("Passed Query : " + s);

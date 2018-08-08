@@ -57,8 +57,8 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     //List<GenericRow> _rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
 
     RecordReader _recordReader = new GenericRowRecordReader(_rows, schema);
-    File _indexDir = StarTreeV2SegmentHelper.createSegment(schema, _segmentName, _segmentOutputDir, _recordReader);
-    File _filepath = new File(_indexDir, "v3");
+    File indexDir = StarTreeV2SegmentHelper.createSegment(schema, _segmentName, _segmentOutputDir, _recordReader);
+    File filepath = new File(indexDir, "v3");
 
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
@@ -67,18 +67,18 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     metric2aggFuncPairs1.add(pair1);
 
     StarTreeV2Config starTreeV2Config = new StarTreeV2Config();
-    starTreeV2Config.setOutDir(_filepath);
+    starTreeV2Config.setOutDir(filepath);
     starTreeV2Config.setMaxNumLeafRecords(1);
     starTreeV2Config.setDimensions(schema.getDimensionNames());
     starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
 
 
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
-    buildTest.init(_indexDir, starTreeV2Config);
+    buildTest.init(indexDir, starTreeV2Config);
     buildTest.build();
     buildTest.serialize();
 
-    _indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
+    _indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.heap);
     _starTreeV2 = _indexSegment.getStarTrees().get(0);
   }
 

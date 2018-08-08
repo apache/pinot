@@ -427,6 +427,10 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       String columnName = pair.toColumnName();
       AggregationFunction function = _aggregationFunctions.get(index);
       index++;
+
+      System.out.println(function.getType().getName());
+      System.out.println(function.getResultMaxByteSize());
+
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
           ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getResultDataType(), _aggregatedDocCount,
           function.getResultMaxByteSize());
@@ -485,11 +489,14 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
         AggregationFunction function = _aggregationFunctions.get(j);
         if (function.getResultDataType().equals(FieldSpec.DataType.BYTES)) {
+          System.out.println(function.getType().getName());
+          System.out.println(function.serialize(values[j]).length);
           ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, function.serialize(values[j]));
         } else {
           ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, values[j]);
         }
       }
+      System.out.println(docId);
       docId++;
     }
 
