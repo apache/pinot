@@ -36,8 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.mockito.ArgumentMatchers;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -55,7 +53,6 @@ import static org.mockito.Mockito.*;
 public class TableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReaderTest.class);
   private final Executor executor = Executors.newFixedThreadPool(1);
-  private final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
 
   private PinotHelixResourceManager helix;
   private Map<String, FakeSizeServer> serverMap = new HashMap<>();
@@ -219,7 +216,7 @@ public class TableSizeReaderTest {
 
   @Test
   public void testNoSuchTable() throws InvalidConfigException {
-    TableSizeReader reader = new TableSizeReader(executor, connectionManager, helix);
+    TableSizeReader reader = new TableSizeReader(executor, helix);
     Assert.assertNull(reader.getTableSizeDetails("mytable", 5000));
   }
 
@@ -243,7 +240,7 @@ public class TableSizeReaderTest {
           }
         });
 
-    TableSizeReader reader = new TableSizeReader(executor, connectionManager, helix);
+    TableSizeReader reader = new TableSizeReader(executor, helix);
     return reader.getTableSizeDetails(table, timeoutMsec);
   }
 

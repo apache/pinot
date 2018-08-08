@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,8 +106,7 @@ public class MultiGetRequestTest {
 
   @Test
   public void testMultiGet() {
-    MultiGetRequest mget = new MultiGetRequest(Executors.newCachedThreadPool(),
-        new MultiThreadedHttpConnectionManager());
+    MultiGetRequest mget = new MultiGetRequest(Executors.newCachedThreadPool());
     List<String> urls = Arrays.asList("http://localhost:" + String.valueOf(portStart) + URI_PATH,
         "http://localhost:" + String.valueOf(portStart + 1) + URI_PATH,
         "http://localhost:" + String.valueOf(portStart + 2) + URI_PATH,
