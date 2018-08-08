@@ -28,26 +28,24 @@ import java.util.List;
 public class AggregationFunctionColumnPairBuffer {
 
   int _totalBytes;
-  protected final Object[] _values;
-  private final List<AggregationFunctionColumnPair> _aggFunColumnPairs;
+  final Object[] _values;
+  private final List<AggregationFunction> _aggFunColumnPairFunctions;
 
-  public AggregationFunctionColumnPairBuffer(Object[] values, List<AggregationFunctionColumnPair> aggFunColumnPairs) {
+  AggregationFunctionColumnPairBuffer(Object[] values, List<AggregationFunction> aggFunColumnPairFunctions) {
     _values = values;
-    _aggFunColumnPairs = aggFunColumnPairs;
-
-    calculateBytesRequired();
+    _aggFunColumnPairFunctions = aggFunColumnPairFunctions;
   }
 
   /**
-   * NOTE: pass in byte size for performance. Byte size can be calculated by adding up field size for all metrics.
+   * NOTE: convert to byte array from objects array.
    */
-  public byte[] toBytes() {
+  public byte[] toBytes() throws IOException {
+    calculateBytesRequired();
     byte[] bytes = new byte[_totalBytes];
     ByteBuffer buffer = ByteBuffer.wrap(bytes).order(PinotDataBuffer.NATIVE_ORDER);
 
-    for (int i = 0; i < _aggFunColumnPairs.size(); i++) {
-      AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
-      AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+    for (int i = 0; i < _aggFunColumnPairFunctions.size(); i++) {
+      AggregationFunction factory = _aggFunColumnPairFunctions.get(i);
 
       switch (factory.getResultDataType()) {
         case INT:
@@ -63,18 +61,9 @@ public class AggregationFunctionColumnPairBuffer {
           buffer.putDouble(new Double(_values[i].toString()));
           break;
         case BYTES:
-          int size = 0;
-          try {
-            size = getObjectSize(factory, _values[i]);
-          } catch (IOException e) {
-            e.printStackTrace();
-          }
-          buffer.putInt(size);
-          try {
-            buffer.put(ObjectCustomSerDe.serialize(_values[i]));
-          } catch (IOException e) {
-            e.printStackTrace();
-          }
+          byte[] serializedObject = ObjectCustomSerDe.serialize(_values[i]);
+          buffer.putInt(serializedObject.length);
+          buffer.put(serializedObject);
           break;
         default:
           throw new IllegalStateException();
@@ -85,17 +74,17 @@ public class AggregationFunctionColumnPairBuffer {
   }
 
   /**
-   * NOTE: pass in byte size for performance. Byte size can be calculated by adding up field size for all metrics.
+   * NOTE: convert from byte to  objects array
    */
-  public static AggregationFunctionColumnPairBuffer fromBytes(byte[] bytes, List<AggregationFunctionColumnPair> aggFunColumnPairs) {
+  public static AggregationFunctionColumnPairBuffer fromBytes(byte[] bytes, List<AggregationFunction> aggFunColumnPairFunctions)
+      throws IOException {
 
-    int numMetrics = aggFunColumnPairs.size();
+    int numMetrics = aggFunColumnPairFunctions.size();
     Object[] values = new Object[numMetrics];
-
     ByteBuffer buffer = ByteBuffer.wrap(bytes).order(PinotDataBuffer.NATIVE_ORDER);
+
     for (int i = 0; i < numMetrics; i++) {
-      AggregationFunctionColumnPair pair = aggFunColumnPairs.get(i);
-      AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+      AggregationFunction factory = aggFunColumnPairFunctions.get(i);
 
       switch (factory.getResultDataType()) {
         case INT:
@@ -114,16 +103,12 @@ public class AggregationFunctionColumnPairBuffer {
           int objLength = buffer.getInt();
           byte[] objBytes = new byte[objLength];
           buffer.get(objBytes);
-          try {
-            if (pair.getFunctionType().getName().equals(AggregationFunctionType.DISTINCTCOUNTHLL.getName())) {
-              values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.HyperLogLog);
-            } else if (pair.getFunctionType().getName().equals(AggregationFunctionType.PERCENTILEEST.getName())) {
-              values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.QuantileDigest);
-            } else if (pair.getFunctionType().getName().equals(AggregationFunctionType.PERCENTILETDIGEST.getName())) {
-              values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.TDigest);
-            }
-          } catch (IOException e) {
-            e.printStackTrace();
+          if (factory.getType().getName().equals(AggregationFunctionType.DISTINCTCOUNTHLL.getName())) {
+            values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.HyperLogLog);
+          } else if (factory.getType().getName().equals(AggregationFunctionType.PERCENTILEEST.getName())) {
+            values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.QuantileDigest);
+          } else if (factory.getType().getName().equals(AggregationFunctionType.PERCENTILETDIGEST.getName())) {
+            values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.TDigest);
           }
           break;
         default:
@@ -131,19 +116,18 @@ public class AggregationFunctionColumnPairBuffer {
       }
     }
 
-    return new AggregationFunctionColumnPairBuffer(values, aggFunColumnPairs);
+    return new AggregationFunctionColumnPairBuffer(values, aggFunColumnPairFunctions);
   }
 
   /**
-   * NOTE: pass in byte size for performance. Byte size can be calculated by adding up field size for all metrics.
+   * NOTE: aggregate the metric values.
    */
   public void aggregate(AggregationFunctionColumnPairBuffer buffer) {
     int numValues = _values.length;
 
     int aggregatedByteSize = 0;
     for (int i = 0; i < numValues; i++) {
-      AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
-      AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+      AggregationFunction factory = _aggFunColumnPairFunctions.get(i);
       _values[i] = factory.aggregate(_values[i], buffer._values[i]);
       try {
         aggregatedByteSize += getObjectSize(factory, _values[i]);
@@ -158,10 +142,12 @@ public class AggregationFunctionColumnPairBuffer {
     _totalBytes = aggregatedByteSize;
   }
 
+  /**
+   * NOTE: calculate size of buffer required to store metric values.
+   */
   private void calculateBytesRequired() {
-    for (int i = 0; i < _aggFunColumnPairs.size(); i++) {
-      AggregationFunctionColumnPair pair = _aggFunColumnPairs.get(i);
-      AggregationFunction factory = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+    for (int i = 0; i < _aggFunColumnPairFunctions.size(); i++) {
+      AggregationFunction factory = _aggFunColumnPairFunctions.get(i);
       int size = 0;
       try {
         size = getObjectSize(factory, _values[i]);
@@ -172,6 +158,9 @@ public class AggregationFunctionColumnPairBuffer {
     }
   }
 
+  /**
+   * NOTE: get the size of the objects.
+   */
   private int getObjectSize(AggregationFunction factory, Object obj) throws IOException {
 
     switch (factory.getResultDataType()) {

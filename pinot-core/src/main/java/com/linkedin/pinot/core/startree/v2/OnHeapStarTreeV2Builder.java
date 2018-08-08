@@ -189,12 +189,13 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
         String metricName = _aggFunColumnPairs.get(j).getColumn();
         String aggFunc = _aggFunColumnPairs.get(j).getFunctionType().getName();
+        AggregationFunction function = _aggregationFunctions.get(j);
         if (aggFunc.equals(AggregationFunctionType.COUNT.getName())) {
-          metricRawValues.add(1L);
+          metricRawValues.add(function.convert(1));
         } else {
           MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(metricName);
           Object val = readHelper(metricColumnReaders.get(metricName), metricFieldSpec.getDataType(), i);
-          metricRawValues.add(val);
+          metricRawValues.add(function.convert(val));
         }
       }
       record.setAggregatedValues(metricRawValues);
@@ -645,17 +646,9 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     List<Object> aggregatedMetricsValue = new ArrayList<>();
     for (int i = 0; i < aggfunColumnPairs.size(); i++) {
       AggregationFunction function = _aggregationFunctions.get(i);
-
       Object obj1 = starTreeData.get(start).getAggregatedValues().get(i);
-      if (isRawData) {
-        obj1 = function.convert(obj1);
-      }
-
       for (int j = start + 1; j < end; j++) {
         Object obj2 = starTreeData.get(j).getAggregatedValues().get(i);
-        if (isRawData) {
-          obj2 = function.convert(obj2);
-        }
         obj1 = function.aggregate(obj1, obj2);
       }
       aggregatedMetricsValue.add(obj1);

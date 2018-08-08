@@ -63,6 +63,7 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.LoggerFactory;
 
 
 public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements StarTreeV2Builder, Closeable {
@@ -82,8 +83,6 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
   private File _metricOffsetFile;
   private File _tempMetricOffsetFile;
   private List<AggregationFunction> _aggregationFunctions;
-  private List<ForwardIndexCreator> _dimensionForwardIndexCreatorList;
-  private List<ForwardIndexCreator> _aggFunColumnPairForwardIndexCreatorList;
 
   private int _starTreeCount = 0;
   private int _aggregatedDocCount;
@@ -91,6 +90,8 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
   private BufferedOutputStream _outputStream;
   private BufferedOutputStream _tempOutputStream;
   private final Set<StarTreeV2DataTable> _dataTablesToClose = new HashSet<>();
+
+  private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(OffHeapStarTreeV2Builder.class);
 
   @Override
   public void init(File indexDir, StarTreeV2Config config) throws Exception {
@@ -230,7 +231,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
         }
       }
       AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer =
-          new AggregationFunctionColumnPairBuffer(metricValues, _aggFunColumnPairs);
+          new AggregationFunctionColumnPairBuffer(metricValues, _aggregationFunctions);
       appendToRawBuffer(i, dimensions, aggregationFunctionColumnPairBuffer);
     }
     _tempOutputStream.flush();
@@ -420,14 +421,14 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
    */
   private void createIndexes() throws Exception {
 
-    _dimensionForwardIndexCreatorList = new ArrayList<>();
-    _aggFunColumnPairForwardIndexCreatorList = new ArrayList<>();
+    List<ForwardIndexCreator> dimensionForwardIndexCreatorList = new ArrayList<>();
+    List<ForwardIndexCreator> aggFunColumnPairForwardIndexCreatorList = new ArrayList<>();
 
     // 'SingleValueForwardIndexCreator' for dimensions.
     for (String dimensionName : _dimensionsName) {
       DimensionFieldSpec spec = _dimensionsSpecMap.get(dimensionName);
       int cardinality = _immutableSegment.getDictionary(dimensionName).length();
-      _dimensionForwardIndexCreatorList.add(
+      dimensionForwardIndexCreatorList.add(
           new SingleValueUnsortedForwardIndexCreator(spec, _outDir, cardinality, _aggregatedDocCount,
               _aggregatedDocCount, false));
     }
@@ -445,7 +446,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
           ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getResultDataType(),
           _aggregatedDocCount, function.getResultMaxByteSize());
-      _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
+      aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
     }
 
     PinotDataBuffer tempBuffer;
@@ -495,22 +496,22 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       for (int j = 0; j < _dimensionsCount; j++) {
         int val = buffer.getInt();
         val = (val == StarTreeV2Constant.SKIP_VALUE) ? StarTreeV2Constant.VALID_INDEX_VALUE : val;
-        ((SingleValueForwardIndexCreator) _dimensionForwardIndexCreatorList.get(j)).index(docId, val);
+        ((SingleValueForwardIndexCreator) dimensionForwardIndexCreatorList.get(j)).index(docId, val);
       }
 
       // indexing AggFunColumn Pair data.
       AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer =
-          AggregationFunctionColumnPairBuffer.fromBytes(next.getRight(), _aggFunColumnPairs);
+          AggregationFunctionColumnPairBuffer.fromBytes(next.getRight(), _aggregationFunctions);
       Object[] values = aggregationFunctionColumnPairBuffer._values;
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
         AggregationFunction function = _aggregationFunctions.get(j);
         if (function.getResultDataType().equals(FieldSpec.DataType.BYTES)) {
           System.out.println(function.getType().getName());
           System.out.println(function.serialize(values[j]).length);
-          ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId,
+          ((SingleValueRawIndexCreator) aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId,
               function.serialize(values[j]));
         } else {
-          ((SingleValueRawIndexCreator) _aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, values[j]);
+          ((SingleValueRawIndexCreator) aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, values[j]);
         }
       }
       System.out.println(docId);
@@ -518,12 +519,12 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     }
 
     // closing all the opened index creator.
-    for (int i = 0; i < _dimensionForwardIndexCreatorList.size(); i++) {
-      _dimensionForwardIndexCreatorList.get(i).close();
+    for (int i = 0; i < dimensionForwardIndexCreatorList.size(); i++) {
+      dimensionForwardIndexCreatorList.get(i).close();
     }
 
-    for (int i = 0; i < _aggFunColumnPairForwardIndexCreatorList.size(); i++) {
-      _aggFunColumnPairForwardIndexCreatorList.get(i).close();
+    for (int i = 0; i < aggFunColumnPairForwardIndexCreatorList.size(); i++) {
+      aggFunColumnPairForwardIndexCreatorList.get(i).close();
     }
 
     return;
@@ -598,8 +599,13 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
         while (_iterator.hasNext()) {
           Pair<byte[], byte[]> next = _iterator.next();
           byte[] dimensionBytes = next.getLeft();
-          AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer =
-              AggregationFunctionColumnPairBuffer.fromBytes(next.getRight(), _aggFunColumnPairs);
+          AggregationFunctionColumnPairBuffer aggregationFunctionColumnPairBuffer = null;
+          try {
+            aggregationFunctionColumnPairBuffer =
+                AggregationFunctionColumnPairBuffer.fromBytes(next.getRight(), _aggregationFunctions);
+          } catch (IOException e) {
+            LOGGER.info("failed in getting objects from bytes array");
+          }
 
           if (_currentDimensions == null) {
             _currentDimensions = DimensionBuffer.fromBytes(dimensionBytes);
@@ -666,11 +672,11 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       Iterator<Pair<byte[], byte[]>> iterator =
           dataTable.iterator(node._startDocId, node._endDocId, _docSizeIndex, sortedDocIds);
       Pair<byte[], byte[]> first = iterator.next();
-      aggregatedMetrics = AggregationFunctionColumnPairBuffer.fromBytes(first.getRight(), _aggFunColumnPairs);
+      aggregatedMetrics = AggregationFunctionColumnPairBuffer.fromBytes(first.getRight(), _aggregationFunctions);
       while (iterator.hasNext()) {
         Pair<byte[], byte[]> next = iterator.next();
         AggregationFunctionColumnPairBuffer metricBuffer =
-            AggregationFunctionColumnPairBuffer.fromBytes(next.getRight(), _aggFunColumnPairs);
+            AggregationFunctionColumnPairBuffer.fromBytes(next.getRight(), _aggregationFunctions);
         aggregatedMetrics.aggregate(metricBuffer);
       }
     } else {
