@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import org.apache.commons.io.FileUtils;
 
 
@@ -44,9 +43,7 @@ public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardI
 
   @Override
   public void index(int docId, int[] dictionaryIndices) {
-    final int[] entries = Arrays.copyOf(dictionaryIndices, dictionaryIndices.length);
-    Arrays.sort(entries);
-    mVWriter.setIntArray(docId, entries);
+    mVWriter.setIntArray(docId, dictionaryIndices);
   }
 
   @Override
