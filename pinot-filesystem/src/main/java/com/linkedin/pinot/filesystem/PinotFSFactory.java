@@ -42,7 +42,8 @@ public class PinotFSFactory {
     String className = _schemeConfig.getString(scheme);
 
     if (className == null) {
-      throw new RuntimeException("No fs class defined for scheme: " + scheme);
+      LOGGER.info("No pinot fs is configured, using LocaLPinotFS by default");
+      return new LocalPinotFS();
     }
 
     LOGGER.info("Creating a new pinot fs for fs: {} with class: {}", scheme, className);
