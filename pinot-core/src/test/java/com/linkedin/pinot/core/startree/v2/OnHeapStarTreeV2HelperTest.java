@@ -49,32 +49,32 @@ public class OnHeapStarTreeV2HelperTest {
 
     Record r1 = new Record();
     r1.setDimensionValues(new int[]{4, 1, 0});
-    r1.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    r1.setAggregatedValues(Arrays.asList(1, 2, 3, 1));
     data.add(r1);
 
     Record r2 = new Record();
     r2.setDimensionValues(new int[]{5, 1, 1});
-    r2.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    r2.setAggregatedValues(Arrays.asList(3, 2, 1, 1));
     data.add(r2);
 
     Record r3 = new Record();
     r3.setDimensionValues(new int[]{1, 2, 1});
-    r3.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    r3.setAggregatedValues(Arrays.asList(1, 2, 3, 1));
     data.add(r3);
 
     Record r4 = new Record();
     r4.setDimensionValues(new int[]{1, 3, 1});
-    r4.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    r4.setAggregatedValues(Arrays.asList(3, 2, 1, 1));
     data.add(r4);
 
     Record r5 = new Record();
     r5.setDimensionValues(new int[]{1, 1, 2});
-    r5.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    r5.setAggregatedValues(Arrays.asList(1, 2, 3, 1));
     data.add(r5);
 
     Record r6 = new Record();
     r6.setDimensionValues(new int[]{4, 4, 3});
-    r6.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    r6.setAggregatedValues(Arrays.asList(3, 2, 1, 1));
     data.add(r6);
 
     return data;
@@ -100,22 +100,22 @@ public class OnHeapStarTreeV2HelperTest {
 
     Record r1 = new Record();
     r1.setDimensionValues(new int[]{1, 1, 2});
-    r1.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    r1.setAggregatedValues(Arrays.asList(1, 2, 3, 1));
     data.add(r1);
 
     Record r2 = new Record();
     r2.setDimensionValues(new int[]{1, 2, 1});
-    r2.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    r2.setAggregatedValues(Arrays.asList(1, 2, 3, 1));
     data.add(r2);
 
     Record r3 = new Record();
     r3.setDimensionValues(new int[]{1, 3, 1});
-    r3.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    r3.setAggregatedValues(Arrays.asList(3, 2, 1, 1));
     data.add(r3);
 
     Record r4 = new Record();
     r4.setDimensionValues(new int[]{4, 4, 3});
-    r4.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    r4.setAggregatedValues(Arrays.asList(3, 2, 1, 1));
     data.add(r4);
 
     return data;
@@ -126,22 +126,22 @@ public class OnHeapStarTreeV2HelperTest {
 
     Record r1 = new Record();
     r1.setDimensionValues(new int[]{1, -1, 1});
-    r1.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    r1.setAggregatedValues(Arrays.asList(1, 2, 3, 1));
     data.add(r1);
 
     Record r2 = new Record();
     r2.setDimensionValues(new int[]{1, -1, 1});
-    r2.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    r2.setAggregatedValues(Arrays.asList(3, 2, 1, 1));
     data.add(r2);
 
     Record r3 = new Record();
     r3.setDimensionValues(new int[]{1, -1, 2});
-    r3.setMetricValues(Arrays.asList(1, 2, 3, 1));
+    r3.setAggregatedValues(Arrays.asList(1, 2, 3, 1));
     data.add(r3);
 
     Record r4 = new Record();
     r4.setDimensionValues(new int[]{5, -1, 1});
-    r4.setMetricValues(Arrays.asList(3, 2, 1, 1));
+    r4.setAggregatedValues(Arrays.asList(3, 2, 1, 1));
     data.add(r4);
 
     return data;
@@ -152,17 +152,17 @@ public class OnHeapStarTreeV2HelperTest {
 
     Record r1 = new Record();
     r1.setDimensionValues(new int[]{1, -1, 1});
-    r1.setMetricValues(Arrays.asList(4.0, 2.0, 3.0, 2L));
+    r1.setAggregatedValues(Arrays.asList(4.0, 2.0, 3.0, 2L));
     data.add(r1);
 
     Record r2 = new Record();
     r2.setDimensionValues(new int[]{1, -1, 2});
-    r2.setMetricValues(Arrays.asList(1.0, 2.0, 3.0, 1L));
+    r2.setAggregatedValues(Arrays.asList(1.0, 2.0, 3.0, 1L));
     data.add(r2);
 
     Record r3 = new Record();
     r3.setDimensionValues(new int[]{5, -1, 1});
-    r3.setMetricValues(Arrays.asList(3.0, 2.0, 1.0, 1L));
+    r3.setAggregatedValues(Arrays.asList(3.0, 2.0, 1.0, 1L));
     data.add(r3);
 
     return data;
@@ -445,8 +445,8 @@ public class OnHeapStarTreeV2HelperTest {
       Assert.assertEquals(aD[i], bD[i]);
     }
 
-    List<Object> aM = a.getMetricValues();
-    List<Object> bM = b.getMetricValues();
+    List<Object> aM = a.getAggregatedValues();
+    List<Object> bM = b.getAggregatedValues();
 
     for (int i = 0; i < aM.size(); i++) {
       Assert.assertEquals(aM.get(i), bM.get(i));
@@ -461,7 +461,7 @@ public class OnHeapStarTreeV2HelperTest {
         System.out.print(" ");
       }
 
-      List<Object> aM = record.getMetricValues();
+      List<Object> aM = record.getAggregatedValues();
       for (int i = 0; i < aM.size(); i++) {
         System.out.print(aM.get(i));
         System.out.print(" ");

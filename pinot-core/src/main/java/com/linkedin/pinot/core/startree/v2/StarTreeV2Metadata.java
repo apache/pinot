@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.util.Set;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nonnull;
 
 

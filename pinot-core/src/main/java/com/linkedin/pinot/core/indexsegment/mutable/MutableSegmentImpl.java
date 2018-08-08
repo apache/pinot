@@ -85,8 +85,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _maxTime = Long.MIN_VALUE;
   private final int _numKeyColumns;
 
-  private final List<StarTreeV2> _starTreeV2List;
-
   public MutableSegmentImpl(RealtimeSegmentConfig config) {
     _segmentName = config.getSegmentName();
     _schema = config.getSchema();
@@ -170,8 +168,6 @@ public class MutableSegmentImpl implements MutableSegment {
         _invertedIndexMap.put(column, new RealtimeInvertedIndexReader());
       }
     }
-
-    _starTreeV2List = new ArrayList<>();
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {

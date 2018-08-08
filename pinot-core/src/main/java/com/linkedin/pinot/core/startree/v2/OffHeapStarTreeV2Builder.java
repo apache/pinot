@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
 import java.io.File;
 import java.nio.ByteOrder;
@@ -171,14 +172,13 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     _nodesCount++;
     _starTreeCount++;
     _aggregationFunctions = new ArrayList<>();
-    _aggregationFunctionFactory = new AggregationFunctionFactory();
 
     File metadataFile = findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     _properties = new PropertiesConfiguration(metadataFile);
   }
 
   @Override
-  public void build() throws IOException {
+  public void build() throws Exception {
 
     // storing dimension cardinality for calculating default sorting order.
     _dimensionsCardinality = new ArrayList<>();
@@ -205,7 +205,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     // collecting all aggFunColObjects
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
       AggregationFunction function =
-          _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+          AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
       _aggregationFunctions.add(function);
     }
@@ -224,7 +224,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
         String metricName = pair.getColumn();
         String aggfunc = pair.getFunctionType().getName();
         AggregationFunction function = _aggregationFunctions.get(j);
-        if (aggfunc.equals(StarTreeV2Constant.AggregateFunctions.COUNT)) {
+        if (aggfunc.equals(AggregationFunctionType.COUNT.getName())) {
           metricValues[j] = function.convert(1);
         } else {
           MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(metricName);
@@ -272,30 +272,15 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
     // create aggregated doc for all nodes.
     createAggregatedDocForAllNodes();
+
+    // serialize the tree.
+    serialize();
+
     FileUtils.deleteQuietly(_tempDataFile);
     FileUtils.deleteQuietly(_tempMetricOffsetFile);
-
-    return;
   }
 
-  @Override
-  public void serialize() throws Exception {
 
-    // updating segment metadata by adding star tree meta data.
-    Map<String, String> metadata = getMetaData();
-    for (String key : metadata.keySet()) {
-      String value = metadata.get(key);
-      _properties.setProperty(key, value);
-    }
-    _properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, _starTreeCount);
-    _properties.save();
-
-    createIndexes();
-    serializeTree(new File(_outDir, _starTreeId));
-    combineIndexesFiles(_starTreeCount - 1);
-
-    return;
-  }
 
   @Override
   public Map<String, String> getMetaData() {
@@ -317,6 +302,25 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     metadata.put(maxNumLeafRecords, Integer.toString(_maxNumLeafRecords));
 
     return metadata;
+  }
+
+  /**
+   * Helper function to serialize tree.
+   */
+  private void serialize() throws Exception {
+
+    // updating segment metadata by adding star tree meta data.
+    Map<String, String> metadata = getMetaData();
+    for (String key : metadata.keySet()) {
+      String value = metadata.get(key);
+      _properties.setProperty(key, value);
+    }
+    _properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, _starTreeCount);
+    _properties.save();
+
+    createIndexes();
+    serializeTree(new File(_outDir, _starTreeId));
+    combineIndexesFiles(_starTreeCount - 1);
   }
 
   /**

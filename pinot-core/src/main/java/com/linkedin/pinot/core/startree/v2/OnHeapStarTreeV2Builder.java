@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import java.io.File;
 import java.util.Map;
 import java.util.List;
@@ -127,14 +128,13 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     _nodesCount++;
     _starTreeCount++;
     _aggregationFunctions = new ArrayList<>();
-    _aggregationFunctionFactory = new AggregationFunctionFactory();
 
     File metadataFile = StarTreeV2BaseClass.findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
     _properties = new PropertiesConfiguration(metadataFile);
   }
 
   @Override
-  public void build() throws IOException {
+  public void build() throws Exception {
 
     _starTreeData = new ArrayList<>();
     _dimensionsCardinality = new ArrayList<>();
@@ -178,7 +178,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     // collecting all aggFunColObjects
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
         AggregationFunction function =
-            _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+            AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
         _aggregationFunctions.add(function);
     }
@@ -190,7 +190,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
         String metricName = _aggFunColumnPairs.get(j).getColumn();
         String aggFunc = _aggFunColumnPairs.get(j).getFunctionType().getName();
-        if (aggFunc.equals(StarTreeV2Constant.AggregateFunctions.COUNT)) {
+        if (aggFunc.equals(AggregationFunctionType.COUNT.getName())) {
           metricRawValues.add(1L);
         } else {
           MetricFieldSpec metricFieldSpec = _metricsSpecMap.get(metricName);
@@ -198,7 +198,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
           metricRawValues.add(val);
         }
       }
-      record.setMetricValues(metricRawValues);
+      record.setAggregatedValues(metricRawValues);
     }
 
     computeDefaultSplitOrder(_dimensionsCardinality);
@@ -220,24 +220,9 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     long end = System.currentTimeMillis();
     LOGGER.info("Took {}ms to build star tree index with {} aggregated documents", (end - start),
         _starTreeData.size());
-  }
 
-  @Override
-  public void serialize() throws Exception {
-    createIndexes();
-    serializeTree(new File(_outDir, _starTreeId));
-
-    // updating segment metadata by adding star tree meta data.
-    Map<String, String> metadata = getMetaData();
-    for (String key : metadata.keySet()) {
-      String value = metadata.get(key);
-      _properties.setProperty(key, value);
-    }
-    _properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, _starTreeCount);
-    _properties.save();
-
-    // combining all the indexes and star tree in one file.
-    combineIndexesFiles(_starTreeCount - 1);
+    // serialize all the files and tree.
+    serialize();
   }
 
   @Override
@@ -333,6 +318,26 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     if (starChildEndDocId - starChildStartDocId > _maxNumLeafRecords) {
       constructStarTree(starChild, starChildStartDocId, starChildEndDocId, level + 1);
     }
+  }
+
+  /**
+   * Helper function to serialize tree.
+   */
+  private void serialize() throws Exception {
+    createIndexes();
+    serializeTree(new File(_outDir, _starTreeId));
+
+    // updating segment metadata by adding star tree meta data.
+    Map<String, String> metadata = getMetaData();
+    for (String key : metadata.keySet()) {
+      String value = metadata.get(key);
+      _properties.setProperty(key, value);
+    }
+    _properties.setProperty(StarTreeV2Constant.STAR_TREE_V2_COUNT, _starTreeCount);
+    _properties.save();
+
+    // combining all the indexes and star tree in one file.
+    combineIndexesFiles(_starTreeCount - 1);
   }
 
   /**
@@ -450,7 +455,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     }
 
     aggRecord.setDimensionValues(dimensionsValue);
-    aggRecord.setMetricValues(aggregatedValues);
+    aggRecord.setAggregatedValues(aggregatedValues);
     _starTreeData.add(aggRecord);
 
     return size;
@@ -514,7 +519,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     for (int i = 0; i < _starTreeData.size(); i++) {
       Record row = _starTreeData.get(i);
       int[] dimension = row.getDimensionValues();
-      List<Object> metric = row.getMetricValues();
+      List<Object> metric = row.getAggregatedValues();
 
       // indexing dimension data.
       for (int j = 0; j < dimension.length; j++) {
@@ -584,12 +589,12 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     for (int i = startDocId; i < endDocId; i++) {
       Record record = starTreeData.get(i);
       int[] dimension = record.getDimensionValues().clone();
-      List<Object> metric = record.getMetricValues();
+      List<Object> metric = record.getAggregatedValues();
       dimension[dimensionIdToRemove] = StarTreeV2Constant.SKIP_VALUE;
 
       Record newRecord = new Record();
       newRecord.setDimensionValues(dimension);
-      newRecord.setMetricValues(metric);
+      newRecord.setAggregatedValues(metric);
 
       newData.add(newRecord);
     }
@@ -613,7 +618,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       if (!Record.compareDimensions(prevDimensions, nextDimensions)) {
         List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, aggfunColumnPairs, isRawData);
         Record newRecord = new Record();
-        newRecord.setMetricValues(aggregatedMetricsValue);
+        newRecord.setAggregatedValues(aggregatedMetricsValue);
         newRecord.setDimensionValues(prevRecord.getDimensionValues());
         newData.add(newRecord);
         prevRecord = nextRecord;
@@ -624,7 +629,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     record.setDimensionValues(starTreeData.get(start).getDimensionValues());
     List<Object> aggregatedMetricsValue =
         aggregateMetrics(start, starTreeData.size(), starTreeData, aggfunColumnPairs, isRawData);
-    record.setMetricValues(aggregatedMetricsValue);
+    record.setAggregatedValues(aggregatedMetricsValue);
     newData.add(record);
 
     return newData;
@@ -640,13 +645,13 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     for (int i = 0; i < aggfunColumnPairs.size(); i++) {
       AggregationFunction function = _aggregationFunctions.get(i);
 
-      Object obj1 = starTreeData.get(start).getMetricValues().get(i);
+      Object obj1 = starTreeData.get(start).getAggregatedValues().get(i);
       if (isRawData) {
         obj1 = function.convert(obj1);
       }
 
       for (int j = start + 1; j < end; j++) {
-        Object obj2 = starTreeData.get(j).getMetricValues().get(i);
+        Object obj2 = starTreeData.get(j).getAggregatedValues().get(i);
         if (isRawData) {
           obj2 = function.convert(obj2);
         }

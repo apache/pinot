@@ -63,7 +63,6 @@ public class StarTreeV2LoaderHelper {
     Block block = source.nextBlock();
     BlockValSet blockValSet = block.getBlockValueSet();
     BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
-    AggregationFunctionFactory aggregationFunctionFactory = new AggregationFunctionFactory();
 
     while (itr.hasNext()) {
       switch (dataType) {
@@ -81,7 +80,7 @@ public class StarTreeV2LoaderHelper {
           break;
         case StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL: {
           AggregationFunction function =
-              aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL);
+              AggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL);
           byte[] h = itr.nextBytesVal();
           System.out.println(function.deserialize(h) instanceof HyperLogLog);
           System.out.println(h.length);
@@ -89,14 +88,14 @@ public class StarTreeV2LoaderHelper {
         }
         case StarTreeV2Constant.AggregateFunctions.PERCENTILEEST: {
           AggregationFunction function =
-              aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST);
+              AggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST);
           byte[] h = itr.nextBytesVal();
           System.out.println(function.deserialize(h) instanceof QuantileDigest);
           System.out.println(h.length);
           break;
         }
         case StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST: {
-          AggregationFunction function = aggregationFunctionFactory.getAggregationFunction(
+          AggregationFunction function = AggregationFunctionFactory.getAggregationFunction(
               StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST);
           byte[] h = itr.nextBytesVal();
           System.out.println(function.deserialize(h) instanceof TDigest);
@@ -137,8 +136,6 @@ public class StarTreeV2LoaderHelper {
     BlockValSet blockValSet2 = b2.getBlockValueSet();
     BlockSingleValIterator itr2 = (BlockSingleValIterator) blockValSet2.iterator();
 
-    AggregationFunctionFactory aggregationFunctionFactory = new AggregationFunctionFactory();
-
     while (itr1.hasNext() || itr2.hasNext()) {
       switch (dataType) {
         case StarTreeV2Constant.AggregateFunctions.SUM:
@@ -159,7 +156,7 @@ public class StarTreeV2LoaderHelper {
 
         case StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL: {
           AggregationFunction function =
-              aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL);
+              AggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL);
           byte[] ah = itr1.nextBytesVal();
           byte[] bh = itr2.nextBytesVal();
 
@@ -168,7 +165,7 @@ public class StarTreeV2LoaderHelper {
         }
         case StarTreeV2Constant.AggregateFunctions.PERCENTILEEST: {
           AggregationFunction function =
-              aggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST);
+              AggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST);
           byte[] ah = itr1.nextBytesVal();
           byte[] bh = itr2.nextBytesVal();
 
@@ -176,7 +173,7 @@ public class StarTreeV2LoaderHelper {
           break;
         }
         case StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST: {
-          AggregationFunction function = aggregationFunctionFactory.getAggregationFunction(
+          AggregationFunction function = AggregationFunctionFactory.getAggregationFunction(
               StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST);
           byte[] ah = itr1.nextBytesVal();
           byte[] bh = itr2.nextBytesVal();

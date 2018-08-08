@@ -70,7 +70,7 @@ public class StarTreeDataTable implements Closeable {
    * @param endDocId End document id (exclusive) of the range to be sorted
    * @param sortOrder Sort order of dimensions
    */
-  public void sort(int startDocId, int endDocId, final int[] sortOrder){
+  public void sort(int startDocId, int endDocId, final int[] sortOrder) {
     Preconditions.checkState(startDocId < endDocId);
 
     // Get sorted doc ids

@@ -69,7 +69,6 @@ public class StarTreeV2BaseClass {
   int _rawDocsCount;
   TreeNode _rootNode;
   int _maxNumLeafRecords;
-  AggregationFunctionFactory _aggregationFunctionFactory;
 
   protected final Charset UTF_8 = Charset.forName("UTF-8");
 

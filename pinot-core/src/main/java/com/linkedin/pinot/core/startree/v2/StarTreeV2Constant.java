@@ -33,17 +33,6 @@ public class StarTreeV2Constant {
 
   public static final Boolean IS_RAW_DATA = true;
 
-  // aggregate functions name.
-  public static class AggregateFunctions {
-    public static final String MAX = "max";
-    public static final String SUM = "sum";
-    public static final String MIN = "min";
-    public static final String COUNT = "count";
-    public static final String DISTINCTCOUNTHLL = "distinctCountHLL";
-    public static final String PERCENTILETDIGEST = "percentileTDigest";
-    public static final String PERCENTILEEST = "percentileEst";
-  }
-
   // star tree meta data.
   public static class StarTreeMetadata {
     public static final String STAR_TREE_DOCS_COUNT = "docs.count";

@@ -23,7 +23,6 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2Constant;
@@ -92,7 +91,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Map<String, String> _hllDerivedColumnMap = new HashMap<>();
   private int _totalDocs;
   private int _totalRawDocs;
-  private int _starTreesV2Count;
+  private int _starTreeV2Count;
   private long _segmentStartTime;
   private long _segmentEndTime;
 
@@ -305,10 +304,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     // Build star tree v2 metadata.
-    _starTreesV2Count = segmentMetadataPropertiesConfiguration.getInt(StarTreeV2Constant.STAR_TREE_V2_COUNT, 0);
-    _starTreeV2MetadataList = new ArrayList<>();
-    if (_starTreesV2Count > 0) {
-      initStarTreeV2Metadata(_starTreesV2Count, segmentMetadataPropertiesConfiguration);
+    _starTreeV2Count = segmentMetadataPropertiesConfiguration.getInt(StarTreeV2Constant.STAR_TREE_V2_COUNT, 0);
+    if (_starTreeV2Count > 0) {
+      _starTreeV2MetadataList = new ArrayList<>();
+      initStarTreeV2Metadata(segmentMetadataPropertiesConfiguration);
     }
   }
 
@@ -368,13 +367,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   /**
    * Reads and initializes the star tree v2 metadata from segment metadata properties.
    */
-  private void initStarTreeV2Metadata(int starTreesCount, PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
+  private void initStarTreeV2Metadata(PropertiesConfiguration segmentMetadataPropertiesConfiguration) {
 
-    for ( int i = 0; i < starTreesCount;  i++ ) {
-      String starTreeId = Integer.toString(i);
-      // met2agg func pairs
-      String met2agg = "startree_" + starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
-      Iterator<String> iterator = segmentMetadataPropertiesConfiguration.getList(met2agg).iterator();
+    for ( int i = 0; i < _starTreeV2Count;  i++ ) {
+
+      // aggFunCol pairs
+      String aggFunCol = "startree_" + i + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
+      Iterator<String> iterator = segmentMetadataPropertiesConfiguration.getList(aggFunCol).iterator();
       Set<AggregationFunctionColumnPair> aggFunColPairs = new HashSet<>();
       while (iterator.hasNext()) {
         final String sPair = iterator.next();
@@ -383,7 +382,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
 
       // dimension split order
-      String splitOrder = "startree_" + starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
+      String splitOrder = "startree_" + i + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
       iterator = segmentMetadataPropertiesConfiguration.getList(splitOrder).iterator();
       List<String> dimensionsSplitOrder = new ArrayList<>();
       while (iterator.hasNext()) {
@@ -392,8 +391,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
 
 
-      // dimension split order
-      String withoutStarNode = "startree_" + starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
+      // dimension without star node
+      String withoutStarNode = "startree_" + i + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
       iterator = segmentMetadataPropertiesConfiguration.getList(withoutStarNode).iterator();
       Set<String> dimensionWithoutStarNode = new HashSet<>();
       while (iterator.hasNext()) {
@@ -402,20 +401,18 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
 
       // number of aggregated docs.
-      String aggregatedDocsCount = "startree_" + starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
+      String aggregatedDocsCount = "startree_" + i + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
       String docsCount = segmentMetadataPropertiesConfiguration.getString(aggregatedDocsCount);
 
 
       // max number of records in leaf.
-      String maxLeafRecordString = "startree_" + starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
+      String maxLeafRecordString = "startree_" + i + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
       String maxLeafRecord = segmentMetadataPropertiesConfiguration.getString(maxLeafRecordString);
 
       StarTreeV2Metadata metadata = new StarTreeV2Metadata(Integer.parseInt(docsCount), dimensionsSplitOrder, aggFunColPairs, Integer.parseInt(maxLeafRecord), dimensionWithoutStarNode);
 
       _starTreeV2MetadataList.add(metadata);
     }
-
-    return;
   }
 
 
@@ -577,10 +574,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   public List<StarTreeV2Metadata> getStarTreeV2Metadata() {
     return _starTreeV2MetadataList;
-  }
-
-  public int getStarTreeV2Count() {
-    return _starTreesV2Count;
   }
 
   @Override

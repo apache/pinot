@@ -23,23 +23,23 @@ import java.util.List;
  */
 public class Record {
   private int[] _dimensionValues;
-  private List<Object> _metricValues;
+  private List<Object> _aggregatedValues;
 
   /**
    * Return the metric values for the record.
    *
    * @return 'String' value
    */
-  public List<Object> getMetricValues() {
-    return _metricValues;
+  public List<Object> getAggregatedValues() {
+    return _aggregatedValues;
   }
 
   /**
    * Set the metric values for the record.
    *
    */
-  public void setMetricValues(List<Object> metricValues) {
-    _metricValues = metricValues;
+  public void setAggregatedValues(List<Object> aggregatedValues) {
+    _aggregatedValues = aggregatedValues;
   }
 
   /**

@@ -75,7 +75,6 @@ public class MinStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
     buildTest.init(_indexDir, _starTreeV2Config);
     buildTest.build();
-    buildTest.serialize();
 
     _indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
     _starTreeV2 = _indexSegment.getStarTrees().get(0);
@@ -86,7 +85,6 @@ public class MinStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
     OffHeapStarTreeV2Builder buildTest = new OffHeapStarTreeV2Builder();
     buildTest.init(_indexDir, _starTreeV2Config);
     buildTest.build();
-    buildTest.serialize();
 
     _indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
     _starTreeV2 = _indexSegment.getStarTrees().get(0);

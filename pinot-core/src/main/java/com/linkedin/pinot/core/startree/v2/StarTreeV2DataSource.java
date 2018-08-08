@@ -47,7 +47,6 @@ public class StarTreeV2DataSource {
   private SegmentMetadataImpl _segmentMetadataImpl;
   private Map<String, Integer> _columnIndexInfoMap;
   private Set<AggregationFunctionColumnPair> _aggFunColPairs;
-  private AggregationFunctionFactory _aggregationFunctionFactory;
   private Map<String, StarTreeV2DimensionDataSource> _dimensionIndexReader;
   private Map<String, StarTreeV2AggfunColumnPairDataSource> _metricRawIndexReader;
 
@@ -71,8 +70,6 @@ public class StarTreeV2DataSource {
 
     _dimensionIndexReader = new HashMap<>();
     _metricRawIndexReader = new HashMap<>();
-
-    _aggregationFunctionFactory = new AggregationFunctionFactory();
   }
 
   public StarTree loadStarTree(int starTreeId) throws IOException {
@@ -121,7 +118,7 @@ public class StarTreeV2DataSource {
       int start = _columnIndexInfoMap.get(a);
       long size = _columnIndexInfoMap.get(b);
 
-      function = _aggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+      function = AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
       PinotDataBuffer buffer;
       if (function.getResultDataType().equals(FieldSpec.DataType.BYTES)) {

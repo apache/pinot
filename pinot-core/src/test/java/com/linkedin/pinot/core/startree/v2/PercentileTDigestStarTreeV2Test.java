@@ -76,7 +76,6 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
     buildTest.init(indexDir, starTreeV2Config);
     buildTest.build();
-    buildTest.serialize();
 
     _indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.heap);
     _starTreeV2 = _indexSegment.getStarTrees().get(0);

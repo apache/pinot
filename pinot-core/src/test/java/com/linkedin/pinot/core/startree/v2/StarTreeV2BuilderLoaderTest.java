@@ -44,14 +44,6 @@ public class StarTreeV2BuilderLoaderTest {
   private List<StarTreeV2Config> _onHeapStarTreeV2ConfigList = new ArrayList<>();
   private List<StarTreeV2Config> _offHeapStarTreeV2ConfigList = new ArrayList<>();
 
-
-
-  private final String[] STAR_TREE1_HARD_CODED_QUERIES =
-      new String[] {
-          "SELECT SUM(salary) FROM T GROUP BY Name",
-          "SELECT MAX(m1) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"
-  };
-
   @BeforeTest
   void setUp() throws Exception {
 
@@ -61,9 +53,9 @@ public class StarTreeV2BuilderLoaderTest {
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
 
-    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
 
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
 
     RecordReader _recordReader = new GenericRowRecordReader(rows, schema);
     _onHeapIndexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, onHeapSegmentOutputDir, _recordReader);
@@ -130,14 +122,12 @@ public class StarTreeV2BuilderLoaderTest {
       for (int i = 0; i < _onHeapStarTreeV2ConfigList.size(); i++) {
         onheapBuildTest.init(_onHeapIndexDir, _onHeapStarTreeV2ConfigList.get(i));
         onheapBuildTest.build();
-        onheapBuildTest.serialize();
       }
 
       System.out.println("Building Off-heap starts");
       for (int i = 0; i < _offHeapStarTreeV2ConfigList.size(); i++) {
         offHeapBuildTest.init(_offHeapIndexDir, _offHeapStarTreeV2ConfigList.get(i));
         offHeapBuildTest.build();
-        offHeapBuildTest.serialize();
       }
 
     } catch (Exception e) {
@@ -147,8 +137,8 @@ public class StarTreeV2BuilderLoaderTest {
 
   @Test
   public void testLoader() throws Exception {
-    OnHeapStarTreeV2Loader onHeapLoadTest = new OnHeapStarTreeV2Loader();
-    OnHeapStarTreeV2Loader offHeapLoadTest = new OnHeapStarTreeV2Loader();
+    StarTreeLoader onHeapLoadTest = new StarTreeLoader();
+    StarTreeLoader offHeapLoadTest = new StarTreeLoader();
 
     IndexLoadingConfig v3IndexLoadingConfig = new IndexLoadingConfig();
     v3IndexLoadingConfig.setReadMode(ReadMode.mmap);

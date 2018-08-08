@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
  */
 public class AggregationFunctionFactory {
 
-  public AggregationFunctionFactory() {
+  private AggregationFunctionFactory() {
   }
 
   /**
