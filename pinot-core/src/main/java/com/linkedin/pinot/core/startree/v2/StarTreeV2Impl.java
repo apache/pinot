@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.util.Map;
-import java.io.IOException;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.startree.StarTree;
+import java.io.IOException;
+import java.util.Map;
 
 
 public class StarTreeV2Impl implements StarTreeV2 {

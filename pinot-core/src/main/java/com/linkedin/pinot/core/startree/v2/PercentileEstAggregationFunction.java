@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.IOException;
-import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import java.io.IOException;
+import javax.annotation.Nonnull;
 
 
 public class PercentileEstAggregationFunction implements AggregationFunction<Number, QuantileDigest> {

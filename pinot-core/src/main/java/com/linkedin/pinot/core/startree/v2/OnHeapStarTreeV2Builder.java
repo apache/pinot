@@ -15,40 +15,40 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
 import java.io.File;
-import java.util.Map;
-import java.util.List;
-import org.slf4j.Logger;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.io.IOException;
-import java.util.Comparator;
 import java.util.Collections;
-import org.slf4j.LoggerFactory;
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
-import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
-import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements StarTreeV2Builder {
@@ -93,7 +93,6 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     LOGGER.info("Dimensions Split Order: {}", _dimensionsSplitOrder);
     LOGGER.info("Dimensions without star node: {}", dimensionsWithoutStarNode);
-
 
     // metric
     _aggFunColumnPairsString = "";
@@ -177,10 +176,10 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     // collecting all aggFunColObjects
     for (AggregationFunctionColumnPair pair : _aggFunColumnPairs) {
-        AggregationFunction function =
-            AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
+      AggregationFunction function =
+          AggregationFunctionFactory.getAggregationFunction(pair.getFunctionType().getName());
 
-        _aggregationFunctions.add(function);
+      _aggregationFunctions.add(function);
     }
 
     // gathering metric data ( raw data )
@@ -218,35 +217,10 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     createAggregatedDocForAllNodes(_rootNode, null);
 
     long end = System.currentTimeMillis();
-    LOGGER.info("Took {}ms to build star tree index with {} aggregated documents", (end - start),
-        _starTreeData.size());
+    LOGGER.info("Took {}ms to build star tree index with {} aggregated documents", (end - start), _starTreeData.size());
 
     // serialize all the files and tree.
     serialize();
-  }
-
-  @Override
-  public Map<String, String> getMetaData() {
-    Map<String, String> metadata = new HashMap<>();
-
-    String starTreeDocsCount = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
-    metadata.put(starTreeDocsCount, Integer.toString(_starTreeData.size()));
-
-    String startTreeSplitOrder = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
-    metadata.put(startTreeSplitOrder, _dimensionSplitOrderString);
-
-    String withoutStarNode =
-        _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
-    metadata.put(withoutStarNode, _dimensionWithoutStarNodeString);
-
-    String startTreeMet2aggfuncPairs =
-        _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
-    metadata.put(startTreeMet2aggfuncPairs, _aggFunColumnPairsString);
-
-    String maxNumLeafRecords = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
-    metadata.put(maxNumLeafRecords, Integer.toString(_maxNumLeafRecords));
-
-    return metadata;
   }
 
   /**
@@ -293,7 +267,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     }
 
     // directly return if we don't need to create star-node or there is just one child node.
-    if ((_dimensionsWithoutStarNode != null && _dimensionsWithoutStarNode.contains(splitDimensionId)) || dimensionRangeMap.size() == 1) {
+    if ((_dimensionsWithoutStarNode != null && _dimensionsWithoutStarNode.contains(splitDimensionId))
+        || dimensionRangeMap.size() == 1) {
       return;
     }
 
@@ -338,6 +313,32 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     // combining all the indexes and star tree in one file.
     combineIndexesFiles(_starTreeCount - 1);
+  }
+
+  /**
+   * Helper method to create star-tree meta data for saving to segment meta data
+   */
+  private Map<String, String> getMetaData() {
+    Map<String, String> metadata = new HashMap<>();
+
+    String starTreeDocsCount = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_DOCS_COUNT;
+    metadata.put(starTreeDocsCount, Integer.toString(_starTreeData.size()));
+
+    String startTreeSplitOrder = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SPLIT_ORDER;
+    metadata.put(startTreeSplitOrder, _dimensionSplitOrderString);
+
+    String withoutStarNode =
+        _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
+    metadata.put(withoutStarNode, _dimensionWithoutStarNodeString);
+
+    String startTreeMet2aggfuncPairs =
+        _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_AGG_FUN_COL_PAIR;
+    metadata.put(startTreeMet2aggfuncPairs, _aggFunColumnPairsString);
+
+    String maxNumLeafRecords = _starTreeId + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
+    metadata.put(maxNumLeafRecords, Integer.toString(_maxNumLeafRecords));
+
+    return metadata;
   }
 
   /**
@@ -510,8 +511,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       AggregationFunction function = _aggregationFunctions.get(index);
       index++;
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
-          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getResultDataType(), _starTreeData.size(),
-          function.getResultMaxByteSize());
+          ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getResultDataType(),
+          _starTreeData.size(), function.getResultMaxByteSize());
       _aggFunColumnPairForwardIndexCreatorList.add(rawIndexCreator);
     }
 

@@ -15,15 +15,15 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.IOException;
 import javax.annotation.Nonnull;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.startree.hll.HllConstants;
-import com.linkedin.pinot.core.common.datatable.ObjectType;
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
-import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 
 
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<Object, HyperLogLog> {

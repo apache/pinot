@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import java.io.File;
-import java.util.Map;
 
 
 public interface StarTreeV2Builder {
@@ -30,10 +29,5 @@ public interface StarTreeV2Builder {
    * Build the StarTree
    */
   void build() throws Exception;
-
-  /**
-   * Returns the Meta Data of the Star tree.
-   */
-  Map<String, String> getMetaData();
 }
 

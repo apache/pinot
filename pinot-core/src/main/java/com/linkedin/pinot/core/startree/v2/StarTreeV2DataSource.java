@@ -15,28 +15,28 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.File;
-import java.util.Set;
-import java.util.Map;
-import java.util.List;
-import java.util.HashMap;
-import java.nio.ByteOrder;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.nio.channels.FileChannel;
-import org.apache.commons.io.FileUtils;
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.startree.OffHeapStarTree;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.memory.PinotByteBuffer;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
+import com.linkedin.pinot.core.startree.StarTree;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
 
 
 public class StarTreeV2DataSource {

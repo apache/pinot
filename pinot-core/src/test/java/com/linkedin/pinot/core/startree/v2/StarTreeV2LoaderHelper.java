@@ -15,19 +15,19 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.quantile.TDigest;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.StarTreeNode;
+import java.io.IOException;
 import java.util.List;
 import org.testng.Assert;
-import java.io.IOException;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.startree.StarTreeNode;
-import com.clearspring.analytics.stream.quantile.TDigest;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
-
 
 public class StarTreeV2LoaderHelper {
 
@@ -59,44 +59,40 @@ public class StarTreeV2LoaderHelper {
     }
   }
 
-  static void printMetricAggfuncDataFromDataSource(DataSource source, String dataType) throws IOException {
+  static void printMetricAggfuncDataFromDataSource(DataSource source, AggregationFunctionType dataType) throws IOException {
     Block block = source.nextBlock();
     BlockValSet blockValSet = block.getBlockValueSet();
     BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
 
     while (itr.hasNext()) {
       switch (dataType) {
-        case StarTreeV2Constant.AggregateFunctions.SUM:
+        case SUM:
+        case MAX:
+        case MIN:
           System.out.println(itr.nextDoubleVal());
           break;
-        case StarTreeV2Constant.AggregateFunctions.COUNT:
+        case COUNT:
           System.out.println(itr.nextLongVal());
           break;
-        case StarTreeV2Constant.AggregateFunctions.MAX:
-          System.out.println(itr.nextDoubleVal());
-          break;
-        case StarTreeV2Constant.AggregateFunctions.MIN:
-          System.out.println(itr.nextDoubleVal());
-          break;
-        case StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL: {
+        case DISTINCTCOUNTHLL: {
           AggregationFunction function =
-              AggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL);
+              AggregationFunctionFactory.getAggregationFunction(AggregationFunctionType.DISTINCTCOUNTHLL.getName());
           byte[] h = itr.nextBytesVal();
           System.out.println(function.deserialize(h) instanceof HyperLogLog);
           System.out.println(h.length);
           break;
         }
-        case StarTreeV2Constant.AggregateFunctions.PERCENTILEEST: {
+        case PERCENTILEEST: {
           AggregationFunction function =
-              AggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST);
+              AggregationFunctionFactory.getAggregationFunction(AggregationFunctionType.PERCENTILEEST.getName());
           byte[] h = itr.nextBytesVal();
           System.out.println(function.deserialize(h) instanceof QuantileDigest);
           System.out.println(h.length);
           break;
         }
-        case StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST: {
+        case PERCENTILETDIGEST: {
           AggregationFunction function = AggregationFunctionFactory.getAggregationFunction(
-              StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST);
+              AggregationFunctionType.PERCENTILETDIGEST.getName());
           byte[] h = itr.nextBytesVal();
           System.out.println(function.deserialize(h) instanceof TDigest);
           System.out.println(h.length);
@@ -127,7 +123,7 @@ public class StarTreeV2LoaderHelper {
     }
   }
 
-  static void compareMetricAggfuncDataFromDataSource(DataSource d1, DataSource d2, String dataType) throws IOException {
+  static void compareMetricAggfuncDataFromDataSource(DataSource d1, DataSource d2, AggregationFunctionType dataType) throws IOException {
     Block b1 = d1.nextBlock();
     BlockValSet blockValSet1 = b1.getBlockValueSet();
     BlockSingleValIterator itr1 = (BlockSingleValIterator) blockValSet1.iterator();
@@ -138,47 +134,50 @@ public class StarTreeV2LoaderHelper {
 
     while (itr1.hasNext() || itr2.hasNext()) {
       switch (dataType) {
-        case StarTreeV2Constant.AggregateFunctions.SUM:
-        case StarTreeV2Constant.AggregateFunctions.MAX:
-        case StarTreeV2Constant.AggregateFunctions.MIN:
+        case SUM:
+        case MAX:
+        case MIN:
           double da = itr1.nextDoubleVal();
           double db = itr2.nextDoubleVal();
           System.out.println(Double.toString(da) + ", " + Double.toString(db));
           Assert.assertEquals(da, db);
           break;
 
-        case StarTreeV2Constant.AggregateFunctions.COUNT:
+        case COUNT:
           long la = itr1.nextLongVal();
           long lb = itr2.nextLongVal();
           System.out.println(Long.toString(la) + ", " + Long.toString(lb));
           Assert.assertEquals(la, lb);
           break;
 
-        case StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL: {
+        case DISTINCTCOUNTHLL: {
           AggregationFunction function =
-              AggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL);
+              AggregationFunctionFactory.getAggregationFunction(AggregationFunctionType.DISTINCTCOUNTHLL.getName());
           byte[] ah = itr1.nextBytesVal();
           byte[] bh = itr2.nextBytesVal();
 
-          System.out.println((function.deserialize(ah) instanceof HyperLogLog) + ", " + (function.deserialize(bh) instanceof HyperLogLog));
+          System.out.println((function.deserialize(ah) instanceof HyperLogLog) + ", " + (function.deserialize(
+              bh) instanceof HyperLogLog));
           break;
         }
-        case StarTreeV2Constant.AggregateFunctions.PERCENTILEEST: {
+        case PERCENTILEEST: {
           AggregationFunction function =
-              AggregationFunctionFactory.getAggregationFunction(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST);
+              AggregationFunctionFactory.getAggregationFunction(AggregationFunctionType.PERCENTILEEST.getName());
           byte[] ah = itr1.nextBytesVal();
           byte[] bh = itr2.nextBytesVal();
 
-          System.out.println((function.deserialize(ah) instanceof QuantileDigest) + ", " + (function.deserialize(bh) instanceof QuantileDigest));
+          System.out.println((function.deserialize(ah) instanceof QuantileDigest) + ", " + (function.deserialize(
+              bh) instanceof QuantileDigest));
           break;
         }
-        case StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST: {
+        case PERCENTILETDIGEST: {
           AggregationFunction function = AggregationFunctionFactory.getAggregationFunction(
-              StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST);
+              AggregationFunctionType.PERCENTILETDIGEST.getName());
           byte[] ah = itr1.nextBytesVal();
           byte[] bh = itr2.nextBytesVal();
 
-          System.out.println((function.deserialize(ah) instanceof TDigest) + ", " + (function.deserialize(bh) instanceof TDigest));
+          System.out.println(
+              (function.deserialize(ah) instanceof TDigest) + ", " + (function.deserialize(bh) instanceof TDigest));
           break;
         }
       }

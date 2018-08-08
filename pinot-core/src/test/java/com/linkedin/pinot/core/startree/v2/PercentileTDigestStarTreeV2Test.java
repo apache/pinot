@@ -15,35 +15,34 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.clearspring.analytics.stream.quantile.TDigest;
+import com.google.common.io.Files;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
 import com.linkedin.pinot.core.common.datatable.ObjectType;
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-import org.testng.Assert;
-import java.util.ArrayList;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import com.google.common.io.Files;
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeClass;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.clearspring.analytics.stream.quantile.TDigest;
-import com.linkedin.pinot.core.data.readers.RecordReader;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDigest> {
 
-  private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
-      "SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"
-  };
+  private final String[] STAR_TREE1_HARD_CODED_QUERIES =
+      new String[]{"SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"};
 
   @BeforeClass
   void setUp() throws Exception {
@@ -60,10 +59,10 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     File indexDir = StarTreeV2SegmentHelper.createSegment(schema, _segmentName, _segmentOutputDir, _recordReader);
     File filepath = new File(indexDir, "v3");
 
-
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
-    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
+    AggregationFunctionColumnPair pair1 =
+        new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
     metric2aggFuncPairs1.add(pair1);
 
     StarTreeV2Config starTreeV2Config = new StarTreeV2Config();
@@ -71,7 +70,6 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     starTreeV2Config.setMaxNumLeafRecords(1);
     starTreeV2Config.setDimensions(schema.getDimensionNames());
     starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
-
 
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
     buildTest.init(indexDir, starTreeV2Config);
@@ -83,7 +81,7 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
 
   @Test
   public void testQueries() {
-    for (String s: STAR_TREE1_HARD_CODED_QUERIES) {
+    for (String s : STAR_TREE1_HARD_CODED_QUERIES) {
       testQuery(s);
       System.out.println("Passed Query : " + s);
     }
@@ -101,7 +99,7 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
   @Override
   protected TDigest aggregate(@Nonnull List<byte[]> values) {
     TDigest tDigest = new TDigest(100);
-    for (byte [] obj: values) {
+    for (byte[] obj : values) {
       try {
         tDigest.add(ObjectCustomSerDe.deserialize(obj, ObjectType.TDigest));
       } catch (IOException e) {

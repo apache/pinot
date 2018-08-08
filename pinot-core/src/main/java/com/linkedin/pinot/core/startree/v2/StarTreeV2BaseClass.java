@@ -15,26 +15,26 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.File;
-import java.util.Map;
-import java.util.Set;
-import java.util.List;
-import java.util.Queue;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.Comparator;
-import java.util.Collections;
-import java.nio.charset.Charset;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.core.startree.OffHeapStarTree;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import com.linkedin.pinot.core.data.readers.PinotSegmentColumnReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
+import java.io.File;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import org.apache.commons.configuration.PropertiesConfiguration;
 
 
 public class StarTreeV2BaseClass {

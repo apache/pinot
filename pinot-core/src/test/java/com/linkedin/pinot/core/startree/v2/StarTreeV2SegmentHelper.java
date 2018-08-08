@@ -15,19 +15,19 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.File;
-import java.util.List;
-import java.util.Random;
-import java.util.HashMap;
-import java.util.ArrayList;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
 
 
 public class StarTreeV2SegmentHelper {
@@ -44,8 +44,6 @@ public class StarTreeV2SegmentHelper {
   private static final int DIM_MAX_VALUE = 2000;
   private static final int METRIC_MAX_VALUE = 10000;
   private static final Random RANDOM = new Random();
-
-
 
   static Schema createSegmentSchema() {
 

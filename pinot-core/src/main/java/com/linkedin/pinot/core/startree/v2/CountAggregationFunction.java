@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.IOException;
-import javax.annotation.Nonnull;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import java.io.IOException;
+import javax.annotation.Nonnull;
 
 
 public class CountAggregationFunction implements AggregationFunction<Number, Long> {

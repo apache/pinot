@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import javax.annotation.Nonnull;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import javax.annotation.Nonnull;
 
 
 /**

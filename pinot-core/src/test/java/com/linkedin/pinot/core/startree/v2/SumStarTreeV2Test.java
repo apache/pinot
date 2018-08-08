@@ -15,23 +15,23 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.File;
-import java.util.List;
-import org.testng.Assert;
-import java.util.ArrayList;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import com.google.common.io.Files;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
@@ -39,12 +39,8 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   private File _indexDir;
   private StarTreeV2Config _starTreeV2Config;
 
-  private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[] {
-      "SELECT SUM(salary) FROM T",
-      "SELECT SUM(salary) FROM T GROUP BY Name",
-      "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"
-  };
-
+  private final String[] STAR_TREE_HARD_CODED_QUERIES =
+      new String[]{"SELECT SUM(salary) FROM T", "SELECT SUM(salary) FROM T GROUP BY Name", "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"};
 
   private void setUp() throws Exception {
 
@@ -59,7 +55,6 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
     File filepath = new File(_indexDir, "v3");
-
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
@@ -97,7 +92,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   public void testQueries() throws Exception {
     onHeapSetUp();
     System.out.println("Testing On-Heap Version");
-    for (String s: STAR_TREE_HARD_CODED_QUERIES) {
+    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
       testQuery(s);
       System.out.println("Passed Query : " + s);
     }
@@ -105,7 +100,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     offHeapSetUp();
     System.out.println("Testing Off-Heap Version");
-    for (String s: STAR_TREE_HARD_CODED_QUERIES) {
+    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
       testQuery(s);
       System.out.println("Passed Query : " + s);
     }

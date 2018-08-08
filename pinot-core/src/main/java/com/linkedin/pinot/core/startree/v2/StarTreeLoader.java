@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.File;
-import java.util.Map;
-import java.util.List;
-import java.util.ArrayList;
-import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.startree.StarTree;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 
 public class StarTreeLoader {

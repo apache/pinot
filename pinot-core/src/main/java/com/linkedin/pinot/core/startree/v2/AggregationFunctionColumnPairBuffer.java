@@ -15,13 +15,14 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.util.List;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.datatable.ObjectType;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import java.util.List;
 
 
 public class AggregationFunctionColumnPairBuffer {
@@ -114,11 +115,11 @@ public class AggregationFunctionColumnPairBuffer {
           byte[] objBytes = new byte[objLength];
           buffer.get(objBytes);
           try {
-            if (pair.getFunctionType().getName().equals(StarTreeV2Constant.AggregateFunctions.DISTINCTCOUNTHLL)) {
+            if (pair.getFunctionType().getName().equals(AggregationFunctionType.DISTINCTCOUNTHLL.getName())) {
               values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.HyperLogLog);
-            } else if (pair.getFunctionType().getName().equals(StarTreeV2Constant.AggregateFunctions.PERCENTILEEST)) {
+            } else if (pair.getFunctionType().getName().equals(AggregationFunctionType.PERCENTILEEST.getName())) {
               values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.QuantileDigest);
-            } else if (pair.getFunctionType().getName().equals(StarTreeV2Constant.AggregateFunctions.PERCENTILETDIGEST)) {
+            } else if (pair.getFunctionType().getName().equals(AggregationFunctionType.PERCENTILETDIGEST.getName())) {
               values[i] = ObjectCustomSerDe.deserialize(objBytes, ObjectType.TDigest);
             }
           } catch (IOException e) {

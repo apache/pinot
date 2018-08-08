@@ -15,21 +15,21 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import java.io.BufferedWriter;
 import java.io.File;
-import java.util.Set;
-import java.util.List;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
-import java.io.BufferedWriter;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileNotFoundException;
 import java.nio.channels.FileChannel;
+import java.util.List;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 
 
 public class StarTreeIndexesConverter implements StarTreeFormatConverter {

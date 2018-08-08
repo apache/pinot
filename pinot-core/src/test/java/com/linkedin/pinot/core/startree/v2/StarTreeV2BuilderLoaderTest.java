@@ -15,23 +15,23 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.File;
-import java.util.List;
-import java.util.ArrayList;
 import com.google.common.io.Files;
-import org.testng.annotations.Test;
-import org.testng.annotations.BeforeTest;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
+import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import org.testng.annotations.BeforeTest;
+import org.testng.annotations.Test;
 
 
 public class StarTreeV2BuilderLoaderTest {
@@ -59,7 +59,8 @@ public class StarTreeV2BuilderLoaderTest {
 
     RecordReader _recordReader = new GenericRowRecordReader(rows, schema);
     _onHeapIndexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, onHeapSegmentOutputDir, _recordReader);
-    _offHeapIndexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, offHeapSegmentOutputDir, _recordReader);
+    _offHeapIndexDir =
+        StarTreeV2SegmentHelper.createSegment(schema, segmentName, offHeapSegmentOutputDir, _recordReader);
 
     _onHeapFilePath = new File(_onHeapIndexDir, "v3");
     _offHeapFilePath = new File(_offHeapIndexDir, "v3");
@@ -71,7 +72,6 @@ public class StarTreeV2BuilderLoaderTest {
     AggregationFunctionColumnPair pair2 = new AggregationFunctionColumnPair(AggregationFunctionType.MAX, "salary");
     AggregationFunctionColumnPair pair3 = new AggregationFunctionColumnPair(AggregationFunctionType.MIN, "salary");
     AggregationFunctionColumnPair pair7 = new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "star");
-
 
     AggregationFunctionColumnPair pair4 =
         new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "salary");
@@ -129,7 +129,6 @@ public class StarTreeV2BuilderLoaderTest {
         offHeapBuildTest.init(_offHeapIndexDir, _offHeapStarTreeV2ConfigList.get(i));
         offHeapBuildTest.build();
       }
-
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -147,13 +146,12 @@ public class StarTreeV2BuilderLoaderTest {
     ImmutableSegment onHeapImmutableSegment = ImmutableSegmentLoader.load(_onHeapIndexDir, v3IndexLoadingConfig);
     ImmutableSegment offHeapImmutableSegment = ImmutableSegmentLoader.load(_offHeapIndexDir, v3IndexLoadingConfig);
 
-
     try {
       List<StarTreeV2> onHeapStarTreeImplList = onHeapLoadTest.load(_onHeapFilePath, onHeapImmutableSegment);
       List<StarTreeV2> offHeapStarTreeImplList = offHeapLoadTest.load(_offHeapFilePath, offHeapImmutableSegment);
 
       int starTreeId = 0;
-      for ( int i = 0; i < onHeapStarTreeImplList.size(); i++) {
+      for (int i = 0; i < onHeapStarTreeImplList.size(); i++) {
         System.out.println("Working on star tree " + Integer.toString(starTreeId + 1));
 
         for (String dimension : _onHeapStarTreeV2ConfigList.get(starTreeId).getDimensions()) {
@@ -163,12 +161,14 @@ public class StarTreeV2BuilderLoaderTest {
           StarTreeV2LoaderHelper.compareDimensionDataSources(source1, source2);
         }
 
-        for (AggregationFunctionColumnPair pair : _onHeapStarTreeV2ConfigList.get(starTreeId).getMetric2aggFuncPairs()) {
+        for (AggregationFunctionColumnPair pair : _onHeapStarTreeV2ConfigList.get(starTreeId)
+            .getMetric2aggFuncPairs()) {
           String metPair = pair.toColumnName();
           DataSource source1 = onHeapStarTreeImplList.get(i).getDataSource(metPair);
           DataSource source2 = offHeapStarTreeImplList.get(i).getDataSource(metPair);
           System.out.println("Printing for Met2AggPair : " + metPair);
-          StarTreeV2LoaderHelper.compareMetricAggfuncDataFromDataSource(source1, source2, pair.getFunctionType().getName());
+          StarTreeV2LoaderHelper.compareMetricAggfuncDataFromDataSource(source1, source2,
+              pair.getFunctionType());
         }
         starTreeId += 1;
       }

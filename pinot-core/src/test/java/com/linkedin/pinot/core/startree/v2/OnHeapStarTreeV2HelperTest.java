@@ -15,31 +15,31 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import java.io.File;
-import java.util.List;
-import java.util.Arrays;
-import org.testng.Assert;
-import java.nio.ByteOrder;
-import java.util.ArrayList;
-import java.io.IOException;
-import com.google.common.io.Files;
-import org.testng.annotations.Test;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.startree.hll.HllConstants;
-import com.clearspring.analytics.stream.quantile.TDigest;
-import com.linkedin.pinot.core.common.datatable.ObjectType;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.segment.memory.PinotByteBuffer;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.clearspring.analytics.stream.quantile.TDigest;
+import com.google.common.io.Files;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
+import com.linkedin.pinot.core.segment.memory.PinotByteBuffer;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.startree.hll.HllConstants;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class OnHeapStarTreeV2HelperTest {
@@ -204,16 +204,17 @@ public class OnHeapStarTreeV2HelperTest {
 
     File temp = Files.createTempDir();
     SingleValueRawIndexCreator indexCreator =
-        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random",
-             1, tDigest.byteSize());
+        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", 1,
+            tDigest.byteSize());
     indexCreator.index(0, src);
     indexCreator.close();
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
-    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
-    StarTreeV2AggfunColumnPairDataSource
-        source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer =
+        PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN, "star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -242,16 +243,18 @@ public class OnHeapStarTreeV2HelperTest {
 
     File temp = Files.createTempDir();
     SingleValueRawIndexCreator indexCreator =
-        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random",
-            1, tDigest.byteSize());
+        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", 1,
+            tDigest.byteSize());
     indexCreator.index(0, src);
     indexCreator.close();
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
-    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer =
+        PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN, "star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -281,16 +284,18 @@ public class OnHeapStarTreeV2HelperTest {
 
     File temp = Files.createTempDir();
     SingleValueRawIndexCreator indexCreator =
-        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random",
-             1, hyperLogLog.getBytes().length);
+        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", 1,
+            hyperLogLog.getBytes().length);
     indexCreator.index(0, src);
     indexCreator.close();
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
-    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer =
+        PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN, "star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -322,16 +327,18 @@ public class OnHeapStarTreeV2HelperTest {
 
     File temp = Files.createTempDir();
     SingleValueRawIndexCreator indexCreator =
-        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random",
-            1, hyperLogLog.getBytes().length);
+        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", 1,
+            hyperLogLog.getBytes().length);
     indexCreator.index(0, src);
     indexCreator.close();
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
 
-    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
-    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer =
+        PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN, "star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -365,15 +372,17 @@ public class OnHeapStarTreeV2HelperTest {
 
     File temp = Files.createTempDir();
     SingleValueRawIndexCreator indexCreator =
-        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random",
-            1, qDigest.estimatedSerializedSizeInBytes());
+        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", 1,
+            qDigest.estimatedSerializedSizeInBytes());
     indexCreator.index(1, src);
     indexCreator.close();
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
-    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
-    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer =
+        PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN, "star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
@@ -402,15 +411,17 @@ public class OnHeapStarTreeV2HelperTest {
 
     File temp = Files.createTempDir();
     SingleValueRawIndexCreator indexCreator =
-        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random",
-             1, qDigest.estimatedSerializedSizeInBytes());
+        new SingleValueVarByteRawIndexCreator(temp, ChunkCompressorFactory.CompressionType.PASS_THROUGH, "random", 1,
+            qDigest.estimatedSerializedSizeInBytes());
     indexCreator.index(1, src);
     indexCreator.close();
 
     File columnDataFile = new File(temp, "random.sv.raw.fwd");
     long size = columnDataFile.length();
-    PinotDataBuffer buffer = PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN,"star tree v2");
-    StarTreeV2AggfunColumnPairDataSource source = new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
+    PinotDataBuffer buffer =
+        PinotByteBuffer.mapFile(columnDataFile, false, 0, size, ByteOrder.BIG_ENDIAN, "star tree v2");
+    StarTreeV2AggfunColumnPairDataSource source =
+        new StarTreeV2AggfunColumnPairDataSource(buffer, "random", 1, FieldSpec.DataType.BYTES);
 
     Block b = source.getNextBlock();
     BlockValSet blockValSet = b.getBlockValueSet();
