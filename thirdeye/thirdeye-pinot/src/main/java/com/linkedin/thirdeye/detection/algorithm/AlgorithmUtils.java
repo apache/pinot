@@ -310,12 +310,14 @@ public class AlgorithmUtils {
 
   /**
    * Returns the time series re-scaled to and stitched backwards from change points
-   * (i.e. the last timestamp will be on its original level).
+   * (i.e. the last timestamp will be on its original level). This method is suitable
+   * for level changes but not for trending time series.
+   *
    * <br/><b>NOTE:</b> rescales relative to segment median
    *
    * @param dfTimeseries time series dataframe
    * @param changePoints set of change points
-   * @param lookForward look forward period for segment adjustment
+   * @param lookForward look forward period for segment adjustment (all if negative)
    * @return re-scaled time series
    */
   public static DataFrame getRescaledSeries(DataFrame dfTimeseries, Collection<Long> changePoints, long lookForward) {
@@ -344,7 +346,8 @@ public class AlgorithmUtils {
     List<Double> medians = new ArrayList<>();
     for (DataFrame segment : segments) {
       long start = segment.getLong(COL_TIME, 0);
-      medians.add(segment.filter(segment.getLongs(COL_TIME).lt(start + lookForward)).dropNull(COL_TIME).getDoubles(COL_VALUE).median().doubleValue());
+      long cutoff = lookForward > 0 ? (start + lookForward) : Long.MAX_VALUE;
+      medians.add(segment.filter(segment.getLongs(COL_TIME).lt(cutoff)).dropNull(COL_TIME).getDoubles(COL_VALUE).median().doubleValue());
     }
 
     // rescale time series

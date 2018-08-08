@@ -95,7 +95,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), "quantileMax", Double.NaN);
     this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreMin", Double.NaN);
     this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreMax", Double.NaN);
-    this.zscoreOutlier = MapUtils.getDoubleValue(config.getProperties(), "zscoreOutlier", 5);
+    this.zscoreOutlier = MapUtils.getDoubleValue(config.getProperties(), "zscoreOutlier", 3);
     this.kernelMin = MapUtils.getDoubleValue(config.getProperties(), "kernelMin", Double.NaN);
     this.kernelMax = MapUtils.getDoubleValue(config.getProperties(), "kernelMax", Double.NaN);
     this.kernelSumMin = MapUtils.getDoubleValue(config.getProperties(), "kernelSumMin", Double.NaN);
@@ -153,26 +153,27 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
   @Override
   public DetectionPipelineResult run(StaticDetectionPipelineData data) throws Exception {
-    DataFrame df = data.getTimeseries().get(this.sliceData);
+    DataFrame dfInput = data.getTimeseries().get(this.sliceData);
 
     Collection<MergedAnomalyResultDTO> existingAnomalies = data.getAnomalies().get(this.anomalySlice);
 
     // pre-detection change points
-    TreeSet<Long> changePoints = getChangePoints(df, this.effectiveStartTime, existingAnomalies);
-
-    // populate pre-existing anomalies
-    DataFrame dfInput = applyExistingAnomalies(df, existingAnomalies);
+    TreeSet<Long> changePoints = getChangePoints(dfInput, this.effectiveStartTime, existingAnomalies);
 
     // write-through arrays
-    dfInput.addSeries(COL_MEAN, DoubleSeries.nulls(df.size()));
-    dfInput.addSeries(COL_STD, DoubleSeries.nulls(df.size()));
-    dfInput.addSeries(COL_ZSCORE, DoubleSeries.nulls(df.size()));
-    dfInput.addSeries(COL_QUANTILE_MIN, DoubleSeries.nulls(df.size()));
-    dfInput.addSeries(COL_QUANTILE_MAX, DoubleSeries.nulls(df.size()));
-    dfInput.addSeries(COL_KERNEL, DoubleSeries.nulls(df.size()));
-    dfInput.addSeries(COL_KERNEL_SUM, DoubleSeries.zeros(df.size()));
-    dfInput.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
-    dfInput.addSeries(COL_OUTLIER, BooleanSeries.fillValues(df.size(), false));
+    dfInput.addSeries(COL_MEAN, DoubleSeries.nulls(dfInput.size()));
+    dfInput.addSeries(COL_STD, DoubleSeries.nulls(dfInput.size()));
+    dfInput.addSeries(COL_ZSCORE, DoubleSeries.nulls(dfInput.size()));
+    dfInput.addSeries(COL_QUANTILE_MIN, DoubleSeries.nulls(dfInput.size()));
+    dfInput.addSeries(COL_QUANTILE_MAX, DoubleSeries.nulls(dfInput.size()));
+    dfInput.addSeries(COL_KERNEL, DoubleSeries.nulls(dfInput.size()));
+    dfInput.addSeries(COL_KERNEL_SUM, DoubleSeries.zeros(dfInput.size()));
+    dfInput.addSeries(COL_ANOMALY, BooleanSeries.fillValues(dfInput.size(), false));
+    dfInput.addSeries(COL_OUTLIER, BooleanSeries.fillValues(dfInput.size(), false));
+
+    // populate pre-existing anomalies
+    dfInput = applyExistingAnomalies(dfInput, existingAnomalies);
+    dfInput.addSeries(COL_OUTLIER, dfInput.get(COL_ANOMALY));
 
     // generate detection time series
     Result result = this.run(dfInput, this.effectiveStartTime, changePoints);
@@ -199,7 +200,6 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private Result run(DataFrame df, long start, TreeSet<Long> changePoints) throws Exception {
     DoubleSeries originalValue = df.getDoubles(COL_VALUE);
 
-    // TODO support rescaling on trending time series
     DataFrame dfValue = AlgorithmUtils.getRescaledSeries(df, changePoints, this.changeDuration.toStandardDuration().getMillis());
 
     // relative baseline
