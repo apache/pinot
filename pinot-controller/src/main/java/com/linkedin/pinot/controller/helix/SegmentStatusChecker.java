@@ -30,8 +30,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -80,8 +78,7 @@ public class SegmentStatusChecker {
     _segmentStatusIntervalSeconds = config.getStatusCheckerFrequencyInSeconds();
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _metricsRegistry = metricsRegistry;
-    HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
-    _tableSizeReader = new TableSizeReader(Executors.newCachedThreadPool(), httpConnectionManager, _pinotHelixResourceManager);
+    _tableSizeReader = new TableSizeReader(Executors.newCachedThreadPool(), _pinotHelixResourceManager);
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override

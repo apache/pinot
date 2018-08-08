@@ -23,7 +23,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
 import javax.annotation.Nonnull;
 import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,19 +72,13 @@ public class MultiGetRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiGetRequest.class);
 
   Executor executor;
-  HttpConnectionManager connectionManager;
 
   /**
    * @param executor executor service to use for making parallel requests
-   * @param connectionManager http connection manager to use.
    */
-  public MultiGetRequest(@Nonnull Executor executor,
-      @Nonnull HttpConnectionManager connectionManager) {
+  public MultiGetRequest(@Nonnull Executor executor) {
     Preconditions.checkNotNull(executor);
-    Preconditions.checkNotNull(connectionManager);
-
     this.executor = executor;
-    this.connectionManager = connectionManager;
   }
 
   /**
@@ -105,7 +98,7 @@ public class MultiGetRequest {
         @Override
         public GetMethod call()
             throws Exception {
-          HttpClient client = new HttpClient(connectionManager);
+          HttpClient client = new HttpClient();
           GetMethod getMethod = new GetMethod(url);
           getMethod.getParams().setSoTimeout(timeoutMs);
           // if all connections in the connection manager are busy this will wait to retrieve a connection

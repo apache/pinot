@@ -30,7 +30,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.ConnectTimeoutException;
 import org.apache.commons.httpclient.ConnectionPoolTimeoutException;
-import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -47,11 +46,9 @@ public class ServerTableSizeReader {
       ServerTableSizeReader.class);
 
   private final Executor executor;
-  private final HttpConnectionManager connectionManager;
 
-  public ServerTableSizeReader(Executor executor, HttpConnectionManager connectionManager) {
+  public ServerTableSizeReader(Executor executor) {
     this.executor = executor;
-    this.connectionManager = connectionManager;
   }
 
   public Map<String, List<SegmentSizeInfo>> getSizeDetailsFromServers(BiMap<String, String> serverEndPoints,
@@ -64,7 +61,7 @@ public class ServerTableSizeReader {
       serverUrls.add(tableSizeUri);
     }
 
-    MultiGetRequest mget = new MultiGetRequest(executor, connectionManager);
+    MultiGetRequest mget = new MultiGetRequest(executor);
     LOGGER.info("Reading segment sizes from {} servers for table: {}, timeoutMsec: {}", serverUrls.size(), table, timeoutMsec);
     CompletionService<GetMethod> completionService = mget.execute(serverUrls, timeoutMsec);
 
