@@ -77,7 +77,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
   protected static final int NUM_ROWS = 1000;
   protected static final double VALUE_RANGE = Integer.MAX_VALUE;
-  protected static final double DELTA = 0.1 * VALUE_RANGE; // Allow 10% quantile error
+  protected static final double DELTA = 0.15 * VALUE_RANGE; // Allow 15% quantile error
   protected static final String DOUBLE_COLUMN = "doubleColumn";
   protected static final String TDIGEST_COLUMN = "tDigestColumn";
   protected static final String GROUP_BY_COLUMN = "groupByColumn";
