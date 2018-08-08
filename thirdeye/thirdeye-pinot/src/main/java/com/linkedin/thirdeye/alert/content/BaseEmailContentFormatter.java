@@ -20,11 +20,13 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -47,11 +49,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
@@ -100,7 +104,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   protected Period postEventCrawlOffset;
   protected String imgPath = null;
   protected EmailContentFormatterConfiguration emailContentFormatterConfiguration;
-
+  protected MetricConfigManager metricDAO;
 
   @Override
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
@@ -119,6 +123,8 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       this.postEventCrawlOffset = Period.parse(properties.getProperty(POST_EVENT_CRAWL_OFFSET));
     }
     this.emailContentFormatterConfiguration = configuration;
+
+    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
   }
 
   @Override
@@ -186,6 +192,8 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     Set<String> datasets = new TreeSet<>();
     List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>();
 
+    Map<String, MetricConfigDTO> metricsMap = new TreeMap<>();
+
     // Calculate start and end time of the anomalies
     DateTime startTime = DateTime.now();
     DateTime endTime = new DateTime(0l);
@@ -195,6 +203,12 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
         mergedAnomalyResults.add(mergedAnomaly);
         datasets.add(mergedAnomaly.getCollection());
         metrics.add(mergedAnomaly.getMetric());
+
+        MetricConfigDTO metric = this.metricDAO.findByMetricAndDataset(mergedAnomaly.getMetric(), mergedAnomaly.getCollection());
+        if (metric != null) {
+          // NOTE: our stale freemarker version doesn't play nice with non-string keys
+          metricsMap.put(metric.getId().toString(), metric);
+        }
       }
       if (anomalyResult.getStartTime() < startTime.getMillis()) {
         startTime = new DateTime(anomalyResult.getStartTime(), dateTimeZone);
@@ -210,6 +224,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     templateData.put("datasets", StringUtils.join(datasets, ", "));
     templateData.put("metricsCount", metrics.size());
     templateData.put("metrics", StringUtils.join(metrics, ", "));
+    templateData.put("metricsMap", metricsMap);
     templateData.put("anomalyCount", anomalies.size());
     templateData.put("startTime", getDateString(startTime));
     templateData.put("endTime", getDateString(endTime));

@@ -153,7 +153,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName);
         }
         helixTaskResult.setSuccess(true);
-      } catch (Exception e) {
+      } catch (Throwable e) {
+        // catch all Errors and Exceptions: if we only catch Exception, Errors go completely unhandled
+        // (without any corresponding logs to indicate failure!) in the callable path
         throw new RuntimeException(
             "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableNameWithType, e);
       } finally {

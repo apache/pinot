@@ -29,11 +29,11 @@ import com.linkedin.pinot.core.operator.filter.EmptyFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
-import com.linkedin.pinot.core.operator.filter.StarTreeIndexBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,11 +51,7 @@ public class FilterPlanNode implements PlanNode {
   @Override
   public BaseFilterOperator run() {
     FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    if (RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), _brokerRequest, rootFilterNode)) {
-      return new StarTreeIndexBasedFilterOperator(_segment, _brokerRequest, rootFilterNode);
-    } else {
-      return constructPhysicalOperator(rootFilterNode, _segment, _brokerRequest);
-    }
+    return constructPhysicalOperator(rootFilterNode, _segment, _brokerRequest.getDebugOptions());
   }
 
   /**
@@ -67,7 +63,7 @@ public class FilterPlanNode implements PlanNode {
    */
   @VisibleForTesting
   public static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree,
-      IndexSegment segment, BrokerRequest request) {
+      IndexSegment segment, Map<String, String> debugOptions) {
     if (filterQueryTree == null) {
       return new MatchEntireSegmentOperator(segment.getSegmentMetadata().getTotalRawDocs());
     }
@@ -80,17 +76,17 @@ public class FilterPlanNode implements PlanNode {
       if (filterType == FilterOperator.AND) {
         for (FilterQueryTree childFilter : childFilters) {
           BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment,
-              request);
+              debugOptions);
           if (childFilterOperator.isResultEmpty()) {
             return EmptyFilterOperator.getInstance();
           }
           childFilterOperators.add(childFilterOperator);
         }
-        FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, request);
+        FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, debugOptions);
         return new AndOperator(childFilterOperators);
       } else {
         for (FilterQueryTree childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment, request);
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment, debugOptions);
           if (!childFilterOperator.isResultEmpty()) {
             childFilterOperators.add(childFilterOperator);
           }

@@ -319,7 +319,7 @@ public class ResourceUtils {
       case ANOMALY_NEW_TREND:
         return AnomalyClassificationType.TRUE_POSITIVE;
       case NOT_ANOMALY:
-        return AnomalyClassificationType.TRUE_NEGATIVE;
+        return AnomalyClassificationType.FALSE_POSITIVE;
     }
 
     throw new IllegalStateException(String.format("Could not classify feedback status of anomaly id %d", anomaly.getId()));

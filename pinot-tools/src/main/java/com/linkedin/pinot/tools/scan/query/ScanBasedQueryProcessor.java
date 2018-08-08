@@ -69,7 +69,7 @@ public class ScanBasedQueryProcessor implements Cloneable {
     List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
     if (aggregationsInfo != null) {
       GroupBy groupBy = brokerRequest.getGroupBy();
-      groupByColumns = (brokerRequest.isSetGroupBy()) ? groupBy.getColumns() : null;
+      groupByColumns = (brokerRequest.isSetGroupBy()) ? groupBy.getExpressions() : null;
       long topN = (groupByColumns != null) ? groupBy.getTopN() : 10;
       aggregation = new Aggregation(brokerRequest.getAggregationsInfo(), groupByColumns, topN);
     }

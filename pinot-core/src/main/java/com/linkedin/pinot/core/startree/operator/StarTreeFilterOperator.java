@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.operator.filter;
+package com.linkedin.pinot.core.startree.operator;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.EmptyFilterBlock;
+import com.linkedin.pinot.core.operator.filter.AndOperator;
+import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
+import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeNode;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -41,6 +43,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -78,16 +82,18 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  *   <li>Conjoin all {@link BaseFilterOperator}s with AND if we have multiple of them</li>
  * </ul>
  */
-public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
+public class StarTreeFilterOperator extends BaseFilterOperator {
+
   /**
    * Helper class to wrap the information needed when traversing the star tree.
    */
   private static class SearchEntry {
-    StarTreeNode _starTreeNode;
-    Set<String> _remainingPredicateColumns;
-    Set<String> _remainingGroupByColumns;
+    final StarTreeNode _starTreeNode;
+    final Set<String> _remainingPredicateColumns;
+    final Set<String> _remainingGroupByColumns;
 
-    SearchEntry(StarTreeNode starTreeNode, Set<String> remainingPredicateColumns, Set<String> remainingGroupByColumns) {
+    SearchEntry(@Nonnull StarTreeNode starTreeNode, @Nonnull Set<String> remainingPredicateColumns,
+        @Nonnull Set<String> remainingGroupByColumns) {
       _starTreeNode = starTreeNode;
       _remainingPredicateColumns = remainingPredicateColumns;
       _remainingGroupByColumns = remainingGroupByColumns;
@@ -101,44 +107,45 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
     final ImmutableRoaringBitmap _matchedDocIds;
     final Set<String> _remainingPredicateColumns;
 
-    StarTreeResult(ImmutableRoaringBitmap matchedDocIds, Set<String> remainingPredicateColumns) {
+    StarTreeResult(@Nonnull ImmutableRoaringBitmap matchedDocIds, @Nonnull Set<String> remainingPredicateColumns) {
       _matchedDocIds = matchedDocIds;
       _remainingPredicateColumns = remainingPredicateColumns;
     }
   }
 
-  private static final String OPERATOR_NAME = "StarTreeIndexBasedFilterOperator";
+  private static final String OPERATOR_NAME = "StarTreeFilterOperator";
   // If (number of matching dictionary ids * threshold) > (number of child nodes), use scan to traverse nodes instead of
   // binary search on each dictionary id
   private static final int USE_SCAN_TO_TRAVERSE_NODES_THRESHOLD = 10;
 
-  private final IndexSegment _indexSegment;
+  // Star-tree
+  private final StarTreeV2 _starTreeV2;
+  // Set of group-by columns
+  private final Set<String> _groupByColumns;
   // Map from column to predicate evaluators
   private final Map<String, List<PredicateEvaluator>> _predicateEvaluatorsMap;
   // Map from column to matching dictionary ids
   private final Map<String, IntSet> _matchingDictIdsMap;
-  // Set of group-by columns
-  private final Set<String> _groupByColumns;
 
-  private final BrokerRequest _brokerRequest;
+  private final Map<String, String> _debugOptions;
   boolean _resultEmpty = false;
 
-  public StarTreeIndexBasedFilterOperator(IndexSegment indexSegment, BrokerRequest brokerRequest,
-      FilterQueryTree rootFilterNode) {
-    _indexSegment = indexSegment;
-    _brokerRequest = brokerRequest;
-    _groupByColumns = RequestUtils.getAllGroupByColumns(brokerRequest.getGroupBy());
+  public StarTreeFilterOperator(@Nonnull StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+      @Nullable Set<String> groupByColumns, Map<String, String> debugOptions) {
+    _starTreeV2 = starTreeV2;
+    _groupByColumns = groupByColumns != null ? new HashSet<>(groupByColumns) : Collections.emptySet();
+    _debugOptions = debugOptions;
 
     if (rootFilterNode != null) {
       // Process the filter tree and get a map from column to a list of predicates applied to it
-      Map<String, List<Predicate>> predicatesMap = processFilterTree(rootFilterNode);
+      Map<String, List<Predicate>> predicatesMap = getPredicatesMap(rootFilterNode);
 
       // Remove columns with predicates from group-by columns because we won't use star node for that column
       _groupByColumns.removeAll(predicatesMap.keySet());
 
-      int numColumns = predicatesMap.size();
-      _predicateEvaluatorsMap = new HashMap<>(numColumns);
-      _matchingDictIdsMap = new HashMap<>(numColumns);
+      int numColumnsInPredicates = predicatesMap.size();
+      _predicateEvaluatorsMap = new HashMap<>(numColumnsInPredicates);
+      _matchingDictIdsMap = new HashMap<>(numColumnsInPredicates);
 
       // Initialize the predicate evaluators map
       for (Map.Entry<String, List<Predicate>> entry : predicatesMap.entrySet()) {
@@ -146,7 +153,7 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
         List<Predicate> predicates = entry.getValue();
         List<PredicateEvaluator> predicateEvaluators = new ArrayList<>(predicates.size());
 
-        DataSource dataSource = _indexSegment.getDataSource(columnName);
+        DataSource dataSource = starTreeV2.getDataSource(columnName);
         for (Predicate predicate : predicates) {
           PredicateEvaluator predicateEvaluator =
               PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource);
@@ -168,7 +175,7 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
   /**
    * Helper method to process the filter tree and get a map from column to a list of predicates applied to it.
    */
-  private Map<String, List<Predicate>> processFilterTree(FilterQueryTree rootFilterNode) {
+  private Map<String, List<Predicate>> getPredicatesMap(@Nonnull FilterQueryTree rootFilterNode) {
     Map<String, List<Predicate>> predicatesMap = new HashMap<>();
     Queue<FilterQueryTree> queue = new LinkedList<>();
     queue.add(rootFilterNode);
@@ -179,12 +186,7 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
       if (children == null) {
         String columnName = filterNode.getColumn();
         Predicate predicate = Predicate.newPredicate(filterNode);
-        List<Predicate> predicates = predicatesMap.get(columnName);
-        if (predicates == null) {
-          predicates = new ArrayList<>();
-          predicatesMap.put(columnName, predicates);
-        }
-        predicates.add(predicate);
+        predicatesMap.computeIfAbsent(columnName, k -> new ArrayList<>()).add(predicate);
       } else {
         queue.addAll(children);
       }
@@ -199,12 +201,13 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
       return EmptyFilterBlock.getInstance();
     }
     List<BaseFilterOperator> childFilterOperators = getChildFilterOperators();
-    if (childFilterOperators.isEmpty()) {
+    int numChildFilterOperators = childFilterOperators.size();
+    if (numChildFilterOperators == 0) {
       return EmptyFilterBlock.getInstance();
-    } else if (childFilterOperators.size() == 1) {
+    } else if (numChildFilterOperators == 1) {
       return childFilterOperators.get(0).nextBlock();
     } else {
-      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, _brokerRequest);
+      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, _debugOptions);
       return new AndOperator(childFilterOperators).nextBlock();
     }
   }
@@ -239,7 +242,7 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
 
     int startDocId = 0;
     // Inclusive end document id
-    int endDocId = _indexSegment.getSegmentMetadata().getTotalDocs() - 1;
+    int endDocId = _starTreeV2.getMetadata().getNumDocs() - 1;
 
     // Add the bitmap of matching documents from star tree
     childFilterOperators.add(
@@ -249,7 +252,7 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
     // Add remaining predicates
     for (String remainingPredicateColumn : starTreeResult._remainingPredicateColumns) {
       List<PredicateEvaluator> predicateEvaluators = _predicateEvaluatorsMap.get(remainingPredicateColumn);
-      DataSource dataSource = _indexSegment.getDataSource(remainingPredicateColumn);
+      DataSource dataSource = _starTreeV2.getDataSource(remainingPredicateColumn);
       for (PredicateEvaluator predicateEvaluator : predicateEvaluators) {
         childFilterOperators.add(
             FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId));
@@ -269,7 +272,7 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
     MutableRoaringBitmap matchedDocIds = new MutableRoaringBitmap();
     Set<String> remainingPredicateColumns = new HashSet<>();
 
-    StarTree starTree = _indexSegment.getStarTree();
+    StarTree starTree = _starTreeV2.getStarTree();
     List<String> dimensionNames = starTree.getDimensionNames();
     StarTreeNode starTreeRootNode = starTree.getRoot();
 
@@ -385,7 +388,7 @@ public class StarTreeIndexBasedFilterOperator extends BaseFilterOperator {
    */
   private IntSet getMatchingDictIds(List<PredicateEvaluator> predicateEvaluators) {
     // Sort the predicate evaluators so that we process less dictionary ids
-    Collections.sort(predicateEvaluators, new Comparator<PredicateEvaluator>() {
+    predicateEvaluators.sort(new Comparator<PredicateEvaluator>() {
       @Override
       public int compare(PredicateEvaluator o1, PredicateEvaluator o2) {
         return getPriority(o1) - getPriority(o2);

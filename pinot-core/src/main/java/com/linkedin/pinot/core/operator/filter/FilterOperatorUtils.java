@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
@@ -64,7 +63,7 @@ public class FilterOperatorUtils {
    * <p>Special filter operators such as {@link MatchEntireSegmentOperator} and {@link EmptyFilterOperator} should be
    * removed from the list before calling this method.
    */
-  public static void reOrderFilterOperators(List<BaseFilterOperator> filterOperators, BrokerRequest request) {
+  public static void reOrderFilterOperators(List<BaseFilterOperator> filterOperators, Map<String, String> debugOptions) {
     Collections.sort(filterOperators, new Comparator<BaseFilterOperator>() {
       @Override
       public int compare(BaseFilterOperator o1, BaseFilterOperator o2) {
@@ -85,7 +84,7 @@ public class FilterOperatorUtils {
           return 3;
         }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return getScanBasedFilterPriority(filterOperator, 4, request);
+          return getScanBasedFilterPriority(filterOperator, 4, debugOptions);
         }
         throw new IllegalStateException(filterOperator.getClass().getSimpleName()
             + " should not be re-ordered, remove it from the list before calling this method");
@@ -97,16 +96,16 @@ public class FilterOperatorUtils {
    * Returns the priority for scan based filtering. Multivalue column evaluation is costly, so
    * reorder such that multivalue columns are evaluated after single value columns.
    *
-   * TODO: additional cost based prioritization to be                         added
+   * TODO: additional cost based prioritization to be added
    *
    * @param filterOperator the filter operator to prioritize
+   * @param debugOptions  debug-options to enable/disable the optimization
    * @return the priority to be associated with the filter
    */
   private static int getScanBasedFilterPriority(BaseFilterOperator filterOperator,
-      int basePriority, BrokerRequest request) {
+      int basePriority, Map<String, String> debugOptions) {
 
     boolean disabled = false;
-    Map<String, String> debugOptions = request.getDebugOptions();
     if (debugOptions != null &&
         StringUtils.compareIgnoreCase(debugOptions.get(USE_MV_OPT), "false") == 0) {
       disabled = true;

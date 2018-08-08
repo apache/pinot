@@ -25,7 +25,7 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 
 
-public class ConvertToRawIndexTaskExecutor extends BaseSegmentConversionExecutor {
+public class ConvertToRawIndexTaskExecutor extends BaseSingleSegmentConversionExecutor {
 
   @Override
   protected SegmentConversionResult convert(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull File originalIndexDir,

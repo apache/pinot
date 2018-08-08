@@ -53,15 +53,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
   };
 
-  private final int _numFunctions;
-  private final AggregationFunction[] _functions;
-  private final TransformExpressionTree[] _aggregationExpressions;
-  private final GroupKeyGenerator _groupKeyGenerator;
-  private final GroupByResultHolder[] _resultHolders;
-  private final boolean _hasMVGroupByExpression;
-  private final boolean _hasNoDictionaryGroupByExpression;
-  private final int[] _svGroupKeys;
-  private final int[][] _mvGroupKeys;
+  protected final int _numFunctions;
+  protected final AggregationFunction[] _functions;
+  protected final TransformExpressionTree[] _aggregationExpressions;
+  protected final GroupKeyGenerator _groupKeyGenerator;
+  protected final GroupByResultHolder[] _resultHolders;
+  protected final boolean _hasMVGroupByExpression;
+  protected final boolean _hasNoDictionaryGroupByExpression;
+  protected final int[] _svGroupKeys;
+  protected final int[][] _mvGroupKeys;
 
   /**
    * Constructor for the class.
@@ -81,7 +81,6 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (int i = 0; i < _numFunctions; i++) {
       AggregationFunction function = functionContexts[i].getAggregationFunction();
       _functions[i] = function;
-      // TODO: currently only support single argument aggregation
       if (function.getType() != AggregationFunctionType.COUNT) {
         _aggregationExpressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumn());
       }
@@ -144,24 +143,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int length = transformBlock.getNumDocs();
     int capacityNeeded = _groupKeyGenerator.getCurrentGroupKeyUpperBound();
     for (int i = 0; i < _numFunctions; i++) {
-      AggregationFunction function = _functions[i];
       GroupByResultHolder resultHolder = _resultHolders[i];
-
       resultHolder.ensureCapacity(capacityNeeded);
-      if (function.getType() == AggregationFunctionType.COUNT) {
-        if (_hasMVGroupByExpression) {
-          function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder);
-        } else {
-          function.aggregateGroupBySV(length, _svGroupKeys, resultHolder);
-        }
-      } else {
-        BlockValSet blockValueSet = transformBlock.getBlockValueSet(_aggregationExpressions[i]);
-        if (_hasMVGroupByExpression) {
-          function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValueSet);
-        } else {
-          function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValueSet);
-        }
-      }
+
+      aggregate(transformBlock, length, i);
 
       // Result holder limits the max number of group keys (default 100k), if the number of groups
       // exceeds beyond that limit, groups with lower values (as per sort order) are trimmed.
@@ -169,6 +154,26 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       if (!_hasNoDictionaryGroupByExpression) {
         int[] trimmedKeys = resultHolder.trimResults();
         _groupKeyGenerator.purgeKeys(trimmedKeys);
+      }
+    }
+  }
+
+  protected void aggregate(@Nonnull TransformBlock transformBlock, int length, int functionIndex) {
+    AggregationFunction function = _functions[functionIndex];
+    GroupByResultHolder resultHolder = _resultHolders[functionIndex];
+
+    if (function.getType() == AggregationFunctionType.COUNT) {
+      if (_hasMVGroupByExpression) {
+        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder);
+      } else {
+        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder);
+      }
+    } else {
+      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_aggregationExpressions[functionIndex]);
+      if (_hasMVGroupByExpression) {
+        function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValueSet);
+      } else {
+        function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValueSet);
       }
     }
   }

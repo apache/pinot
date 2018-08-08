@@ -109,6 +109,7 @@ public class PinotTableRestletResource {
     }
     try {
       ensureMinReplicas(tableConfig);
+      verifyTableConfigs(tableConfig);
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of the validation manager)
@@ -292,6 +293,7 @@ public class PinotTableRestletResource {
       }
 
       ensureMinReplicas(tableConfig);
+      verifyTableConfigs(tableConfig);
       _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
     } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       String errStr = String.format("Failed to update configuration for %s due to: %s", tableName, e.getMessage());
@@ -398,6 +400,55 @@ public class PinotTableRestletResource {
     }
   }
 
+  /**
+   * Verify table configs if it's a hybrid table, i.e. having both offline and real-time sub-tables.
+   */
+  private void verifyTableConfigs(TableConfig newTableConfig) {
+    String rawTableName = TableNameBuilder.extractRawTableName(newTableConfig.getTableName());
+    LOGGER.info("Validating table configs for Table: {}", rawTableName);
+
+    TableConfig tableConfigToCompare = null;
+    if (newTableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
+      if (_pinotHelixResourceManager.hasOfflineTable(rawTableName)) {
+        tableConfigToCompare = _pinotHelixResourceManager.getOfflineTableConfig(rawTableName);
+      }
+    } else {
+      if (_pinotHelixResourceManager.hasRealtimeTable(rawTableName)) {
+        tableConfigToCompare = _pinotHelixResourceManager.getRealtimeTableConfig(rawTableName);
+      }
+    }
+
+    // Check if it is a hybrid table or not. If not, there's no need to verify anything.
+    if (tableConfigToCompare == null) {
+      LOGGER.info(
+          "Table: {} is not a hybrid table. Skipping consistency check across realtime and offline parts of the table.",
+          rawTableName);
+      return;
+    }
+
+    SegmentsValidationAndRetentionConfig newSegmentConfig = newTableConfig.getValidationConfig();
+    SegmentsValidationAndRetentionConfig SegmentConfigToCompare = tableConfigToCompare.getValidationConfig();
+
+    String newTimeColumnName = newSegmentConfig.getTimeColumnName();
+    String existingTimeColumnName = SegmentConfigToCompare.getTimeColumnName();
+    if (!existingTimeColumnName.equals(newTimeColumnName)) {
+      throw new PinotHelixResourceManager.InvalidTableConfigException(
+          String.format("Time column names are different! Existing time column name: %s. New time column name: %s",
+              existingTimeColumnName, newTimeColumnName));
+    }
+
+    String newTimeColumnType = newSegmentConfig.getTimeType();
+    String existingTimeColumnType = SegmentConfigToCompare.getTimeType();
+    if (!existingTimeColumnType.equalsIgnoreCase(newTimeColumnType)) {
+      throw new PinotHelixResourceManager.InvalidTableConfigException(
+          String.format("Time column types are different! Existing time column type: %s. New time column type: %s",
+              existingTimeColumnType, newTimeColumnType));
+    }
+
+    // TODO: validate time unit size but now there's no metadata for that in table config.
+    LOGGER.info("Finished validating tables config for Table: {}", rawTableName);
+  }
+
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
@@ -418,8 +469,7 @@ public class PinotTableRestletResource {
 
     TableType type = TableType.valueOf(tableType.toUpperCase());
     if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
-        || type == TableType.REALTIME && (!_pinotHelixResourceManager
-        .hasRealtimeTable(tableName))) {
+        || type == TableType.REALTIME && (!_pinotHelixResourceManager.hasRealtimeTable(tableName))) {
       throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
           Response.Status.NOT_FOUND);
     }

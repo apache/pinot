@@ -16,19 +16,21 @@
 package com.linkedin.pinot.core.startree;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.filter.StarTreeIndexBasedFilterOperator;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.startree.plan.StarTreeFilterPlanNode;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.testng.Assert;
 
 
@@ -45,6 +47,7 @@ public abstract class BaseStarTreeIndexTest {
   protected int _numMetricColumns;
   protected Dictionary[] _metricDictionaries;
   protected BlockSingleValIterator[] _metricValIterators;
+  protected Set<String> _groupByColumns;
   protected int _numGroupByColumns;
   protected BlockSingleValIterator[] _groupByValIterators;
 
@@ -68,41 +71,46 @@ public abstract class BaseStarTreeIndexTest {
     for (String query : getHardCodedQueries()) {
       _brokerRequest = COMPILER.compileToBrokerRequest(query);
 
-      List<String> groupByColumns;
+      _groupByColumns = new HashSet<>();
       if (_brokerRequest.isSetGroupBy()) {
-        groupByColumns = _brokerRequest.getGroupBy().getColumns();
-      } else {
-        groupByColumns = Collections.emptyList();
+        for (String groupByExpression : _brokerRequest.getGroupBy().getExpressions()) {
+          TransformExpressionTree.compileToExpressionTree(groupByExpression).getColumns(_groupByColumns);
+        }
       }
-      _numGroupByColumns = groupByColumns.size();
+      _numGroupByColumns = _groupByColumns.size();
       _groupByValIterators = new BlockSingleValIterator[_numGroupByColumns];
-      for (int i = 0; i < _numGroupByColumns; i++) {
-        DataSource dataSource = _segment.getDataSource(groupByColumns.get(i));
-        _groupByValIterators[i] = (BlockSingleValIterator) dataSource.nextBlock().getBlockValueSet().iterator();
+      int index = 0;
+      for (String groupByColumn : _groupByColumns) {
+        _groupByValIterators[index++] =
+            (BlockSingleValIterator) _segment.getDataSource(groupByColumn).nextBlock().getBlockValueSet().iterator();
       }
 
-      Assert.assertEquals(computeUsingAggregatedDocs(), computeUsingRawDocs(), "Comparison failed for query: " + query);
+      Assert.assertEquals(computeWithoutStarTree(), computeWithStarTree(), "Comparison failed for query: " + query);
     }
   }
 
   /**
    * Helper method to compute the result using raw docs.
    */
-  private Map<List<Integer>, List<Double>> computeUsingRawDocs() throws Exception {
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    Operator filterOperator = FilterPlanNode.constructPhysicalOperator(filterQueryTree, _segment, _brokerRequest);
-    Assert.assertFalse(filterOperator instanceof StarTreeIndexBasedFilterOperator);
-
+  private Map<List<Integer>, List<Double>> computeWithStarTree() throws Exception {
+    FilterQueryTree rootFilterNode = RequestUtils.generateFilterQueryTree(_brokerRequest);
+    Operator filterOperator;
+    if (_numGroupByColumns > 0) {
+      filterOperator =
+          new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
+              _groupByColumns, _brokerRequest.getDebugOptions()).run();
+    } else {
+      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
+          null, _brokerRequest.getDebugOptions()).run();
+    }
     return compute(filterOperator);
   }
 
   /**
    * Helper method to compute the result using aggregated docs.
    */
-  private Map<List<Integer>, List<Double>> computeUsingAggregatedDocs() throws Exception {
+  private Map<List<Integer>, List<Double>> computeWithoutStarTree() throws Exception {
     Operator filterOperator = new FilterPlanNode(_segment, _brokerRequest).run();
-    Assert.assertTrue(filterOperator instanceof StarTreeIndexBasedFilterOperator);
-
     return compute(filterOperator);
   }
 

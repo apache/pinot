@@ -23,7 +23,7 @@ import java.util.Map;
 
 /**
  * The class <code>SegmentConversionResult</code> wraps the result of
- * {@link BaseSegmentConversionExecutor#convert(PinotTaskConfig, File, File)}.
+ * {@link BaseSingleSegmentConversionExecutor#convert(PinotTaskConfig, File, File)}.
  */
 public class SegmentConversionResult {
   private final File _file;

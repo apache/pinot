@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByExecutor;
+import com.linkedin.pinot.core.startree.executor.StarTreeGroupByExecutor;
 import javax.annotation.Nonnull;
 
 
@@ -40,18 +41,20 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
   private final int _numGroupsLimit;
   private final TransformOperator _transformOperator;
   private final long _numTotalRawDocs;
+  private final boolean _useStarTree;
 
   private ExecutionStatistics _executionStatistics;
 
-  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] functionContexts,
-      @Nonnull GroupBy groupBy, int maxInitialResultHolderCapacity, int numGroupsLimit,
-      @Nonnull TransformOperator transformOperator, long numTotalRawDocs) {
+  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
+      int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator,
+      long numTotalRawDocs, boolean useStarTree) {
     _functionContexts = functionContexts;
     _groupBy = groupBy;
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
     _numTotalRawDocs = numTotalRawDocs;
+    _useStarTree = useStarTree;
   }
 
   @Override
@@ -59,9 +62,16 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     int numDocsScanned = 0;
 
     // Perform aggregation group-by on all the blocks
-    GroupByExecutor groupByExecutor =
-        new DefaultGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity,
-            _numGroupsLimit, _transformOperator);
+    GroupByExecutor groupByExecutor;
+    if (_useStarTree) {
+      groupByExecutor =
+          new StarTreeGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity, _numGroupsLimit,
+              _transformOperator);
+    } else {
+      groupByExecutor =
+          new DefaultGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity, _numGroupsLimit,
+              _transformOperator);
+    }
     TransformBlock transformBlock;
     while ((transformBlock = _transformOperator.nextBlock()) != null) {
       numDocsScanned += transformBlock.getNumDocs();

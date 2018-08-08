@@ -45,12 +45,16 @@ public class TransformBlock implements Block {
     return _projectionBlock.getNumDocs();
   }
 
-  public BlockValSet getBlockValueSet(TransformExpressionTree expressionTree) {
-    if (expressionTree.getExpressionType() == TransformExpressionTree.ExpressionType.IDENTIFIER) {
-      return _projectionBlock.getBlockValueSet(expressionTree.getValue());
+  public BlockValSet getBlockValueSet(TransformExpressionTree expression) {
+    if (expression.isColumn()) {
+      return _projectionBlock.getBlockValueSet(expression.getValue());
     } else {
-      return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expressionTree));
+      return new TransformBlockValSet(_projectionBlock, _transformFunctionMap.get(expression));
     }
+  }
+
+  public BlockValSet getBlockValueSet(String column) {
+    return _projectionBlock.getBlockValueSet(column);
   }
 
   @Override

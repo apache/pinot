@@ -262,6 +262,7 @@ public class SegmentDictionaryCreator implements Closeable {
         throw new UnsupportedOperationException("Unsupported data type : " + _fieldSpec.getDataType());
     }
 
+    Arrays.sort(indexes);
     return indexes;
   }
 

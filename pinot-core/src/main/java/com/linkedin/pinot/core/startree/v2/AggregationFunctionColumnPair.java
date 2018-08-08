@@ -21,13 +21,21 @@ import javax.annotation.Nonnull;
 
 public class AggregationFunctionColumnPair {
   public static final String DELIMITER = "__";
+  public static final String STAR = "*";
+  public static final AggregationFunctionColumnPair COUNT_STAR =
+      new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, STAR);
+  public static final String COUNT_STAR_COLUMN_NAME = COUNT_STAR.toColumnName();
 
   private final AggregationFunctionType _functionType;
   private final String _column;
 
   public AggregationFunctionColumnPair(@Nonnull AggregationFunctionType functionType, @Nonnull String column) {
     _functionType = functionType;
-    _column = column;
+    if (functionType == AggregationFunctionType.COUNT) {
+      _column = STAR;
+    } else {
+      _column = column;
+    }
   }
 
   @Nonnull
@@ -48,7 +56,12 @@ public class AggregationFunctionColumnPair {
   @Nonnull
   public static AggregationFunctionColumnPair fromColumnName(@Nonnull String columnName) {
     String[] parts = columnName.split(DELIMITER, 2);
-    return new AggregationFunctionColumnPair(AggregationFunctionType.getAggregationFunctionType(parts[0]), parts[1]);
+    AggregationFunctionType functionType = AggregationFunctionType.valueOf(parts[0].toUpperCase());
+    if (functionType == AggregationFunctionType.COUNT) {
+      return COUNT_STAR;
+    } else {
+      return new AggregationFunctionColumnPair(functionType, parts[1]);
+    }
   }
 
   @Override
