@@ -16,6 +16,8 @@
 package com.linkedin.pinot.filesystem;
 
 import com.google.common.base.Strings;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -121,7 +123,32 @@ public class HadoopPinotFS extends PinotFS {
 
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
-    hadoopFS.copyToLocalFile(new Path(srcUri), new Path(dstFile.toURI()));
+    LOGGER.debug("starting to fetch segment from hdfs");
+    final String dstFilePath = dstFile.getAbsolutePath();
+    try {
+      final Path remoteFile = new Path(srcUri);
+      final Path localFile = new Path(dstFile.toURI());
+
+      RetryPolicy fixDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(retryCount, retryWaitMs);
+      fixDelayRetryPolicy.attempt(() -> {
+        try {
+          if (hadoopFS == null) {
+            throw new RuntimeException("hadoopFS client is not initialized when trying to copy files");
+          }
+          long startMs = System.currentTimeMillis();
+          hadoopFS.copyToLocalFile(remoteFile, localFile);
+          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath,
+              dstFile.length(), System.currentTimeMillis() - startMs);
+          return true;
+        } catch (IOException ex) {
+          LOGGER.warn(String.format("failed to fetch segment %s from hdfs, might retry", srcUri), ex);
+          return false;
+        }
+      });
+    } catch (Exception ex) {
+      LOGGER.error(String.format("failed to fetch %s from hdfs to local %s", srcUri, dstFilePath), ex);
+      throw ex;
+    }
   }
 
   @Override
