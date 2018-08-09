@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +33,6 @@ import org.slf4j.LoggerFactory;
 public class SegmentFetcherFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
   private static final SegmentFetcherFactory INSTANCE = new SegmentFetcherFactory();
-  private static final String DEFAULT_STORAGE_KEY = "controller.storage.factory.class.file";
 
   private SegmentFetcherFactory() {
   }
@@ -56,27 +54,30 @@ public class SegmentFetcherFactory {
   public static final String FETCHER_CLASS_KEY_SUFFIX = ".class";
 
   private final Map<String, SegmentFetcher> _segmentFetcherMap = new HashMap<>();
+  private Configuration _pinotFSConfig;
 
   /**
    * Initiate the segment fetcher factory. This method should only be called once.
-   *  @param config Segment fetcher factory config
+   * @param segmentFetcherClassConfig Segment fetcher factory config
+   * @param pinotFSConfig
    *
    */
-  public void init(Configuration config) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+  public void init(Configuration segmentFetcherClassConfig, Configuration pinotFSConfig) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
     @SuppressWarnings("unchecked")
-    List<String> protocols = config.getList(PROTOCOLS_KEY, DEFAULT_PROTOCOLS);
+    List<String> protocols = segmentFetcherClassConfig.getList(PROTOCOLS_KEY, DEFAULT_PROTOCOLS);
     for (String protocol : protocols) {
       String fetcherClass =
-          config.getString(protocol + FETCHER_CLASS_KEY_SUFFIX, DEFAULT_FETCHER_CLASS_MAP.get(protocol));
+          segmentFetcherClassConfig.getString(protocol + FETCHER_CLASS_KEY_SUFFIX, DEFAULT_FETCHER_CLASS_MAP.get(protocol));
       Preconditions.checkNotNull(fetcherClass, "No fetcher class defined for protocol: " + protocol);
       LOGGER.info("Creating a new segment fetcher for protocol: {} with class: {}", protocol, fetcherClass);
       SegmentFetcher segmentFetcher = (SegmentFetcher) Class.forName(fetcherClass).newInstance();
       LOGGER.info("Initializing segment fetcher for protocol: {}", protocol);
-      Configuration segmentFetcherConfig = config.subset(protocol);
+      Configuration segmentFetcherConfig = segmentFetcherClassConfig.subset(protocol);
       logFetcherInitConfig(segmentFetcher, protocol, segmentFetcherConfig);
       segmentFetcher.init(segmentFetcherConfig);
       _segmentFetcherMap.put(protocol, segmentFetcher);
     }
+    _pinotFSConfig = pinotFSConfig;
   }
 
   public boolean containsProtocol(String protocol) {
@@ -87,10 +88,11 @@ public class SegmentFetcherFactory {
     String protocol = new URI(uri).getScheme();
     SegmentFetcher segmentFetcher = _segmentFetcherMap.get(protocol);
     if (segmentFetcher instanceof GenericSegmentFetcher) {
-      Configuration configuration = new BaseConfiguration();
-      configuration.addProperty(DEFAULT_STORAGE_KEY, LocalPinotFS.class.getName());
       LOGGER.info("Initializing pinotFS for segment fetcher with uri {}", uri);
-      segmentFetcher = new GenericSegmentFetcher(new URI(uri), configuration);
+      if (_pinotFSConfig.getProperty("file") == null) {
+        _pinotFSConfig.addProperty("file", LocalPinotFS.class.getName());
+      }
+      segmentFetcher = new GenericSegmentFetcher(new URI(uri), _pinotFSConfig);
     }
     return segmentFetcher;
   }

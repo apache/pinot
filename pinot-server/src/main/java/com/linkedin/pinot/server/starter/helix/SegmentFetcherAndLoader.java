@@ -51,10 +51,11 @@ public class SegmentFetcherAndLoader {
     _propertyStore = propertyStore;
     _dataManager = dataManager;
 
+    Configuration pinotFSConfig = pinotHelixProperties.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
         pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
-    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
   }
 
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {

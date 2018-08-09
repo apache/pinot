@@ -619,7 +619,7 @@ public class PinotSegmentUploadRestletResource {
       URI srcUri) throws Exception {
     // Move tarred segment file to data directory when there is no external download URL
     File tarredSegmentFile = new File(new File(provider.getBaseDataDir(), tableName), segmentName);
-    PinotFS pinotFS = new PinotFSFactory(_controllerConf).create(srcUri);
+    PinotFS pinotFS = new PinotFSFactory(_controllerConf.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY)).create(srcUri);
     // The move will overwrite current segment file
     pinotFS.move(srcUri, tarredSegmentFile.toURI());
     LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, srcUri.getPath(), tarredSegmentFile.getAbsolutePath());

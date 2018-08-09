@@ -41,7 +41,7 @@ public class SegmentFetcherFactoryTest {
 
   @Test
   public void testDefaultSegmentFetcherFactory() throws Exception {
-    _segmentFetcherFactory.init(new PropertiesConfiguration());
+    _segmentFetcherFactory.init(new PropertiesConfiguration(), new PropertiesConfiguration());
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("file"));
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("http"));
     Assert.assertFalse(_segmentFetcherFactory.containsProtocol("https"));
@@ -56,7 +56,7 @@ public class SegmentFetcherFactoryTest {
     config.addProperty("http.other", "some config");
     config.addProperty("https.class", NoOpFetcher.class.getName());
     config.addProperty("test.class", TestSegmentFetcher.class.getName());
-    _segmentFetcherFactory.init(config);
+    _segmentFetcherFactory.init(config, new PropertiesConfiguration());
 
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("http"));
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("https"));
@@ -68,7 +68,7 @@ public class SegmentFetcherFactoryTest {
 
   @Test
   public void testGetSegmentFetcherBasedOnURI() throws Exception {
-    _segmentFetcherFactory.init(new PropertiesConfiguration());
+    _segmentFetcherFactory.init(new PropertiesConfiguration(), new PropertiesConfiguration());
 
     Assert.assertTrue(
         _segmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);

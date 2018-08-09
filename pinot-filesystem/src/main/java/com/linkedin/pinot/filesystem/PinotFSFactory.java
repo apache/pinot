@@ -30,7 +30,7 @@ public class PinotFSFactory {
   private static Configuration _schemeConfig;
 
   public PinotFSFactory(Configuration config) {
-    _schemeConfig = config.subset("controller.storage.factory.class");
+    _schemeConfig = config;
   }
 
   public PinotFS create(URI uri) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
