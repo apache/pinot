@@ -16,8 +16,8 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.filesystem.LocalPinotFS;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 public class SegmentFetcherFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
   private static final SegmentFetcherFactory INSTANCE = new SegmentFetcherFactory();
+  private static final String DEFAULT_STORAGE_KEY = "controller.storage.factory.class.file";
 
   private SegmentFetcherFactory() {
   }
@@ -44,12 +46,12 @@ public class SegmentFetcherFactory {
   public static final String PROTOCOLS_KEY = "protocols";
   public static final List<String> DEFAULT_PROTOCOLS = Collections.unmodifiableList(Arrays.asList("file", "http"));
   public static final Map<String, String> DEFAULT_FETCHER_CLASS_MAP =
-      Collections.unmodifiableMap(new HashMap<String, String>(4) {{
-        put("file", LocalFileSegmentFetcher.class.getName());
+      Collections.unmodifiableMap(new HashMap<String, String>(5) {{
         put("http", HttpSegmentFetcher.class.getName());
         put("https", HttpsSegmentFetcher.class.getName());
-        put("hdfs", HdfsSegmentFetcher.class.getName());
-        put("adl", AzureSegmentFetcher.class.getName());
+        put("hdfs", GenericSegmentFetcher.class.getName());
+        put("adl", GenericSegmentFetcher.class.getName());
+        put("file", GenericSegmentFetcher.class.getName());
       }});
   public static final String FETCHER_CLASS_KEY_SUFFIX = ".class";
 
@@ -57,8 +59,8 @@ public class SegmentFetcherFactory {
 
   /**
    * Initiate the segment fetcher factory. This method should only be called once.
+   *  @param config Segment fetcher factory config
    *
-   * @param config Segment fetcher factory config
    */
   public void init(Configuration config) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
     @SuppressWarnings("unchecked")
@@ -81,9 +83,16 @@ public class SegmentFetcherFactory {
     return _segmentFetcherMap.containsKey(protocol);
   }
 
-  public SegmentFetcher getSegmentFetcherBasedOnURI(String uri) throws URISyntaxException {
+  public SegmentFetcher getSegmentFetcherBasedOnURI(String uri) throws Exception {
     String protocol = new URI(uri).getScheme();
-    return _segmentFetcherMap.get(protocol);
+    SegmentFetcher segmentFetcher = _segmentFetcherMap.get(protocol);
+    if (segmentFetcher instanceof GenericSegmentFetcher) {
+      Configuration configuration = new BaseConfiguration();
+      configuration.addProperty(DEFAULT_STORAGE_KEY, LocalPinotFS.class.getName());
+      LOGGER.info("Initializing pinotFS for segment fetcher with uri {}", uri);
+      segmentFetcher = new GenericSegmentFetcher(new URI(uri), configuration);
+    }
+    return segmentFetcher;
   }
 
   private static void logFetcherInitConfig(SegmentFetcher fetcher, String protocol, Configuration conf) {
