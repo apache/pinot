@@ -125,9 +125,9 @@ public class LocalPinotFSTest {
 
     Assert.assertTrue(testFile.exists());
 
-    localPinotFS.copyFromLocalFile(testFile.toURI(), secondTestFileUri);
+    localPinotFS.copyFromLocalFile(testFile, secondTestFileUri);
     Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
-    localPinotFS.copyToLocalFile(testFile.toURI(), secondTestFileUri);
+    localPinotFS.copyToLocalFile(testFile.toURI(), new File(secondTestFileUri));
     Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
 
     // List files on a file - exception if file already exists

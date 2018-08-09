@@ -116,9 +116,9 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File tempFile) throws Exception {
+  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     try (InputStream adlStream = _adlStoreClient.getReadStream(srcUri.getPath())) {
-      Path dstFilePath = Paths.get(tempFile.toURI());
+      Path dstFilePath = Paths.get(dstFile.toURI());
 
       /* Copy the source file to the destination directory as a file with the same name as the source,
        * replace an existing file with the same name in the destination directory, if any.
@@ -126,14 +126,14 @@ public class AzurePinotFS extends PinotFS {
        */
       Files.copy(adlStream, dstFilePath);
 
-      LOGGER.info("Copied file {} from ADL to {}", srcUri, tempFile);
+      LOGGER.info("Copied file {} from ADL to {}", srcUri, dstFile);
     } catch (Exception ex) {
       throw ex;
     }
   }
 
   @Override
-  public void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException {
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws IOException {
     // TODO: Add this method. Not needed for now because of metadata upload
     throw new UnsupportedOperationException("Cannot copy from local to Azure");
   }

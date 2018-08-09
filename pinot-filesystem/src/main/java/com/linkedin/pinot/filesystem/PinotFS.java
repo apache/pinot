@@ -90,17 +90,17 @@ public abstract class PinotFS {
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.
    * @param srcUri location of current file on remote filesystem
-   * @param tempFile location of destination on local filesystem
-   * @throws Exception 
+   * @param dstFile location of destination on local filesystem
+   * @throws Exception
    */
-  public abstract void copyToLocalFile(URI srcUri, File tempFile) throws Exception;
+  public abstract void copyToLocalFile(URI srcUri, File dstFile) throws Exception;
 
   /**
    * The src file is on the local disk. Add it to filesystem at the given dst name and the source is kept intact
    * afterwards.
-   * @param srcUri location of src file on local disk
+   * @param srcFile location of src file on local disk
    * @param dstUri location of dst on remote filesystem
    * @throws IOException for IO Error
    */
-  public abstract void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException;
+  public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws IOException;
 }

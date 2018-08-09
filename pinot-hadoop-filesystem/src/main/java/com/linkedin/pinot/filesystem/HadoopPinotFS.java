@@ -120,13 +120,13 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File tempFile) throws Exception {
-    hadoopFS.copyToLocalFile(new Path(srcUri), new Path(tempFile.toURI()));
+  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
+    hadoopFS.copyToLocalFile(new Path(srcUri), new Path(dstFile.toURI()));
   }
 
   @Override
-  public void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException {
-    hadoopFS.copyFromLocalFile(new Path(srcUri), new Path(dstUri));
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws IOException {
+    hadoopFS.copyFromLocalFile(new Path(srcFile.toURI()), new Path(dstUri));
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {

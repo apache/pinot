@@ -110,13 +110,13 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File tempFile) throws Exception {
-    copy(srcUri, tempFile.toURI());
-    LOGGER.info("Copy file from {} to {}; Length of file: {}", srcUri, tempFile, tempFile.length());
+  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
+    copy(srcUri, dstFile.toURI());
+    LOGGER.info("Copy file from {} to {}; Length of file: {}", srcUri, dstFile, dstFile.length());
   }
 
   @Override
-  public void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException {
-    copy(srcUri, dstUri);
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws IOException {
+    copy(srcFile.toURI(), dstUri);
   }
 }
