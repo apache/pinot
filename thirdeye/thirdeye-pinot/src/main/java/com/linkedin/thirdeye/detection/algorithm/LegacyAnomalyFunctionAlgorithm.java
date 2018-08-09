@@ -115,7 +115,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
     }
 
     if (!dataFilter.isQualified(metricTimeSeries, dimension, this.startTime, this.endTime)) {
-      return new DetectionPipelineResult(new ArrayList<MergedAnomalyResultDTO>());
+      return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList());
     }
 
     List<AnomalyResult> result =
