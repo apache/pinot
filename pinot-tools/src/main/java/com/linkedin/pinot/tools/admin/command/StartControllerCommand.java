@@ -148,7 +148,6 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
 
         conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
         conf.setValidationControllerFrequencyInSeconds(3600);
-        conf.setPinotFSFactoryClasses(null);
       }
 
       LOGGER.info("Executing command: " + toString());
