@@ -101,8 +101,6 @@ public abstract class ControllerTest {
     config.setDataDir(DEFAULT_DATA_DIR);
     config.setZkStr(ZkStarter.DEFAULT_ZK_STR);
 
-    // Includes default local PinotFS class
-    config.setPinotFSFactoryClasses(null);
     return config;
   }
 

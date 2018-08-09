@@ -328,8 +328,6 @@ public class ControllerStarter {
     conf.setStatusCheckerWaitForPushTimeInSeconds(10 * 60);
     conf.setTenantIsolationEnabled(true);
 
-    // set to null because the local file pinot fs factory class is included by default
-    conf.setPinotFSFactoryClasses(null);
     final ControllerStarter starter = new ControllerStarter(conf);
 
     starter.start();
