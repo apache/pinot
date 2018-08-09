@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.filesystem;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
@@ -89,10 +90,10 @@ public abstract class PinotFS {
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.
    * @param srcUri location of current file on remote filesystem
-   * @param dstUri location of destination on local filesystem
-   * @throws IOException IO Failures
+   * @param tempFile location of destination on local filesystem
+   * @throws Exception 
    */
-  public abstract void copyToLocalFile(URI srcUri, URI dstUri) throws IOException;
+  public abstract void copyToLocalFile(URI srcUri, File tempFile) throws Exception;
 
   /**
    * The src file is on the local disk. Add it to filesystem at the given dst name and the source is kept intact

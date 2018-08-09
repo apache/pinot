@@ -22,6 +22,8 @@ import java.nio.file.Files;
 import java.util.Collection;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -29,6 +31,7 @@ import org.apache.commons.io.FileUtils;
  * if access to the file is denied.
  */
 public class LocalPinotFS extends PinotFS {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LocalPinotFS.class);
 
   public LocalPinotFS() {
   }
@@ -107,8 +110,9 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
-    copy(srcUri, dstUri);
+  public void copyToLocalFile(URI srcUri, File tempFile) throws Exception {
+    copy(srcUri, tempFile.toURI());
+    LOGGER.info("Copy file from {} to {}; Length of file: {}", srcUri, tempFile, tempFile.length());
   }
 
   @Override

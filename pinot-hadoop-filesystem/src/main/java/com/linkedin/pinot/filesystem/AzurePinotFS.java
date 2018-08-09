@@ -20,6 +20,7 @@ import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
 import com.microsoft.azure.datalake.store.oauth2.AccessTokenProvider;
 import com.microsoft.azure.datalake.store.oauth2.ClientCredsTokenProvider;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -115,9 +116,9 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
+  public void copyToLocalFile(URI srcUri, File tempFile) throws Exception {
     try (InputStream adlStream = _adlStoreClient.getReadStream(srcUri.getPath())) {
-      Path dstFilePath = Paths.get(dstUri);
+      Path dstFilePath = Paths.get(tempFile.toURI());
 
       /* Copy the source file to the destination directory as a file with the same name as the source,
        * replace an existing file with the same name in the destination directory, if any.
@@ -125,7 +126,7 @@ public class AzurePinotFS extends PinotFS {
        */
       Files.copy(adlStream, dstFilePath);
 
-      LOGGER.info("Copied file {} from ADL to {}", srcUri, dstUri);
+      LOGGER.info("Copied file {} from ADL to {}", srcUri, tempFile);
     } catch (Exception ex) {
       throw ex;
     }

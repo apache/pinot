@@ -16,6 +16,7 @@
 package com.linkedin.pinot.filesystem;
 
 import com.google.common.base.Strings;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -119,8 +120,8 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
-    hadoopFS.copyToLocalFile(new Path(srcUri), new Path(dstUri));
+  public void copyToLocalFile(URI srcUri, File tempFile) throws Exception {
+    hadoopFS.copyToLocalFile(new Path(srcUri), new Path(tempFile.toURI()));
   }
 
   @Override
