@@ -6,6 +6,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Collections2;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
+import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilter;
+import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilterFactory;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricSchema;
 import com.linkedin.thirdeye.api.MetricSpec;
@@ -50,6 +52,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
   private BaseAnomalyFunction anomalyFunction;
   private String metricUrn;
   private MetricEntity metricEntity;
+  private DataFilter dataFilter;
 
   /**
    * Instantiates a new Legacy anomaly function algorithm.
@@ -69,6 +72,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
     anomalyFunction = (BaseAnomalyFunction) Class.forName(anomalyFunctionClassName).newInstance();
     String specs = OBJECT_MAPPER.writeValueAsString(MapUtils.getMap(config.getProperties(), PROP_SPEC));
     anomalyFunction.init(OBJECT_MAPPER.readValue(specs, AnomalyFunctionDTO.class));
+    dataFilter = DataFilterFactory.fromSpec(anomalyFunction.getSpec().getDataFilter());
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     metricEntity = MetricEntity.fromURN(metricUrn, 1.0);
   }
@@ -108,6 +112,10 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
     LongSeries timestamps = df.getLongs(COL_TIME);
     for (int i = 0; i < timestamps.size(); i++) {
       metricTimeSeries.set(timestamps.get(i), metricConfig.getName(), df.getDoubles(COL_VALUE).get(i));
+    }
+
+    if (!dataFilter.isQualified(metricTimeSeries, dimension, this.startTime, this.endTime)) {
+      return new DetectionPipelineResult(new ArrayList<MergedAnomalyResultDTO>());
     }
 
     List<AnomalyResult> result =
