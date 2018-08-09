@@ -53,7 +53,7 @@ public class StorageQuotaChecker {
     _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
-  public class QuotaCheckerResponse {
+  public static class QuotaCheckerResponse {
     public boolean isSegmentWithinQuota;
     public String reason;
 
@@ -61,6 +61,14 @@ public class StorageQuotaChecker {
       this.isSegmentWithinQuota = isSegmentWithinQuota;
       this.reason = reason;
     }
+  }
+
+  public static QuotaCheckerResponse success(String msg) {
+    return new QuotaCheckerResponse(true, msg);
+  }
+
+  public static QuotaCheckerResponse failure(String msg) {
+    return new QuotaCheckerResponse(false, msg);
   }
 
   /**
@@ -92,13 +100,13 @@ public class StorageQuotaChecker {
     if (quotaConfig == null || Strings.isNullOrEmpty(quotaConfig.getStorage())) {
       // no quota configuration...so ignore for backwards compatibility
       LOGGER.warn("Quota configuration not set for table: {}", tableNameWithType);
-      return new QuotaCheckerResponse(true, "Quota configuration not set for table: " + tableNameWithType);
+      return success("Quota configuration not set for table: " + tableNameWithType);
     }
 
     long allowedStorageBytes = numReplicas * quotaConfig.storageSizeBytes();
     if (allowedStorageBytes < 0) {
       LOGGER.warn("Storage quota is not configured for table: {}", tableNameWithType);
-      return new QuotaCheckerResponse(true, "Storage quota is not configured for table: " + tableNameWithType);
+      return success("Storage quota is not configured for table: " + tableNameWithType);
     }
     _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.TABLE_QUOTA, allowedStorageBytes);
 
@@ -115,8 +123,7 @@ public class StorageQuotaChecker {
 
     if (tableSubtypeSize.estimatedSizeInBytes == -1) {
       // don't fail the quota check in this case
-      return new QuotaCheckerResponse(true,
-          "Failed to get size estimate for table: " + tableNameWithType);
+      return success("Failed to get size estimate for table: " + tableNameWithType);
     }
 
     // If the segment exists(refresh), get the existing size
@@ -159,7 +166,7 @@ public class StorageQuotaChecker {
             segmentName, tableName, DataSize.fromBytes(allowedStorageBytes), DataSize.fromBytes(quotaConfig.storageSizeBytes()), numReplicas, DataSize.fromBytes(estimatedFinalSizeBytes), DataSize.fromBytes(tableSubtypeSize.estimatedSizeInBytes), DataSize.fromBytes(totalIncomingSegmentSizeBytes), DataSize.fromBytes(incomingSegmentSizeBytes), numReplicas, DataSize.fromBytes(existingSegmentSizeBytes));
       }
       LOGGER.info(message);
-      return new QuotaCheckerResponse(true, message);
+      return success(message);
     } else {
       String message;
       if (tableSubtypeSize.estimatedSizeInBytes > allowedStorageBytes) {
@@ -174,7 +181,7 @@ public class StorageQuotaChecker {
             DataSize.fromBytes(incomingSegmentSizeBytes), numReplicas, DataSize.fromBytes(quotaConfig.storageSizeBytes()), numReplicas);
       }
       LOGGER.warn(message);
-      return new QuotaCheckerResponse(false, message);
+      return failure(message);
     }
   }
 }
