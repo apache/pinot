@@ -46,6 +46,8 @@ import java.io.OutputStream;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.task.TaskDriver;
@@ -182,6 +184,8 @@ public class ControllerStarter {
 
     LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
     LOGGER.info("Injecting configuration and resource managers to the API context");
+    final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
+    connectionManager.getParams().setConnectionTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000);
     // register all the controller objects for injection to jersey resources
     _adminApp.registerBinder(new AbstractBinder() {
       @Override
@@ -190,6 +194,7 @@ public class ControllerStarter {
         bind(_helixResourceManager).to(PinotHelixResourceManager.class);
         bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
         bind(_taskManager).to(PinotTaskManager.class);
+        bind(connectionManager).to(HttpConnectionManager.class);
         bind(_executorService).to(Executor.class);
         bind(_controllerMetrics).to(ControllerMetrics.class);
         bind(accessControlFactory).to(AccessControlFactory.class);

@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import org.apache.commons.httpclient.HttpConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -44,11 +45,13 @@ import javax.annotation.Nullable;
 public class TableSizeReader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReader.class);
   private Executor _executor;
+  private HttpConnectionManager _connectionManager;
   private PinotHelixResourceManager _helixResourceManager;
 
-  public TableSizeReader(Executor executor,
+  public TableSizeReader(Executor executor, HttpConnectionManager connectionManager,
       PinotHelixResourceManager helixResourceManager) {
     _executor = executor;
+    _connectionManager = connectionManager;
     _helixResourceManager = helixResourceManager;
   }
 
@@ -140,7 +143,7 @@ public class TableSizeReader {
     // get list of servers
     Map<String, List<String>> serverSegmentsMap =
         _helixResourceManager.getInstanceToSegmentsInATableMap(table);
-    ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor);
+    ServerTableSizeReader serverTableSizeReader = new ServerTableSizeReader(_executor, _connectionManager);
     BiMap<String, String> endpoints = _helixResourceManager.getDataInstanceAdminEndpoints(serverSegmentsMap.keySet());
     Map<String, List<SegmentSizeInfo>> serverSizeInfo =
         serverTableSizeReader.getSizeDetailsFromServers(endpoints, table, timeoutMsec);
