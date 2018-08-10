@@ -33,15 +33,13 @@ import java.util.Random;
 public class StarTreeV2SegmentHelper {
 
   private static final int smallNumRows = 6;
-  private static final int largeNumRows = 5000;
+  private static final int largeNumRows = 15000;
 
-  private static final String[] names = {"Rahul", "Rahul", "Rahul", "Zackie", "Zackie", "Zackie"};
-  private static final String[] country = {"IN", "IN", "CH", "CH", "CH", "US"};
-  private static final String[] language = {"Hin", "Hin", "Eng", "Eng", "Eng", "Eng"};
-
+  private static final String[] names = {"Rahul", "Jennifer", "Neha", "Subbu", "Sunita", "Zackie"};
+  private static final String[] country = {"IN", "MC", "CA", "CH", "CH", "US"};
+  private static final String[] language = {"Hin", "Hin", "Eng", "Eng", "Kor", "Eng"};
   private static final int[] metricValues = {3, 5, 2, 8, 9, 1};
 
-  private static final int DIM_MAX_VALUE = 2000;
   private static final int METRIC_MAX_VALUE = 10000;
   private static final Random RANDOM = new Random();
 
@@ -79,8 +77,10 @@ public class StarTreeV2SegmentHelper {
       // dimension
       String dimName = schema.getDimensionFieldSpecs().get(0).getName();
       map.put(dimName, names[rowId]);
+
       dimName = schema.getDimensionFieldSpecs().get(1).getName();
       map.put(dimName, country[rowId]);
+
       dimName = schema.getDimensionFieldSpecs().get(2).getName();
       map.put(dimName, language[rowId]);
 
@@ -98,6 +98,7 @@ public class StarTreeV2SegmentHelper {
 
   public static List<GenericRow> createSegmentLargeData(Schema schema) throws Exception {
 
+    int index;
     List<GenericRow> rows = new ArrayList<>(largeNumRows);
     for (int rowId = 0; rowId < largeNumRows; rowId++) {
       HashMap<String, Object> map = new HashMap<>();
@@ -105,7 +106,20 @@ public class StarTreeV2SegmentHelper {
       // Dim columns.
       for (int i = 0; i < 3; i++) {
         String dimName = schema.getDimensionFieldSpecs().get(i).getName();
-        map.put(dimName, dimName + "-v" + RANDOM.nextInt(DIM_MAX_VALUE));
+        //map.put(dimName, dimName + "-v" + RANDOM.nextInt(100));
+
+        switch (i) {
+          case 0:
+            index = RANDOM.nextInt(6);
+            map.put(dimName, names[index]);
+            break;
+          case 1:
+            index = RANDOM.nextInt(6);
+            map.put(dimName, country[index]);
+          case 2:
+            index = RANDOM.nextInt(6);
+            map.put(dimName, language[index]);
+        }
       }
 
       // Metric columns.

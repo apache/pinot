@@ -33,6 +33,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
@@ -58,6 +59,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
   private String _starTreeId = null;
   private List<Record> _starTreeData;
   private List<AggregationFunction> _aggregationFunctions;
+
+  Map<String, Dictionary> _dictionary = new HashMap<>();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapStarTreeV2Builder.class);
 
@@ -123,7 +126,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     _outDir = config.getOutDir();
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
     _rootNode = new TreeNode();
-    _rootNode._dimensionId = StarTreeV2Constant.STAR_NODE;
+    _rootNode._dimensionValue = StarTreeV2Constant.ROOT_NODE;
+    _rootNode._dimensionId = StarTreeV2Constant.ROOT_NODE;
     _nodesCount++;
     _starTreeCount++;
     _aggregationFunctions = new ArrayList<>();
@@ -143,6 +147,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     for (int i = 0; i < _dimensionsCount; i++) {
       String dimensionName = _dimensionsName.get(i);
       ImmutableDictionaryReader dictionary = _immutableSegment.getDictionary(dimensionName);
+      _dictionary.put(dimensionName ,dictionary);
       _dimensionsCardinality.add(dictionary.length());
     }
 
@@ -450,7 +455,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       dimensionsValue[i] = StarTreeV2Constant.SKIP_VALUE;
     }
 
-    if (node._dimensionValue == StarTreeV2Constant.STAR_NODE) {
+    if (node._dimensionValue == StarTreeV2Constant.STAR_NODE && parent._dimensionValue != StarTreeV2Constant.ROOT_NODE) {
       dimensionsValue[parent._dimensionId] = parent._dimensionValue;
     } else {
       dimensionsValue[node._dimensionId] = node._dimensionValue;

@@ -33,6 +33,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.startree.DimensionBuffer;
@@ -90,6 +91,14 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
   private BufferedOutputStream _outputStream;
   private BufferedOutputStream _tempOutputStream;
   private final Set<StarTreeV2DataTable> _dataTablesToClose = new HashSet<>();
+
+
+
+
+  Map<String, Dictionary> _dictionary = new HashMap<>();
+
+
+
 
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(OffHeapStarTreeV2Builder.class);
 
@@ -166,7 +175,8 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
     _rootNode = new TreeNode();
-    _rootNode._dimensionId = StarTreeV2Constant.STAR_NODE;
+    _rootNode._dimensionId = StarTreeV2Constant.ROOT_NODE;
+    _rootNode._dimensionValue = StarTreeV2Constant.ROOT_NODE;
     _nodesCount++;
     _starTreeCount++;
     _aggregationFunctions = new ArrayList<>();
@@ -183,6 +193,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     for (int i = 0; i < _dimensionsCount; i++) {
       String dimensionName = _dimensionsName.get(i);
       ImmutableDictionaryReader dictionary = _immutableSegment.getDictionary(dimensionName);
+      _dictionary.put(dimensionName ,dictionary);
       _dimensionsCardinality.add(dictionary.length());
     }
 
@@ -439,10 +450,6 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       String columnName = pair.toColumnName();
       AggregationFunction function = _aggregationFunctions.get(index);
       index++;
-
-      System.out.println(function.getType().getName());
-      System.out.println(function.getResultMaxByteSize());
-
       SingleValueRawIndexCreator rawIndexCreator = SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(_outDir,
           ChunkCompressorFactory.CompressionType.PASS_THROUGH, columnName, function.getResultDataType(),
           _aggregatedDocCount, function.getResultMaxByteSize());
@@ -506,15 +513,12 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       for (int j = 0; j < _aggFunColumnPairsCount; j++) {
         AggregationFunction function = _aggregationFunctions.get(j);
         if (function.getResultDataType().equals(FieldSpec.DataType.BYTES)) {
-          System.out.println(function.getType().getName());
-          System.out.println(function.serialize(values[j]).length);
           ((SingleValueRawIndexCreator) aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId,
               function.serialize(values[j]));
         } else {
           ((SingleValueRawIndexCreator) aggFunColumnPairForwardIndexCreatorList.get(j)).index(docId, values[j]);
         }
       }
-      System.out.println(docId);
       docId++;
     }
 
@@ -706,7 +710,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     } else {
       node._aggDataDocumentId = _aggregatedDocCount;
       // preserving the parent value in share aggregated document for star child node.
-      if (node._dimensionValue == StarTreeV2Constant.STAR_NODE) {
+      if (node._dimensionValue == StarTreeV2Constant.STAR_NODE && parent._dimensionValue != StarTreeV2Constant.ROOT_NODE) {
         dimensions.setDictId(parent._dimensionId, parent._dimensionValue);
         appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
         dimensions.setDictId(parent._dimensionId, StarTreeNode.ALL);

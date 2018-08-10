@@ -48,9 +48,9 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
 
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
@@ -63,7 +63,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     _starTreeV2Config = new StarTreeV2Config();
     _starTreeV2Config.setOutDir(filepath);
-    _starTreeV2Config.setMaxNumLeafRecords(1);
+    _starTreeV2Config.setMaxNumLeafRecords(10);
     _starTreeV2Config.setDimensions(schema.getDimensionNames());
     _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
   }

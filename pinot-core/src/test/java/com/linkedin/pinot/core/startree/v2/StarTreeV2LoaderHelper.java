@@ -50,7 +50,7 @@ public class StarTreeV2LoaderHelper {
     System.out.println(node.getDimensionValue());
   }
 
-  static void printDimensionDataFromDataSource(DataSource source) {
+  static void printDimensionDataSource(DataSource source) {
     Block block = source.nextBlock();
     BlockValSet blockValSet = block.getBlockValueSet();
     BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
@@ -59,7 +59,7 @@ public class StarTreeV2LoaderHelper {
     }
   }
 
-  static void printMetricAggfuncDataFromDataSource(DataSource source, AggregationFunctionType dataType) throws IOException {
+  static void printAggFuncColPairDataFromDataSource(DataSource source, AggregationFunctionType dataType) throws IOException {
     Block block = source.nextBlock();
     BlockValSet blockValSet = block.getBlockValueSet();
     BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
@@ -102,7 +102,7 @@ public class StarTreeV2LoaderHelper {
     }
   }
 
-  static void compareDimensionDataSources(DataSource d1, DataSource d2) {
+  static void compareDimensionDataSource(DataSource d1, DataSource d2) {
     Block b1 = d1.nextBlock();
     Block b2 = d2.nextBlock();
 
@@ -115,15 +115,16 @@ public class StarTreeV2LoaderHelper {
     BlockSingleValIterator itr1 = (BlockSingleValIterator) blockValSet1.iterator();
     BlockSingleValIterator itr2 = (BlockSingleValIterator) blockValSet2.iterator();
 
+    int i = 0;
     while (itr1.hasNext() || itr2.hasNext()) {
       int a = itr1.nextIntVal();
       int b = itr2.nextIntVal();
-      System.out.println(Integer.toString(a) + ", " + Integer.toString(b));
+      System.out.println( "DocId : " + Integer.toString(i++) + ", " + Integer.toString(a) + ", " + Integer.toString(b));
       Assert.assertEquals(dict1.get(a), dict2.get(b));
     }
   }
 
-  static void compareMetricAggfuncDataFromDataSource(DataSource d1, DataSource d2, AggregationFunctionType dataType) throws IOException {
+  static void compareAggFuncColPairDataFromDataSource(DataSource d1, DataSource d2, AggregationFunctionType dataType) throws IOException {
     Block b1 = d1.nextBlock();
     BlockValSet blockValSet1 = b1.getBlockValueSet();
     BlockSingleValIterator itr1 = (BlockSingleValIterator) blockValSet1.iterator();

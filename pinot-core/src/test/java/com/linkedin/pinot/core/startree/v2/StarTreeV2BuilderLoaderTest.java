@@ -30,7 +30,7 @@ import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -44,7 +44,7 @@ public class StarTreeV2BuilderLoaderTest {
   private List<StarTreeV2Config> _onHeapStarTreeV2ConfigList = new ArrayList<>();
   private List<StarTreeV2Config> _offHeapStarTreeV2ConfigList = new ArrayList<>();
 
-  @BeforeTest
+  @BeforeClass
   void setUp() throws Exception {
 
     String segmentName = "starTreeV2BuilderTest";
@@ -53,14 +53,17 @@ public class StarTreeV2BuilderLoaderTest {
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
 
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
 
-    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
 
-    RecordReader _recordReader = new GenericRowRecordReader(rows, schema);
-    _onHeapIndexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, onHeapSegmentOutputDir, _recordReader);
+    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+
+    _onHeapIndexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, onHeapSegmentOutputDir, recordReader);
+    recordReader.rewind();
+
     _offHeapIndexDir =
-        StarTreeV2SegmentHelper.createSegment(schema, segmentName, offHeapSegmentOutputDir, _recordReader);
+        StarTreeV2SegmentHelper.createSegment(schema, segmentName, offHeapSegmentOutputDir, recordReader);
 
     _onHeapFilePath = new File(_onHeapIndexDir, "v3");
     _offHeapFilePath = new File(_offHeapIndexDir, "v3");
@@ -96,34 +99,32 @@ public class StarTreeV2BuilderLoaderTest {
     metric2aggFuncPairs2.add(pair6);
     metric2aggFuncPairs2.add(pair7);
 
-    StarTreeV2Config _starTreeV2Config1 = new StarTreeV2Config();
-    _starTreeV2Config1.setOutDir(_onHeapFilePath);
-    _starTreeV2Config1.setMaxNumLeafRecords(1);
-    _starTreeV2Config1.setDimensions(schema.getDimensionNames());
-    _starTreeV2Config1.setMetric2aggFuncPairs(metric2aggFuncPairs1);
-    _onHeapStarTreeV2ConfigList.add(_starTreeV2Config1);
+    StarTreeV2Config onHeapStarTreeV2Config = new StarTreeV2Config();
+    onHeapStarTreeV2Config.setOutDir(_onHeapFilePath);
+    onHeapStarTreeV2Config.setMaxNumLeafRecords(1);
+    onHeapStarTreeV2Config.setDimensions(schema.getDimensionNames());
+    onHeapStarTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
+    _onHeapStarTreeV2ConfigList.add(onHeapStarTreeV2Config);
 
-    StarTreeV2Config _starTreeV2Config2 = new StarTreeV2Config();
-    _starTreeV2Config2.setOutDir(_offHeapFilePath);
-    _starTreeV2Config2.setMaxNumLeafRecords(1);
-    _starTreeV2Config2.setDimensions(schema.getDimensionNames());
-    _starTreeV2Config2.setMetric2aggFuncPairs(metric2aggFuncPairs2);
-    _offHeapStarTreeV2ConfigList.add(_starTreeV2Config2);
-
-    return;
+    StarTreeV2Config offHeapStarTreeV2Config = new StarTreeV2Config();
+    offHeapStarTreeV2Config.setOutDir(_offHeapFilePath);
+    offHeapStarTreeV2Config.setMaxNumLeafRecords(1);
+    offHeapStarTreeV2Config.setDimensions(schema.getDimensionNames());
+    offHeapStarTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs2);
+    _offHeapStarTreeV2ConfigList.add(offHeapStarTreeV2Config);
   }
+
 
   @Test
   public void testBuilder() throws Exception {
-    OnHeapStarTreeV2Builder onheapBuildTest = new OnHeapStarTreeV2Builder();
+    OnHeapStarTreeV2Builder onHeapBuildTest = new OnHeapStarTreeV2Builder();
     OffHeapStarTreeV2Builder offHeapBuildTest = new OffHeapStarTreeV2Builder();
     try {
       System.out.println("Building On-heap starts");
       for (int i = 0; i < _onHeapStarTreeV2ConfigList.size(); i++) {
-        onheapBuildTest.init(_onHeapIndexDir, _onHeapStarTreeV2ConfigList.get(i));
-        onheapBuildTest.build();
+        onHeapBuildTest.init(_onHeapIndexDir, _onHeapStarTreeV2ConfigList.get(i));
+        onHeapBuildTest.build();
       }
-
       System.out.println("Building Off-heap starts");
       for (int i = 0; i < _offHeapStarTreeV2ConfigList.size(); i++) {
         offHeapBuildTest.init(_offHeapIndexDir, _offHeapStarTreeV2ConfigList.get(i));
@@ -136,6 +137,7 @@ public class StarTreeV2BuilderLoaderTest {
 
   @Test
   public void testLoader() throws Exception {
+    System.out.println("Loader Testing Starts");
     StarTreeLoader onHeapLoadTest = new StarTreeLoader();
     StarTreeLoader offHeapLoadTest = new StarTreeLoader();
 
@@ -158,7 +160,7 @@ public class StarTreeV2BuilderLoaderTest {
           System.out.println("Checking for dimension : " + dimension);
           DataSource source1 = onHeapStarTreeImplList.get(i).getDataSource(dimension);
           DataSource source2 = offHeapStarTreeImplList.get(i).getDataSource(dimension);
-          StarTreeV2LoaderHelper.compareDimensionDataSources(source1, source2);
+          StarTreeV2LoaderHelper.compareDimensionDataSource(source1, source2);
         }
 
         for (AggregationFunctionColumnPair pair : _onHeapStarTreeV2ConfigList.get(starTreeId)
@@ -166,8 +168,8 @@ public class StarTreeV2BuilderLoaderTest {
           String metPair = pair.toColumnName();
           DataSource source1 = onHeapStarTreeImplList.get(i).getDataSource(metPair);
           DataSource source2 = offHeapStarTreeImplList.get(i).getDataSource(metPair);
-          System.out.println("Printing for Met2AggPair : " + metPair);
-          StarTreeV2LoaderHelper.compareMetricAggfuncDataFromDataSource(source1, source2,
+          System.out.println("Printing for aggFunColPair : " + metPair);
+          StarTreeV2LoaderHelper.compareAggFuncColPairDataFromDataSource(source1, source2,
               pair.getFunctionType());
         }
         starTreeId += 1;

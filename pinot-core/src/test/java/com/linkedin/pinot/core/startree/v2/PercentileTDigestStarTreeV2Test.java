@@ -39,7 +39,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDigest> {
+public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {
 
   private final String[] STAR_TREE1_HARD_CODED_QUERIES =
       new String[]{"SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"};
@@ -88,7 +88,7 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
   }
 
   @Override
-  protected byte[] getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
+  protected Object getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
     if (dictionary == null) {
       return valueIterator.nextBytesVal();
     } else {
@@ -97,11 +97,11 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
   }
 
   @Override
-  protected TDigest aggregate(@Nonnull List<byte[]> values) {
+  protected TDigest aggregate(@Nonnull List<Object> values) {
     TDigest tDigest = new TDigest(100);
-    for (byte[] obj : values) {
+    for (Object obj : values) {
       try {
-        tDigest.add(ObjectCustomSerDe.deserialize(obj, ObjectType.TDigest));
+        tDigest.add(ObjectCustomSerDe.deserialize((byte[]) obj, ObjectType.TDigest));
       } catch (IOException e) {
         e.printStackTrace();
       }

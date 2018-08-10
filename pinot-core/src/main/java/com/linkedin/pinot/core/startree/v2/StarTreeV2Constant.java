@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.startree.v2;
 public class StarTreeV2Constant {
 
   // final strings
+  public static final int ROOT_NODE = -2;
   public static final int STAR_NODE = -1;
   public static final int SKIP_VALUE = -1;
   public static final int INVALID_INDEX = -1;
