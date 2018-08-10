@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -44,6 +46,7 @@ public class ServerTableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
 
   private final ExecutorService executor = Executors.newFixedThreadPool(3);
+  private final HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
   private final int serverPortStart = 10000;
   private final String URI_PATH = "/table/";
   private final List<HttpServer> servers = new ArrayList<>();
@@ -141,7 +144,7 @@ public class ServerTableSizeReaderTest {
 
   @Test
   public void testServerSizeReader() {
-    ServerTableSizeReader reader = new ServerTableSizeReader(executor);
+    ServerTableSizeReader reader = new ServerTableSizeReader(executor, httpConnectionManager);
     BiMap<String, String> endpoints = HashBiMap.create();
     for (int i = 0; i < 2; i++) {
       endpoints.put(serverList.get(i), endpointList.get(i));
@@ -160,7 +163,7 @@ public class ServerTableSizeReaderTest {
 
   @Test
   public void testServerSizesErrors() {
-    ServerTableSizeReader reader = new ServerTableSizeReader(executor);
+    ServerTableSizeReader reader = new ServerTableSizeReader(executor, httpConnectionManager);
     BiMap<String, String> endpoints = HashBiMap.create();
     for (int i = 0; i < serverCount; i++) {
       endpoints.put(serverList.get(i), endpointList.get(i));
