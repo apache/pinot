@@ -40,10 +40,10 @@ import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.
  */
 public class HadoopPinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(HadoopPinotFS.class);
-  private org.apache.hadoop.fs.FileSystem hadoopFS = null;
-  private int retryCount = RETRY_DEFAULT;
-  private int retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
-  private org.apache.hadoop.conf.Configuration hadoopConf;
+  private org.apache.hadoop.fs.FileSystem _hadoopFS = null;
+  private int _retryCount = RETRY_DEFAULT;
+  private int _retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
+  private org.apache.hadoop.conf.Configuration _hadoopConf;
 
   public HadoopPinotFS() {
 
@@ -52,11 +52,11 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public void init(Configuration config) {
     try {
-      retryCount = config.getInt(RETRY, retryCount);
-      retryWaitMs = config.getInt(RETRY_WAITIME_MS, retryWaitMs);
-      hadoopConf = getConf(config.getString(HADOOP_CONF_PATH));
-      authenticate(hadoopConf, config);
-      hadoopFS = org.apache.hadoop.fs.FileSystem.get(hadoopConf);
+      _retryCount = config.getInt(RETRY, _retryCount);
+      _retryWaitMs = config.getInt(RETRY_WAITIME_MS, _retryWaitMs);
+      _hadoopConf = getConf(config.getString(HADOOP_CONF_PATH));
+      authenticate(_hadoopConf, config);
+      _hadoopFS = org.apache.hadoop.fs.FileSystem.get(_hadoopConf);
       LOGGER.info("successfully initialized HadoopPinotFS");
     } catch (IOException e) {
       throw new RuntimeException("Could not initialize HadoopPinotFS", e);
@@ -65,12 +65,12 @@ public class HadoopPinotFS extends PinotFS {
 
   @Override
   public boolean delete(URI segmentUri) throws IOException {
-    return hadoopFS.delete(new Path(segmentUri), true);
+    return _hadoopFS.delete(new Path(segmentUri), true);
   }
 
   @Override
   public boolean move(URI srcUri, URI dstUri) throws IOException {
-    return hadoopFS.rename(new Path(srcUri), new Path(dstUri));
+    return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }
 
   /**
@@ -81,10 +81,10 @@ public class HadoopPinotFS extends PinotFS {
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     Path source = new Path(srcUri);
     Path target = new Path(dstUri);
-    RemoteIterator<LocatedFileStatus> sourceFiles = hadoopFS.listFiles(source, true);
+    RemoteIterator<LocatedFileStatus> sourceFiles = _hadoopFS.listFiles(source, true);
     if (sourceFiles != null) {
       while (sourceFiles.hasNext()) {
-        boolean succeeded = FileUtil.copy(hadoopFS, sourceFiles.next().getPath(), hadoopFS, target, true, hadoopConf);
+        boolean succeeded = FileUtil.copy(_hadoopFS, sourceFiles.next().getPath(), _hadoopFS, target, true, _hadoopConf);
         if (!succeeded) {
           return false;
         }
@@ -95,20 +95,20 @@ public class HadoopPinotFS extends PinotFS {
 
   @Override
   public boolean exists(URI fileUri) throws IOException {
-    return hadoopFS.exists(new Path(fileUri));
+    return _hadoopFS.exists(new Path(fileUri));
   }
 
   @Override
   public long length(URI fileUri) throws IOException {
-    return hadoopFS.getLength(new Path(fileUri));
+    return _hadoopFS.getLength(new Path(fileUri));
   }
 
   @Override
   public String[] listFiles(URI fileUri) throws IOException {
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(fileUri);
-    if (hadoopFS.exists(path)) {
-      RemoteIterator<LocatedFileStatus> fileListItr = hadoopFS.listFiles(path, true);
+    if (_hadoopFS.exists(path)) {
+      RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, true);
       while (fileListItr != null && fileListItr.hasNext()) {
         LocatedFileStatus file = fileListItr.next();
         filePathStrings.add(file.getPath().toUri().toString());
@@ -129,31 +129,31 @@ public class HadoopPinotFS extends PinotFS {
       final Path remoteFile = new Path(srcUri);
       final Path localFile = new Path(dstFile.toURI());
 
-      RetryPolicy fixDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(retryCount, retryWaitMs);
-      fixDelayRetryPolicy.attempt(() -> {
+      RetryPolicy fixedDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(_retryCount, _retryWaitMs);
+      fixedDelayRetryPolicy.attempt(() -> {
         try {
-          if (hadoopFS == null) {
-            throw new RuntimeException("hadoopFS client is not initialized when trying to copy files");
+          if (_hadoopFS == null) {
+            throw new RuntimeException("_hadoopFS client is not initialized when trying to copy files");
           }
           long startMs = System.currentTimeMillis();
-          hadoopFS.copyToLocalFile(remoteFile, localFile);
+          _hadoopFS.copyToLocalFile(remoteFile, localFile);
           LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", srcUri, dstFilePath,
               dstFile.length(), System.currentTimeMillis() - startMs);
           return true;
-        } catch (IOException ex) {
-          LOGGER.warn(String.format("failed to fetch segment %s from hdfs, might retry", srcUri), ex);
+        } catch (IOException e) {
+          LOGGER.warn("failed to fetch segment {} from hdfs, might retry", srcUri, e);
           return false;
         }
       });
-    } catch (Exception ex) {
-      LOGGER.error(String.format("failed to fetch %s from hdfs to local %s", srcUri, dstFilePath), ex);
-      throw ex;
+    } catch (Exception e) {
+      LOGGER.error("failed to fetch {} from hdfs to local {}", srcUri, dstFilePath, e);
+      throw e;
     }
   }
 
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri) throws IOException {
-    hadoopFS.copyFromLocalFile(new Path(srcFile.toURI()), new Path(dstUri));
+    _hadoopFS.copyFromLocalFile(new Path(srcFile.toURI()), new Path(dstUri));
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {
