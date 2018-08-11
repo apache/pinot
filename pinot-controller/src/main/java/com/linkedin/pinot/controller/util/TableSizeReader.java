@@ -16,6 +16,8 @@
 package com.linkedin.pinot.controller.util;
 
 import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.metrics.ControllerGauge;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,11 +49,14 @@ public class TableSizeReader {
   private Executor _executor;
   private HttpConnectionManager _connectionManager;
   private PinotHelixResourceManager _helixResourceManager;
+  private final ControllerMetrics _controllerMetrics;
 
   public TableSizeReader(Executor executor, HttpConnectionManager connectionManager,
+      ControllerMetrics controllerMetrics,
       PinotHelixResourceManager helixResourceManager) {
     _executor = executor;
     _connectionManager = connectionManager;
+    _controllerMetrics = controllerMetrics;
     _helixResourceManager = helixResourceManager;
   }
 
@@ -123,8 +128,13 @@ public class TableSizeReader {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   static public class TableSubTypeSizeDetails {
-    public long reportedSizeInBytes = 0;
+
+    public long reportedSizeInBytes = 0; // actual sizes reported by servers
+    /* Actual reported size + missing replica sizes filled in from other reachable replicas
+     * for segments
+     */
     public long estimatedSizeInBytes = 0;
+    public int missingSegments = 0; // segments for which no replica provided a report
     public Map<String, SegmentSizeDetails> segments = new HashMap<>();
   }
 
@@ -169,13 +179,12 @@ public class TableSizeReader {
 
     // iterate through the map of segments and calculate the reported and estimated sizes
     // for each segment. For servers that reported error, we use the max size of the same segment
-    // reported by another server. If no server reported size for a segment, we use the size
-    // of the largest segment reported by any server for the table.
+    // reported by another server. If no server reported size for a segment, we bump up a missing
+    // segment count.
     // At all times, reportedSize indicates actual size that is reported by servers. For errored
     // segments are not reflected in that count. Estimated size is what we estimate in case of
     // errors, as described above.
     // estimatedSize >= reportedSize. If no server reported error, estimatedSize == reportedSize
-    long tableLevelMax = -1;
     for (Map.Entry<String, SegmentSizeDetails> segmentEntry : segmentMap.entrySet()) {
       SegmentSizeDetails segmentSizes = segmentEntry.getValue();
       // track segment level max size
@@ -199,35 +208,36 @@ public class TableSizeReader {
               segmentEntry.getKey(), errors, segmentLevelMax);
         }
         segmentSizes.estimatedSizeInBytes = segmentSizes.reportedSizeInBytes + errors * segmentLevelMax;
-        tableLevelMax = Math.max(tableLevelMax, segmentLevelMax);
         subTypeSizeDetails.reportedSizeInBytes += segmentSizes.reportedSizeInBytes;
         subTypeSizeDetails.estimatedSizeInBytes += segmentSizes.estimatedSizeInBytes;
       } else {
         LOGGER.warn("Could not get size report from any server for segment {}", segmentEntry.getKey());
         segmentSizes.reportedSizeInBytes = -1;
         segmentSizes.estimatedSizeInBytes = -1;
+        subTypeSizeDetails.missingSegments++;
       }
     }
-    if (tableLevelMax == -1) {
-      LOGGER.warn("Could not get size from any of the servers for table {}. Setting size estimate to -1",
-          tableNameWithType);
-      // no server reported size
-      subTypeSizeDetails.reportedSizeInBytes = -1;
-      subTypeSizeDetails.estimatedSizeInBytes = -1;
-    } else {
-      LOGGER.info("Table {} max segment size is {}", tableNameWithType, tableLevelMax);
-      // For segments with no reported sizes, use max table-level segment size as an estimate
-      for (Map.Entry<String, SegmentSizeDetails> segmentSizeDetailsEntry : segmentMap.entrySet()) {
-        SegmentSizeDetails sizeDetails = segmentSizeDetailsEntry.getValue();
-        if (sizeDetails.reportedSizeInBytes != -1) {
-          continue;
-        }
-        LOGGER.info("Using tableLevelMax {} for segment {} size estimation", tableLevelMax, segmentSizeDetailsEntry.getKey());
-        sizeDetails.estimatedSizeInBytes += sizeDetails.serverInfo.size() * tableLevelMax;
-        subTypeSizeDetails.estimatedSizeInBytes += sizeDetails.estimatedSizeInBytes;
-      }
-    }
+    if (subTypeSizeDetails.missingSegments > 0) {
+      if (subTypeSizeDetails.missingSegments == subTypeSizeDetails.segments.size()) {
+        LOGGER.warn("Could not get size reports from any server for all segments of the table {}", table);
+        subTypeSizeDetails.reportedSizeInBytes = -1;
+        subTypeSizeDetails.estimatedSizeInBytes = -1;
+        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_FAILURE,
+            1);
+        // reset metric tracking partial estimation
+        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_PARTIAL,
+            0);
 
+      } else {
+        LOGGER.warn("Missing size report for {} out of {} segments for table {}", subTypeSizeDetails.missingSegments,
+            subTypeSizeDetails.segments.size(), table);
+        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_PARTIAL,
+            1);
+        // reset metric tracking failure
+        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_FAILURE,
+            0);
+      }
+    }
     return subTypeSizeDetails;
   }
 

@@ -81,7 +81,8 @@ public class SegmentStatusChecker {
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _metricsRegistry = metricsRegistry;
     HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
-    _tableSizeReader = new TableSizeReader(Executors.newCachedThreadPool(), httpConnectionManager, _pinotHelixResourceManager);
+    _tableSizeReader = new TableSizeReader(Executors.newCachedThreadPool(), httpConnectionManager,
+        _metricsRegistry, _pinotHelixResourceManager);
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
