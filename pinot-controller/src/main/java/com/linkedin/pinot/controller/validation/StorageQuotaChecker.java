@@ -89,6 +89,8 @@ public class StorageQuotaChecker {
     Preconditions.checkArgument(segmentFile.exists(), "Segment file: %s does not exist", segmentFile);
     Preconditions.checkArgument(segmentFile.isDirectory(), "Segment file: %s is not a directory", segmentFile);
 
+    long incomingSegmentSizeBytes = FileUtils.sizeOfDirectory(segmentFile);
+
     // 1. Read table config
     // 2. read table size from all the servers
     // 3. update predicted segment sizes
@@ -109,8 +111,6 @@ public class StorageQuotaChecker {
       return success("Storage quota is not configured for table: " + tableNameWithType);
     }
     _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.TABLE_QUOTA, allowedStorageBytes);
-
-    long incomingSegmentSizeBytes = FileUtils.sizeOfDirectory(segmentFile);
 
     // read table size
     TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize = null;

@@ -17,6 +17,7 @@ package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
@@ -283,6 +284,9 @@ public abstract class ClusterTest extends ControllerTest {
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
       List<String> invertedIndexColumns, TableTaskConfig taskConfig) throws Exception {
+    final QuotaConfig qc = new QuotaConfig();
+    qc.setStorage("100M");
+
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName(timeColumnName)
         .setTimeType(timeType)
@@ -293,6 +297,7 @@ public abstract class ClusterTest extends ControllerTest {
         .setSegmentVersion(segmentVersion.toString())
         .setInvertedIndexColumns(invertedIndexColumns)
         .setTaskConfig(taskConfig)
+        .setQuotaConfig(qc)
         .build();
   }
 

@@ -165,6 +165,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 600_000L, "Failed to generate inverted index");
   }
 
+  @Test
+  public void testUploadQuotaCheck() throws Exception {
+    try {
+      // upload 1G
+      sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/checkQuotaForUpload?size=1000000000");
+    } catch (IOException e) {
+      // expected exception as quota is exceeded
+    }
+    try {
+      // upload 1k
+      sendGetRequest(_controllerBaseApiUrl + "/tables/mytable/checkQuotaForUpload?size=1000");
+    } catch (IOException e) {
+      Assert.fail("Quota check should suceeed with upload size=1000");
+    }
+  }
+
   /**
    * We will add extra new columns to the schema to test adding new columns with default value to the offline segments.
    * <p>New columns are: (name, field type, data type, single/multi value, default null value)
