@@ -13,6 +13,7 @@ export default DS.Model.extend({
   metricId: DS.attr(),
   functionName: DS.attr(),
   functionId: DS.attr(),
-  dataset: DS.attr()
+  dataset: DS.attr(),
+  classification: DS.attr()
 });
 //DEMO: avoidTheSharedObject: attr('object', { defaultValue: () => {} })
