@@ -63,4 +63,10 @@ public class PinotThirdEyeDataSourceTest {
     Assert.assertEquals(PinotThirdEyeDataSource.reduce(4, 3, 4, MetricAggFunction.COUNT), 5.0);
   }
 
+  @Test
+  public void testReduceTDigest() {
+    Assert.assertEquals(PinotThirdEyeDataSource.reduce(10, 2, 3, MetricAggFunction.percentileTDigest50), 8.0);
+    Assert.assertEquals(PinotThirdEyeDataSource.reduce(10, 2, 3, MetricAggFunction.percentileTDigest90), 8.0);
+  }
+
 }

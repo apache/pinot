@@ -439,17 +439,16 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   }
 
   static double reduce(double aggregate, double value, int prevCount, MetricAggFunction aggFunction) {
-    switch(aggFunction) {
-      case SUM:
-        return aggregate + value;
-      case AVG:
-        return (aggregate * prevCount + value) / (prevCount + 1);
-      case MAX:
-        return Math.max(aggregate, value);
-      case COUNT:
-        return aggregate + 1;
-      default:
-        throw new IllegalArgumentException(String.format("Unknown aggregation function '%s'", aggFunction));
+    if (aggFunction.equals(MetricAggFunction.SUM)) {
+      return aggregate + value;
+    } else if (aggFunction.equals(MetricAggFunction.AVG) || aggFunction.isTDigest()) {
+      return (aggregate * prevCount + value) / (prevCount + 1);
+    } else if (aggFunction.equals(MetricAggFunction.MAX)) {
+      return Math.max(aggregate, value);
+    } else if (aggFunction.equals(MetricAggFunction.COUNT)) {
+      return aggregate + 1;
+    } else {
+      throw new IllegalArgumentException(String.format("Unknown aggregation function '%s'", aggFunction));
     }
   }
 
