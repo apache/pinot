@@ -329,7 +329,7 @@ public class TableSizeReaderTest {
     Assert.assertEquals(tableSizeDetails.estimatedSizeInBytes, offlineSizes.estimatedSizeInBytes);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
     Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
-        ControllerGauge.TABLE_STORAGE_MISSING_SEGMENT_PERCENT), 0);
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 0);
   }
 
   @Test
@@ -344,7 +344,8 @@ public class TableSizeReaderTest {
     Assert.assertEquals(offlineSizes.reportedSizeInBytes, -1);
     Assert.assertEquals(tableSizeDetails.estimatedSizeInBytes, -1);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
-    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_MISSING_SEGMENT_PERCENT), 100);
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 100);
   }
 
   @Test
@@ -359,7 +360,8 @@ public class TableSizeReaderTest {
     validateTableSubTypeSize(servers, offlineSizes);
     Assert.assertNull(tableSizeDetails.realtimeSegments);
     String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
-    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_MISSING_SEGMENT_PERCENT), 20);
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 20);
   }
 
   @Test
