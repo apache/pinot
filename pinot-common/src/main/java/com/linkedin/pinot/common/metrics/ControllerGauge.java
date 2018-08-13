@@ -44,7 +44,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false), // Table storage quota utilization.
   TABLE_STORAGE_ESTIMATION_FAILURE("TableStorageEstimationFailure", false), // Table storage estimation failure.
-  TABLE_STORAGE_ESTIMATION_PARTIAL("TableStorageEstimationPartial", false); // partial estimation of table storage
+  TABLE_STORAGE_EST_FAILED_SEGMENTS("TableStorageEstFailedSegments", false); // number fo segments we failed to get size for
 
   private final String gaugeName;
   private final String unit;

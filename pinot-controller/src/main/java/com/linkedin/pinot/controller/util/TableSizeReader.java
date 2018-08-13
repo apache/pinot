@@ -225,18 +225,23 @@ public class TableSizeReader {
         _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_FAILURE,
             1);
         // reset metric tracking partial estimation
-        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_PARTIAL,
+        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_EST_FAILED_SEGMENTS,
             0);
 
       } else {
         LOGGER.warn("Missing size report for {} out of {} segments for table {}", subTypeSizeDetails.missingSegments,
             subTypeSizeDetails.segments.size(), table);
-        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_PARTIAL,
-            1);
+        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_EST_FAILED_SEGMENTS,
+            subTypeSizeDetails.missingSegments);
         // reset metric tracking failure
         _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_FAILURE,
             0);
       }
+    } else {
+      _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_FAILURE,
+          0);
+      _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_EST_FAILED_SEGMENTS,
+          0);
     }
     return subTypeSizeDetails;
   }

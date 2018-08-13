@@ -23,7 +23,6 @@ import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -62,7 +61,6 @@ public class SegmentStatusChecker {
   private final HelixAdmin _helixAdmin;
   private final long _segmentStatusIntervalSeconds;
   private final int _waitForPushTimeSeconds;
-  private final TableSizeReader _tableSizeReader;
 
   // log messages about disabled tables atmost once a day
   private static final long DISABLED_TABLE_LOG_INTERVAL_MS = TimeUnit.DAYS.toMillis(1);
@@ -81,8 +79,6 @@ public class SegmentStatusChecker {
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _metricsRegistry = metricsRegistry;
     HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
-    _tableSizeReader = new TableSizeReader(Executors.newCachedThreadPool(), httpConnectionManager,
-        _metricsRegistry, _pinotHelixResourceManager);
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
