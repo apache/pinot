@@ -2,8 +2,10 @@ package com.linkedin.thirdeye.detection;
 
 import com.google.common.base.Strings;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
@@ -19,6 +21,7 @@ import java.util.Map;
 public class LegacyAnomalyFunctionTranslator {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private DetectionConfigManager detectionConfigDAO;
+  private MetricConfigManager metricConfigDAO;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
 
   /**
@@ -26,6 +29,7 @@ public class LegacyAnomalyFunctionTranslator {
    */
   public LegacyAnomalyFunctionTranslator(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.detectionConfigDAO = DAO_REGISTRY.getDetectionConfigManager();
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
@@ -40,8 +44,8 @@ public class LegacyAnomalyFunctionTranslator {
         anomalyFunctionFactory.getClassNameForFunctionType(anomalyFunctionDTO.getType()));
 
     String filters = anomalyFunctionDTO.getFilters();
-    long metricId = anomalyFunctionDTO.getMetricId();
-    MetricEntity me = MetricEntity.fromMetric(1.0, metricId).withFilters(ThirdEyeUtils.getFilterSet(filters));
+    MetricConfigDTO metricDTO = this.metricConfigDAO.findByMetricAndDataset(anomalyFunctionDTO.getMetric(), anomalyFunctionDTO.getCollection());
+    MetricEntity me = MetricEntity.fromMetric(1.0, metricDTO.getId()).withFilters(ThirdEyeUtils.getFilterSet(filters));
     String metricUrn = me.getUrn();
 
     Map<String, Object> legacyAnomalyFunctionProperties = new HashMap<>();
