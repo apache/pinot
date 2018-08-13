@@ -214,7 +214,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     List<Record> rawSortedStarTreeData = sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
     _starTreeData = condenseData(rawSortedStarTreeData, _aggFunColumnPairs, StarTreeV2Constant.IS_RAW_DATA);
 
-    // Recursively construct the star tree
+    // recursively construct the star tree
     _rootNode._startDocId = 0;
     _rootNode._endDocId = _starTreeData.size();
     constructStarTree(_rootNode, 0, _starTreeData.size(), 0);

@@ -48,9 +48,9 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
 
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);

@@ -31,6 +31,7 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -42,6 +43,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   private final String[] STAR_TREE_HARD_CODED_QUERIES =
       new String[]{"SELECT SUM(salary) FROM T", "SELECT SUM(salary) FROM T GROUP BY Name", "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"};
 
+  @BeforeClass
   private void setUp() throws Exception {
 
     String segmentName = "starTreeV2BuilderTest";

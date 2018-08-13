@@ -39,26 +39,31 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {
+public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDigest> {
 
+  private File _indexDir;
   private final int _percentile = 90;
-  private final String[] STAR_TREE1_HARD_CODED_QUERIES =
+  private final double VALUE_RANGE = Integer.MAX_VALUE;
+  private final double DELTA = 0.15 * VALUE_RANGE; // Allow 15% quantile error
+
+  private StarTreeV2Config _starTreeV2Config;
+  private final String[] STAR_TREE_HARD_CODED_QUERIES =
       new String[]{"SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"};
 
   @BeforeClass
-  void setUp() throws Exception {
+  private void setUp() throws Exception {
 
-    String _segmentName = "starTreeV2BuilderTest";
-    String _segmentOutputDir = Files.createTempDir().toString();
+    String segmentName = "starTreeV2BuilderTest";
+    String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    List<GenericRow> _rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
 
-    //List<GenericRow> _rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    // List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
 
-    RecordReader _recordReader = new GenericRowRecordReader(_rows, schema);
-    File indexDir = StarTreeV2SegmentHelper.createSegment(schema, _segmentName, _segmentOutputDir, _recordReader);
-    File filepath = new File(indexDir, "v3");
+    RecordReader recordReader = new GenericRowRecordReader(rows, schema);
+    _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
+    File filepath = new File(_indexDir, "v3");
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
@@ -66,36 +71,59 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, 
         new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
     metric2aggFuncPairs1.add(pair1);
 
-    StarTreeV2Config starTreeV2Config = new StarTreeV2Config();
-    starTreeV2Config.setOutDir(filepath);
-    starTreeV2Config.setMaxNumLeafRecords(1);
-    starTreeV2Config.setDimensions(schema.getDimensionNames());
-    starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
+    _starTreeV2Config = new StarTreeV2Config();
+    _starTreeV2Config.setOutDir(filepath);
+    _starTreeV2Config.setMaxNumLeafRecords(10);
+    _starTreeV2Config.setDimensions(schema.getDimensionNames());
+    _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
+  }
 
+  private void onHeapSetUp() throws Exception {
+    setUp();
     OnHeapStarTreeV2Builder buildTest = new OnHeapStarTreeV2Builder();
-    buildTest.init(indexDir, starTreeV2Config);
+    buildTest.init(_indexDir, _starTreeV2Config);
     buildTest.build();
 
-    _indexSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.heap);
+    _indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
+    _starTreeV2 = _indexSegment.getStarTrees().get(0);
+  }
+
+  private void offHeapSetUp() throws Exception {
+    setUp();
+    OffHeapStarTreeV2Builder buildTest = new OffHeapStarTreeV2Builder();
+    buildTest.init(_indexDir, _starTreeV2Config);
+    buildTest.build();
+
+    _indexSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
     _starTreeV2 = _indexSegment.getStarTrees().get(0);
   }
 
   @Test
-  public void testQueries() {
-    for (String s : STAR_TREE1_HARD_CODED_QUERIES) {
+  public void testQueries() throws Exception {
+    onHeapSetUp();
+    System.out.println("Testing On-Heap Version");
+    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
+      testQuery(s);
+      System.out.println("Passed Query : " + s);
+    }
+    System.out.println();
+
+    offHeapSetUp();
+    System.out.println("Testing Off-Heap Version");
+    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
       testQuery(s);
       System.out.println("Passed Query : " + s);
     }
   }
 
   @Override
-  protected Object getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
+  protected byte[] getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
     if (dictionary == null) {
       return valueIterator.nextBytesVal();
     } else {
       Object val = dictionary.get(valueIterator.nextIntVal());
 
-      Double d = new Double((int) val);
+      double d = ((Number) val).doubleValue();
       TDigest tDigest = new TDigest(100);
       tDigest.add(d);
 
@@ -109,11 +137,11 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, 
   }
 
   @Override
-  protected TDigest aggregate(@Nonnull List<Object> values) {
+  protected TDigest aggregate(@Nonnull List<byte[]> values) {
     TDigest tDigest = new TDigest(100);
-    for (Object obj : values) {
+    for (byte[] obj : values) {
       try {
-        tDigest.add(ObjectCustomSerDe.deserialize((byte[]) obj, ObjectType.TDigest));
+        tDigest.add(ObjectCustomSerDe.deserialize(obj, ObjectType.TDigest));
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -123,13 +151,12 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, 
 
   @Override
   protected void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
+    System.out.println("Star Tree Result Object Size: " + Integer.toString(starTreeResult.size()));
+    System.out.println("Star Tree Result Object Size: " + Integer.toString(nonStarTreeResult.size()));
 
-//    System.out.println(nonStarTreeResult.size());
-//
-//    System.out.println(starTreeResult.quantile(_percentile / 100.0));
-//    System.out.println(nonStarTreeResult.quantile(_percentile / 100.0));
-//
-//    Assert.assertEquals(starTreeResult.quantile(_percentile / 100.0), nonStarTreeResult.quantile(_percentile / 100.0));
-    Assert.assertEquals(starTreeResult instanceof TDigest, nonStarTreeResult instanceof TDigest);
+    if ((nonStarTreeResult.size() != starTreeResult.size()) && (starTreeResult.size() != 1)) {
+      Assert.assertEquals(starTreeResult.quantile(_percentile / 100.0), nonStarTreeResult.quantile(_percentile / 100.0),
+          DELTA, "failed badly");
+    }
   }
 }
