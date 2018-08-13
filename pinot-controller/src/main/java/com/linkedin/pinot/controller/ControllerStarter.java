@@ -332,6 +332,7 @@ public class ControllerStarter {
     conf.setRealtimeSegmentRelocatorFrequency("1h");
     conf.setStatusCheckerWaitForPushTimeInSeconds(10 * 60);
     conf.setTenantIsolationEnabled(true);
+
     final ControllerStarter starter = new ControllerStarter(conf);
 
     starter.start();

@@ -69,7 +69,7 @@ public class PqlQueryResource {
       String pqlQuery = requestJson.getString("pql");
       String traceEnabled = "false";
       if (requestJson.has("trace")) {
-        traceEnabled = requestJson.getString("trace");
+        traceEnabled = requestJson.get("trace").toString();
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, pqlQuery);
       return getQueryResponse(pqlQuery, traceEnabled, httpHeaders);

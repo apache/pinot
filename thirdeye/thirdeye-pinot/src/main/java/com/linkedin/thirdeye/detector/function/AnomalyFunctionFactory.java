@@ -85,4 +85,8 @@ public class AnomalyFunctionFactory {
 
     return baseAnomalyFunctions;
   }
+
+  public String getClassNameForFunctionType(String functionType) {
+    return props.getProperty(functionType);
+  }
 }

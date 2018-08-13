@@ -13,113 +13,115 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.realtime.converter.stats;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
+package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
+
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
-import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
 
 
-public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
+public class DefaultColumnStatistics implements ColumnStatistics {
 
-  final BlockValSet _blockValSet;
-  final int _numDocIds;
-  final String _operatorName;
+  private final Object _minValue;
+  private final Object _maxValue;
+  private final Object _uniqueValuesSet;
+  private final int _cardinality = 1;
+  private final int _lengthOfShortestElement = -1;
+  private final int _lengthOfLargestElement = -1;
+  private final boolean _isSorted;
+  private final int _totalNumberOfEntries;
+  private final int _maxNumberOfMultiValues;
+  private final boolean _hasNull = false;
+  private final PartitionFunction _partitionFunction = null;
+  private final int _numPartitions = -1;
+  private final List<IntRange> _partitionRanges = null;
+  private final int _partitionRangeWidth = -1;
 
-  public RealtimeNoDictionaryColStatistics(ColumnDataSource dataSource) {
-    _operatorName = dataSource.getOperatorName();
-    Block block = dataSource.nextBlock();
-    _numDocIds = block.getMetadata().getEndDocId() + 1;
-    _blockValSet = block.getBlockValueSet();
+  public DefaultColumnStatistics(
+      Object minValue,
+      Object maxValue,
+      Object uniqueValuesSet,
+      boolean isSorted,
+      int totalNumberOfEntries,
+      int maxNumberOfMultiValues
+  ) {
+    _minValue = minValue;
+    _maxValue = maxValue;
+    _uniqueValuesSet = uniqueValuesSet;
+    _isSorted = isSorted;
+    _totalNumberOfEntries = totalNumberOfEntries;
+    _maxNumberOfMultiValues = maxNumberOfMultiValues;
   }
 
   @Override
   public Object getMinValue() {
-    throw new RuntimeException("Cannot get min value for no dictionary column " + _operatorName);
+    return _minValue;
   }
 
   @Override
   public Object getMaxValue() {
-    throw new RuntimeException("Cannot get max value for no dictionary column " + _operatorName);
+    return _maxValue;
   }
 
   @Override
   public Object getUniqueValuesSet() {
-    return null;
+    return _uniqueValuesSet;
   }
 
   @Override
   public int getCardinality() {
-    return Constants.UNKNOWN_CARDINALITY;
+    return _cardinality;
   }
 
   @Override
   public int getLengthOfShortestElement() {
-    return lengthOfDataType(); // Only fixed length data types supported.
+    return _lengthOfShortestElement;
   }
 
   @Override
   public int getLengthOfLargestElement() {
-    return lengthOfDataType(); // Only fixed length data types supported.
+    return _lengthOfLargestElement;
   }
 
   @Override
   public boolean isSorted() {
-    return false;
+    return _isSorted;
   }
 
   @Override
   public int getTotalNumberOfEntries() {
-    return _numDocIds;
+    return _totalNumberOfEntries;
   }
 
   @Override
   public int getMaxNumberOfMultiValues() {
-    return 1;
+    return _maxNumberOfMultiValues;
   }
 
   @Override
   public boolean hasNull() {
-    return false;
+    return _hasNull;
   }
 
   @Override
   public PartitionFunction getPartitionFunction() {
-    return null;
+    return _partitionFunction;
   }
 
   @Override
   public int getNumPartitions() {
-    return 0;
+    return _numPartitions;
   }
 
   @Override
   public List<IntRange> getPartitionRanges() {
-    return null;
+    return _partitionRanges;
   }
 
   @Override
   public int getPartitionRangeWidth() {
-    return 0;
-  }
-
-  private int lengthOfDataType() {
-    switch (_blockValSet.getValueType()) {
-      case INT:
-        return Integer.BYTES;
-      case LONG:
-        return Long.BYTES;
-      case FLOAT:
-        return Float.BYTES;
-      case DOUBLE:
-        return Double.BYTES;
-      default:
-        throw new UnsupportedOperationException();
-    }
+    return _partitionRangeWidth;
   }
 }

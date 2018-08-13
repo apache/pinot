@@ -102,20 +102,43 @@ export default Controller.extend({
    * @type {Object[]} - array of objects, each of which represents a stats card
    */
   stats: computed(
-    'model.anomalyPerformance',
+    'model.anomalyMapping',
     function() {
-      if (!get(this, 'model.anomalyPerformance')) {
+      const anomalyMapping = get(this, 'model.anomalyMapping');
+      if (!anomalyMapping) {
         return {};
       }
+      let respondedAnomaliesCount = 0;
+      let truePositives = 0;
+      let falsePositives = 0;
+      let falseNegatives = 0;
+      Object.keys(anomalyMapping).forEach(function (key) {
+        anomalyMapping[key].forEach(function (attr) {
+          const classification = attr.anomaly.data.classification;
+          if (classification != 'NONE') {
+            respondedAnomaliesCount++;
+            if (classification == 'TRUE_POSITIVE') {
+              truePositives++;
+            } else if (classification == 'FALSE_POSITIVE') {
+              falsePositives++;
+            } else if (classification == 'FALSE_NEGATIVE') {
+              falseNegatives++;
+            }
+          }
+        })
+      });
 
-      const { responseRate, precision, recall } = get(this, 'model.anomalyPerformance').getProperties('responseRate', 'precision', 'recall');
+      const totalAnomaliesCount = get(this, 'anomaliesCount');
+      const responseRate = respondedAnomaliesCount / totalAnomaliesCount;
+      const precision = truePositives / (truePositives + falsePositives);
+      const recall = truePositives / (truePositives + falseNegatives);
       const totalAlertsDescription = 'Total number of anomalies that occured over a period of time';
       const responseRateDescription = '% of anomalies that are reviewed';
       const precisionDescription = '% of all anomalies detected by the system that are true';
       const recallDescription = '% of all anomalies detected by the system';
       //TODO: Since totalAlerts is not correct here. We will use anomaliesCount for now till backend api is fixed. - lohuynh
       const statsArray = [
-        ['Number of anomalies', totalAlertsDescription, get(this, 'anomaliesCount'), 'digit'],
+        ['Number of anomalies', totalAlertsDescription, totalAnomaliesCount, 'digit'],
         ['Response Rate', responseRateDescription, floatToPercent(responseRate), 'percent'],
         ['Precision', precisionDescription, floatToPercent(precision), 'percent'],
         ['Recall', recallDescription, floatToPercent(recall), 'percent']

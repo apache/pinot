@@ -110,7 +110,7 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
         JSONObject response = postQuery("select count(*) from mytable");
         JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
         JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
-        String pinotValue = firstAggregationResult.getString("value");
+        String pinotValue = firstAggregationResult.get("value").toString();
         pinotRecordCount = Integer.parseInt(pinotValue);
       } catch (Exception e) {
         // Ignore

@@ -80,6 +80,9 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
 
+  private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
+  private static final boolean DEFAULT_STORAGE_QUOTA_CHECK = true;
+
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
   public ControllerConf(File file) throws ConfigurationException {
@@ -392,5 +395,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setRealtimeSegmentMetadataCommitNumLocks(int realtimeSegmentMetadataCommitNumLocks) {
     setProperty(REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS, realtimeSegmentMetadataCommitNumLocks);
+  }
+
+  public boolean getEnableStorageQuotaCheck() {
+    return getBoolean(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_STORAGE_QUOTA_CHECK);
   }
 }

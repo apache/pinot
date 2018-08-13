@@ -72,7 +72,7 @@ public class AzurePinotFSTest {
     MockADLFileInputStream adlFileInputStream = new MockADLFileInputStream(
         new ByteArrayInputStream(Files.readAllBytes(Paths.get(testFileURI))));
     when(adlStoreClient.getReadStream(anyString())).thenReturn(adlFileInputStream);
-    azurePinotFS.copyToLocalFile(testFileURI, file.toURI());
+    azurePinotFS.copyToLocalFile(testFileURI, file);
     Assert.assertTrue(file.exists());
   }
 

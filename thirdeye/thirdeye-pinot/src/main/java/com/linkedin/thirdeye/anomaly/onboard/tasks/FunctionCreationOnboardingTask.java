@@ -285,7 +285,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setWindowSize(6);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
         anomalyFunctionSpec.setFrequency(new TimeGranularity(15, TimeUnit.MINUTES));
-        anomalyFunctionSpec.setProperties("");
+        anomalyFunctionSpec.setProperties("signTestWindowSize=24");
         anomalyFunctionSpec.setRequiresCompletenessCheck(false);
         break;
       case HOURS:

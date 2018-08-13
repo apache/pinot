@@ -65,7 +65,7 @@ class GroupByResultSet extends AbstractResultSet {
     }
 
     try {
-      return _groupByResults.getJSONObject(rowIndex).getString("value");
+      return _groupByResults.getJSONObject(rowIndex).get("value").toString();
     } catch (Exception e) {
       throw new PinotClientException(e);
     }

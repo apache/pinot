@@ -563,7 +563,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(currentTable);
         List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
         for (Map<String, List<String>> routingTable : routingTables) {
-          entries.put(new JSONObject(routingTable.toString()));
+          entries.put(new JSONObject(routingTable));
         }
         tableEntry.put("routingTableEntries", entries);
         routingTableSnapshot.put(tableEntry);
