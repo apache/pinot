@@ -218,29 +218,20 @@ public class TableSizeReader {
       }
     }
     if (subTypeSizeDetails.missingSegments > 0) {
-      if (subTypeSizeDetails.missingSegments == subTypeSizeDetails.segments.size()) {
+      int totalSegments = subTypeSizeDetails.segments.size();
+      int missingPercent = totalSegments == 0 ? 0 : subTypeSizeDetails.missingSegments * 100 / totalSegments;
+      _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_MISSING_SEGMENT_PERCENT,
+          missingPercent);
+      if (subTypeSizeDetails.missingSegments == totalSegments) {
         LOGGER.warn("Could not get size reports from any server for all segments of the table {}", table);
         subTypeSizeDetails.reportedSizeInBytes = -1;
         subTypeSizeDetails.estimatedSizeInBytes = -1;
-        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_FAILURE,
-            1);
-        // reset metric tracking partial estimation
-        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_EST_FAILED_SEGMENTS,
-            0);
-
       } else {
         LOGGER.warn("Missing size report for {} out of {} segments for table {}", subTypeSizeDetails.missingSegments,
-            subTypeSizeDetails.segments.size(), table);
-        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_EST_FAILED_SEGMENTS,
-            subTypeSizeDetails.missingSegments);
-        // reset metric tracking failure
-        _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_FAILURE,
-            0);
+            totalSegments, table);
       }
     } else {
-      _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_ESTIMATION_FAILURE,
-          0);
-      _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_EST_FAILED_SEGMENTS,
+      _controllerMetrics.setValueOfTableGauge(table, ControllerGauge.TABLE_STORAGE_MISSING_SEGMENT_PERCENT,
           0);
     }
     return subTypeSizeDetails;
