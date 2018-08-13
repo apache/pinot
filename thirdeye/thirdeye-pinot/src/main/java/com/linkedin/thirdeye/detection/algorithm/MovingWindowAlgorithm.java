@@ -98,7 +98,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.kernelSize = MapUtils.getIntValue(config.getProperties(), "kernelSize", 1);
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "UTC"));
     this.windowSize = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "windowSize", "1week"));
-    this.minLookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "minLookback", "4w"));
+    this.minLookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "minLookback", "1day"));
     this.changeDuration = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "5days"));
     this.changeFraction = MapUtils.getDoubleValue(config.getProperties(), "changeFraction", 0.666);
     this.baselineWeeks = MapUtils.getIntValue(config.getProperties(), "baselineWeeks", 0);
@@ -579,13 +579,13 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         sValue[i] = df.getDouble(COL_VALUE, valueIndex);
         sWeight[i] = 0.5 * Math.pow(0.5, offset);
 
-        if (BooleanSeries.isTrue(df.getBoolean(COL_OUTLIER, valueIndex))
-            && (lastChangePoint == null || timestamp >= new DateTime(lastChangePoint, this.timezone).plus(this.changeDuration).getMillis())) {
-          sWeight[i] = 0;
-        }
-
         if (lastChangePoint != null && timestamp < lastChangePoint) {
           sWeight[i] *= 0.1;
+        }
+
+        if (BooleanSeries.isTrue(df.getBoolean(COL_OUTLIER, valueIndex))
+            && (lastChangePoint == null || timestamp >= new DateTime(lastChangePoint, this.timezone).plus(this.changeDuration).getMillis())) {
+          sWeight[i] *= 0.01;
         }
       }
     }
