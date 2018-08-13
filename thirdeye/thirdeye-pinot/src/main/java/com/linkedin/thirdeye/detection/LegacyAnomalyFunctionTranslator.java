@@ -13,6 +13,8 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -20,6 +22,7 @@ import java.util.Map;
  */
 public class LegacyAnomalyFunctionTranslator {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final Logger LOGGER = LoggerFactory.getLogger(LegacyAnomalyFunctionTranslator.class);
   private DetectionConfigManager detectionConfigDAO;
   private MetricConfigManager metricConfigDAO;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
@@ -45,6 +48,10 @@ public class LegacyAnomalyFunctionTranslator {
 
     String filters = anomalyFunctionDTO.getFilters();
     MetricConfigDTO metricDTO = this.metricConfigDAO.findByMetricAndDataset(anomalyFunctionDTO.getMetric(), anomalyFunctionDTO.getCollection());
+    if (metricDTO == null) {
+      LOGGER.error("Cannot find metric {} for anomaly function {}", anomalyFunctionDTO.getMetric(), anomalyFunctionDTO.getFunctionName());
+      return;
+    }
     MetricEntity me = MetricEntity.fromMetric(1.0, metricDTO.getId()).withFilters(ThirdEyeUtils.getFilterSet(filters));
     String metricUrn = me.getUrn();
 
