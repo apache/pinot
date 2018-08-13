@@ -53,9 +53,9 @@ export default Controller.extend({
 
   baseline: null,
 
-  analysisRange: [moment().subtract(1.5, 'month').valueOf(), moment().valueOf()],
+  analysisRange: [moment().subtract(2, 'month').valueOf(), moment().valueOf()],
 
-  displayRange: [moment().subtract(2.5, 'month').valueOf(), moment().valueOf()],
+  displayRange: [moment().subtract(3, 'month').valueOf(), moment().valueOf()],
 
   compareMode: 'wo1w',
 
