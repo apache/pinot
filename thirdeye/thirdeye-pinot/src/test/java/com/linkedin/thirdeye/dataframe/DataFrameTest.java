@@ -2700,6 +2700,16 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleFind() {
+    DoubleSeries base = DataFrame.toSeries(0.5, DNULL, 3.1, 2.5, 1.8, DNULL, 3.2);
+    Assert.assertEquals(base.find(0.4, 0.1), 0);
+    Assert.assertEquals(base.find(DNULL, DNULL), 1);
+    Assert.assertEquals(base.find(3, 0.2), 2);
+    Assert.assertEquals(base.find(DNULL, 10.0, 2), 5);
+    Assert.assertEquals(base.find(3, 0.2, 3), 6);
+  }
+
+  @Test
   public void testDoubleFilterSeries() {
     DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
     BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
@@ -3005,6 +3015,15 @@ public class DataFrameTest {
     assertEquals(base.replace(2, 1), LNULL, 0, 0, 5, 10);
     assertEquals(base.replace(5, LNULL), LNULL, 0, 0, LNULL, 10);
     assertEquals(base.replace(LNULL, 1), 1, 0, 0, 5, 10);
+  }
+
+  @Test
+  public void testLongFind() {
+    LongSeries base = DataFrame.toSeries(0, LNULL, 3, 2, 1, LNULL, 3);
+    Assert.assertEquals(base.find(0), 0);
+    Assert.assertEquals(base.find(LNULL), 1);
+    Assert.assertEquals(base.find(3, 2), 2);
+    Assert.assertEquals(base.find(LNULL, 2), 5);
   }
 
   @Test

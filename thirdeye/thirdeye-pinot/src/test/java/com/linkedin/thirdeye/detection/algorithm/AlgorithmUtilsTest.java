@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detection.algorithm;
 
-import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import java.io.InputStreamReader;
@@ -51,7 +50,8 @@ public class AlgorithmUtilsTest {
 
   @Test
   public void testOutlier() {
-    Assert.assertEquals(AlgorithmUtils.getOutliers(this.outlierData, new Duration(86400000L)).sum().longValue(), 48);
+    // NOTE: spline smoothing effect expands window
+    Assert.assertEquals(AlgorithmUtils.getOutliers(this.outlierData, new Duration(86400000L)).sum().longValue(), 57);
   }
 
   @Test
@@ -76,20 +76,68 @@ public class AlgorithmUtilsTest {
     Assert.assertNotNull(AlgorithmUtils.getChangePoints(this.outlierData, new Duration(86400000L)).higher(86400000L * 2));
   }
 
+//  @Test
+//  public void testRescaleNoData() {
+//    Assert.assertTrue(AlgorithmUtils.getRescaledSeries(new DataFrame(), new HashSet<Long>()).isEmpty());
+//  }
+//
+//  @Test
+//  public void testRescaleNone() {
+//    Assert.assertEquals(AlgorithmUtils.getRescaledSeries(this.data, new HashSet<Long>()), this.data);
+//  }
+//
+//  @Test
+//  public void testRescale() {
+//    Set<Long> changePoints = new HashSet<>(Arrays.asList(86400000L, 86400000L * 3));
+//    Assert.assertTrue(equals(AlgorithmUtils.getRescaledSeries(this.outlierData, changePoints), this.data, 50));
+//  }
+
   @Test
-  public void testRescaleNoData() {
-    Assert.assertTrue(AlgorithmUtils.getRescaledSeries(new DataFrame(), new HashSet<Long>()).isEmpty());
+  public void testFastBSplineNoData() {
+    DoubleSeries s = DoubleSeries.buildFrom();
+    Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 1), DoubleSeries.buildFrom(), 0.001));
   }
 
   @Test
-  public void testRescaleNone() {
-    Assert.assertEquals(AlgorithmUtils.getRescaledSeries(this.data, new HashSet<Long>()), this.data);
+  public void testFastBSplineOneElement() {
+    DoubleSeries s = DoubleSeries.buildFrom(5);
+    Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 1), DoubleSeries.buildFrom(5), 0.001));
   }
 
   @Test
-  public void testRescale() {
-    Set<Long> changePoints = new HashSet<>(Arrays.asList(86400000L, 86400000L * 3));
-    Assert.assertTrue(equals(AlgorithmUtils.getRescaledSeries(this.outlierData, changePoints), this.data, 50));
+  public void testFastBSplineTwoElements() {
+    DoubleSeries s = DoubleSeries.buildFrom(5, 6);
+    Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 1), DoubleSeries.buildFrom(5.5, 5.5), 0.001));
+  }
+
+  @Test
+  public void testFastBSpline() {
+    DoubleSeries s = DoubleSeries.buildFrom(1, 2, 3, 1, 2, 3, 1, 3, 2);
+    Assert.assertTrue(equals(AlgorithmUtils.fastBSpline(s, 4), DoubleSeries.buildFrom(2, 2, 2, 2, 2, 2, 2, 2, 2), 0.25));
+  }
+
+  @Test
+  public void testRobustMeanNoData() {
+    DoubleSeries s = DoubleSeries.buildFrom();
+    Assert.assertTrue(equals(AlgorithmUtils.robustMean(s, 1), s, 0.001));
+  }
+
+  @Test
+  public void testRobustMeanSingleWindow() {
+    DoubleSeries s = DoubleSeries.buildFrom(1, 2, 3);
+    Assert.assertTrue(equals(AlgorithmUtils.robustMean(s, 1), DoubleSeries.buildFrom(1, 2, 3), 0.001));
+  }
+
+  @Test
+  public void testRobustMeanSmallWindow() {
+    DoubleSeries s = DoubleSeries.buildFrom(1, 2, 3);
+    Assert.assertTrue(equals(AlgorithmUtils.robustMean(s, 2), DoubleSeries.buildFrom(Double.NaN, 1.5, 2.5), 0.001));
+  }
+
+  @Test
+  public void testRobustMean() {
+    DoubleSeries s = DoubleSeries.buildFrom(1, 2, 3, 4, 5, 6);
+    Assert.assertTrue(equals(AlgorithmUtils.robustMean(s, 4), DoubleSeries.buildFrom(Double.NaN, Double.NaN, Double.NaN, 2.5, 3.5, 4.5), 0.001));
   }
 
   private static boolean equals(DataFrame a, DataFrame b, double epsilon) {
@@ -104,8 +152,10 @@ public class AlgorithmUtilsTest {
     DoubleSeries valA = a.getDoubles(COL_VALUE);
     DoubleSeries valB = b.getDoubles(COL_VALUE);
 
-    BooleanSeries output = valA.lte(valB.add(epsilon)).and(valA.gte(valB.subtract(epsilon)));
+    return equals(valA, valB, epsilon);
+  }
 
-    return !output.hasFalse();
+  private static boolean equals(DoubleSeries a, DoubleSeries b, double epsilon) {
+    return !a.lte(b.add(epsilon)).and(a.gte(b.subtract(epsilon))).hasFalse();
   }
 }

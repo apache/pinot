@@ -627,7 +627,7 @@ public class RootCauseMetricResource {
   }
 
   private MetricSlice makeSlice(String urn, long start, long end, TimeGranularity granularity) {
-    MetricEntity metric = MetricEntity.fromURN(urn, 1.0);
+    MetricEntity metric = MetricEntity.fromURN(urn);
     return MetricSlice.from(metric.getId(), start, end, metric.getFilters(), granularity);
   }
 

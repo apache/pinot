@@ -30,7 +30,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +39,7 @@ import org.slf4j.LoggerFactory;
 public class DetectionResource {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
   private final EventManager eventDAO;
@@ -69,7 +69,10 @@ public class DetectionResource {
 
   @POST
   @Path("/preview")
-  public Response detectionPreview(@QueryParam("start") long start, @QueryParam("end") long end,
+  public Response detectionPreview(
+      @QueryParam("start") long start,
+      @QueryParam("end") long end,
+      @QueryParam("diagnostics") Boolean diagnostics,
       @ApiParam("jsonPayload") String jsonPayload) throws Exception {
     if (jsonPayload == null) {
       throw new IllegalArgumentException("Empty Json Payload");
@@ -85,13 +88,20 @@ public class DetectionResource {
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
     DetectionPipelineResult result = pipeline.run();
 
-    return Response.ok(result.getAnomalies()).build();
+    if (diagnostics == null || !diagnostics) {
+      result.setDiagnostics(Collections.<String, Object>emptyMap());
+    }
+
+    return Response.ok(result).build();
   }
 
   @POST
   @Path("/gridsearch")
-  public Response gridSearch(@QueryParam("configId") long configId, @QueryParam("start") long start,
-      @QueryParam("end") long end, @ApiParam("jsonPayload") String jsonPayload) throws Exception {
+  public Response gridSearch(
+      @QueryParam("configId") long configId,
+      @QueryParam("start") long start,
+      @QueryParam("end") long end,
+      @ApiParam("jsonPayload") String jsonPayload) throws Exception {
     if (jsonPayload == null) {
       throw new IllegalArgumentException("Empty Json Payload");
     }
@@ -113,6 +123,7 @@ public class DetectionResource {
   public Response detectionPreview(
       @PathParam("id") long id,
       @QueryParam("start") long start,
+      @QueryParam("diagnostics") Boolean diagnostics,
       @QueryParam("end") long end) throws Exception {
 
     DetectionConfigDTO config = this.configDAO.findById(id);
@@ -123,7 +134,11 @@ public class DetectionResource {
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
     DetectionPipelineResult result = pipeline.run();
 
-    return Response.ok(result.getAnomalies()).build();
+    if (diagnostics == null || !diagnostics) {
+      result.setDiagnostics(Collections.<String, Object>emptyMap());
+    }
+
+    return Response.ok(result).build();
   }
 
   @POST
@@ -164,6 +179,6 @@ public class DetectionResource {
       this.anomalyDAO.save(anomaly);
     }
 
-    return Response.ok(result.getAnomalies()).build();
+    return Response.ok(result).build();
   }
 }

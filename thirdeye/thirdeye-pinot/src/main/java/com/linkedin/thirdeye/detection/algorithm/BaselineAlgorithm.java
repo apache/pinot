@@ -16,6 +16,7 @@ import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTimeZone;
@@ -64,7 +65,7 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
     Preconditions.checkArgument(config.getProperties().containsKey(PROP_METRIC_URN));
 
     String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
     this.slice = MetricSlice.from(me.getId(), this.startTime, this.endTime, me.getFilters());
 
     int weeks = MapUtils.getIntValue(config.getProperties(), PROP_WEEKS, PROP_WEEKS_DEFAULT);
@@ -113,6 +114,7 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
-    return new DetectionPipelineResult(anomalies);
+    return new DetectionPipelineResult(anomalies)
+        .setDiagnostics(Collections.singletonMap(DetectionPipelineResult.DIAGNOSTICS_DATA, (Object) df.dropAllNullColumns()));
   }
 }

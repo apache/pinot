@@ -94,6 +94,7 @@ public class ThirdEyeAnomalyApplication
     }
 
     environment.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    environment.getObjectMapper().registerModule(makeMapperModule());
 
     environment.lifecycle().manage(new Managed() {
       @Override

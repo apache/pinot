@@ -36,7 +36,7 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
     this.max = MapUtils.getDoubleValue(config.getProperties(), "max", Double.NaN);
 
     String metricUrn = MapUtils.getString(config.getProperties(), "metricUrn");
-    MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
     this.slice = MetricSlice.from(me.getId(), this.startTime, this.endTime, me.getFilters());
   }
 
@@ -68,6 +68,7 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
-    return new DetectionPipelineResult(anomalies);
+    return new DetectionPipelineResult(anomalies)
+        .setDiagnostics(Collections.singletonMap(DetectionPipelineResult.DIAGNOSTICS_DATA, (Object) df.dropAllNullColumns()));
   }
 }

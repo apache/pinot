@@ -68,9 +68,12 @@ public class MergeWrapper extends DetectionPipeline {
 
   @Override
   public DetectionPipelineResult run() throws Exception {
+    Map<String, Object> diagnostics = new HashMap<>();
+
     // generate anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
 
+    int i = 0;
     for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
@@ -85,6 +88,9 @@ public class MergeWrapper extends DetectionPipeline {
       DetectionPipelineResult intermediate = pipeline.run();
 
       generated.addAll(intermediate.getAnomalies());
+      diagnostics.put(String.valueOf(i), intermediate.getDiagnostics());
+
+      i++;
     }
 
     // retrieve anomalies
@@ -100,7 +106,8 @@ public class MergeWrapper extends DetectionPipeline {
     all.addAll(retrieved);
     all.addAll(generated);
 
-    return new DetectionPipelineResult(this.merge(all));
+    return new DetectionPipelineResult(this.merge(all))
+        .setDiagnostics(diagnostics);
   }
 
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
