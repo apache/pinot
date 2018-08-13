@@ -50,6 +50,7 @@ public class MovingWindowAlgorithmTest {
   private static final String PROP_ZSCORE_MAX = "zscoreMax";
   private static final String PROP_KERNEL_MIN = "kernelMin";
   private static final String PROP_KERNEL_MAX = "kernelMax";
+  private static final String PROP_KERNEL_SIZE = "kernelSize";
   private static final String PROP_ZSCORE_OUTLIER = "zscoreOutlier";
   private static final String PROP_CHANGE_DURATION = "changeDuration";
   private static final String PROP_BASELINE_WEEKS = "baselineWeeks";
@@ -210,9 +211,9 @@ public class MovingWindowAlgorithmTest {
     DetectionPipelineResult res = this.algorithm.run();
 
     Assert.assertEquals(res.getAnomalies().size(), 4);
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(925200000L, 928800000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(957600000L, 961200000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1767600000L, 1774800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(921600000L, 928800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(954000000L, 968400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1767600000L, 1778400000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1792800000L, 1796400000L)));
   }
 
@@ -226,18 +227,19 @@ public class MovingWindowAlgorithmTest {
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(903600000L, 907200000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(918000000L, 921600000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(950400000L, 954000000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1764000000L, 1767600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1756800000L, 1767600000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1800000000L, 1807200000L)));
   }
 
   @Test
   public void testZScoreDiffMax() throws Exception {
     this.properties.put(PROP_ZSCORE_MAX, 2.0);
+    this.properties.put(PROP_KERNEL_SIZE, 4);
     this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
     DetectionPipelineResult res = this.algorithm.run();
 
-    Assert.assertEquals(res.getAnomalies().size(), 12);
+    Assert.assertEquals(res.getAnomalies().size(), 11);
 //    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1274400000L, 1278000000L)));
 //    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1335600000L, 1339200000L)));
 //    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1551600000L, 1555200000L)));
@@ -255,29 +257,32 @@ public class MovingWindowAlgorithmTest {
   @Test
   public void testKernelMin() throws Exception {
     this.properties.put(PROP_KERNEL_MIN, -1.25);
+    this.properties.put(PROP_KERNEL_SIZE, 4);
     this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
     DetectionPipelineResult res = this.algorithm.run();
 
     Assert.assertEquals(res.getAnomalies().size(), 3);
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1771200000L, 1792800000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2217600000L, 2235600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1767600000L, 1782000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2217600000L, 2232000000L)));
     Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2397600000L, 2412000000L)));
   }
 
   @Test
   public void testKernelMax() throws Exception {
     this.properties.put(PROP_KERNEL_MAX, 1.25);
+    this.properties.put(PROP_KERNEL_SIZE, 4);
     this.properties.put(PROP_BASELINE_WEEKS, 1);
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 1209600000L, 2419200000L);
     DetectionPipelineResult res = this.algorithm.run();
 
-    Assert.assertEquals(res.getAnomalies().size(), 5);
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1274400000L, 1296000000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1544400000L, 1576800000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1756800000L, 1767600000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1796400000L, 1810800000L)));
-    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2379600000L, 2386800000L)));
+    Assert.assertEquals(res.getAnomalies().size(), 6);
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1274400000L, 1288800000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1540800000L, 1569600000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1612800000L, 1634400000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1753200000L, 1764000000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(1792800000L, 1807200000L)));
+    Assert.assertTrue(res.getAnomalies().contains(makeAnomaly(2372400000L, 2379600000L)));
   }
 
   //
