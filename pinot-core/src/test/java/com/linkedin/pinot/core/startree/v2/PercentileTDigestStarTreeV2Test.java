@@ -41,6 +41,7 @@ import org.testng.annotations.Test;
 
 public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {
 
+  private final int _percentile = 90;
   private final String[] STAR_TREE1_HARD_CODED_QUERIES =
       new String[]{"SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"};
 
@@ -92,8 +93,19 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, 
     if (dictionary == null) {
       return valueIterator.nextBytesVal();
     } else {
-      return dictionary.getBytesValue(valueIterator.nextIntVal());
+      Object val = dictionary.get(valueIterator.nextIntVal());
+
+      Double d = new Double((int) val);
+      TDigest tDigest = new TDigest(100);
+      tDigest.add(d);
+
+      try {
+        return ObjectCustomSerDe.serialize(tDigest);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
+    return null;
   }
 
   @Override
@@ -111,6 +123,13 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, 
 
   @Override
   protected void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
+
+//    System.out.println(nonStarTreeResult.size());
+//
+//    System.out.println(starTreeResult.quantile(_percentile / 100.0));
+//    System.out.println(nonStarTreeResult.quantile(_percentile / 100.0));
+//
+//    Assert.assertEquals(starTreeResult.quantile(_percentile / 100.0), nonStarTreeResult.quantile(_percentile / 100.0));
     Assert.assertEquals(starTreeResult instanceof TDigest, nonStarTreeResult instanceof TDigest);
   }
 }
