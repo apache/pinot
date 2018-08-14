@@ -19,13 +19,17 @@ import com.google.common.io.Files;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -35,18 +39,15 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
+public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], QuantileDigest> {
 
   private File _indexDir;
+  private int ROWS_COUNT = 1000;
+  private final int _percentile = 90;
+
   private StarTreeV2Config _starTreeV2Config;
-
-  private int ROWS_COUNT = 26000;
-
-  private final String[] STAR_TREE_HARD_CODED_QUERIES =
-      new String[]{
-          "SELECT SUM(salary) FROM T",
-          "SELECT SUM(salary) FROM T GROUP BY Name",
-          "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"
+  private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
+      "SELECT PERCENTILEEST50(salary) FROM T"
   };
 
   @BeforeClass
@@ -64,12 +65,13 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
-    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "salary");
+    AggregationFunctionColumnPair pair1 =
+        new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILEEST, "salary");
     metric2aggFuncPairs1.add(pair1);
 
     _starTreeV2Config = new StarTreeV2Config();
     _starTreeV2Config.setOutDir(filepath);
-    _starTreeV2Config.setMaxNumLeafRecords(1);
+    _starTreeV2Config.setMaxNumLeafRecords(10);
     _starTreeV2Config.setDimensions(schema.getDimensionNames());
     _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
   }
@@ -113,25 +115,44 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   }
 
   @Override
-  protected Double getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
+  protected byte[] getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
     if (dictionary == null) {
-      return valueIterator.nextDoubleVal();
+      return valueIterator.nextBytesVal();
     } else {
-      return dictionary.getDoubleValue(valueIterator.nextIntVal());
+      Object val = dictionary.get(valueIterator.nextIntVal());
+
+      long d = ((Number) val).longValue();
+      QuantileDigest qDigest = new QuantileDigest(0.05);
+      qDigest.add(d);
+
+      try {
+        return ObjectCustomSerDe.serialize(qDigest);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
+    return null;
   }
 
   @Override
-  protected Double aggregate(@Nonnull List<Double> values) {
-    double sumVal = 0;
-    for (Double value : values) {
-      sumVal += value;
+  protected QuantileDigest aggregate(@Nonnull List<byte[]> values) {
+    QuantileDigest qDigest = new QuantileDigest(0.05);
+
+    for (byte[] obj : values) {
+      try {
+        qDigest.merge((QuantileDigest) ObjectCustomSerDe.deserialize(obj, ObjectType.QuantileDigest));
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
-    return sumVal;
+    return qDigest;
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  protected void assertAggregatedValue(QuantileDigest starTreeResult, QuantileDigest nonStarTreeResult) {
+    System.out.println("Star-Tree Result Object Size: " + Long.toString(starTreeResult.getQuantile(_percentile / 100.0)));
+    System.out.println("Non Star-Tree Result Object Size: " + Long.toString(nonStarTreeResult.getQuantile(_percentile / 100.0)));
+
+    Assert.assertEquals(starTreeResult.getQuantile(_percentile / 100.0), nonStarTreeResult.getQuantile(_percentile / 100.0));
   }
 }
