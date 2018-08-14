@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.detection;
 
 import com.google.common.base.Strings;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -26,7 +25,6 @@ public class LegacyAnomalyFunctionTranslator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LegacyAnomalyFunctionTranslator.class);
   private DetectionConfigManager detectionConfigDAO;
   private MetricConfigManager metricConfigDAO;
-  private AnomalyFunctionManager anomalyFunctionDAO;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
 
   /**
@@ -35,7 +33,6 @@ public class LegacyAnomalyFunctionTranslator {
   public LegacyAnomalyFunctionTranslator(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.detectionConfigDAO = DAO_REGISTRY.getDetectionConfigManager();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-    this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
@@ -80,6 +77,7 @@ public class LegacyAnomalyFunctionTranslator {
     config.setName(anomalyFunctionDTO.getFunctionName());
     config.setCron(anomalyFunctionDTO.getCron());
     config.setProperties(properties);
+    config.setActive(true);
     this.detectionConfigDAO.save(config);
   }
 }
