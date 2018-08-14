@@ -144,9 +144,15 @@ export default Component.extend({
 
   /**
    * Anomaly baseline as computed by anomaly function
-   * @type {Float}
+   * @type {float}
    */
   predicted: reads('anomaly.attributes.baseline.firstObject'),
+
+  /**
+   * Anomaly aggregate multiplier
+   * @type {float}
+   */
+  aggregateMultiplier: reads('anomaly.attributes.aggregateMultiplier.firstObject'),
 
   /**
    * Anomaly unique identifier
@@ -299,13 +305,14 @@ export default Component.extend({
    * @private
    */
   _getAggregate(offset) {
-    const { metricUrn, aggregates, predicted } = getProperties(this, 'metricUrn', 'aggregates', 'predicted');
+    const { metricUrn, aggregates, predicted, aggregateMultiplier } =
+      getProperties(this, 'metricUrn', 'aggregates', 'predicted', 'aggregateMultiplier');
 
     if (offset === 'predicted') {
       return parseFloat(predicted);
     }
 
-    return aggregates[toOffsetUrn(metricUrn, offset)];
+    return aggregates[toOffsetUrn(metricUrn, offset)] * aggregateMultiplier;
   },
 
   actions: {
