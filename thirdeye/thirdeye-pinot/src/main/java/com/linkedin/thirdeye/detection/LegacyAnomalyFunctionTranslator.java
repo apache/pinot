@@ -52,6 +52,8 @@ public class LegacyAnomalyFunctionTranslator {
       LOGGER.error("Cannot find metric {} for anomaly function {}", anomalyFunctionDTO.getMetric(), anomalyFunctionDTO.getFunctionName());
       return;
     }
+    anomalyFunctionDTO.setMetricId(metricDTO.getId());
+
     MetricEntity me = MetricEntity.fromMetric(1.0, metricDTO.getId()).withFilters(ThirdEyeUtils.getFilterSet(filters));
     String metricUrn = me.getUrn();
 
@@ -75,6 +77,7 @@ public class LegacyAnomalyFunctionTranslator {
     config.setName(anomalyFunctionDTO.getFunctionName());
     config.setCron(anomalyFunctionDTO.getCron());
     config.setProperties(properties);
+    config.setActive(true);
     this.detectionConfigDAO.save(config);
   }
 }
