@@ -28,6 +28,7 @@ import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -186,10 +187,16 @@ public class LegacyMergeWrapper extends DetectionPipeline {
       List<MergedAnomalyResultDTO> mergedAnomalyResults =
           AnomalyTimeBasedSummarizer.mergeAnomalies(latestOverlappedMergedResult, generatedAnomalies, mergeConfig);
 
+      AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
       for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
-        mergedAnomalyResult.setFunction(anomalyFunction.getSpec());
-        mergedAnomalyResult.setCollection(anomalyFunction.getSpec().getCollection());
-        mergedAnomalyResult.setMetric(anomalyFunction.getSpec().getTopicMetric());
+        mergedAnomalyResult.setFunction(anomalyFunctionSpec);
+        mergedAnomalyResult.setCollection(anomalyFunctionSpec.getCollection());
+        mergedAnomalyResult.setMetric(anomalyFunctionSpec.getTopicMetric());
+
+        String filters = anomalyFunctionSpec.getFilters();
+        MetricEntity me = MetricEntity.fromMetric(1.0, anomalyFunctionSpec.getMetricId()).withFilters(ThirdEyeUtils.getFilterSet(filters));
+        String metricUrn = me.getUrn();
+        mergedAnomalyResult.setMetricUrn(metricUrn);
         MetricTimeSeries metricTimeSeries = getMetricTimeSeries(entry.getKey());
 
         try {

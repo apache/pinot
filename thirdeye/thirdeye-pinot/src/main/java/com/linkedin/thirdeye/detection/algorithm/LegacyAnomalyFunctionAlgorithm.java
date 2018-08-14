@@ -129,6 +129,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
             MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
             anomaly.populateFrom(result);
             anomaly.setDimensions(dimension);
+            anomaly.setMetricUrn(metricUrn);
             return anomaly;
           }
         });
