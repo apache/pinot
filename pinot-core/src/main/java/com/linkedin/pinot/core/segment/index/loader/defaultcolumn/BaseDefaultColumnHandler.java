@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexType;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexType;
@@ -300,7 +301,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         Preconditions.checkState(defaultValue instanceof String);
         String stringDefaultValue = (String) defaultValue;
         // Length of the UTF-8 encoded byte array.
-        dictionaryElementSize = stringDefaultValue.getBytes("UTF8").length;
+        dictionaryElementSize = StringUtil.encodeUtf8(stringDefaultValue).length;
         sortedArray = new String[]{stringDefaultValue};
         break;
       default:

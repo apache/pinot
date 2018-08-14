@@ -15,11 +15,11 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 
 
 /**
@@ -27,7 +27,6 @@ import java.nio.charset.Charset;
  * For data layout, please refer to the documentation for {@link VarByteChunkSingleValueWriter}
  */
 public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
   private final int _maxChunkSize;
 
   // Thread local (reusable) byte[] to read bytes from data file.
@@ -64,7 +63,7 @@ public class VarByteChunkSingleValueReader extends BaseChunkSingleValueReader {
     chunkBuffer.position(rowOffset);
     chunkBuffer.get(bytes, 0, length);
 
-    return new String(bytes, 0, length, UTF_8);
+    return StringUtil.decodeUtf8(bytes, 0, length);
   }
 
   @Override

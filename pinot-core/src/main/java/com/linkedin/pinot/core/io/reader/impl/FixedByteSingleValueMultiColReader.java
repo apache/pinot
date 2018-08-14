@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.io.reader.impl;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,7 +158,7 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
    * @return
    */
   public String getString(int row, int col) {
-    return new String(getBytes(row, col), Charset.forName("UTF-8"));
+    return StringUtil.decodeUtf8(getBytes(row, col));
   }
 
   /**
