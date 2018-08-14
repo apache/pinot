@@ -123,7 +123,18 @@ public class StorageQuotaChecker {
 
     if (tableSubtypeSize.estimatedSizeInBytes == -1) {
       // don't fail the quota check in this case
-      return success("Failed to get size estimate for table: " + tableNameWithType);
+      return success("Missing size reports from all servers. Bypassing storage quota check for " + tableNameWithType);
+    }
+
+    if (tableSubtypeSize.missingSegments > 0) {
+      if (tableSubtypeSize.estimatedSizeInBytes > allowedStorageBytes) {
+        return failure("Table " + tableNameWithType + " already over quota. Estimated size for all replicas is "
+            + DataSize.fromBytes(tableSubtypeSize.estimatedSizeInBytes) + ". Configured size for " + numReplicas + " is "
+            + DataSize.fromBytes(allowedStorageBytes));
+      } else {
+        return success( "Missing size report for " + tableSubtypeSize.missingSegments
+            + " segments. Bypassing storage quota check for " + tableNameWithType);
+      }
     }
 
     // If the segment exists(refresh), get the existing size
@@ -136,9 +147,7 @@ public class StorageQuotaChecker {
         tableSubtypeSize.estimatedSizeInBytes);
 
     LOGGER.info("Table {}'s estimatedSizeInBytes is {}. ReportedSizeInBytes (actual reports from servers) is {}",
-        tableName,
-        tableSubtypeSize.estimatedSizeInBytes,
-        tableSubtypeSize.reportedSizeInBytes);
+        tableName, tableSubtypeSize.estimatedSizeInBytes, tableSubtypeSize.reportedSizeInBytes);
 
     // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
     if (_pinotHelixResourceManager.isLeader() && allowedStorageBytes != 0L) {

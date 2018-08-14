@@ -42,7 +42,8 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_QUOTA("TableQuotaBasedOnTableConfig", false), // Table quota based on setting in table config.
 
-  TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false); // Table storage quota utilization.
+  TABLE_STORAGE_QUOTA_UTILIZATION("TableStorageQuotaUtilization", false), // Table storage quota utilization.
+  TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT("TableStorageEstMissingSegmentPercent", false); // percentage of segments we failed to get size for
 
   private final String gaugeName;
   private final String unit;
