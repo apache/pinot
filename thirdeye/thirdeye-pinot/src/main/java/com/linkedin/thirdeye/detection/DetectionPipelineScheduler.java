@@ -56,16 +56,24 @@ public class DetectionPipelineScheduler implements Runnable {
       // add or update
       for (DetectionConfigDTO config : configs) {
         JobKey key = new JobKey(getJobKey(config.getId()), TaskConstants.TaskType.DETECTION.toString());
+        if (!config.isActive()) {
+          LOG.info("Detection config  " + key + " is inactive. Skipping.");
+          continue;
+        }
 
-        if (scheduler.checkExists(key)) {
-          LOG.warn("Detection config  " + key + " is already scheduled.");
-          if (jobUpdated(config, key)){
-            // restart job
-            stopJob(key);
+        try {
+          if (scheduler.checkExists(key)) {
+            LOG.info("Detection config  " + key + " is already scheduled.");
+            if (jobUpdated(config, key)) {
+              // restart job
+              stopJob(key);
+              startJob(config, key);
+            }
+          } else {
             startJob(config, key);
           }
-        } else {
-          startJob(config, key);
+        } catch (Exception e) {
+          LOG.error("Error creating/updating job key {}", key);
         }
       }
 
@@ -78,11 +86,16 @@ public class DetectionPipelineScheduler implements Runnable {
           if (detectionDTO == null) {
             LOG.info("Found a scheduled detection pipeline, but not found in the database {}", id);
             stopJob(jobKey);
+
+          } else if (!detectionDTO.isActive()) {
+            LOG.info("Found a scheduled pipeline, but has been deactivated");
+            stopJob(jobKey);
           }
-        } catch (NumberFormatException e) {
-          LOG.error("Error job key {}", jobKey);
+        } catch (Exception e) {
+          LOG.error("Error removing job key {}", jobKey);
         }
       }
+
     } catch (SchedulerException e) {
       LOG.error("Error while scheduling detection pipeline", e);
     }

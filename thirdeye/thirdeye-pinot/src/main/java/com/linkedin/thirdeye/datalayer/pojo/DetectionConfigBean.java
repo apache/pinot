@@ -18,6 +18,7 @@ public class DetectionConfigBean extends AbstractBean {
   String name;
   long lastTimestamp;
   Map<String, Object> properties;
+  boolean active;
 
   public String getName() {
     return name;
@@ -51,6 +52,14 @@ public class DetectionConfigBean extends AbstractBean {
     this.lastTimestamp = lastTimestamp;
   }
 
+  public boolean isActive() {
+    return active;
+  }
+
+  public void setActive(boolean active) {
+    this.active = active;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -60,12 +69,12 @@ public class DetectionConfigBean extends AbstractBean {
       return false;
     }
     DetectionConfigBean that = (DetectionConfigBean) o;
-    return lastTimestamp == that.lastTimestamp && Objects.equals(cron, that.cron)
+    return lastTimestamp == that.lastTimestamp && active == that.active && Objects.equals(cron, that.cron)
         && Objects.equals(name, that.name) && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(cron, name, lastTimestamp, properties);
+    return Objects.hash(cron, name, lastTimestamp, properties, active);
   }
 }
