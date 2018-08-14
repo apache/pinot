@@ -38,7 +38,6 @@ import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.startree.DimensionBuffer;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
-import com.linkedin.pinot.core.startree.StarTreeNode;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.io.BufferedOutputStream;
 import java.io.BufferedWriter;
@@ -175,8 +174,8 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
     _rootNode = new TreeNode();
-    _rootNode._dimensionId = StarTreeV2Constant.ROOT_NODE;
-    _rootNode._dimensionValue = StarTreeV2Constant.ROOT_NODE;
+    _rootNode._dimensionId = StarTreeV2Constant.STAR_NODE;
+    _rootNode._dimensionValue = StarTreeV2Constant.STAR_NODE;
     _nodesCount++;
     _starTreeCount++;
     _aggregationFunctions = new ArrayList<>();
@@ -648,9 +647,9 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
       DimensionBuffer dimensions = new DimensionBuffer(_dimensionsCount);
       for (int i = 0; i < _dimensionsCount; i++) {
-        dimensions.setDictId(i, StarTreeV2Constant.STAR_NODE);
+        dimensions.setDictId(i, StarTreeV2Constant.SKIP_VALUE);
       }
-      createAggregatedDocForAllNodesHelper(dataTable, _rootNode, dimensions, null);
+      createAggregatedDocForAllNodesHelper(dataTable, _rootNode, dimensions);
     }
     _outputStream.flush();
   }
@@ -659,13 +658,10 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
    * Helper function to create aggregated document from children for a parent node.
    */
   private AggregationFunctionColumnPairBuffer createAggregatedDocForAllNodesHelper(StarTreeV2DataTable dataTable,
-      TreeNode node, DimensionBuffer dimensions, TreeNode parent) throws IOException {
+      TreeNode node, DimensionBuffer dimensions) throws IOException {
     AggregationFunctionColumnPairBuffer aggregatedMetrics = null;
 
     int index = 0;
-    int aggregatedDocId = -1;
-    boolean hasStarNode = false;
-
     int[] sortedDocIds = new int[node._endDocId - node._startDocId];
     for (int i = node._startDocId; i < node._endDocId; i++) {
       sortedDocIds[index] = i;
@@ -673,10 +669,12 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     }
 
     if (node._children == null) {
+
       Iterator<Pair<byte[], byte[]>> iterator =
           dataTable.iterator(node._startDocId, node._endDocId, _docSizeIndex, sortedDocIds);
       Pair<byte[], byte[]> first = iterator.next();
       aggregatedMetrics = AggregationFunctionColumnPairBuffer.fromBytes(first.getRight(), _aggregationFunctions);
+
       while (iterator.hasNext()) {
         Pair<byte[], byte[]> next = iterator.next();
         AggregationFunctionColumnPairBuffer metricBuffer =
@@ -684,45 +682,26 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
         aggregatedMetrics.aggregate(metricBuffer);
       }
     } else {
+      int childDimensionId = node._childDimensionId;
       for (Map.Entry<Integer, TreeNode> entry : node._children.entrySet()) {
         int childDimensionValue = entry.getKey();
         TreeNode child = entry.getValue();
+        dimensions.setDictId(childDimensionId, childDimensionValue);
         AggregationFunctionColumnPairBuffer childAggregatedMetrics =
-            createAggregatedDocForAllNodesHelper(dataTable, child, dimensions, node);
+            createAggregatedDocForAllNodesHelper(dataTable, child, dimensions);
         // Skip star node value when computing aggregate for the parent
-        if (childDimensionValue != StarTreeNode.ALL) {
+        if (childDimensionValue != StarTreeV2Constant.STAR_NODE) {
           if (aggregatedMetrics == null) {
             aggregatedMetrics = childAggregatedMetrics;
           } else {
             aggregatedMetrics.aggregate(childAggregatedMetrics);
           }
-        } else {
-          aggregatedDocId = entry.getValue()._aggDataDocumentId;
-          hasStarNode = true;
         }
       }
+      dimensions.setDictId(childDimensionId, StarTreeV2Constant.STAR_NODE);
     }
-
-    if (hasStarNode) {
-      node._aggDataDocumentId = aggregatedDocId;
-      aggregatedDocId = -1;
-      hasStarNode = false;
-    } else {
-      node._aggDataDocumentId = _aggregatedDocCount;
-      // preserving the parent value in share aggregated document for star child node.
-      if (node._dimensionValue == StarTreeV2Constant.STAR_NODE && parent._dimensionValue != StarTreeV2Constant.ROOT_NODE) {
-        dimensions.setDictId(parent._dimensionId, parent._dimensionValue);
-        appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
-        dimensions.setDictId(parent._dimensionId, StarTreeNode.ALL);
-      } else {
-        dimensions.setDictId(node._dimensionId, node._dimensionValue);
-        appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
-        dimensions.setDictId(node._dimensionId, StarTreeNode.ALL);
-      }
-
-      _docSizeIndex.add(_fileSize);
-    }
-
+    appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
+    _docSizeIndex.add(_fileSize);
     return aggregatedMetrics;
   }
 

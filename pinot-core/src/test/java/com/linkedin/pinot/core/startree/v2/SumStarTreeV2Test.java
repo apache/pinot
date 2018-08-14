@@ -40,8 +40,14 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   private File _indexDir;
   private StarTreeV2Config _starTreeV2Config;
 
+  private int ROWS_COUNT = 26000;
+
   private final String[] STAR_TREE_HARD_CODED_QUERIES =
-      new String[]{"SELECT SUM(salary) FROM T", "SELECT SUM(salary) FROM T GROUP BY Name", "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"};
+      new String[]{
+          "SELECT SUM(salary) FROM T",
+          "SELECT SUM(salary) FROM T GROUP BY Name",
+          "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"
+  };
 
   @BeforeClass
   private void setUp() throws Exception {
@@ -50,9 +56,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
-
-    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
@@ -65,7 +69,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     _starTreeV2Config = new StarTreeV2Config();
     _starTreeV2Config.setOutDir(filepath);
-    _starTreeV2Config.setMaxNumLeafRecords(10);
+    _starTreeV2Config.setMaxNumLeafRecords(1);
     _starTreeV2Config.setDimensions(schema.getDimensionNames());
     _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
   }
@@ -92,6 +96,13 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
   @Test
   public void testQueries() throws Exception {
+    offHeapSetUp();
+    System.out.println("Testing Off-Heap Version");
+    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
+      testQuery(s);
+      System.out.println("Passed Query : " + s);
+    }
+
     onHeapSetUp();
     System.out.println("Testing On-Heap Version");
     for (String s : STAR_TREE_HARD_CODED_QUERIES) {
@@ -99,13 +110,6 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
       System.out.println("Passed Query : " + s);
     }
     System.out.println();
-
-    offHeapSetUp();
-    System.out.println("Testing Off-Heap Version");
-    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
-      testQuery(s);
-      System.out.println("Passed Query : " + s);
-    }
   }
 
   @Override

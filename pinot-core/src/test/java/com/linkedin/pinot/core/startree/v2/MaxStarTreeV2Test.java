@@ -39,6 +39,8 @@ public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   private File _indexDir;
   private StarTreeV2Config _starTreeV2Config;
 
+  private int ROWS_COUNT = 1000;
+
   private final String[] STAR_TREE1_HARD_CODED_QUERIES =
       new String[]{"SELECT MAX(salary) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"};
 
@@ -48,9 +50,7 @@ public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentSmallData(schema);
-
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);

@@ -331,6 +331,23 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     // Create aggregate rows for all nodes in the tree
     createAggregatedDocForAllNodes();
 
+    System.out.println(_numRawDocs);
+    System.out.println(_numAggregatedDocs);
+
+    StarTreeDataTable dataTable = new StarTreeDataTable(
+        PinotDataBuffer.mapFile(_dataFile, false, 0, _dataFile.length(), PinotDataBuffer.NATIVE_ORDER,
+            "OffHeapStarTreeBuilder#removeSkipMaterializationDimensions: data buffer"), _dimensionSize, _metricSize,
+        0);
+
+    Iterator<Pair<byte[], byte[]>> iterator = dataTable.iterator(0, _numRawDocs + _numAggregatedDocs);
+    while (iterator.hasNext()) {
+      Pair<byte[], byte[]> next = iterator.next();
+      byte[] dimensionBytes = next.getLeft();
+      DimensionBuffer dimensions = DimensionBuffer.fromBytes(dimensionBytes);
+      System.out.println(dimensions);
+    }
+
+
     long end = System.currentTimeMillis();
     LOGGER.info("Took {}ms to build star tree index with {} raw documents and {} aggregated documents", (end - start),
         _numRawDocs, _numAggregatedDocs);
@@ -422,6 +439,9 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       dimensions.setDictId(childDimensionId, StarTreeNode.ALL);
     }
     node._aggregatedDocId = _numRawDocs + _numAggregatedDocs;
+
+    System.out.println(dimensions);
+
     appendToAggBuffer(dimensions, aggregatedMetrics);
     return aggregatedMetrics;
   }

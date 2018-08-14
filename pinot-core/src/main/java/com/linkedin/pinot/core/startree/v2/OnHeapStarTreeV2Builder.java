@@ -126,8 +126,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     _outDir = config.getOutDir();
     _maxNumLeafRecords = config.getMaxNumLeafRecords();
     _rootNode = new TreeNode();
-    _rootNode._dimensionValue = StarTreeV2Constant.ROOT_NODE;
-    _rootNode._dimensionId = StarTreeV2Constant.ROOT_NODE;
+    _rootNode._dimensionValue = StarTreeV2Constant.STAR_NODE;
+    _rootNode._dimensionId = StarTreeV2Constant.STAR_NODE;
     _nodesCount++;
     _starTreeCount++;
     _aggregationFunctions = new ArrayList<>();
@@ -147,7 +147,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     for (int i = 0; i < _dimensionsCount; i++) {
       String dimensionName = _dimensionsName.get(i);
       ImmutableDictionaryReader dictionary = _immutableSegment.getDictionary(dimensionName);
-      _dictionary.put(dimensionName ,dictionary);
+      _dictionary.put(dimensionName, dictionary);
       _dimensionsCardinality.add(dictionary.length());
     }
 
@@ -220,7 +220,22 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     constructStarTree(_rootNode, 0, _starTreeData.size(), 0);
 
     // create aggregated doc for all nodes.
-    createAggregatedDocForAllNodes(_rootNode, null);
+    createAggregatedDocForAllNodes();
+
+    for (int i = 0; i < _starTreeData.size(); i++) {
+      for (int j = 0; j < _dimensionsCount; j++) {
+        String name = _dimensionsName.get(j);
+        int val = _starTreeData.get(i).getDimensionValues()[j];
+        if (val == -1) {
+          System.out.print("-1");
+        } else {
+          System.out.print(_dictionary.get(name).get(val));
+        }
+        System.out.print(", ");
+      }
+      System.out.println(_starTreeData.get(i).getAggregatedValues().get(0));
+      System.out.println();
+    }
 
     long end = System.currentTimeMillis();
     LOGGER.info("Took {}ms to build star tree index with {} aggregated documents", (end - start), _starTreeData.size());
@@ -291,6 +306,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     List<Record> sortedFilteredData =
         filterData(startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder, _starTreeData);
     List<Record> condensedData = condenseData(sortedFilteredData, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
+
     _starTreeData.addAll(condensedData);
 
     int starChildEndDocId = _starTreeData.size();
@@ -379,24 +395,41 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
   /**
    * Helper function to create aggregated document for all nodes
-   *
-   * @param node 'TreeNode' to start creating aggregated documents from.
    */
-  private void createAggregatedDocForAllNodes(TreeNode node, TreeNode parent) {
+  private void createAggregatedDocForAllNodes() {
+
+    int[] dimensions = new int[_dimensionsCount];
+    for (int i = 0; i < _dimensionsCount; i++) {
+      dimensions[i] = StarTreeV2Constant.STAR_NODE;
+    }
+    createAggregatedDocForAllNodesHelper(_rootNode, dimensions);
+  }
+
+  /**
+   * Helper function to create aggregated document for all nodes
+   * @param node 'TreeNode' to create aggregate documents for.
+   * @param dimension 'Array' int array for keeping dimensions value.
+   *
+   *
+   */
+  private void createAggregatedDocForAllNodesHelper(TreeNode node, int[] dimension) {
+    List<Object> aggregatedValues;
 
     if (node._children == null) {
-      List<Object> aggregatedValues = getAggregatedDocument(node._startDocId, node._endDocId);
-      node._aggDataDocumentId = appendAggregatedDocuments(aggregatedValues, node, parent);
-      return;
+      aggregatedValues = getAggregatedDocument(node._startDocId, node._endDocId);
+    } else {
+      int childDimensionId = node._childDimensionId;
+      Map<Integer, TreeNode> children = node._children;
+      for (int key : children.keySet()) {
+        int childDimensionValue = key;
+        TreeNode child = children.get(key);
+        dimension[childDimensionId] = childDimensionValue;
+        createAggregatedDocForAllNodesHelper(child, dimension);
+      }
+      dimension[childDimensionId] = StarTreeV2Constant.STAR_NODE;
+      aggregatedValues = calculateAggregatedDocumentFromChildren(node, dimension);
     }
-
-    Map<Integer, TreeNode> children = node._children;
-    for (int key : children.keySet()) {
-      TreeNode child = children.get(key);
-      createAggregatedDocForAllNodes(child, node);
-    }
-
-    node._aggDataDocumentId = calculateAggregatedDocumentFromChildren(node);
+    node._aggDataDocumentId = appendAggregatedDocument(aggregatedValues, dimension);
   }
 
   /**
@@ -406,24 +439,48 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
    *
    * @return aggregated document id.
    */
-  private Integer calculateAggregatedDocumentFromChildren(TreeNode parent) {
+  private List<Object> calculateAggregatedDocumentFromChildren(TreeNode parent, int[] dimension) {
     Map<Integer, TreeNode> children = parent._children;
-    List<Record> chilAggRecordsList = new ArrayList<>();
+    List<Record> childAggRecordsList = new ArrayList<>();
 
     for (int key : children.keySet()) {
       TreeNode child = children.get(key);
       child._dimensionValue = key;
       if (child._dimensionValue == StarTreeV2Constant.STAR_NODE) {
-        return child._aggDataDocumentId;
+        continue;
       } else {
-        chilAggRecordsList.add(_starTreeData.get(child._aggDataDocumentId));
+        childAggRecordsList.add(_starTreeData.get(child._aggDataDocumentId));
       }
     }
     List<Object> aggregatedValues =
-        aggregateMetrics(0, chilAggRecordsList.size(), chilAggRecordsList, _aggFunColumnPairs,
+        aggregateMetrics(0, childAggRecordsList.size(), childAggRecordsList, _aggFunColumnPairs,
             !StarTreeV2Constant.IS_RAW_DATA);
 
-    return appendAggregatedDocuments(aggregatedValues, parent, null);
+    return aggregatedValues;
+  }
+
+  /**
+   * Helper function to append a aggregated document to star tree data.
+   *
+   * @param aggregatedValues 'List' of all aggregated values
+   * @param dimension 'int[]' dimension value to be added.
+   *
+   * @return aggregated document id.
+   */
+  private int appendAggregatedDocument(List<Object> aggregatedValues, int[] dimension) {
+
+    int size = _starTreeData.size();
+    int[] d = new int[_dimensionsCount];
+    for (int i = 0; i < _dimensionsCount; i++) {
+      d[i] = dimension[i];
+    }
+
+    Record aggRecord = new Record();
+    aggRecord.setDimensionValues(d);
+    aggRecord.setAggregatedValues(aggregatedValues);
+    _starTreeData.add(aggRecord);
+
+    return size;
   }
 
   /**
@@ -436,36 +493,6 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
    */
   private List<Object> getAggregatedDocument(int startDocId, int endDocId) {
     return aggregateMetrics(startDocId, endDocId, _starTreeData, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
-  }
-
-  /**
-   * Helper function to append a aggregated document to star tree data.
-   *
-   * @param aggregatedValues 'List' of all aggregated values
-   * @param node 'TreeNode' currently in use.
-   *
-   * @return aggregated document id.
-   */
-  private int appendAggregatedDocuments(List<Object> aggregatedValues, TreeNode node, TreeNode parent) {
-    int size = _starTreeData.size();
-
-    Record aggRecord = new Record();
-    int[] dimensionsValue = new int[_dimensionsCount];
-    for (int i = 0; i < _dimensionsCount; i++) {
-      dimensionsValue[i] = StarTreeV2Constant.SKIP_VALUE;
-    }
-
-    if (node._dimensionValue == StarTreeV2Constant.STAR_NODE && parent._dimensionValue != StarTreeV2Constant.ROOT_NODE) {
-      dimensionsValue[parent._dimensionId] = parent._dimensionValue;
-    } else {
-      dimensionsValue[node._dimensionId] = node._dimensionValue;
-    }
-
-    aggRecord.setDimensionValues(dimensionsValue);
-    aggRecord.setAggregatedValues(aggregatedValues);
-    _starTreeData.add(aggRecord);
-
-    return size;
   }
 
   /**

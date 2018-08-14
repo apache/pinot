@@ -76,8 +76,8 @@ public class AggregationFunctionColumnPairBuffer {
   /**
    * NOTE: convert from byte to  objects array
    */
-  public static AggregationFunctionColumnPairBuffer fromBytes(byte[] bytes, List<AggregationFunction> aggFunColumnPairFunctions)
-      throws IOException {
+  public static AggregationFunctionColumnPairBuffer fromBytes(byte[] bytes,
+      List<AggregationFunction> aggFunColumnPairFunctions) throws IOException {
 
     int numMetrics = aggFunColumnPairFunctions.size();
     Object[] values = new Object[numMetrics];
@@ -134,7 +134,6 @@ public class AggregationFunctionColumnPairBuffer {
         if (factory.getResultDataType().equals(FieldSpec.DataType.BYTES)) {
           aggregatedByteSize += Integer.BYTES;
         }
-
       } catch (IOException e) {
         e.printStackTrace();
       }
