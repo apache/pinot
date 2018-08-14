@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.google.common.io.Files;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -27,6 +26,7 @@ import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.io.IOException;
@@ -39,17 +39,16 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDigest> {
+public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], QuantileDigest> {
 
   private File _indexDir;
   private int ROWS_COUNT = 1000;
   private final int _percentile = 90;
-  private final double VALUE_RANGE = Integer.MAX_VALUE;
-  private final double DELTA = 0.15 * VALUE_RANGE; // Allow 15% quantile error
 
   private StarTreeV2Config _starTreeV2Config;
-  private final String[] STAR_TREE_HARD_CODED_QUERIES =
-      new String[]{"SELECT PERCENTILEEST50(salary) FROM T WHERE Name = 'Rahul'"};
+  private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
+      "SELECT PERCENTILEEST50(salary) FROM T"
+  };
 
   @BeforeClass
   private void setUp() throws Exception {
@@ -67,7 +66,7 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDig
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
     AggregationFunctionColumnPair pair1 =
-        new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
+        new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILEEST, "salary");
     metric2aggFuncPairs1.add(pair1);
 
     _starTreeV2Config = new StarTreeV2Config();
@@ -99,20 +98,20 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDig
 
   @Test
   public void testQueries() throws Exception {
-//    onHeapSetUp();
-//    System.out.println("Testing On-Heap Version");
-//    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
-//      testQuery(s);
-//      System.out.println("Passed Query : " + s);
-//    }
-//    System.out.println();
-//
-//    offHeapSetUp();
-//    System.out.println("Testing Off-Heap Version");
-//    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
-//      testQuery(s);
-//      System.out.println("Passed Query : " + s);
-//    }
+    onHeapSetUp();
+    System.out.println("Testing On-Heap Version");
+    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
+      testQuery(s);
+      System.out.println("Passed Query : " + s);
+    }
+    System.out.println();
+
+    offHeapSetUp();
+    System.out.println("Testing Off-Heap Version");
+    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
+      testQuery(s);
+      System.out.println("Passed Query : " + s);
+    }
   }
 
   @Override
@@ -122,12 +121,12 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDig
     } else {
       Object val = dictionary.get(valueIterator.nextIntVal());
 
-      double d = ((Number) val).doubleValue();
-      TDigest tDigest = new TDigest(100);
-      tDigest.add(d);
+      long d = ((Number) val).longValue();
+      QuantileDigest qDigest = new QuantileDigest(0.05);
+      qDigest.add(d);
 
       try {
-        return ObjectCustomSerDe.serialize(tDigest);
+        return ObjectCustomSerDe.serialize(qDigest);
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -136,26 +135,24 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDig
   }
 
   @Override
-  protected TDigest aggregate(@Nonnull List<byte[]> values) {
-    TDigest tDigest = new TDigest(100);
+  protected QuantileDigest aggregate(@Nonnull List<byte[]> values) {
+    QuantileDigest qDigest = new QuantileDigest(0.05);
+
     for (byte[] obj : values) {
       try {
-        tDigest.add(ObjectCustomSerDe.deserialize(obj, ObjectType.TDigest));
+        qDigest.merge((QuantileDigest) ObjectCustomSerDe.deserialize(obj, ObjectType.QuantileDigest));
       } catch (IOException e) {
         e.printStackTrace();
       }
     }
-    return tDigest;
+    return qDigest;
   }
 
   @Override
-  protected void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
-    System.out.println("Star Tree Result Object Size: " + Integer.toString(starTreeResult.size()));
-    System.out.println("Star Tree Result Object Size: " + Integer.toString(nonStarTreeResult.size()));
+  protected void assertAggregatedValue(QuantileDigest starTreeResult, QuantileDigest nonStarTreeResult) {
+    System.out.println("Star-Tree Result Object Size: " + Long.toString(starTreeResult.getQuantile(_percentile / 100.0)));
+    System.out.println("Non Star-Tree Result Object Size: " + Long.toString(nonStarTreeResult.getQuantile(_percentile / 100.0)));
 
-    if ((nonStarTreeResult.size() != starTreeResult.size()) && (starTreeResult.size() != 1)) {
-      Assert.assertEquals(starTreeResult.quantile(_percentile / 100.0), nonStarTreeResult.quantile(_percentile / 100.0),
-          DELTA, "failed badly");
-    }
+    Assert.assertEquals(starTreeResult.getQuantile(_percentile / 100.0), nonStarTreeResult.getQuantile(_percentile / 100.0));
   }
 }

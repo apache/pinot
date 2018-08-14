@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
+import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.io.Files;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -28,6 +29,7 @@ import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,17 +41,15 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDigest> {
+public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<byte[], HyperLogLog> {
 
   private File _indexDir;
-  private int ROWS_COUNT = 260000;
-  private final int _percentile = 90;
-  private final double VALUE_RANGE = Integer.MAX_VALUE;
-  private final double DELTA = 0.15 * VALUE_RANGE; // Allow 15% quantile error
+  private int ROWS_COUNT = 10000;
 
   private StarTreeV2Config _starTreeV2Config;
-  private final String[] STAR_TREE_HARD_CODED_QUERIES =
-      new String[]{"SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"};
+  private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
+      "SELECT DISTINCTCOUNTHLL(salary) FROM T"
+  };
 
   @BeforeClass
   private void setUp() throws Exception {
@@ -67,7 +67,7 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
     AggregationFunctionColumnPair pair1 =
-        new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
+        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "salary");
     metric2aggFuncPairs1.add(pair1);
 
     _starTreeV2Config = new StarTreeV2Config();
@@ -121,13 +121,11 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
       return valueIterator.nextBytesVal();
     } else {
       Object val = dictionary.get(valueIterator.nextIntVal());
-
-      double d = ((Number) val).doubleValue();
-      TDigest tDigest = new TDigest(100);
-      tDigest.add(d);
+      HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      hyperLogLog.offer(val);
 
       try {
-        return ObjectCustomSerDe.serialize(tDigest);
+        return ObjectCustomSerDe.serialize(hyperLogLog);
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -136,26 +134,26 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
   }
 
   @Override
-  protected TDigest aggregate(@Nonnull List<byte[]> values) {
-    TDigest tDigest = new TDigest(100);
+  protected HyperLogLog aggregate(@Nonnull List<byte[]> values) {
+    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+
     for (byte[] obj : values) {
       try {
-        tDigest.add(ObjectCustomSerDe.deserialize(obj, ObjectType.TDigest));
+        hyperLogLog.merge((HyperLogLog) ObjectCustomSerDe.deserialize(obj, ObjectType.HyperLogLog));
       } catch (IOException e) {
+        e.printStackTrace();
+      } catch (CardinalityMergeException e) {
         e.printStackTrace();
       }
     }
-    return tDigest;
+    return hyperLogLog;
   }
 
   @Override
-  protected void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
-    System.out.println("Star-Tree Result Object Size: " + Integer.toString(starTreeResult.size()));
-    System.out.println("Non Star-Tree Result Object Size: " + Integer.toString(nonStarTreeResult.size()));
+  protected void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
+    System.out.println("Star-Tree Result Object Size: " + Long.toString(starTreeResult.cardinality()));
+    System.out.println("Non Star-Tree Result Object Size: " + Long.toString(nonStarTreeResult.cardinality()));
 
-    if ((nonStarTreeResult.size() != starTreeResult.size()) && (starTreeResult.size() != 1)) {
-      Assert.assertEquals(starTreeResult.quantile(_percentile / 100.0), nonStarTreeResult.quantile(_percentile / 100.0),
-          DELTA, "failed badly");
-    }
+    Assert.assertEquals(starTreeResult.cardinality() , nonStarTreeResult.cardinality());
   }
 }
