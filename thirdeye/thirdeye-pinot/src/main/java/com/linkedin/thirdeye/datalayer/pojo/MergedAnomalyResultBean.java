@@ -34,6 +34,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
 
   private String message;
 
+  private String metricUrn;
   private Long detectionConfigId;
   private Set<Long> childIds; // ids of the anomalies this anomaly merged from
   private boolean isChild;
@@ -214,9 +215,17 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.anomalyResultSource = anomalyResultSource;
   }
 
+  public String getMetricUrn() {
+    return metricUrn;
+  }
+
+  public void setMetricUrn(String metricUrn) {
+    this.metricUrn = metricUrn;
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToGlobal, avgBaselineVal, avgCurrentVal, anomalyResultSource, detectionConfigId, childIds, isChild);
+    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToGlobal, avgBaselineVal, avgCurrentVal, anomalyResultSource, metricUrn, detectionConfigId, childIds, isChild);
   }
 
   @Override
@@ -230,8 +239,9 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
         .equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions()) && Objects
         .equals(score, m.getScore()) && Objects.equals(avgBaselineVal, m.getAvgBaselineVal()) && Objects
         .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(impactToGlobal, m.getImpactToGlobal()) &&
-        Objects.equals(anomalyResultSource, m.getAnomalyResultSource()) && Objects.equals(detectionConfigId,
-        m.getDetectionConfigId()) && Objects.equals(childIds, m.getChildIds()) && Objects.equals(isChild, m.isChild());
+        Objects.equals(anomalyResultSource, m.getAnomalyResultSource()) && Objects.equals(metricUrn, m.getMetricUrn()) &&
+        Objects.equals(detectionConfigId, m.getDetectionConfigId()) && Objects.equals(childIds, m.getChildIds()) &&
+        Objects.equals(isChild, m.isChild());
   }
 
   @Override

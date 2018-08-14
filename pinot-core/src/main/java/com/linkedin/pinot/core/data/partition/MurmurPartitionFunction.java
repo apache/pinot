@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.data.partition;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.StringUtil;
 import org.apache.kafka.common.utils.Utils;
-import java.nio.charset.Charset;
 
 
 /**
@@ -32,7 +32,6 @@ import java.nio.charset.Charset;
  */
 public class MurmurPartitionFunction implements PartitionFunction {
   private static final String NAME = "Murmur";
-  private static final Charset UTF8_CHARSET = Charset.forName("UTF-8");
   private final int _numPartitions;
 
   /**
@@ -47,7 +46,7 @@ public class MurmurPartitionFunction implements PartitionFunction {
   @Override
   public int getPartition(Object valueIn) {
     String value = (valueIn instanceof String) ? (String) valueIn : valueIn.toString();
-    return (Utils.murmur2((value).getBytes(UTF8_CHARSET)) & 0x7fffffff) % _numPartitions;
+    return (Utils.murmur2(StringUtil.encodeUtf8(value)) & 0x7fffffff) % _numPartitions;
   }
 
   @Override

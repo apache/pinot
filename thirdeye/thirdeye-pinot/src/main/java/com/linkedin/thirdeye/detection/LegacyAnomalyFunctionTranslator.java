@@ -2,8 +2,10 @@ package com.linkedin.thirdeye.detection;
 
 import com.google.common.base.Strings;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
@@ -11,6 +13,8 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -18,7 +22,9 @@ import java.util.Map;
  */
 public class LegacyAnomalyFunctionTranslator {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final Logger LOGGER = LoggerFactory.getLogger(LegacyAnomalyFunctionTranslator.class);
   private DetectionConfigManager detectionConfigDAO;
+  private MetricConfigManager metricConfigDAO;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
 
   /**
@@ -26,6 +32,7 @@ public class LegacyAnomalyFunctionTranslator {
    */
   public LegacyAnomalyFunctionTranslator(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.detectionConfigDAO = DAO_REGISTRY.getDetectionConfigManager();
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
@@ -40,8 +47,14 @@ public class LegacyAnomalyFunctionTranslator {
         anomalyFunctionFactory.getClassNameForFunctionType(anomalyFunctionDTO.getType()));
 
     String filters = anomalyFunctionDTO.getFilters();
-    long metricId = anomalyFunctionDTO.getMetricId();
-    MetricEntity me = MetricEntity.fromMetric(1.0, metricId).withFilters(ThirdEyeUtils.getFilterSet(filters));
+    MetricConfigDTO metricDTO = this.metricConfigDAO.findByMetricAndDataset(anomalyFunctionDTO.getMetric(), anomalyFunctionDTO.getCollection());
+    if (metricDTO == null) {
+      LOGGER.error("Cannot find metric {} for anomaly function {}", anomalyFunctionDTO.getMetric(), anomalyFunctionDTO.getFunctionName());
+      return;
+    }
+    anomalyFunctionDTO.setMetricId(metricDTO.getId());
+
+    MetricEntity me = MetricEntity.fromMetric(1.0, metricDTO.getId()).withFilters(ThirdEyeUtils.getFilterSet(filters));
     String metricUrn = me.getUrn();
 
     Map<String, Object> legacyAnomalyFunctionProperties = new HashMap<>();
@@ -64,6 +77,7 @@ public class LegacyAnomalyFunctionTranslator {
     config.setName(anomalyFunctionDTO.getFunctionName());
     config.setCron(anomalyFunctionDTO.getCron());
     config.setProperties(properties);
+    config.setActive(true);
     this.detectionConfigDAO.save(config);
   }
 }

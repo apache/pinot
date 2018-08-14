@@ -709,7 +709,8 @@ public class PinotSegmentUploadRestletResource {
     if (!_controllerConf.getEnableStorageQuotaCheck()) {
       return StorageQuotaChecker.success("Quota check is disabled");
     }
-    TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
+    TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager,
+        _controllerMetrics, _pinotHelixResourceManager);
     StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader, _controllerMetrics, _pinotHelixResourceManager);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());
     return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName, metadata.getName(),

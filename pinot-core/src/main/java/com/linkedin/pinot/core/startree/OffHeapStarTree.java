@@ -18,12 +18,12 @@ package com.linkedin.pinot.core.startree;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -37,7 +37,6 @@ public class OffHeapStarTree implements StarTree {
   public static final long MAGIC_MARKER = 0xBADDA55B00DAD00DL;
   public static final int VERSION = 1;
 
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DIMENSION_NAME_MAX_LENGTH = 4096;
 
   private final PinotDataBuffer _dataBuffer;
@@ -86,7 +85,7 @@ public class OffHeapStarTree implements StarTree {
       _dataBuffer.copyTo(offset, dimensionNameBytes, 0, dimensionLength);
       offset += dimensionLength;
 
-      String dimensionName = new String(dimensionNameBytes, 0, dimensionLength, UTF_8);
+      String dimensionName = StringUtil.decodeUtf8(dimensionNameBytes, 0, dimensionLength);
       dimensionNames[dimensionId] = dimensionName;
     }
     _dimensionNames = Arrays.asList(dimensionNames);

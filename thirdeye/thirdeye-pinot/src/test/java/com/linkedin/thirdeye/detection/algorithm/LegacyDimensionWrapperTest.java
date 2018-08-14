@@ -7,13 +7,13 @@ import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.MockPipeline;
 import com.linkedin.thirdeye.detection.MockPipelineLoader;
 import com.linkedin.thirdeye.detection.MockPipelineOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +36,7 @@ public class LegacyDimensionWrapperTest {
 
   // prototyping
   private static final String PROP_NESTED = "nested";
-  private static final String PROP_NESTED_METRIC_URN = "nestedMetricUrn";
+  private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
   private static final String PROP_NESTED_METRIC_URN_KEY = "nestedMetricUrnKey";
   private static final String PROP_CLASS_NAME = "className";
 
@@ -44,7 +44,7 @@ public class LegacyDimensionWrapperTest {
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
   private static final String PROP_CLASS_NAME_VALUE = "MyClassName";
-  private static final String PROP_NESTED_METRIC_URN_VALUE = "thirdeye:metric:2";
+  private static final Collection<String> PROP_NESTED_METRIC_URN_VALUES = Collections.singleton("thirdeye:metric:2");
   private static final String PROP_NESTED_METRIC_URN_KEY_VALUE = "myMetricUrn";
   private static final String PROP_ANOMALY_FUNCTION_CLASS_NAME_VALUE =
       "com.linkedin.thirdeye.anomalydetection.function.MinMaxThresholdFunction";
@@ -84,7 +84,7 @@ public class LegacyDimensionWrapperTest {
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put(PROP_DIMENSIONS, Arrays.asList("b"));
     this.properties.put(PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_VALUE);
-    this.properties.put(PROP_NESTED_METRIC_URN, PROP_NESTED_METRIC_URN_VALUE);
+    this.properties.put(PROP_NESTED_METRIC_URNS, PROP_NESTED_METRIC_URN_VALUES);
     this.properties.put(PROP_NESTED, Collections.singletonList(this.nestedProperties));
     this.properties.put(PROP_LOOKBACK, 0);
     this.specs = new HashMap<>();
@@ -103,7 +103,8 @@ public class LegacyDimensionWrapperTest {
 
   @Test
   public void testRun() throws Exception {
-    DetectionPipelineResult result = this.dimensionWrapper.run();
+    this.dimensionWrapper.run();
+
     Assert.assertEquals(this.runs.size(), 6);
     Assert.assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:2:a%3D1:b%3D1"));
     Assert.assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:a%3D1:b%3D2"));

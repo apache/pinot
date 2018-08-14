@@ -16,13 +16,10 @@
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
 import com.linkedin.pinot.core.segment.index.readers.BaseDictionary;
-import java.nio.charset.Charset;
 import javax.annotation.Nonnull;
 
 
 public abstract class MutableDictionary extends BaseDictionary {
-  protected static final Charset UTF_8 = Charset.forName("UTF-8");
-
   @Override
   public String getStringValue(int dictId) {
     return get(dictId).toString();

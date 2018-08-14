@@ -18,7 +18,10 @@ package com.linkedin.pinot.controller.api.resources;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.metrics.ControllerGauge;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -26,6 +29,7 @@ import com.linkedin.pinot.controller.util.TableSizeReader;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -56,7 +60,7 @@ public class TableSizeReaderTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableSizeReaderTest.class);
   private final Executor executor = Executors.newFixedThreadPool(1);
   private final HttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-
+  private final ControllerMetrics _controllerMetrics = new ControllerMetrics(new MetricsRegistry());
   private PinotHelixResourceManager helix;
   private Map<String, FakeSizeServer> serverMap = new HashMap<>();
   private final String URI_PATH = "/table/";
@@ -86,7 +90,7 @@ public class TableSizeReaderTest {
 
     int counter = 0;
     // server0
-    FakeSizeServer s = new FakeSizeServer(Arrays.asList("s1","s2", "s3"));
+    FakeSizeServer s = new FakeSizeServer(Arrays.asList("s2", "s3", "s6"));
     s.start(URI_PATH, createHandler(200, s.sizes, 0));
     serverMap.put(serverName(counter), s);
     ++counter;
@@ -116,7 +120,7 @@ public class TableSizeReaderTest {
     ++counter;
 
     // server5 ... timing out server
-    s = new FakeSizeServer(Arrays.asList("s3","s5"));
+    s = new FakeSizeServer(Arrays.asList("s1", "s3"));
     s.start(URI_PATH, createHandler(200, s.sizes, timeoutMsec * 100));
     serverMap.put(serverName(counter), s);
     ++counter;
@@ -219,7 +223,8 @@ public class TableSizeReaderTest {
 
   @Test
   public void testNoSuchTable() throws InvalidConfigException {
-    TableSizeReader reader = new TableSizeReader(executor, connectionManager, helix);
+    TableSizeReader reader = new TableSizeReader(executor, connectionManager,
+        _controllerMetrics, helix);
     Assert.assertNull(reader.getTableSizeDetails("mytable", 5000));
   }
 
@@ -243,7 +248,8 @@ public class TableSizeReaderTest {
           }
         });
 
-    TableSizeReader reader = new TableSizeReader(executor, connectionManager, helix);
+    TableSizeReader reader = new TableSizeReader(executor, connectionManager,
+        _controllerMetrics, helix);
     return reader.getTableSizeDetails(table, timeoutMsec);
   }
 
@@ -297,20 +303,22 @@ public class TableSizeReaderTest {
             expectedServers.size() * expectedSegmentSize);
       } else {
         Assert.assertEquals(segmentDetails.reportedSizeInBytes, -1);
-        Assert.assertTrue(segmentDetails.estimatedSizeInBytes > 0);
+        Assert.assertEquals(segmentDetails.estimatedSizeInBytes, -1);
       }
     }
     Assert.assertEquals(tableSize.reportedSizeInBytes, reportedSize);
     Assert.assertEquals(tableSize.estimatedSizeInBytes, estimatedSize);
     if (hasErrors) {
       Assert.assertTrue(tableSize.reportedSizeInBytes != tableSize.estimatedSizeInBytes);
+      Assert.assertTrue(tableSize.missingSegments > 0);
     }
   }
 
   @Test
   public void testGetTableSubTypeSizeAllSuccess() throws InvalidConfigException {
     final String[] servers = { "server0", "server1"};
-    TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "offline");
+    String table = "offline";
+    TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
     Assert.assertNotNull(offlineSizes);
     Assert.assertEquals(offlineSizes.segments.size(), 4);
@@ -319,17 +327,41 @@ public class TableSizeReaderTest {
     Assert.assertNull(tableSizeDetails.realtimeSegments);
     Assert.assertEquals(tableSizeDetails.reportedSizeInBytes, offlineSizes.reportedSizeInBytes);
     Assert.assertEquals(tableSizeDetails.estimatedSizeInBytes, offlineSizes.estimatedSizeInBytes);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 0);
+  }
+
+  @Test
+  public void testGetTableSubTypeSizeAllErrors() throws InvalidConfigException {
+    final String[] servers = { "server2", "server5"};
+    String table = "offline";
+    TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, table);
+    TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
+    Assert.assertNotNull(offlineSizes);
+    Assert.assertEquals(offlineSizes.missingSegments, 3);
+    Assert.assertEquals(offlineSizes.segments.size(), 3);
+    Assert.assertEquals(offlineSizes.reportedSizeInBytes, -1);
+    Assert.assertEquals(tableSizeDetails.estimatedSizeInBytes, -1);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 100);
   }
 
   @Test
   public void testGetTableSubTypeSizesWithErrors() throws InvalidConfigException {
     final String[] servers = { "server0", "server1", "server2", "server5"};
+    String table = "offline";
     TableSizeReader.TableSizeDetails tableSizeDetails = testRunner(servers, "offline");
     TableSizeReader.TableSubTypeSizeDetails offlineSizes = tableSizeDetails.offlineSegments;
     Assert.assertEquals(offlineSizes.segments.size(), 5);
+    Assert.assertEquals(offlineSizes.missingSegments, 1);
     Assert.assertTrue(offlineSizes.reportedSizeInBytes != offlineSizes.estimatedSizeInBytes);
     validateTableSubTypeSize(servers, offlineSizes);
     Assert.assertNull(tableSizeDetails.realtimeSegments);
+    String tableNameWithType = TableNameBuilder.OFFLINE.tableNameWithType(table);
+    Assert.assertEquals(_controllerMetrics.getValueOfTableGauge(tableNameWithType,
+        ControllerGauge.TABLE_STORAGE_EST_MISSING_SEGMENT_PERCENT), 20);
   }
 
   @Test

@@ -169,6 +169,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new RootCauseMetricResource(Executors.newCachedThreadPool(), aggregationLoader, timeSeriesLoader, DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+    env.getObjectMapper().registerModule(makeMapperModule());
 
     /*
       Adding DetectionJobResource in Dashboard to allow replay/autotune from ui.

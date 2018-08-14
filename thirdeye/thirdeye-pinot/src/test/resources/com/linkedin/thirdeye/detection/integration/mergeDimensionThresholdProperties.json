@@ -6,7 +6,7 @@
     {
       "className": "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper",
       "metricUrn": "thirdeye:metric:1:a%3D1:a%3D2",
-      "nestedMetricUrn": "thirdeye:metric:2",
+      "nestedMetricUrns": [ "thirdeye:metric:2" ],
       "dimensions": ["a", "b"],
       "minValue": 10,
       "lookback": 0,
