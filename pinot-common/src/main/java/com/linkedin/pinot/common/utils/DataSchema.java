@@ -21,7 +21,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 
@@ -30,7 +29,6 @@ import javax.annotation.Nonnull;
  * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
  */
 public class DataSchema {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private String[] _columnNames;
   private ColumnDataType[] _columnDataTypes;
@@ -121,7 +119,7 @@ public class DataSchema {
 
     // Write the column names.
     for (String columnName : _columnNames) {
-      byte[] bytes = columnName.getBytes(UTF_8);
+      byte[] bytes = StringUtil.encodeUtf8(columnName);
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
     }
@@ -130,7 +128,7 @@ public class DataSchema {
     for (ColumnDataType columnDataType : _columnDataTypes) {
       // We don't want to use ordinal of the enum since adding a new data type will break things if server and broker
       // use different versions of DataType class.
-      byte[] bytes = columnDataType.name().getBytes(UTF_8);
+      byte[] bytes = StringUtil.encodeUtf8(columnDataType.name());
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
     }
@@ -154,7 +152,7 @@ public class DataSchema {
       byte[] bytes = new byte[length];
       readLength = dataInputStream.read(bytes);
       assert readLength == length;
-      columnNames[i] = new String(bytes, UTF_8);
+      columnNames[i] = StringUtil.decodeUtf8(bytes);
     }
 
     // Read the column types.
@@ -163,7 +161,7 @@ public class DataSchema {
       byte[] bytes = new byte[length];
       readLength = dataInputStream.read(bytes);
       assert readLength == length;
-      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
+      columnDataTypes[i] = ColumnDataType.valueOf(StringUtil.decodeUtf8(bytes));
     }
 
     return new DataSchema(columnNames, columnDataTypes);

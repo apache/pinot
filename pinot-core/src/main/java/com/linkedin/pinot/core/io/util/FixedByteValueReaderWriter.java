@@ -15,14 +15,13 @@
  */
 package com.linkedin.pinot.core.io.util;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.charset.Charset;
 
 
 public final class FixedByteValueReaderWriter implements Closeable {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private final PinotDataBuffer _dataBuffer;
 
@@ -51,11 +50,11 @@ public final class FixedByteValueReaderWriter implements Closeable {
     for (int i = 0; i < numBytesPerValue; i++) {
       byte currentByte = _dataBuffer.getByte(startOffset + i);
       if (currentByte == paddingByte) {
-        return new String(buffer, 0, i, UTF_8);
+        return StringUtil.decodeUtf8(buffer, 0, i);
       }
       buffer[i] = currentByte;
     }
-    return new String(buffer, UTF_8);
+    return StringUtil.decodeUtf8(buffer);
   }
 
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
@@ -63,7 +62,7 @@ public final class FixedByteValueReaderWriter implements Closeable {
     for (int i = 0; i < numBytesPerValue; i++) {
       buffer[i] = _dataBuffer.getByte(startOffset + i);
     }
-    return new String(buffer, UTF_8);
+    return StringUtil.decodeUtf8(buffer);
   }
 
   public byte[] getBytes(int index, int numBytesPerValue, byte[] output) {

@@ -17,6 +17,7 @@ package com.linkedin.pinot.tools.segment.converter;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
@@ -31,7 +32,6 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.nio.charset.Charset;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -50,7 +50,6 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
 public class DictionaryToRawIndexConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryToRawIndexConverter.class);
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   @Option(name = "-dataDir", required = true, usage = "Directory containing uncompressed segments")
   private String _dataDir = null;
@@ -353,7 +352,7 @@ public class DictionaryToRawIndexConverter {
     while (bvIter.hasNext()) {
       int dictId = bvIter.nextIntVal();
       String value = (String) dictionary.get(dictId);
-      lengthOfLongestEntry = Math.max(lengthOfLongestEntry, value.getBytes(UTF_8).length);
+      lengthOfLongestEntry = Math.max(lengthOfLongestEntry, StringUtil.encodeUtf8(value).length);
     }
 
     return lengthOfLongestEntry;

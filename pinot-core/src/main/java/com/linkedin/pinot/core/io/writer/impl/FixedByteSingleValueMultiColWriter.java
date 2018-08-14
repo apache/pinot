@@ -15,13 +15,11 @@
  */
 package com.linkedin.pinot.core.io.writer.impl;
 
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class FixedByteSingleValueMultiColWriter {
@@ -95,7 +93,7 @@ public class FixedByteSingleValueMultiColWriter {
   }
 
   public void setString(int row, int col, String string) {
-    setBytes(row, col, string.getBytes(Charset.forName("UTF-8")));
+    setBytes(row, col, StringUtil.encodeUtf8(string));
   }
 
   public void setBytes(int row, int col, byte[] bytes) {

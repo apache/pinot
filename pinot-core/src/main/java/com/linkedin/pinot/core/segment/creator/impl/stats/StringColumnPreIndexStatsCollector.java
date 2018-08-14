@@ -15,17 +15,15 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import java.nio.charset.Charset;
 import java.util.Arrays;
-
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private String min = V1Constants.Str.NULL_STRING;
   private String max = V1Constants.Str.NULL_STRING;
@@ -59,7 +57,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         String value = e.toString();
         set.add(value);
 
-        int valueLength = value.getBytes(UTF_8).length;
+        int valueLength = StringUtil.encodeUtf8(value).length;
         smallestStringLength = Math.min(smallestStringLength, valueLength);
         longestStringLength = Math.max(longestStringLength, valueLength);
       }
@@ -79,7 +77,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       updatePartition(value);
       set.add(value);
 
-      int valueLength = value.getBytes(UTF_8).length;
+      int valueLength = StringUtil.encodeUtf8(value).length;
       smallestStringLength = Math.min(smallestStringLength, valueLength);
       longestStringLength = Math.max(longestStringLength, valueLength);
       totalNumberOfEntries++;

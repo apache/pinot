@@ -17,12 +17,9 @@ package com.linkedin.pinot.core.startree.hll;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.google.common.collect.ImmutableBiMap;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.startree.hll.HllSizeUtils;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,10 +28,6 @@ import java.util.List;
  * Utility functions for manipulation of hll field.
  */
 public class HllUtil {
-
-  private static final ImmutableBiMap<Integer, Integer> LOG2M_TO_SIZE_IN_BYTES = HllSizeUtils.getLog2mToSizeInBytes();
-
-  private static final Charset charset = Charset.forName("UTF-8");
 
   /**
    * To display a row with hll fields properly,

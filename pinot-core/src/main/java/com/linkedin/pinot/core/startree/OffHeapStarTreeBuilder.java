@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -35,7 +36,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -95,7 +95,6 @@ import org.slf4j.LoggerFactory;
  */
 public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapStarTreeBuilder.class);
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   // If the temporary buffer needed is larger than 500M, use MMAP, otherwise use DIRECT
   private static final long MMAP_SIZE_THRESHOLD = 500_000_000;
@@ -845,7 +844,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     for (String dimension : _dimensionNames) {
       headerSizeInBytes += Integer.BYTES; // For dimension index
       headerSizeInBytes += Integer.BYTES; // For length of dimension name
-      headerSizeInBytes += dimension.getBytes(UTF_8).length; // For dimension name
+      headerSizeInBytes += StringUtil.encodeUtf8(dimension).length; // For dimension name
     }
 
     headerSizeInBytes += Integer.BYTES; // For number of nodes.
@@ -876,7 +875,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       dataBuffer.putInt(offset, i);
       offset += Integer.BYTES;
 
-      byte[] dimensionBytes = dimensionName.getBytes(UTF_8);
+      byte[] dimensionBytes = StringUtil.encodeUtf8(dimensionName);
       int dimensionLength = dimensionBytes.length;
       dataBuffer.putInt(offset, dimensionLength);
       offset += Integer.BYTES;

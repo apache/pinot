@@ -16,17 +16,16 @@
 package com.linkedin.pinot.core.segment.index.readers;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 
 
 @SuppressWarnings("Duplicates")
 public abstract class ImmutableDictionaryReader extends BaseDictionary {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private final FixedByteValueReaderWriter _valueReader;
   private final int _length;
@@ -191,7 +190,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
   }
 
   protected String padString(String value) {
-    byte[] valueBytes = value.getBytes(UTF_8);
+    byte[] valueBytes = StringUtil.encodeUtf8(value);
     int length = valueBytes.length;
     String paddedValue;
     if (length >= _numBytesPerValue) {
@@ -200,7 +199,7 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
       byte[] paddedValueBytes = new byte[_numBytesPerValue];
       System.arraycopy(valueBytes, 0, paddedValueBytes, 0, length);
       Arrays.fill(paddedValueBytes, length, _numBytesPerValue, _paddingByte);
-      paddedValue = new String(paddedValueBytes, UTF_8);
+      paddedValue = StringUtil.decodeUtf8(paddedValueBytes);
     }
     return paddedValue;
   }
