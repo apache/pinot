@@ -22,7 +22,6 @@ import java.io.IOException;
 
 
 public final class FixedByteValueReaderWriter implements Closeable {
-
   private final PinotDataBuffer _dataBuffer;
 
   public FixedByteValueReaderWriter(PinotDataBuffer dataBuffer) {

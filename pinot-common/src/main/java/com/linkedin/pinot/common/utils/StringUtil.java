@@ -22,7 +22,7 @@ import org.apache.commons.lang.StringUtils;
 
 public class StringUtil {
   private static final char NULL_CHARACTER = '\0';
-  private static String charSet = "UTF-8";
+  private static final String charSet = "UTF-8";
 
   /**
    * Joins the given keys with the separator.

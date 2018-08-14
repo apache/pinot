@@ -20,7 +20,6 @@ import javax.annotation.Nonnull;
 
 
 public abstract class MutableDictionary extends BaseDictionary {
-
   @Override
   public String getStringValue(int dictId) {
     return get(dictId).toString();

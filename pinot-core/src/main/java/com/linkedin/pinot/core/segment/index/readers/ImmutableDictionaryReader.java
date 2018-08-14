@@ -26,7 +26,6 @@ import java.util.Arrays;
 
 @SuppressWarnings("Duplicates")
 public abstract class ImmutableDictionaryReader extends BaseDictionary {
-
   private final FixedByteValueReaderWriter _valueReader;
   private final int _length;
   private final int _numBytesPerValue;

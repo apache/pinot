@@ -29,7 +29,6 @@ import javax.annotation.Nonnull;
  * The <code>DataSchema</code> class describes the schema of {@link DataTable}.
  */
 public class DataSchema {
-
   private String[] _columnNames;
   private ColumnDataType[] _columnDataTypes;
 

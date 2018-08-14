@@ -28,7 +28,6 @@ import java.util.List;
  * Utility functions for manipulation of hll field.
  */
 public class HllUtil {
-
   /**
    * To display a row with hll fields properly,
    * instead of directly invoking {@link GenericRow#toString()},

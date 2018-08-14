@@ -24,7 +24,6 @@ import javax.annotation.Nonnull;
 
 
 public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
-
   private final MutableOffHeapByteArrayStore _byteStore;
   private String _min = null;
   private String _max = null;
