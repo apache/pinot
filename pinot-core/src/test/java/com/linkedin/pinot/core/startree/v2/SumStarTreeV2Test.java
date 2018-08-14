@@ -96,13 +96,6 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
   @Test
   public void testQueries() throws Exception {
-    offHeapSetUp();
-    System.out.println("Testing Off-Heap Version");
-    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
-      testQuery(s);
-      System.out.println("Passed Query : " + s);
-    }
-
     onHeapSetUp();
     System.out.println("Testing On-Heap Version");
     for (String s : STAR_TREE_HARD_CODED_QUERIES) {
@@ -110,6 +103,13 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
       System.out.println("Passed Query : " + s);
     }
     System.out.println();
+
+    offHeapSetUp();
+    System.out.println("Testing Off-Heap Version");
+    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
+      testQuery(s);
+      System.out.println("Passed Query : " + s);
+    }
   }
 
   @Override

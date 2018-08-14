@@ -64,11 +64,11 @@ public class StarTreeV2SegmentHelper {
     return schema;
   }
 
-  public static List<GenericRow> createSegmentData(Schema schema, int rowCount) throws Exception {
+  public static List<GenericRow> createSegmentSmallData(Schema schema, int rowsCount) throws Exception {
 
     int index;
-    List<GenericRow> rows = new ArrayList<>(rowCount);
-    for (int rowId = 0; rowId < rowCount; rowId++) {
+    List<GenericRow> rows = new ArrayList<>(rowsCount);
+    for (int rowId = 0; rowId < rowsCount; rowId++) {
       HashMap<String, Object> map = new HashMap<>();
 
       // Dim columns.
@@ -94,6 +94,31 @@ public class StarTreeV2SegmentHelper {
       for (int i = 0; i < 1; i++) {
         String metName = schema.getMetricFieldSpecs().get(i).getName();
         map.put(metName, metricValues[RANDOM.nextInt(6)]);
+      }
+
+      GenericRow genericRow = new GenericRow();
+      genericRow.init(map);
+      rows.add(genericRow);
+    }
+
+    return rows;
+  }
+
+  public static List<GenericRow> createSegmentData(Schema schema, int rowsCount) throws Exception {
+    List<GenericRow> rows = new ArrayList<>(rowsCount);
+    for (int rowId = 0; rowId < rowsCount; rowId++) {
+      HashMap<String, Object> map = new HashMap<>();
+
+      // Dim columns.
+      for (int i = 0; i < 3; i++) {
+        String dimName = schema.getDimensionFieldSpecs().get(i).getName();
+        map.put(dimName, dimName + "-v" + RANDOM.nextInt(100));
+      }
+
+      // Metric columns.
+      for (int i = 0; i < 1; i++) {
+        String metName = schema.getMetricFieldSpecs().get(i).getName();
+        map.put(metName, RANDOM.nextInt(10000));
       }
 
       GenericRow genericRow = new GenericRow();

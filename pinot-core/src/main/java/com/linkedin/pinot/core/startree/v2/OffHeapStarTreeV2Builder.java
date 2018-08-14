@@ -662,6 +662,9 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     AggregationFunctionColumnPairBuffer aggregatedMetrics = null;
 
     int index = 0;
+    boolean hasStarChild = false;
+    int starChildAggDocId = StarTreeV2Constant.STAR_NODE;
+
     int[] sortedDocIds = new int[node._endDocId - node._startDocId];
     for (int i = node._startDocId; i < node._endDocId; i++) {
       sortedDocIds[index] = i;
@@ -669,7 +672,6 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     }
 
     if (node._children == null) {
-
       Iterator<Pair<byte[], byte[]>> iterator =
           dataTable.iterator(node._startDocId, node._endDocId, _docSizeIndex, sortedDocIds);
       Pair<byte[], byte[]> first = iterator.next();
@@ -696,12 +698,21 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
           } else {
             aggregatedMetrics.aggregate(childAggregatedMetrics);
           }
+        } else {
+          hasStarChild = true;
+          starChildAggDocId = entry.getValue()._aggDataDocumentId;
         }
       }
       dimensions.setDictId(childDimensionId, StarTreeV2Constant.STAR_NODE);
     }
-    appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
-    _docSizeIndex.add(_fileSize);
+
+    if (hasStarChild) {
+      node._aggDataDocumentId = starChildAggDocId;
+    } else {
+      appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
+      _docSizeIndex.add(_fileSize);
+    }
+
     return aggregatedMetrics;
   }
 

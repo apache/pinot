@@ -42,7 +42,7 @@ import org.testng.annotations.Test;
 public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], TDigest> {
 
   private File _indexDir;
-  private int ROWS_COUNT = 1000;
+  private int ROWS_COUNT = 260000;
   private final int _percentile = 90;
   private final double VALUE_RANGE = Integer.MAX_VALUE;
   private final double DELTA = 0.15 * VALUE_RANGE; // Allow 15% quantile error
@@ -60,8 +60,6 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
     List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
 
-    // List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentLargeData(schema);
-
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
     File filepath = new File(_indexDir, "v3");
@@ -69,7 +67,7 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
     AggregationFunctionColumnPair pair1 =
-        new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILEEST, "salary");
+        new AggregationFunctionColumnPair(AggregationFunctionType.PERCENTILETDIGEST, "salary");
     metric2aggFuncPairs1.add(pair1);
 
     _starTreeV2Config = new StarTreeV2Config();
