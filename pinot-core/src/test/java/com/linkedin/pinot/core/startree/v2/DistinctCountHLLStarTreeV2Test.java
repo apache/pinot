@@ -15,17 +15,23 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.io.Files;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
+import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -35,18 +41,14 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
+public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<byte[], HyperLogLog> {
 
   private File _indexDir;
+  private int ROWS_COUNT = 10000;
+
   private StarTreeV2Config _starTreeV2Config;
-
-  private int ROWS_COUNT = 26000;
-
-  private final String[] STAR_TREE_HARD_CODED_QUERIES =
-      new String[]{
-          "SELECT SUM(salary) FROM T",
-          "SELECT SUM(salary) FROM T GROUP BY Name",
-          "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"
+  private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
+      "SELECT DISTINCTCOUNTHLL(salary) FROM T"
   };
 
   @BeforeClass
@@ -64,7 +66,8 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
-    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "salary");
+    AggregationFunctionColumnPair pair1 =
+        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "salary");
     metric2aggFuncPairs1.add(pair1);
 
     _starTreeV2Config = new StarTreeV2Config();
@@ -113,25 +116,44 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   }
 
   @Override
-  protected Double getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
+  protected byte[] getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
     if (dictionary == null) {
-      return valueIterator.nextDoubleVal();
+      return valueIterator.nextBytesVal();
     } else {
-      return dictionary.getDoubleValue(valueIterator.nextIntVal());
+      Object val = dictionary.get(valueIterator.nextIntVal());
+      HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      hyperLogLog.offer(val);
+
+      try {
+        return ObjectCustomSerDe.serialize(hyperLogLog);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
+    return null;
   }
 
   @Override
-  protected Double aggregate(@Nonnull List<Double> values) {
-    double sumVal = 0;
-    for (Double value : values) {
-      sumVal += value;
+  protected HyperLogLog aggregate(@Nonnull List<byte[]> values) {
+    HyperLogLog hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+
+    for (byte[] obj : values) {
+      try {
+        hyperLogLog.merge((HyperLogLog) ObjectCustomSerDe.deserialize(obj, ObjectType.HyperLogLog));
+      } catch (IOException e) {
+        e.printStackTrace();
+      } catch (CardinalityMergeException e) {
+        e.printStackTrace();
+      }
     }
-    return sumVal;
+    return hyperLogLog;
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  protected void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
+    System.out.println("Star-Tree Result Object Size: " + Long.toString(starTreeResult.cardinality()));
+    System.out.println("Non Star-Tree Result Object Size: " + Long.toString(nonStarTreeResult.cardinality()));
+
+    Assert.assertEquals(starTreeResult.cardinality() , nonStarTreeResult.cardinality());
   }
 }

@@ -72,7 +72,7 @@ public class PinotSegmentUtil {
     return value1Set.containsAll(value2Set);
   }
 
-  static File createSegment(Schema schema, String segmentName, String segmentOutputDir, RecordReader recordReader)
+  public static File createSegment(Schema schema, String segmentName, String segmentOutputDir, RecordReader recordReader)
       throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
     segmentGeneratorConfig.setTableName(segmentName);

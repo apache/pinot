@@ -31,25 +31,21 @@ import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
+public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
 
   private File _indexDir;
   private StarTreeV2Config _starTreeV2Config;
 
   private int ROWS_COUNT = 26000;
 
-  private final String[] STAR_TREE_HARD_CODED_QUERIES =
+  private final String[] STAR_TREE1_HARD_CODED_QUERIES =
       new String[]{
-          "SELECT SUM(salary) FROM T",
-          "SELECT SUM(salary) FROM T GROUP BY Name",
-          "SELECT SUM(salary) FROM T WHERE Name = 'Rahul'"
-  };
+          "SELECT COUNT(*) FROM T WHERE Name = 'Rahul'",
+          "SELECT COUNT(*) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"};
 
-  @BeforeClass
   private void setUp() throws Exception {
 
     String segmentName = "starTreeV2BuilderTest";
@@ -64,7 +60,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     List<AggregationFunctionColumnPair> metric2aggFuncPairs1 = new ArrayList<>();
 
-    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.SUM, "salary");
+    AggregationFunctionColumnPair pair1 = new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, "*");
     metric2aggFuncPairs1.add(pair1);
 
     _starTreeV2Config = new StarTreeV2Config();
@@ -98,7 +94,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   public void testQueries() throws Exception {
     onHeapSetUp();
     System.out.println("Testing On-Heap Version");
-    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
+    for (String s : STAR_TREE1_HARD_CODED_QUERIES) {
       testQuery(s);
       System.out.println("Passed Query : " + s);
     }
@@ -106,32 +102,32 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     offHeapSetUp();
     System.out.println("Testing Off-Heap Version");
-    for (String s : STAR_TREE_HARD_CODED_QUERIES) {
+    for (String s : STAR_TREE1_HARD_CODED_QUERIES) {
       testQuery(s);
       System.out.println("Passed Query : " + s);
     }
   }
 
   @Override
-  protected Double getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
+  protected Long getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
     if (dictionary == null) {
-      return valueIterator.nextDoubleVal();
+      return valueIterator.nextLongVal();
     } else {
-      return dictionary.getDoubleValue(valueIterator.nextIntVal());
+      return dictionary.getLongValue(valueIterator.nextIntVal());
     }
   }
 
   @Override
-  protected Double aggregate(@Nonnull List<Double> values) {
-    double sumVal = 0;
-    for (Double value : values) {
-      sumVal += value;
+  protected Long aggregate(@Nonnull List<Long> values) {
+    long countVal = 0;
+    for (Long value : values) {
+      countVal = countVal + value;
     }
-    return sumVal;
+    return countVal;
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
+  protected void assertAggregatedValue(Long starTreeResult, Long nonStarTreeResult) {
     Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
   }
 }

@@ -41,11 +41,18 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   }
 
   @Override
+  public void index(int docId, byte [] valueToIndex) {
+    _indexWriter.setBytes(docId, valueToIndex);
+  }
+
+  @Override
   public void index(int docId, Object valueToIndex) {
     if (valueToIndex instanceof String) {
       _indexWriter.setString(docId, (String) valueToIndex);
     } else if (valueToIndex instanceof ByteArray) {
       _indexWriter.setBytes(docId, ((ByteArray) valueToIndex).getBytes());
+    } else if (valueToIndex instanceof byte[]) {
+      _indexWriter.setBytes(docId, (byte []) valueToIndex);
     } else {
       throw new IllegalArgumentException(
           "Illegal data type for variable length indexing: " + valueToIndex.getClass().getName());
