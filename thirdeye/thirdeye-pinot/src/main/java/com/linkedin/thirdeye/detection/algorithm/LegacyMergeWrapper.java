@@ -195,8 +195,7 @@ public class LegacyMergeWrapper extends DetectionPipeline {
 
         String filters = anomalyFunctionSpec.getFilters();
         MetricEntity me = MetricEntity.fromMetric(1.0, anomalyFunctionSpec.getMetricId()).withFilters(ThirdEyeUtils.getFilterSet(filters));
-        String metricUrn = me.getUrn();
-        mergedAnomalyResult.setMetricUrn(metricUrn);
+        mergedAnomalyResult.setMetricUrn(me.getUrn());
         MetricTimeSeries metricTimeSeries = getMetricTimeSeries(entry.getKey());
 
         try {
