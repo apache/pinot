@@ -49,10 +49,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String COL_VIOLATION = "violation";
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_OUTLIER = "outlier";
+  private static final String COL_COMPUTED_OUTLIER = "computedOutlier";
   private static final String COL_TIME = DataFrameUtils.COL_TIME;
   private static final String COL_VALUE = DataFrameUtils.COL_VALUE;
   private static final String COL_COMPUTED_VALUE = "computedValue";
   private static final String COL_WINDOW_SIZE = "windowSize";
+  private static final String COL_BASELINE = "baseline";
 
   private static final String COL_WEIGHT = "weight";
   private static final String COL_WEIGHTED_VALUE = "weightedValue";
@@ -146,6 +148,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     TreeSet<Long> changePoints = getChangePoints(dfInput, this.effectiveStartTime, existingAnomalies);
 
     // write-through arrays
+    dfInput.addSeries(COL_BASELINE, DoubleSeries.nulls(dfInput.size()));
     dfInput.addSeries(COL_MEAN, DoubleSeries.nulls(dfInput.size()));
     dfInput.addSeries(COL_STD, DoubleSeries.nulls(dfInput.size()));
     dfInput.addSeries(COL_ZSCORE, DoubleSeries.nulls(dfInput.size()));
@@ -164,7 +167,25 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     long[] sTimestamp = dfInput.getLongs(COL_TIME).values();
     double[] sComputed = dfInput.getDoubles(COL_COMPUTED_VALUE).values();
     for (int i = 0; i < sTimestamp.length && sTimestamp[i] < this.effectiveStartTime; i++) {
-      sComputed[i] = this.makeValue(dfInput, sTimestamp[i], changePoints);
+      double baseline = 0;
+      if (this.baselineWeeks > 0) {
+        baseline = this.makeBaseline(dfInput, sTimestamp[i], changePoints);
+      }
+      sComputed[i] = dfInput.getDouble(COL_VALUE, i) - baseline;
+    }
+
+    // estimate pre-computed outliers (non-anomaly outliers)
+    // NOTE: https://en.m.wikipedia.org/wiki/Median_absolute_deviation
+    DataFrame dfPrefix = dfInput.filter(dfInput.getLongs(COL_TIME).lt(this.effectiveStartTime)).dropNull(COL_TIME, COL_COMPUTED_VALUE);
+    DoubleSeries prefix = dfPrefix.getDoubles(COL_COMPUTED_VALUE);
+    DoubleSeries mad = prefix.subtract(prefix.median()).abs().median();
+    if (!mad.isNull(0) && mad.getDouble(0) > 0.0) {
+      double std = 1.4826 * mad.doubleValue();
+      double mean = AlgorithmUtils.robustMean(prefix, prefix.size()).getDouble(prefix.size() - 1);
+      dfPrefix.addSeries(COL_COMPUTED_OUTLIER, prefix.subtract(mean).divide(std).abs().gt(this.zscoreOutlier));
+
+      dfInput.addSeries(dfPrefix, COL_COMPUTED_OUTLIER);
+      dfInput.mapInPlace(BooleanSeries.HAS_TRUE, COL_OUTLIER, COL_OUTLIER, COL_COMPUTED_OUTLIER);
     }
 
     // generate detection time series
@@ -192,6 +213,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private Result run(DataFrame df, long start, TreeSet<Long> changePoints) throws Exception {
 
     // write-through arrays
+    double[] sBaseline = df.getDoubles(COL_BASELINE).values();
     double[] sMean = df.getDoubles(COL_MEAN).values();
     double[] sStd = df.getDoubles(COL_STD).values();
     double[] sZscore = df.getDoubles(COL_ZSCORE).values();
@@ -233,7 +255,15 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       //
       // computed values
       //
-      double computed = this.makeValue(df, timestamp, changePoints);
+      double value = df.getDouble(COL_VALUE, index);
+
+      double baseline = 0;
+      if (this.baselineWeeks > 0) {
+        baseline = this.makeBaseline(df, timestamp, changePoints);
+      }
+      sBaseline[index] = baseline;
+
+      double computed = value - baseline;
       sComputed[index] = computed;
 
       final int kernelOffset = -1 * this.kernelSize / 2;
@@ -536,14 +566,14 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   }
 
   /**
-   * Helper generates effective value for timestamp via passthrough and/or differentiation
+   * Helper generates baseline value for timestamp via exponential smoothing
    *
-   * @param df time series dataframe
-   * @param tCurrent current timestamp
-   * @param changePoints change points
+   * @param df
+   * @param tCurrent
+   * @param changePoints
    * @return
    */
-  double makeValue(DataFrame df, long tCurrent, TreeSet<Long> changePoints) {
+  double makeBaseline(DataFrame df, long tCurrent, TreeSet<Long> changePoints) {
     DateTime now = new DateTime(tCurrent);
 
     int index = df.getLongs(COL_TIME).find(tCurrent);
@@ -551,10 +581,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       return Double.NaN;
     }
 
-    double value = df.getDoubles(COL_VALUE).values()[index];
-
     if (this.baselineWeeks <= 0) {
-      return value;
+      return 0.0;
     }
 
     // construct baseline
@@ -577,7 +605,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       int valueIndex = df.getLongs(COL_TIME).find(timestamp);
       if (valueIndex >= 0) {
         sValue[i] = df.getDouble(COL_VALUE, valueIndex);
-        sWeight[i] = 0.5 * Math.pow(0.5, offset);
+        sWeight[i] = Math.pow(0.666, offset);
 
         if (lastChangePoint != null && timestamp < lastChangePoint) {
           sWeight[i] *= 0.1;
@@ -608,7 +636,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       return Double.NaN;
     }
 
-    return value - computed.doubleValue();
+    return computed.doubleValue();
   }
 
   /**
