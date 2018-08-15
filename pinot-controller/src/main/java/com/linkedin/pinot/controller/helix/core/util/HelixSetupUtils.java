@@ -98,7 +98,7 @@ public class HelixSetupUtils {
           LOGGER.info("Updating {} to add states for low level kafka consumers", segmentStateModelName);
           StateModelDefinition newStateModelDef = PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition();
           ZkClient zkClient = new ZkClient(zkPath);
-          zkClient.waitUntilConnected(20, TimeUnit.SECONDS);
+          zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_TIMEOUT_IN_SECOND, TimeUnit.SECONDS);
           zkClient.setZkSerializer(new ZNRecordSerializer());
           HelixDataAccessor accessor = new ZKHelixDataAccessor(helixClusterName, new ZkBaseDataAccessor<ZNRecord>(zkClient));
           PropertyKey.Builder keyBuilder = accessor.keyBuilder();
