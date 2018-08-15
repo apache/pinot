@@ -41,10 +41,10 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
 
   private int ROWS_COUNT = 26000;
 
-  private final String[] STAR_TREE1_HARD_CODED_QUERIES =
-      new String[]{
-          "SELECT COUNT(*) FROM T WHERE Name = 'Rahul'",
-          "SELECT COUNT(*) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"};
+  private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
+      "SELECT COUNT(*) FROM T WHERE Name = 'Rahul'",
+      "SELECT COUNT(*) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"
+  };
 
   private void setUp() throws Exception {
 

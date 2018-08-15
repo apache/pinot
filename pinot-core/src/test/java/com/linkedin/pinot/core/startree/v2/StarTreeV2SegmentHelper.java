@@ -64,7 +64,7 @@ public class StarTreeV2SegmentHelper {
     return schema;
   }
 
-  public static List<GenericRow> createSegmentSmallData(Schema schema) throws Exception {
+  public static List<GenericRow> createSegmentStaticData(Schema schema) throws Exception {
 
     int index;
     String dimName;

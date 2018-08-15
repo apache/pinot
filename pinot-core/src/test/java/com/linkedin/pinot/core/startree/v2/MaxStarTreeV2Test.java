@@ -41,8 +41,9 @@ public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
   private int ROWS_COUNT = 26000;
 
-  private final String[] STAR_TREE1_HARD_CODED_QUERIES =
-      new String[]{"SELECT MAX(salary) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"};
+  private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
+      "SELECT MAX(salary) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"
+  };
 
   private void setUp() throws Exception {
 

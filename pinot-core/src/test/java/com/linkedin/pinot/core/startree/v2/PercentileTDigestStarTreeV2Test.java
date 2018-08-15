@@ -48,8 +48,9 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
   private final double DELTA = 0.15 * VALUE_RANGE; // Allow 15% quantile error
 
   private StarTreeV2Config _starTreeV2Config;
-  private final String[] STAR_TREE_HARD_CODED_QUERIES =
-      new String[]{"SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"};
+  private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
+      "SELECT PERCENTILETDIGEST90(salary) FROM T WHERE Name = 'Rahul'"
+  };
 
   @BeforeClass
   private void setUp() throws Exception {
