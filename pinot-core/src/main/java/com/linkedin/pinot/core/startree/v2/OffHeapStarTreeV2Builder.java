@@ -93,7 +93,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
 
 
-
+  // using this dictionary map for debugging, can be removed later.
   Map<String, Dictionary> _dictionary = new HashMap<>();
 
 
@@ -358,6 +358,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     }
 
     int splitDimensionId = _dimensionsSplitOrder.get(level);
+
     Int2ObjectMap<Pairs.IntPair> dimensionRangeMap;
     try (StarTreeV2DataTable dataTable = new StarTreeV2DataTable(
         PinotDataBuffer.mapFile(_dataFile, true, _docSizeIndex.get(startDocId),
@@ -662,9 +663,6 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
     AggregationFunctionColumnPairBuffer aggregatedMetrics = null;
 
     int index = 0;
-    boolean hasStarChild = false;
-    int starChildAggDocId = StarTreeV2Constant.STAR_NODE;
-
     int[] sortedDocIds = new int[node._endDocId - node._startDocId];
     for (int i = node._startDocId; i < node._endDocId; i++) {
       sortedDocIds[index] = i;
@@ -683,7 +681,12 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
             AggregationFunctionColumnPairBuffer.fromBytes(next.getRight(), _aggregationFunctions);
         aggregatedMetrics.aggregate(metricBuffer);
       }
+      appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
+      _docSizeIndex.add(_fileSize);
+
     } else {
+      boolean hasStarChild = false;
+      int starChildAggDocId = StarTreeV2Constant.STAR_NODE;
       int childDimensionId = node._childDimensionId;
       for (Map.Entry<Integer, TreeNode> entry : node._children.entrySet()) {
         int childDimensionValue = entry.getKey();
@@ -704,14 +707,15 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
         }
       }
       dimensions.setDictId(childDimensionId, StarTreeV2Constant.STAR_NODE);
-    }
 
-    // do  not create aggregated document for node with star child.
-    if (hasStarChild) {
-      node._aggDataDocumentId = starChildAggDocId;
-    } else {
-      appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
-      _docSizeIndex.add(_fileSize);
+      // do  not create aggregated document for node with star child.
+      if (hasStarChild) {
+        node._aggDataDocumentId = starChildAggDocId;
+      } else {
+        appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
+        _docSizeIndex.add(_fileSize);
+      }
+
     }
 
     return aggregatedMetrics;

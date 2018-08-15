@@ -60,7 +60,11 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
   private List<Record> _starTreeData;
   private List<AggregationFunction> _aggregationFunctions;
 
+
+  // using this dictionary map for debugging, can be removed later.
   Map<String, Dictionary> _dictionary = new HashMap<>();
+
+
 
   private static final Logger LOGGER = LoggerFactory.getLogger(OnHeapStarTreeV2Builder.class);
 
@@ -244,7 +248,6 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       return;
     }
 
-    int numDocs = endDocId - startDocId;
     int splitDimensionId = _dimensionsSplitOrder.get(level);
     Map<Integer, Pairs.IntPair> dimensionRangeMap = groupOnDimension(startDocId, endDocId, splitDimensionId);
 
@@ -425,11 +428,11 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       dimension[childDimensionId] = StarTreeV2Constant.STAR_NODE;
 
       // do  not create aggregated document for node with star child.
-      if (!hasStarChild) {
+      if (hasStarChild) {
+        node._aggDataDocumentId = starChild._aggDataDocumentId;
+      } else {
         aggregatedValues = aggregateMetrics(0, childAggRecordsList.size(), childAggRecordsList, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
         node._aggDataDocumentId = appendAggregatedDocument(aggregatedValues, dimension);
-      } else {
-        node._aggDataDocumentId = starChild._aggDataDocumentId;
       }
     }
   }

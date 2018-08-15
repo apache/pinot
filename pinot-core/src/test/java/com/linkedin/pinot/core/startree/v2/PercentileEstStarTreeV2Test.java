@@ -140,7 +140,8 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
 
     for (byte[] obj : values) {
       try {
-        qDigest.merge((QuantileDigest) ObjectCustomSerDe.deserialize(obj, ObjectType.QuantileDigest));
+        QuantileDigest value = QuantileDigest.Builder.build(obj);
+        qDigest.merge(value);
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -150,6 +151,7 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
 
   @Override
   protected void assertAggregatedValue(QuantileDigest starTreeResult, QuantileDigest nonStarTreeResult) {
+
     System.out.println("Star-Tree Result Object Quantile: " + Long.toString(starTreeResult.getQuantile(_percentile / 100.0)));
     System.out.println("Non Star-Tree Result Object Quantile: " + Long.toString(nonStarTreeResult.getQuantile(_percentile / 100.0)));
 

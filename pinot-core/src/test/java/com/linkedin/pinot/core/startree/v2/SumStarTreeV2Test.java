@@ -40,7 +40,7 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   private File _indexDir;
   private StarTreeV2Config _starTreeV2Config;
 
-  private int ROWS_COUNT = 200;
+  private int ROWS_COUNT = 500000;
 
   private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
       "SELECT SUM(salary) FROM T",
@@ -56,6 +56,8 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
     List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
+
+    //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentStaticData(schema);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
