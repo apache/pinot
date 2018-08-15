@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 
@@ -62,7 +61,7 @@ public class LegacyAlertFilterWrapper extends DetectionPipeline {
     }
     this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
     this.alertFilterLookBack =
-        MapUtils.getLong(config.getProperties(), PROP_ALERT_FILTER_LOOKBACK, TimeUnit.DAYS.toMillis(14));
+        ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), PROP_ALERT_FILTER_LOOKBACK, "2week")).toStandardDuration().getMillis();
   }
 
   @Override
