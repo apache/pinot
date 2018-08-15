@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.index.reader;
 
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
@@ -57,7 +59,7 @@ public class SortedForwardIndexReaderTest {
     }
     writer.close();
 
-    try (SortedIndexReader reader = new SortedIndexReader(PinotDataBuffer.loadBigEndianFile(file), cardinality)) {
+    try (SortedIndexReader reader = new SortedIndexReaderImpl(PinotDataBuffer.loadBigEndianFile(file), cardinality)) {
       // without using context
       long start, end;
       start = System.currentTimeMillis();
@@ -69,7 +71,7 @@ public class SortedForwardIndexReaderTest {
       end = System.currentTimeMillis();
       System.out.println("Took " + (end - start) + " to scan " + totalDocs + " docs without using context");
       // with context
-      SortedIndexReader.Context context = reader.createContext();
+      ReaderContext context = reader.createContext();
       start = System.currentTimeMillis();
       for (int i = 0; i < cardinality; i++) {
         for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.core.io.util.ValueReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
@@ -22,6 +23,10 @@ public class StringDictionary extends ImmutableDictionaryReader {
 
   public StringDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
     super(dataBuffer, length, numBytesPerValue, paddingByte);
+  }
+
+  public StringDictionary(ValueReader valueReader, int length) {
+    super(valueReader, length);
   }
 
   @Override

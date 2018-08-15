@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -86,14 +87,13 @@ public class SelectionOperatorUtils {
   public static List<String> getSelectionColumns(@Nonnull List<String> selectionColumns,
       @Nonnull IndexSegment indexSegment) {
     if (selectionColumns.size() == 1 && selectionColumns.get(0).equals("*")) {
-      List<String> allColumns = new ArrayList<>(indexSegment.getColumnNames());
-      String[] columnNames = indexSegment.getColumnNames();
+      List<String> allColumns = new LinkedList<>(indexSegment.getColumnNames());
+      Set<String> columnNames = indexSegment.getColumnNames();
 
       // Remove columns that start with $ (eg. $docId) when doing select *
-      for (int i = 0; i < columnNames.length; i++) {
-        String columnName = columnNames[i];
-        if (!columnName.startsWith("$")) {
-          allColumns.add(columnName);
+      for (String columnName : columnNames) {
+        if (columnName.startsWith("$")) {
+          allColumns.remove(columnName);
         }
       }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,18 +21,17 @@ import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import java.io.IOException;
 
 
-public final class SortedIndexReaderImpl
-    extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader {
-  private static final int INT_SIZE_IN_BYTES = Integer.SIZE / Byte.SIZE;
-
+public class SortedIndexReaderImpl extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
   private final FixedByteValueReaderWriter _reader;
   private final int _cardinality;
 
+
   public SortedIndexReaderImpl(PinotDataBuffer dataBuffer, int cardinality) {
     // 2 values per dictionary id
-    Preconditions.checkState(dataBuffer.size() == 2 * cardinality * INT_SIZE_IN_BYTES);
+    Preconditions.checkState(dataBuffer.size() == 2 * cardinality * Integer.BYTES);
     _reader = new FixedByteValueReaderWriter(dataBuffer);
     _cardinality = cardinality;
   }
@@ -124,7 +123,7 @@ public final class SortedIndexReaderImpl
   }
 
   @Override
-  public void close() {
+  public void close() throws IOException {
     _reader.close();
   }
 

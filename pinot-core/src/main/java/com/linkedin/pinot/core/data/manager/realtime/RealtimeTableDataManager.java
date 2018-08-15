@@ -52,6 +52,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
 
+import static com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema;
+
 
 @ThreadSafe
 public class RealtimeTableDataManager extends BaseTableDataManager {
@@ -208,14 +210,14 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     LoaderUtils.reloadFailureRecovery(indexDir);
 
     Schema schema =
-        ZKMetadataProvider.getTableSchema(_propertyStore, TableNameBuilder.REALTIME.tableNameWithType(_tableName));
+        ZKMetadataProvider.getTableSchema(_propertyStore, TableNameBuilder.REALTIME.tableNameWithType(_tableNameWithType));
 
     Preconditions.checkNotNull(schema);
     addBuiltInVirtualColumnsToSchema(schema);
 
     if (!isValid(schema, tableConfig.getIndexingConfig())) {
       _logger.error("Not adding segment {}", segmentName);
-      throw new RuntimeException("Mismatching schema/table config for " + _tableName);
+      throw new RuntimeException("Mismatching schema/table config for " + _tableNameWithType);
     }
 
     InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(_propertyStore, _instanceId);

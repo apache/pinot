@@ -36,6 +36,7 @@ import com.linkedin.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStat
 import com.linkedin.pinot.core.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -145,8 +146,8 @@ public class DictionariesTest {
 
     for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
         .keySet()) {
-      ImmutableDictionaryReader heapDictionary = heapSegment.getDictionary(column);
-      ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionary(column);
+      Dictionary heapDictionary = heapSegment.getDictionary(column);
+      Dictionary mmapDictionary = mmapSegment.getDictionary(column);
 
       switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
           .get(column)
@@ -189,8 +190,8 @@ public class DictionariesTest {
     final Map<String, ColumnMetadata> metadataMap =
         ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
     for (final String column : metadataMap.keySet()) {
-      final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionary(column);
-      final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionary(column);
+      final Dictionary heapDictionary = heapSegment.getDictionary(column);
+      final Dictionary mmapDictionary = mmapSegment.getDictionary(column);
 
       final Set<Object> uniques = uniqueEntries.get(column);
       final List<Object> list = Arrays.asList(uniques.toArray());

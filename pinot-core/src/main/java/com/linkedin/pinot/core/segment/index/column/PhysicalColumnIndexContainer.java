@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,24 +16,28 @@
 package com.linkedin.pinot.core.segment.index.column;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.BytesDictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapDoubleDictionary;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapFloatDictionary;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapIntDictionary;
+import com.linkedin.pinot.core.segment.index.readers.OnHeapLongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.OnHeapStringDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -44,7 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class PhysicalColumnIndexContainer implements ColumnIndexContainer {
+public final class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static final Logger LOGGER = LoggerFactory.getLogger(PhysicalColumnIndexContainer.class);
 
   private final DataFileReader _forwardIndex;
@@ -69,7 +73,7 @@ public class PhysicalColumnIndexContainer implements ColumnIndexContainer {
         // Single-value
         if (metadata.isSorted()) {
           // Sorted
-          SortedIndexReaderImpl sortedIndexReader = new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
+          SortedIndexReader sortedIndexReader = new SortedIndexReaderImpl(fwdIndexBuffer, metadata.getCardinality());
           _forwardIndex = sortedIndexReader;
           _invertedIndex = sortedIndexReader;
           return;
@@ -117,26 +121,40 @@ public class PhysicalColumnIndexContainer implements ColumnIndexContainer {
   private static ImmutableDictionaryReader loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
       boolean loadOnHeap) throws IOException {
     FieldSpec.DataType dataType = metadata.getDataType();
-    if (loadOnHeap && (dataType != FieldSpec.DataType.STRING)) {
-      LOGGER.warn("Only support on-heap dictionary for String data type, load off-heap dictionary for column: {}",
-          metadata.getColumnName());
+    if (loadOnHeap) {
+      String columnName = metadata.getColumnName();
+      LOGGER.info("Loading on-heap dictionary for column: {}", columnName);
     }
 
     int length = metadata.getCardinality();
     switch (dataType) {
       case INT:
-        return new IntDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapIntDictionary(dictionaryBuffer, length)
+            : new IntDictionary(dictionaryBuffer, length);
+
       case LONG:
-        return new LongDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapLongDictionary(dictionaryBuffer, length)
+            : new LongDictionary(dictionaryBuffer, length);
+
       case FLOAT:
-        return new FloatDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapFloatDictionary(dictionaryBuffer, length)
+            : new FloatDictionary(dictionaryBuffer, length);
+
       case DOUBLE:
-        return new DoubleDictionary(dictionaryBuffer, length);
+        return (loadOnHeap) ? new OnHeapDoubleDictionary(dictionaryBuffer, length)
+            : new DoubleDictionary(dictionaryBuffer, length);
+
       case STRING:
-        int numBytesPerValue = metadata.getStringColumnMaxLength();
+        int numBytesPerValue = metadata.getColumnMaxLength();
         byte paddingByte = (byte) metadata.getPaddingCharacter();
         return loadOnHeap ? new OnHeapStringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte)
             : new StringDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+
+      case BYTES:
+        numBytesPerValue = metadata.getColumnMaxLength();
+        paddingByte = (byte) metadata.getPaddingCharacter();
+        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+
       default:
         throw new IllegalStateException("Illegal data type for dictionary: " + dataType);
     }
@@ -144,17 +162,16 @@ public class PhysicalColumnIndexContainer implements ColumnIndexContainer {
 
   private static SingleColumnSingleValueReader loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
       FieldSpec.DataType dataType) throws IOException {
-    // TODO: Make compression/decompression configurable.
-    ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor("snappy");
 
     switch (dataType) {
       case INT:
       case LONG:
       case FLOAT:
       case DOUBLE:
-        return new FixedByteChunkSingleValueReader(forwardIndexBuffer, decompressor);
+        return new FixedByteChunkSingleValueReader(forwardIndexBuffer);
       case STRING:
-        return new VarByteChunkSingleValueReader(forwardIndexBuffer, decompressor);
+      case BYTES:
+        return new VarByteChunkSingleValueReader(forwardIndexBuffer);
       default:
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }

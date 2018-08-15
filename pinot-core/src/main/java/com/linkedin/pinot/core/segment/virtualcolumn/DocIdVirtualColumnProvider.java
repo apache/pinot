@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.segment.virtualcolumn;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -22,9 +21,13 @@ import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import com.linkedin.pinot.core.io.util.DictionaryDelegatingValueReader;
+import com.linkedin.pinot.core.io.util.ValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.BaseDictionary;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.io.IOException;
 
@@ -40,7 +43,10 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
 
   @Override
   public Dictionary buildDictionary(VirtualColumnContext context) {
-    return new DocIdDictionary(context.getTotalDocCount());
+    DictionaryDelegatingValueReader valueReader = new DictionaryDelegatingValueReader();
+    DocIdDictionary docIdDictionary = new DocIdDictionary(valueReader, context.getTotalDocCount());
+    valueReader.setDictionary(docIdDictionary);
+    return docIdDictionary;
   }
 
   @Override
@@ -100,7 +106,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
   }
 
-  private class DocIdInvertedIndex implements SortedIndexReader {
+  private class DocIdInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
     @Override
     public Pairs.IntPair getDocIds(int dictId) {
       return new Pairs.IntPair(dictId, dictId);
@@ -109,12 +115,28 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     @Override
     public void close() throws IOException {
     }
+
+    @Override
+    public SortedIndexReaderImpl.Context createContext() {
+      return null;
+    }
+
+    @Override
+    public int getInt(int row) {
+      return row;
+    }
+
+    @Override
+    public int getInt(int rowId, SortedIndexReaderImpl.Context context) {
+      return rowId;
+    }
   }
 
-  private class DocIdDictionary extends BaseDictionary {
+  private class DocIdDictionary extends IntDictionary {
     private int _length;
 
-    public DocIdDictionary(int length) {
+    public DocIdDictionary(ValueReader valueReader, int length) {
+      super(valueReader, length);
       _length = length;
     }
 
@@ -136,7 +158,7 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     }
 
     @Override
-    public Object get(int dictId) {
+    public Integer get(int dictId) {
       return dictId;
     }
 
@@ -168,6 +190,11 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
     @Override
     public int length() {
       return _length;
+    }
+
+    @Override
+    public boolean isSorted() {
+      return true;
     }
 
     @Override

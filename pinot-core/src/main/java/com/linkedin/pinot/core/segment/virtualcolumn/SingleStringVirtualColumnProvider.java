@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.segment.virtualcolumn;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
+import com.linkedin.pinot.core.io.util.DictionaryDelegatingValueReader;
+import com.linkedin.pinot.core.io.util.ValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.BaseDictionary;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
 import java.io.IOException;
 
 
@@ -40,7 +43,10 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
 
   @Override
   public Dictionary buildDictionary(VirtualColumnContext context) {
-    return new SingleStringDictionary(context.getTotalDocCount(), context);
+    DictionaryDelegatingValueReader valueReader = new DictionaryDelegatingValueReader();
+    SingleStringDictionary stringDictionary = new SingleStringDictionary(valueReader, context.getTotalDocCount(), context);
+    valueReader.setDictionary(stringDictionary);
+    return stringDictionary;
   }
 
   @Override
@@ -64,7 +70,7 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
     return new SingleStringInvertedIndex(context.getTotalDocCount());
   }
 
-  private class SingleStringInvertedIndex implements SortedIndexReader {
+  private class SingleStringInvertedIndex extends BaseSingleColumnSingleValueReader<SortedIndexReaderImpl.Context> implements SortedIndexReader<SortedIndexReaderImpl.Context> {
     private int _length;
 
     public SingleStringInvertedIndex(int length) {
@@ -81,15 +87,32 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
     }
 
     @Override
+    public int getInt(int row) {
+      return 0;
+    }
+
+    @Override
+    public int getInt(int rowId, SortedIndexReaderImpl.Context context) {
+      return 0;
+    }
+
+    @Override
     public void close() throws IOException {
+    }
+
+    @Override
+    public SortedIndexReaderImpl.Context createContext() {
+      return null;
     }
   }
 
-  private class SingleStringDictionary extends BaseDictionary {
+  private class SingleStringDictionary extends StringDictionary {
     private int _length;
     private VirtualColumnContext _context;
 
-    public SingleStringDictionary(int length, VirtualColumnContext context) {
+    public SingleStringDictionary(ValueReader valueReader, int length, VirtualColumnContext context) {
+      super(valueReader, length);
+
       _length = length;
       _context = context;
     }
@@ -120,6 +143,11 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
     }
 
     @Override
+    public boolean isSorted() {
+      return true;
+    }
+
+    @Override
     public int indexOf(Object rawValue) {
       if (rawValue.equals(getValue(_context))) {
         return 0;
@@ -129,7 +157,7 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
     }
 
     @Override
-    public Object get(int dictId) {
+    public String get(int dictId) {
       return getValue(_context);
     }
 

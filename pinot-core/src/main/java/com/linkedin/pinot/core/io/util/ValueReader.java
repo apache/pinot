@@ -13,14 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.virtualcolumn;
+package com.linkedin.pinot.core.io.util;
+
+import java.io.IOException;
+
 
 /**
- * Virtual column provider that returns the current host name.
+ * Interface for value readers, which read a value at a given index.
  */
-public class HostNameVirtualColumnProvider extends SingleStringVirtualColumnProvider {
-  @Override
-  protected String getValue(VirtualColumnContext context) {
-    return context.getHostname();
-  }
+public interface ValueReader {
+  int getInt(int index);
+
+  long getLong(int index);
+
+  float getFloat(int index);
+
+  double getDouble(int index);
+
+  String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer);
+
+  String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
+
+  byte[] getBytes(int index, int numBytesPerValue, byte[] output);
+
+  void close() throws IOException;
 }
