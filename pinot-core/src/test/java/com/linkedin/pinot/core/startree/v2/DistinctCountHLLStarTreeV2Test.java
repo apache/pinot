@@ -139,7 +139,7 @@ public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<byte[], H
 
     for (byte[] obj : values) {
       try {
-        hyperLogLog.merge((HyperLogLog) ObjectCustomSerDe.deserialize(obj, ObjectType.HyperLogLog));
+        hyperLogLog.addAll(ObjectCustomSerDe.deserialize(obj, ObjectType.HyperLogLog));
       } catch (IOException e) {
         e.printStackTrace();
       } catch (CardinalityMergeException e) {
@@ -151,8 +151,8 @@ public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<byte[], H
 
   @Override
   protected void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
-    System.out.println("Star-Tree Result Object Size: " + Long.toString(starTreeResult.cardinality()));
-    System.out.println("Non Star-Tree Result Object Size: " + Long.toString(nonStarTreeResult.cardinality()));
+    System.out.println("Star-Tree Result Object Cardinality: " + Long.toString(starTreeResult.cardinality()));
+    System.out.println("Non Star-Tree Result Object Cardinality: " + Long.toString(nonStarTreeResult.cardinality()));
 
     Assert.assertEquals(starTreeResult.cardinality() , nonStarTreeResult.cardinality());
   }

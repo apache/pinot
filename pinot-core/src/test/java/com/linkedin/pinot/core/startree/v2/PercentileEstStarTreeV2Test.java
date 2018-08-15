@@ -42,8 +42,8 @@ import org.testng.annotations.Test;
 public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], QuantileDigest> {
 
   private File _indexDir;
-  private int ROWS_COUNT = 1000;
-  private final int _percentile = 90;
+  private int ROWS_COUNT = 10000;
+  private final int _percentile = 50;
 
   private StarTreeV2Config _starTreeV2Config;
   private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
@@ -71,7 +71,7 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
 
     _starTreeV2Config = new StarTreeV2Config();
     _starTreeV2Config.setOutDir(filepath);
-    _starTreeV2Config.setMaxNumLeafRecords(10);
+    _starTreeV2Config.setMaxNumLeafRecords(1);
     _starTreeV2Config.setDimensions(schema.getDimensionNames());
     _starTreeV2Config.setMetric2aggFuncPairs(metric2aggFuncPairs1);
   }
@@ -150,8 +150,8 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
 
   @Override
   protected void assertAggregatedValue(QuantileDigest starTreeResult, QuantileDigest nonStarTreeResult) {
-    System.out.println("Star-Tree Result Object Size: " + Long.toString(starTreeResult.getQuantile(_percentile / 100.0)));
-    System.out.println("Non Star-Tree Result Object Size: " + Long.toString(nonStarTreeResult.getQuantile(_percentile / 100.0)));
+    System.out.println("Star-Tree Result Object Quantile: " + Long.toString(starTreeResult.getQuantile(_percentile / 100.0)));
+    System.out.println("Non Star-Tree Result Object Quantile: " + Long.toString(nonStarTreeResult.getQuantile(_percentile / 100.0)));
 
     Assert.assertEquals(starTreeResult.getQuantile(_percentile / 100.0), nonStarTreeResult.getQuantile(_percentile / 100.0));
   }
