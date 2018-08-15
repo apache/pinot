@@ -200,7 +200,20 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   @Nonnull
   @Override
   public Double extractFinalResult(@Nonnull TDigest intermediateResult) {
-    return intermediateResult.quantile(_percentile / 100.0);
+    return calculatePercentile(intermediateResult, _percentile);
+  }
+
+  /**
+   * Calculates percentile from {@link TDigest}.
+   * <p>Handles cases where only one value in TDigest object.
+   */
+  public static double calculatePercentile(@Nonnull TDigest tDigest, int percentile) {
+    if (tDigest.size() == 1) {
+      // Specialize cases where only one value in TDigest (cannot use quantile method)
+      return tDigest.centroids().iterator().next().mean();
+    } else {
+      return tDigest.quantile(percentile / 100.0);
+    }
   }
 
   /**
