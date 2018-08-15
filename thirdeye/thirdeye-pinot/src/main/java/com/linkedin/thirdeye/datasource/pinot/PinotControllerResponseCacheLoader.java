@@ -84,7 +84,7 @@ public class PinotControllerResponseCacheLoader extends PinotResponseCacheLoader
         && pinotThirdEyeDataSourceConfig.getBrokerUrl().trim().length() > 0) {
       ZkClient zkClient = new ZkClient(pinotThirdEyeDataSourceConfig.getZookeeperUrl());
       zkClient.setZkSerializer(new ZNRecordSerializer());
-      zkClient.waitUntilConnected();
+      zkClient.waitUntilConnected(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
       ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkClient);
       List<String> thirdeyeBrokerList = helixAdmin.getInstancesInClusterWithTag(
           pinotThirdEyeDataSourceConfig.getClusterName(), pinotThirdEyeDataSourceConfig.getTag());
