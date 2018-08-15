@@ -42,20 +42,6 @@ export default [
     disableFiltering: true,
     className: 'metrics-table__column metrics-table__column--small'
   }, {
-    propertyName: 'wo3w',
-    template: 'custom/metrics-table-offset',
-    sortedBy: 'sortable_wo3w',
-    title: 'Wo3W',
-    disableFiltering: true,
-    className: 'metrics-table__column metrics-table__column--small'
-  }, {
-    propertyName: 'wo4w',
-    template: 'custom/metrics-table-offset',
-    sortedBy: 'sortable_wo4w',
-    title: 'Wo4W',
-    disableFiltering: true,
-    className: 'metrics-table__column metrics-table__column--small'
-  }, {
     propertyName: 'score',
     title: 'Outlier',
     disableFiltering: true,
