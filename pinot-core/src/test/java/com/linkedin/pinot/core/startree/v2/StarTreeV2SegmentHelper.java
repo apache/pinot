@@ -32,10 +32,10 @@ import java.util.Random;
 
 public class StarTreeV2SegmentHelper {
 
-  private static final String[] names = {"Rahul", "Jennifer", "Neha", "Subbu", "Sunita", "Zackie"};
-  private static final String[] country = {"IN", "MX", "CA", "CH", "CH", "US"};
-  private static final String[] language = {"Hin", "Hin", "Eng", "Eng", "Kor", "Eng"};
-  private static final int[] metricValues = {3, 5, 2, 8, 9, 1};
+  private static final String[] names = {"Sunita", "Subbu", "Sunita", "Zackie", "Zackie", "Sunita"};
+  private static final String[] country = {"CH", "IN", "CA", "CH", "CH", "CH"};
+  private static final String[] language = {"Hin", "Eng", "Kor", "Eng", "Kor", "Hin"};
+  private static final int[] metricValues = {2, 2, 3, 8, 8, 5};
 
   private static final Random RANDOM = new Random();
 
@@ -64,37 +64,26 @@ public class StarTreeV2SegmentHelper {
     return schema;
   }
 
-  public static List<GenericRow> createSegmentSmallData(Schema schema, int rowsCount) throws Exception {
+  public static List<GenericRow> createSegmentSmallData(Schema schema) throws Exception {
 
     int index;
-    List<GenericRow> rows = new ArrayList<>(rowsCount);
-    for (int rowId = 0; rowId < rowsCount; rowId++) {
+    String dimName;
+    List<GenericRow> rows = new ArrayList<>(6);
+    for (int rowId = 0; rowId < 6; rowId++) {
       HashMap<String, Object> map = new HashMap<>();
 
-      // Dim columns.
-      for (int i = 0; i < 3; i++) {
-        String dimName = schema.getDimensionFieldSpecs().get(i).getName();
-        switch (i) {
-          case 0:
-            index = RANDOM.nextInt(6);
-            map.put(dimName, names[index]);
-            break;
-          case 1:
-            index = RANDOM.nextInt(6);
-            map.put(dimName, country[index]);
-            break;
-          case 2:
-            index = RANDOM.nextInt(6);
-            map.put(dimName, language[index]);
-            break;
-        }
-      }
+      dimName = schema.getDimensionFieldSpecs().get(0).getName();
+      map.put(dimName, names[rowId]);
 
-      // Metric columns.
-      for (int i = 0; i < 1; i++) {
-        String metName = schema.getMetricFieldSpecs().get(i).getName();
-        map.put(metName, metricValues[RANDOM.nextInt(6)]);
-      }
+      dimName = schema.getDimensionFieldSpecs().get(1).getName();
+      map.put(dimName, country[rowId]);
+
+      dimName = schema.getDimensionFieldSpecs().get(2).getName();
+      map.put(dimName, language[rowId]);
+
+
+      String metName = schema.getMetricFieldSpecs().get(0).getName();
+      map.put(metName, metricValues[rowId]);
 
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);
