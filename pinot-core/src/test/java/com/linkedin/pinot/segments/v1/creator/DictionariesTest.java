@@ -193,6 +193,11 @@ public class DictionariesTest {
       final Dictionary heapDictionary = heapSegment.getDictionary(column);
       final Dictionary mmapDictionary = mmapSegment.getDictionary(column);
 
+      // Skip virtual columns
+      if (column.startsWith("$")) {
+        continue;
+      }
+
       final Set<Object> uniques = uniqueEntries.get(column);
       final List<Object> list = Arrays.asList(uniques.toArray());
       Collections.shuffle(list);
