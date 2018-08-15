@@ -45,7 +45,7 @@ public interface AggregationFunction<R, A> {
   int getResultMaxByteSize();
 
   /**
-   * Perform aggregation on the given raw data.
+   * Convert raw data to aggregated data type.
    */
   A convert(R data);
 

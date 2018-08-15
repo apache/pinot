@@ -18,20 +18,20 @@ package com.linkedin.pinot.core.startree.v2;
 public class StarTreeV2Constant {
 
   // final strings
-  public static final int STAR_NODE = -1;
-  public static final int SKIP_VALUE = -1;
-  public static final int INVALID_INDEX = -1;
-  public static final int VALID_INDEX_VALUE = 0;
-  public static final String STAR_TREE = "startree";
+  static final int STAR_NODE = -1;
+  static final int SKIP_VALUE = -1;
+  static final int INVALID_INDEX = -1;
+  static final int VALID_INDEX_VALUE = 0;
+  static final String STAR_TREE = "startree";
   public static final String STAR_TREE_V2_COUNT = "startreeV2.count";
-  public static final String STAR_TREE_V2_COlUMN_FILE = "startreev2.column.psf";
-  public static final String STAR_TREE_V2_INDEX_MAP_FILE = "startreev2.index.map";
-  public static final String STAR_TREE_V2_TEMP_FILE = "startree.temp";
+  static final String STAR_TREE_V2_COlUMN_FILE = "startreev2.column.psf";
+  static final String STAR_TREE_V2_INDEX_MAP_FILE = "startreev2.index.map";
+  static final String STAR_TREE_V2_TEMP_FILE = "startree.temp";
 
-  public static final String METRIC_RAW_INDEX_SUFFIX = ".sv.raw.fwd";
-  public static final String DIMENSION_FWD_INDEX_SUFFIX = ".sv.unsorted.fwd";
+  static final String METRIC_RAW_INDEX_SUFFIX = ".sv.raw.fwd";
+  static final String DIMENSION_FWD_INDEX_SUFFIX = ".sv.unsorted.fwd";
 
-  public static final Boolean IS_RAW_DATA = true;
+  static final Boolean IS_RAW_DATA = true;
 
   // star tree meta data.
   public static class StarTreeMetadata {

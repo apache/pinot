@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.datatable.ObjectCustomSerDe;
-import com.linkedin.pinot.core.common.datatable.ObjectType;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.GenericRowRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
@@ -46,7 +45,7 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
   private final int _percentile = 50;
 
   private StarTreeV2Config _starTreeV2Config;
-  private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
+  private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[] {
       "SELECT PERCENTILEEST50(salary) FROM T"
   };
 

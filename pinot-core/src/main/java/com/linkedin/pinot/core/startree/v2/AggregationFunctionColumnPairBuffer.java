@@ -134,7 +134,7 @@ public class AggregationFunctionColumnPairBuffer {
           aggregatedByteSize += Integer.BYTES;
         }
       } catch (IOException e) {
-        e.printStackTrace();
+        throw new IllegalStateException(e);
       }
     }
     _totalBytes = aggregatedByteSize;
@@ -150,7 +150,7 @@ public class AggregationFunctionColumnPairBuffer {
       try {
         size = getObjectSize(factory, _values[i]);
       } catch (IOException e) {
-        e.printStackTrace();
+        throw new IllegalStateException(e);
       }
       _totalBytes += factory.getResultDataType().equals(FieldSpec.DataType.BYTES) ? (size + Integer.BYTES) : size;
     }

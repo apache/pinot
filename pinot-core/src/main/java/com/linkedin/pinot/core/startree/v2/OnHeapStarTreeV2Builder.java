@@ -216,7 +216,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     // sorting the data as per the sort order.
     List<Record> rawSortedStarTreeData = sortStarTreeData(0, _rawDocsCount, _dimensionsSplitOrder, _rawStarTreeData);
-    _starTreeData = condenseData(rawSortedStarTreeData, _aggFunColumnPairs, StarTreeV2Constant.IS_RAW_DATA);
+    _starTreeData = condenseData(rawSortedStarTreeData, _aggFunColumnPairs);
 
     // recursively construct the star tree
     _rootNode._startDocId = 0;
@@ -293,7 +293,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     List<Record> sortedFilteredData =
         filterData(startDocId, endDocId, splitDimensionId, _dimensionsSplitOrder, _starTreeData);
-    List<Record> condensedData = condenseData(sortedFilteredData, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
+    List<Record> condensedData = condenseData(sortedFilteredData, _aggFunColumnPairs);
 
     _starTreeData.addAll(condensedData);
 
@@ -405,7 +405,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     List<Record> childAggRecordsList = new ArrayList<>();
 
     if (node._children == null) {
-      aggregatedValues = aggregateMetrics(node._startDocId, node._endDocId, _starTreeData, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
+      aggregatedValues = aggregateMetrics(node._startDocId, node._endDocId, _starTreeData, _aggFunColumnPairs);
       node._aggDataDocumentId = appendAggregatedDocument(aggregatedValues, dimension);
 
     } else {
@@ -431,7 +431,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       if (hasStarChild) {
         node._aggDataDocumentId = starChild._aggDataDocumentId;
       } else {
-        aggregatedValues = aggregateMetrics(0, childAggRecordsList.size(), childAggRecordsList, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
+        aggregatedValues = aggregateMetrics(0, childAggRecordsList.size(), childAggRecordsList, _aggFunColumnPairs);
         node._aggDataDocumentId = appendAggregatedDocument(aggregatedValues, dimension);
       }
     }
@@ -449,9 +449,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
 
     int size = _starTreeData.size();
     int[] d = new int[_dimensionsCount];
-    for (int i = 0; i < _dimensionsCount; i++) {
-      d[i] = dimension[i];
-    }
+    System.arraycopy(dimension, 0, d, 0, _dimensionsCount);
 
     Record aggRecord = new Record();
     aggRecord.setDimensionValues(d);
@@ -540,15 +538,13 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     }
 
     // closing all the opened index creator.
-    for (int i = 0; i < _dimensionForwardIndexCreatorList.size(); i++) {
-      _dimensionForwardIndexCreatorList.get(i).close();
+    for (ForwardIndexCreator a_dimensionForwardIndexCreatorList : _dimensionForwardIndexCreatorList) {
+      a_dimensionForwardIndexCreatorList.close();
     }
 
-    for (int i = 0; i < _aggFunColumnPairForwardIndexCreatorList.size(); i++) {
-      _aggFunColumnPairForwardIndexCreatorList.get(i).close();
+    for (ForwardIndexCreator a_aggFunColumnPairForwardIndexCreatorList : _aggFunColumnPairForwardIndexCreatorList) {
+      a_aggFunColumnPairForwardIndexCreatorList.close();
     }
-
-    return;
   }
 
   /**
@@ -604,8 +600,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
   /**
    * function to condense documents according to sorted order.
    */
-  List<Record> condenseData(List<Record> starTreeData, List<AggregationFunctionColumnPair> aggfunColumnPairs,
-      boolean isRawData) {
+  private List<Record> condenseData(List<Record> starTreeData, List<AggregationFunctionColumnPair> aggfunColumnPairs) {
     int start = 0;
     List<Record> newData = new ArrayList<>();
     Record prevRecord = starTreeData.get(0);
@@ -616,7 +611,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       int[] nextDimensions = nextRecord.getDimensionValues();
 
       if (!Record.compareDimensions(prevDimensions, nextDimensions)) {
-        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, aggfunColumnPairs, isRawData);
+        List<Object> aggregatedMetricsValue = aggregateMetrics(start, i, starTreeData, aggfunColumnPairs);
         Record newRecord = new Record();
         newRecord.setAggregatedValues(aggregatedMetricsValue);
         newRecord.setDimensionValues(prevRecord.getDimensionValues());
@@ -628,7 +623,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     Record record = new Record();
     record.setDimensionValues(starTreeData.get(start).getDimensionValues());
     List<Object> aggregatedMetricsValue =
-        aggregateMetrics(start, starTreeData.size(), starTreeData, aggfunColumnPairs, isRawData);
+        aggregateMetrics(start, starTreeData.size(), starTreeData, aggfunColumnPairs);
     record.setAggregatedValues(aggregatedMetricsValue);
     newData.add(record);
 
@@ -639,10 +634,10 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
    * aggregate metric values ( raw or aggregated )
    */
   private List<Object> aggregateMetrics(int start, int end, List<Record> starTreeData,
-      List<AggregationFunctionColumnPair> aggfunColumnPairs, boolean isRawData) {
+      List<AggregationFunctionColumnPair> aggFunColumnPairs) {
 
     List<Object> aggregatedMetricsValue = new ArrayList<>();
-    for (int i = 0; i < aggfunColumnPairs.size(); i++) {
+    for (int i = 0; i < aggFunColumnPairs.size(); i++) {
       AggregationFunction function = _aggregationFunctions.get(i);
       Object obj1 = starTreeData.get(start).getAggregatedValues().get(i);
       for (int j = start + 1; j < end; j++) {

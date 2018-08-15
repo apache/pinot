@@ -258,6 +258,8 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       _sortOrder[i] = _dimensionsSplitOrder.get(i);
     }
 
+    long start = System.currentTimeMillis();
+
     // create pre-aggregated data for star tree
     Iterator<Pair<DimensionBuffer, AggregationFunctionColumnPairBuffer>> iterator =
         condenseData(_tempDataFile, 0, _rawDocsCount, _tempDocSizeIndex, StarTreeV2Constant.IS_RAW_DATA, -1);
@@ -284,6 +286,9 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
 
     // serialize the tree.
     serialize();
+
+    long end = System.currentTimeMillis();
+    LOGGER.info("Took {}ms to build star tree index with {} aggregated documents", (end - start), _aggregatedDocCount);
 
     FileUtils.deleteQuietly(_tempDataFile);
     FileUtils.deleteQuietly(_tempMetricOffsetFile);
@@ -563,9 +568,9 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
             "Error transferring data from data file to temp file, transfer size mis-match");
         dest.force(false);
       } catch (FileNotFoundException e) {
-        e.printStackTrace();
+        LOGGER.info("File not found");
       } catch (IOException e) {
-        e.printStackTrace();
+        LOGGER.info("Couldn't open the file");
       }
       tempBuffer = PinotDataBuffer.mapFile(tempFile, false, docSizeIndex.get(startDocId), tempBufferSize,
           PinotDataBuffer.NATIVE_ORDER, "OffHeapStarTreeBuilder#getUniqueCombinations: temp buffer");
@@ -715,7 +720,6 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
         appendToAggBuffer(_aggregatedDocCount, dimensions, aggregatedMetrics);
         _docSizeIndex.add(_fileSize);
       }
-
     }
 
     return aggregatedMetrics;

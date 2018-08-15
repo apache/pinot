@@ -39,7 +39,7 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
   private File _indexDir;
   private StarTreeV2Config _starTreeV2Config;
 
-  private int ROWS_COUNT = 26000;
+  private int ROWS_COUNT = 260;
 
   private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
       "SELECT COUNT(*) FROM T WHERE Name = 'Rahul'",
