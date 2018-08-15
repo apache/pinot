@@ -55,6 +55,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   public static final String DATA_SOURCE_NAME = PinotThirdEyeDataSource.class.getSimpleName();
 
+  private static final long CONNECTION_TIMEOUT = 60000;
+
   public static final String CACHE_LOADER_CLASS_NAME_STRING = "cacheLoaderClassName";
   // TODO: make default cache size configurable
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
@@ -556,7 +558,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   public static PinotThirdEyeDataSource fromZookeeper(String controllerHost, int controllerPort, String zkUrl) {
     ZkClient zkClient = new ZkClient(zkUrl);
     zkClient.setZkSerializer(new ZNRecordSerializer());
-    zkClient.waitUntilConnected();
+    zkClient.waitUntilConnected(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
     PinotThirdEyeDataSource pinotThirdEyeDataSource = new PinotThirdEyeDataSource(controllerHost, controllerPort);
     LOG.info("Created PinotThirdEyeDataSource to zookeeper: {} controller: {}:{}", zkUrl, controllerHost, controllerPort);
     return pinotThirdEyeDataSource;
