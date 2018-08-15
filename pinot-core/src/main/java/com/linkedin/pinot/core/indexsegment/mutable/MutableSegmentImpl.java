@@ -39,7 +39,6 @@ import com.linkedin.pinot.core.util.FixedIntArray;
 import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
 import com.linkedin.pinot.core.util.IdMap;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;

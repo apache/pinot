@@ -26,7 +26,6 @@ import java.util.List;
 
 
 public class AggregationFunctionColumnPairBuffer {
-
   int _totalBytes;
   final Object[] _values;
   private final List<AggregationFunction> _aggFunColumnPairFunctions;

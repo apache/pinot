@@ -424,6 +424,7 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
       }
       dimension[childDimensionId] = StarTreeV2Constant.STAR_NODE;
 
+      // do  not create aggregated document for node with star child.
       if (!hasStarChild) {
         aggregatedValues = aggregateMetrics(0, childAggRecordsList.size(), childAggRecordsList, _aggFunColumnPairs, !StarTreeV2Constant.IS_RAW_DATA);
         node._aggDataDocumentId = appendAggregatedDocument(aggregatedValues, dimension);

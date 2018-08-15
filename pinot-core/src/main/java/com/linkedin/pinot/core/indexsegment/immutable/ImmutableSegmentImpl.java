@@ -55,7 +55,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
   private List<StarTreeV2> _starTrees;
 
-
   public ImmutableSegmentImpl(@Nonnull SegmentDirectory segmentDirectory, @Nonnull SegmentMetadataImpl segmentMetadata,
       @Nonnull Map<String, ColumnIndexContainer> columnIndexContainerMap, @Nullable StarTree starTree) {
     _segmentDirectory = segmentDirectory;
@@ -219,7 +218,6 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     }
     _starTrees.addAll(starTreeV2List);
   }
-
 
   @Override
   public List<StarTreeV2> getStarTrees() {

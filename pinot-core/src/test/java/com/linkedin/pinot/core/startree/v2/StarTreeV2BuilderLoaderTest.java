@@ -41,7 +41,7 @@ public class StarTreeV2BuilderLoaderTest {
   private File _onHeapFilePath;
   private File _offHeapFilePath;
 
-  private int ROWS_COUNT = 1000;
+  private int ROWS_COUNT = 10;
 
   private List<StarTreeV2Config> _onHeapStarTreeV2ConfigList = new ArrayList<>();
   private List<StarTreeV2Config> _offHeapStarTreeV2ConfigList = new ArrayList<>();

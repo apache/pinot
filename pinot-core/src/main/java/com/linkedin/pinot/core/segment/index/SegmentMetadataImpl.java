@@ -363,7 +363,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-
   /**
    * Reads and initializes the star tree v2 metadata from segment metadata properties.
    */
@@ -390,7 +389,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
         dimensionsSplitOrder.add(splitColumn);
       }
 
-
       // dimension without star node
       String withoutStarNode = "startree_" + i + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS;
       iterator = segmentMetadataPropertiesConfiguration.getList(withoutStarNode).iterator();
@@ -409,12 +407,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       String maxLeafRecordString = "startree_" + i + "_" + StarTreeV2Constant.StarTreeMetadata.STAR_TREE_MAX_LEAF_RECORD;
       String maxLeafRecord = segmentMetadataPropertiesConfiguration.getString(maxLeafRecordString);
 
+      // prepare star-tree-v2 metadata.
       StarTreeV2Metadata metadata = new StarTreeV2Metadata(Integer.parseInt(docsCount), dimensionsSplitOrder, aggFunColPairs, Integer.parseInt(maxLeafRecord), dimensionWithoutStarNode);
-
       _starTreeV2MetadataList.add(metadata);
     }
   }
-
 
   public ColumnMetadata getColumnMetadataFor(String column) {
     return _columnMetadataMap.get(column);

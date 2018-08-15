@@ -706,6 +706,7 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       dimensions.setDictId(childDimensionId, StarTreeV2Constant.STAR_NODE);
     }
 
+    // do  not create aggregated document for node with star child.
     if (hasStarChild) {
       node._aggDataDocumentId = starChildAggDocId;
     } else {
