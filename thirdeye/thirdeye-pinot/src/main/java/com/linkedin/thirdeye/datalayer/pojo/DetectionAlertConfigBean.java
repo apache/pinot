@@ -14,12 +14,12 @@ import java.util.Objects;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DetectionAlertConfigBean extends AbstractBean {
-
   boolean active;
   String name;
-  String fromAddress;
+  String from;
   String cronExpression;
   String application;
+  AlertConfigBean.SubjectType subjectType = AlertConfigBean.SubjectType.ALERT;
 
   Map<Long, Long> vectorClocks;
   Long highWaterMark;
@@ -50,12 +50,12 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.cronExpression = cronExpression;
   }
 
-  public String getFromAddress() {
-    return fromAddress;
+  public String getFrom() {
+    return from;
   }
 
-  public void setFromAddress(String fromAddress) {
-    this.fromAddress = fromAddress;
+  public void setFrom(String fromAddress) {
+    this.from = fromAddress;
   }
 
   public Map<String, Object> getProperties() {
@@ -90,6 +90,14 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.highWaterMark = highWaterMark;
   }
 
+  public AlertConfigBean.SubjectType getSubjectType() {
+    return subjectType;
+  }
+
+  public void setSubjectType(AlertConfigBean.SubjectType subjectType) {
+    this.subjectType = subjectType;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -99,16 +107,15 @@ public class DetectionAlertConfigBean extends AbstractBean {
       return false;
     }
     DetectionAlertConfigBean that = (DetectionAlertConfigBean) o;
-    return active == that.active && Objects.equals(name, that.name) && Objects.equals(fromAddress, that.fromAddress)
+    return active == that.active && Objects.equals(name, that.name) && Objects.equals(from, that.from)
         && Objects.equals(cronExpression, that.cronExpression) && Objects.equals(application, that.application)
-        && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(highWaterMark, that.highWaterMark)
-        && Objects.equals(properties, that.properties);
+        && subjectType == that.subjectType && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(
+        highWaterMark, that.highWaterMark) && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
-
-    return Objects.hash(active, name, fromAddress, cronExpression, application, vectorClocks, highWaterMark,
-        properties);
+    return Objects.hash(active, name, from, cronExpression, application, subjectType, vectorClocks,
+        highWaterMark, properties);
   }
 }

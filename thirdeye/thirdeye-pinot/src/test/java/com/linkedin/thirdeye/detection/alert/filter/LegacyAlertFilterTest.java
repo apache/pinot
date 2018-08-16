@@ -4,9 +4,11 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.MockDataProvider;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +27,9 @@ public class LegacyAlertFilterTest {
   private static final String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
   private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
   private static final String RECIPIENTS_VALUES = "test@example.com,mytest@example.org";
+
+  private static final DetectionAlertFilterRecipients RECIPIENTS =
+      new DetectionAlertFilterRecipients(new HashSet<>(Arrays.asList("test@example.com", "mytest@example.org")), Collections.<String>emptySet(), Collections.<String>emptySet());
 
   private List<MergedAnomalyResultDTO> detectedAnomalies;
   private LegacyAlertFilter legacyAlertFilter;
@@ -59,7 +64,7 @@ public class LegacyAlertFilterTest {
   @Test
   public void testRun() throws Exception {
     DetectionAlertFilterResult result = this.legacyAlertFilter.run();
-    Assert.assertEquals(result.getResult().get(new HashSet<>(Arrays.asList("test@example.com", "mytest@example.org"))),
+    Assert.assertEquals(result.getResult().get(RECIPIENTS),
         new HashSet<>(this.detectedAnomalies.subList(0, 4)));
   }
 }

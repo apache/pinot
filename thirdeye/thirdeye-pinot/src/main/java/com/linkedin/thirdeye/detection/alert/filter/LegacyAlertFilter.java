@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilter;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
@@ -52,7 +53,7 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
   }
 
   @Override
-  public DetectionAlertFilterResult run() throws Exception {
+  public DetectionAlertFilterResult run() {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
 
     for (Long detectionConfigId : this.detectionConfigIds) {
@@ -71,7 +72,8 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
             }
           });
 
-      result.addMapping(new HashSet<>(Arrays.asList(this.alertConfig.getRecipients().split(","))), new HashSet<>(anomalies));
+      result.addMapping(new DetectionAlertFilterRecipients(
+          new HashSet<>(Arrays.asList(this.alertConfig.getRecipients().split(","))), Collections.<String>emptySet(), Collections.<String>emptySet()), new HashSet<>(anomalies));
 
     }
 
