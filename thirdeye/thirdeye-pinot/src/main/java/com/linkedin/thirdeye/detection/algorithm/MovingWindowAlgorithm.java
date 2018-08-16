@@ -558,7 +558,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     BooleanSeries outlierAndTimeFilter = df.getBooleans(COL_OUTLIER).not().and(timeFilter);
 
     // TODO make threshold for fallback to outlier period configurable
-    if (outlierAndTimeFilter.sum().longValue() <= timeFilter.sum().longValue() / 3) {
+    if (outlierAndTimeFilter.sum().fillNull().longValue() <= timeFilter.sum().fillNull().longValue() / 3) {
       return df.filter(timeFilter).dropNull(COL_TIME, COL_COMPUTED_VALUE);
     }
 
