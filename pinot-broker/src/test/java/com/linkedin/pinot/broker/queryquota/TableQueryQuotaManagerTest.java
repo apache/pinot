@@ -115,6 +115,9 @@ public class TableQueryQuotaManagerTest {
     _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
 
+    // All the request should be passed.
+    runQueries(70, 10);
+
     _tableQueryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
   }
@@ -219,11 +222,8 @@ public class TableQueryQuotaManagerTest {
     // The hash map now contains 2 entries for both of the tables.
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 2);
 
-    for (int i = 0; i < 70; i++) {
-      Assert.assertTrue(_tableQueryQuotaManager.acquire(RAW_TABLE_NAME));
-      // Rate limiter generates 1 token every 10 milliseconds, have to make it sleep for a while.
-      Thread.sleep(10);
-    }
+    // Rate limiter generates 1 token every 10 milliseconds, have to make it sleep for a while.
+    runQueries(70, 10L);
 
     _tableQueryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
     // Since real-time table still has the qps quota, the size of the hash map becomes 1.
@@ -241,6 +241,11 @@ public class TableQueryQuotaManagerTest {
     setQps(tableConfig);
     _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
+
+    runQueries(70, 10L);
+
+    _tableQueryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
+    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -366,5 +371,26 @@ public class TableQueryQuotaManagerTest {
     brokerResource.setState(tableName, "broker_instance_1", "ONLINE");
     brokerResource.setState(tableName, "broker_instance_2", "OFFLINE");
     return brokerResource;
+  }
+
+  private void runQueries(int numOfTimesToRun, long millis) throws InterruptedException {
+    int count = 0;
+    for (int i = 0; i < numOfTimesToRun; i++) {
+      Assert.assertTrue(_tableQueryQuotaManager.acquire(RAW_TABLE_NAME));
+      count++;
+      Thread.sleep(millis);
+    }
+    Assert.assertEquals(count, numOfTimesToRun);
+
+    //Reduce the time of sleeping and some of the queries should be throttled.
+    count = 0;
+    millis /= 2;
+    for (int i = 0; i < numOfTimesToRun; i++) {
+      if (!_tableQueryQuotaManager.acquire(RAW_TABLE_NAME)) {
+        count++;
+      }
+      Thread.sleep(millis);
+    }
+    Assert.assertTrue(count > 0 && count < numOfTimesToRun);
   }
 }

@@ -176,46 +176,56 @@ public class TableQueryQuotaManager {
    */
   public boolean acquire(String tableName) {
     LOGGER.debug("Trying to acquire token for table: {}", tableName);
+    String offlineTableName = null;
+    String realtimeTableName = null;
+    QueryQuotaConfig offlineTableQueryQuotaConfig = null;
+    QueryQuotaConfig realtimeTableQueryQuotaConfig = null;
 
-    final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      offlineTableName = tableName;
+      offlineTableQueryQuotaConfig = _rateLimiterMap.get(tableName);
+    } else if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+      realtimeTableName = tableName;
+      realtimeTableQueryQuotaConfig = _rateLimiterMap.get(tableName);
+    } else {
+      offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      offlineTableQueryQuotaConfig = _rateLimiterMap.get(offlineTableName);
+      realtimeTableQueryQuotaConfig = _rateLimiterMap.get(realtimeTableName);
+    }
 
-    QueryQuotaConfig offlineTableQueryQuotaConfig = _rateLimiterMap.get(offlineTableName);
-    QueryQuotaConfig realtimeTableQueryQuotaConfig = _rateLimiterMap.get(realtimeTableName);
-
-
-    boolean offlineQuotaOk = offlineTableQueryQuotaConfig == null || tryAcquireToken(tableName, offlineTableQueryQuotaConfig);
-    boolean realtimeQuotaOk = realtimeTableQueryQuotaConfig == null || tryAcquireToken(tableName, realtimeTableQueryQuotaConfig);
+    boolean offlineQuotaOk = offlineTableQueryQuotaConfig == null || tryAcquireToken(offlineTableName, offlineTableQueryQuotaConfig);
+    boolean realtimeQuotaOk = realtimeTableQueryQuotaConfig == null || tryAcquireToken(realtimeTableName, realtimeTableQueryQuotaConfig);
 
     return offlineQuotaOk && realtimeQuotaOk;
   }
 
   /**
    * Try to acquire token from rate limiter. Emit the utilization of the qps quota if broker metric isn't null.
-   * @param tableName origin table name, which could be raw.
+   * @param tableNameWithType table name with type.
    * @param queryQuotaConfig query quota config for type-specific table.
    * @return true if there's no qps quota for that table, or a token is acquired successfully.
    */
-  private boolean tryAcquireToken(String tableName, QueryQuotaConfig queryQuotaConfig) {
+  private boolean tryAcquireToken(String tableNameWithType, QueryQuotaConfig queryQuotaConfig) {
     // Use hit counter to count the number of hits.
     queryQuotaConfig.getHitCounter().hit();
 
     RateLimiter rateLimiter = queryQuotaConfig.getRateLimiter();
     double perBrokerRate = rateLimiter.getRate();
-    if (!rateLimiter.tryAcquire()) {
-      LOGGER.info("Quota is exceeded for table: {}. Per-broker rate: {}", tableName, perBrokerRate);
-      return false;
-    }
 
     // Emit the qps capacity utilization rate.
+    int numHits = queryQuotaConfig.getHitCounter().getHitCount();
     if (_brokerMetrics != null) {
-      int numHits = queryQuotaConfig.getHitCounter().getHitCount();
       int percentageOfCapacityUtilization = (int)(numHits * 100 / perBrokerRate);
       LOGGER.debug("The percentage of rate limit capacity utilization is {}", percentageOfCapacityUtilization);
-      _brokerMetrics.setValueOfTableGauge(tableName, BrokerGauge.QUERY_QUOTA_CAPACITY_UTILIZATION_RATE, percentageOfCapacityUtilization);
+      _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.QUERY_QUOTA_CAPACITY_UTILIZATION_RATE, percentageOfCapacityUtilization);
     }
 
+    if (!rateLimiter.tryAcquire()) {
+      LOGGER.info("Quota is exceeded for table: {}. Per-broker rate: {}. Current qps: {}", tableNameWithType, perBrokerRate, numHits);
+      return false;
+    }
     // Token is successfully acquired.
     return true;
   }
