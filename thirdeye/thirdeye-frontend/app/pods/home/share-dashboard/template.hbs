@@ -18,11 +18,11 @@
         {{#x-tree
           chosenId=selectedNode
           checkable=true
-          expandDepth=2
+          expandDepth=0
           model=tree as |node|}}
             {{node.name}}
             {{#if node.isComment}}
-              <input type="text" {{action 'updateComment' node.id on="change"}} value="{{node.comment}}" placeholder="Comment for {{node.name}}" name="{{node.name}}" id="{{node.id}}" style="border: none;border-bottom: 1px solid grey;margin-left: 30px;width: 800px;">
+              <input type="text" {{action 'updateComment' node.id on="change"}} value="{{node.comment}}" placeholder="Add comments for metrics/alerts" name="{{node.name}}" id="{{node.id}}" style="border: none;border-bottom: 1px solid grey;margin-left: 30px;width: 800px;">
             {{/if}}
         {{/x-tree}}
     </section>
@@ -70,7 +70,7 @@
               {{#if dashboard_summary_comment}}
                 <div id="section_dashboard_summary">
                   <h5>Summary</h5>
-                  <p id="dashboardId_dashboard_summary">{{dashboard_summary_comment}}</p>
+                  <p id="dashboardId_dashboard_summary">{{markdown-to-html dashboard_summary_comment}}</p>
                 </div>
               {{/if}}
               {{#if shareUrl}}
@@ -90,7 +90,7 @@
                   {{#if metricList.viewTreeNode.comment}}
                     <div id="section_{metricList.metricId}">
                       <h5 style="margin-left: 20px;font-weight: bold;">Metric summary</h5>
-                      <p style="margin-left: 20px;" id="metricId_{{metricList.metricId}}">{{metricList.viewTreeNode.comment}}</p>
+                      <p style="margin-left: 20px;" id="metricId_{{metricList.metricId}}">{{markdown-to-html metricList.viewTreeNode.comment}}</p>
                     </div>
                   {{/if}}
                   <!-- Alert level -->
