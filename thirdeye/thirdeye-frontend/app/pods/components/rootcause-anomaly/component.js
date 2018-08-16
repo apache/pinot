@@ -286,16 +286,27 @@ export default Component.extend({
         const value = this._getAggregate(offset);
         const change = curr / value - 1;
 
-        anomalyInfo[offset] = {
-          value: humanizeFloat(value), // numerical value to display
-          change: humanizeChange(change), // text of % change with + or - sign
-          direction: toColorDirection(change, isInverse(metricUrn, entities))
-        };
+        if (!Number.isNaN(value)) {
+          anomalyInfo[offset] = {
+            value: humanizeFloat(value), // numerical value to display
+            change: humanizeChange(change), // text of % change with + or - sign
+            direction: toColorDirection(change, isInverse(metricUrn, entities))
+          };
+        }
       });
 
       return anomalyInfo;
     }
   ),
+
+  /**
+   * Returns any offset that has associated current and change values
+   * @type {Array}
+   */
+  availableOffsets: computed('offsets', 'anomalyInfo', function () {
+    const { offsets, anomalyInfo } = getProperties(this, 'offsets', 'anomalyInfo');
+    return offsets.filter(offset => offset in anomalyInfo);
+  }),
 
   /**
    * Returns the aggregate value for a given offset. Handles computed baseline special case.
@@ -309,7 +320,9 @@ export default Component.extend({
       getProperties(this, 'metricUrn', 'aggregates', 'predicted', 'aggregateMultiplier');
 
     if (offset === 'predicted') {
-      return parseFloat(predicted);
+      const value = parseFloat(predicted);
+      if (value === 0.0) { return Number.NaN; }
+      return value;
     }
 
     return aggregates[toOffsetUrn(metricUrn, offset)] * aggregateMultiplier;

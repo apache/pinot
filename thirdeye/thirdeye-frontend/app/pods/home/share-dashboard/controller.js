@@ -233,6 +233,7 @@ export default Controller.extend({
      * Created a PDF to save
      */
     createPDF(){
+      $('.share-dashboard-container__preview-container-body').css({backgroundColor: '#EDF0F3'});
       html2canvas($('.share-dashboard-container__preview-container-body'), {
         onrendered: (canvas) => {
           const imgData = canvas.toDataURL('image/jpeg', 1.0);
@@ -245,6 +246,7 @@ export default Controller.extend({
           }
           doc.addImage(imgData, 'PNG', 10, 10);
           doc.save(`shared_summary.pdf`);
+          $('.share-dashboard-container__preview-container-body').css({backgroundColor: 'transparent'});
         }
       });
     },
@@ -276,7 +278,6 @@ export default Controller.extend({
     updateComment(id) {
       const userComment = document.getElementById(id).value;
       if (id === 'dashboard_summary') {
-        //document.getElementById(`dashboardId_dashboard_summary`).innerHTML = userComment;
         //update the tree with latest comment
         let res = get(this, 'tree.firstObject');
         set(res, 'comment', userComment);
@@ -317,7 +318,7 @@ export default Controller.extend({
       const shareResponse = get(this, 'shareDashboardApiService').saveShareDashboard(treeView);
       const hashKey = get(this, 'shareDashboardApiService').getHashKey();
       //ADD to helper method
-      let currentUrl = `/app/#/home/share-dashboard?`;
+      let currentUrl = `${window.location.origin}/app/#/home/share-dashboard?`;
       if(get(this, 'model.appName')){
         currentUrl = currentUrl.concat(`appName=${get(this, 'model.appName')}`);
       }
