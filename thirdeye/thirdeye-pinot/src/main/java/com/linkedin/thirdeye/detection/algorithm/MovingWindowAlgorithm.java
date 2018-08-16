@@ -36,6 +36,11 @@ import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
 
 
+/**
+ * Exponential smoothing for baseline generation. Detects anomalies via normalized
+ * zscore or quantile rules from rolling look-back window. Supports basic noise
+ * suppression, outlier elimination and change point detection.
+ */
 public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private static final String COL_CURR = "currentValue";
   private static final String COL_BASE = "baselineValue";
@@ -186,6 +191,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
       dfInput.addSeries(dfPrefix, COL_COMPUTED_OUTLIER);
       dfInput.mapInPlace(BooleanSeries.HAS_TRUE, COL_OUTLIER, COL_OUTLIER, COL_COMPUTED_OUTLIER);
+      dfInput = dfInput.fillNull(COL_OUTLIER);
     }
 
     // generate detection time series
@@ -244,8 +250,6 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       if (fractionChangePoint >= 0 && fractionChangePoint >= minChangePoint) {
         TreeSet<Long> changePointsNew = new TreeSet<>(changePoints);
         changePointsNew.add(fractionChangePoint);
-        System.out.println("change point during execution at " + timestamp + " for " + this.sliceData);
-
         return this.run(df, timestamp, changePointsNew);
       }
 
@@ -317,28 +321,28 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
       if (!Double.isNaN(this.zscoreMin) && zscore < this.zscoreMin) {
         sAnomaly[index] |= 1;
-        partialViolation = partialViolation.or(df.getDoubles(COL_ZSCORE).lt(this.zscoreMin / 2));
+        partialViolation = partialViolation.or(df.getDoubles(COL_ZSCORE).lt(this.zscoreMin / 2).fillNull());
       }
 
       if (!Double.isNaN(this.zscoreMax) && zscore > this.zscoreMax) {
         sAnomaly[index] |= 1;
-        partialViolation = partialViolation.or(df.getDoubles(COL_ZSCORE).gt(this.zscoreMax / 2));
+        partialViolation = partialViolation.or(df.getDoubles(COL_ZSCORE).gt(this.zscoreMax / 2).fillNull());
       }
 
       // range anomalies (zscore kernel)
       if (!Double.isNaN(this.kernelMin) && kernelZscore < this.kernelMin) {
         sAnomaly[index + kernelOffset] |= 1;
-        partialViolation = partialViolation.or(df.getDoubles(COL_KERNEL_ZSCORE).lt(this.kernelMin / 2));
+        partialViolation = partialViolation.or(df.getDoubles(COL_KERNEL_ZSCORE).lt(this.kernelMin / 2).fillNull());
       }
 
       if (!Double.isNaN(this.kernelMax) && kernelZscore > this.kernelMax) {
         sAnomaly[index + kernelOffset] |= 1;
-        partialViolation = partialViolation.or(df.getDoubles(COL_KERNEL_ZSCORE).gt(this.kernelMax / 2));
+        partialViolation = partialViolation.or(df.getDoubles(COL_KERNEL_ZSCORE).gt(this.kernelMax / 2).fillNull());
       }
 
       // anomaly region expansion
       if (partialViolation.hasTrue()) {
-        partialViolation = partialViolation.or(df.getBooleans(COL_ANOMALY));
+        partialViolation = partialViolation.or(df.getBooleans(COL_ANOMALY).fillNull());
         sAnomaly = anomalyRangeHelper(df, df.getBooleans(COL_ANOMALY), partialViolation).getBooleans(COL_ANOMALY).values();
       }
 
