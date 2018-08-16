@@ -79,4 +79,8 @@ public class AlertFilterFactory {
     alertFilter.setParameters(alertFilterSpec);
     return alertFilter;
   }
+
+  public String getClassNameForAlertFilterType(String type) {
+    return props.getProperty(type);
+  }
 }
