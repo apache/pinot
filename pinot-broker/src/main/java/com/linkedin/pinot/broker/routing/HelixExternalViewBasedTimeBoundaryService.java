@@ -21,11 +21,12 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -33,8 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@ThreadSafe
 public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundaryService {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedTimeBoundaryService.class);
 
   private static final String DAYS_SINCE_EPOCH = "daysSinceEpoch";
@@ -43,13 +44,13 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
   private static final String SECONDS_SINCE_EPOCH = "secondsSinceEpoch";
 
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private final Map<String, TimeBoundaryInfo> _timeBoundaryInfoMap = new HashMap<String, TimeBoundaryInfo>();
+  private final Map<String, TimeBoundaryInfo> _timeBoundaryInfoMap = new ConcurrentHashMap<>();
 
   public HelixExternalViewBasedTimeBoundaryService(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _propertyStore = propertyStore;
   }
 
-  public synchronized void updateTimeBoundaryService(ExternalView externalView) {
+  public void updateTimeBoundaryService(ExternalView externalView) {
     if (_propertyStore == null) {
       return;
     }
@@ -66,6 +67,7 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
     }
 
     TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    assert offlineTableConfig != null;
     String timeType = offlineTableConfig.getValidationConfig().getTimeType();
     TimeUnit tableTimeUnit = getTimeUnitFromString(timeType);
     if (tableTimeUnit == null) {
