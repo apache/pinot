@@ -39,15 +39,19 @@ public class PinotFSFactory {
       // Assume local
       scheme = "file";
     }
-    String className = _schemeConfig.getString(scheme);
+    if (_schemeConfig != null) {
+      String className = _schemeConfig.getString(scheme);
 
-    if (className == null) {
-      LOGGER.info("No pinot fs is configured, using LocaLPinotFS by default");
+      if (className == null) {
+        LOGGER.info("No pinot fs is configured, using LocaLPinotFS by default");
+        return new LocalPinotFS();
+      }
+
+      LOGGER.info("Creating a new pinot fs for fs: {} with class: {}", scheme, className);
+
+      return (PinotFS) Class.forName(className).newInstance();
+    } else {
       return new LocalPinotFS();
     }
-
-    LOGGER.info("Creating a new pinot fs for fs: {} with class: {}", scheme, className);
-
-    return (PinotFS) Class.forName(className).newInstance();
   }
 }

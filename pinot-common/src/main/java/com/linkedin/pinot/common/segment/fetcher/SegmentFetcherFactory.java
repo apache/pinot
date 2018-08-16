@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.filesystem.LocalPinotFS;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
@@ -89,9 +88,6 @@ public class SegmentFetcherFactory {
     SegmentFetcher segmentFetcher = _segmentFetcherMap.get(protocol);
     if (segmentFetcher instanceof GenericSegmentFetcher) {
       LOGGER.info("Initializing pinotFS for segment fetcher with uri {}", uri);
-      if (_pinotFSConfig.getProperty("file") == null) {
-        _pinotFSConfig.addProperty("file", LocalPinotFS.class.getName());
-      }
       segmentFetcher = new GenericSegmentFetcher(new URI(uri), _pinotFSConfig);
     }
     return segmentFetcher;
