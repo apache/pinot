@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.detection.alert;
 
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -10,8 +9,8 @@ import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
@@ -47,6 +46,9 @@ import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.HtmlEmail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,7 +129,11 @@ public class DetectionAlertTaskRunner implements TaskRunner {
           this.detectionAlertConfig.getVectorClocks(),
           makeVectorClock(result.getAllAnomalies())));
 
-      this.detectionAlertConfig.setHighWaterMark(getHighWaterMark(result.getAllAnomalies()));
+      long highWaterMark = getHighWaterMark(result.getAllAnomalies());
+      if (this.detectionAlertConfig.getHighWaterMark() != null) {
+        highWaterMark = Math.max(this.detectionAlertConfig.getHighWaterMark(), highWaterMark);
+      }
+      this.detectionAlertConfig.setHighWaterMark(highWaterMark);
 
       this.alertConfigDAO.save(this.detectionAlertConfig);
     }
@@ -135,12 +141,19 @@ public class DetectionAlertTaskRunner implements TaskRunner {
   }
 
   private void sendEmail(DetectionAlertFilterResult detectionResult) throws Exception {
-    for (Map.Entry<Set<String>, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
-      Set<String> recipients = entry.getKey();
+    for (Map.Entry<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
+      DetectionAlertFilterRecipients recipients = entry.getKey();
       Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
 
       if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
-        recipients.retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.to.retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.cc.retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.bcc.retainAll(this.thirdeyeConfig.getEmailWhitelist());
+      }
+
+      if (recipients.to.isEmpty()) {
+        LOG.warn("Email doesn't have any valid (whitelisted) recipients. Skipping.");
+        continue;
       }
 
       EmailContentFormatter emailContentFormatter =
@@ -149,20 +162,26 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       emailContentFormatter.init(new Properties(),
           EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.thirdeyeConfig));
 
-      Joiner joiner = Joiner.on(",").skipNulls();
-
       List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
       anomalyResultListOfGroup.addAll(anomalies);
       Collections.sort(anomalyResultListOfGroup, COMPARATOR_DESC);
 
       AlertConfigDTO alertConfig = new AlertConfigDTO();
       alertConfig.setName(this.detectionAlertConfig.getName());
-      alertConfig.setFromAddress(this.detectionAlertConfig.getFromAddress());
+      alertConfig.setFromAddress(this.detectionAlertConfig.getFrom());
+      alertConfig.setSubjectType(this.detectionAlertConfig.getSubjectType());
 
-      EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, joiner.join(recipients),
+      EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
           "Thirdeye Alert : " + this.detectionAlertConfig.getName(), null, null, anomalyResultListOfGroup,
           new EmailContentFormatterContext());
-      EmailHelper.sendEmailWithEmailEntity(emailEntity, thirdeyeConfig.getSmtpConfiguration());
+
+      HtmlEmail email = emailEntity.getContent();
+      email.setFrom(this.detectionAlertConfig.getFrom());
+      email.setTo(AlertUtils.toAddress(recipients.to));
+      email.setCc(AlertUtils.toAddress(recipients.cc));
+      email.setBcc(AlertUtils.toAddress(recipients.bcc));
+
+      this.sendEmail(emailEntity);
     }
   }
 
@@ -214,5 +233,27 @@ public class DetectionAlertTaskRunner implements TaskRunner {
     }
 
     return result;
+  }
+
+  /** Sends email according to the provided config. */
+  private void sendEmail(EmailEntity entity) throws EmailException {
+    HtmlEmail email = entity.getContent();
+    SmtpConfiguration config = this.thirdeyeConfig.getSmtpConfiguration();
+
+    if (config == null) {
+      LOG.error("No email configuration available. Skipping.");
+      return;
+    }
+
+    email.setHostName(config.getSmtpHost());
+    email.setSmtpPort(config.getSmtpPort());
+    if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
+      email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
+      email.setSSLOnConnect(true);
+    }
+    email.send();
+
+    int recipientCount = email.getToAddresses().size() + email.getCcAddresses().size() + email.getBccAddresses().size();
+    LOG.info("Sent email sent with subject '{}' to {} recipients", email.getSubject(), recipientCount);
   }
 }
