@@ -376,15 +376,13 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       throw new IllegalArgumentException("Series must be of equal size");
     }
 
-    // TODO max lookback/forward range for performance
-
     byte[] full = violation.values();
     byte[] partial = partialViolation.values();
     byte[] output = new byte[full.length];
 
     int lastPartial = -1;
     for (int i = 0; i < violation.size(); i++) {
-      if (lastPartial >= 0 && BooleanSeries.isFalse(partial[i])) {
+      if (BooleanSeries.isFalse(partial[i])) {
         lastPartial = -1;
       }
 
@@ -393,15 +391,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       }
 
       if (full[i] > 0) {
-        // partial[i] must be 1 here
-        if (partial[i] != 1) {
-          System.out.println("meh.");
-        }
+        lastPartial = lastPartial >= 0 ? lastPartial : i;
 
-        int j = lastPartial;
+        int j;
 
-        for (; j < full.length && !BooleanSeries.isFalse(partial[j]); j++) {
-          if (!BooleanSeries.isNull(partial[j])) {
+        for (j = lastPartial; j < full.length && !BooleanSeries.isFalse(partial[j]); j++) {
+          if (BooleanSeries.isTrue(full[j]) || BooleanSeries.isTrue(partial[j])) {
             output[j] = 1;
           }
         }
