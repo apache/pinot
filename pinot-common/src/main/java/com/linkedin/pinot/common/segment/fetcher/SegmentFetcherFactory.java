@@ -46,9 +46,9 @@ public class SegmentFetcherFactory {
       Collections.unmodifiableMap(new HashMap<String, String>(5) {{
         put("http", HttpSegmentFetcher.class.getName());
         put("https", HttpsSegmentFetcher.class.getName());
-        put("hdfs", GenericSegmentFetcher.class.getName());
-        put("adl", GenericSegmentFetcher.class.getName());
-        put("file", GenericSegmentFetcher.class.getName());
+        put("hdfs", PinotFSSegmentFetcher.class.getName());
+        put("adl", PinotFSSegmentFetcher.class.getName());
+        put("file", PinotFSSegmentFetcher.class.getName());
       }});
   public static final String FETCHER_CLASS_KEY_SUFFIX = ".class";
 
@@ -86,10 +86,6 @@ public class SegmentFetcherFactory {
   public SegmentFetcher getSegmentFetcherBasedOnURI(String uri) throws Exception {
     String protocol = new URI(uri).getScheme();
     SegmentFetcher segmentFetcher = _segmentFetcherMap.get(protocol);
-    if (segmentFetcher instanceof GenericSegmentFetcher) {
-      LOGGER.info("Initializing pinotFS for segment fetcher with uri {}", uri);
-      segmentFetcher = new GenericSegmentFetcher(new URI(uri), _pinotFSConfig);
-    }
     return segmentFetcher;
   }
 

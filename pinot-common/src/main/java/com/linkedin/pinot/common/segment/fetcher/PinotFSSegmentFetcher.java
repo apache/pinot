@@ -24,26 +24,21 @@ import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 
 
-public class GenericSegmentFetcher implements SegmentFetcher {
+public class PinotFSSegmentFetcher implements SegmentFetcher {
   private PinotFS _pinotFS;
 
   @Override
   public void init(Configuration config) {
-  }
 
-  public GenericSegmentFetcher() {
-
-  }
-
-  public GenericSegmentFetcher(URI uri, Configuration configuration) throws Exception {
-    PinotFSFactory factory = new PinotFSFactory(configuration);
-    _pinotFS = factory.create(uri);
-    _pinotFS.init(configuration);
   }
 
   @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
-    _pinotFS.copyToLocalFile(new URI(uri), tempFile.toURI());
+  public void fetchSegmentToLocal(String uriString, File tempFile) throws Exception {
+    URI uri = new URI(uriString);
+
+    // TODO: move _pinotFS creation to init, however, it needs the right config passed in into init.
+    _pinotFS = PinotFSFactory.create(uri.getScheme());
+    _pinotFS.copyToLocalFile(uri, tempFile.toURI());
   }
 
   /**

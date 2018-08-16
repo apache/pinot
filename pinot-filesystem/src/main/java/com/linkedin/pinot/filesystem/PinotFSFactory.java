@@ -16,7 +16,9 @@
 
 package com.linkedin.pinot.filesystem;
 
-import java.net.URI;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,32 +28,44 @@ import org.slf4j.LoggerFactory;
  * This factory class initializes the PinotFS class. It creates a PinotFS object based on the URI found.
  */
 public class PinotFSFactory {
-  public static final Logger LOGGER = LoggerFactory.getLogger(PinotFSFactory.class);
-  private static Configuration _schemeConfig;
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSFactory.class);
+  private static final String DEFAULT_FS_SCHEME = "file";
 
-  public PinotFSFactory(Configuration config) {
-    _schemeConfig = config;
+  private static Map<String, PinotFS> _fileSystemMap = new HashMap<>();
+
+  // Prevent factory from being instantiated.
+  private PinotFSFactory() {
+
   }
 
-  public PinotFS create(URI uri) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
-    String scheme = uri.getScheme();
-    if (scheme == null) {
-      // Assume local
-      scheme = "file";
-    }
-    if (_schemeConfig != null) {
-      String className = _schemeConfig.getString(scheme);
+  public static void init(Configuration fsConfig) {
+    Iterator<String> keys = fsConfig.getKeys();
+    while (keys.hasNext()) {
+      String key = keys.next();
+      String fsClassName = (String) fsConfig.getProperty(key);
 
-      if (className == null) {
-        LOGGER.info("No pinot fs is configured, using LocaLPinotFS by default");
-        return new LocalPinotFS();
+      try {
+        PinotFS pinotFS = (PinotFS) Class.forName(fsClassName).newInstance();
+        pinotFS.init(fsConfig.subset(null)); // fixme: Add a new subset config here.
+
+        _fileSystemMap.put(key, pinotFS);
+      } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+        LOGGER.error("Could not instantiate file system for class {}", fsClassName, e);
+        throw new RuntimeException(e);
       }
-
-      LOGGER.info("Creating a new pinot fs for fs: {} with class: {}", scheme, className);
-
-      return (PinotFS) Class.forName(className).newInstance();
-    } else {
-      return new LocalPinotFS();
     }
+
+    if (!_fileSystemMap.containsKey(DEFAULT_FS_SCHEME)) {
+      LOGGER.info("Pinot file system not configured, configuring LocalPinotFS as default");
+      _fileSystemMap.put(DEFAULT_FS_SCHEME, new LocalPinotFS());
+    }
+  }
+
+  public static PinotFS create(String scheme) {
+    PinotFS pinotFS = _fileSystemMap.get(scheme);
+    if (pinotFS == null) {
+      throw new RuntimeException("Pinot file system not configured for scheme: " + scheme);
+    }
+    return pinotFS;
   }
 }

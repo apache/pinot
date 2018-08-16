@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nonnull;
@@ -55,6 +56,7 @@ public class SegmentFetcherAndLoader {
     Configuration segmentFetcherFactoryConfig =
         pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
+    PinotFSFactory.init(pinotFSConfig);
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
   }
 
