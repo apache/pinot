@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.detection;
 
 import com.google.common.base.Strings;
-import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
