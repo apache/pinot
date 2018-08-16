@@ -40,6 +40,7 @@ public class MinStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
   private StarTreeV2Config _starTreeV2Config;
 
   private int ROWS_COUNT = 26000;
+  private long RANDOM_SEED = System.nanoTime();
 
   private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
       "SELECT MIN(salary) FROM T WHERE Country IN ('US', 'IN') AND Name NOT IN ('Rahul') GROUP BY Language"
@@ -51,7 +52,7 @@ public class MinStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT, RANDOM_SEED);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
@@ -127,6 +128,6 @@ public class MinStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
 
   @Override
   protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+    Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5, "failed for random seed " + RANDOM_SEED);
   }
 }

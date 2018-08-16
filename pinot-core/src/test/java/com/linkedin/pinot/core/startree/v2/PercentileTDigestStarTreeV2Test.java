@@ -43,9 +43,10 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
 
   private File _indexDir;
   private int ROWS_COUNT = 260000;
-  private final int _percentile = 90;
-  private final double VALUE_RANGE = Integer.MAX_VALUE;
-  private final double DELTA = 0.15 * VALUE_RANGE; // Allow 15% quantile error
+  private int _percentile = 90;
+  private long RANDOM_SEED = System.nanoTime();
+  private double VALUE_RANGE = Integer.MAX_VALUE;
+  private double DELTA = 0.15 * VALUE_RANGE; // Allow 15% quantile error
 
   private StarTreeV2Config _starTreeV2Config;
   private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
@@ -59,7 +60,7 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT, RANDOM_SEED);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
@@ -156,7 +157,7 @@ public class PercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<byte[], 
 
     if ((nonStarTreeResult.size() != starTreeResult.size()) && (starTreeResult.size() != 1)) {
       Assert.assertEquals(starTreeResult.quantile(_percentile / 100.0), nonStarTreeResult.quantile(_percentile / 100.0),
-          DELTA, "failed badly");
+          DELTA, "failed for random seed " + RANDOM_SEED);
     }
   }
 }

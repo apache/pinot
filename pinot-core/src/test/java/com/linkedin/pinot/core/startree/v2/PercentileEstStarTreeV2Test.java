@@ -42,7 +42,8 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
 
   private File _indexDir;
   private int ROWS_COUNT = 60;
-  private final int _percentile = 80;
+  private int _percentile = 20;
+  private long RANDOM_SEED = System.nanoTime();
 
   private StarTreeV2Config _starTreeV2Config;
   private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[] {
@@ -56,7 +57,7 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT, RANDOM_SEED);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
@@ -153,6 +154,6 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
     System.out.println("Star-Tree Result Object Quantile: " + Long.toString(starTreeResult.getQuantile(_percentile / 100.0)));
     System.out.println("Non Star-Tree Result Object Quantile: " + Long.toString(nonStarTreeResult.getQuantile(_percentile / 100.0)));
 
-    Assert.assertEquals(starTreeResult.getQuantile(_percentile / 100.0), nonStarTreeResult.getQuantile(_percentile / 100.0));
+    Assert.assertEquals(starTreeResult.getQuantile(_percentile / 100.0), nonStarTreeResult.getQuantile(_percentile / 100.0), "failed for random seed " + RANDOM_SEED);
   }
 }

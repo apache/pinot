@@ -45,6 +45,7 @@ public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<byte[], H
 
   private File _indexDir;
   private int ROWS_COUNT = 10000;
+  private long RANDOM_SEED = System.nanoTime();
 
   private StarTreeV2Config _starTreeV2Config;
   private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[]{
@@ -58,7 +59,7 @@ public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<byte[], H
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT, RANDOM_SEED);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
@@ -154,6 +155,6 @@ public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<byte[], H
     System.out.println("Star-Tree Result Object Cardinality: " + Long.toString(starTreeResult.cardinality()));
     System.out.println("Non Star-Tree Result Object Cardinality: " + Long.toString(nonStarTreeResult.cardinality()));
 
-    Assert.assertEquals(starTreeResult.cardinality() , nonStarTreeResult.cardinality());
+    Assert.assertEquals(starTreeResult.cardinality() , nonStarTreeResult.cardinality(), "failed for random seed " + RANDOM_SEED);
   }
 }

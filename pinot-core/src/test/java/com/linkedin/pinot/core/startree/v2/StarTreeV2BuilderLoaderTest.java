@@ -42,6 +42,7 @@ public class StarTreeV2BuilderLoaderTest {
   private File _offHeapFilePath;
 
   private int ROWS_COUNT = 40;
+  private long RANDOM_SEED = System.nanoTime();
 
   private List<StarTreeV2Config> _onHeapStarTreeV2ConfigList = new ArrayList<>();
   private List<StarTreeV2Config> _offHeapStarTreeV2ConfigList = new ArrayList<>();
@@ -57,7 +58,7 @@ public class StarTreeV2BuilderLoaderTest {
 
     //List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentStaticData(schema);
 
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT, RANDOM_SEED);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
 

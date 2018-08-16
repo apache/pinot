@@ -40,6 +40,7 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
   private StarTreeV2Config _starTreeV2Config;
 
   private int ROWS_COUNT = 260;
+  private long RANDOM_SEED = System.nanoTime();
 
   private final String[] STAR_TREE1_HARD_CODED_QUERIES = new String[]{
       "SELECT COUNT(*) FROM T WHERE Name = 'Rahul'",
@@ -52,7 +53,7 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
     String segmentOutputDir = Files.createTempDir().toString();
 
     Schema schema = StarTreeV2SegmentHelper.createSegmentSchema();
-    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT);
+    List<GenericRow> rows = StarTreeV2SegmentHelper.createSegmentData(schema, ROWS_COUNT, RANDOM_SEED);
 
     RecordReader recordReader = new GenericRowRecordReader(rows, schema);
     _indexDir = StarTreeV2SegmentHelper.createSegment(schema, segmentName, segmentOutputDir, recordReader);
@@ -128,6 +129,6 @@ public class CountStarTreeV2Test extends BaseStarTreeV2Test<Long, Long> {
 
   @Override
   protected void assertAggregatedValue(Long starTreeResult, Long nonStarTreeResult) {
-    Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+    Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5, "failed for random seed " + RANDOM_SEED);
   }
 }
