@@ -13,7 +13,10 @@
       <section>
         <div style="margin-left: 15px;margin-bottom: 15px;display: inline-block;">
           <p><input type="checkbox" {{action 'toggleSelection' "dashboard_summary" on="change"}} checked> Add dashboard-level comments</p>
-          <p><input type="text" {{action 'updateComment' "dashboard_summary" on="change"}} value="{{dashboard_summary_comment}}" placeholder="Comment for dashboard summary" name="dashboard_summary" id="dashboard_summary" style="border: none;border-bottom: 1px solid grey;margin-left: 15px;width: 800px;"></p>
+          <p>
+            <textarea {{action 'updateComment' "dashboard_summary" on="change"}} value="{{dashboard_summary_comment}}" placeholder="Comment for dashboard summary" name="dashboard_summary" id="dashboard_summary" style="border: none;border-bottom: 1px solid grey;margin-left: 15px;width: 800px;">
+            </textarea>
+          </p>
         </div>
         {{#x-tree
           chosenId=selectedNode
