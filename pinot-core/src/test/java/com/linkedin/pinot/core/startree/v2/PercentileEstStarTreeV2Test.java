@@ -41,12 +41,12 @@ import org.testng.annotations.Test;
 public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], QuantileDigest> {
 
   private File _indexDir;
-  private int ROWS_COUNT = 10000;
-  private final int _percentile = 50;
+  private int ROWS_COUNT = 60;
+  private final int _percentile = 80;
 
   private StarTreeV2Config _starTreeV2Config;
   private final String[] STAR_TREE_HARD_CODED_QUERIES = new String[] {
-      "SELECT PERCENTILEEST50(salary) FROM T"
+      "SELECT PERCENTILEEST80(salary) FROM T"
   };
 
   @BeforeClass
@@ -119,7 +119,6 @@ public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<byte[], Quan
       return valueIterator.nextBytesVal();
     } else {
       Object val = dictionary.get(valueIterator.nextIntVal());
-
       long d = ((Number) val).longValue();
       QuantileDigest qDigest = new QuantileDigest(0.05);
       qDigest.add(d);

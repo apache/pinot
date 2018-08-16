@@ -37,10 +37,13 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeNode;
+import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -249,18 +252,17 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
     }
 
     int splitDimensionId = _dimensionsSplitOrder.get(level);
-    Map<Integer, Pairs.IntPair> dimensionRangeMap = groupOnDimension(startDocId, endDocId, splitDimensionId);
 
-    node._childDimensionId = splitDimensionId;
+    Int2ObjectMap<Pairs.IntPair> dimensionRangeMap = groupOnDimension(startDocId, endDocId, splitDimensionId);
 
     // reserve one space for star node
     Map<Integer, TreeNode> children = new HashMap<>(dimensionRangeMap.size() + 1);
 
+    node._childDimensionId = splitDimensionId;
     node._children = children;
     for (Integer key : dimensionRangeMap.keySet()) {
       int childDimensionValue = key;
       Pairs.IntPair range = dimensionRangeMap.get(childDimensionValue);
-
       TreeNode child = new TreeNode();
       child._dimensionValue = key;
       child._dimensionId = splitDimensionId;
@@ -360,8 +362,8 @@ public class OnHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Star
    *
    * @return Map from dimension value to a pair of start docId and end docId (exclusive)
    */
-  private Map<Integer, Pairs.IntPair> groupOnDimension(int startDocId, int endDocId, Integer dimensionId) {
-    Map<Integer, Pairs.IntPair> rangeMap = new HashMap<>();
+  private Int2ObjectMap<Pairs.IntPair> groupOnDimension(int startDocId, int endDocId, Integer dimensionId) {
+    Int2ObjectMap<Pairs.IntPair> rangeMap = new Int2ObjectLinkedOpenHashMap<>();
     int[] rowDimensions = _starTreeData.get(startDocId).getDimensionValues();
     int currentValue = rowDimensions[dimensionId];
 

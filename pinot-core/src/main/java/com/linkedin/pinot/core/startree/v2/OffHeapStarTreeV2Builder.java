@@ -372,16 +372,15 @@ public class OffHeapStarTreeV2Builder extends StarTreeV2BaseClass implements Sta
       dimensionRangeMap = dataTable.groupOnDimension(startDocId, endDocId, splitDimensionId, _docSizeIndex);
     }
 
-    node._childDimensionId = splitDimensionId;
 
     // reserve one space for star node
     Map<Integer, TreeNode> children = new HashMap<>(dimensionRangeMap.size() + 1);
 
+    node._childDimensionId = splitDimensionId;
     node._children = children;
     for (Integer key : dimensionRangeMap.keySet()) {
       int childDimensionValue = key;
       Pairs.IntPair range = dimensionRangeMap.get(childDimensionValue);
-
       TreeNode child = new TreeNode();
       child._dimensionValue = key;
       child._dimensionId = splitDimensionId;
