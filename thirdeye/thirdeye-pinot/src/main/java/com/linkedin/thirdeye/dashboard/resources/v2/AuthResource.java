@@ -88,7 +88,7 @@ public class AuthResource {
       sessionDTO.setSessionKey(sessionKey);
       sessionDTO.setPrincipalType(SessionBean.PrincipalType.USER);
       sessionDTO.setPrincipal(principal.getName());
-      sessionDTO.setExpirationTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(6));
+      sessionDTO.setExpirationTime(System.currentTimeMillis() + TimeUnit.HOURS.toMillis(8));
       this.sessionDAO.save(sessionDTO);
 
       NewCookie cookie =
@@ -100,12 +100,15 @@ public class AuthResource {
     }
     return Response.status(Response.Status.UNAUTHORIZED).build();
   }
-
   @Path("/logout")
   @GET
   public Response logout() {
     ThirdEyePrincipal principal = ThirdEyeAuthFilter.getCurrentPrincipal();
-    this.sessionDAO.deleteByPredicate(Predicate.EQ("sessionKey", principal.getSessionKey()));
+
+    if (principal != null) {
+      // if not logged out already
+      this.sessionDAO.deleteByPredicate(Predicate.EQ("sessionKey", principal.getSessionKey()));
+    }
 
     NewCookie cookie = new NewCookie(AUTH_TOKEN_NAME, "", "/", null, null, -1, false);
     return Response.ok().cookie(cookie).build();
