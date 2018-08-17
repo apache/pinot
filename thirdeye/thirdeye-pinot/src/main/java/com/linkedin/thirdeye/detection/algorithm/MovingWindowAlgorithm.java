@@ -247,6 +247,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
       long fractionChangePoint = extractAnomalyFractionChangePoint(changePointWindow, this.changeFraction);
 
+      // TODO prevent change point from anomalies labeled as outliers by user
+
       if (fractionChangePoint >= 0 && fractionChangePoint >= minChangePoint) {
         TreeSet<Long> changePointsNew = new TreeSet<>(changePoints);
         changePointsNew.add(fractionChangePoint);
@@ -584,6 +586,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       return 0.0;
     }
 
+    Long lastChangePoint = changePoints.floor(tCurrent);
+
     // construct baseline
     DataFrame raw = new DataFrame(COL_TIME, LongSeries.nulls(this.baselineWeeks))
         .addSeries(COL_VALUE, DoubleSeries.nulls(this.baselineWeeks))
@@ -593,13 +597,11 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     double[] sValue = raw.getDoubles(COL_VALUE).values();
     double[] sWeight = raw.getDoubles(COL_WEIGHT).values();
 
-    // TODO fit actual model
+    // exponential smoothing with weekly seasonality
     for (int i = 0; i < this.baselineWeeks; i++) {
       int offset = this.baselineWeeks - i;
       long timestamp = now.minus(new Period().withWeeks(offset)).getMillis();
       sTimestamp[i] = timestamp;
-
-      Long lastChangePoint = changePoints.floor(timestamp);
 
       int valueIndex = df.getLongs(COL_TIME).find(timestamp);
       if (valueIndex >= 0) {
@@ -607,12 +609,14 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
         sWeight[i] = Math.pow(0.666, offset);
 
         if (lastChangePoint != null && timestamp < lastChangePoint) {
-          sWeight[i] *= 0.1;
+          sWeight[i] *= 0.001;
         }
 
         if (BooleanSeries.isTrue(df.getBoolean(COL_OUTLIER, valueIndex))
-            && (lastChangePoint == null || timestamp >= new DateTime(lastChangePoint, this.timezone).plus(this.changeDuration).getMillis())) {
-          sWeight[i] *= 0.01;
+            && (lastChangePoint == null
+                || timestamp >= new DateTime(lastChangePoint, this.timezone).plus(this.changeDuration).getMillis()
+                || timestamp < lastChangePoint)) {
+          sWeight[i] *= 0.001;
         }
       }
     }
