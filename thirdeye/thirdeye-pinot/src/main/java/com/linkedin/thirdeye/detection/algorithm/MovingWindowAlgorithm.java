@@ -180,18 +180,20 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     }
 
     // estimate pre-computed outliers (non-anomaly outliers)
-    // NOTE: https://en.m.wikipedia.org/wiki/Median_absolute_deviation
-    DataFrame dfPrefix = dfInput.filter(dfInput.getLongs(COL_TIME).lt(this.effectiveStartTime)).dropNull(COL_TIME, COL_COMPUTED_VALUE);
-    DoubleSeries prefix = dfPrefix.getDoubles(COL_COMPUTED_VALUE);
-    DoubleSeries mad = prefix.subtract(prefix.median()).abs().median();
-    if (!mad.isNull(0) && mad.getDouble(0) > 0.0) {
-      double std = 1.4826 * mad.doubleValue();
-      double mean = AlgorithmUtils.robustMean(prefix, prefix.size()).getDouble(prefix.size() - 1);
-      dfPrefix.addSeries(COL_COMPUTED_OUTLIER, prefix.subtract(mean).divide(std).abs().gt(this.zscoreOutlier));
+    // https://en.m.wikipedia.org/wiki/Median_absolute_deviation
+    if (!Double.isNaN(this.zscoreOutlier)) {
+      DataFrame dfPrefix = dfInput.filter(dfInput.getLongs(COL_TIME).lt(this.effectiveStartTime)).dropNull(COL_TIME, COL_COMPUTED_VALUE);
+      DoubleSeries prefix = dfPrefix.getDoubles(COL_COMPUTED_VALUE);
+      DoubleSeries mad = prefix.subtract(prefix.median()).abs().median();
+      if (!mad.isNull(0) && mad.getDouble(0) > 0.0) {
+        double std = 1.4826 * mad.doubleValue();
+        double mean = AlgorithmUtils.robustMean(prefix, prefix.size()).getDouble(prefix.size() - 1);
+        dfPrefix.addSeries(COL_COMPUTED_OUTLIER, prefix.subtract(mean).divide(std).abs().gt(this.zscoreOutlier));
 
-      dfInput.addSeries(dfPrefix, COL_COMPUTED_OUTLIER);
-      dfInput.mapInPlace(BooleanSeries.HAS_TRUE, COL_OUTLIER, COL_OUTLIER, COL_COMPUTED_OUTLIER);
-      dfInput = dfInput.fillNull(COL_OUTLIER);
+        dfInput.addSeries(dfPrefix, COL_COMPUTED_OUTLIER);
+        dfInput.mapInPlace(BooleanSeries.HAS_TRUE, COL_OUTLIER, COL_OUTLIER, COL_COMPUTED_OUTLIER);
+        dfInput = dfInput.fillNull(COL_OUTLIER);
+      }
     }
 
     // generate detection time series
@@ -247,7 +249,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
 
       long fractionChangePoint = extractAnomalyFractionChangePoint(changePointWindow, this.changeFraction);
 
-      // TODO prevent change point from anomalies labeled as outliers by user
+      // TODO prevent change point from anomalies labeled as outliers (but not new trend) by user
 
       if (fractionChangePoint >= 0 && fractionChangePoint >= minChangePoint) {
         TreeSet<Long> changePointsNew = new TreeSet<>(changePoints);
