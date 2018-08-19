@@ -594,8 +594,9 @@ public class EventTableGenerator {
     public GenericRow getRandomGenericRow(List<GenericRow> rowList, Random randGen)
     {
         int size = rowList.size();
-        int index = randGen.nextInt(size);
-        return rowList.get(index);
+        //int index = randGen.nextInt(size);
+        int index = (int)(Math.random() * size);
+	return rowList.get(index);
     }
 
     public GenericRow getRandomGenericRow(List<GenericRow> rowList, ZipfRandom indexDistribution)
