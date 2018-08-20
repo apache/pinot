@@ -10,7 +10,7 @@
       predefinedRanges=pill.predefinedRanges
       selectAction=(action "onRangeSelection")
     }}
-    
+
     {{#link-to "home.share-dashboard" (query-params appName=appName duration=duration startDate=startDate endDate=endDate feedbackType=feedbackType shareId=null) tagName="button" type="button" class="pull-right te-button te-button--outline"}}
       Share
     {{/link-to}}
@@ -23,7 +23,8 @@
         {{#power-select
           options=model.applications
           selected=appNameSelected
-          searchEnabled=false
+          searchField="application"
+          searchEnabled=true
           placeholder="Please pick an application"
           onchange=(action "selectApplication")
           as |app|}}
