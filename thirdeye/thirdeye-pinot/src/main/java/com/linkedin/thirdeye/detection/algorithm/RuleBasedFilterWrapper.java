@@ -16,7 +16,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
- * This filter wrapper filters the anomalies if either the absolute change or percentage change does not pass the threshold.
+ * This abstract filter wrapper allows user to plug in exclusion filter business rules in the detection pipeline.
  */
 public abstract class RuleBasedFilterWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
