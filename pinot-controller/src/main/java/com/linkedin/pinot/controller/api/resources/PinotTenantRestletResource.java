@@ -163,7 +163,7 @@ public class PinotTenantRestletResource {
       @ApiResponse(code = 500, message = "Error reading tenants list")
   })
   public TenantsList getAllTenants(
-      @ApiParam(value = "Tenant type", required = false, allowableValues = "[BROKER, SERVER]", defaultValue = "")
+      @ApiParam(value = "Tenant type", required = false, allowableValues = "BROKER, SERVER", defaultValue = "")
       @QueryParam("type") @DefaultValue("") String type) {
     TenantsList tenants = new TenantsList();
 
@@ -270,7 +270,7 @@ public class PinotTenantRestletResource {
       @ApiParam(value = "Tenant name", required = true)
       @PathParam("tenantName")
       String tenantName,
-      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "[SERVER, BROKER]")
+      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER")
       @QueryParam("type") @DefaultValue("") String type) {
 
     TenantMetadata tenantMeta = new TenantMetadata();
@@ -316,9 +316,9 @@ public class PinotTenantRestletResource {
       @ApiParam(value = "Tenant name", required = true)
       @PathParam("tenantName")
       String tenantName,
-      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "[SERVER, BROKER]")
+      @ApiParam(value = "tenant type", required = false, defaultValue = "", allowableValues = "SERVER, BROKER")
       @QueryParam("type") String type,
-      @ApiParam(value = "state", required = true, defaultValue = "", allowableValues = "[enable, disable, drop]")
+      @ApiParam(value = "state", required = true, defaultValue = "", allowableValues = "enable, disable, drop")
       @QueryParam("state") @DefaultValue("") String state) {
     TenantMetadata tenantMetadata = getTenantMetadata(tenantName, type);
     Set<String> allInstances = new HashSet<>();
@@ -377,7 +377,7 @@ public class PinotTenantRestletResource {
   public SuccessResponse deleteTenant(
       @ApiParam(value = "Tenant name", required = true)
       @PathParam("tenantName") String tenantName,
-      @ApiParam(value = "Tenant type", required = true, allowableValues = "[SERVER, BROKER]")
+      @ApiParam(value = "Tenant type", required = true, allowableValues = "SERVER, BROKER")
       @QueryParam("type") @DefaultValue("") String type) {
 
     if (type == null || type.isEmpty()) {
