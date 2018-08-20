@@ -39,14 +39,14 @@ public class PinotFSFactory {
   }
 
   public static void init(Configuration fsConfig) {
-    Iterator<String> keys = fsConfig.getKeys();
+    Iterator<String> keys = fsConfig.subset("class").getKeys();
     while (keys.hasNext()) {
       String key = keys.next();
       String fsClassName = (String) fsConfig.getProperty(key);
 
       try {
         PinotFS pinotFS = (PinotFS) Class.forName(fsClassName).newInstance();
-        pinotFS.init(fsConfig.subset(null)); // fixme: Add a new subset config here.
+        pinotFS.init(fsConfig.subset("config"));
 
         _fileSystemMap.put(key, pinotFS);
       } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {

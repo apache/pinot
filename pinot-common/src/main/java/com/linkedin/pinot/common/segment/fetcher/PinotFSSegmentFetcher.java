@@ -38,7 +38,7 @@ public class PinotFSSegmentFetcher implements SegmentFetcher {
 
     // TODO: move _pinotFS creation to init, however, it needs the right config passed in into init.
     _pinotFS = PinotFSFactory.create(uri.getScheme());
-    _pinotFS.copyToLocalFile(uri, tempFile.toURI());
+    _pinotFS.copyToLocalFile(uri, tempFile);
   }
 
   /**
