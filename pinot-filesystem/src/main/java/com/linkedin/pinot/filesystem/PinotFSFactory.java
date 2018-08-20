@@ -39,7 +39,7 @@ public class PinotFSFactory {
   }
 
   public static void init(Configuration fsConfig) {
-    Iterator<String> keys = fsConfig.subset("class").getKeys();
+    Iterator<String> keys = fsConfig.getKeys();
     while (keys.hasNext()) {
       String key = keys.next();
       String fsClassName = (String) fsConfig.getProperty(key);

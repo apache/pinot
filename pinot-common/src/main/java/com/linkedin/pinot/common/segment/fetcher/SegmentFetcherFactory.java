@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.segment.fetcher;
 
 import com.google.common.base.Preconditions;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -83,10 +84,9 @@ public class SegmentFetcherFactory {
     return _segmentFetcherMap.containsKey(protocol);
   }
 
-  public SegmentFetcher getSegmentFetcherBasedOnURI(String uri) throws Exception {
+  public SegmentFetcher getSegmentFetcherBasedOnURI(String uri) throws URISyntaxException {
     String protocol = new URI(uri).getScheme();
-    SegmentFetcher segmentFetcher = _segmentFetcherMap.get(protocol);
-    return segmentFetcher;
+    return _segmentFetcherMap.get(protocol);
   }
 
   private static void logFetcherInitConfig(SegmentFetcher fetcher, String protocol, Configuration conf) {
