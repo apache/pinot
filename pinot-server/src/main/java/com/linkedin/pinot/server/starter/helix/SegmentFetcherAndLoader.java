@@ -28,6 +28,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nonnull;
@@ -51,10 +52,12 @@ public class SegmentFetcherAndLoader {
     _propertyStore = propertyStore;
     _dataManager = dataManager;
 
+    Configuration pinotFSConfig = pinotHelixProperties.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
         pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
-    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+    PinotFSFactory.init(pinotFSConfig);
+    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
   }
 
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {
