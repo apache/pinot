@@ -116,6 +116,7 @@ public class AzurePinotFS extends PinotFS {
       LOGGER.error("Exception encountered during copy, input: '{}', output: '{}'.", srcUri.toString(),
           dstUri.toString(), e);
     }
+
     return true;
   }
 
@@ -188,5 +189,9 @@ public class AzurePinotFS extends PinotFS {
     byte[] inputStream = IOUtils.toByteArray(new FileInputStream(srcFile));
     out.write(inputStream);
     out.close();
+  }
+
+  public void createFile(String fileName) throws IOException {
+    _adlStoreClient.createEmptyFile("kgFile");
   }
 }

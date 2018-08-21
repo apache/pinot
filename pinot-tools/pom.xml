@@ -78,6 +78,10 @@
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-hadoop-filesystem</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
