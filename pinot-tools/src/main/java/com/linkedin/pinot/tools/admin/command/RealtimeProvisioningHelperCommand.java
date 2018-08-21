@@ -15,13 +15,18 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.realtime.provisioning.MemoryEstimator;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.json.JSONObject;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,47 +42,38 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   private static final int MEMORY_STR_LEN = 9;
   private static final String COMMA_SEPARATOR = ",";
+  private static final int DEFAULT_RETENTION_FOR_HOURLY_PUSH = 24;
+  private static final int DEFAULT_RETENTION_FOR_DAILY_PUSH = 72;
 
-  // TODO: pick details like retention and replicas from table config, allow override for retention
+  @Option(name = "-tableConfigFile", required = true, metaVar = "<String>")
+  private String _tableConfigFile;
 
-  // TODO: add numReplicas as a variable in the output
-  @Option(name = "-numReplicas", required = true, metaVar = "<int>",
-      usage = "number of replicas for the table")
-  private int _numReplicas;
-
-  @Option(name = "-numPartitions", required = true, metaVar = "<int>",
-      usage = "number of stream partitions for the table")
+  @Option(name = "-numPartitions", required = true, metaVar = "<int>", usage = "number of stream partitions for the table")
   private int _numPartitions;
 
-  @Option(name = "-retentionHours", metaVar = "<int>",
-      usage = "number of hours we would require this segment to be in memory. "
-      + "\nThis would depend on the retention set in the table config for the table, as well as the frequency of offline flows. "
-      + "\nIf offline segments are available until time N, TimeBoundaryService will query offline until N-1 and realtime for >=N"
-      + "\neg. If daily flows exist, assuming the flow runs everyday, we would need realtime segments in memory for a little over 2 days")
-  private int _retentionHours = 72;
+  @Option(name = "-retentionHours", metaVar = "<int>", usage = "Number of hours the segments will need to be retained in memory. "
+      + "\nThe realtime segments will need to be in memory only until the offline segments are available and used for queries"
+      + "\nThis will be picked from the table config  by looking at the segmentPushFrequency (72h if daily, 24h if hourly, buffer added as TimeBoundaryService doesn't query the last offline timestamp), "
+      + "\nIt can be overridden using this option")
+  private int _retentionHours;
 
-  @Option(name = "-numHosts", metaVar = "<String>",
-      usage = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
+  @Option(name = "-numHosts", metaVar = "<String>", usage = "number of hosts as comma separated values (default 2,4,6,8,10,12,14,16)")
   private String _numHosts = "2,4,6,8,10,12,14,16";
 
-  @Option(name = "-numHours", metaVar = "<String>",
-      usage = "number of hours to consume as comma separated values (default 2,3,4,5,6,7,8,9,10,11,12)")
+  @Option(name = "-numHours", metaVar = "<String>", usage = "number of hours to consume as comma separated values (default 2,3,4,5,6,7,8,9,10,11,12)")
   private String _numHours = "2,3,4,5,6,7,8,9,10,11,12";
 
-  @Option(name = "-sampleCompletedSegmentDir", required = true, metaVar = "<String>",
-      usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
+  @Option(name = "-sampleCompletedSegmentDir", required = true, metaVar = "<String>", usage = "Consume from the topic for n hours and provide the path of the segment dir after it completes")
   private String _sampleCompletedSegmentDir;
 
-  @Option(name = "-periodSampleSegmentConsumed", required = true, metaVar = "<String>",
-      usage = "Period for which the sample segment was consuming in format 4h, 5h30m, 40m etc")
+  @Option(name = "-periodSampleSegmentConsumed", required = true, metaVar = "<String>", usage = "Period for which the sample segment was consuming in format 4h, 5h30m, 40m etc")
   private String _periodSampleSegmentConsumed;
 
   @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"})
   private boolean _help = false;
 
-
-  public RealtimeProvisioningHelperCommand setNumReplicas(int numReplicas) {
-    _numReplicas = numReplicas;
+  public RealtimeProvisioningHelperCommand setTableConfigFile(String tableConfigFile) {
+    _tableConfigFile = tableConfigFile;
     return this;
   }
 
@@ -90,6 +86,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     _retentionHours = retentionHours;
     return this;
   }
+
   public RealtimeProvisioningHelperCommand setNumHosts(String numHosts) {
     _numHosts = numHosts;
     return this;
@@ -99,7 +96,6 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     _numHours = numHours;
     return this;
   }
-
 
   public RealtimeProvisioningHelperCommand setSampleCompletedSegmentDir(String sampleCompletedSegmentDir) {
     _sampleCompletedSegmentDir = sampleCompletedSegmentDir;
@@ -113,10 +109,10 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   @Override
   public String toString() {
-    return ("RealtimeProvisioningHelperCommand -numReplicas " + _numReplicas + " -numPartitions " + _numPartitions
-        + " -retentionHours " + _retentionHours + " -numHosts " + _numHosts + " -numHours " + _numHours
-        + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir
-        + " -periodSampleSegmentConsumed " + _periodSampleSegmentConsumed);
+    return ("RealtimeProvisioningHelperCommand -tableConfigFile " + _tableConfigFile + " -numPartitions "
+        + _numPartitions + " -retentionHours " + _retentionHours + " -numHosts " + _numHosts + " -numHours " + _numHours
+        + " -sampleCompletedSegmentDir " + _sampleCompletedSegmentDir + " -periodSampleSegmentConsumed "
+        + _periodSampleSegmentConsumed);
   }
 
   @Override
@@ -127,7 +123,7 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   @Override
   public String description() {
     return
-        "Given the num replicas, partitions, retention and a sample completed segment for a realtime table to be setup, "
+        "Given the table config, partitions, retention and a sample completed segment for a realtime table to be setup, "
             + "this tool will provide memory used by each host and an optimal segment size for various combinations of hours to consume and hosts";
   }
 
@@ -137,13 +133,30 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute() throws IOException {
     LOGGER.info("Executing command: {}", toString());
+
+    TableConfig tableConfig;
+    try (FileInputStream fis = new FileInputStream(new File(_tableConfigFile))) {
+      String tableConfigString = IOUtils.toString(fis);
+      tableConfig = TableConfig.fromJSONConfig(new JSONObject(tableConfigString));
+    } catch (IOException e) {
+      throw new RuntimeException("Exception in reading table config from file " + _tableConfigFile, e);
+    }
+
+    int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
+    if (_retentionHours == 0) {
+      if (tableConfig.getValidationConfig().getSegmentPushFrequency().equalsIgnoreCase("hourly")) {
+        _retentionHours = DEFAULT_RETENTION_FOR_HOURLY_PUSH;
+      } else {
+        _retentionHours = DEFAULT_RETENTION_FOR_DAILY_PUSH;
+      }
+    }
 
     int[] numHosts = Arrays.stream(_numHosts.split(COMMA_SEPARATOR)).mapToInt(Integer::parseInt).toArray();
     int[] numHours = Arrays.stream(_numHours.split(COMMA_SEPARATOR)).mapToInt(Integer::parseInt).toArray();
 
-    int totalConsumingPartitions = _numPartitions * _numReplicas;
+    int totalConsumingPartitions = _numPartitions * numReplicas;
 
     // TODO: allow multiple segments.
     // Consuming: Build statsHistory using multiple segments. Use multiple data points of (totalDocs,numHoursConsumed) to calculate totalDocs for our numHours
@@ -153,9 +166,11 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
     long sampleSegmentConsumedSeconds =
         TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(_periodSampleSegmentConsumed), TimeUnit.MILLISECONDS);
 
-    MemoryEstimator memoryEstimator = new MemoryEstimator(sampleCompletedSegmentFile, sampleSegmentConsumedSeconds);
+    MemoryEstimator memoryEstimator =
+        new MemoryEstimator(tableConfig, sampleCompletedSegmentFile, sampleSegmentConsumedSeconds);
     File sampleStatsHistory = memoryEstimator.initializeStatsHistory();
-    memoryEstimator.estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions, _retentionHours);
+    memoryEstimator.estimateMemoryUsed(sampleStatsHistory, numHosts, numHours, totalConsumingPartitions,
+        _retentionHours);
 
     // TODO: Make a recommendation of what config to choose by considering more inputs such as qps
     LOGGER.info("\nMemory used per host");
