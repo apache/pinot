@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.realtime.provisioning;
 
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.DataSize;
@@ -28,8 +29,10 @@ import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 
 
@@ -44,13 +47,14 @@ public class MemoryEstimator {
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String STATS_FILE_COPY_NAME = "stats.copy.ser";
 
+  private TableConfig _tableConfig;
   private File _sampleCompletedSegment;
   private long _sampleSegmentConsumedSeconds;
 
   private SegmentMetadataImpl _segmentMetadata;
   private long _sampleCompletedSegmentSizeBytes;
-  private Set<String> _invertedIndexColumns;
-  private Set<String> _noDictionaryColumns;
+  private Set<String> _invertedIndexColumns = new HashSet<>();
+  private Set<String> _noDictionaryColumns = new HashSet<>();
   int _avgMultiValues;
   private File _tableDataDir;
 
@@ -58,7 +62,8 @@ public class MemoryEstimator {
   private String[][] _optimalSegmentSize;
   private String[][] _consumingMemoryPerHost;
 
-  public MemoryEstimator(File sampleCompletedSegment, long sampleSegmentConsumedSeconds) {
+  public MemoryEstimator(TableConfig tableConfig, File sampleCompletedSegment, long sampleSegmentConsumedSeconds) {
+    _tableConfig = tableConfig;
     _sampleCompletedSegment = sampleCompletedSegment;
     _sampleSegmentConsumedSeconds = sampleSegmentConsumedSeconds;
 
@@ -69,14 +74,12 @@ public class MemoryEstimator {
       throw new RuntimeException("Caught exception when reading segment index dir", e);
     }
 
-    _noDictionaryColumns = _segmentMetadata.getAllColumns()
-        .stream()
-        .filter(column -> !_segmentMetadata.hasDictionary(column))
-        .collect(Collectors.toSet());
-    _invertedIndexColumns = _segmentMetadata.getAllColumns()
-        .stream()
-        .filter(column -> _segmentMetadata.getColumnMetadataFor(column).hasInvertedIndex())
-        .collect(Collectors.toSet());
+    if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getNoDictionaryColumns())) {
+      _noDictionaryColumns.addAll(_tableConfig.getIndexingConfig().getNoDictionaryColumns());
+    }
+    if (CollectionUtils.isNotEmpty(_tableConfig.getIndexingConfig().getInvertedIndexColumns())) {
+      _invertedIndexColumns.addAll(_tableConfig.getIndexingConfig().getInvertedIndexColumns());
+    }
     _avgMultiValues = getAvgMultiValues();
 
     _tableDataDir = new File(TMP_DIR, _segmentMetadata.getTableName());
