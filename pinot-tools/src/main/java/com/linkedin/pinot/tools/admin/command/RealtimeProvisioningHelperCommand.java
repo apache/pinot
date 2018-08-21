@@ -42,8 +42,8 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
   private static final int MEMORY_STR_LEN = 9;
   private static final String COMMA_SEPARATOR = ",";
-  private static final int RETENTION_FOR_HOURLY = 24;
-  private static final int RETENTION_FOR_DAILY = 72;
+  private static final int DEFAULT_RETENTION_FOR_HOURLY_PUSH = 24;
+  private static final int DEFAULT_RETENTION_FOR_DAILY_PUSH = 72;
 
   @Option(name = "-tableConfigFile", required = true, metaVar = "<String>")
   private String _tableConfigFile;
@@ -146,10 +146,10 @@ public class RealtimeProvisioningHelperCommand extends AbstractBaseAdminCommand 
 
     int numReplicas = tableConfig.getValidationConfig().getReplicasPerPartitionNumber();
     if (_retentionHours == 0) {
-      if (tableConfig.getValidationConfig().getSegmentPushFrequency().equals("hourly")) {
-        _retentionHours = RETENTION_FOR_HOURLY;
+      if (tableConfig.getValidationConfig().getSegmentPushFrequency().equalsIgnoreCase("hourly")) {
+        _retentionHours = DEFAULT_RETENTION_FOR_HOURLY_PUSH;
       } else {
-        _retentionHours = RETENTION_FOR_DAILY;
+        _retentionHours = DEFAULT_RETENTION_FOR_DAILY_PUSH;
       }
     }
 
