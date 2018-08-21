@@ -16,6 +16,8 @@
 package com.linkedin.pinot.filesystem;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.microsoft.azure.datalake.store.ADLFileInputStream;
+import com.microsoft.azure.datalake.store.ADLFileOutputStream;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
 import com.microsoft.azure.datalake.store.oauth2.AccessTokenProvider;
@@ -30,6 +32,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,8 +91,15 @@ public class AzurePinotFS extends PinotFS {
 
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
-    // TODO: Add this method. Not needed for now because file will be in final location
-    throw new UnsupportedOperationException("Cannot copy from AzureFS to AzureFS");
+    if (exists(dstUri)) {
+      delete(dstUri);
+    }
+    _adlStoreClient.createEmptyFile(dstUri.getPath());
+    ADLFileOutputStream appendStream = _adlStoreClient.getAppendStream(dstUri.getPath());
+    ADLFileInputStream readStream = _adlStoreClient.getReadStream(srcUri.getPath());
+    appendStream.write(readStream.read());
+    appendStream.close();
+    return true;
   }
 
   @Override
@@ -117,6 +127,13 @@ public class AzurePinotFS extends PinotFS {
 
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
+    if (dstFile.exists()) {
+      if (dstFile.isDirectory()) {
+        FileUtils.deleteDirectory(dstFile);
+      } else {
+        FileUtils.deleteQuietly(dstFile);
+      }
+    }
     try (InputStream adlStream = _adlStoreClient.getReadStream(srcUri.getPath())) {
       Path dstFilePath = Paths.get(dstFile.toURI());
 
