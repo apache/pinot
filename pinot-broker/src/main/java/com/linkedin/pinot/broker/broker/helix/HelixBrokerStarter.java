@@ -183,15 +183,12 @@ public class HelixBrokerStarter {
     }
   }
 
-  private BrokerServerBuilder startBroker(Configuration config) throws Exception {
+  private BrokerServerBuilder startBroker(Configuration config) {
     if (config == null) {
       config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     }
-    final BrokerServerBuilder brokerServerBuilder =
-        new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
-            _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener, _tableQueryQuotaManager);
-    brokerServerBuilder.buildNetwork();
-    brokerServerBuilder.buildHTTP();
+    BrokerServerBuilder brokerServerBuilder = new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
+        _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener, _tableQueryQuotaManager);
     _accessControlFactory = brokerServerBuilder.getAccessControlFactory();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
     _tableQueryQuotaManager.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
