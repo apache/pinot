@@ -236,13 +236,14 @@ public class UserDashboardResource {
     //
     List<AnomalySummary> output = new ArrayList<>();
     for (MergedAnomalyResultDTO anomaly : anomalies) {
+      long metricId = this.getMetricId(anomaly);
+
       AnomalySummary summary = new AnomalySummary();
       summary.setId(anomaly.getId());
       summary.setStart(anomaly.getStartTime());
       summary.setEnd(anomaly.getEndTime());
       summary.setCurrent(anomaly.getAvgCurrentVal());
       summary.setBaseline(anomaly.getAvgBaselineVal());
-      summary.setMetricId(getMetricId(anomaly));
 
       summary.setFunctionId(-1);
       if (anomaly.getFunctionId() != null) {
@@ -263,7 +264,11 @@ public class UserDashboardResource {
       summary.setMetricName(anomaly.getMetric());
       summary.setDimensions(anomaly.getDimensions());
       summary.setDataset(anomaly.getCollection());
-//      summary.setMetricUrn(this.getMetricUrn(anomaly));
+      summary.setMetricId(metricId);
+
+      if (metricId > 0) {
+        summary.setMetricUrn(this.getMetricUrn(anomaly));
+      }
 
       // TODO use alert filter if necessary
       summary.setSeverity(Math.abs(anomaly.getWeight()));
@@ -277,6 +282,7 @@ public class UserDashboardResource {
       }
 
       summary.setClassification(ResourceUtils.getStatusClassification(anomaly));
+      summary.setSource(anomaly.getAnomalyResultSource());
 
       output.add(summary);
     }
