@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
@@ -105,39 +106,46 @@ public class DetectionAlertTaskRunner implements TaskRunner {
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-    List<TaskResult> taskResult = new ArrayList<>();
-    DetectionAlertTaskInfo alertTaskInfo = (DetectionAlertTaskInfo) taskInfo;
-    this.thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
+    ThirdeyeMetricsUtil.alertTaskCounter.inc();
 
-    long detectionAlertConfigId = alertTaskInfo.getDetectionAlertConfigId();
-    this.detectionAlertConfig = this.alertConfigDAO.findById(detectionAlertConfigId);
-    if (this.detectionAlertConfig.getProperties() == null) {
-      LOG.warn(String.format("Detection alert %d contains no properties", detectionAlertConfigId));
-    }
+    try {
+      List<TaskResult> taskResult = new ArrayList<>();
+      DetectionAlertTaskInfo alertTaskInfo = (DetectionAlertTaskInfo) taskInfo;
+      this.thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
 
-    DetectionAlertFilter alertFilter = this.alertFilterLoader.from(this.provider, this.detectionAlertConfig, System.currentTimeMillis());
-
-    DetectionAlertFilterResult result = alertFilter.run();
-
-    if (result.getResult().isEmpty()) {
-      LOG.info("Zero anomalies found, skipping sending email");
-    } else {
-      this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(result.getAllAnomalies());
-      sendEmail(result);
-
-      this.detectionAlertConfig.setVectorClocks(mergeVectorClock(
-          this.detectionAlertConfig.getVectorClocks(),
-          makeVectorClock(result.getAllAnomalies())));
-
-      long highWaterMark = getHighWaterMark(result.getAllAnomalies());
-      if (this.detectionAlertConfig.getHighWaterMark() != null) {
-        highWaterMark = Math.max(this.detectionAlertConfig.getHighWaterMark(), highWaterMark);
+      long detectionAlertConfigId = alertTaskInfo.getDetectionAlertConfigId();
+      this.detectionAlertConfig = this.alertConfigDAO.findById(detectionAlertConfigId);
+      if (this.detectionAlertConfig.getProperties() == null) {
+        LOG.warn(String.format("Detection alert %d contains no properties", detectionAlertConfigId));
       }
-      this.detectionAlertConfig.setHighWaterMark(highWaterMark);
 
-      this.alertConfigDAO.save(this.detectionAlertConfig);
+      DetectionAlertFilter alertFilter = this.alertFilterLoader.from(this.provider, this.detectionAlertConfig, System.currentTimeMillis());
+
+      DetectionAlertFilterResult result = alertFilter.run();
+
+      if (result.getResult().isEmpty()) {
+        LOG.info("Zero anomalies found, skipping sending email");
+      } else {
+        this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(result.getAllAnomalies());
+        sendEmail(result);
+
+        this.detectionAlertConfig.setVectorClocks(mergeVectorClock(
+            this.detectionAlertConfig.getVectorClocks(),
+            makeVectorClock(result.getAllAnomalies())));
+
+        long highWaterMark = getHighWaterMark(result.getAllAnomalies());
+        if (this.detectionAlertConfig.getHighWaterMark() != null) {
+          highWaterMark = Math.max(this.detectionAlertConfig.getHighWaterMark(), highWaterMark);
+        }
+        this.detectionAlertConfig.setHighWaterMark(highWaterMark);
+
+        this.alertConfigDAO.save(this.detectionAlertConfig);
+      }
+      return taskResult;
+
+    } finally {
+      ThirdeyeMetricsUtil.alertTaskSuccessCounter.inc();
     }
-    return taskResult;
   }
 
   private void sendEmail(DetectionAlertFilterResult detectionResult) throws Exception {

@@ -132,11 +132,16 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
   // TODO : separate code path for new vs old alert config !
   private void runTask() throws Exception {
-    LOG.info("Starting email report for id : {}, name : {} ", alertConfig.getId(),
-        alertConfig.getName());
-    sendAnomalyReport();
-    sendScheduledDataReport();
-    ThirdeyeMetricsUtil.alertTaskSuccessCounter.inc();
+    ThirdeyeMetricsUtil.alertTaskCounter.inc();
+    try {
+      LOG.info("Starting email report for id : {}, name : {} ", alertConfig.getId(),
+          alertConfig.getName());
+      sendAnomalyReport();
+      sendScheduledDataReport();
+
+    } finally {
+      ThirdeyeMetricsUtil.alertTaskSuccessCounter.inc();
+    }
   }
 
   private void sendAnomalyReport() throws Exception {
