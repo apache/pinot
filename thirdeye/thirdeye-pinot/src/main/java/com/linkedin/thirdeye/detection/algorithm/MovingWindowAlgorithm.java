@@ -71,7 +71,8 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   private final AnomalySlice anomalySlice;
 
   private final Period windowSize;
-  private final Period minLookback;
+  private final Period lookbackPeriod;
+  private final Period reworkPeriod;
   private final double zscoreMin;
   private final double zscoreMax;
   private final double zscoreOutlier;
@@ -99,11 +100,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     this.quantileMax = MapUtils.getDoubleValue(config.getProperties(), "quantileMax", Double.NaN);
     this.zscoreMin = MapUtils.getDoubleValue(config.getProperties(), "zscoreMin", Double.NaN);
     this.zscoreMax = MapUtils.getDoubleValue(config.getProperties(), "zscoreMax", Double.NaN);
-    this.zscoreOutlier = MapUtils.getDoubleValue(config.getProperties(), "zscoreOutlier", 3);
+    this.zscoreOutlier = MapUtils.getDoubleValue(config.getProperties(), "zscoreOutlier", Double.NaN);
     this.kernelSize = MapUtils.getIntValue(config.getProperties(), "kernelSize", 1);
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "UTC"));
     this.windowSize = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "windowSize", "1week"));
-    this.minLookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "minLookback", "1day"));
+    this.lookbackPeriod = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "lookbackPeriod", "1week"));
+    this.reworkPeriod = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "reworkPeriod", "1day"));
     this.changeDuration = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "changeDuration", "5days"));
     this.changeFraction = MapUtils.getDoubleValue(config.getProperties(), "changeFraction", 0.666);
     this.baselineWeeks = MapUtils.getIntValue(config.getProperties(), "baselineWeeks", 0);
@@ -113,17 +115,14 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
     Preconditions.checkArgument(Double.isNaN(this.quantileMin) || (this.quantileMin >= 0 && this.quantileMin <= 1.0), "quantileMin must be between 0.0 and 1.0");
     Preconditions.checkArgument(Double.isNaN(this.quantileMax) || (this.quantileMax >= 0 && this.quantileMax <= 1.0), "quantileMax must be between 0.0 and 1.0");
 
-    long effectiveStartTime = startTime;
-    if (endTime - startTime < this.minLookback.toStandardDuration().getMillis()) {
-      effectiveStartTime = endTime - this.minLookback.toStandardDuration().getMillis();
-    }
-    this.effectiveStartTime = effectiveStartTime;
+    this.effectiveStartTime = new DateTime(startTime, this.timezone).minus(this.lookbackPeriod).getMillis();
 
-    DateTime trainStart = new DateTime(effectiveStartTime, this.timezone).minus(this.windowSize);
+    DateTime trainStart = new DateTime(this.effectiveStartTime, this.timezone).minus(this.windowSize);
     DateTime dataStart = trainStart.minus(new Period().withField(DurationFieldType.weeks(), baselineWeeks));
+    DateTime detectionStart = new DateTime(startTime, this.timezone).minus(this.reworkPeriod);
 
     this.sliceData = MetricSlice.from(me.getId(), dataStart.getMillis(), endTime, me.getFilters());
-    this.sliceDetection = MetricSlice.from(me.getId(), effectiveStartTime, endTime, me.getFilters());
+    this.sliceDetection = MetricSlice.from(me.getId(), detectionStart.getMillis(), endTime, me.getFilters());
 
     this.anomalySlice = new AnomalySlice()
         .withConfigId(this.config.getId())
