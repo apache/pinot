@@ -99,6 +99,7 @@ public class AzurePinotFS extends PinotFS {
     ADLFileInputStream readStream = _adlStoreClient.getReadStream(srcUri.getPath());
     appendStream.write(readStream.read());
     appendStream.close();
+    readStream.close();
     return true;
   }
 
