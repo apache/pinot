@@ -570,6 +570,20 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     });
   }
 
+  /**
+   * Returns a copy of the series with the natural log of values.
+   *
+   * @return series copy with log values
+   */
+  public DoubleSeries log() {
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return Math.log(values[0]);
+      }
+    });
+  }
+
   public DoubleSeries add(Series other) {
     if(other.size() == 1)
       return this.add(other.getDouble(0));
