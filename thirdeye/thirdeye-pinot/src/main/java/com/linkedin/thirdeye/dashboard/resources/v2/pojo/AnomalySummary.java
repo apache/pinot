@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import java.util.Map;
 
 
@@ -24,6 +25,7 @@ public class AnomalySummary {
   private long functionId;
   private String dataset;
   private AnomalyClassificationType classification;
+  private AnomalyResultSource source;
   private long detectionConfigId;
 
   public AnomalySummary() {
@@ -164,5 +166,13 @@ public class AnomalySummary {
 
   public void setDetectionConfigId(long detectionConfigId) {
     this.detectionConfigId = detectionConfigId;
+  }
+
+  public AnomalyResultSource getSource() {
+    return source;
+  }
+
+  public void setSource(AnomalyResultSource source) {
+    this.source = source;
   }
 }
