@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
@@ -77,27 +78,34 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-    DetectionPipelineTaskInfo info = (DetectionPipelineTaskInfo) taskInfo;
+    ThirdeyeMetricsUtil.detectionTaskCounter.inc();
 
-    DetectionConfigDTO config = this.detectionDAO.findById(info.configId);
-    if (config == null) {
-      throw new IllegalArgumentException(String.format("Could not resolve config id %d", info.configId));
-    }
+    try {
+      DetectionPipelineTaskInfo info = (DetectionPipelineTaskInfo) taskInfo;
 
-    DetectionPipeline pipeline = this.loader.from(this.provider, config, info.start, info.end);
-    DetectionPipelineResult result = pipeline.run();
+      DetectionConfigDTO config = this.detectionDAO.findById(info.configId);
+      if (config == null) {
+        throw new IllegalArgumentException(String.format("Could not resolve config id %d", info.configId));
+      }
 
-    if (result.getLastTimestamp() < 0) {
+      DetectionPipeline pipeline = this.loader.from(this.provider, config, info.start, info.end);
+      DetectionPipelineResult result = pipeline.run();
+
+      if (result.getLastTimestamp() < 0) {
+        return Collections.emptyList();
+      }
+
+      config.setLastTimestamp(result.getLastTimestamp());
+      this.detectionDAO.update(config);
+
+      for (MergedAnomalyResultDTO mergedAnomalyResultDTO: result.getAnomalies()) {
+        this.anomalyDAO.save(mergedAnomalyResultDTO);
+      }
+
       return Collections.emptyList();
+
+    } finally {
+      ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();
     }
-
-    config.setLastTimestamp(result.getLastTimestamp());
-    this.detectionDAO.update(config);
-
-    for (MergedAnomalyResultDTO mergedAnomalyResultDTO: result.getAnomalies()) {
-      this.anomalyDAO.save(mergedAnomalyResultDTO);
-    }
-
-    return Collections.emptyList();
   }
 }

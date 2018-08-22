@@ -24,6 +24,9 @@ public class ThirdeyeMetricsUtil {
   public static final Counter detectionTaskSuccessCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionTaskSuccessCounter");
 
+  public static final Counter alertTaskCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "alertTaskCounter");
+
   public static final Counter alertTaskSuccessCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "alertTaskSuccessCounter");
 

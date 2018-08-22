@@ -21,9 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.joda.time.DurationFieldType;
-import org.joda.time.Period;
-import org.joda.time.PeriodType;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -35,12 +32,6 @@ public class MovingWindowAlgorithmTest {
   private static final String METRIC_NAME = "myMetric";
   private static final String DATASET_NAME = "myDataset";
 
-  private static final String COL_STD = "std";
-  private static final String COL_MEAN = "mean";
-  private static final String COL_QUANTILE_MIN = "quantileMin";
-  private static final String COL_QUANTILE_MAX = "quantileMax";
-  private static final String COL_OUTLIER = "outlier";
-
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_WINDOW_SIZE = "windowSize";
   private static final String PROP_MIN_LOOKBACK = "minLookback";
@@ -48,8 +39,6 @@ public class MovingWindowAlgorithmTest {
   private static final String PROP_QUANTILE_MAX = "quantileMax";
   private static final String PROP_ZSCORE_MIN = "zscoreMin";
   private static final String PROP_ZSCORE_MAX = "zscoreMax";
-  private static final String PROP_KERNEL_MIN = "kernelMin";
-  private static final String PROP_KERNEL_MAX = "kernelMax";
   private static final String PROP_KERNEL_SIZE = "kernelSize";
   private static final String PROP_ZSCORE_OUTLIER = "zscoreOutlier";
   private static final String PROP_CHANGE_DURATION = "changeDuration";
