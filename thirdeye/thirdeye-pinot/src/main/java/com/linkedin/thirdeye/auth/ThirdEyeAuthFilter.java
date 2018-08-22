@@ -72,15 +72,10 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
 
       throw new WebApplicationException("Unable to validate credentials", Response.Status.UNAUTHORIZED);
     } else {
-      if (this.administrators != null && uriPath.equals("thirdeye-admin")) {
-        if (principal.getName() == null) {
-          throw new WebApplicationException("Unauthorized admin access", Response.Status.UNAUTHORIZED);
-        }
-        String principalName = principal.getName().split("@")[0];
-        if (!this.administrators.contains(principalName)) {
-          LOG.info("Unauthorized admin access: {}", principalName);
-          throw new WebApplicationException("Unauthorized admin access", Response.Status.UNAUTHORIZED);
-        }
+      if (this.administrators != null && uriPath.equals("thirdeye-admin") && (principal.getName() == null
+          || !this.administrators.contains(principal.getName().split("@")[0]))) {
+        LOG.info("Unauthorized admin access: {}", principal.getName());
+        throw new WebApplicationException("Unauthorized admin access", Response.Status.UNAUTHORIZED);
       }
     }
 
