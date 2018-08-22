@@ -210,7 +210,7 @@ public class ThirdEyeDashboardApplication
         authenticator = new CachingAuthenticator<>(env.metrics(), authenticatorLdap, CacheBuilder.newBuilder().expireAfterWrite(authConfig.getCacheTTL(), TimeUnit.SECONDS));
       }
       // auth filter
-      env.jersey().register(new ThirdEyeAuthFilter(authenticator, authConfig.getAllowedPaths()));
+      env.jersey().register(new ThirdEyeAuthFilter(authenticator, authConfig.getAllowedPaths(), authConfig.getAdminUsers()));
       // auth resource
       env.jersey().register(new AuthResource(authenticator, authConfig.getCookieTTL() * 1000));
     }

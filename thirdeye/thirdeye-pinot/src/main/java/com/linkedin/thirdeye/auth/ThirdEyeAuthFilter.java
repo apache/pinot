@@ -6,6 +6,8 @@ import com.linkedin.thirdeye.datalayer.dto.SessionDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import io.dropwizard.auth.AuthFilter;
 import io.dropwizard.auth.Authenticator;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.WebApplicationException;
@@ -24,11 +26,15 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
 
   private final Set<String> allowedPaths;
   private final SessionManager sessionDAO;
+  private Set<String> administrators;
 
-  public ThirdEyeAuthFilter(Authenticator<Credentials, ThirdEyePrincipal> authenticator, Set<String> allowedPaths) {
+  public ThirdEyeAuthFilter(Authenticator<Credentials, ThirdEyePrincipal> authenticator, Set<String> allowedPaths, List<String> administrators) {
     this.authenticator = authenticator;
     this.allowedPaths = allowedPaths;
     this.sessionDAO = DAO_REGISTRY.getSessionDAO();
+    if (administrators != null) {
+      this.administrators = new HashSet<>(administrators);
+    }
   }
 
   @Override
@@ -65,6 +71,17 @@ public class ThirdEyeAuthFilter extends AuthFilter<Credentials, ThirdEyePrincipa
       }
 
       throw new WebApplicationException("Unable to validate credentials", Response.Status.UNAUTHORIZED);
+    } else {
+      if (this.administrators != null && uriPath.equals("thirdeye-admin")) {
+        if (principal.getName() == null) {
+          throw new WebApplicationException("Unauthorized admin access", Response.Status.UNAUTHORIZED);
+        }
+        String principalName = principal.getName().split("@")[0];
+        if (!this.administrators.contains(principalName)) {
+          LOG.info("Unauthorized admin access: {}", principalName);
+          throw new WebApplicationException("Unauthorized admin access", Response.Status.UNAUTHORIZED);
+        }
+      }
     }
 
     setCurrentPrincipal(principal);
