@@ -325,7 +325,7 @@ export default Component.extend({
       return value;
     }
 
-    return aggregates[toOffsetUrn(metricUrn, offset)] * aggregateMultiplier;
+    return aggregates[toOffsetUrn(metricUrn, offset)] * (aggregateMultiplier || 1.0);
   },
 
   actions: {
