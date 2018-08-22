@@ -2465,6 +2465,12 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleLog() {
+    DoubleSeries s = DataFrame.toSeries(-1, 0, Math.exp(1), Math.exp(2), Math.exp(3));
+    assertEquals(s.log(), DataFrame.toSeries(DNULL, Double.NEGATIVE_INFINITY, 1.0, 2.0, 3.0));
+  }
+
+  @Test
   public void testDoubleOperationsSeries() {
     DoubleSeries base = DataFrame.toSeries(DNULL, 0, 1, 1.5, 0.003);
     DoubleSeries mod = DataFrame.toSeries(1, 1, 1, 0, DNULL);
