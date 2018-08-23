@@ -34,7 +34,8 @@ public class MovingWindowAlgorithmTest {
 
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_WINDOW_SIZE = "windowSize";
-  private static final String PROP_MIN_LOOKBACK = "minLookback";
+  private static final String PROP_LOOKBACK_PERIOD = "lookbackPeriod";
+  private static final String PROP_REWORK_PERIOD = "reworkPeriod";
   private static final String PROP_QUANTILE_MIN = "quantileMin";
   private static final String PROP_QUANTILE_MAX = "quantileMax";
   private static final String PROP_ZSCORE_MIN = "zscoreMin";
@@ -79,6 +80,8 @@ public class MovingWindowAlgorithmTest {
     this.properties = new HashMap<>();
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put(PROP_WINDOW_SIZE, "1week");
+    this.properties.put(PROP_LOOKBACK_PERIOD, "0");
+    this.properties.put(PROP_REWORK_PERIOD, "0");
     this.properties.put(PROP_ZSCORE_OUTLIER, Double.NaN);
     this.properties.put(PROP_CHANGE_DURATION, "0");
 
@@ -349,7 +352,7 @@ public class MovingWindowAlgorithmTest {
     this.properties.put(PROP_ZSCORE_MIN, -3.0);
     this.properties.put(PROP_ZSCORE_MAX, 3.0);
     this.properties.put(PROP_WINDOW_SIZE, "100secs");
-    this.properties.put(PROP_MIN_LOOKBACK, "0");
+    this.properties.put(PROP_LOOKBACK_PERIOD, "0");
     this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 200000L, 300000L);
     DetectionPipelineResult res = this.algorithm.run();
 
@@ -359,8 +362,8 @@ public class MovingWindowAlgorithmTest {
   @Test
   public void testMinLookback() throws Exception {
     this.properties.put(PROP_WINDOW_SIZE, "100secs");
-    this.properties.put(PROP_MIN_LOOKBACK, 100000);
-    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 250000L, 300000L);
+    this.properties.put(PROP_LOOKBACK_PERIOD, 100000);
+    this.algorithm = new MovingWindowAlgorithm(this.provider, this.config, 300000L, 300000L);
     DetectionPipelineResult res = this.algorithm.run();
 
     Assert.assertEquals(res.getAnomalies().size(), 0);
