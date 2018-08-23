@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.linkedin.pinot.minion.events.EventObserverFactoryRegistry;
 import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutorFactory;
@@ -132,6 +133,14 @@ public class MinionStarter {
     Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+
+    // Start all components
+    LOGGER.info("Initializing PinotFSFactory");
+    try {
+      PinotFSFactory.init(pinotFSConfig);
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
 
     LOGGER.info("Initializing segment fetchers for all protocols");
     SegmentFetcherFactory.getInstance()

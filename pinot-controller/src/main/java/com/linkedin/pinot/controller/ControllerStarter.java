@@ -38,6 +38,7 @@ import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrate
 import com.linkedin.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -126,6 +127,13 @@ public class ControllerStarter {
         _config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
     // Start all components
+    LOGGER.info("Initializing PinotFSFactory");
+    try {
+      PinotFSFactory.init(pinotFSConfig);
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
       SegmentFetcherFactory.getInstance()
