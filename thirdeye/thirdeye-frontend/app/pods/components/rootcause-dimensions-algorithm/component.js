@@ -289,9 +289,12 @@ export default Component.extend({
     // Stringifying any custom settings so that we can append to our caching key
     const customSettings = Object.values(customTableSettings).join(':');
     // Isolate filter keys/values from incoming metric URN
-    const rawFilterStr = metricUrn.split(':').filter((urnFragment) => {
+    const metricArr = metricUrn.length ? metricUrn.split(':') : ['0'];
+    const rawFilterStr = metricArr.filter((urnFragment) => {
       return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
     }).join(';');
+    // Grab metric Id from URN
+    const metricId = metricArr[metricArr.length - 1];
     // Construct API-ready filter string
     const finalFilterStr = makeFilterString(decodeURIComponent(rawFilterStr));
     // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
@@ -326,7 +329,7 @@ export default Component.extend({
       }
       get(this, 'fetchDimensionAnalysisData').perform(requestObj);
       // Fetch dimension options
-      get(this, 'fetchDimensionOptions').perform(get(this, 'metricId'));
+      get(this, 'fetchDimensionOptions').perform(metricId);
       // Cache incoming settings and URNs
       setProperties(this, {
         previousSettings: newConcatSettings,
