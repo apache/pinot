@@ -131,10 +131,9 @@ public class ControllerStarter {
     try {
       PinotFSFactory.init(pinotFSConfig);
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while initializing PinotFSFactory", e);
+      Utils.rethrowException(e);
     }
 
-    // Start all components
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
       SegmentFetcherFactory.getInstance()

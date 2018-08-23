@@ -139,7 +139,7 @@ public class MinionStarter {
     try {
       PinotFSFactory.init(pinotFSConfig);
     } catch (Exception e) {
-      throw new RuntimeException("Caught exception while initializing PinotFSFactory", e);
+      Utils.rethrowException(e);
     }
 
     LOGGER.info("Initializing segment fetchers for all protocols");
