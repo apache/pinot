@@ -121,6 +121,7 @@ export default Route.extend({
     duration: queryParamsConfig,
     startDate: queryParamsConfig,
     endDate: queryParamsConfig,
+    openReport: queryParamsConfig,
     repRunStatus: queryParamsConfig
   },
 
@@ -179,6 +180,7 @@ export default Route.extend({
           startDate,
           evalUrl,
           endDate,
+          dateParams,
           alertEvalMetrics,
           isReplayDone
         };
@@ -199,6 +201,7 @@ export default Route.extend({
       startDate,
       endDate,
       duration,
+      dateParams,
       alertEvalMetrics
     } = model;
 
@@ -236,7 +239,7 @@ export default Route.extend({
     const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
     const anomalyDataUrl = getAnomalyDataUrl(startStamp, endStamp);
     const metricsUrl = selfServeApiCommon.metricAutoComplete(metricName);
-    const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
+    const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${dateParams}&useNotified=true`;
     let anomalyPromiseHash = {
       projectedMttd: 0,
       metricsByName: [],

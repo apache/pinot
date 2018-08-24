@@ -116,8 +116,12 @@ export default Route.extend(AuthenticatedRouteMixin, {
         anomalyMapping[metricName] = [];
       }
 
+      console.log('applicationAnomalies : ', applicationAnomalies);
+
       // Group anomalies by metricName and function name (alertName) and wrap it into the Humanized cache. Each `anomaly` is the raw data from ember data cache.
       anomalyMapping[metricName].push(this.get('anomaliesApiService').getHumanizedEntity(anomaly, humanizedObject));
+
+      console.log('anomalymapping for ', metricName, ' : ', anomalyMapping[metricName]);
     });
 
     return anomalyMapping;
@@ -157,6 +161,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
    */
   setupController(controller, model) {
     this._super(...arguments);
+    console.log('model: ', model);
     controller.setProperties({
       columns,
       appNameSelected: model.applications.findBy('application', this.get('appName')),

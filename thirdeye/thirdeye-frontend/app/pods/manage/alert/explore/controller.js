@@ -13,6 +13,7 @@ import { task, timeout } from 'ember-concurrency';
 import {
   computed,
   set,
+  get,
   setProperties,
   getProperties,
   getWithDefault
@@ -40,6 +41,7 @@ export default Controller.extend({
   startDate: null,
   endDate: null,
   repRunStatus: null,
+  openReport: false,
 
   /**
    * Mapping anomaly table column names to corresponding prop keys
@@ -68,7 +70,11 @@ export default Controller.extend({
    * @return {undefined}
    */
   initialize() {
-    const repRunStatus = this.get('repRunStatus');
+    const {
+      repRunStatus,
+      openReport
+    } = this.getProperties('repRunStatus', 'openReport');
+
     this.setProperties({
       filters: {},
       loadedWowData: [],
@@ -108,6 +114,11 @@ export default Controller.extend({
     // If a replay is still running, reload when done
     if (repRunStatus) {
       this.get('checkForNewAnomalies').perform(repRunStatus);
+    }
+
+    // If query param is set, auto-open report anomaly modal
+    if (openReport) {
+      this.triggerOpenReportModal();
     }
   },
 
@@ -482,6 +493,25 @@ export default Controller.extend({
   },
 
   /**
+   * Modal opener for "report missing anomaly". Can be triggered from link click or
+   * automatically via queryparam "openReport=true"
+   * @method triggerOpenReportModal
+   * @return {undefined}
+   */
+  triggerOpenReportModal() {
+    this.setProperties({
+      isReportSuccess: false,
+      isReportFailure: false,
+      openReportModal: true
+    });
+    // We need the C3/D3 graph to render after its containing parent elements are rendered
+    // in order to avoid strange overflow effects.
+    later(() => {
+      this.set('renderModalContent', true);
+    });
+  },
+
+  /**
    * When exiting route, lets kill the replay status check calls
    * @method clearAll
    * @return {undefined}
@@ -591,12 +621,13 @@ export default Controller.extend({
           const endStr = moment(missingAnomalyProps.endTime).format(rangeFormat);
           this.setProperties({
             isReportSuccess: true,
+            openReportModal: false,
             reportedRange: `${startStr} - ${endStr}`
           });
           // Reload after save confirmation
-          later(this, function() {
+/*          later(this, function() {
             this.send('refreshModel');
-          }, 1000);
+          }, 1000);*/
         })
         // If failure, leave modal open and report
         .catch((err) => {
@@ -614,6 +645,7 @@ export default Controller.extend({
       this.setProperties({
         isReportSuccess: false,
         isReportFailure: false,
+        openReportModal: false,
         renderModalContent: false
       });
     },
@@ -622,16 +654,7 @@ export default Controller.extend({
      * Open modal for missing anomalies
      */
     onClickReportAnomaly() {
-      this.setProperties({
-        isReportSuccess: false,
-        isReportFailure: false,
-        openReportModal: true
-      });
-      // We need the C3/D3 graph to render after its containing parent elements are rendered
-      // in order to avoid strange overflow effects.
-      later(() => {
-        this.set('renderModalContent', true);
-      });
+      this.triggerOpenReportModal();
     },
 
     /**

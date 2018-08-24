@@ -245,7 +245,13 @@
                     {{/if}}
 
                     {{#if anomaly.isUserReported}}
-                      <span class="te-anomaly-table__text">User Reported</span>
+                      <div class="te-anomaly-table__text te-anomaly-table__text--explore">User Reported</div>
+                      <div class="te-anomaly-table__comment">
+                        <i class="glyphicon glyphicon-th-list"></i>
+                        {{#tooltip-on-element class="te-anomaly-table__tooltip"}}
+                          {{anomaly.anomalyFeedbackComments}}
+                        {{/tooltip-on-element}}
+                      </div>
                     {{else}}
                       {{#power-select
                         triggerId=anomaly.anomalyId
