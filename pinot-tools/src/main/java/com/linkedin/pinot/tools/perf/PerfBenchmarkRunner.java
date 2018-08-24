@@ -47,7 +47,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
   private String _tempDir = "/tmp/";
 
   @Option(name = "-loadMode", required = false, metaVar = "<String>", usage = "Load mode of the segments (HEAP|MMAP).")
-  private String _loadMode = "HEAP";
+  private String _loadMode = "MMAP";
 
   @Option(name = "-segmentFormatVersion", required = false, metaVar = "<String>",
       usage = "Segment format version to be loaded (v1|v3).")

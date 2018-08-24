@@ -33,8 +33,6 @@ import java.util.List;
 public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "SortedInvertedIndexBasedFilterOperator";
 
-  private final PredicateEvaluator _predicateEvaluator;
-  private final DataSource _dataSource;
   private final int _startDocId;
   // TODO: change it to exclusive
   // Inclusive

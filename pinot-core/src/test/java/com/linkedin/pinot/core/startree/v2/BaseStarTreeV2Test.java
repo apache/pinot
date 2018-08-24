@@ -89,9 +89,11 @@ public abstract class BaseStarTreeV2Test<R, A> {
     // Extract values with star-tree
     PlanNode starTreeFilterPlanNode;
     if (groupByColumns.isEmpty()) {
-      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, rootFilterNode, null);
+      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, rootFilterNode,
+          null, brokerRequest.getDebugOptions());
     } else {
-      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, rootFilterNode, groupByColumnSet);
+      starTreeFilterPlanNode = new StarTreeFilterPlanNode(_starTreeV2, rootFilterNode,
+          groupByColumnSet, brokerRequest.getDebugOptions());
     }
     List<BlockSingleValIterator> starTreeAggregationColumnValueIterators = new ArrayList<>(numAggregations);
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {

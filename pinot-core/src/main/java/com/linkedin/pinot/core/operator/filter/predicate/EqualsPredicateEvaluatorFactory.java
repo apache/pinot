@@ -94,6 +94,11 @@ public class EqualsPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingDictIds() {
+      return _matchingDictIds.length;
+    }
+
+    @Override
     public int[] getMatchingDictIds() {
       return _matchingDictIds;
     }
