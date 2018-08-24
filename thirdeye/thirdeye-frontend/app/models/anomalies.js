@@ -8,6 +8,7 @@ export default DS.Model.extend({
   current: DS.attr(),
   baseline: DS.attr(),
   feedback: DS.attr(),
+  source: DS.attr(),
   comment: DS.attr(),
   metricName: DS.attr(),
   metricId: DS.attr(),

@@ -85,7 +85,7 @@ const fillAppBuckets = (allApps, validGroups) => {
   let appBucket = [];
 
   allApps.forEach((app) => {
-    let associatedGroups = validGroups.filter(group => group.application.toLowerCase().includes(app.application));
+    let associatedGroups = validGroups.filter(group => group.application.includes(app.application));
     if (associatedGroups.length) {
       let uniqueIds = Array.from(new Set([].concat(...associatedGroups.map(group => group.emailConfig.functionIds))));
       if (isDemoMode) {
@@ -217,6 +217,10 @@ export default Route.extend({
     const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
     const groupsWithAlertId = groupsWithAppName.filter(group => group.emailConfig.functionIds.length > 0);
     const filteredGroups = isDemoMode ? groupsWithAlertId.slice(0, 3) : groupsWithAlertId;
+
+    // NOTE: use this in order to find non-existent alert in the event of an error
+    // filteredGroups.filter(group => group.emailConfig.functionIds.includes(45639479)));
+
     const idsByApplication = fillAppBuckets(model.applications, filteredGroups);
     Object.assign(model, { idsByApplication });
   },
