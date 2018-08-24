@@ -34,6 +34,9 @@ const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDispla
   severity: computed('anomaly.severity', function() {
     return humanizeFloat(get(this, 'anomaly.severity'));
   }),
+  source: computed('anomaly.source', function() {
+    return humanizeFloat(get(this, 'anomaly.source'));
+  }),
   anomalyFeedback: computed('anomaly.feedback', function() {
     return get(this, 'anomaly.feedback') ? anomalyResponseObj.find(res => res.value === get(this, 'anomaly.feedback')).name : '';
   }),

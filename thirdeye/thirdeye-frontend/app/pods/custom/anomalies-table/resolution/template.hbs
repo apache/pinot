@@ -1,13 +1,12 @@
 <div class="anomalies-table__column-cell">
-  {{#if showResponseSaved}}
-    <i class="{{if showResponseSaved "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-ok-circle" ></i>
+  {{#if isUserReported}}
+    <div class="te-anomaly-table__text">User Reported</div>
   {{else}}
-    <i class="{{if showResponseFailed "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-remove-circle" ></i>
-  {{/if}}
-
-  {{#if record.isUserReported}}
-    <span class="te-anomaly-table__text">User Reported</span>
-  {{else}}
+    {{#if showResponseSaved}}
+      <i class="{{if showResponseSaved "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-ok-circle" ></i>
+    {{else}}
+      <i class="{{if showResponseFailed "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-remove-circle" ></i>
+    {{/if}}
     {{#power-select
       triggerId=record.anomalyId
       triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
@@ -20,9 +19,12 @@
       {{response}}
     {{/power-select}}
   {{/if}}
+  {{#if hasComment}}
+    <div class="te-anomaly-table__comment">
+      <i class="glyphicon glyphicon-th-list"></i>
+      {{#tooltip-on-element class="te-anomaly-table__tooltip"}}
+        {{record.anomaly.comment}}
+      {{/tooltip-on-element}}
+    </div>
+  {{/if}}
 </div>
-{{#if record.anomaly.comment}}
-  <div class="te-anomaly-table__comment">
-    comment: {{markdown-to-html record.anomaly.comment}}
-  </div>
-{{/if}}

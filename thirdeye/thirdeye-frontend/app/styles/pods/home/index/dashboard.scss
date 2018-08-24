@@ -84,6 +84,14 @@
           width: 280px;
         }
     }
+
+    &__text {
+      margin-bottom: 0px;
+
+      &--stronger {
+        font-weight: bold;
+      }
+    }
   }
 
   .te-anomaly-table {

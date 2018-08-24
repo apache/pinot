@@ -4,8 +4,8 @@
   border: 1px solid app-shade(black, 1);
 
   &__comment {
-    word-wrap: break-word;
-    width: 220px;
+    margin-top: 10px;
+    float: left;
   }
 
   &__wrapper {
@@ -14,7 +14,12 @@
   }
 
   &__text {
-    margin-right: 30px;
+    margin: 10px 10px 0 30px;
+
+    &--explore {
+      float: left;
+      margin-left: 0;
+    }
   }
 
   &__head {
@@ -72,21 +77,20 @@
   }
 
   &__list-item {
+    font-size: 13px;
+
     &--smaller {
-      font-size: 12px;
       margin-left: -2px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     &--lighter {
-      font-size: 12px;
       color: app-shade(black, 6);
     }
 
     &--warning {
       color: $te-red;
-      font-size: 13px;
     }
 
     &--shadow {
@@ -97,7 +101,7 @@
   }
 
   &__list-value {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     margin-left: 5px;
   }
@@ -111,6 +115,10 @@
 
     &--down {
       color: $te-red;
+    }
+
+    &--dash {
+      line-height: 5px;
     }
   }
 
@@ -140,6 +148,21 @@
     font-weight: 600;
     letter-spacing: .03em;
     font-size: 15px;
+
+    &--glyph {
+      margin-left: 10px;
+      color: rgba(0, 0, 0, .3);
+      font-size: 17px;
+      display: inline-block;
+
+      &:hover {
+        color: #78b12f;
+      }
+    }
+  }
+
+  &__tooltip {
+    font-weight: normal;
   }
 
   &__icon {
