@@ -28,7 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 public class FilterOperatorUtils {
 
   // Debug option to enable or disable multi-value optimization
-  private static final String USE_MV_OPT = "useMVOpt";
+  public static final String USE_MV_OPT = "useMVOpt";
 
   private FilterOperatorUtils() {
   }
