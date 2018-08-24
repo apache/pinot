@@ -127,12 +127,14 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   // Map from column to matching dictionary ids
   private final Map<String, IntSet> _matchingDictIdsMap;
 
+  private final Map<String, String> _debugOptions;
   boolean _resultEmpty = false;
 
   public StarTreeFilterOperator(@Nonnull StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
-      @Nullable Set<String> groupByColumns) {
+      @Nullable Set<String> groupByColumns, Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _groupByColumns = groupByColumns != null ? new HashSet<>(groupByColumns) : Collections.emptySet();
+    _debugOptions = debugOptions;
 
     if (rootFilterNode != null) {
       // Process the filter tree and get a map from column to a list of predicates applied to it
@@ -205,7 +207,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     } else if (numChildFilterOperators == 1) {
       return childFilterOperators.get(0).nextBlock();
     } else {
-      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators);
+      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, _debugOptions);
       return new AndOperator(childFilterOperators).nextBlock();
     }
   }

@@ -36,12 +36,13 @@ public class StarTreeProjectionPlanNode implements PlanNode {
   private final StarTreeDocIdSetPlanNode _starTreeDocIdSetPlanNode;
 
   public StarTreeProjectionPlanNode(@Nonnull StarTreeV2 starTreeV2, @Nonnull Set<String> projectionColumns,
-      @Nullable FilterQueryTree rootFilterNode, @Nullable Set<String> groupByColumns) {
+      @Nullable FilterQueryTree rootFilterNode, @Nullable Set<String> groupByColumns,
+      @Nonnull Map<String, String> debugOptions) {
     _dataSourceMap = new HashMap<>(projectionColumns.size());
     for (String projectionColumn : projectionColumns) {
       _dataSourceMap.put(projectionColumn, starTreeV2.getDataSource(projectionColumn));
     }
-    _starTreeDocIdSetPlanNode = new StarTreeDocIdSetPlanNode(starTreeV2, rootFilterNode, groupByColumns);
+    _starTreeDocIdSetPlanNode = new StarTreeDocIdSetPlanNode(starTreeV2, rootFilterNode, groupByColumns, debugOptions);
   }
 
   @Override

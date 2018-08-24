@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -38,7 +39,8 @@ public class StarTreeTransformPlanNode implements PlanNode {
 
   public StarTreeTransformPlanNode(@Nonnull StarTreeV2 starTreeV2,
       @Nonnull Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs,
-      @Nullable Set<TransformExpressionTree> groupByExpressions, @Nullable FilterQueryTree rootFilterNode) {
+      @Nullable Set<TransformExpressionTree> groupByExpressions, @Nullable FilterQueryTree rootFilterNode,
+      @Nonnull Map<String, String> debugOptions) {
     Set<String> projectionColumns = new HashSet<>();
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
@@ -56,7 +58,8 @@ public class StarTreeTransformPlanNode implements PlanNode {
       groupByColumns = null;
     }
     _starTreeProjectionPlanNode =
-        new StarTreeProjectionPlanNode(starTreeV2, projectionColumns, rootFilterNode, groupByColumns);
+        new StarTreeProjectionPlanNode(starTreeV2, projectionColumns, rootFilterNode,
+            groupByColumns, debugOptions);
   }
 
   @Override

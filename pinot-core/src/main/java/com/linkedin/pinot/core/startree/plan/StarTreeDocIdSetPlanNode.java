@@ -20,6 +20,7 @@ import com.linkedin.pinot.core.operator.DocIdSetOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -33,8 +34,9 @@ public class StarTreeDocIdSetPlanNode implements PlanNode {
   private final StarTreeFilterPlanNode _starTreeFilterPlanNode;
 
   public StarTreeDocIdSetPlanNode(@Nonnull StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
-      @Nullable Set<String> groupByColumns) {
-    _starTreeFilterPlanNode = new StarTreeFilterPlanNode(starTreeV2, rootFilterNode, groupByColumns);
+      @Nullable Set<String> groupByColumns, @Nonnull Map<String, String> debugOptions) {
+    _starTreeFilterPlanNode = new StarTreeFilterPlanNode(starTreeV2, rootFilterNode,
+        groupByColumns, debugOptions);
   }
 
   @Override

@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.index.data.source;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
@@ -44,6 +45,7 @@ public final class ColumnDataSource extends DataSource {
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
   private final Dictionary _dictionary;
+  private final int _cardinality;
   private final DataSourceMetadata _metadata;
 
   /**
@@ -52,7 +54,7 @@ public final class ColumnDataSource extends DataSource {
   public ColumnDataSource(ColumnIndexContainer indexContainer, ColumnMetadata metadata) {
     this(metadata.getColumnName(), metadata.getDataType(), metadata.isSingleValue(), metadata.isSorted(),
         metadata.getTotalDocs(), metadata.getMaxNumberOfMultiValues(), indexContainer.getForwardIndex(),
-        indexContainer.getInvertedIndex(), indexContainer.getDictionary());
+        indexContainer.getInvertedIndex(), indexContainer.getDictionary(), metadata.getCardinality());
   }
 
   /**
@@ -61,12 +63,12 @@ public final class ColumnDataSource extends DataSource {
   public ColumnDataSource(FieldSpec fieldSpec, int numDocs, int maxNumMultiValues, DataFileReader forwardIndex,
       InvertedIndexReader invertedIndex, MutableDictionary dictionary) {
     this(fieldSpec.getName(), fieldSpec.getDataType(), fieldSpec.isSingleValueField(), false, numDocs,
-        maxNumMultiValues, forwardIndex, invertedIndex, dictionary);
+        maxNumMultiValues, forwardIndex, invertedIndex, dictionary, Constants.UNKNOWN_CARDINALITY);
   }
 
   private ColumnDataSource(String columnName, FieldSpec.DataType dataType, boolean isSingleValue, boolean isSorted,
       int numDocs, int maxNumMultiValues, DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
-      Dictionary dictionary) {
+      Dictionary dictionary, int cardinality) {
     // Sanity check
     if (isSingleValue) {
       Preconditions.checkState(forwardIndex instanceof SingleColumnSingleValueReader);
@@ -92,6 +94,8 @@ public final class ColumnDataSource extends DataSource {
     _forwardIndex = forwardIndex;
     _invertedIndex = invertedIndex;
     _dictionary = dictionary;
+    _cardinality = cardinality;
+
     _metadata = new DataSourceMetadata() {
       @Override
       public FieldSpec.DataType getDataType() {
@@ -127,6 +131,9 @@ public final class ColumnDataSource extends DataSource {
       public boolean hasDictionary() {
         return _dictionary != null;
       }
+
+      @Override
+      public int getCardinality() { return _cardinality;}
     };
   }
 

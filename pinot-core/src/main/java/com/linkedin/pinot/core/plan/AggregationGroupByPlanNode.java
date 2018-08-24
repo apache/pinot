@@ -81,7 +81,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
             _transformPlanNode = null;
             _starTreeTransformPlanNode =
                 new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,
-                    rootFilterNode);
+                    rootFilterNode, brokerRequest.getDebugOptions());
             return;
           }
         }

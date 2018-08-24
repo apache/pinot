@@ -77,6 +77,7 @@ public class RangePredicateEvaluatorFactory {
     final int _startDictId;
     // Exclusive
     final int _endDictId;
+    int _numMatchingDictIds;
     int[] _matchingDictIds;
 
     OfflineDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, ImmutableDictionaryReader dictionary) {
@@ -113,6 +114,7 @@ public class RangePredicateEvaluatorFactory {
           }
         }
       }
+      _numMatchingDictIds = _endDictId - _startDictId;
     }
 
     @Override
@@ -131,14 +133,18 @@ public class RangePredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingDictIds() {
+      return _numMatchingDictIds;
+    }
+
+    @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
-        int numMatchingDictIds = _endDictId - _startDictId;
-        if (numMatchingDictIds <= 0) {
+        if (_numMatchingDictIds <= 0) {
           _matchingDictIds = new int[0];
         } else {
-          _matchingDictIds = new int[numMatchingDictIds];
-          for (int i = 0; i < numMatchingDictIds; i++) {
+          _matchingDictIds = new int[_numMatchingDictIds];
+          for (int i = 0; i < _numMatchingDictIds; i++) {
             _matchingDictIds[i] = _startDictId + i;
           }
         }
@@ -149,6 +155,7 @@ public class RangePredicateEvaluatorFactory {
 
   private static final class RealtimeDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final IntSet _matchingDictIdSet;
+    int _numMatchingDictIds;
     int[] _matchingDictIds;
 
     RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, MutableDictionary dictionary) {
@@ -176,6 +183,7 @@ public class RangePredicateEvaluatorFactory {
           _matchingDictIdSet.add(dictId);
         }
       }
+      _numMatchingDictIds = _matchingDictIdSet.size();
     }
 
     @Override
@@ -186,6 +194,11 @@ public class RangePredicateEvaluatorFactory {
     @Override
     public boolean applySV(int dictId) {
       return _matchingDictIdSet.contains(dictId);
+    }
+
+    @Override
+    public int getNumMatchingDictIds() {
+      return _numMatchingDictIds;
     }
 
     @Override

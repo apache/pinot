@@ -30,9 +30,6 @@ import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "ScanBasedFilterOperator";
-
-  private final PredicateEvaluator _predicateEvaluator;
-  private final DataSource _dataSource;
   private final int _startDocId;
   // TODO: change it to exclusive
   // Inclusive
