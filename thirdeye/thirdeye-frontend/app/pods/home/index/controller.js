@@ -1,7 +1,6 @@
 import Controller from '@ember/controller';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 import { computed, set, get } from '@ember/object';
-import { later } from "@ember/runloop";
 import { isBlank } from '@ember/utils';
 import moment from 'moment';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';

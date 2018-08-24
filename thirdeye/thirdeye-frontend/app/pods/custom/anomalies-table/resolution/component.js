@@ -13,11 +13,16 @@
  *   },
  */
 import Component from "@ember/component";
-import { getWithDefault, computed, get, set } from '@ember/object';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
-import { setProperties } from '@ember/object';
 import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
 import { inject as service } from '@ember/service';
+import {
+  set,
+  get,
+  computed,
+  setProperties,
+  getWithDefault
+} from '@ember/object';
 
 export default Component.extend({
   tagName: '',//using tagless so i can add my own in hbs
