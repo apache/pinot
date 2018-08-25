@@ -28,7 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 public class FilterOperatorUtils {
 
   // Debug option to enable or disable multi-value optimization
-  public static final String USE_MV_OPT = "useMVOpt";
+  public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
 
   private FilterOperatorUtils() {
   }
@@ -107,7 +107,7 @@ public class FilterOperatorUtils {
 
     boolean disabled = false;
     if (debugOptions != null &&
-        StringUtils.compareIgnoreCase(debugOptions.get(USE_MV_OPT), "false") == 0) {
+        StringUtils.compareIgnoreCase(debugOptions.get(USE_SCAN_REORDER_OPTIMIZATION), "false") == 0) {
       disabled = true;
     }
     DataSourceMetadata metadata = filterOperator.getDataSourceMetadata();
