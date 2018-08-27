@@ -14,11 +14,12 @@ import {
   selfServeApiOnboard
 } from 'thirdeye-frontend/utils/api/self-serve';
 import { postProps, checkStatus } from 'thirdeye-frontend/utils/utils';
+import { inject as service } from '@ember/service';
 
 let onboardStartTime = {};
 
 export default Route.extend({
-
+  session: service(),
   /**
    * Model hook for the create alert route.
    * @method model
@@ -72,7 +73,25 @@ export default Route.extend({
     return fetch(selfServeApiOnboard.deleteAlert(functionId), postProps).then(checkStatus);
   },
 
+
   actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+    error() {
+      // The `error` hook is also provided the failed
+      // `transition`, which can be stored and later
+      // `.retry()`d if desired.
+      return true;
+    },
+
     /**
     * Refresh route's model.
     * @method refreshModel

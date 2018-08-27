@@ -11,8 +11,10 @@ import { get, getWithDefault } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { inject as service } from '@ember/service';
 
 export default Route.extend({
+  session: service(),
 
 /**
  * Optional params to load a fresh view
@@ -109,6 +111,25 @@ export default Route.extend({
   }),
 
   actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+    /**
+     * Handle any errors occurring in model/afterModel in parent route
+     * https://www.emberjs.com/api/ember/2.16/classes/Route/events/error?anchor=error
+     * https://guides.emberjs.com/v2.18.0/routing/loading-and-error-substates/#toc_the-code-error-code-event
+     */
+    error() {
+      return true;
+    },
+
     /**
      * Action called on submission to reload the route's model
      */

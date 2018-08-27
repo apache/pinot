@@ -2,6 +2,7 @@ import { type } from './utils';
 import { COMPARE_MODE_MAPPING } from './constants';
 import fetch from 'fetch';
 import moment from 'moment';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 /**
  * Define the anomaly action types
@@ -97,7 +98,7 @@ function fetchDimensions(metricId) {
     // TODO: save url in an API folder
     // need to have a new endpoint with just the anomaly details
     return fetch(`/data/autocomplete/dimensions/metric/${metricId}`)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => dispatch(load(res, metricId)))
       .catch((res) => dispatch(requestFail(res)));
   };
@@ -128,7 +129,7 @@ function updateDimension(newDimension) {
 
     dispatch(setDimension(newDimension));
     return fetch(url)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => dispatch(loadTimeSeries(res)));
   };
 }
@@ -156,7 +157,7 @@ function fetchHeatMapData(start, end) {
     const heatmapUrl = `/data/heatmap/${primaryMetricId}/${start}/${end}/${baselineStart}/${baselineEnd}?filters=${encodeURIComponent(filters)}`;
 
     return fetch(heatmapUrl)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => dispatch(loadHeatMap(res)));
   };
 }

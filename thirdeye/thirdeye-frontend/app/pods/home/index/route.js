@@ -18,6 +18,7 @@ const queryParamsConfig = {
 
 export default Route.extend(AuthenticatedRouteMixin, {
   anomaliesApiService: service('services/api/anomalies'),
+  session: service(),
 
   queryParams: {
     appName: queryParamsConfig,
@@ -165,5 +166,18 @@ export default Route.extend(AuthenticatedRouteMixin, {
       appName: this.get('appName'),
       anomaliesCount: this.get('applicationAnomalies.content') ? this.get('applicationAnomalies.content').length : 0
     });
+  },
+
+  actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    }
   }
 });

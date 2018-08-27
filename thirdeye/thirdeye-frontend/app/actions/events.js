@@ -10,7 +10,7 @@ import {
   ROOTCAUSE_ANALYSIS_DURATION_MAX,
   ROOTCAUSE_ANOMALY_DURATION_MAX
 } from './constants';
-
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 /**
  * Define the metric action types
  */
@@ -277,7 +277,7 @@ function fetchEvents(start, end, mode) {
     dispatch(setDate([anomalyStart, anomalyEnd]));
     dispatch(loading());
     return fetch(`/rootcause/query?framework=relatedEvents&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=${urns}`)
-      .then(res => res.json())
+      .then(checkStatus)
       .then((res) => {
         return _.uniqBy(res, 'urn')
           .map(adjustHolidayTimestamp)

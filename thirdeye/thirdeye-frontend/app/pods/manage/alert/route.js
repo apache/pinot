@@ -25,6 +25,7 @@ export default Route.extend({
   },
 
   durationCache: service('services/duration'),
+  session: service(),
 
   beforeModel(transition) {
     const id = transition.params['manage.alert'].alert_id;
@@ -63,8 +64,8 @@ export default Route.extend({
       destination: transition.targetName,
       alertData: fetch(selfServeApiCommon.alertById(id)).then(checkStatus),
       email: fetch(selfServeApiCommon.configGroupByAlertId(id)).then(checkStatus),
-      allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(res => res.json()),
-      allAppNames: fetch(selfServeApiCommon.allApplications).then(res => res.json())
+      allConfigGroups: fetch(selfServeApiCommon.allConfigGroups).then(checkStatus),
+      allAppNames: fetch(selfServeApiCommon.allApplications).then(checkStatus)
     });
   },
 
@@ -133,6 +134,11 @@ export default Route.extend({
      * Set loader on start of transition
      */
     willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+
       this.controller.set('isTransitionDone', false);
       if (transition.targetName === 'manage.alert.index') {
         this.refresh();
@@ -193,9 +199,12 @@ export default Route.extend({
       }
     },
 
-    // Sub-route errors will bubble up to this
-    error(error, transition) {
-      this.controller.set('isLoadError', true);
+    // // Sub-route errors will bubble up to this
+    error() {
+      if (this.controller) {
+        this.controller.set('isLoadError', true);
+      }
+      return true;//pass up stream
     }
   }
 

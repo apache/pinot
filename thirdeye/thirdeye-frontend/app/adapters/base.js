@@ -1,10 +1,13 @@
 import DS from 'ember-data';
 import { inject as service } from '@ember/service';
 
+const S_401_UNAUTHORIZED = 401;
+
 /**
  * @summary This base supports the standard advanced configurations needed for making the requests.
  */
 export default DS.RESTAdapter.extend({
+  session: service(),
   shareDashboardApiService: service('services/api/share-dashboard'),
   headers: {
     'Accept': '*/*'
@@ -28,7 +31,9 @@ export default DS.RESTAdapter.extend({
 
   handleResponse(status, headers, payload, requestData) {
     // For creates we look into the header
-    if (status === 201 || status === 204) {
+    if (status === S_401_UNAUTHORIZED) {
+      this.get('session').invalidate();
+    } else if (status === 201 || status === 204) {
       headers['content-type'] = 'application/json';
       const id = headers['x-restli-id'] || headers['X-RestLi-Id'];
       if (id) {
@@ -37,6 +42,20 @@ export default DS.RESTAdapter.extend({
     }
     let response = this._super(status, headers, payload, requestData);
     return response;
+  },
+
+ /**
+  * @summary Handle any specific errors on request attempts
+  */
+  handleError(status) {
+    if (status) {
+      // Redirect if one of the errors is a 401 from the API.
+      const unauthorized = status === S_401_UNAUTHORIZED;
+      if (unauthorized) {
+        this.get('session').invalidate();
+      }
+
+    }
   },
 
   /**

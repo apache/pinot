@@ -128,6 +128,7 @@ export default Route.extend({
    * Make duration service accessible
    */
   durationCache: service('services/duration'),
+  session: service(),
 
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
@@ -534,6 +535,17 @@ export default Route.extend({
   }).cancelOn('deactivate').restartable(),
 
   actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+
     /**
     * Refresh route's model.
     */

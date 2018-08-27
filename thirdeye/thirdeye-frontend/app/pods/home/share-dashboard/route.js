@@ -20,6 +20,7 @@ const queryParamsConfig = {
 export default Route.extend(AuthenticatedRouteMixin, {
   anomaliesApiService: service('services/api/anomalies'),
   shareDashboardApiService: service('services/api/share-dashboard'),
+  session: service(),
   queryParams: {
     appName: queryParamsConfig,
     startDate: queryParamsConfig,
@@ -126,6 +127,11 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   actions: {
     willTransition: function(transition){
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+
       if (transition.targetName !== 'home.share-dashboard') {
         //reset on leaving this route only vs calling itself
         this.controller.setProperties({

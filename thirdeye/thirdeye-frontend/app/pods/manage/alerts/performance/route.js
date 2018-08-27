@@ -18,6 +18,7 @@ import {
 } from 'thirdeye-frontend/utils/utils';
 import { isPresent } from '@ember/utils';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
+import { inject as service } from '@ember/service';
 
 /**
  * If true, this reduces the list of alerts per app to 2 for a quick demo.
@@ -162,6 +163,7 @@ const queryParamsConfig = {
 };
 
 export default Route.extend({
+  session: service(),
   queryParams: {
     duration: queryParamsConfig,
     startDate: queryParamsConfig,
@@ -173,17 +175,6 @@ export default Route.extend({
     // Default to 1 month of anomalies to show if no dates present in query params
     if (!duration || !startDate) {
       this.transitionTo({ queryParams: defaultDurationObj });
-    }
-  },
-
-  actions: {
-    /**
-    * Refresh route's model.
-    * @method refreshModel
-    * @return {undefined}
-    */
-    refreshModel() {
-      this.refresh();
     }
   },
 
@@ -202,8 +193,8 @@ export default Route.extend({
 
     return hash({
       // Fetch all alert group configurations
-      configGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
-      applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json()),
+      configGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(checkStatus),
+      applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus),
       duration,
       startDate,
       endDate
@@ -337,5 +328,30 @@ export default Route.extend({
           errMsg
         });
       });
+  },
+
+  actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+    error() {
+      return true;
+    },
+
+    /**
+    * Refresh route's model.
+    * @method refreshModel
+    * @return {undefined}
+    */
+    refreshModel() {
+      this.refresh();
+    }
   }
 });

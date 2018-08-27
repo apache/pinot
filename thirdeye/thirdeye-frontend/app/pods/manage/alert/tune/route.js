@@ -248,6 +248,7 @@ export default Route.extend({
    * Make duration service accessible
    */
   durationCache: service('services/duration'),
+  session: service(),
 
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
@@ -414,6 +415,25 @@ export default Route.extend({
   }).cancelOn('deactivate').restartable(),
 
   actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+
+    /**
+     * Handle any errors occurring in model/afterModel in parent route
+     * https://www.emberjs.com/api/ember/2.16/classes/Route/events/error?anchor=error
+     * https://guides.emberjs.com/v2.18.0/routing/loading-and-error-substates/#toc_the-code-error-code-event
+     */
+    error() {
+      return true;
+    },
 
     // User clicks reset button
     resetPage() {
