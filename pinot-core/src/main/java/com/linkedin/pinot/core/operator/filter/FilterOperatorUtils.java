@@ -22,9 +22,14 @@ import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-
+import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 public class FilterOperatorUtils {
+
+  // Debug option to enable or disable multi-value optimization
+  public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
+
   private FilterOperatorUtils() {
   }
 
@@ -58,7 +63,7 @@ public class FilterOperatorUtils {
    * <p>Special filter operators such as {@link MatchEntireSegmentOperator} and {@link EmptyFilterOperator} should be
    * removed from the list before calling this method.
    */
-  public static void reOrderFilterOperators(List<BaseFilterOperator> filterOperators) {
+  public static void reOrderFilterOperators(List<BaseFilterOperator> filterOperators, Map<String, String> debugOptions) {
     Collections.sort(filterOperators, new Comparator<BaseFilterOperator>() {
       @Override
       public int compare(BaseFilterOperator o1, BaseFilterOperator o2) {
@@ -79,11 +84,38 @@ public class FilterOperatorUtils {
           return 3;
         }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return 4;
+          return getScanBasedFilterPriority(filterOperator, 4, debugOptions);
         }
         throw new IllegalStateException(filterOperator.getClass().getSimpleName()
             + " should not be re-ordered, remove it from the list before calling this method");
       }
     });
+  }
+
+  /**
+   * Returns the priority for scan based filtering. Multivalue column evaluation is costly, so
+   * reorder such that multivalue columns are evaluated after single value columns.
+   *
+   * TODO: additional cost based prioritization to be added
+   *
+   * @param filterOperator the filter operator to prioritize
+   * @param debugOptions  debug-options to enable/disable the optimization
+   * @return the priority to be associated with the filter
+   */
+  private static int getScanBasedFilterPriority(BaseFilterOperator filterOperator,
+      int basePriority, Map<String, String> debugOptions) {
+
+    boolean disabled = false;
+    if (debugOptions != null &&
+        StringUtils.compareIgnoreCase(debugOptions.get(USE_SCAN_REORDER_OPTIMIZATION), "false") == 0) {
+      disabled = true;
+    }
+    DataSourceMetadata metadata = filterOperator.getDataSourceMetadata();
+    if (disabled || metadata == null || metadata.isSingleValue()) {
+      return basePriority;
+    }
+
+    // lower priority for multivalue
+    return basePriority + 1;
   }
 }

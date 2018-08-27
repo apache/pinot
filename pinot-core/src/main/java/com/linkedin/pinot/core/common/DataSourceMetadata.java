@@ -33,4 +33,6 @@ public interface DataSourceMetadata {
   boolean hasInvertedIndex();
 
   boolean hasDictionary();
+
+  int getCardinality();
 }

@@ -97,9 +97,11 @@ public abstract class BaseStarTreeIndexTest {
     Operator filterOperator;
     if (_numGroupByColumns > 0) {
       filterOperator =
-          new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode, _groupByColumns).run();
+          new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
+              _groupByColumns, _brokerRequest.getDebugOptions()).run();
     } else {
-      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode, null).run();
+      filterOperator = new StarTreeFilterPlanNode(_segment.getStarTrees().get(0), rootFilterNode,
+          null, _brokerRequest.getDebugOptions()).run();
     }
     return compute(filterOperator);
   }
