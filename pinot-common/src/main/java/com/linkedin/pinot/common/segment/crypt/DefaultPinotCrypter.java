@@ -18,14 +18,14 @@ package com.linkedin.pinot.common.segment.crypt;
 import java.net.URI;
 
 
-public class DefaultPinotCrypter extends PinotCrypter {
+public class DefaultPinotCrypter implements PinotCrypter {
   @Override
-  public void encrypt(URI uri) {
+  public void encrypt(URI uri) throws Exception {
 
   }
 
   @Override
-  public void decrypt(URI uri) {
+  public void decrypt(URI uri) throws Exception {
 
   }
 }

@@ -22,16 +22,18 @@ import java.net.URI;
  * The PinotCrypter will encrypt and decrypt segments when they are downloaded. This class is especially useful in cases
  * where segments cannot be stored unencrypted in storage.
  */
-public abstract class PinotCrypter {
+public interface PinotCrypter {
   /**
    * Encrypts data.
    * @param uri location of data to be encrypted
+   * @Exception throws an Exception if encrypt fails
    */
-  public abstract void encrypt(URI uri);
+  void encrypt(URI uri) throws Exception;
 
   /**
    * Decrypts data.
    * @param uri location of data to be decrypted
+   * @Exception throws an Exception if decrypt fails
    */
-  public abstract void decrypt(URI uri);
+  void decrypt(URI uri) throws Exception;
 }
