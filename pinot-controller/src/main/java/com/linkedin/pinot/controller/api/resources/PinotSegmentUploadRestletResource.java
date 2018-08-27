@@ -504,9 +504,10 @@ public class PinotSegmentUploadRestletResource {
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
       LOGGER.info("Adding new segment: {}", segmentName);
-      if (downloadUrl == null) {
+      // We will only assume that segment metadata upload doesn't have to do a move through the controller because
+      // otherwise, we shouldn't send a separate payload.
+      if (!isSegmentMetadataUpload) {
         try {
-          // Assumes local implementation because downloadUrl should be set in a header for non-local implementations
           downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile.toURI());
         } catch (Exception e) {
           LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, rawTableName);
@@ -601,7 +602,9 @@ public class PinotSegmentUploadRestletResource {
         // New segment is different with the existing one, update ZK metadata and refresh the segment
         LOGGER.info("New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing segment {}",
             newCrc, existingCrc, segmentName);
-        if (downloadUrl == null) {
+        // We will only assume that segment metadata upload doesn't have to do a move through the controller because
+        // otherwise, we shouldn't send a separate payload.
+        if (!isSegmentMetadataUpload) {
           URI currentLocation = tempTarredSegmentFile.toURI();
           downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, currentLocation);
         }
@@ -617,12 +620,13 @@ public class PinotSegmentUploadRestletResource {
 
   private String moveSegmentToPermanentDirectory(FileUploadPathProvider provider, String tableName, String segmentName,
       URI srcUri) throws Exception {
-    // Move tarred segment file to data directory when there is no external download URL
-    File tarredSegmentFile = new File(new File(provider.getBaseDataDir(), tableName), segmentName);
+    URI tarredSegmentURI = new URI(provider.getBaseDataDirURI() + "/" + tableName + "/" + segmentName);
     PinotFS pinotFS = PinotFSFactory.create(srcUri.getScheme());
-    // The move will overwrite current segment file
-    pinotFS.move(srcUri, tarredSegmentFile.toURI());
-    LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, srcUri.getPath(), tarredSegmentFile.getAbsolutePath());
+    // We want this copy to overwrite the remote segment file
+    pinotFS.delete(tarredSegmentURI);
+    // All files that come and go to remote filesystem will come through the controller.
+    pinotFS.copyFromLocalFile(new File(srcUri), tarredSegmentURI);
+    LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, srcUri.getPath(), tarredSegmentURI);
     return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
   }
 
