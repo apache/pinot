@@ -79,8 +79,8 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public void mkdir(URI uri) throws IOException {
-    _adlStoreClient.createDirectory(uri.getPath());
+  public boolean mkdir(URI uri) throws IOException {
+    return _adlStoreClient.createDirectory(uri.getPath());
   }
 
   @Override

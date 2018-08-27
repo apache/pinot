@@ -70,8 +70,8 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public void mkdir(URI uri) {
-
+    public boolean mkdir(URI uri) {
+      return true;
     }
 
     @Override
