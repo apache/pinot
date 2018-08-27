@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.segment.crypt.DefaultPinotCrypter;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.filesystem.LocalPinotFS;
 import java.io.File;
@@ -62,6 +63,10 @@ public class ControllerConf extends PropertiesConfiguration {
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
   private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
+
+  // Defines the crypter class
+  private static final String PINOT_CRYPTER_CLASS = "controller.crypter.class";
+  private static final String PINOT_CRYPTER_CLASS_DEFAULT = DefaultPinotCrypter.class.getName();
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
@@ -379,6 +384,14 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setAccessControlFactoryClass(String accessControlFactoryClass) {
     setProperty(ACCESS_CONTROL_FACTORY_CLASS, accessControlFactoryClass);
+  }
+
+  public String getPinotCrypterClass() {
+    return getString(PINOT_CRYPTER_CLASS, PINOT_CRYPTER_CLASS_DEFAULT);
+  }
+
+  public void setPinotCrypterClass(String pinotCrypterClass) {
+    setProperty(PINOT_CRYPTER_CLASS, pinotCrypterClass);
   }
 
   public long getSegmentUploadTimeoutInMillis() {

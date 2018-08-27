@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.segment.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ServiceStatus;
@@ -130,6 +131,14 @@ public class ControllerStarter {
     LOGGER.info("Initializing PinotFSFactory");
     try {
       PinotFSFactory.init(pinotFSConfig);
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+
+    LOGGER.info("Initializing PinotCrypterFactory");
+    try {
+      Configuration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER_FACTORY);
+      PinotCrypterFactory.init(pinotCrypterConfig);
     } catch (Exception e) {
       Utils.rethrowException(e);
     }

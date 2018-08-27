@@ -18,6 +18,7 @@ package com.linkedin.pinot.minion;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.segment.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -138,6 +139,14 @@ public class MinionStarter {
     LOGGER.info("Initializing PinotFSFactory");
     try {
       PinotFSFactory.init(pinotFSConfig);
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+
+    LOGGER.info("Initializing PinotCrypterFactory");
+    try {
+      Configuration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER_FACTORY);
+      PinotCrypterFactory.init(pinotCrypterConfig);
     } catch (Exception e) {
       Utils.rethrowException(e);
     }

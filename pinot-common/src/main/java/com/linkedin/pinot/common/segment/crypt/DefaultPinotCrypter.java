@@ -15,17 +15,28 @@
  */
 package com.linkedin.pinot.common.segment.crypt;
 
-import java.net.URI;
+import java.io.File;
+import java.io.IOException;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.io.FileUtils;
 
 
+/**
+ * The default crypter class assumes that the file is not encrypted
+ */
 public class DefaultPinotCrypter implements PinotCrypter {
   @Override
-  public void encrypt(URI uri) throws Exception {
+  public void init(Configuration configs) {
 
   }
 
   @Override
-  public void decrypt(URI uri) throws Exception {
+  public void encrypt(File srcFile, File dstFile) throws IOException {
+    FileUtils.copyFile(srcFile, dstFile);
+  }
 
+  @Override
+  public void decrypt(File srcFile, File dstFile) throws IOException {
+    FileUtils.copyFile(srcFile, dstFile);
   }
 }

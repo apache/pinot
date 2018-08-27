@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -55,8 +56,10 @@ public class SegmentFetcherAndLoader {
     Configuration pinotFSConfig = config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
         config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    Configuration pinotCrypterConfig = config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER_FACTORY);
 
     PinotFSFactory.init(pinotFSConfig);
+    PinotCrypterFactory.init(pinotCrypterConfig);
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
   }
 
