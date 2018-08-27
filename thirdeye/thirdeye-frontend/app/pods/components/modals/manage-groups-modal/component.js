@@ -476,7 +476,7 @@ export default Component.extend({
      */
     onRecipients () {
       const recipients = get(this, 'groupRecipients');
-      set(this, 'group.recipients', recipients.replace(' ', ''));
+      set(this, 'group.recipients', recipients.replace(/[^!-~]+/g, '').replace(/,+/g, ','));
     },
 
     /**
