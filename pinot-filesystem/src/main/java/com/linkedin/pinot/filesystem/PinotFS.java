@@ -32,6 +32,11 @@ public abstract class PinotFS {
   public abstract void init(Configuration config);
 
   /**
+   * Creates a new directory.
+   */
+  public abstract void mkdir(URI uri) throws IOException;
+
+  /**
    * Deletes the file at the location provided. If the segmentUri is a directory, it will delete the entire directory.
    * @param segmentUri URI of the segment
    * @return true if delete is successful else false

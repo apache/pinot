@@ -70,6 +70,11 @@ public class PinotFSFactoryTest {
     }
 
     @Override
+    public void mkdir(URI uri) {
+
+    }
+    
+    @Override
     public boolean delete(URI segmentUri) throws IOException {
       return true;
     }

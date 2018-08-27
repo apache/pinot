@@ -41,6 +41,11 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
+  public void mkdir(URI uri) throws IOException {
+    FileUtils.forceMkdir(new File(uri));
+  }
+
+  @Override
   public boolean delete(URI segmentUri) throws IOException {
     File file = new File(segmentUri);
     if (file.isDirectory()) {
