@@ -64,6 +64,11 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
+  public boolean mkdir(URI uri) throws IOException {
+    return _hadoopFS.mkdirs(new Path(uri));
+  }
+
+  @Override
   public boolean delete(URI segmentUri) throws IOException {
     return _hadoopFS.delete(new Path(segmentUri), true);
   }

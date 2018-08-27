@@ -99,7 +99,8 @@ public class LocalPinotFSTest {
 
     File firstTempDir = new File(_absoluteTmpDirPath, "firstTempDir");
     File secondTempDir = new File(_absoluteTmpDirPath, "secondTempDir");
-    Assert.assertTrue(firstTempDir.mkdirs(), "Could not make directory " + firstTempDir.getPath());
+    localPinotFS.mkdir(firstTempDir.toURI());
+    Assert.assertTrue(firstTempDir.exists(), "Could not make directory " + firstTempDir.getPath());
 
     // Check that directory only copy worked
     localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
