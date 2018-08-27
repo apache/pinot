@@ -15,11 +15,13 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.net.URI;
+import java.net.URISyntaxException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,6 +30,10 @@ import org.slf4j.LoggerFactory;
 public class FileUploadPathProvider {
   public final static String STATE = "state";
   public final static String TABLE_NAME = "tableName";
+  private final static String DEFAULT_SCHEME = "file";
+  private final static String FILE_UPLOAD_TEMP_PATH = "/fileUploadTemp";
+  private final static String UNTARRED_PATH = "/untarred";
+  private final static String SCHEMAS_TEMP = "/schemasTemp";
   private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadPathProvider.class);
 
   private final ControllerConf _controllerConf;
@@ -43,15 +49,20 @@ public class FileUploadPathProvider {
 
     // Pick the correct scheme for PinotFS. For pluggable storage, we will expect that the directory is configured
     // with a storage prefix. For backwards compatibility, we will assume local/mounted NFS storage if nothing is configured.
-    String scheme = "file";
+    String scheme = DEFAULT_SCHEME;
     String dataDir = _controllerConf.getDataDir();
     try {
       URI uri = new URI(_controllerConf.getDataDir());
-      scheme = uri.getScheme();
-    } catch (Exception e) {
-      // Assume local FS
-      LOGGER.warn("Could not create controller config data dir URI with {}", _controllerConf.getDataDir());
-      dataDir = "file://" + _controllerConf.getDataDir();
+      String dataDirScheme = uri.getScheme();
+      if (dataDirScheme ==  null) {
+        // Assume local fs
+        dataDir = "file://" + _controllerConf.getDataDir();
+      } else {
+        scheme = dataDirScheme;
+      }
+    } catch (URISyntaxException e) {
+      LOGGER.error("Invalid path set as data dir {}", _controllerConf.getDataDir());
+      Utils.rethrowException(e);
     }
 
     PinotFS pinotFS = PinotFSFactory.create(scheme);
@@ -61,15 +72,15 @@ public class FileUploadPathProvider {
       if (!pinotFS.exists(_baseDataDirURI)) {
         pinotFS.mkdir(_baseDataDirURI);
       }
-      _fileUploadTmpDirURI = new URI(_baseDataDirURI + "/fileUploadTemp");
+      _fileUploadTmpDirURI = new URI(_baseDataDirURI + FILE_UPLOAD_TEMP_PATH);
       if (!pinotFS.exists(_fileUploadTmpDirURI)) {
         pinotFS.mkdir(_fileUploadTmpDirURI);
       }
-      _tmpUntarredPathURI = new URI(_fileUploadTmpDirURI + "/untarred");
+      _tmpUntarredPathURI = new URI(_fileUploadTmpDirURI + UNTARRED_PATH);
       if (!pinotFS.exists(_tmpUntarredPathURI)) {
         pinotFS.mkdir(_tmpUntarredPathURI);
       }
-      _schemasTmpDirURI = new URI(_baseDataDirURI + "/schemasTemp");
+      _schemasTmpDirURI = new URI(_baseDataDirURI + SCHEMAS_TEMP);
       if (!pinotFS.exists(_schemasTmpDirURI)) {
         pinotFS.mkdir(_schemasTmpDirURI);
       }
