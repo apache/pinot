@@ -24,15 +24,16 @@ import org.apache.commons.collections.MapUtils;
  * the anomalies that don't pass the filter.
  */
 public class LegacyAlertFilterWrapper extends DetectionPipeline {
+  private static final String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
   private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_ALERT_FILTER_LOOKBACK = "alertFilterLookBack";
-  private static String PROP_SPEC = "specs";
-  private static String PROP_ALERT_FILTER = "alertFilter";
+  private static final String PROP_SPEC = "specs";
+  private static final String PROP_ALERT_FILTER = "alertFilter";
 
 
-  private BaseAlertFilter alertFilter;
+  private final BaseAlertFilter alertFilter;
   private final List<Map<String, Object>> nestedProperties;
 
   // look back of the alert filter runs to pickup new merged anomalies from the past
@@ -52,16 +53,18 @@ public class LegacyAlertFilterWrapper extends DetectionPipeline {
       throws Exception {
     super(provider, config, startTime, endTime);
 
-    this.alertFilter = new DummyAlertFilter();
     this.anomalyFunctionSpecs = MapUtils.getMap(config.getProperties(), PROP_SPEC);
+
     if (config.getProperties().containsKey(PROP_LEGACY_ALERT_FILTER_CLASS_NAME)) {
       String className = MapUtils.getString(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CLASS_NAME);
       this.alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
       this.alertFilter.setParameters(MapUtils.getMap(this.anomalyFunctionSpecs, PROP_ALERT_FILTER));
+    } else {
+      this.alertFilter = new DummyAlertFilter();
     }
+
     this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
-    this.alertFilterLookBack =
-        ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), PROP_ALERT_FILTER_LOOKBACK, "2week")).toStandardDuration().getMillis();
+    this.alertFilterLookBack = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), PROP_ALERT_FILTER_LOOKBACK, "2week")).toStandardDuration().getMillis();
   }
 
   @Override
@@ -72,13 +75,17 @@ public class LegacyAlertFilterWrapper extends DetectionPipeline {
 
       Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
 
-      properties.put(PROP_SPEC, anomalyFunctionSpecs);
+      if (!properties.containsKey(PROP_SPEC)) {
+        properties.put(PROP_SPEC, this.anomalyFunctionSpecs);
+      }
+      if (!properties.containsKey(PROP_ANOMALY_FUNCTION_CLASS)) {
+        properties.put(PROP_ANOMALY_FUNCTION_CLASS, this.config.getProperties().get(PROP_ANOMALY_FUNCTION_CLASS));
+      }
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
       nestedConfig.setProperties(properties);
 
-      DetectionPipeline pipeline =
-          this.provider.loadPipeline(nestedConfig, this.startTime - this.alertFilterLookBack, this.endTime);
+      DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime - this.alertFilterLookBack, this.endTime);
 
       DetectionPipelineResult intermediate = pipeline.run();
       candidates.addAll(intermediate.getAnomalies());
