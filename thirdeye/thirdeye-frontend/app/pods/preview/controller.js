@@ -169,12 +169,16 @@ export default Controller.extend({
     'timeseries',
     'baseline',
     'diagnosticsSeries',
+    'analysisRange',
+    'displayRange',
     function () {
       const metricUrn = get(this, 'metricUrn');
       const anomalies = get(this, 'anomalies');
       const timeseries = get(this, 'timeseries');
       const baseline = get(this, 'baseline');
       const diagnosticsSeries = get(this, 'diagnosticsSeries');
+      const analysisRange = get(this, 'analysisRange');
+      const displayRange = get(this, 'displayRange');
 
       const series = {};
 
@@ -213,6 +217,16 @@ export default Controller.extend({
           values: baseline.value,
           type: 'line',
           color: 'light-' + toColor(metricUrn)
+        };
+      }
+
+      // detection range
+      if (timeseries && !_.isEmpty(timeseries.value)) {
+        series['pre-detection-region'] = {
+          timestamps: [displayRange[0], analysisRange[0]],
+          values: [1, 1],
+          type: 'region',
+          color: 'grey'
         };
       }
 
