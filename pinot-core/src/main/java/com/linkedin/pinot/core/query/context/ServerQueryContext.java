@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.query;
+package com.linkedin.pinot.core.query.context;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
@@ -29,7 +28,7 @@ import javax.annotation.Nullable;
  * Class to encapsulate the query request and query processing context within the server. Goal is to make most of the
  * information available to lower levels of code in the server for logging, tracking etc.
  */
-public class ServerQueryRequest {
+public class ServerQueryContext {
   private final InstanceRequest _instanceRequest;
   private final ServerMetrics _serverMetrics;
   private final BrokerRequest _brokerRequest;
@@ -40,7 +39,7 @@ public class ServerQueryRequest {
 
   private int _segmentCountAfterPruning = -1;
 
-  public ServerQueryRequest(@Nonnull InstanceRequest instanceRequest, @Nonnull ServerMetrics serverMetrics,
+  public ServerQueryContext(@Nonnull InstanceRequest instanceRequest, @Nonnull ServerMetrics serverMetrics,
       long queryArrivalTimeMs) {
     _instanceRequest = instanceRequest;
     _serverMetrics = serverMetrics;

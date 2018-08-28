@@ -21,8 +21,8 @@ import com.google.common.util.concurrent.ListenableFutureTask;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
 import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManager;
@@ -43,16 +43,16 @@ public class FCFSQueryScheduler extends QueryScheduler {
     super(queryExecutor, new UnboundedResourceManager(config), serverMetrics);
   }
 
+  @Nonnull
   @Override
-  public ListenableFuture<byte[]> submit(final ServerQueryRequest queryRequest) {
-    Preconditions.checkNotNull(queryRequest);
-    if (! isRunning) {
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
+  public ListenableFuture<byte[]> submit(@Nonnull ServerQueryContext queryContext) {
+    Preconditions.checkNotNull(queryContext);
+    if (!isRunning) {
+      return immediateErrorResponse(queryContext, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
     }
-    queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
-    QueryExecutorService queryExecutorService =
-        resourceManager.getExecutorService(queryRequest, null);
-    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, queryExecutorService);
+    queryContext.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
+    QueryExecutorService queryExecutorService = resourceManager.getExecutorService(queryContext, null);
+    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryContext, queryExecutorService);
     resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;
   }

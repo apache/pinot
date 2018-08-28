@@ -16,12 +16,11 @@
 package com.linkedin.pinot.core.query.pruner;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.List;
@@ -37,12 +36,12 @@ import org.apache.commons.configuration.Configuration;
 public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
 
   @Override
-  public void init(Configuration config) {
+  public void init(@Nonnull Configuration config) {
   }
 
   @Override
-  public boolean prune(@Nonnull IndexSegment segment, @Nonnull ServerQueryRequest queryRequest) {
-    FilterQueryTree filterQueryTree = queryRequest.getFilterQueryTree();
+  public boolean prune(@Nonnull IndexSegment segment, @Nonnull ServerQueryContext queryContext) {
+    FilterQueryTree filterQueryTree = queryContext.getFilterQueryTree();
     if (filterQueryTree == null) {
       return false;
     }

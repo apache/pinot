@@ -17,14 +17,15 @@ package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
@@ -43,7 +44,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -90,11 +90,11 @@ public class PrioritySchedulerTest {
     conf.setProperty(ResourceLimitPolicy.TABLE_THREADS_HARD_LIMIT, 5);
     conf.setProperty(MultiLevelPriorityQueue.MAX_PENDING_PER_GROUP_KEY, 5);
     List<ListenableFuture<byte[]>> results = new ArrayList<>();
-    results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
+    results.add(scheduler.submit(createServerQueryContext("1", metrics)));
     TestSchedulerGroup group = TestPriorityScheduler.groupFactory.groupMap.get("1");
     group.addReservedThreads(10);
     group.addLast(createQueryRequest("1", metrics));
-    results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
+    results.add(scheduler.submit(createServerQueryContext("1", metrics)));
 
     scheduler.stop();
      long queueWakeTimeMicros = ((MultiLevelPriorityQueue) scheduler.getQueue()).getWakeupTimeMicros();
@@ -123,7 +123,7 @@ public class PrioritySchedulerTest {
     int totalPermits = scheduler.getRunningQueriesSemaphore().availablePermits();
     scheduler.start();
     ListenableFuture<byte[]> result = scheduler.submit(
-        createServerQueryRequest("1", metrics));
+        createServerQueryContext("1", metrics));
     startupBarrier.await();
     TestSchedulerGroup group = TestPriorityScheduler.groupFactory.groupMap.get("1");
     assertEquals(group.numRunning(), 1);
@@ -170,7 +170,7 @@ public class PrioritySchedulerTest {
         @Override
         public void run() {
           for (int j = 0; j < queriesPerThread; j++) {
-            results.add(scheduler.submit(createServerQueryRequest(Integer.toString(index), metrics)));
+            results.add(scheduler.submit(createServerQueryContext(Integer.toString(index), metrics)));
             Uninterruptibles.sleepUninterruptibly(random.nextInt(100), TimeUnit.MILLISECONDS);
           }
         }
@@ -192,11 +192,11 @@ public class PrioritySchedulerTest {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create(conf);
     scheduler.start();
     List<ListenableFuture<byte[]>> results = new ArrayList<>();
-    results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
+    results.add(scheduler.submit(createServerQueryContext("1", metrics)));
     TestSchedulerGroup group = TestPriorityScheduler.groupFactory.groupMap.get("1");
     group.addReservedThreads(10);
     group.addLast(createQueryRequest("1", metrics));
-    results.add(scheduler.submit(createServerQueryRequest("1", metrics)));
+    results.add(scheduler.submit(createServerQueryContext("1", metrics)));
     DataTable dataTable = DataTableFactory.getDataTable(results.get(1).get());
     assertTrue(dataTable.getMetadata().containsKey(
         DataTable.EXCEPTION_METADATA_KEY + QueryException.SERVER_OUT_OF_CAPACITY_ERROR.getErrorCode()));
@@ -207,7 +207,7 @@ public class PrioritySchedulerTest {
   public void testSubmitBeforeRunning() throws ExecutionException, InterruptedException, IOException {
     TestPriorityScheduler scheduler = TestPriorityScheduler.create();
     ListenableFuture<byte[]> result = scheduler.submit(
-        createServerQueryRequest("1", metrics));
+        createServerQueryContext("1", metrics));
     // start is not called
     DataTable response = DataTableFactory.getDataTable(result.get());
     assertTrue(response.getMetadata().containsKey(
@@ -264,19 +264,21 @@ public class PrioritySchedulerTest {
   static class TestQueryExecutor implements QueryExecutor {
 
     @Override
-    public void init(Configuration queryExecutorConfig, DataManager dataManager, ServerMetrics serverMetrics)
-        throws ConfigurationException {
-
+    public void init(@Nonnull QueryExecutorConfig queryExecutorConfig, @Nonnull InstanceDataManager instanceDataManager,
+        @Nonnull ServerMetrics serverMetrics) {
     }
 
     @Override
     public void start() {
-
     }
 
     @Override
-    public DataTable processQuery(ServerQueryRequest queryRequest,
-        ExecutorService executorService) {
+    public void shutDown() {
+    }
+
+    @Nonnull
+    @Override
+    public DataTable processQuery(@Nonnull ServerQueryContext queryContext, @Nonnull ExecutorService executorService) {
       if (useBarrier) {
         try {
           startupBarrier.await();
@@ -285,7 +287,7 @@ public class PrioritySchedulerTest {
         }
       }
       DataTableImplV2 result = new DataTableImplV2();
-      result.getMetadata().put("table", queryRequest.getTableName());
+      result.getMetadata().put("table", queryContext.getTableName());
       if (useBarrier) {
         try {
           validationBarrier.await();
@@ -298,18 +300,7 @@ public class PrioritySchedulerTest {
     }
 
     @Override
-    public void shutDown() {
-
-    }
-
-    @Override
-    public boolean isStarted() {
-      return true;
-    }
-
-    @Override
-    public void updateResourceTimeOutInMs(String resource, long timeOutMs) {
-
+    public void setTableTimeoutMs(@Nonnull String tableNameWithType, long timeOutMs) {
     }
   }
 }

@@ -16,16 +16,16 @@
 package com.linkedin.pinot.core.query.scheduler;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import java.util.Arrays;
 
 
 public class TestHelper {
 
-  public static ServerQueryRequest createServerQueryRequest(String table, ServerMetrics metrics,
+  public static ServerQueryContext createServerQueryContext(String table, ServerMetrics metrics,
       long queryArrivalTimeMs) {
     InstanceRequest request = new InstanceRequest();
     request.setBrokerId("broker");
@@ -37,15 +37,15 @@ public class TestHelper {
     qs.setTableName(table);
     br.setQuerySource(qs);
     request.setQuery(br);
-    return new ServerQueryRequest(request, metrics, queryArrivalTimeMs);
+    return new ServerQueryContext(request, metrics, queryArrivalTimeMs);
   }
 
-  public static ServerQueryRequest createServerQueryRequest(String table, ServerMetrics metrics) {
-    return createServerQueryRequest(table, metrics, System.currentTimeMillis());
+  public static ServerQueryContext createServerQueryContext(String table, ServerMetrics metrics) {
+    return createServerQueryContext(table, metrics, System.currentTimeMillis());
   }
 
   public static SchedulerQueryContext createQueryRequest(String table, ServerMetrics metrics, long queryArrivalTimeMs) {
-    return new SchedulerQueryContext(createServerQueryRequest(table, metrics, queryArrivalTimeMs));
+    return new SchedulerQueryContext(createServerQueryContext(table, metrics, queryArrivalTimeMs));
   }
 
   public static SchedulerQueryContext createQueryRequest(String table, ServerMetrics metrics) {

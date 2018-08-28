@@ -21,9 +21,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.netty.NettyServer;
@@ -67,13 +66,13 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
       return Futures.immediateFuture(null);
     }
 
-    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics, queryArrivalTimeMs);
-    queryRequest.getTimerContext()
+    ServerQueryContext queryContext = new ServerQueryContext(instanceRequest, serverMetrics, queryArrivalTimeMs);
+    queryContext.getTimerContext()
         .startNewPhaseTimer(ServerQueryPhase.REQUEST_DESERIALIZATION, queryArrivalTimeMs)
         .stopAndRecord();
 
     LOGGER.debug("Processing requestId:{},request={}", instanceRequest.getRequestId(), instanceRequest);
-    return queryScheduler.submit(queryRequest);
+    return queryScheduler.submit(queryContext);
   }
 
   public void setScheduler(QueryScheduler scheduler) {

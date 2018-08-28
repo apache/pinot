@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.query.context;
+package com.linkedin.pinot.core.query.context;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 
 
 public class TimerContext {
@@ -34,7 +35,7 @@ public class TimerContext {
     private long _durationMs;
     private boolean _ended;
 
-    private Timer(ServerQueryPhase queryPhase, long startTimeMs) {
+    private Timer(@Nonnull ServerQueryPhase queryPhase, long startTimeMs) {
       _queryPhase = queryPhase;
       _startTimeMs = startTimeMs;
     }

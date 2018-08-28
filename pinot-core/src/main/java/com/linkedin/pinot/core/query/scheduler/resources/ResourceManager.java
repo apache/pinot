@@ -19,7 +19,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -137,7 +137,7 @@ public abstract class ResourceManager {
    * @param accountant Accountant for a scheduler group
    * @return
    */
-  public abstract QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant);
+  public abstract QueryExecutorService getExecutorService(ServerQueryContext query, SchedulerGroupAccountant accountant);
 
   /**
    * Hard limit on number of threads for a scheduler group.
