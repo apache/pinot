@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.query.pruner;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
@@ -25,6 +24,7 @@ import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import java.util.HashSet;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;

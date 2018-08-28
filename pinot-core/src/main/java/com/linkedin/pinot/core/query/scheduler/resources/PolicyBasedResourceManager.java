@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.query.scheduler.resources;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
