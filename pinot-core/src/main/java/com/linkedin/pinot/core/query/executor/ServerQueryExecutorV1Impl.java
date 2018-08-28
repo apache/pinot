@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
@@ -47,12 +46,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nonnull;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
   private static final boolean PRINT_QUERY_PLAN = false;
@@ -60,20 +62,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private InstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
-  private volatile boolean _isStarted = false;
   private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
-  private final Map<String, Long> _resourceTimeOutMsMap = new ConcurrentHashMap<>();
+  private final Map<String, Long> _tableTimeoutMs = new ConcurrentHashMap<>();
   private ServerMetrics _serverMetrics;
 
-  public ServerQueryExecutorV1Impl() {
-  }
-
   @Override
-  public void init(Configuration configuration, DataManager dataManager, ServerMetrics serverMetrics)
-      throws ConfigurationException {
+  public synchronized void init(@Nonnull Configuration config, @Nonnull InstanceDataManager instanceDataManager,
+      @Nonnull ServerMetrics serverMetrics) throws ConfigurationException {
+    _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
-    _instanceDataManager = (InstanceDataManager) dataManager;
-    QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(configuration);
+    QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(config);
     if (queryExecutorConfig.getTimeOut() > 0) {
       _defaultTimeOutMs = queryExecutorConfig.getTimeOut();
     }
@@ -86,7 +84,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService) {
+  public synchronized void start() {
+    LOGGER.info("Query executor started");
+  }
+
+  @Override
+  public synchronized void shutDown() {
+    LOGGER.info("Query executor shut down");
+  }
+
+  @Nonnull
+  @Override
+  public DataTable processQuery(@Nonnull ServerQueryRequest queryRequest, @Nonnull ExecutorService executorService) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
@@ -100,7 +109,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     BrokerRequest brokerRequest = instanceRequest.getQuery();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
     String tableNameWithType = brokerRequest.getQuerySource().getTableName();
-    long queryTimeoutMs = _resourceTimeOutMsMap.getOrDefault(tableNameWithType, _defaultTimeOutMs);
+    long queryTimeoutMs = _tableTimeoutMs.getOrDefault(tableNameWithType, _defaultTimeOutMs);
     long remainingTimeMs = queryTimeoutMs - querySchedulingTimeMs;
 
     // Query scheduler wait time already exceeds query timeout, directly return
@@ -240,28 +249,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public synchronized void shutDown() {
-    if (isStarted()) {
-      _isStarted = false;
-      LOGGER.info("QueryExecutor is shutDown!");
-    } else {
-      LOGGER.warn("QueryExecutor is already shutDown, won't do anything!");
-    }
-  }
-
-  @Override
-  public boolean isStarted() {
-    return _isStarted;
-  }
-
-  @Override
-  public synchronized void start() {
-    _isStarted = true;
-    LOGGER.info("QueryExecutor is started!");
-  }
-
-  @Override
-  public void updateResourceTimeOutInMs(String resource, long timeOutMs) {
-    _resourceTimeOutMsMap.put(resource, timeOutMs);
+  public void setTableTimeoutMs(@Nonnull String tableNameWithType, long timeOutMs) {
+    _tableTimeoutMs.put(tableNameWithType, timeOutMs);
   }
 }

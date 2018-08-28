@@ -15,41 +15,47 @@
  */
 package com.linkedin.pinot.core.query.executor;
 
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nonnull;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
 
+@ThreadSafe
 public interface QueryExecutor {
-  /**
-   * Initialize query executor
-   * @param queryExecutorConfig
-   * @param dataManager
-   * @param serverMetrics
-   * @throws ConfigurationException
-   */
-  void init(Configuration queryExecutorConfig, DataManager dataManager, ServerMetrics serverMetrics) throws ConfigurationException;
 
+  /**
+   * Initializes the query executor.
+   * <p>Should be called only once and before calling any other method.
+   */
+  void init(@Nonnull Configuration config, @Nonnull InstanceDataManager instanceDataManager,
+      @Nonnull ServerMetrics serverMetrics) throws ConfigurationException;
+
+  /**
+   * Starts the query executor.
+   * <p>Should be called only once after query executor gets initialized but before calling any other method.
+   */
   void start();
 
   /**
-   * Execute a given query optionally parallelizing execution using provided
-   * executor service
-   * @param queryRequest Query to execute
-   * @param executorService executor service to use for parallelizing query execution
-   *                        across different segments
-   *
-   * @return
+   * Shuts down the query executor.
+   * <p>Should be called only once. After calling shut down, no other method should be called.
    */
-  DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService);
-
   void shutDown();
 
-  boolean isStarted();
+  /**
+   * Processes the query with the given executor service.
+   */
+  @Nonnull
+  DataTable processQuery(@Nonnull ServerQueryRequest queryRequest, @Nonnull ExecutorService executorService);
 
-  void updateResourceTimeOutInMs(String resource, long timeOutMs);
+  /**
+   * Sets the timeout for the given table, instead of using the global timeout.
+   */
+  void setTableTimeoutMs(@Nonnull String tableNameWithType, long timeOutMs);
 }

@@ -28,7 +28,6 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -67,12 +66,8 @@ public class TablesResource {
       @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
   })
   public String listTables() {
-    InstanceDataManager dataManager = checkGetInstanceDataManager();
-    Collection<TableDataManager> tableDataManagers = dataManager.getTableDataManagers();
-    List<String> tables = new ArrayList<>(tableDataManagers.size());
-    for (TableDataManager tableDataManager : tableDataManagers) {
-      tables.add(tableDataManager.getTableName());
-    }
+    InstanceDataManager instanceDataManager = checkGetInstanceDataManager();
+    List<String> tables = new ArrayList<>(instanceDataManager.getAllTables());
     return ResourceUtils.convertToJsonString(new TablesList(tables));
   }
 
