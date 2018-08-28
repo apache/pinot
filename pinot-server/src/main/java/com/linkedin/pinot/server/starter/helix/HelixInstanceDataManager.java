@@ -34,15 +34,16 @@ import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -67,8 +68,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ServerMetrics _serverMetrics;
 
   @Override
-  public void init(Configuration config, ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics)
-      throws Exception {
+  public synchronized void init(@Nonnull Configuration config, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull ServerMetrics serverMetrics) throws ConfigurationException {
     LOGGER.info("Initializing Helix instance data manager");
 
     _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(config);
@@ -90,15 +91,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void start() {
-    LOGGER.info("Starting Helix instance data manager");
-    LOGGER.info("Started Helix instance data manager");
+  public synchronized void start() {
+    LOGGER.info("Helix instance data manager started");
   }
 
   @Override
-  public void shutDown() {
-    LOGGER.info("Shutting down Helix instance data manager");
-    LOGGER.info("Shut down Helix instance data manager");
+  public synchronized void shutDown() {
+    LOGGER.info("Helix instance data manager shut down");
   }
 
   @Override
@@ -245,8 +244,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Nonnull
   @Override
-  public Collection<TableDataManager> getTableDataManagers() {
-    return _tableDataManagerMap.values();
+  public Set<String> getAllTables() {
+    return _tableDataManagerMap.keySet();
   }
 
   @Nullable

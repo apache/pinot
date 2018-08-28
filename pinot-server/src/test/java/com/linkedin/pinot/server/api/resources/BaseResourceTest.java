@@ -72,7 +72,7 @@ public abstract class BaseResourceTest {
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
     when(instanceDataManager.getTableDataManager(anyString())).thenAnswer(
         invocation -> _tableDataManagerMap.get(invocation.getArguments()[0]));
-    when(instanceDataManager.getTableDataManagers()).thenReturn(_tableDataManagerMap.values());
+    when(instanceDataManager.getAllTables()).thenReturn(_tableDataManagerMap.keySet());
 
     // Mock the server instance
     ServerInstance serverInstance = mock(ServerInstance.class);

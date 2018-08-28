@@ -120,7 +120,7 @@ public class HelixServerStarter {
 
     // Register state model factory
     SegmentFetcherAndLoader fetcherAndLoader =
-        new SegmentFetcherAndLoader(_serverInstance.getInstanceDataManager(), propertyStore, _helixServerConfig);
+        new SegmentFetcherAndLoader(_helixServerConfig, _serverInstance.getInstanceDataManager(), propertyStore);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, _serverInstance.getInstanceDataManager(),
             fetcherAndLoader, propertyStore);
