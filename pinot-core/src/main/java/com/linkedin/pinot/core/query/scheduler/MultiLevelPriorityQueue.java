@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -190,7 +190,7 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
 
     SchedulerQueryContext query = null;
     if (currentWinnerGroup != null) {
-      ServerQueryRequest queryRequest = currentWinnerGroup.peekFirst().getQueryRequest();
+      ServerQueryContext queryRequest = currentWinnerGroup.peekFirst().getQueryContext();
       if (LOGGER.isDebugEnabled()) {
         sb.append(String.format(" Winner: %s: [%d,%d,%d,%d]", currentWinnerGroup.name(), queryRequest.getTimerContext().getQueryArrivalTimeMs(),
             queryRequest.getInstanceRequest().getRequestId(), queryRequest.getInstanceRequest().getSearchSegments().size(),

@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.scheduler.resources;
 
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -44,7 +44,7 @@ public class ResourceManagerTest {
     return new ResourceManager(getConfig(runners, workers)) {
 
       @Override
-      public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {
+      public QueryExecutorService getExecutorService(ServerQueryContext query, SchedulerGroupAccountant accountant) {
         return new QueryExecutorService() {
           @Override
           public void execute(Runnable command) {

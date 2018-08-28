@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
 import com.linkedin.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;

@@ -24,14 +24,13 @@ import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,21 +58,22 @@ public abstract class PriorityScheduler extends QueryScheduler {
     runningQueriesSemaphore = new Semaphore(numRunners);
   }
 
+  @Nonnull
   @Override
-  public ListenableFuture<byte[]> submit(@Nullable final ServerQueryRequest queryRequest) {
-    Preconditions.checkNotNull(queryRequest);
+  public ListenableFuture<byte[]> submit(@Nonnull ServerQueryContext queryContext) {
+    Preconditions.checkNotNull(queryContext);
     if (! isRunning) {
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
+      return immediateErrorResponse(queryContext, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
     }
-    queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
-    final SchedulerQueryContext schedQueryContext = new SchedulerQueryContext(queryRequest);
+    queryContext.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
+    final SchedulerQueryContext schedQueryContext = new SchedulerQueryContext(queryContext);
     try {
       queryQueue.put(schedQueryContext);
     } catch (OutOfCapacityException e) {
-      LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableName(), e.getMessage());
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
+      LOGGER.error("Out of capacity for table {}, message: {}", queryContext.getTableName(), e.getMessage());
+      return immediateErrorResponse(queryContext, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
     }
-    serverMetrics.addMeteredTableValue(queryRequest.getTableName(), ServerMeter.QUERIES, 1);
+    serverMetrics.addMeteredTableValue(queryContext.getTableName(), ServerMeter.QUERIES, 1);
     return schedQueryContext.getResultFuture();
   }
 
@@ -100,7 +100,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
             if (request == null) {
               continue;
             }
-            ServerQueryRequest queryRequest = request.getQueryRequest();
+            ServerQueryContext queryRequest = request.getQueryContext();
             final QueryExecutorService executor = resourceManager.getExecutorService(queryRequest,
                 request.getSchedulerGroup());
             final ListenableFutureTask<byte[]> queryFutureTask = createQueryFutureTask(queryRequest, executor);
@@ -149,7 +149,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
   synchronized private void failAllPendingQueries() {
     List<SchedulerQueryContext> pending = queryQueue.drain();
     for (SchedulerQueryContext queryContext : pending) {
-      queryContext.setResultFuture(immediateErrorResponse(queryContext.getQueryRequest(),
+      queryContext.setResultFuture(immediateErrorResponse(queryContext.getQueryContext(),
           QueryException.SERVER_SCHEDULER_DOWN_ERROR));
     }
   }

@@ -28,6 +28,6 @@ public class TableBasedGroupMapper implements SchedulerGroupMapper {
    */
   @Override
   public String getSchedulerGroupName(SchedulerQueryContext query) {
-    return query.getQueryRequest().getTableName();
+    return query.getQueryContext().getTableName();
   }
 }

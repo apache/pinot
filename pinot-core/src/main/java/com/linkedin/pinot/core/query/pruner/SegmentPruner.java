@@ -15,26 +15,21 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import org.apache.commons.configuration.Configuration;
-
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
+import javax.annotation.Nonnull;
+import org.apache.commons.configuration.Configuration;
 
 
 public interface SegmentPruner {
 
   /**
-   *
-   * @param config
+   * Initializes the segment pruner.
    */
-  public void init(Configuration config);
+  void init(@Nonnull Configuration config);
 
   /**
-   * Returns true if the given segment can be pruned
-   *
-   * @param segment
-   * @param queryRequest
-   * @return true if the given segment is pruned.
+   * Returns <code>true</code> if the given segment can be pruned based on the query context.
    */
-  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest);
+  boolean prune(@Nonnull IndexSegment segment, @Nonnull ServerQueryContext queryContext);
 }

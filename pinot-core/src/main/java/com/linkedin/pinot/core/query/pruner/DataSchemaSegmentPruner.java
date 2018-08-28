@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.query.pruner;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
@@ -25,8 +24,10 @@ import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import java.util.HashSet;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 
 
@@ -41,8 +42,8 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
   private static final String COLUMN_KEY = "column";
 
   @Override
-  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
-    BrokerRequest brokerRequest = queryRequest.getBrokerRequest();
+  public boolean prune(@Nonnull IndexSegment segment, @Nonnull ServerQueryContext queryContext) {
+    BrokerRequest brokerRequest = queryContext.getBrokerRequest();
     Schema schema = segment.getSegmentMetadata().getSchema();
 
     // Check filtering columns
@@ -118,7 +119,7 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
   }
 
   @Override
-  public void init(Configuration config) {
+  public void init(@Nonnull Configuration config) {
 
   }
 

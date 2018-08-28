@@ -17,10 +17,11 @@ package com.linkedin.pinot.server.starter;
 
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
+import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.QuerySchedulerFactory;
 import com.linkedin.pinot.server.conf.ServerConf;
@@ -102,7 +103,8 @@ public class ServerBuilder {
     String className = _serverConf.getQueryExecutorClassName();
     LOGGER.info("Building query scheduler of class: {}", className);
     QueryExecutor queryExecutor = (QueryExecutor) Class.forName(className).newInstance();
-    queryExecutor.init(_serverConf.getQueryExecutorConfig(), instanceDataManager, _serverMetrics);
+    queryExecutor.init(new QueryExecutorConfig(_serverConf.getQueryExecutorConfig()), instanceDataManager,
+        _serverMetrics);
     return queryExecutor;
   }
 

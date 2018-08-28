@@ -25,13 +25,13 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
+import com.linkedin.pinot.core.query.context.TimerContext;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.Map;
@@ -75,11 +75,12 @@ public abstract class QueryScheduler {
 
   /**
    * Submit a query for execution. The query will be scheduled for execution as per the scheduling algorithm
-   * @param queryRequest query to schedule for execution
+   * @param queryContext query to schedule for execution
    * @return Listenable future for query result representing serialized response. It is possible that the
    *    future may return immediately or be scheduled for execution at a later time.
    */
-  public abstract @Nonnull ListenableFuture<byte[]> submit(@Nullable ServerQueryRequest queryRequest);
+  @Nonnull
+  public abstract ListenableFuture<byte[]> submit(@Nonnull ServerQueryContext queryContext);
 
   /**
    * Query scheduler name for logging
@@ -114,7 +115,7 @@ public abstract class QueryScheduler {
    * @return Future task that can be scheduled for execution on an ExecutorService. Ideally, this future
    * should be executed on a different executor service than {@code e} to avoid deadlock.
    */
-  protected ListenableFutureTask<byte[]> createQueryFutureTask(@Nonnull final ServerQueryRequest request,
+  protected ListenableFutureTask<byte[]> createQueryFutureTask(@Nonnull final ServerQueryContext request,
       @Nonnull final QueryExecutorService e) {
     return ListenableFutureTask.create(new Callable<byte[]>() {
       @Override
@@ -132,7 +133,7 @@ public abstract class QueryScheduler {
    * @return serialized query response
    */
   @Nullable
-  protected byte[] processQueryAndSerialize(@Nonnull final ServerQueryRequest request,
+  protected byte[] processQueryAndSerialize(@Nonnull final ServerQueryContext request,
       @Nonnull final ExecutorService executorService) {
     DataTable dataTable;
     try {
@@ -182,7 +183,7 @@ public abstract class QueryScheduler {
    * @return serialized response bytes
    */
   @Nullable
-  public static byte[] serializeDataTable(@Nonnull ServerQueryRequest queryRequest,
+  public static byte[] serializeDataTable(@Nonnull ServerQueryContext queryRequest,
       @Nonnull DataTable instanceResponse) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer responseSerializationTimer =
@@ -213,7 +214,7 @@ public abstract class QueryScheduler {
    * @param error error code to send
    * @return
    */
-  protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest, ProcessingException error) {
+  protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryContext queryRequest, ProcessingException error) {
     DataTable result = new DataTableImplV2();
     result.addException(error);
     return Futures.immediateFuture(QueryScheduler.serializeDataTable(queryRequest, result));

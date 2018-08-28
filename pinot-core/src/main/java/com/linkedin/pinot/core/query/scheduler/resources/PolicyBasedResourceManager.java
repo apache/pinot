@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.query.scheduler.resources;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import com.linkedin.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
@@ -46,7 +46,7 @@ public class PolicyBasedResourceManager extends ResourceManager {
    * for limiting their parallelism.
    */
   @Override
-  public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {
+  public QueryExecutorService getExecutorService(ServerQueryContext query, SchedulerGroupAccountant accountant) {
     int numSegments = query.getInstanceRequest().getSearchSegmentsSize();
     int queryThreadLimit = Math.max(1, Math.min(resourcePolicy.getMaxThreadsPerQuery(), numSegments));
     int spareThreads = resourcePolicy.getTableThreadsHardLimit() - accountant.totalReservedThreads();

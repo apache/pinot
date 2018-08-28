@@ -21,8 +21,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataSchema;
@@ -30,6 +28,8 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManager;
@@ -109,7 +109,7 @@ public class ScheduledRequestHandlerTest {
         new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
           @Nonnull
           @Override
-          public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+          public ListenableFuture<byte[]> submit(@Nonnull ServerQueryContext queryContext) {
             ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(() -> {
               throw new RuntimeException("query processing error");
             });
@@ -148,7 +148,7 @@ public class ScheduledRequestHandlerTest {
         new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
           @Nonnull
           @Override
-          public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+          public ListenableFuture<byte[]> submit(@Nonnull ServerQueryContext queryContext) {
             ListenableFuture<DataTable> response = resourceManager.getQueryRunners().submit(() -> {
               String[] columnNames = new String[]{"foo", "bar"};
               DataSchema.ColumnDataType[] columnDataTypes =

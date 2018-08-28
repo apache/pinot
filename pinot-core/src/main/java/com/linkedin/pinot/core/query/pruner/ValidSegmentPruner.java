@@ -15,9 +15,10 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
+import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 
 
@@ -27,7 +28,7 @@ import org.apache.commons.configuration.Configuration;
  */
 public class ValidSegmentPruner implements SegmentPruner {
   @Override
-  public void init(Configuration config) {
+  public void init(@Nonnull Configuration config) {
 
   }
 
@@ -37,11 +38,11 @@ public class ValidSegmentPruner implements SegmentPruner {
    * - Empty segment.
    *
    * @param segment
-   * @param queryRequest
+   * @param queryContext
    * @return
    */
   @Override
-  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
+  public boolean prune(@Nonnull IndexSegment segment, @Nonnull ServerQueryContext queryContext) {
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
 
     // Check for empty segment.

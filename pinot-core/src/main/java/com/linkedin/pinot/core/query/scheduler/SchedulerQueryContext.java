@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.query.scheduler;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.context.ServerQueryContext;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -28,22 +28,24 @@ import javax.annotation.Nullable;
  */
 public class SchedulerQueryContext {
 
-  private final ServerQueryRequest queryRequest;
+  private final ServerQueryContext _queryContext;
   private final SettableFuture<byte[]> resultFuture;
   private SchedulerGroup schedulerGroup;
 
-  public SchedulerQueryContext(@Nonnull ServerQueryRequest queryRequest) {
-    Preconditions.checkNotNull(queryRequest);
+  public SchedulerQueryContext(@Nonnull ServerQueryContext queryContext) {
+    Preconditions.checkNotNull(queryContext);
 
-    this.queryRequest = queryRequest;
+    this._queryContext = queryContext;
     this.resultFuture = SettableFuture.create();
   }
 
-  public @Nonnull ServerQueryRequest getQueryRequest() {
-    return queryRequest;
+  @Nonnull
+  public ServerQueryContext getQueryContext() {
+    return _queryContext;
   }
 
-  public @Nonnull SettableFuture<byte[]> getResultFuture() {
+  @Nonnull
+  public SettableFuture<byte[]> getResultFuture() {
     return resultFuture;
   }
 
@@ -55,8 +57,8 @@ public class SchedulerQueryContext {
     this.schedulerGroup = schedulerGroup;
   }
 
-  public @Nullable
-  SchedulerGroup getSchedulerGroup() {
+  @Nullable
+  public SchedulerGroup getSchedulerGroup() {
     return schedulerGroup;
   }
 
@@ -65,6 +67,6 @@ public class SchedulerQueryContext {
    * @return
    */
   public long getArrivalTimeMs() {
-    return queryRequest.getTimerContext().getQueryArrivalTimeMs();
+    return _queryContext.getTimerContext().getQueryArrivalTimeMs();
   }
 }
