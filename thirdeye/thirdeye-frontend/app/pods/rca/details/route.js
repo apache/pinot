@@ -8,7 +8,7 @@ import { Actions } from 'thirdeye-frontend/actions/primary-metric';
 import { Actions as MetricsActions } from 'thirdeye-frontend/actions/metrics';
 import { Actions as DimensionsActions } from 'thirdeye-frontend/actions/dimensions';
 import { Actions as EventsActions } from 'thirdeye-frontend/actions/events';
-
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 const queryParamsConfig = {
   refreshModel: true,
@@ -34,6 +34,7 @@ export default Route.extend({
   },
 
   redux: service(),
+  session: service(),
 
   // resets all redux stores' state
   beforeModel(transition) {
@@ -54,9 +55,9 @@ export default Route.extend({
     if (!id) { return; }
 
     return RSVP.hash({
-      granularities: fetch(`/data/agg/granularity/metric/${id}`).then(res => res.json()),
-      metricFilters: fetch(`/data/autocomplete/filters/metric/${id}`).then(res => res.json()),
-      maxTime: fetch(`/data/maxDataTime/metricId/${id}`).then(res => res.json()),
+      granularities: fetch(`/data/agg/granularity/metric/${id}`).then(checkStatus),
+      metricFilters: fetch(`/data/autocomplete/filters/metric/${id}`).then(checkStatus),
+      maxTime: fetch(`/data/maxDataTime/metricId/${id}`).then(checkStatus),
       id
     });
   },
@@ -189,9 +190,20 @@ export default Route.extend({
 
   actions: {
     willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+
       if (transition.targetName === 'rca.index') {
         this.refresh();
       }
+    },
+    error() {
+      // The `error` hook is also provided the failed
+      // `transition`, which can be stored and later
+      // `.retry()`d if desired.
+      return true;
     },
 
     /**

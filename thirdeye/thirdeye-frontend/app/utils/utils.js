@@ -12,7 +12,10 @@ import { splitFilterFragment, toFilterMap } from 'thirdeye-frontend/utils/rca-ut
  * @return {Object} either json-formatted payload or error object
  */
 export function checkStatus(response, mode = 'get', recoverBlank = false) {
-  if (response.status >= 200 && response.status < 300) {
+  if (response.status === 401) {
+    // We want to throw a 401 error up the error substate(s) to handle it
+    throw new Error('401');
+  } else if (response.status >= 200 && response.status < 300) {
     // Prevent parsing of null response
     if (response.status === 204) {
       return '';

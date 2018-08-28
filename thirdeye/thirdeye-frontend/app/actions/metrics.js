@@ -9,6 +9,7 @@ import {
   ROOTCAUSE_ANALYSIS_DURATION_MAX,
   ROOTCAUSE_ANOMALY_DURATION_MAX
 } from './constants';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 /**
  * Define the metric action types
@@ -161,7 +162,7 @@ function fetchRelatedMetricIds() {
     const urns = [primaryUrn].concat(filterUrns).join(',');
 
     return fetch(`/rootcause/query?framework=relatedMetrics&anomalyStart=${anomalyStart}&anomalyEnd=${anomalyEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&analysisStart=${analysisStart}&analysisEnd=${analysisEnd}&urns=${urns}`)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => res.filter(metric => metric.urn != primaryUrn))
       .then(res => dispatch(loadRelatedMetricIds(res)));
   };
@@ -195,7 +196,7 @@ function fetchRegions() {
     const metricIds = [primaryMetricId, ...relatedMetricIds].join(',');
 
     return fetch(`/data/anomalies/ranges?metricIds=${metricIds}&start=${currentStart}&end=${currentEnd}&filters=${encodeURIComponent(filters)}`)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => dispatch(loadRegions(res)));
   };
 }
@@ -224,7 +225,7 @@ function fetchRelatedMetricData() {
     if (!metricIds.length) { return; }
     const promiseHash = metricIds.reduce((hash, id) => {
       const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=All&granularity=${granularity}&filters=${encodeURIComponent(filters)}`;
-      hash[id] = fetch(url).then(res => res.json());
+      hash[id] = fetch(url).then(checkStatus);
 
       return hash;
     }, {});
@@ -311,4 +312,3 @@ export const Actions = {
   reset,
   updateDates
 };
-

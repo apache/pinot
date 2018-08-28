@@ -9,7 +9,8 @@ const Router = EmberRouter.extend({
 Router.map(function() {
   this.route('login');
   this.route('logout');
-  //this.route('error'); disable for now
+  //page not found placeholder - lohuynh
+  //this.route('404', { path: '/*path' });
 
   this.route('home', function() {
     this.route('index', { path: '/' });

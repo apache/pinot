@@ -2,17 +2,18 @@ import { hash } from 'rsvp';
 import Route from '@ember/routing/route';
 import fetch from 'fetch';
 import { inject as service } from '@ember/service';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Route.extend({
 
   // Make duration service accessible
   durationCache: service('services/duration'),
-
+  session: service(),
   model() {
     return hash({
-      alerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(res => res.json()),
-      subscriberGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(res => res.json()),
-      applications: fetch('/thirdeye/entity/APPLICATION').then(res => res.json())
+      alerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(checkStatus),
+      subscriberGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(checkStatus),
+      applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus)
     });
   },
 
@@ -66,6 +67,17 @@ export default Route.extend({
     willTransition(transition) {
       this.get('durationCache').resetDuration();
       this.controller.set('isLoading', true);
+
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+    error() {
+      // The `error` hook is also provided the failed
+      // `transition`, which can be stored and later
+      // `.retry()`d if desired.
+      return true;
     },
 
     /**

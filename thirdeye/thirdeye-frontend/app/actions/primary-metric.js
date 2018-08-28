@@ -3,6 +3,7 @@ import { type } from './utils';
 import fetch from 'fetch';
 import moment from 'moment';
 import { COMPARE_MODE_MAPPING } from './constants';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 /**
  * Define the metric action types
@@ -133,7 +134,7 @@ function fetchRegions() {
     const metricIds = [primaryMetricId, ...relatedMetricIds].join(',');
     // todo: identify better way for query params
     return fetch(`/data/anomalies/ranges?metricIds=${metricIds}&start=${currentStart}&end=${currentEnd}&filters=${encodeURIComponent(filters)}`)
-      .then(res => res.json())
+      .then(checkStatus)
       .then(res => dispatch(loadRegions(res)))
       .catch(() => {
         dispatch(requestFail());
@@ -166,7 +167,7 @@ function fetchRelatedMetricData() {
     if (!metricIds.length) { return; }
     const promiseHash = metricIds.reduce((hash, id) => {
       const url = `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=All&granularity=${granularity}&filters=${encodeURIComponent(filters)}`;
-      hash[id] = fetch(url).then(res => res.json());
+      hash[id] = fetch(url).then(checkStatus);
 
       return hash;
     }, {});
@@ -262,4 +263,3 @@ export const Actions = {
   selectEvent,
   reset
 };
-

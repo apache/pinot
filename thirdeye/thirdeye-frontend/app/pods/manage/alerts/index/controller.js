@@ -189,7 +189,7 @@ export default Controller.extend({
   searchByFunctionName: task(function* (alert) {
     yield timeout(600);
     return fetch(selfServeApiCommon.alertFunctionByName(alert))
-      .then(res => res.json());
+      .then(checkStatus);
   }),
 
   /**
@@ -204,7 +204,7 @@ export default Controller.extend({
     this.set('currentPage', 1);
 
     return fetch(selfServeApiCommon.alertFunctionByAppName(appName))
-      .then(res => res.json())
+      .then(checkStatus)
       .then((alerts) => {
         this.set('isLoading', false);
         this.set('selectedAlerts', alerts);

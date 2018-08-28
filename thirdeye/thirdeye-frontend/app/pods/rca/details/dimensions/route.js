@@ -6,7 +6,7 @@ import { inject as service } from '@ember/service';
 
 export default Route.extend({
   redux: service(),
-
+  session: service(),
   // queryParam unique to the dimension route
   queryParams: {
     dimension: {
@@ -71,6 +71,23 @@ export default Route.extend({
   },
 
   actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+    error() {
+      // The `error` hook is also provided the failed
+      // `transition`, which can be stored and later
+      // `.retry()`d if desired.
+      return true;
+    },
+
     // Dispatches a redux action on query param change
     queryParamsDidChange(changedParams, oldParams) {
       const redux = this.get('redux');

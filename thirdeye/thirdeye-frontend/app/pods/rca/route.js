@@ -1,8 +1,11 @@
 import Route from '@ember/routing/route';
 import fetch from 'fetch';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
+import { inject as service } from '@ember/service';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Route.extend(AuthenticatedRouteMixin, {
+  session: service(),
 
   model(params, transition) {
     const {
@@ -14,7 +17,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     if (!metric_id) { return {}; }
 
     return fetch(`/data/metric/${metric_id}`)
-      .then(res => res.json());
+      .then(checkStatus);
   },
 
   setupController(controller, model) {
@@ -27,6 +30,23 @@ export default Route.extend(AuthenticatedRouteMixin, {
   },
 
   actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+    error() {
+      // The `error` hook is also provided the failed
+      // `transition`, which can be stored and later
+      // `.retry()`d if desired.
+      return true;
+    },
+
     transitionToDetails(id) {
       this.transitionTo('rca.details', id, { queryParams: {
         startDate: undefined,

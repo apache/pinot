@@ -3,6 +3,7 @@ import { oneWay } from '@ember/object/computed';
 import Controller from '@ember/controller';
 import { task, timeout } from 'ember-concurrency';
 import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Controller.extend({
   primaryMetric: oneWay('model'),
@@ -28,7 +29,7 @@ export default Controller.extend({
     };
 
     return fetch(selfServeApiCommon.metricAutoComplete(metric), headers)
-      .then(res => res.json());
+      .then(checkStatus);
   }),
 
   placeholder: computed(function() {

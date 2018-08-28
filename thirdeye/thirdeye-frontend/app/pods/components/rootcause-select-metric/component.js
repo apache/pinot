@@ -4,6 +4,7 @@ import { toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/utils/rca-utils';
 import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
+import { checkStatus } from 'thirdeye-frontend/utils/utils';
 
 export default Component.extend({
   classNames: ['rootcause-select-metric-dimension'],
@@ -29,7 +30,7 @@ export default Component.extend({
   searchMetrics: task(function* (metric) {
     yield timeout(1000);
     return fetch(selfServeApiCommon.metricAutoComplete(metric))
-      .then(res => res.json());
+      .then(checkStatus);
   }),
 
   didReceiveAttrs() {
@@ -43,7 +44,7 @@ export default Component.extend({
       if (selectedUrn) {
         const url = `/data/metric/${selectedUrn.split(':')[2]}`;
         fetch(url)
-          .then(res => res.json())
+          .then(checkStatus)
           .then(res => this.set('selectedMetric', res));
       } else {
         this.set('selectedMetric', null);
