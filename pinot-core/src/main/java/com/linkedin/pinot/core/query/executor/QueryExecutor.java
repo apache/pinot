@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.query;
+package com.linkedin.pinot.core.query.executor;
 
+import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import java.util.concurrent.ExecutorService;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.utils.DataTable;
 
 
 public interface QueryExecutor {

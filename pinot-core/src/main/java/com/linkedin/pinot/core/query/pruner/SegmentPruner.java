@@ -15,10 +15,9 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import org.apache.commons.configuration.Configuration;
-
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
+import org.apache.commons.configuration.Configuration;
 
 
 public interface SegmentPruner {

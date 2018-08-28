@@ -16,10 +16,10 @@
 package com.linkedin.pinot.core.query.scheduler;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.request.QuerySource;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import java.util.Arrays;
 
 
