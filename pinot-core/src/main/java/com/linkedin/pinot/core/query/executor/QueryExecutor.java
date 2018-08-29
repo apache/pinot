@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import java.util.concurrent.ExecutorService;
-import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -33,8 +32,8 @@ public interface QueryExecutor {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  void init(@Nonnull Configuration config, @Nonnull InstanceDataManager instanceDataManager,
-      @Nonnull ServerMetrics serverMetrics) throws ConfigurationException;
+  void init(Configuration config, InstanceDataManager instanceDataManager, ServerMetrics serverMetrics)
+      throws ConfigurationException;
 
   /**
    * Starts the query executor.
@@ -51,11 +50,10 @@ public interface QueryExecutor {
   /**
    * Processes the query with the given executor service.
    */
-  @Nonnull
-  DataTable processQuery(@Nonnull ServerQueryRequest queryRequest, @Nonnull ExecutorService executorService);
+  DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService);
 
   /**
    * Sets the timeout for the given table, instead of using the global timeout.
    */
-  void setTableTimeoutMs(@Nonnull String tableNameWithType, long timeOutMs);
+  void setTableTimeoutMs(String tableNameWithType, long timeOutMs);
 }

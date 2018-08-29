@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.query.scheduler.fcfs;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.linkedin.pinot.common.exception.QueryException;
@@ -37,21 +36,19 @@ import org.apache.commons.configuration.Configuration;
  */
 public class FCFSQueryScheduler extends QueryScheduler {
 
-
   public FCFSQueryScheduler(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
       @Nonnull ServerMetrics serverMetrics) {
     super(queryExecutor, new UnboundedResourceManager(config), serverMetrics);
   }
 
+  @Nonnull
   @Override
-  public ListenableFuture<byte[]> submit(final ServerQueryRequest queryRequest) {
-    Preconditions.checkNotNull(queryRequest);
-    if (! isRunning) {
+  public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
+    if (!isRunning) {
       return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
-    QueryExecutorService queryExecutorService =
-        resourceManager.getExecutorService(queryRequest, null);
+    QueryExecutorService queryExecutorService = resourceManager.getExecutorService(queryRequest, null);
     ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, queryExecutorService);
     resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;

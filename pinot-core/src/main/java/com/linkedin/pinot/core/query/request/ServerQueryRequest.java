@@ -16,97 +16,186 @@
 package com.linkedin.pinot.core.query.request;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.request.Selection;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.request.context.TimerContext;
-import javax.annotation.Nonnull;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 
 
 /**
- * Class to encapsulate the query request and query processing context within the server. Goal is to make most of the
- * information available to lower levels of code in the server for logging, tracking etc.
+ * The <code>ServerQueryRequest</code> class encapsulates the query related information as well as the query processing
+ * context.
+ * <p>All segment independent information should be pre-computed and stored in this class to avoid repetitive work on a
+ * per segment basis.
  */
 public class ServerQueryRequest {
-  private final InstanceRequest _instanceRequest;
-  private final ServerMetrics _serverMetrics;
+  private final long _requestId;
   private final BrokerRequest _brokerRequest;
-  private final FilterQueryTree _filterQueryTree;
+  private final String _tableNameWithType;
+  private final List<String> _segmentsToQuery;
+  private final boolean _enableTrace;
+  private final String _brokerId;
 
   // Timing information for different phases of query execution
   private final TimerContext _timerContext;
 
-  private int _segmentCountAfterPruning = -1;
+  // Pre-computed segment independent information
+  private final Set<String> _allColumns;
+  private final FilterQueryTree _filterQueryTree;
+  private final Set<String> _filterColumns;
+  private final Set<TransformExpressionTree> _aggregationExpressions;
+  private final Set<String> _aggregationColumns;
+  private final Set<TransformExpressionTree> _groupByExpressions;
+  private final Set<String> _groupByColumns;
+  private final Set<String> _selectionColumns;
 
-  public ServerQueryRequest(@Nonnull InstanceRequest instanceRequest, @Nonnull ServerMetrics serverMetrics,
-      long queryArrivalTimeMs) {
-    _instanceRequest = instanceRequest;
-    _serverMetrics = serverMetrics;
+  // Query processing context
+  private volatile int _segmentCountAfterPruning = -1;
+
+  public ServerQueryRequest(InstanceRequest instanceRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
+    _requestId = instanceRequest.getRequestId();
     _brokerRequest = instanceRequest.getQuery();
+    _tableNameWithType = _brokerRequest.getQuerySource().getTableName();
+    _segmentsToQuery = instanceRequest.getSearchSegments();
+    _enableTrace = instanceRequest.isEnableTrace();
+    _brokerId = instanceRequest.getBrokerId() != null ? instanceRequest.getBrokerId() : "unknown";
+    _timerContext = new TimerContext(_tableNameWithType, serverMetrics, queryArrivalTimeMs);
+
+    // Pre-compute segment independent information
+    _allColumns = new HashSet<>();
+
+    // Filter
     _filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    _timerContext = new TimerContext(_brokerRequest, serverMetrics, queryArrivalTimeMs);
+    if (_filterQueryTree != null) {
+      _filterColumns = RequestUtils.extractFilterColumns(_filterQueryTree);
+      _allColumns.addAll(_filterColumns);
+    } else {
+      _filterColumns = null;
+    }
+
+    // Aggregation
+    List<AggregationInfo> aggregationsInfo = _brokerRequest.getAggregationsInfo();
+    if (aggregationsInfo != null) {
+      _aggregationExpressions = new HashSet<>();
+      for (AggregationInfo aggregationInfo : aggregationsInfo) {
+        if (!aggregationInfo.getAggregationType().equalsIgnoreCase(AggregationFunctionType.COUNT.getName())) {
+          _aggregationExpressions.add(
+              TransformExpressionTree.compileToExpressionTree(AggregationFunctionUtils.getColumn(aggregationInfo)));
+        }
+      }
+      _aggregationColumns = RequestUtils.extractColumnsFromExpressions(_aggregationExpressions);
+      _allColumns.addAll(_aggregationColumns);
+    } else {
+      _aggregationExpressions = null;
+      _aggregationColumns = null;
+    }
+
+    // Group-by
+    GroupBy groupBy = _brokerRequest.getGroupBy();
+    if (groupBy != null) {
+      _groupByExpressions = new HashSet<>();
+      for (String expression : groupBy.getExpressions()) {
+        _groupByExpressions.add(TransformExpressionTree.compileToExpressionTree(expression));
+      }
+      _groupByColumns = RequestUtils.extractColumnsFromExpressions(_groupByExpressions);
+      _allColumns.addAll(_groupByColumns);
+    } else {
+      _groupByExpressions = null;
+      _groupByColumns = null;
+    }
+
+    // Selection
+    Selection selection = _brokerRequest.getSelections();
+    if (selection != null) {
+      _selectionColumns = RequestUtils.extractSelectionColumns(selection);
+      _allColumns.addAll(_selectionColumns);
+    } else {
+      _selectionColumns = null;
+    }
   }
 
-  /**
-   * Get the instance request received from broker.
-   */
-  @Nonnull
-  public InstanceRequest getInstanceRequest() {
-    return _instanceRequest;
+  public long getRequestId() {
+    return _requestId;
   }
 
-  /**
-   * Get the server metrics.
-   */
-  @Nonnull
-  public ServerMetrics getServerMetrics() {
-    return _serverMetrics;
-  }
-
-  /**
-   * Get the broker request.
-   */
-  @Nonnull
   public BrokerRequest getBrokerRequest() {
     return _brokerRequest;
   }
 
-  /**
-   * Get the filter query tree for the server request.
-   */
+  public String getTableNameWithType() {
+    return _tableNameWithType;
+  }
+
+  public List<String> getSegmentsToQuery() {
+    return _segmentsToQuery;
+  }
+
+  public boolean isEnableTrace() {
+    return _enableTrace;
+  }
+
+  public String getBrokerId() {
+    return _brokerId;
+  }
+
+  public TimerContext getTimerContext() {
+    return _timerContext;
+  }
+
+  public Set<String> getAllColumns() {
+    return _allColumns;
+  }
+
   @Nullable
   public FilterQueryTree getFilterQueryTree() {
     return _filterQueryTree;
   }
 
-  /**
-   * Get the timer context.
-   */
-  @Nonnull
-  public TimerContext getTimerContext() {
-    return _timerContext;
+  @Nullable
+  public Set<String> getFilterColumns() {
+    return _filterColumns;
   }
 
-  /**
-   * Get the table name to be queried.
-   */
-  @Nonnull
-  public String getTableName() {
-    return _brokerRequest.getQuerySource().getTableName();
+  @Nullable
+  public Set<TransformExpressionTree> getAggregationExpressions() {
+    return _aggregationExpressions;
   }
 
-  /**
-   * Get the segment count after pruning.
-   */
+  @Nullable
+  public Set<String> getAggregationColumns() {
+    return _aggregationColumns;
+  }
+
+  @Nullable
+  public Set<TransformExpressionTree> getGroupByExpressions() {
+    return _groupByExpressions;
+  }
+
+  @Nullable
+  public Set<String> getGroupByColumns() {
+    return _groupByColumns;
+  }
+
+  @Nullable
+  public Set<String> getSelectionColumns() {
+    return _selectionColumns;
+  }
+
   public int getSegmentCountAfterPruning() {
     return _segmentCountAfterPruning;
   }
 
-  /**
-   * Set the segment count after pruning.
-   */
   public void setSegmentCountAfterPruning(int segmentCountAfterPruning) {
     _segmentCountAfterPruning = segmentCountAfterPruning;
   }

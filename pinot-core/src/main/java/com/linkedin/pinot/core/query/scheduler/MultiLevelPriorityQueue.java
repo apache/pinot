@@ -192,9 +192,9 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     if (currentWinnerGroup != null) {
       ServerQueryRequest queryRequest = currentWinnerGroup.peekFirst().getQueryRequest();
       if (LOGGER.isDebugEnabled()) {
-        sb.append(String.format(" Winner: %s: [%d,%d,%d,%d]", currentWinnerGroup.name(), queryRequest.getTimerContext().getQueryArrivalTimeMs(),
-            queryRequest.getInstanceRequest().getRequestId(), queryRequest.getInstanceRequest().getSearchSegments().size(),
-            startTime));
+        sb.append(String.format(" Winner: %s: [%d,%d,%d,%d]", currentWinnerGroup.name(),
+            queryRequest.getTimerContext().getQueryArrivalTimeMs(), queryRequest.getRequestId(),
+            queryRequest.getSegmentsToQuery().size(), startTime));
       }
       query = currentWinnerGroup.removeFirst();
     }
