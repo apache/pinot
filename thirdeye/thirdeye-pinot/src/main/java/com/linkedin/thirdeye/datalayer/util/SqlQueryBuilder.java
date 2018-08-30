@@ -304,7 +304,7 @@ public class SqlQueryBuilder {
     List<Pair<String, Object>> parametersList = new ArrayList<>();
     generateWhereClause(entityNameToDBNameMapping, predicate, parametersList, whereClause);
     sqlBuilder.append(whereClause.toString());
-    LOG.debug("createFindByParamsStatement Query:{} " + sqlBuilder);
+    LOG.debug("createFindByParamsStatement Query: {}", sqlBuilder);
     PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
     int parameterIndex = 1;
     LinkedHashMap<String, ColumnInfo> columnInfoMap =
@@ -342,12 +342,13 @@ public class SqlQueryBuilder {
         whereClause.append(")");
         break;
       case EQ:
+      case LIKE:
       case GT:
       case LT:
       case NEQ:
       case LE:
       case GE:
-        whereClause.append(columnName).append(predicate.getOper().toString()).append("?");
+        whereClause.append(columnName).append(" ").append(predicate.getOper().toString()).append(" ?");
         parametersList.add(ImmutablePair.of(columnName, predicate.getRhs()));
         break;
       case IN:
