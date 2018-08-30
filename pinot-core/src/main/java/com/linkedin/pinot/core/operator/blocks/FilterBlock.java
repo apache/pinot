@@ -15,42 +15,37 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
-import com.linkedin.pinot.core.operator.docidsets.OrBlockDocIdSet;
-import java.util.List;
 
 
-public class OrBlock extends BaseFilterBlock {
+public class FilterBlock implements Block {
+  private final FilterBlockDocIdSet _filterBlockDocIdSet;
 
-  final List<FilterBlockDocIdSet> blockDocIdSets;
-  public OrBlockDocIdSet orBlockDocIdSet;
-
-  public OrBlock(List<FilterBlockDocIdSet> blockDocIdSets) {
-    this.blockDocIdSets = blockDocIdSets;
+  public FilterBlock(FilterBlockDocIdSet filterBlockDocIdSet) {
+    _filterBlockDocIdSet = filterBlockDocIdSet;
   }
 
   @Override
-  public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-    orBlockDocIdSet = new OrBlockDocIdSet(blockDocIdSets);
-    return orBlockDocIdSet;
+  public FilterBlockDocIdSet getBlockDocIdSet() {
+    return _filterBlockDocIdSet;
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException("Cannot apply predicate on a AND Block");
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException("Cannot apply predicate on a AND Block");
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockMetadata getMetadata() {
-    return null;
+    throw new UnsupportedOperationException();
   }
-
 }
