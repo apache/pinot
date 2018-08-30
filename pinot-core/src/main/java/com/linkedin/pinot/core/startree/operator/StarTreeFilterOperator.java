@@ -18,9 +18,9 @@ package com.linkedin.pinot.core.startree.operator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.EmptyFilterBlock;
-import com.linkedin.pinot.core.operator.filter.AndOperator;
+import com.linkedin.pinot.core.operator.blocks.FilterBlock;
+import com.linkedin.pinot.core.operator.filter.AndFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
@@ -196,7 +196,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public BaseFilterBlock getNextBlock() {
+  public FilterBlock getNextBlock() {
     if (_resultEmpty) {
       return EmptyFilterBlock.getInstance();
     }
@@ -208,7 +208,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       return childFilterOperators.get(0).nextBlock();
     } else {
       FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, _debugOptions);
-      return new AndOperator(childFilterOperators).nextBlock();
+      return new AndFilterOperator(childFilterOperators).nextBlock();
     }
   }
 

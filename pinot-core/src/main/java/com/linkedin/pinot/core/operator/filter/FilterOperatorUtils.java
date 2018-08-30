@@ -27,15 +27,14 @@ import org.apache.commons.lang3.StringUtils;
 
 
 public class FilterOperatorUtils {
+  private FilterOperatorUtils() {
+  }
 
   // Debug option to enable or disable multi-value optimization
   public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
 
-  private FilterOperatorUtils() {
-  }
-
   /**
-   * Get the leaf filter operator (i.e. not {@link AndOperator} or {@link OrOperator}).
+   * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
    */
   public static BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
       int startDocId, int endDocId) {
@@ -61,7 +60,7 @@ public class FilterOperatorUtils {
   /**
    * For AND filter operator, reorders its child filter operators based on the their cost and puts the ones with
    * inverted index first in order to reduce the number of documents to be processed.
-   * <p>Special filter operators such as {@link MatchEntireSegmentOperator} and {@link EmptyFilterOperator} should be
+   * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
    * removed from the list before calling this method.
    */
   public static void reorderAndFilterChildOperators(List<BaseFilterOperator> filterOperators,
@@ -79,14 +78,14 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof BitmapBasedFilterOperator) {
           return 1;
         }
-        if (filterOperator instanceof AndOperator) {
+        if (filterOperator instanceof AndFilterOperator) {
           return 2;
         }
-        if (filterOperator instanceof OrOperator) {
+        if (filterOperator instanceof OrFilterOperator) {
           return 3;
         }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return getScanBasedFilterPriority(filterOperator, 4, debugOptions);
+          return getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator, 4, debugOptions);
         }
         throw new IllegalStateException(filterOperator.getClass().getSimpleName()
             + " should not be reordered, remove it from the list before calling this method");
@@ -100,18 +99,18 @@ public class FilterOperatorUtils {
    *
    * TODO: additional cost based prioritization to be added
    *
-   * @param filterOperator the filter operator to prioritize
+   * @param scanBasedFilterOperator the filter operator to prioritize
    * @param debugOptions  debug-options to enable/disable the optimization
    * @return the priority to be associated with the filter
    */
-  private static int getScanBasedFilterPriority(BaseFilterOperator filterOperator, int basePriority,
+  private static int getScanBasedFilterPriority(ScanBasedFilterOperator scanBasedFilterOperator, int basePriority,
       @Nullable Map<String, String> debugOptions) {
     boolean disabled = false;
     if (debugOptions != null
         && StringUtils.compareIgnoreCase(debugOptions.get(USE_SCAN_REORDER_OPTIMIZATION), "false") == 0) {
       disabled = true;
     }
-    DataSourceMetadata metadata = filterOperator.getDataSourceMetadata();
+    DataSourceMetadata metadata = scanBasedFilterOperator.getDataSourceMetadata();
     if (disabled || metadata == null || metadata.isSingleValue()) {
       return basePriority;
     }
