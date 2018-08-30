@@ -296,7 +296,7 @@ export default Component.extend({
       return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
     }).join(';');
     // Grab metric Id from URN
-    const metricId = metricUrn.match(/^thirdeye:metric\:(\d+)/)[1];
+    const metricId = metricUrn.match(/^thirdeye:metric:(\d+)/)[1];
     // Construct API-ready filter string
     const finalFilterStr = makeFilterString(decodeURIComponent(rawFilterStr));
     // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
@@ -487,9 +487,7 @@ export default Component.extend({
    */
   fetchDimensionAnalysisData: task(function * (dimensionObj) {
     const dimensionsPayload = yield this.get('dimensionsApiService').queryDimensionsByMetric(dimensionObj);
-    const dimensionNames = dimensionsPayload.dimensions || [];
     const ratio = dimensionsPayload.globalRatio;
-    const cobTotal = `${dimensionsPayload.currentTotal}/${dimensionsPayload.baselineTotal}`;
 
     this.setProperties({
       dimensionsRawData: dimensionsPayload,
