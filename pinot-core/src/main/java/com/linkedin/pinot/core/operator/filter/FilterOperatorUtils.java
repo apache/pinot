@@ -19,11 +19,12 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+
 
 public class FilterOperatorUtils {
 
@@ -58,13 +59,14 @@ public class FilterOperatorUtils {
   }
 
   /**
-   * Re-order filter operators based on the their cost. Put the ons with inverted index first so we can process less
-   * documents.
+   * For AND filter operator, reorders its child filter operators based on the their cost and puts the ones with
+   * inverted index first in order to reduce the number of documents to be processed.
    * <p>Special filter operators such as {@link MatchEntireSegmentOperator} and {@link EmptyFilterOperator} should be
    * removed from the list before calling this method.
    */
-  public static void reOrderFilterOperators(List<BaseFilterOperator> filterOperators, Map<String, String> debugOptions) {
-    Collections.sort(filterOperators, new Comparator<BaseFilterOperator>() {
+  public static void reorderAndFilterChildOperators(List<BaseFilterOperator> filterOperators,
+      @Nullable Map<String, String> debugOptions) {
+    filterOperators.sort(new Comparator<BaseFilterOperator>() {
       @Override
       public int compare(BaseFilterOperator o1, BaseFilterOperator o2) {
         return getPriority(o1) - getPriority(o2);
@@ -87,7 +89,7 @@ public class FilterOperatorUtils {
           return getScanBasedFilterPriority(filterOperator, 4, debugOptions);
         }
         throw new IllegalStateException(filterOperator.getClass().getSimpleName()
-            + " should not be re-ordered, remove it from the list before calling this method");
+            + " should not be reordered, remove it from the list before calling this method");
       }
     });
   }
@@ -102,12 +104,11 @@ public class FilterOperatorUtils {
    * @param debugOptions  debug-options to enable/disable the optimization
    * @return the priority to be associated with the filter
    */
-  private static int getScanBasedFilterPriority(BaseFilterOperator filterOperator,
-      int basePriority, Map<String, String> debugOptions) {
-
+  private static int getScanBasedFilterPriority(BaseFilterOperator filterOperator, int basePriority,
+      @Nullable Map<String, String> debugOptions) {
     boolean disabled = false;
-    if (debugOptions != null &&
-        StringUtils.compareIgnoreCase(debugOptions.get(USE_SCAN_REORDER_OPTIMIZATION), "false") == 0) {
+    if (debugOptions != null
+        && StringUtils.compareIgnoreCase(debugOptions.get(USE_SCAN_REORDER_OPTIMIZATION), "false") == 0) {
       disabled = true;
     }
     DataSourceMetadata metadata = filterOperator.getDataSourceMetadata();

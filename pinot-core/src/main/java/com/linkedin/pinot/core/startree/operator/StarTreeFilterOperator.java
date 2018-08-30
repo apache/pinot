@@ -130,8 +130,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   private final Map<String, String> _debugOptions;
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(@Nonnull StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
-      @Nullable Set<String> groupByColumns, Map<String, String> debugOptions) {
+  public StarTreeFilterOperator(StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _groupByColumns = groupByColumns != null ? new HashSet<>(groupByColumns) : Collections.emptySet();
     _debugOptions = debugOptions;
@@ -207,7 +207,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     } else if (numChildFilterOperators == 1) {
       return childFilterOperators.get(0).nextBlock();
     } else {
-      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, _debugOptions);
+      FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, _debugOptions);
       return new AndOperator(childFilterOperators).nextBlock();
     }
   }
