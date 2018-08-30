@@ -296,7 +296,6 @@ export default Component.extend({
       return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
     }).join(';');
     // Grab metric Id from URN
-    //const metricId = metricArr[metricArr.length - 1];
     const metricId = metricUrn.match(/^thirdeye:metric\:(\d+)/)[1];
     // Construct API-ready filter string
     const finalFilterStr = makeFilterString(decodeURIComponent(rawFilterStr));
