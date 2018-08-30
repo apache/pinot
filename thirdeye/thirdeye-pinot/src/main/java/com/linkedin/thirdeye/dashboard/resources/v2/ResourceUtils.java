@@ -16,6 +16,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -47,14 +48,39 @@ public class ResourceUtils {
    * @param params input of params
    * @return list of params
    */
-
   public static List<String> parseListParams(List<String> params) {
     if (params == null){
       return Collections.emptyList();
     }
-    if(params.size() != 1)
+    if (params.size() != 1)
       return params;
     return Arrays.asList(params.get(0).split(","));
+  }
+
+  /**
+   * Return a list of numeric parameters.
+   * Support both multi-entity notations:
+   * <br/><b>(1) comma-delimited:</b> {@code "ids=1,2"}
+   * <br/><b>(2) multi-param</b> {@code "ids=1&ids=2"}
+   *
+   * @param params input of params
+   * @return list of params
+   */
+  public static List<Long> parseListParamsLong(List<String> params) {
+    if (params == null){
+      return Collections.emptyList();
+    }
+
+    if (params.size() == 1) {
+      params = Arrays.asList(params.get(0).split(","));
+    }
+
+    List<Long> numbers = new ArrayList<>(params.size());
+    for (String p : params) {
+      numbers.add(Long.parseLong(p));
+    }
+
+    return numbers;
   }
 
   /**
