@@ -62,10 +62,6 @@ public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicat
     throw new UnsupportedOperationException();
   }
 
-  // NOTE: override this for exclusive predicates
-  @Override
-  public int getNumNonMatchingDictIds() { throw new UnsupportedOperationException();}
-
   // NOTE: override it for exclusive predicate
   @Override
   public int[] getNonMatchingDictIds() {
