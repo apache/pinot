@@ -18,11 +18,12 @@
     {{/power-select-multiple}}
 
     <div class="te-form__sub-label te-form__sub-label--micro">Show only these dimensions</div>
-    {{!-- {{input
+    {{input
       type="checkbox"
       id="dimension-order"
-      checked=true}}
-    <label for="dimension-order" class="control-label te-label te-label--small">Maintain this order</label> --}}
+      change=(action "onChangeMaintainOrder")
+      checked=isDimensionOrderActive}}
+    <label for="dimension-order" class="control-label te-label te-label--small">Maintain this order</label>
   </div>
 </fieldset>
 

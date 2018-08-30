@@ -68,7 +68,7 @@ export default DS.RESTAdapter.extend({
         return `${this.get('namespace')}/${query.appName}`;
       }
       case 'dimensions': {
-        return `${this.get('namespace')}`;
+        return `${this.get('namespace')}/${query.orderType}DimensionOrder`;
       }
       case 'shareDashboard': {
         return `${this.get('namespace')}/${query.key}`;
