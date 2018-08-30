@@ -15,41 +15,14 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import javax.annotation.Nullable;
+import com.linkedin.pinot.core.operator.blocks.FilterBlock;
 
-/**
- * Base Operator for all filter operators. ResultBlock is initialized in the planning phase
- *
- */
-public abstract class BaseFilterOperator extends BaseOperator<BaseFilterBlock> {
 
-  protected DataSource _dataSource;
-
-  protected PredicateEvaluator _predicateEvaluator;
+public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
 
   /**
-   * Return whether the result is empty.
+   * Returns whether the result is empty.
    */
   public abstract boolean isResultEmpty();
-
-  /**
-   * Returns the datasource metadata
-   */
-  public @Nullable DataSourceMetadata getDataSourceMetadata() {
-    if (_dataSource == null) return null;
-
-    return _dataSource.getDataSourceMetadata();
-  }
-
-  /**
-   * Return the predicate evaluator associated with the filter.
-   */
-  public @Nullable PredicateEvaluator getPredicateEvaluator() {
-    return _predicateEvaluator;
-  }
 }

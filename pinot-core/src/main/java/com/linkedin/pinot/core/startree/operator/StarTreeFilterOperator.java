@@ -18,9 +18,9 @@ package com.linkedin.pinot.core.startree.operator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.EmptyFilterBlock;
-import com.linkedin.pinot.core.operator.filter.AndOperator;
+import com.linkedin.pinot.core.operator.blocks.FilterBlock;
+import com.linkedin.pinot.core.operator.filter.AndFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -92,8 +91,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     final Set<String> _remainingPredicateColumns;
     final Set<String> _remainingGroupByColumns;
 
-    SearchEntry(@Nonnull StarTreeNode starTreeNode, @Nonnull Set<String> remainingPredicateColumns,
-        @Nonnull Set<String> remainingGroupByColumns) {
+    SearchEntry(StarTreeNode starTreeNode, Set<String> remainingPredicateColumns, Set<String> remainingGroupByColumns) {
       _starTreeNode = starTreeNode;
       _remainingPredicateColumns = remainingPredicateColumns;
       _remainingGroupByColumns = remainingGroupByColumns;
@@ -107,7 +105,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     final ImmutableRoaringBitmap _matchedDocIds;
     final Set<String> _remainingPredicateColumns;
 
-    StarTreeResult(@Nonnull ImmutableRoaringBitmap matchedDocIds, @Nonnull Set<String> remainingPredicateColumns) {
+    StarTreeResult(ImmutableRoaringBitmap matchedDocIds, Set<String> remainingPredicateColumns) {
       _matchedDocIds = matchedDocIds;
       _remainingPredicateColumns = remainingPredicateColumns;
     }
@@ -122,16 +120,16 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   private final StarTreeV2 _starTreeV2;
   // Set of group-by columns
   private final Set<String> _groupByColumns;
+  // Debug options
+  private final Map<String, String> _debugOptions;
   // Map from column to predicate evaluators
   private final Map<String, List<PredicateEvaluator>> _predicateEvaluatorsMap;
   // Map from column to matching dictionary ids
   private final Map<String, IntSet> _matchingDictIdsMap;
-
-  private final Map<String, String> _debugOptions;
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(@Nonnull StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
-      @Nullable Set<String> groupByColumns, Map<String, String> debugOptions) {
+  public StarTreeFilterOperator(StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _groupByColumns = groupByColumns != null ? new HashSet<>(groupByColumns) : Collections.emptySet();
     _debugOptions = debugOptions;
@@ -175,7 +173,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   /**
    * Helper method to process the filter tree and get a map from column to a list of predicates applied to it.
    */
-  private Map<String, List<Predicate>> getPredicatesMap(@Nonnull FilterQueryTree rootFilterNode) {
+  private Map<String, List<Predicate>> getPredicatesMap(FilterQueryTree rootFilterNode) {
     Map<String, List<Predicate>> predicatesMap = new HashMap<>();
     Queue<FilterQueryTree> queue = new LinkedList<>();
     queue.add(rootFilterNode);
@@ -196,7 +194,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public BaseFilterBlock getNextBlock() {
+  public FilterBlock getNextBlock() {
     if (_resultEmpty) {
       return EmptyFilterBlock.getInstance();
     }
@@ -207,8 +205,9 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     } else if (numChildFilterOperators == 1) {
       return childFilterOperators.get(0).nextBlock();
     } else {
-      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, _debugOptions);
-      return new AndOperator(childFilterOperators).nextBlock();
+      FilterOperatorUtils.reorderFilterOperators(childFilterOperators,
+          FilterOperatorUtils.enableScanReorderOptimization(_debugOptions));
+      return new AndFilterOperator(childFilterOperators).nextBlock();
     }
   }
 

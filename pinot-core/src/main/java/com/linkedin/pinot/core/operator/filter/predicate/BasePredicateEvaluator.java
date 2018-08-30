@@ -21,4 +21,14 @@ public abstract class BasePredicateEvaluator implements PredicateEvaluator {
   public final boolean isExclusive() {
     return getPredicateType().isExclusive();
   }
+
+  @Override
+  public int getNumMatchingDictIds() {
+    return getMatchingDictIds().length;
+  }
+
+  @Override
+  public int getNumNonMatchingDictIds() {
+    return getNonMatchingDictIds().length;
+  }
 }

@@ -19,22 +19,21 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
+import javax.annotation.Nullable;
+
 
 public class FilterOperatorUtils {
-
-  // Debug option to enable or disable multi-value optimization
-  public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
-
   private FilterOperatorUtils() {
   }
 
+  // Debug option to enable or disable the optimization of reordering the scan filters
+  public static final String SCAN_REORDER_OPTIMIZATION = "scanReorderOpt";
+
   /**
-   * Get the leaf filter operator (i.e. not {@link AndOperator} or {@link OrOperator}).
+   * Get the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
    */
   public static BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
       int startDocId, int endDocId) {
@@ -58,13 +57,21 @@ public class FilterOperatorUtils {
   }
 
   /**
-   * Re-order filter operators based on the their cost. Put the ons with inverted index first so we can process less
+   * Returns whether to use scan re-order optimization (ON by default) based on the given debug options.
+   */
+  public static boolean enableScanReorderOptimization(@Nullable Map<String, String> debugOptions) {
+    return debugOptions == null || !"false".equalsIgnoreCase(debugOptions.get(SCAN_REORDER_OPTIMIZATION));
+  }
+
+  /**
+   * Reorders filter operators based on the their cost. Put the ones with inverted index first so we can process less
    * documents.
    * <p>Special filter operators such as {@link MatchEntireSegmentOperator} and {@link EmptyFilterOperator} should be
    * removed from the list before calling this method.
    */
-  public static void reOrderFilterOperators(List<BaseFilterOperator> filterOperators, Map<String, String> debugOptions) {
-    Collections.sort(filterOperators, new Comparator<BaseFilterOperator>() {
+  public static void reorderFilterOperators(List<BaseFilterOperator> filterOperators,
+      boolean enableScanReorderOptimization) {
+    filterOperators.sort(new Comparator<BaseFilterOperator>() {
       @Override
       public int compare(BaseFilterOperator o1, BaseFilterOperator o2) {
         return getPriority(o1) - getPriority(o2);
@@ -77,45 +84,38 @@ public class FilterOperatorUtils {
         if (filterOperator instanceof BitmapBasedFilterOperator) {
           return 1;
         }
-        if (filterOperator instanceof AndOperator) {
+        if (filterOperator instanceof AndFilterOperator) {
           return 2;
         }
-        if (filterOperator instanceof OrOperator) {
+        if (filterOperator instanceof OrFilterOperator) {
           return 3;
         }
         if (filterOperator instanceof ScanBasedFilterOperator) {
-          return getScanBasedFilterPriority(filterOperator, 4, debugOptions);
+          if (enableScanReorderOptimization) {
+            return 4 + getScanBasedFilterPriority((ScanBasedFilterOperator) filterOperator);
+          } else {
+            return 4;
+          }
         }
         throw new IllegalStateException(filterOperator.getClass().getSimpleName()
-            + " should not be re-ordered, remove it from the list before calling this method");
+            + " should not be reordered, remove it from the list before calling this method");
       }
     });
   }
 
   /**
-   * Returns the priority for scan based filtering. Multivalue column evaluation is costly, so
-   * reorder such that multivalue columns are evaluated after single value columns.
+   * Returns the priority of the scan based filter.
+   * <p>The priority is determined based on:
+   * <ul>
+   *   <li>Multi-valued column has lower priority because of its higher reading cost</li>
+   * </ul>
    *
    * TODO: additional cost based prioritization to be added
-   *
-   * @param filterOperator the filter operator to prioritize
-   * @param debugOptions  debug-options to enable/disable the optimization
-   * @return the priority to be associated with the filter
    */
-  private static int getScanBasedFilterPriority(BaseFilterOperator filterOperator,
-      int basePriority, Map<String, String> debugOptions) {
+  private static int getScanBasedFilterPriority(ScanBasedFilterOperator scanBasedFilterOperator) {
+    DataSourceMetadata dataSourceMetadata = scanBasedFilterOperator.getDataSourceMetadata();
 
-    boolean disabled = false;
-    if (debugOptions != null &&
-        StringUtils.compareIgnoreCase(debugOptions.get(USE_SCAN_REORDER_OPTIMIZATION), "false") == 0) {
-      disabled = true;
-    }
-    DataSourceMetadata metadata = filterOperator.getDataSourceMetadata();
-    if (disabled || metadata == null || metadata.isSingleValue()) {
-      return basePriority;
-    }
-
-    // lower priority for multivalue
-    return basePriority + 1;
+    // Multi-valued column has lower priority
+    return dataSourceMetadata.isSingleValue() ? 0 : 1;
   }
 }

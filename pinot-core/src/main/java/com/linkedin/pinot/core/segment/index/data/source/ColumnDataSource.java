@@ -133,7 +133,9 @@ public final class ColumnDataSource extends DataSource {
       }
 
       @Override
-      public int getCardinality() { return _cardinality;}
+      public int getCardinality() {
+        return _cardinality;
+      }
     };
   }
 

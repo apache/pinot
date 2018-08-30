@@ -65,7 +65,7 @@ public interface PredicateEvaluator {
    */
 
   /**
-   * Return the count of matching dictionary ids.
+   * Get the number of matching dictionary ids.
    */
   int getNumMatchingDictIds();
 
@@ -75,7 +75,7 @@ public interface PredicateEvaluator {
   int[] getMatchingDictIds();
 
   /**
-   * Return the count of non-matching dictionary ids
+   * Get the number of non-matching dictionary ids.
    */
   int getNumNonMatchingDictIds();
 

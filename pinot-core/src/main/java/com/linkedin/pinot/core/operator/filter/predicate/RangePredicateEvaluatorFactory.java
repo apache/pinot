@@ -73,11 +73,12 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class OfflineDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  private static final class OfflineDictionaryBasedRangePredicateEvaluator
+      extends BaseDictionaryBasedPredicateEvaluator {
     final int _startDictId;
     // Exclusive
     final int _endDictId;
-    int _numMatchingDictIds;
+    final int _numMatchingDictIds;
     int[] _matchingDictIds;
 
     OfflineDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, ImmutableDictionaryReader dictionary) {
@@ -153,9 +154,9 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  private static final class RealtimeDictionaryBasedRangePredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  private static final class RealtimeDictionaryBasedRangePredicateEvaluator
+      extends BaseDictionaryBasedPredicateEvaluator {
     final IntSet _matchingDictIdSet;
-    int _numMatchingDictIds;
     int[] _matchingDictIds;
 
     RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, MutableDictionary dictionary) {
@@ -183,7 +184,6 @@ public class RangePredicateEvaluatorFactory {
           _matchingDictIdSet.add(dictId);
         }
       }
-      _numMatchingDictIds = _matchingDictIdSet.size();
     }
 
     @Override
@@ -198,7 +198,7 @@ public class RangePredicateEvaluatorFactory {
 
     @Override
     public int getNumMatchingDictIds() {
-      return _numMatchingDictIds;
+      return _matchingDictIdSet.size();
     }
 
     @Override
@@ -207,11 +207,6 @@ public class RangePredicateEvaluatorFactory {
         _matchingDictIds = _matchingDictIdSet.toIntArray();
       }
       return _matchingDictIds;
-    }
-
-    @Override
-    public int[] getNonMatchingDictIds() {
-      throw new UnsupportedOperationException();
     }
 
     @Override
