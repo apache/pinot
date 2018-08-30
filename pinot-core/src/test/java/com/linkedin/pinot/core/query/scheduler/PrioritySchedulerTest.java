@@ -286,7 +286,7 @@ public class PrioritySchedulerTest {
         }
       }
       DataTableImplV2 result = new DataTableImplV2();
-      result.getMetadata().put("table", queryRequest.getTableName());
+      result.getMetadata().put("table", queryRequest.getTableNameWithType());
       if (useBarrier) {
         try {
           validationBarrier.await();

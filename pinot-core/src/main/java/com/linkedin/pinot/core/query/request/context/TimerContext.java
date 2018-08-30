@@ -17,12 +17,12 @@ package com.linkedin.pinot.core.query.request.context;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 
 public class TimerContext {
-  private final BrokerRequest _brokerRequest;
+  private final String _tableNameWithType;
   private final ServerMetrics _serverMetrics;
   private final long _queryArrivalTimeMs;
   private final Timer[] _phaseTimers = new Timer[ServerQueryPhase.values().length];
@@ -31,8 +31,8 @@ public class TimerContext {
     private final ServerQueryPhase _queryPhase;
     private final long _startTimeMs;
 
-    private long _durationMs;
-    private boolean _ended;
+    private volatile long _durationMs;
+    private volatile boolean _ended;
 
     private Timer(ServerQueryPhase queryPhase, long startTimeMs) {
       _queryPhase = queryPhase;
@@ -42,7 +42,7 @@ public class TimerContext {
     public void stopAndRecord() {
       if (!_ended) {
         _durationMs = System.currentTimeMillis() - _startTimeMs;
-        _serverMetrics.addPhaseTiming(_brokerRequest, _queryPhase, _durationMs, TimeUnit.MILLISECONDS);
+        _serverMetrics.addPhaseTiming(_tableNameWithType, _queryPhase, _durationMs, TimeUnit.MILLISECONDS);
         _ended = true;
       }
     }
@@ -52,8 +52,8 @@ public class TimerContext {
     }
   }
 
-  public TimerContext(BrokerRequest brokerRequest, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
-    _brokerRequest = brokerRequest;
+  public TimerContext(String tableNameWithType, ServerMetrics serverMetrics, long queryArrivalTimeMs) {
+    _tableNameWithType = tableNameWithType;
     _serverMetrics = serverMetrics;
     _queryArrivalTimeMs = queryArrivalTimeMs;
   }
@@ -87,6 +87,7 @@ public class TimerContext {
     return startNewPhaseTimer(queryPhase, System.currentTimeMillis());
   }
 
+  @Nullable
   public Timer getPhaseTimer(ServerQueryPhase queryPhase) {
     return _phaseTimers[queryPhase.ordinal()];
   }

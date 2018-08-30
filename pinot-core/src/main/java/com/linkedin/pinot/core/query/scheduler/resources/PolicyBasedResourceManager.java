@@ -47,7 +47,7 @@ public class PolicyBasedResourceManager extends ResourceManager {
    */
   @Override
   public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {
-    int numSegments = query.getInstanceRequest().getSearchSegmentsSize();
+    int numSegments = query.getSegmentsToQuery().size();
     int queryThreadLimit = Math.max(1, Math.min(resourcePolicy.getMaxThreadsPerQuery(), numSegments));
     int spareThreads = resourcePolicy.getTableThreadsHardLimit() - accountant.totalReservedThreads();
     if (spareThreads <= 0) {
