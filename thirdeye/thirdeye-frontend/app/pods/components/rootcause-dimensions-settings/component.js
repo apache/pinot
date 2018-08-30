@@ -60,6 +60,14 @@ export default Component.extend({
     selectedErrorOption: 'oneSideError'
   },
 
+  // Text for field tooltips
+  tooltips: {
+    include: 'Dimensions to include',
+    exclude: 'Dimensions to exclude',
+    maintain: 'Keep this order',
+    contributors: 'TBD'
+  },
+
   /**
    * Selection options for "include dimensions". Do not include options selected to exclude
    * @returns {Array} Dimension options to include
