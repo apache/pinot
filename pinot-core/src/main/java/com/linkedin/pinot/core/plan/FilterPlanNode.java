@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
@@ -34,6 +33,7 @@ import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvi
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,14 +56,9 @@ public class FilterPlanNode implements PlanNode {
 
   /**
    * Helper method to build the operator tree from the filter query tree.
-   *
-   * @param filterQueryTree
-   * @param segment Index segment
-   * @return Filter Operator created
    */
-  @VisibleForTesting
-  public static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree,
-      IndexSegment segment, Map<String, String> debugOptions) {
+  private static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree, IndexSegment segment,
+      @Nullable Map<String, String> debugOptions) {
     if (filterQueryTree == null) {
       return new MatchEntireSegmentOperator(segment.getSegmentMetadata().getTotalRawDocs());
     }
@@ -75,14 +70,13 @@ public class FilterPlanNode implements PlanNode {
       List<BaseFilterOperator> childFilterOperators = new ArrayList<>(childFilters.size());
       if (filterType == FilterOperator.AND) {
         for (FilterQueryTree childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment,
-              debugOptions);
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment, debugOptions);
           if (childFilterOperator.isResultEmpty()) {
             return EmptyFilterOperator.getInstance();
           }
           childFilterOperators.add(childFilterOperator);
         }
-        FilterOperatorUtils.reOrderFilterOperators(childFilterOperators, debugOptions);
+        FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, debugOptions);
         return new AndOperator(childFilterOperators);
       } else {
         for (FilterQueryTree childFilter : childFilters) {

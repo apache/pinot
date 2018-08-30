@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,10 +32,9 @@ public class StarTreeDocIdSetPlanNode implements PlanNode {
 
   private final StarTreeFilterPlanNode _starTreeFilterPlanNode;
 
-  public StarTreeDocIdSetPlanNode(@Nonnull StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
-      @Nullable Set<String> groupByColumns, @Nonnull Map<String, String> debugOptions) {
-    _starTreeFilterPlanNode = new StarTreeFilterPlanNode(starTreeV2, rootFilterNode,
-        groupByColumns, debugOptions);
+  public StarTreeDocIdSetPlanNode(StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
+    _starTreeFilterPlanNode = new StarTreeFilterPlanNode(starTreeV2, rootFilterNode, groupByColumns, debugOptions);
   }
 
   @Override
