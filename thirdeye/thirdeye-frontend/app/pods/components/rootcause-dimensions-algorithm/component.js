@@ -114,6 +114,7 @@ export default Component.extend({
     depth: '3',
     dimensions: [],
     summarySize: 20,
+    orderType: 'auto',
     oneSideError: 'false',
     excludedDimensions: []
   },
@@ -284,6 +285,7 @@ export default Component.extend({
       'customTableSettings',
       'isUserCustomizingRequest'
     );
+
     // Labels to omit from URN when isolating filter keys
     const baseUrnArr = ['thirdeye', 'metric'];
     // Stringifying any custom settings so that we can append to our caching key
@@ -294,7 +296,7 @@ export default Component.extend({
       return isNaN(urnFragment) && !baseUrnArr.includes(urnFragment);
     }).join(';');
     // Grab metric Id from URN
-    const metricId = metricArr[metricArr.length - 1];
+    const metricId = metricUrn.match(/^thirdeye:metric:(\d+)/)[1];
     // Construct API-ready filter string
     const finalFilterStr = makeFilterString(decodeURIComponent(rawFilterStr));
     // Baseline start/end is dependent on 'compareMode' (WoW, Wo2W, etc)
@@ -318,6 +320,7 @@ export default Component.extend({
         summarySize: customTableSettings.summarySize,
         oneSideError: customTableSettings.oneSideError,
         depth: customTableSettings.depth,
+        orderType: customTableSettings.orderType,
         filters: rawFilterStr.length ? finalFilterStr : ''
       };
       // Add dimensions/exclusions into query if not empty
@@ -484,9 +487,7 @@ export default Component.extend({
    */
   fetchDimensionAnalysisData: task(function * (dimensionObj) {
     const dimensionsPayload = yield this.get('dimensionsApiService').queryDimensionsByMetric(dimensionObj);
-    const dimensionNames = dimensionsPayload.dimensions || [];
     const ratio = dimensionsPayload.globalRatio;
-    const cobTotal = `${dimensionsPayload.currentTotal}/${dimensionsPayload.baselineTotal}`;
 
     this.setProperties({
       dimensionsRawData: dimensionsPayload,

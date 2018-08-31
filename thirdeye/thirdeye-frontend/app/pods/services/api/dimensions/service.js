@@ -35,7 +35,8 @@ export default Service.extend({
       'baselineStart',  // number: baseline start ISO
       'baselineEnd',    // number: baseline end ISO
       'summarySize',    // number: number of results requested
-      'depth'           // number: nesting levels 1 - 3
+      'depth',          // number: nesting levels 1 - 3
+      'orderType'       // string: manual or auto
     ];
 
     requiredKeys.forEach((key) => {

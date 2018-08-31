@@ -177,7 +177,7 @@ export default Route.extend({
         const { id, duration, startDate, endDate } = tuneModel;
         this.transitionTo('manage.alert.explore', id, { queryParams: { duration, startDate, endDate }});
       } else {
-        this.transitionTo('manage.alert', alertId);
+        this.transitionTo('manage.alert.explore', alertId);
       }
     },
 
