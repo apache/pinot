@@ -16,8 +16,8 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
-import com.linkedin.pinot.core.operator.blocks.BitmapBlock;
+import com.linkedin.pinot.core.operator.blocks.FilterBlock;
+import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.util.ArrayList;
@@ -31,24 +31,28 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BitmapBasedFilterOperator.class);
   private static final String OPERATOR_NAME = "BitmapBasedFilterOperator";
 
+  private final PredicateEvaluator _predicateEvaluator;
+  private final DataSource _dataSource;
+  private final ImmutableRoaringBitmap[] _bitmaps;
   private final int _startDocId;
   // TODO: change it to exclusive
   // Inclusive
   private final int _endDocId;
   private final boolean _exclusive;
 
-  private ImmutableRoaringBitmap[] _bitmaps;
-
   public BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,
       int endDocId) {
     _predicateEvaluator = predicateEvaluator;
     _dataSource = dataSource;
+    _bitmaps = null;
     _startDocId = startDocId;
     _endDocId = endDocId;
     _exclusive = predicateEvaluator.isExclusive();
   }
 
   public BitmapBasedFilterOperator(ImmutableRoaringBitmap[] bitmaps, int startDocId, int endDocId, boolean exclusive) {
+    _predicateEvaluator = null;
+    _dataSource = null;
     _bitmaps = bitmaps;
     _startDocId = startDocId;
     _endDocId = endDocId;
@@ -56,9 +60,9 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected BaseFilterBlock getNextBlock() {
+  protected FilterBlock getNextBlock() {
     if (_bitmaps != null) {
-      return new BitmapBlock(_bitmaps, _startDocId, _endDocId, _exclusive);
+      return new FilterBlock(new BitmapDocIdSet(_bitmaps, _startDocId, _endDocId, _exclusive));
     }
 
     int[] dictIds = _exclusive ? _predicateEvaluator.getNonMatchingDictIds() : _predicateEvaluator.getMatchingDictIds();
@@ -81,7 +85,9 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
       LOGGER.info("Not all inverted indexes are generated, numDictIds: {}, numBitmaps: {}", length, numBitmaps);
     }
 
-    return new BitmapBlock(bitmaps.toArray(new ImmutableRoaringBitmap[numBitmaps]), _startDocId, _endDocId, _exclusive);
+    return new FilterBlock(
+        new BitmapDocIdSet(bitmaps.toArray(new ImmutableRoaringBitmap[numBitmaps]), _startDocId, _endDocId,
+            _exclusive));
   }
 
   @Override

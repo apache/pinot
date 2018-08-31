@@ -22,12 +22,12 @@ import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.filter.AndOperator;
+import com.linkedin.pinot.core.operator.filter.AndFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.EmptyFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
-import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
-import com.linkedin.pinot.core.operator.filter.OrOperator;
+import com.linkedin.pinot.core.operator.filter.MatchAllFilterOperator;
+import com.linkedin.pinot.core.operator.filter.OrFilterOperator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import java.util.ArrayList;
@@ -60,7 +60,7 @@ public class FilterPlanNode implements PlanNode {
   private static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree, IndexSegment segment,
       @Nullable Map<String, String> debugOptions) {
     if (filterQueryTree == null) {
-      return new MatchEntireSegmentOperator(segment.getSegmentMetadata().getTotalRawDocs());
+      return new MatchAllFilterOperator(segment.getSegmentMetadata().getTotalRawDocs());
     }
 
     // For non-leaf node, recursively create the child filter operators
@@ -77,7 +77,7 @@ public class FilterPlanNode implements PlanNode {
           childFilterOperators.add(childFilterOperator);
         }
         FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, debugOptions);
-        return new AndOperator(childFilterOperators);
+        return new AndFilterOperator(childFilterOperators);
       } else {
         for (FilterQueryTree childFilter : childFilters) {
           BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment, debugOptions);
@@ -90,7 +90,7 @@ public class FilterPlanNode implements PlanNode {
         } else if (childFilterOperators.size() == 1) {
           return childFilterOperators.get(0);
         } else {
-          return new OrOperator(childFilterOperators);
+          return new OrFilterOperator(childFilterOperators);
         }
       }
     } else {

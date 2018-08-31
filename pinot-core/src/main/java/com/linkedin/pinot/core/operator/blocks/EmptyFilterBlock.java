@@ -16,24 +16,19 @@
 package com.linkedin.pinot.core.operator.blocks;
 
 import com.linkedin.pinot.core.operator.docidsets.EmptyFilterBlockDocIdSet;
-import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 
 /**
- * Singleton class which extends {@link BaseFilterBlock} that is empty, i.e. does not contain any document.
+ * Singleton class which extends {@link FilterBlock} that is empty, i.e. does not contain any document.
  */
-public final class EmptyFilterBlock extends BaseFilterBlock {
+public final class EmptyFilterBlock extends FilterBlock {
   private EmptyFilterBlock() {
+    super(EmptyFilterBlockDocIdSet.getInstance());
   }
 
   private static final EmptyFilterBlock INSTANCE = new EmptyFilterBlock();
 
   public static EmptyFilterBlock getInstance() {
     return INSTANCE;
-  }
-
-  @Override
-  public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-    return EmptyFilterBlockDocIdSet.getInstance();
   }
 }

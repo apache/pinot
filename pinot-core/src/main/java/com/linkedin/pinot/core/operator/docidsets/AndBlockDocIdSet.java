@@ -15,14 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.docidsets;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import org.roaringbitmap.IntIterator;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
@@ -31,15 +23,19 @@ import com.linkedin.pinot.core.operator.dociditerators.AndDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
-import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.util.SortedRangeIntersection;
+import java.util.ArrayList;
+import java.util.List;
+import org.roaringbitmap.IntIterator;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
-  /**
-   *
-   */
-  static final Logger LOGGER = LoggerFactory.getLogger(AndOperator.class);
-  public final AtomicLong timeMeasure = new AtomicLong(0);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AndBlockDocIdSet.class);
+
   private List<FilterBlockDocIdSet> blockDocIdSets;
   private int minDocId = Integer.MIN_VALUE;
   private int maxDocId = Integer.MAX_VALUE;
@@ -84,7 +80,6 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
       answer = null;
     }
     return fastIterator();
-
   }
 
   public BlockDocIdIterator slowIterator() {

@@ -15,21 +15,22 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
-import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.FilterBlock;
+import com.linkedin.pinot.core.operator.docidsets.SizeBasedDocIdSet;
 
 
-public class MatchEntireSegmentOperator extends BaseFilterOperator {
+public class MatchAllFilterOperator extends BaseFilterOperator {
   private static final String OPERATOR_NAME = "MatchEntireSegmentOperator";
-  private int _totalDocs;
 
-  public MatchEntireSegmentOperator(int totalDocs) {
-    _totalDocs = totalDocs;
+  private int _maxDocId;
+
+  public MatchAllFilterOperator(int totalDocs) {
+    _maxDocId = totalDocs - 1;
   }
 
   @Override
-  protected BaseFilterBlock getNextBlock() {
-    return new MatchEntireSegmentDocIdSetBlock(_totalDocs);
+  protected FilterBlock getNextBlock() {
+    return new FilterBlock(new SizeBasedDocIdSet(_maxDocId));
   }
 
   @Override
