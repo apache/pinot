@@ -61,12 +61,15 @@ export default Component.extend({
   },
 
   // Text for field tooltips
-  tooltips: {
+  tooltips: {},
+
+/*  tooltips: {
     include: 'Dimensions to include',
     exclude: 'Dimensions to exclude',
     maintain: 'Keep this order',
     contributors: 'TBD'
   },
+*/
 
   /**
    * Selection options for "include dimensions". Do not include options selected to exclude
