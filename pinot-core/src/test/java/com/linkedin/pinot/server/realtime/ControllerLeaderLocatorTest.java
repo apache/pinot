@@ -32,6 +32,66 @@ import static org.mockito.Mockito.when;
 
 public class ControllerLeaderLocatorTest {
 
+  /**
+   * Tests the invalidate logic for cached controller leader
+   * @throws InterruptedException
+   */
+  @Test
+  public void testInvalidateCachedControllerLeader() throws InterruptedException {
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
+    BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
+    ZNRecord znRecord = mock(ZNRecord.class);
+    final String leaderHost = "host";
+    final int leaderPort = 12345;
+
+    when(helixManager.getHelixDataAccessor()).thenReturn(helixDataAccessor);
+    when(helixDataAccessor.getBaseDataAccessor()).thenReturn(baseDataAccessor);
+    when(znRecord.getId()).thenReturn(leaderHost + "_" + leaderPort);
+    when(baseDataAccessor.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+    when(helixManager.getClusterName()).thenReturn("testCluster");
+
+    // Create Controller Leader Locator
+    FakeControllerLeaderLocator.create(helixManager);
+    ControllerLeaderLocator controllerLeaderLocator = FakeControllerLeaderLocator.getInstance();
+
+    // check values at startup
+    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), 0);
+
+    // very first invalidate
+    controllerLeaderLocator.invalidateCachedControllerLeader();
+    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    long lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidateMillis();
+    Assert.assertTrue(lastCacheInvalidateMillis > 0);
+
+    // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
+    // values should remain unchanged
+    controllerLeaderLocator.invalidateCachedControllerLeader();
+    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+    lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidateMillis();
+
+    // getControllerLeader, which validates the cache
+    controllerLeaderLocator.getControllerLeader();
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+
+    // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
+    // values should remain unchanged
+    controllerLeaderLocator.invalidateCachedControllerLeader();
+    Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
+    lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidateMillis();
+
+    // invalidate after {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis have elapsed
+    // cache should be invalidated and last cache invalidation time should get updated
+    Thread.sleep(controllerLeaderLocator.getMillisBetweenInvalidate());
+    controllerLeaderLocator.invalidateCachedControllerLeader();
+    Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
+    Assert.assertTrue(controllerLeaderLocator.getLastCacheInvalidateMillis() > lastCacheInvalidateMillis);
+  }
+
   @Test
   public void testNoControllerLeader() {
     HelixManager helixManager = mock(HelixManager.class);
