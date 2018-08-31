@@ -7,14 +7,27 @@ export default Controller.extend({
   errorMessage: null,
   session: service(),
 
-
-  _makeTransition(fromUrl, session) {
+  /**
+   * Helper method to figure out any deep link or stored last attempted transition prior to session lost.
+   * If any exists, we will route the user to it after successful auth, else to home if not route match found.
+   * @param {string} fromUrl the attempted deep link
+   * @param {Objecgt} session the current session
+   */
+  _makeTransition(fromUrl = null, session) {
     const sessionFromUrl = get(session, 'store.fromUrl');
-    const lastIntentTransition = sessionFromUrl.lastIntentTransition.intent;
-    const name = lastIntentTransition.name;
-
-    if (fromUrl) {
-      this.transitionToRoute(fromUrl);
+    const lastIntentTransition = sessionFromUrl && sessionFromUrl.lastIntentTransition ? sessionFromUrl.lastIntentTransition.intent : null;
+    const name = lastIntentTransition ? lastIntentTransition.name : null;
+    const deepLink = sessionFromUrl && sessionFromUrl.deeplink ? sessionFromUrl.deeplink : fromUrl;
+    if (deepLink) {
+      const origin = window.location.origin;
+      // reset the session store fromUrl
+      this.set('session.store.fromUrl', null);
+      // check for unique links or external links and route accordingly
+      if (deepLink.indexOf(origin) > -1) {
+        window.location.replace(deepLink);
+      } else {
+        this.transitionToRoute(deepLink);
+      }
     } else if (lastIntentTransition && name) {
       const queryParams = lastIntentTransition.queryParams;
       const contexts = lastIntentTransition.contexts;

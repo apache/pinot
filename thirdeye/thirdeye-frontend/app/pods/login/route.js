@@ -1,5 +1,4 @@
 import Route from '@ember/routing/route';
-
 import { get, set } from '@ember/object';
 import { inject as service } from '@ember/service';
 import UnauthenticatedRouteMixin from 'ember-simple-auth/mixins/unauthenticated-route-mixin';
@@ -31,8 +30,13 @@ export default Route.extend(UnauthenticatedRouteMixin, {
   setupController(controller, model) {
     this._super(...arguments);
     const errorMsg = get(this, 'session.store.errorMsg');
+
     if (errorMsg) {
       controller.set('errorMessage', errorMsg);
+    }
+
+    if (controller.fromUrl) {
+      this.set('session.store.fromUrl', {deeplink: controller.fromUrl});
     }
   },
 
