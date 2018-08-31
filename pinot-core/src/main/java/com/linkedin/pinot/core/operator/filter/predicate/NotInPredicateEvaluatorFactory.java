@@ -111,11 +111,6 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
-    public int getNumMatchingDictIds() {
-      return getMatchingDictIds().length;
-    }
-
-    @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
         int dictionarySize = _dictionary.length();

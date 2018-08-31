@@ -97,11 +97,6 @@ public class NotEqualsPredicateEvaluatorFactory {
     }
 
     @Override
-    public int getNumMatchingDictIds() {
-      return getMatchingDictIds().length;
-    }
-
-    @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
         int dictionarySize = _dictionary.length();
@@ -121,11 +116,6 @@ public class NotEqualsPredicateEvaluatorFactory {
         }
       }
       return _matchingDictIds;
-    }
-
-    @Override
-    public int getNumNonMatchingDictIds() {
-      return _nonMatchingDictIds.length;
     }
 
     @Override
