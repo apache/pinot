@@ -119,7 +119,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
-    Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: {}", tableNameWithType);
+    Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(queryRequest.getSegmentsToQuery());
     boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
