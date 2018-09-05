@@ -16,11 +16,12 @@
 package com.linkedin.pinot.core.common.datatable;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
+import com.tdunning.math.stats.MergingDigest;
+import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntIterator;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -104,7 +105,7 @@ public class ObjectCustomSerDe {
       case IntOpenHashSet:
         return (T) deserializeIntOpenHashSet(bytes);
       case TDigest:
-        return (T) TDigest.fromBytes(ByteBuffer.wrap(bytes));
+        return (T) MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
       default:
         throw new IllegalArgumentException("Illegal object type for de-serialization: " + objectType);
     }
@@ -141,7 +142,7 @@ public class ObjectCustomSerDe {
       case IntOpenHashSet:
         return (T) deserializeIntOpenHashSet(byteBuffer);
       case TDigest:
-        return (T) TDigest.fromBytes(byteBuffer);
+        return (T) MergingDigest.fromBytes(byteBuffer);
       default:
         throw new IllegalArgumentException("Illegal object type for de-serialization: " + objectType);
     }

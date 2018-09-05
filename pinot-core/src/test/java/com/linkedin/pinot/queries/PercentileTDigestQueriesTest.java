@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -40,6 +39,7 @@ import com.linkedin.pinot.core.query.aggregation.function.PercentileTDigestAggre
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -122,7 +122,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       double value = RANDOM.nextDouble() * VALUE_RANGE;
       valueMap.put(DOUBLE_COLUMN, value);
 
-      TDigest tDigest = new TDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       tDigest.add(value);
       ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
       tDigest.asBytes(byteBuffer);

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
@@ -23,9 +22,10 @@ import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import com.tdunning.math.stats.MergingDigest;
+import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;
-
 
 /**
  * TDigest based Percentile aggregation function.
@@ -88,7 +88,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
         // Serialized TDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          tDigest.add(TDigest.fromBytes(ByteBuffer.wrap(bytesValues[i])));
+          tDigest.add(MergingDigest.fromBytes(ByteBuffer.wrap(bytesValues[i])));
         }
         break;
       default:
@@ -116,7 +116,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
           TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
-          tDigest.add(TDigest.fromBytes(ByteBuffer.wrap(bytesValues[i])));
+          tDigest.add(MergingDigest.fromBytes(ByteBuffer.wrap(bytesValues[i])));
         }
         break;
       default:
@@ -145,7 +145,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          TDigest value = TDigest.fromBytes(ByteBuffer.wrap(bytesValues[i]));
+          TDigest value = MergingDigest.fromBytes(ByteBuffer.wrap(bytesValues[i]));
           for (int groupKey : groupKeysArray[i]) {
             TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
             tDigest.add(value);
@@ -162,7 +162,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   public TDigest extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (tDigest == null) {
-      return new TDigest(DEFAULT_TDIGEST_COMPRESSION);
+      return TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
     } else {
       return tDigest;
     }
@@ -173,7 +173,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   public TDigest extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
-      return new TDigest(DEFAULT_TDIGEST_COMPRESSION);
+      return TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
     } else {
       return tDigest;
     }
@@ -225,7 +225,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   protected static TDigest getTDigest(@Nonnull AggregationResultHolder aggregationResultHolder) {
     TDigest tDigest = aggregationResultHolder.getResult();
     if (tDigest == null) {
-      tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
+      tDigest = TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
       aggregationResultHolder.setValue(tDigest);
     }
     return tDigest;
@@ -241,7 +241,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
   protected static TDigest getTDigest(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     TDigest tDigest = groupByResultHolder.getResult(groupKey);
     if (tDigest == null) {
-      tDigest = new TDigest(DEFAULT_TDIGEST_COMPRESSION);
+      tDigest = TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
       groupByResultHolder.setValueForKey(groupKey, tDigest);
     }
     return tDigest;
