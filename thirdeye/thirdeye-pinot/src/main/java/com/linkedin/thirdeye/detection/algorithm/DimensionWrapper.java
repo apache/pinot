@@ -98,7 +98,7 @@ public class DimensionWrapper extends DetectionPipeline {
       Period testPeriod = new Period(start, end);
 
       MetricEntity metric = MetricEntity.fromURN(this.metricUrn);
-      MetricSlice slice = MetricSlice.from(metric.getId(), startTime, this.endTime, metric.getFilters());
+      MetricSlice slice = MetricSlice.from(metric.getId(), start.getMillis(), end.getMillis(), metric.getFilters());
 
       DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
 
