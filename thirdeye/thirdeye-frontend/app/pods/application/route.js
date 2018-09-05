@@ -8,6 +8,7 @@ import config from 'thirdeye-frontend/config/environment';
 export default Route.extend(ApplicationRouteMixin, {
   moment: service(),
   session: service(),
+  notifications: service('toast'),
 
   beforeModel() {
     // calling this._super to trigger ember-simple-auth's hook
@@ -70,12 +71,22 @@ export default Route.extend(ApplicationRouteMixin, {
      * to retry upon successful authentication. Last, we will logout the user to destroy the session and allow the user to login to be authenticated.
      */
     error: function(error, transition) {
-      if (error.message === '401') {
+      const notifications = this.get('notifications');
+      if (error.message === '401' || error.response.status === '401') {
         this.set('session.store.errorMsg', 'Your session expired. Please login again.');
+        this.transitionTo('logout');
+      } else if (error.message === '500' || error.response.status === '500') {
+        notifications.error('Something went wrong with a request. Please try again or come back later.', '500 error detected', {
+          timeOut: '4000',
+          positionClass: 'toast-bottom-right'
+        });
       } else {
-        this.set('session.store.errorMsg', 'Something went wrong. Please login again.');
+        const errorStatus = error.response.status || 'Unknown';
+        notifications.error('Something went wrong with a request. Please try again or come back later.', `${errorStatus} error detected`, {
+          timeOut: '4000',
+          positionClass: 'toast-bottom-right'
+        });
       }
-      this.transitionTo('logout');
     }
   }
 });
