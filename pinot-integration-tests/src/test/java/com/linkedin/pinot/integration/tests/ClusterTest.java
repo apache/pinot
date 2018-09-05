@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -46,6 +47,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,6 +74,7 @@ import org.testng.Assert;
  * Base class for integration tests that involve a complete Pinot cluster.
  */
 public abstract class ClusterTest extends ControllerTest {
+  private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
   protected final String _clusterName = getHelixClusterName();
@@ -100,7 +103,12 @@ public abstract class ClusterTest extends ControllerTest {
       configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
       configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(basePort + i));
       configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
-      configuration.setProperty("pinot.broker.delayShutdownTimeMs", 0);
+      configuration.setProperty(BrokerServerBuilder.DELAY_SHUTDOWN_TIME_MS_CONFIG, 0);
+      // Randomly choose to use connection-pool or single-connection request handler
+      if (RANDOM.nextBoolean()) {
+        configuration.setProperty(BrokerServerBuilder.REQUEST_HANDLER_TYPE_CONFIG,
+            BrokerServerBuilder.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
+      }
       overrideBrokerConf(configuration);
       _brokerStarters.add(BrokerTestUtils.startBroker(_clusterName, zkStr, configuration));
     }
