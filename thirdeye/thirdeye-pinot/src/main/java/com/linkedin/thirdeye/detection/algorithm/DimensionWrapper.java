@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -30,23 +33,6 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * each filtered time series.
  */
 public class DimensionWrapper extends DetectionPipeline {
-
-  // exploration
-  private static final String PROP_METRIC_URN = "metricUrn";
-
-  private static final String PROP_DIMENSIONS = "dimensions";
-
-  private static final String PROP_MIN_VALUE = "minValue";
-  private static final double PROP_MIN_VALUE_DEFAULT = Double.NaN;
-
-  private static final String PROP_MIN_CONTRIBUTION = "minContribution";
-  private static final double PROP_MIN_CONTRIBUTION_DEFAULT = Double.NaN;
-
-  private static final String PROP_K = "k";
-  private static final int PROP_K_DEFAULT = -1;
-
-  private static final String PROP_LOOKBACK = "lookback";
-  private static final long PROP_LOOKBACK_DEFAULT = TimeUnit.DAYS.toMillis(7);
 
   // prototyping
   private static final String PROP_NESTED = "nested";
@@ -61,9 +47,12 @@ public class DimensionWrapper extends DetectionPipeline {
   private final String metricUrn;
   protected final List<String> dimensions;
   private final int k;
-  private final double minValue;
   private final double minContribution;
-  private final long lookback;
+  private final double minValue;
+  private final double minValueHourly;
+  private final double minValueDaily;
+  private final Period lookback;
+  private DateTimeZone timezone;
 
   private final Collection<String> nestedMetricUrns;
   protected final String nestedMetricUrnKey;
@@ -73,12 +62,15 @@ public class DimensionWrapper extends DetectionPipeline {
     super(provider, config, startTime, endTime);
 
     // exploration
-    this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN, null);
-    this.minValue = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN_VALUE, PROP_MIN_VALUE_DEFAULT);
-    this.minContribution = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN_CONTRIBUTION, PROP_MIN_CONTRIBUTION_DEFAULT);
-    this.k = MapUtils.getIntValue(config.getProperties(), PROP_K, PROP_K_DEFAULT);
-    this.dimensions = ConfigUtils.getList(config.getProperties().get(PROP_DIMENSIONS));
-    this.lookback = MapUtils.getLongValue(config.getProperties(), PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT);
+    this.metricUrn = MapUtils.getString(config.getProperties(), "metricUrn", null);
+    this.minContribution = MapUtils.getDoubleValue(config.getProperties(), "minContribution", Double.NaN);
+    this.minValue = MapUtils.getDoubleValue(config.getProperties(), "minValue", Double.NaN);
+    this.minValueHourly = MapUtils.getDoubleValue(config.getProperties(), "minValueHourly", Double.NaN);
+    this.minValueDaily = MapUtils.getDoubleValue(config.getProperties(), "minValueDaily", Double.NaN);
+    this.k = MapUtils.getIntValue(config.getProperties(), "k", -1);
+    this.dimensions = ConfigUtils.getList(config.getProperties().get("dimensions"));
+    this.lookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "lookback", "1w"));
+    this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "America/Los_Angeles"));
 
     // prototyping
     Preconditions.checkArgument(config.getProperties().containsKey(PROP_NESTED), "Missing " + PROP_NESTED);
@@ -95,13 +87,18 @@ public class DimensionWrapper extends DetectionPipeline {
     if (this.metricUrn != null) {
       // metric and dimension exploration
 
-      long startTime = this.startTime;
-      if (this.endTime - this.startTime < this.lookback) {
-        startTime = this.endTime - this.lookback;
+      DateTime start = new DateTime(this.startTime, this.timezone);
+      DateTime end = new DateTime(this.endTime, this.timezone);
+
+      DateTime minStart = end.minus(this.lookback);
+      if (minStart.isBefore(start)) {
+        start = minStart;
       }
 
+      Period testPeriod = new Period(start, end);
+
       MetricEntity metric = MetricEntity.fromURN(this.metricUrn);
-      MetricSlice slice = MetricSlice.from(metric.getId(), startTime, this.endTime, metric.getFilters());
+      MetricSlice slice = MetricSlice.from(metric.getId(), start.getMillis(), end.getMillis(), metric.getFilters());
 
       DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
 
@@ -111,14 +108,24 @@ public class DimensionWrapper extends DetectionPipeline {
 
       final double total = aggregates.getDoubles(COL_VALUE).sum().fillNull().doubleValue();
 
+      // min contribution
+      if (!Double.isNaN(this.minContribution)) {
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).divide(total).gte(this.minContribution)).dropNull();
+      }
+
       // min value
       if (!Double.isNaN(this.minValue)) {
         aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).gte(this.minValue)).dropNull();
       }
 
-      // min contribution
-      if (!Double.isNaN(this.minContribution)) {
-        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).divide(total).gte(this.minContribution)).dropNull();
+      if (!Double.isNaN(this.minValueHourly)) {
+        double multiplier = TimeUnit.HOURS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueHourly)).dropNull();
+      }
+
+      if (!Double.isNaN(this.minValueDaily)) {
+        double multiplier = TimeUnit.DAYS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueDaily)).dropNull();
       }
 
       // top k

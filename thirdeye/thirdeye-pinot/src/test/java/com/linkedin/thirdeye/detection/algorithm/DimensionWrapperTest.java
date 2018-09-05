@@ -94,7 +94,7 @@ public class DimensionWrapperTest {
 
   @Test
   public void testLookBack() throws Exception {
-    this.properties.put(PROP_LOOKBACK, 5);
+    this.properties.put(PROP_LOOKBACK, "5");
     this.properties.put(PROP_DIMENSIONS, Collections.singleton("b"));
 
     this.wrapper = new DimensionWrapper(this.provider, this.config, 14, 15);
