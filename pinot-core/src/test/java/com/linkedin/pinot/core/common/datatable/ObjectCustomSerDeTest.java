@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.common.datatable;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.IOException;
@@ -172,7 +172,7 @@ public class ObjectCustomSerDeTest {
   public void testTDigest()
       throws IOException {
     for (int i = 0; i < NUM_ITERATIONS; i++) {
-      TDigest expected = new TDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest expected = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       int size = RANDOM.nextInt(1000) + 2; // TDigest.quantile() requires at least 2 entries.
       for (int j = 0; j < size; j++) {
         expected.add(RANDOM.nextDouble());
