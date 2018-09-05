@@ -93,7 +93,14 @@ public class MockDataProvider implements DataProvider {
       }
       expr.add(COL_VALUE + ":sum");
 
-      result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS)).groupByValue(new ArrayList<>(dimensions)).aggregate(expr).dropSeries(COL_KEY).setIndex(dimensions));
+      if (dimensions.isEmpty()) {
+        result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS)));
+
+      } else {
+        result.put(slice, this.aggregates.get(slice.withFilters(NO_FILTERS))
+            .groupByValue(new ArrayList<>(dimensions)).aggregate(expr)
+            .dropSeries(COL_KEY).setIndex(dimensions));
+      }
     }
     return result;
   }
