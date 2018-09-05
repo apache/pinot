@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.config.ConfigNodeLifecycleAware;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
 import org.apache.commons.codec.DecoderException;
@@ -41,11 +40,13 @@ import org.apache.commons.codec.binary.Hex;
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLifecycleAware {
+  private static final byte[] NULL_BYTE_ARRAY_VALUE = new byte[0];
+
   private static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   private static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   private static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   private static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
-  private static final ByteArray DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
+  private static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
 
   private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
@@ -53,7 +54,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
-  private static final ByteArray DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
+  private static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
 
   @ConfigKey("name")
   protected String _name;
@@ -154,7 +155,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
           return stringDefaultNullValue;
         case BYTES:
           try {
-            return new ByteArray(Hex.decodeHex(stringDefaultNullValue.toCharArray()));
+            return Hex.decodeHex(stringDefaultNullValue.toCharArray());
           } catch (DecoderException e) {
             Utils.rethrowException(e); // Re-throw to avoid handling exceptions in all callers.
           }
