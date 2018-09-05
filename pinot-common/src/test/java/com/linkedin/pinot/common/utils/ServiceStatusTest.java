@@ -21,6 +21,7 @@ import java.util.List;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -108,10 +109,10 @@ public class ServiceStatusTest {
   public void testIdealStateMatch() {
     TestIdealStateAndExternalViewMatchServiceStatusCallback callback;
 
-    // No ideal state = STARTING
+    // No ideal state = GOOD
     callback = buildTestISEVCallback();
     callback.setExternalView(new ExternalView(TABLE_NAME));
-    assertEquals(callback.getServiceStatus(), ServiceStatus.Status.STARTING);
+    assertEquals(callback.getServiceStatus(), ServiceStatus.Status.GOOD);
 
     // No external view = STARTING
     callback = buildTestISEVCallback();
@@ -181,22 +182,18 @@ public class ServiceStatusTest {
   }
 
   private TestIdealStateAndExternalViewMatchServiceStatusCallback buildTestISEVCallback() {
-    return new TestIdealStateAndExternalViewMatchServiceStatusCallback(null, "potato", INSTANCE_NAME,
+    return new TestIdealStateAndExternalViewMatchServiceStatusCallback("potato", INSTANCE_NAME,
         Collections.singletonList(TABLE_NAME));
   }
 
-  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
+  private static class TestIdealStateAndExternalViewMatchServiceStatusCallback
+      extends ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback {
     private IdealState _idealState;
     private ExternalView _externalView;
 
-    public TestIdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName) {
-      super(helixManager, clusterName, instanceName);
-    }
-
-    public TestIdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName,
-        String instanceName, List<String> resourcesToMonitor) {
-      super(helixManager, clusterName, instanceName, resourcesToMonitor);
+    public TestIdealStateAndExternalViewMatchServiceStatusCallback(String clusterName, String instanceName,
+        List<String> resourcesToMonitor) {
+      super(Mockito.mock(HelixManager.class), clusterName, instanceName, resourcesToMonitor);
     }
 
     @Override
