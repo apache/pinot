@@ -62,10 +62,8 @@ export default Component.extend({
 
   // Text for field tooltips
   tooltips: {
-    include: 'Dimensions to include',
-    exclude: 'Dimensions to exclude',
-    maintain: 'Keep this order',
-    contributors: 'TBD'
+    maintain: 'Keep this order as dimension columns in analysis table',
+    oneSide: 'Set to true to display only results for which change direction is same as global change. For example, If the global change is negative, the algorithm will only show negative changes in the summary.'
   },
 
   /**
