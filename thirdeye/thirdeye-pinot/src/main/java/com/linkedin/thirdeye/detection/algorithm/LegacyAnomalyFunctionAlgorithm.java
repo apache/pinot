@@ -52,7 +52,6 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final BaseAnomalyFunction anomalyFunction;
-  private final String metricUrn;
   private final MetricEntity metricEntity;
   private final DataFilter dataFilter;
   private final boolean failOnError;
@@ -77,9 +76,13 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
     this.anomalyFunction.init(OBJECT_MAPPER.readValue(specs, AnomalyFunctionDTO.class));
 
     this.dataFilter = DataFilterFactory.fromSpec(this.anomalyFunction.getSpec().getDataFilter());
-    this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    this.metricEntity = MetricEntity.fromURN(this.metricUrn);
     this.failOnError = MapUtils.getBooleanValue(config.getProperties(), PROP_FAIL_ON_ERROR, false);
+
+    if (config.getProperties().containsKey(PROP_METRIC_URN)) {
+      this.metricEntity = MetricEntity.fromURN(MapUtils.getString(config.getProperties(), PROP_METRIC_URN));
+    } else {
+      this.metricEntity = makeEntity(this.anomalyFunction.getSpec());
+    }
   }
 
   @Override
@@ -134,7 +137,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
           anomaly.setDetectionConfigId(LegacyAnomalyFunctionAlgorithm.this.config.getId());
           anomaly.setFunctionId(null);
           anomaly.setFunction(anomalyFunction.getSpec());
-          anomaly.setMetricUrn(metricUrn);
+          anomaly.setMetricUrn(metricEntity.getUrn());
           anomaly.setMetric(metricConfig.getName());
           anomaly.setCollection(metricConfig.getDataset());
           anomaly.setDimensions(dimension);
@@ -150,7 +153,7 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
       }
     }
 
-    LOG.info("Detected {} anomalies for {}", mergedAnomalyResults.size(), this.metricUrn);
+    LOG.info("Detected {} anomalies for {}", mergedAnomalyResults.size(), this.metricEntity.getUrn());
 
     return new DetectionPipelineResult(new ArrayList<>(mergedAnomalyResults));
   }
@@ -161,5 +164,9 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
       dimensionMap.put(entry.getKey(), entry.getValue());
     }
     return dimensionMap;
+  }
+
+  private static MetricEntity makeEntity(AnomalyFunctionDTO spec) {
+    return MetricEntity.fromMetric(1.0, spec.getMetricId(), spec.getFilterSet());
   }
 }

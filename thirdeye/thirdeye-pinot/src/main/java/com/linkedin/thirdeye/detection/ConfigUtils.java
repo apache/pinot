@@ -52,7 +52,7 @@ public class ConfigUtils {
    */
   public static <T> List<T> getList(Object value, List<T> defaultValue) {
     if (value == null) {
-      return defaultValue;
+      return new ArrayList<>(defaultValue);
     }
 
     if (!(value instanceof Collection)) {
@@ -91,7 +91,7 @@ public class ConfigUtils {
    */
   public static <K, V> Map<K, V> getMap(Object value, Map<K, V> defaultValue) {
     if (value == null) {
-      return defaultValue;
+      return new HashMap<>(defaultValue);
     }
 
     if (!(value instanceof Map)) {
