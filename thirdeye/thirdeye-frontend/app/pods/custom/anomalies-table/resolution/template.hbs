@@ -7,17 +7,36 @@
     {{else}}
       <i class="{{if showResponseFailed "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-remove-circle" ></i>
     {{/if}}
-    {{#power-select
-      triggerId=record.anomalyId
-      triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
-      options=anomalyResponseNames
-      searchEnabled=false
-      selected=record.anomalyFeedback
-      onchange=(action "onChangeAnomalyResponse" record)
-      as |response|
-    }}
-      {{response}}
-    {{/power-select}}
+
+    {{#if (eq record.anomalyFeedback "True anomaly")}}
+      <div class="te-anomaly-table__value-label--down">
+        {{#power-select
+          triggerId=record.anomalyId
+          triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+          options=anomalyResponseNames
+          searchEnabled=false
+          selected=record.anomalyFeedback
+          onchange=(action "onChangeAnomalyResponse" record)
+          as |response|
+        }}
+          {{response}}
+        {{/power-select}}
+      </div>
+    {{else}}
+      <div>
+        {{#power-select
+          triggerId=record.anomalyId
+          triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+          options=anomalyResponseNames
+          searchEnabled=false
+          selected=record.anomalyFeedback
+          onchange=(action "onChangeAnomalyResponse" record)
+          as |response|
+        }}
+          {{response}}
+        {{/power-select}}
+      </div>
+    {{/if}}
   {{/if}}
   {{#if hasComment}}
     <div class="te-anomaly-table__comment">

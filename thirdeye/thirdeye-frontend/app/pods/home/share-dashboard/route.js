@@ -101,6 +101,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
       queryEnd: get(this, 'endDate')
     };
     set(this, 'applicationAnomalies', applicationAnomalies);
+    let index = 1;
 
     applicationAnomalies.forEach(anomaly => {
       const metricName = get(anomaly, 'metricName');
@@ -109,17 +110,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
       const functionId = get(anomaly, 'functionId');
       //Grouping the anomalies of the same metric name
       if (!anomalyMapping[metricName]) {
-        anomalyMapping[metricName] = { 'metricId': metricId, items: {} };
+        anomalyMapping[metricName] = { 'metricId': metricId, items: {}, count: index };
+        index++;
       }
 
       if(!anomalyMapping[metricName].items[functionName]) {
         anomalyMapping[metricName].items[functionName] = { 'functionId': functionId, items: [] };
       }
 
-
       // Group anomalies by metricName and function name (alertName) and wrap it into the Humanized cache. Each `anomaly` is the raw data from ember data cache.
       anomalyMapping[metricName].items[functionName].items.push(get(this, 'anomaliesApiService').getHumanizedEntity(anomaly, humanizedObject));
-
     });
 
     return anomalyMapping;
