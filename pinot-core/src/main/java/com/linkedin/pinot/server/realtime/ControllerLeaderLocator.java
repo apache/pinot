@@ -111,7 +111,8 @@ public class ControllerLeaderLocator {
    * Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be getting too many NOT_SENT responses due to some other errors.
    */
   public synchronized void invalidateCachedControllerLeader() {
-    long millisSinceLastInvalidate = System.currentTimeMillis() - _lastCacheInvalidateMillis;
+    long now = System.currentTimeMillis();
+    long millisSinceLastInvalidate = now - _lastCacheInvalidateMillis;
     if (millisSinceLastInvalidate < MILLIS_BETWEEN_INVALIDATE) {
       LOGGER.info(
           "Millis since last controller cache value invalidate {} is less than allowed frequency {}. Skipping invalidate.",
@@ -119,7 +120,7 @@ public class ControllerLeaderLocator {
     } else {
       LOGGER.info("Invalidating cached controller leader value");
       _cachedControllerLeaderInvalid = true;
-      _lastCacheInvalidateMillis = System.currentTimeMillis();
+      _lastCacheInvalidateMillis = now;
     }
   }
 
@@ -134,7 +135,12 @@ public class ControllerLeaderLocator {
   }
 
   @VisibleForTesting
-  protected  long getMillisBetweenInvalidate() {
+  protected long getMillisBetweenInvalidate() {
     return MILLIS_BETWEEN_INVALIDATE;
+  }
+
+  @VisibleForTesting
+  protected void setLastCacheInvalidateMillis(long lastCacheInvalidateMillis) {
+    _lastCacheInvalidateMillis = lastCacheInvalidateMillis;
   }
 }

@@ -34,10 +34,10 @@ public class ControllerLeaderLocatorTest {
 
   /**
    * Tests the invalidate logic for cached controller leader
-   * @throws InterruptedException
+   * We set the value for lastCacheInvalidateMillis as we do not want to rely on operations being executed within or after the time thresholds in the tests
    */
   @Test
-  public void testInvalidateCachedControllerLeader() throws InterruptedException {
+  public void testInvalidateCachedControllerLeader()  {
     HelixManager helixManager = mock(HelixManager.class);
     HelixDataAccessor helixDataAccessor = mock(HelixDataAccessor.class);
     BaseDataAccessor<ZNRecord> baseDataAccessor = mock(BaseDataAccessor.class);
@@ -67,10 +67,11 @@ public class ControllerLeaderLocatorTest {
 
     // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
     // values should remain unchanged
+    lastCacheInvalidateMillis = System.currentTimeMillis();
+    controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
-    lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidateMillis();
 
     // getControllerLeader, which validates the cache
     controllerLeaderLocator.getControllerLeader();
@@ -79,14 +80,16 @@ public class ControllerLeaderLocatorTest {
 
     // invalidate within {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis
     // values should remain unchanged
+    lastCacheInvalidateMillis = System.currentTimeMillis();
+    controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertFalse(controllerLeaderLocator.isCachedControllerLeaderInvalid());
     Assert.assertEquals(controllerLeaderLocator.getLastCacheInvalidateMillis(), lastCacheInvalidateMillis);
-    lastCacheInvalidateMillis = controllerLeaderLocator.getLastCacheInvalidateMillis();
 
-    // invalidate after {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis have elapsed
+    // invalidate after {@link ControllerLeaderLocator::getMillisBetweenInvalidate()} millis have elapsed, by setting lastCacheInvalidateMillis to well before the millisBetweenInvalidate
     // cache should be invalidated and last cache invalidation time should get updated
-    Thread.sleep(controllerLeaderLocator.getMillisBetweenInvalidate());
+    lastCacheInvalidateMillis = System.currentTimeMillis() - 2 * controllerLeaderLocator.getMillisBetweenInvalidate();
+    controllerLeaderLocator.setLastCacheInvalidateMillis(lastCacheInvalidateMillis);
     controllerLeaderLocator.invalidateCachedControllerLeader();
     Assert.assertTrue(controllerLeaderLocator.isCachedControllerLeaderInvalid());
     Assert.assertTrue(controllerLeaderLocator.getLastCacheInvalidateMillis() > lastCacheInvalidateMillis);
