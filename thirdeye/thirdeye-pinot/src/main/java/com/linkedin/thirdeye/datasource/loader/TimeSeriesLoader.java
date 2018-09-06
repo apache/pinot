@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.dashboard.resources.v2.timeseries;
+package com.linkedin.thirdeye.datasource.loader;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;

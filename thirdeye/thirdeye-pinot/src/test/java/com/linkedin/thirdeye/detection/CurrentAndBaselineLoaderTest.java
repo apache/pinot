@@ -1,16 +1,12 @@
 package com.linkedin.thirdeye.detection;
 
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -19,19 +15,17 @@ import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertTaskRunner;
+import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
+import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.testng.Assert.*;
 
 
 public class CurrentAndBaselineLoaderTest {
@@ -103,6 +97,10 @@ public class CurrentAndBaselineLoaderTest {
     this.currentAndBaselineLoader = new CurrentAndBaselineLoader(this.metricDAO, this.dataSetDAO, this.aggregationLoader);
   }
 
+  @AfterMethod
+  public void afterMethod() {
+    this.testDAOProvider.cleanup();
+  }
 
   @Test
   public void testfillInCurrentAndBaselineValue() throws Exception {
