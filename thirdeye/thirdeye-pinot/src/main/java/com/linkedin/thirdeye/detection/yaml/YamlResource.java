@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detection.yaml;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -44,6 +43,9 @@ public class YamlResource {
     this.alertConfigTranslator = new YamlDetectionAlertConfigTranslator();
   }
 
+  /**
+   Set up a detection pipeline using a YAML config
+   */
   @POST
   public Response setUpDetectionPipeline(@ApiParam("payload") String payload) throws Exception {
     if (Strings.isNullOrEmpty(payload)) {
@@ -68,14 +70,14 @@ public class YamlResource {
 
     Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
     DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
-    this.detectionAlertConfigDAO.save(alertConfigDTO);
+    Long detectionAlertId = this.detectionAlertConfigDAO.save(alertConfigDTO);
+    Preconditions.checkNotNull(detectionConfigId, "Save detection alerter config failed");
 
-    ObjectMapper objectMapper = new ObjectMapper();
-    return Response.ok(objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(config)
-        + objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(alertConfigDTO)).build();
+    return Response.ok("detection pipeline:" + detectionConfigId + " and detection alerter " + detectionAlertId
+        + " saved into database").build();
   }
 
-  /*
+  /**
    translate alert yaml to detection alert config
    */
   private DetectionAlertConfigDTO getDetectionAlertConfig(Map<String, Object> alertYaml, Long detectionConfigId) {
@@ -87,12 +89,15 @@ public class YamlResource {
 
     if (existingAlertConfigDTOs.isEmpty()) {
       // if alert does not exist, create a new alerter
-      return this.alertConfigTranslator.generateDetectionAlertConfig(alertYaml, Collections.singletonList(detectionConfigId), new HashMap<Long, Long>());
+      return this.alertConfigTranslator.generateDetectionAlertConfig(alertYaml,
+          Collections.singletonList(detectionConfigId), new HashMap<Long, Long>());
     } else {
+      // get existing detection alerter
       DetectionAlertConfigDTO existingAlertConfigDTO = existingAlertConfigDTOs.get(0);
       if (alertYaml.containsKey(PROP_TYPE)) {
         // if alert Yaml contains alert configuration, update existing alert config properties
-        Set<Long> detectionConfigIds = new HashSet(ConfigUtils.getLongs(existingAlertConfigDTO.getProperties().get(PROP_DETECTION_CONFIG_ID)));
+        Set<Long> detectionConfigIds =
+            new HashSet(ConfigUtils.getLongs(existingAlertConfigDTO.getProperties().get(PROP_DETECTION_CONFIG_ID)));
         detectionConfigIds.add(detectionConfigId);
         DetectionAlertConfigDTO alertConfigDTO =
             this.alertConfigTranslator.generateDetectionAlertConfig(alertYaml, detectionConfigIds, existingAlertConfigDTO.getVectorClocks());
@@ -105,7 +110,8 @@ public class YamlResource {
         if (!existingVectorClocks.containsKey(detectionConfigId)) {
           existingVectorClocks.put(detectionConfigId, 0L);
         }
-        Set<Long> detectionConfigIds = new HashSet(ConfigUtils.getList(existingAlertConfigDTO.getProperties().get(PROP_DETECTION_CONFIG_ID)));
+        Set<Long> detectionConfigIds =
+            new HashSet(ConfigUtils.getList(existingAlertConfigDTO.getProperties().get(PROP_DETECTION_CONFIG_ID)));
         detectionConfigIds.add(detectionConfigId);
         existingAlertConfigDTO.getProperties().put(PROP_DETECTION_CONFIG_ID, detectionConfigIds);
         return existingAlertConfigDTO;

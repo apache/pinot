@@ -4,21 +4,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
-import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
-import org.yaml.snakeyaml.Yaml;
 
 
 /**
