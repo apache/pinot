@@ -11,7 +11,7 @@ public class YamlDetectionTranslatorLoader {
   private static final String PROP_PIPELINE_TYPE= "pipelineType";
 
   private static final Map<String, String> YAML_LOADER_INFO_MAP = ImmutableMap.<String, String>builder()
-      .put("COMPOSITE", String.valueOf(CompositePipelineConfigTranslator.class.getName()))
+      .put("COMPOSITE", CompositePipelineConfigTranslator.class.getName())
       .build();
 
   public YamlDetectionConfigTranslator from(Map<String, Object> yamlConfig) throws Exception {

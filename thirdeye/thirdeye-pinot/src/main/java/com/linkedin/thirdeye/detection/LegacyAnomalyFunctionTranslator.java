@@ -5,13 +5,18 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.algorithm.LegacyAlertFilterWrapper;
+<<<<<<< HEAD
+=======
+import com.linkedin.thirdeye.detection.algorithm.LegacyAnomalyFunctionAlgorithm;
+import com.linkedin.thirdeye.detection.algorithm.LegacyDimensionWrapper;
+import com.linkedin.thirdeye.detection.algorithm.LegacyMergeWrapper;
+>>>>>>> Add tests
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * The Legacy Anomaly function translator.
