@@ -41,6 +41,8 @@ import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -253,9 +255,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  public void downloadAndReplaceSegment(@Nonnull String segmentName,
-      @Nonnull LLCRealtimeSegmentZKMetadata llcSegmentMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig) {
-    final String uri = llcSegmentMetadata.getDownloadUrl();
+  public void downloadAndReplaceSegment(@Nonnull String segmentName, @Nonnull LLCRealtimeSegmentZKMetadata llcSegmentMetadata,
+      @Nonnull IndexLoadingConfig indexLoadingConfig) throws URISyntaxException {
+    final URI uri = new URI(llcSegmentMetadata.getDownloadUrl());
     File tempSegmentFolder =
         new File(_indexDir, "tmp-" + segmentName + "." + String.valueOf(System.currentTimeMillis()));
     File tempFile = new File(_indexDir, segmentName + ".tar.gz");

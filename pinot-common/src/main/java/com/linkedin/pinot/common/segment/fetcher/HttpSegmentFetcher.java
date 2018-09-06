@@ -48,10 +48,10 @@ public class HttpSegmentFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
+  public void fetchSegmentToLocal(final URI uri, final File tempFile) throws Exception {
     RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, 5).attempt(() -> {
       try {
-        int statusCode = _httpClient.downloadFile(new URI(uri), tempFile);
+        int statusCode = _httpClient.downloadFile(uri, tempFile);
         _logger.info("Downloaded file from: {} to: {}; Length of downloaded file: {}; Response status code: {}", uri,
             tempFile, tempFile.length(), statusCode);
         return true;

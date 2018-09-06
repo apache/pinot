@@ -56,6 +56,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -343,7 +344,7 @@ public class PinotSegmentUploadRestletResource {
       FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
 
       SegmentMetadata segmentMetadata = null;
-      String downloadURI = null;
+      URI downloadURI = null;
       switch (uploadType) {
         case JSON:
         case URI:
@@ -384,7 +385,7 @@ public class PinotSegmentUploadRestletResource {
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}", segmentName,
           offlineTableName, clientAddress);
-      uploadSegment(indexDir, segmentMetadata, tempTarredFile, downloadURI, provider,
+      uploadSegment(indexDir, segmentMetadata, tempTarredFile, provider,
           enableParallelPushProtection, headers, isSegmentMetadataUpload);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + offlineTableName);
@@ -417,7 +418,7 @@ public class PinotSegmentUploadRestletResource {
     return dstFile;
   }
 
-  private void downloadSegment(File tempTarredSegmentFile, String downloadURI) throws Exception {
+  private void downloadSegment(File tempTarredSegmentFile, URI downloadURI) throws Exception {
     SegmentFetcher segmentFetcher;
     try {
       segmentFetcher = SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURI);
@@ -458,8 +459,9 @@ public class PinotSegmentUploadRestletResource {
    * </ul>
    */
   private void uploadSegment(File indexDir, SegmentMetadata segmentMetadata, File tempTarredSegmentFile,
-      String downloadUrl, FileUploadPathProvider provider, boolean enableParallelPushProtection, HttpHeaders headers, boolean isSegmentMetadataUpload)
+      FileUploadPathProvider provider, boolean enableParallelPushProtection, HttpHeaders headers, boolean isSegmentMetadataUpload)
       throws Exception {
+    String downloadUrl = null;
     String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
@@ -477,7 +479,7 @@ public class PinotSegmentUploadRestletResource {
     // Check quota when segment file is locally downloaded
     // For metadata-only upload, we have no way to check quota because we don't send the file itself and
     // we can't access length of zipped files in a remote filesystem
-    if (isSegmentMetadataUpload) {
+    if (!isSegmentMetadataUpload) {
       StorageQuotaChecker.QuotaCheckerResponse quotaResponse;
       try {
         quotaResponse = checkStorageQuota(indexDir, segmentMetadata, offlineTableConfig);
@@ -504,17 +506,13 @@ public class PinotSegmentUploadRestletResource {
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
       LOGGER.info("Adding new segment: {}", segmentName);
-      // We will only assume that segment metadata upload doesn't have to do a move through the controller because
-      // otherwise, we shouldn't send a separate payload.
-      if (!isSegmentMetadataUpload) {
-        try {
-          downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile.toURI());
-        } catch (Exception e) {
-          LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, rawTableName);
-          throw new RuntimeException(e);
-        }
+      try {
+        downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, tempTarredSegmentFile.toURI());
+      } catch (Exception e) {
+        LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, rawTableName);
+        throw new RuntimeException(e);
       }
-      _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
+    _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
       return;
     }
 
@@ -602,12 +600,8 @@ public class PinotSegmentUploadRestletResource {
         // New segment is different with the existing one, update ZK metadata and refresh the segment
         LOGGER.info("New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing segment {}",
             newCrc, existingCrc, segmentName);
-        // We will only assume that segment metadata upload doesn't have to do a move through the controller because
-        // otherwise, we shouldn't send a separate payload.
-        if (!isSegmentMetadataUpload) {
-          URI currentLocation = tempTarredSegmentFile.toURI();
-          downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, currentLocation);
-        }
+        URI currentLocation = tempTarredSegmentFile.toURI();
+        downloadUrl = moveSegmentToPermanentDirectory(provider, rawTableName, segmentName, currentLocation);
         _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata, downloadUrl);
       }
     } catch (Exception e) {
@@ -620,27 +614,30 @@ public class PinotSegmentUploadRestletResource {
 
   private String moveSegmentToPermanentDirectory(FileUploadPathProvider provider, String tableName, String segmentName,
       URI srcUri) throws Exception {
-    URI tarredSegmentURI = new URI(provider.getBaseDataDirURI() + "/" + tableName + "/" + segmentName);
+    String finalSegmentPath = StringUtil.join("/", provider.getBaseDataDirURI().toString(), tableName, URLEncoder.encode(segmentName, "UTF-8"));
+    URI finalSegmentLocationURI = new URI(finalSegmentPath);
     PinotFS pinotFS = PinotFSFactory.create(srcUri.getScheme());
-    // We want this copy to overwrite the remote segment file
-    pinotFS.delete(tarredSegmentURI);
-    // All files that come and go to remote filesystem will come through the controller.
-    pinotFS.copyFromLocalFile(new File(srcUri), tarredSegmentURI);
-    LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, srcUri.getPath(), tarredSegmentURI);
-    return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
+    pinotFS.move(srcUri, finalSegmentLocationURI);
+    LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, srcUri.getPath(), finalSegmentLocationURI);
+
+    if (srcUri.getScheme().equals("file")) {
+      return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
+    } else {
+      return finalSegmentPath;
+    }
   }
 
-  private String getDownloadUri(FileUploadDownloadClient.FileUploadType uploadType, HttpHeaders headers,
+  private URI getDownloadUri(FileUploadDownloadClient.FileUploadType uploadType, HttpHeaders headers,
       String segmentJsonStr) throws Exception {
     switch (uploadType) {
       case URI:
-        return headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
+        return new URI(headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI));
       case JSON:
         // Get segmentJsonStr
         JSONTokener tokener = new JSONTokener(segmentJsonStr);
         JSONObject segmentJson = new JSONObject(tokener);
         // Download segment from the given Uri
-        return segmentJson.getString(CommonConstants.Segment.Offline.DOWNLOAD_URL);
+        return new URI(segmentJson.getString(CommonConstants.Segment.Offline.DOWNLOAD_URL));
       default:
         break;
     }

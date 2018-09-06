@@ -68,8 +68,8 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class PinotSegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadIntegrationTest.class);
+public class PinotMetadataSegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotMetadataSegmentUploadIntegrationTest.class);
   private String _tableName;
   private File _metadataDir = new File(_segmentDir, "tmpMeta");
 
@@ -214,11 +214,8 @@ public class PinotSegmentUploadIntegrationTest extends BaseClusterIntegrationTes
       List<Future<Integer>> tasks = new ArrayList<>(numSegments);
       for (final String segmentName : segmentNames) {
         // Move segment file to final location
-        File finalTarredLocation = new File(new File(_controllerDataDir, getTableName()), segmentName);
-        File segmentFile = new File(segmentDir, segmentName);
-        FileUtils.copyFile(segmentFile, finalTarredLocation);
 
-        String downloadUri = StringUtil.join("/", _controllerBaseApiUrl, "segments", _tableName, URLEncoder.encode(segmentName, "UTF-8"));
+        String downloadUri = StringUtil.join("/", segmentDir.getAbsolutePath(), URLEncoder.encode(segmentName, "UTF-8"));
 
         Header uploadTypeHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.URI.toString());
         Header downloadUriHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, downloadUri);

@@ -57,6 +57,7 @@ import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler
 import com.yammer.metrics.core.Meter;
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -886,7 +887,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
+  protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) throws URISyntaxException {
     _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
   }
 

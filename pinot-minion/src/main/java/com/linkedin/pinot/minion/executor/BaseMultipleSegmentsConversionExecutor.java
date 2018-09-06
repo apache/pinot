@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -80,9 +81,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       for (int i = 0; i < downloadURLs.length; i++) {
         // Download the segment file
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
+        URI segmentURI = new URI(downloadURLs[i]);
         SegmentFetcherFactory.getInstance()
-            .getSegmentFetcherBasedOnURI(downloadURLs[i])
-            .fetchSegmentToLocal(downloadURLs[i], tarredSegmentFile);
+            .getSegmentFetcherBasedOnURI(segmentURI)
+            .fetchSegmentToLocal(segmentURI, tarredSegmentFile);
 
         // Un-tar the segment file
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
