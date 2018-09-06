@@ -52,6 +52,7 @@ export default Controller.extend({
 
       if (feedbackItem.value !== 'ALL' && !isBlank(anomalyMapping)) {
         let map = {};
+        let index = 1;
         // Iterate through each anomaly
         Object.keys(anomalyMapping).some(function(metric) {
           Object.keys(anomalyMapping[metric].items).some(function(alert) {
@@ -61,9 +62,12 @@ export default Controller.extend({
                 const metricId = get(item.anomaly, 'metricId');
                 const functionName = get(item.anomaly, 'functionName');
                 const functionId = get(item.anomaly, 'functionId');
+
                 if (!map[metricName]) {
-                  map[metricName] = { 'metricId': metricId, items: {} };
+                  map[metricName] = { 'metricId': metricId, items: {}, count: index };
+                  index++;
                 }
+
                 if(!map[metricName].items[functionName]) {
                   map[metricName].items[functionName] = { 'functionId': functionId, items: [] };
                 }
@@ -131,7 +135,7 @@ export default Controller.extend({
         id: 0,
         name: 'Show only selected metrics/alerts',
         type: 'root',
-        isExpanded: true,
+        isExpanded: false,
         isSelected: false,
         isVisible: true,
         isChecked: true,
