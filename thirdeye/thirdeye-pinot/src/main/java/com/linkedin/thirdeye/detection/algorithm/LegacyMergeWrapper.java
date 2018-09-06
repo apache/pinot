@@ -50,6 +50,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 public class LegacyMergeWrapper extends DetectionPipeline {
   private static final String PROP_SPEC = "specs";
+  private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
@@ -121,7 +122,12 @@ public class LegacyMergeWrapper extends DetectionPipeline {
     this.mergeConfig = mergeConfig;
     this.maxGap = mergeConfig.getSequentialAllowedGap();
     this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime).withConfigId(config.getId());
-    this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+
+    if (config.getProperties().containsKey(PROP_NESTED)) {
+      this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    } else {
+      this.nestedProperties = new ArrayList<>(Collections.singletonList(Collections.singletonMap(PROP_CLASS_NAME, (Object) LegacyDimensionWrapper.class.getName())));
+    }
   }
 
   @Override
@@ -129,7 +135,8 @@ public class LegacyMergeWrapper extends DetectionPipeline {
     // generate anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
 
-    for (Map<String, Object> properties : this.nestedProperties) {
+    for (Map<String, Object> propertiesRaw : this.nestedProperties) {
+      Map<String, Object> properties = new HashMap<>(propertiesRaw);
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
       Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
@@ -139,6 +146,9 @@ public class LegacyMergeWrapper extends DetectionPipeline {
       }
       if (!properties.containsKey(PROP_ANOMALY_FUNCTION_CLASS)) {
         properties.put(PROP_ANOMALY_FUNCTION_CLASS, this.anomalyFunctionClassName);
+      }
+      if (!properties.containsKey(PROP_METRIC_URN)) {
+        properties.put(PROP_METRIC_URN, makeEntity(this.anomalyFunction.getSpec()).getUrn());
       }
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
@@ -177,7 +187,13 @@ public class LegacyMergeWrapper extends DetectionPipeline {
     Map<DimensionMap, List<MergedAnomalyResultDTO>> retrievedAnomaliesByDimension = getAnomaliesByDimension(retrieved);
     Map<DimensionMap, List<MergedAnomalyResultDTO>> generatedAnomaliesByDimension = getAnomaliesByDimension(generated);
 
+    int countRetrieved = 0;
+    int countGenerated = 0;
+    int countMerged = 0;
+
     for (Map.Entry<DimensionMap, List<MergedAnomalyResultDTO>> entry : generatedAnomaliesByDimension.entrySet()) {
+      countGenerated += entry.getValue().size();
+
       // get latest overlapped merged anomaly
       MergedAnomalyResultDTO latestOverlappedMergedResult = null;
       List<MergedAnomalyResultDTO> retrievedAnomalies = null;
@@ -185,38 +201,50 @@ public class LegacyMergeWrapper extends DetectionPipeline {
         retrievedAnomalies = retrievedAnomaliesByDimension.get(entry.getKey());
         Collections.sort(retrievedAnomalies, COMPARATOR);
         latestOverlappedMergedResult = retrievedAnomalies.get(0);
+        countRetrieved += retrievedAnomalies.size();
       }
 
       List<AnomalyResult> generatedAnomalies = new ArrayList<>();
       generatedAnomalies.addAll(entry.getValue());
-      List<MergedAnomalyResultDTO> mergedAnomalyResults =
-          AnomalyTimeBasedSummarizer.mergeAnomalies(latestOverlappedMergedResult, generatedAnomalies, mergeConfig);
+      List<MergedAnomalyResultDTO> mergedAnomalyResults;
+      try {
+        mergedAnomalyResults = AnomalyTimeBasedSummarizer.mergeAnomalies(latestOverlappedMergedResult, generatedAnomalies, this.mergeConfig);
+      } catch (Exception e) {
+        LOG.warn("Could not merge anomalies for dimension '{}'. Skipping.", entry.getKey(), e);
+        continue;
+      }
+
+      countMerged += generatedAnomalies.size();
 
       AnomalyFunctionDTO anomalyFunctionSpec = this.anomalyFunction.getSpec();
       for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
-        mergedAnomalyResult.setFunction(anomalyFunctionSpec);
-        mergedAnomalyResult.setCollection(anomalyFunctionSpec.getCollection());
-        mergedAnomalyResult.setMetric(anomalyFunctionSpec.getTopicMetric());
-
-        SetMultimap<String, String> filters = HashMultimap.create(anomalyFunctionSpec.getFilterSet());
-        for (Map.Entry<String, String> dim : mergedAnomalyResult.getDimensions().entrySet()) {
-          filters.removeAll(dim.getKey()); // remove pre-existing filters
-          filters.put(dim.getKey(), dim.getValue());
-        }
-
-        mergedAnomalyResult.setMetricUrn(MetricEntity.fromMetric(1.0, anomalyFunctionSpec.getMetricId(), filters).getUrn());
-
-        MetricTimeSeries metricTimeSeries = getMetricTimeSeries(entry.getKey());
-
         try {
+          mergedAnomalyResult.setFunction(anomalyFunctionSpec);
+          mergedAnomalyResult.setCollection(anomalyFunctionSpec.getCollection());
+          mergedAnomalyResult.setMetric(anomalyFunctionSpec.getTopicMetric());
+
+          SetMultimap<String, String> filters = HashMultimap.create(anomalyFunctionSpec.getFilterSet());
+          for (Map.Entry<String, String> dim : mergedAnomalyResult.getDimensions().entrySet()) {
+            filters.removeAll(dim.getKey()); // remove pre-existing filters
+            filters.put(dim.getKey(), dim.getValue());
+          }
+
+          mergedAnomalyResult.setMetricUrn(MetricEntity.fromMetric(1.0, anomalyFunctionSpec.getMetricId(), filters).getUrn());
+
+          MetricTimeSeries metricTimeSeries = getMetricTimeSeries(entry.getKey());
+
           this.anomalyFunction.updateMergedAnomalyInfo(mergedAnomalyResult, metricTimeSeries,
               new DateTime(mergedAnomalyResult.getStartTime()), new DateTime(mergedAnomalyResult.getEndTime()), retrievedAnomalies);
+
+          mergedAnomalies.add(mergedAnomalyResult);
+
         } catch (Exception e) {
-          LOG.error("anomaly function update merged anomaly info error", e);
+          LOG.warn("Could not update anomaly info for anomaly '{}'. Skipping.", mergedAnomalyResult, e);
         }
-        mergedAnomalies.add(mergedAnomalyResult);
       }
     }
+
+    LOG.info("Merged {} anomalies from {} retrieved and {} generated", countMerged, countRetrieved, countGenerated);
 
     return mergedAnomalies;
   }
@@ -280,5 +308,9 @@ public class LegacyMergeWrapper extends DetectionPipeline {
       time = Math.max(anomaly.getEndTime(), time);
     }
     return time;
+  }
+
+  private static MetricEntity makeEntity(AnomalyFunctionDTO spec) {
+    return MetricEntity.fromMetric(1.0, spec.getMetricId(), spec.getFilterSet());
   }
 }

@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.detection;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
@@ -48,6 +52,22 @@ public class ConfigUtilsTest {
   @Test
   public void testGetMultimapPartialNull() {
     Assert.assertEquals(ConfigUtils.getMultimap(Collections.singletonMap("a", Arrays.asList("A", null))).size(), 2);
+  }
+
+  @Test
+  public void testGetListModification() {
+    List<String> defaultList = new ArrayList<>();
+    List<String> list = ConfigUtils.getList(null, defaultList);
+    list.add("value");
+    Assert.assertNotEquals(list, defaultList);
+  }
+
+  @Test
+  public void testGetMapModification() {
+    Map<String, String> defaultMap = new HashMap<>();
+    Map<String, String> map = ConfigUtils.getMap(null, defaultMap);
+    map.put("key", "value");
+    Assert.assertNotEquals(map, defaultMap);
   }
 
   @Test

@@ -45,18 +45,18 @@ public class DimensionWrapper extends DetectionPipeline {
   private static final String PROP_CLASS_NAME = "className";
 
   private final String metricUrn;
-  protected final List<String> dimensions;
   private final int k;
   private final double minContribution;
   private final double minValue;
   private final double minValueHourly;
   private final double minValueDaily;
   private final Period lookback;
-  private DateTimeZone timezone;
+  private final DateTimeZone timezone;
 
-  private final Collection<String> nestedMetricUrns;
   protected final String nestedMetricUrnKey;
-  private final List<Map<String, Object>> nestedProperties;
+  protected final List<String> dimensions;
+  protected final Collection<String> nestedMetricUrns;
+  protected final List<Map<String, Object>> nestedProperties;
 
   public DimensionWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
@@ -73,9 +73,7 @@ public class DimensionWrapper extends DetectionPipeline {
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "America/Los_Angeles"));
 
     // prototyping
-    Preconditions.checkArgument(config.getProperties().containsKey(PROP_NESTED), "Missing " + PROP_NESTED);
-
-    this.nestedMetricUrns = (Collection<String>) MapUtils.getObject(config.getProperties(), PROP_NESTED_METRIC_URNS, Collections.singleton(this.metricUrn));
+    this.nestedMetricUrns = ConfigUtils.getList(config.getProperties().get(PROP_NESTED_METRIC_URNS), Collections.singletonList(this.metricUrn));
     this.nestedMetricUrnKey = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_DEFAULT);
     this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
   }

@@ -13,6 +13,8 @@ import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -31,7 +33,6 @@ public class LegacyAlertFilterWrapper extends DetectionPipeline {
   private static final String PROP_ALERT_FILTER_LOOKBACK = "alertFilterLookBack";
   private static final String PROP_SPEC = "specs";
   private static final String PROP_ALERT_FILTER = "alertFilter";
-
 
   private final BaseAlertFilter alertFilter;
   private final List<Map<String, Object>> nestedProperties;
@@ -63,14 +64,20 @@ public class LegacyAlertFilterWrapper extends DetectionPipeline {
       this.alertFilter = new DummyAlertFilter();
     }
 
-    this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    if (config.getProperties().containsKey(PROP_NESTED)) {
+      this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    } else {
+      this.nestedProperties = Collections.singletonList(Collections.singletonMap(PROP_CLASS_NAME, (Object) LegacyMergeWrapper.class.getName()));
+    }
+
     this.alertFilterLookBack = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), PROP_ALERT_FILTER_LOOKBACK, "2week")).toStandardDuration().getMillis();
   }
 
   @Override
   public DetectionPipelineResult run() throws Exception {
     List<MergedAnomalyResultDTO> candidates = new ArrayList<>();
-    for (Map<String, Object> properties : this.nestedProperties) {
+    for (Map<String, Object> propertiesRaw : this.nestedProperties) {
+      Map<String, Object> properties = new HashMap<>(propertiesRaw);
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
       Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
