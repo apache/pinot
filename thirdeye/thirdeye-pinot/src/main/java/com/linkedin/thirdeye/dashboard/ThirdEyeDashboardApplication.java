@@ -148,7 +148,9 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new ThirdEyeResource());
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new DetectionMigrationResource(anomalyFunctionFactory));
+    env.jersey().register(new DetectionMigrationResource(
+        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
+        DAO_REGISTRY.getDetectionConfigManager(), anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new OnboardResource());
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
@@ -160,15 +162,24 @@ public class ThirdEyeDashboardApplication
         DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
         DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
-    env.jersey().register(new DetectionOnboardResource(DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));
+    env.jersey().register(new DetectionOnboardResource(
+        DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));
     env.jersey().register(new DetectionResource());
-    env.jersey().register(new DetectionAlertResource(DAO_REGISTRY.getDetectionAlertConfigManager()));
+    env.jersey().register(new DetectionAlertResource(
+        DAO_REGISTRY.getDetectionAlertConfigManager()));
 
-    TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache());
-    AggregationLoader aggregationLoader = new DefaultAggregationLoader(DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
+    TimeSeriesLoader timeSeriesLoader = new DefaultTimeSeriesLoader(
+        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
+        ThirdEyeCacheRegistry.getInstance().getQueryCache());
+    AggregationLoader aggregationLoader = new DefaultAggregationLoader(
+        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
+        ThirdEyeCacheRegistry.getInstance().getQueryCache(), ThirdEyeCacheRegistry.getInstance().getDatasetMaxDataTimeCache());
 
-    env.jersey().register(new RootCauseSessionResource(DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
-    env.jersey().register(new RootCauseMetricResource(Executors.newCachedThreadPool(), aggregationLoader, timeSeriesLoader, DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
+    env.jersey().register(new RootCauseSessionResource(
+        DAO_REGISTRY.getRootcauseSessionDAO(), new ObjectMapper()));
+    env.jersey().register(new RootCauseMetricResource(
+        Executors.newCachedThreadPool(), aggregationLoader, timeSeriesLoader,
+        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO()));
 
     env.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     env.getObjectMapper().registerModule(makeMapperModule());

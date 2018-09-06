@@ -4,8 +4,8 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.algorithm.LegacyAlertFilterWrapper;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,19 +17,26 @@ import org.slf4j.LoggerFactory;
  * The Legacy Anomaly function translator.
  */
 public class LegacyAnomalyFunctionTranslator {
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOGGER = LoggerFactory.getLogger(LegacyAnomalyFunctionTranslator.class);
-  private static final String PROP_CLASS_NAME = "className";
 
-  private MetricConfigManager metricConfigDAO;
+  private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_ANOMALY_FUNCTION_CLASS_NAME = "anomalyFunctionClassName";
+  private static final String PROP_SPECS = "specs";
+  private static final String PROP_ALERT_FILTER_LOOK_BACK = "alertFilterLookBack";
+  private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
+
+  private final MetricConfigManager metricConfigDAO;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
+  private final AlertFilterFactory alertFilterFactory;
 
   /**
    * Instantiates a new Legacy Anomaly function translator.
    */
-  public LegacyAnomalyFunctionTranslator(AnomalyFunctionFactory anomalyFunctionFactory) {
-    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+  public LegacyAnomalyFunctionTranslator(MetricConfigManager metricConfigDAO,
+      AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
+    this.metricConfigDAO = metricConfigDAO;
     this.anomalyFunctionFactory = anomalyFunctionFactory;
+    this.alertFilterFactory = alertFilterFactory;
   }
 
   /**
@@ -47,9 +54,16 @@ public class LegacyAnomalyFunctionTranslator {
 
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, LegacyAlertFilterWrapper.class);
-    properties.put("anomalyFunctionClassName", anomalyFunctionFactory.getClassNameForFunctionType(anomalyFunctionDTO.getType()));
-    properties.put("specs", anomalyFunctionDTO);
-    properties.put("alertFilterLookBack", "1d");
+    properties.put(PROP_ANOMALY_FUNCTION_CLASS_NAME, anomalyFunctionFactory.getClassNameForFunctionType(anomalyFunctionDTO.getType().toUpperCase()));
+    properties.put(PROP_SPECS, anomalyFunctionDTO);
+
+    if (anomalyFunctionDTO.getAlertFilter() != null) {
+      String type = anomalyFunctionDTO.getAlertFilter().get("type");
+      if (type != null) {
+        properties.put(PROP_LEGACY_ALERT_FILTER_CLASS_NAME, this.alertFilterFactory.getClassNameForAlertFilterType(type.toUpperCase()));
+        properties.put(PROP_ALERT_FILTER_LOOK_BACK, "1d");
+      }
+    }
 
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName(anomalyFunctionDTO.getFunctionName());

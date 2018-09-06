@@ -2,9 +2,10 @@ package com.linkedin.thirdeye.detection;
 
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -22,7 +23,6 @@ import org.slf4j.LoggerFactory;
 @Path("/migrate")
 public class DetectionMigrationResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DetectionMigrationResource.class);
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final LegacyAnomalyFunctionTranslator translator;
   private final AnomalyFunctionManager anomalyFunctionDAO;
@@ -33,10 +33,12 @@ public class DetectionMigrationResource {
    *
    * @param anomalyFunctionFactory the anomaly function factory
    */
-  public DetectionMigrationResource(AnomalyFunctionFactory anomalyFunctionFactory) {
-    this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    this.detectionConfigDAO = DAO_REGISTRY.getDetectionConfigManager();
-    this.translator = new LegacyAnomalyFunctionTranslator(anomalyFunctionFactory);
+  public DetectionMigrationResource(MetricConfigManager metricConfigDAO,
+      AnomalyFunctionManager anomalyFunctionDAO, DetectionConfigManager detectionConfigDAO,
+      AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
+    this.anomalyFunctionDAO = anomalyFunctionDAO;
+    this.detectionConfigDAO = detectionConfigDAO;
+    this.translator = new LegacyAnomalyFunctionTranslator(metricConfigDAO, anomalyFunctionFactory, alertFilterFactory);
   }
 
   /**
