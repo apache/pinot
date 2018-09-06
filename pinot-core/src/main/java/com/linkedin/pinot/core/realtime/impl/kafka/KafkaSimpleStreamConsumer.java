@@ -55,7 +55,7 @@ public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements
    */
   @Override
   public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(_isPartitionMetadata, "Cannot fetch messages from a metadata-only KafkaSimpleStreamConsumer");
+    Preconditions.checkState(isPartitionProvided, "Cannot fetch messages from a metadata-only KafkaSimpleStreamConsumer");
     // TODO Improve error handling
 
     final long connectEndTime = System.currentTimeMillis() + _connectTimeoutMillis;

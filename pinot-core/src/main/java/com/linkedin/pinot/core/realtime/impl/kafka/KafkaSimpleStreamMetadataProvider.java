@@ -137,7 +137,7 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
   @Override
   public synchronized long fetchPartitionOffset(String requestedOffset, long timeoutMillis)
       throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(_isPartitionMetadata, "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
+    Preconditions.checkState(isPartitionProvided, "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
     Preconditions.checkNotNull(requestedOffset);
 
     final long offsetRequestTime;

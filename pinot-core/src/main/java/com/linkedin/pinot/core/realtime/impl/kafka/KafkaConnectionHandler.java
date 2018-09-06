@@ -71,7 +71,7 @@ public class KafkaConnectionHandler {
 
   final Random _random = new Random();
 
-  boolean _isPartitionMetadata;
+  boolean isPartitionProvided;
 
   /**
    * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
@@ -100,7 +100,7 @@ public class KafkaConnectionHandler {
     _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
     _simpleConsumer = null;
 
-    _isPartitionMetadata = false;
+    isPartitionProvided = false;
     _partition = Integer.MIN_VALUE;
 
     initializeBootstrapNodeList(streamMetadata.getBootstrapHosts());
@@ -114,7 +114,7 @@ public class KafkaConnectionHandler {
     _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
     _simpleConsumer = null;
 
-    _isPartitionMetadata = true;
+    isPartitionProvided = true;
     _partition = partition;
 
     initializeBootstrapNodeList(streamMetadata.getBootstrapHosts());
@@ -221,7 +221,7 @@ public class KafkaConnectionHandler {
 
     @Override
     void process() {
-      if (_isPartitionMetadata) {
+      if (isPartitionProvided) {
         // If we're consuming from a partition, we need to find the leader so that we can consume from it. By design,
         // Kafka only allows consumption from the leader and not one of the in-sync replicas.
         setCurrentState(new FetchingLeaderInformation());
