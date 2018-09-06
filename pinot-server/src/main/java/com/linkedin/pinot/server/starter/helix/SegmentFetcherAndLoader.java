@@ -183,9 +183,12 @@ public class SegmentFetcherAndLoader {
     File tempTarFile = new File(tempDir, segmentName + ".tar.gz");
     File tempSegmentDir = new File(tempDir, segmentName);
     try {
-      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempTarFile);
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchEncryptedSegmentToLocal(uri, tempTarFile);
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           tableName, uri, tempTarFile, tempTarFile.length());
+      File decryptedFile = new File(tempTarFile.getParent(), tempTarFile.getName() + CommonConstants.Segment.DECRYPTED_SUFFIX);
+      PinotCrypterFactory.create().decrypt(tempTarFile, decryptedFile);
+      FileUtils.moveFile(decryptedFile, tempTarFile);
 
       // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
       // Thus, there's no need to retry again.

@@ -24,7 +24,7 @@ import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 
 
-public class PinotFSSegmentFetcher implements SegmentFetcher {
+public class PinotFSSegmentFetcher extends SegmentFetcher {
   private PinotFS _pinotFS;
 
   @Override

@@ -33,7 +33,7 @@ import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.
 import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.*;
 
 
-public class HdfsSegmentFetcher implements SegmentFetcher {
+public class HdfsSegmentFetcher extends SegmentFetcher {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HdfsSegmentFetcher.class);
   private FileSystem _hadoopFS = null;

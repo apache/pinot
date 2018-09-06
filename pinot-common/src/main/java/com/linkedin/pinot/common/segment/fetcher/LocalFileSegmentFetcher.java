@@ -24,7 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class LocalFileSegmentFetcher implements SegmentFetcher {
+public class LocalFileSegmentFetcher extends SegmentFetcher {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LocalFileSegmentFetcher.class);
 

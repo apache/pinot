@@ -321,6 +321,8 @@ public class PinotSegmentUploadRestletResource {
       boolean enableParallelPushProtection, HttpHeaders headers, Request request, boolean isSegmentMetadataUpload) {
     File tempTarredFile = null;
     File tempSegmentDir = null;
+    File decryptedTarredFile = null;
+    File encryptedTempTarredFile = null;
 
     if (headers != null) {
       // TODO: Add these headers into open source hadoop jobs
@@ -337,6 +339,7 @@ public class PinotSegmentUploadRestletResource {
       String tempFileName = "tmp-" + System.nanoTime();
       tempTarredFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
+      encryptedTempTarredFile = new File(provider.getFileUploadTmpDir(), tempFileName);
 
       // Get upload type
       String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
@@ -357,6 +360,9 @@ public class PinotSegmentUploadRestletResource {
           if (!isSegmentMetadataUpload) {
             // Get segment fetcher based on the download URI
             downloadSegment(tempTarredFile, downloadURI);
+            decryptedTarredFile = new File(tempTarredFile.getParent(), tempTarredFile.getName() + CommonConstants.Segment.DECRYPTED_SUFFIX);
+            encryptedTempTarredFile = tempTarredFile;
+            tempTarredFile = decryptedTarredFile;
           } else {
             getFileFromMultipart(multiPart, tempTarredFile);
           }
@@ -384,6 +390,8 @@ public class PinotSegmentUploadRestletResource {
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}", segmentName,
           offlineTableName, clientAddress);
+      // Prepare the encrypted segment file to be reuploaded
+      FileUtils.moveFile(encryptedTempTarredFile, tempTarredFile);
       uploadSegment(indexDir, segmentMetadata, tempTarredFile, downloadURI, provider,
           enableParallelPushProtection, headers, isSegmentMetadataUpload);
 
@@ -430,7 +438,7 @@ public class PinotSegmentUploadRestletResource {
           "Failed to get segment fetcher for download URI: " + downloadURI, Response.Status.BAD_REQUEST);
     }
     // Download segment tar file to local
-    segmentFetcher.fetchSegmentToLocal(downloadURI, tempTarredSegmentFile);
+    segmentFetcher.fetchEncryptedSegmentToLocal(downloadURI, tempTarredSegmentFile);
   }
 
   private FileUploadDownloadClient.FileUploadType getUploadType(String uploadTypeStr) {
