@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,6 +27,8 @@ public class LegacyDimensionWrapper extends DimensionWrapper {
   private static final String PROP_SPEC = "specs";
   private static final String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  public static final String SPEC_METRIC_ID = "metricId";
+  public static final String SPEC_FILTERS = "filters";
 
   private final BaseAnomalyFunction anomalyFunction;
   private final Map<String, Object> anomalyFunctionSpecs;
@@ -88,18 +91,11 @@ public class LegacyDimensionWrapper extends DimensionWrapper {
     Map<String, Object> spec = ConfigUtils.getMap(properties.get(PROP_SPEC));
 
     if (!properties.containsKey(PROP_METRIC_URN)) {
-      long metricId = MapUtils.getLongValue(spec, "metricId");
-      String filterString = MapUtils.getString(spec, "filters");
-
-      Multimap<String, String> filters = HashMultimap.create();
-      for (String item : filterString.split(";")) {
-        String[] parts = item.split("=", 2);
-        filters.put(parts[0], parts[1]);
-      }
-
+      long metricId = MapUtils.getLongValue(spec, SPEC_METRIC_ID);
+      Multimap<String, String> filters = ThirdEyeUtils.getFilterSet(MapUtils.getString(spec, SPEC_FILTERS));
       properties.put(PROP_METRIC_URN,MetricEntity.fromMetric(1.0, metricId, filters).getUrn());
     }
-    
+
     return properties;
   }
 }
