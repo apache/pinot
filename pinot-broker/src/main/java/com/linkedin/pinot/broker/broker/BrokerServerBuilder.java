@@ -20,6 +20,7 @@ import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
 import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
+import com.linkedin.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import com.linkedin.pinot.broker.routing.RoutingTable;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService;
 import com.linkedin.pinot.common.Utils;
@@ -36,11 +37,14 @@ import org.slf4j.LoggerFactory;
 public class BrokerServerBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
 
-  private static final String DELAY_SHUTDOWN_TIME_MS_CONFIG = "pinot.broker.delayShutdownTimeMs";
-  private static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000;
-  private static final String ACCESS_CONTROL_PREFIX = "pinot.broker.access.control";
-  private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
-  private static final String TABLE_LEVEL_METRICS_CONFIG = "pinot.broker.enableTableLevelMetrics";
+  public static final String DELAY_SHUTDOWN_TIME_MS_CONFIG = "pinot.broker.delayShutdownTimeMs";
+  public static final long DEFAULT_DELAY_SHUTDOWN_TIME_MS = 10_000;
+  public static final String ACCESS_CONTROL_PREFIX = "pinot.broker.access.control";
+  public static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
+  public static final String TABLE_LEVEL_METRICS_CONFIG = "pinot.broker.enableTableLevelMetrics";
+  public static final String REQUEST_HANDLER_TYPE_CONFIG = "pinot.broker.requestHandlerType";
+  public static final String DEFAULT_REQUEST_HANDLER_TYPE = "connectionPool";
+  public static final String SINGLE_CONNECTION_REQUEST_HANDLER_TYPE = "singleConnection";
 
   public enum State {
     INIT,
@@ -85,8 +89,16 @@ public class BrokerServerBuilder {
   }
 
   private BrokerRequestHandler buildRequestHandler() {
-    return new ConnectionPoolBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
-        _tableQueryQuotaManager, _brokerMetrics, _liveInstanceChangeListener, _metricsRegistry);
+    String requestHandlerType = _config.getString(REQUEST_HANDLER_TYPE_CONFIG, DEFAULT_REQUEST_HANDLER_TYPE);
+    if (requestHandlerType.equalsIgnoreCase(SINGLE_CONNECTION_REQUEST_HANDLER_TYPE)) {
+      LOGGER.info("Using SingleConnectionBrokerRequestHandler");
+      return new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService,
+          _accessControlFactory, _tableQueryQuotaManager, _brokerMetrics);
+    } else {
+      LOGGER.info("Using ConnectionPoolBrokerRequestHandler");
+      return new ConnectionPoolBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
+          _tableQueryQuotaManager, _brokerMetrics, _liveInstanceChangeListener, _metricsRegistry);
+    }
   }
 
   public void start() {

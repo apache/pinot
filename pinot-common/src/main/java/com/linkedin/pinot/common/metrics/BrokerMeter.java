@@ -38,6 +38,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
   // Scatter phase.
   NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
+  REQUEST_SEND_EXCEPTIONS("exceptions", false),
   // Gather phase.
   RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
   // Response deserialize phase.
