@@ -18,8 +18,12 @@ package com.linkedin.pinot.core.realtime.kafka;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleStreamConsumer;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleStreamMetadataProvider;
+import com.linkedin.pinot.core.realtime.stream.MessageBatch;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
 import kafka.api.FetchRequest;
 import kafka.api.PartitionFetchInfo;
 import kafka.api.PartitionMetadata;
@@ -35,6 +39,7 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.Message;
 import org.apache.kafka.common.protocol.Errors;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 import scala.Some;
 import scala.Tuple2;
@@ -42,14 +47,21 @@ import scala.collection.JavaConversions;
 import scala.collection.Seq;
 import scala.collection.immutable.List;
 
-import static org.testng.Assert.*;
-
 
 /**
  * Tests for the KafkaSimpleStreamConsumer.
  */
-public class SimpleConsumerWrapperTest {
+public class KafkaSimpleStreamConsumerTest {
   public class MockKafkaSimpleConsumerFactory implements KafkaSimpleConsumerFactory {
+
+    private String[] hosts;
+    private int[] ports;
+    private int[] partitionLeaderIndices;
+    private int brokerCount;
+    private int partitionCount;
+    private String topicName;
+    private BrokerEndPoint[] brokerArray;
+
     public MockKafkaSimpleConsumerFactory(String[] hosts, int[] ports, long[] partitionStartOffsets,
         long[] partitionEndOffsets, int[] partitionLeaderIndices, String topicName) {
       Preconditions.checkArgument(hosts.length == ports.length);
@@ -64,23 +76,11 @@ public class SimpleConsumerWrapperTest {
 
       Preconditions.checkArgument(partitionStartOffsets.length == partitionEndOffsets.length);
       Preconditions.checkArgument(partitionStartOffsets.length == partitionLeaderIndices.length);
-      this.partitionStartOffsets = partitionStartOffsets;
-      this.partitionEndOffsets = partitionEndOffsets;
       this.partitionLeaderIndices = partitionLeaderIndices;
       partitionCount = partitionStartOffsets.length;
 
       this.topicName = topicName;
     }
-
-    private String[] hosts;
-    private int[] ports;
-    private long[] partitionStartOffsets;
-    private long[] partitionEndOffsets;
-    private int[] partitionLeaderIndices;
-    private int brokerCount;
-    private int partitionCount;
-    private String topicName;
-    private BrokerEndPoint[] brokerArray;
 
     private class MockFetchResponse extends FetchResponse {
       java.util.Map<TopicAndPartition, Short> errorMap;
@@ -210,47 +210,97 @@ public class SimpleConsumerWrapperTest {
 
   @Test
   public void testGetPartitionCount() {
-    MockKafkaSimpleConsumerFactory simpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
+    String streamType = "kafka";
+    String streamKafkaTopicName = "theTopic";
+    String streamKafkaBrokerList = "abcd:1234,bcde:2345";
+    String streamKafkaConsumerType = "simple";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    StreamMetadata streamMetadata = new StreamMetadata(streamConfigMap);
+
+    MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
         new int[] { 1234, 2345 },
         new long[] { 12345L, 23456L },
         new long[] { 23456L, 34567L },
         new int[] { 0, 1 },
-        "theTopic"
+        streamKafkaTopicName
     );
-    KafkaSimpleStreamConsumer consumerWrapper = new KafkaSimpleStreamConsumer(
+
+    KafkaSimpleStreamMetadataProvider streamMetadataProvider = new KafkaSimpleStreamMetadataProvider(streamMetadata, mockKafkaSimpleConsumerFactory);
+    long expected = 2;
+    Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), expected);
+
+    /*KafkaSimpleStreamConsumer consumerWrapper = new KafkaSimpleStreamConsumer(
         simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 10000L);
-    assertEquals(consumerWrapper.getPartitionCount("theTopic", 10000L), 2);
+    assertEquals(consumerWrapper.getPartitionCount("theTopic", 10000L), 2);*/
   }
 
   @Test
   public void testFetchMessages() throws Exception {
-    MockKafkaSimpleConsumerFactory simpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
+    String streamType = "kafka";
+    String streamKafkaTopicName = "theTopic";
+    String streamKafkaBrokerList = "abcd:1234,bcde:2345";
+    String streamKafkaConsumerType = "simple";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    StreamMetadata streamMetadata = new StreamMetadata(streamConfigMap);
+
+    MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
         new int[] { 1234, 2345 },
         new long[] { 12345L, 23456L },
         new long[] { 23456L, 34567L },
         new int[] { 0, 1 },
-        "theTopic"
+        streamKafkaTopicName
     );
-    KafkaSimpleStreamConsumer
+
+    int partition = 0;
+    KafkaSimpleStreamConsumer kafkaSimpleStreamConsumer = new KafkaSimpleStreamConsumer(streamMetadata, partition, mockKafkaSimpleConsumerFactory);
+    MessageBatch messageBatch = kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
+    System.out.println(messageBatch);
+   /* KafkaSimpleStreamConsumer
         consumerWrapper = new KafkaSimpleStreamConsumer(simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0, 10000L);
-    consumerWrapper.fetchMessages(12345L, 23456L, 10000);
+    consumerWrapper.fetchMessages(12345L, 23456L, 10000);*/
   }
 
-  @Test(enabled = false)
+  @Test
   public void testFetchOffsets() throws Exception {
-    MockKafkaSimpleConsumerFactory simpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
+    String streamType = "kafka";
+    String streamKafkaTopicName = "theTopic";
+    String streamKafkaBrokerList = "abcd:1234,bcde:2345";
+    String streamKafkaConsumerType = "simple";
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    StreamMetadata streamMetadata = new StreamMetadata(streamConfigMap);
+
+    MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
         new int[] { 1234, 2345 },
         new long[] { 12345L, 23456L },
         new long[] { 23456L, 34567L },
         new int[] { 0, 1 },
-        "theTopic"
+        streamKafkaTopicName
     );
-    KafkaSimpleStreamConsumer
+
+    int partition = 0;
+    KafkaSimpleStreamMetadataProvider kafkaSimpleStreamMetadataProvider = new KafkaSimpleStreamMetadataProvider(streamMetadata, partition, mockKafkaSimpleConsumerFactory);
+    kafkaSimpleStreamMetadataProvider.fetchPartitionOffset("smallest", 10000);
+    /*KafkaSimpleStreamConsumer
         consumerWrapper = new KafkaSimpleStreamConsumer(simpleConsumerFactory, "abcd:1234,bcde:2345", "clientId", "theTopic", 0, 10000L);
-    consumerWrapper.fetchPartitionOffset("smallest", 10000);
+    consumerWrapper.fetchPartitionOffset("smallest", 10000);*/
 
   }
 }

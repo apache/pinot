@@ -46,16 +46,16 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
    * @param streamMetadata
    * @param partition
    */
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition) {
-    super(streamMetadata, partition);
+  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+    super(streamMetadata, partition, kafkaSimpleConsumerFactory);
   }
 
   /**
    * Create a stream specific metadata provider
    * @param streamMetadata
    */
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata) {
-    super(streamMetadata);
+  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+    super(streamMetadata, kafkaSimpleConsumerFactory);
   }
 
   /**
@@ -86,7 +86,7 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
       // Send the metadata request to Kafka
       TopicMetadataResponse topicMetadataResponse = null;
       try {
-        topicMetadataResponse = _simpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(_topic)));
+        topicMetadataResponse = _kafkaSimpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(_topic)));
       } catch (Exception e) {
         _currentState.handleConsumerException(e);
         continue;
@@ -173,7 +173,7 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
           new PartitionOffsetRequestInfo(offsetRequestTime, 1)), kafka.api.OffsetRequest.CurrentVersion(), _clientId);
       OffsetResponse offsetResponse;
       try {
-        offsetResponse = _simpleConsumer.getOffsetsBefore(request);
+        offsetResponse = _kafkaSimpleConsumer.getOffsetsBefore(request);
       } catch (Exception e) {
         _currentState.handleConsumerException(e);
         continue;

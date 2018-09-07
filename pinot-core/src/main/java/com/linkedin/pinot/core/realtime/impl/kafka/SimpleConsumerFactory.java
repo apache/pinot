@@ -27,16 +27,16 @@ public class SimpleConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamConsumer createStreamConsumer(int partition) {
-    return new KafkaSimpleStreamConsumer(_streamMetadata, partition);
+    return new KafkaSimpleStreamConsumer(_streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(int partition) {
-    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, partition);
+    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
   @Override
   public StreamMetadataProvider createStreamMetadataProvider() {
-    return new KafkaSimpleStreamMetadataProvider(_streamMetadata);
+    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, new KafkaSimpleConsumerFactoryImpl());
   }
 }

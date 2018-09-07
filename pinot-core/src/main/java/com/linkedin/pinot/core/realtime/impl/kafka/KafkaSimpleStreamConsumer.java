@@ -37,8 +37,8 @@ import org.slf4j.LoggerFactory;
 public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements StreamConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamConsumer.class);
 
-  public KafkaSimpleStreamConsumer(StreamMetadata streamMetadata, int partition) {
-    super(streamMetadata, partition);
+  public KafkaSimpleStreamConsumer(StreamMetadata streamMetadata, int partition, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+    super(streamMetadata, partition, kafkaSimpleConsumerFactory);
   }
 
 
@@ -68,7 +68,7 @@ public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements
       throw new java.util.concurrent.TimeoutException();
     }
 
-    FetchResponse fetchResponse = _simpleConsumer.fetch(new FetchRequestBuilder()
+    FetchResponse fetchResponse = _kafkaSimpleConsumer.fetch(new FetchRequestBuilder()
         .minBytes(100000)
         .maxWait(timeoutMillis)
         .addFetch(_topic, _partition, startOffset, 500000)

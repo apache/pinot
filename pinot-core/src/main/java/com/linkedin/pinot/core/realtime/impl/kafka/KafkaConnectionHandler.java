@@ -66,8 +66,8 @@ public class KafkaConnectionHandler {
   String _currentHost;
   int _currentPort;
 
-  final KafkaSimpleConsumerFactory _simpleConsumerFactory;
-  SimpleConsumer _simpleConsumer;
+  final KafkaSimpleConsumerFactory _kafkaSimpleConsumerFactory;
+  SimpleConsumer _kafkaSimpleConsumer;
 
   final Random _random = new Random();
 
@@ -93,12 +93,12 @@ public class KafkaConnectionHandler {
     }
   }
 
-  public KafkaConnectionHandler(StreamMetadata streamMetadata) {
-    _simpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
+  public KafkaConnectionHandler(StreamMetadata streamMetadata, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+    _kafkaSimpleConsumerFactory = kafkaSimpleConsumerFactory;
     _clientId = KafkaConnectionHandler.class.getName() + "-" + streamMetadata.getKafkaTopicName();
     _topic = streamMetadata.getKafkaTopicName();
     _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
-    _simpleConsumer = null;
+    _kafkaSimpleConsumer = null;
 
     isPartitionProvided = false;
     _partition = Integer.MIN_VALUE;
@@ -107,12 +107,12 @@ public class KafkaConnectionHandler {
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
-  public KafkaConnectionHandler(StreamMetadata streamMetadata, int partition) {
-    _simpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
+  public KafkaConnectionHandler(StreamMetadata streamMetadata, int partition, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+    _kafkaSimpleConsumerFactory = kafkaSimpleConsumerFactory;
     _clientId = partition + "-" + NetUtil.getHostnameOrAddress();
     _topic = streamMetadata.getKafkaTopicName();
     _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
-    _simpleConsumer = null;
+    _kafkaSimpleConsumer = null;
 
     isPartitionProvided = true;
     _partition = partition;
@@ -186,9 +186,9 @@ public class KafkaConnectionHandler {
     @Override
     public void process() {
       // Connect to a random bootstrap node
-      if (_simpleConsumer != null) {
+      if (_kafkaSimpleConsumer != null) {
         try {
-          _simpleConsumer.close();
+          _kafkaSimpleConsumer.close();
         } catch (Exception e) {
           LOGGER.warn("Caught exception while closing consumer for topic {}, ignoring", _topic, e);
         }
@@ -200,7 +200,7 @@ public class KafkaConnectionHandler {
 
       try {
         LOGGER.info("Connecting to bootstrap host {}:{} for topic {}", _currentHost, _currentPort, _topic);
-        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
+        _kafkaSimpleConsumer = _kafkaSimpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
             SOCKET_BUFFER_SIZE, _clientId);
         setCurrentState(new ConnectedToBootstrapNode());
       } catch (Exception e) {
@@ -244,7 +244,7 @@ public class KafkaConnectionHandler {
       // Fetch leader information
       try {
         TopicMetadataResponse response =
-            _simpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(_topic)));
+            _kafkaSimpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(_topic)));
         try {
           _leader = null;
           List<PartitionMetadata> pMetaList = response.topicsMetadata().get(0).partitionsMetadata();
@@ -297,10 +297,10 @@ public class KafkaConnectionHandler {
       }
 
       // Disconnect from current broker
-      if (_simpleConsumer != null) {
+      if (_kafkaSimpleConsumer != null) {
         try {
-          _simpleConsumer.close();
-          _simpleConsumer = null;
+          _kafkaSimpleConsumer.close();
+          _kafkaSimpleConsumer = null;
         } catch (Exception e) {
           handleConsumerException(e);
           return;
@@ -309,8 +309,8 @@ public class KafkaConnectionHandler {
 
       // Connect to the partition leader
       try {
-        _simpleConsumer =
-            _simpleConsumerFactory.buildSimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS,
+        _kafkaSimpleConsumer =
+            _kafkaSimpleConsumerFactory.buildSimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS,
                 SOCKET_BUFFER_SIZE, _clientId);
 
         setCurrentState(new ConnectedToPartitionLeader());
@@ -393,15 +393,15 @@ public class KafkaConnectionHandler {
   }
 
   void close() throws IOException {
-    boolean needToCloseConsumer = _currentState.isConnectedToKafkaBroker() && _simpleConsumer != null;
+    boolean needToCloseConsumer = _currentState.isConnectedToKafkaBroker() && _kafkaSimpleConsumer != null;
 
     // Reset the state machine
     setCurrentState(new ConnectingToBootstrapNode());
 
     // Close the consumer if needed
     if (needToCloseConsumer) {
-      _simpleConsumer.close();
-      _simpleConsumer = null;
+      _kafkaSimpleConsumer.close();
+      _kafkaSimpleConsumer = null;
     }
   }
 }
