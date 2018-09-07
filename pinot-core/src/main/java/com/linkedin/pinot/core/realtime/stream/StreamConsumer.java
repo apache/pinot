@@ -24,5 +24,5 @@ import java.io.Closeable;
 public interface StreamConsumer extends Closeable {
 
   MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-        throws java.util.concurrent.TimeoutException;
+      throws java.util.concurrent.TimeoutException;
 }

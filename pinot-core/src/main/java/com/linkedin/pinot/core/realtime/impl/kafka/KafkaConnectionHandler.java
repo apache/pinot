@@ -107,7 +107,8 @@ public class KafkaConnectionHandler {
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
-  public KafkaConnectionHandler(StreamMetadata streamMetadata, int partition, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+  public KafkaConnectionHandler(StreamMetadata streamMetadata, int partition,
+      KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     _kafkaSimpleConsumerFactory = kafkaSimpleConsumerFactory;
     _clientId = partition + "-" + NetUtil.getHostnameOrAddress();
     _topic = streamMetadata.getKafkaTopicName();
@@ -200,8 +201,9 @@ public class KafkaConnectionHandler {
 
       try {
         LOGGER.info("Connecting to bootstrap host {}:{} for topic {}", _currentHost, _currentPort, _topic);
-        _kafkaSimpleConsumer = _kafkaSimpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
-            SOCKET_BUFFER_SIZE, _clientId);
+        _kafkaSimpleConsumer =
+            _kafkaSimpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
+                SOCKET_BUFFER_SIZE, _clientId);
         setCurrentState(new ConnectedToBootstrapNode());
       } catch (Exception e) {
         handleConsumerException(e);
