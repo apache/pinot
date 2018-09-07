@@ -62,7 +62,7 @@ import org.apache.commons.collections.MapUtils;
  *         +-----------+
  *
  *
- * This translator translates a yaml that describes the above structure
+ * This translator translates a yaml that describes the above detection flow
  * to the flowing wrapper structure to be execute in the detection pipeline.
  * +-----------------------------------------+
  * |  Rule Filter                            |

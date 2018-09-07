@@ -14,7 +14,7 @@ import org.apache.commons.collections.MapUtils;
 
 
 /**
- * The translator converts the yaml config into a detection config
+ * The YAML config translator converts the yaml config into a detection config
  */
 public abstract class YamlDetectionConfigTranslator {
   private static final String PROP_NAME = "name";
@@ -32,12 +32,12 @@ public abstract class YamlDetectionConfigTranslator {
 
   /**
    * Convert Yaml configurations into detection properties. Can be customized and override by different detection flow.
-   * @param yamlConfig
+   * @param yamlConfig yaml configuration of a detection pipeline flow type
    */
   abstract Map<String, Object> buildDetectionProperties(Map<String, Object> yamlConfig);
 
   /**
-   * Fill in common fields of detection config. Properties of the pipeline is filled by different detection flow translator.
+   * Fill in common fields of detection config. Properties of the pipeline is filled by the subclass.
    */
   DetectionConfigDTO generateDetectionConfig(Map<String, Object> yamlConfig) {
     DetectionConfigDTO config = new DetectionConfigDTO();

@@ -15,7 +15,7 @@ import java.util.Map;
 
 
 /**
- * Convert rule/algorithm/filter names to class name
+ * The static map that converts rule/algorithm/filter names to class name
  */
 public class YamlTranslatorInfoMap {
   private static final Map<String, String> YAML_INFO_MAP = ImmutableMap.<String, String>builder()

@@ -25,6 +25,13 @@ public class YamlDetectionAlertConfigTranslator {
   private static final String CRON_SCHEDULE_DEFAULT = "0 21 * * * ? *";
   private static final YamlTranslatorInfoMap YAML_TRANSLATOR_INFO_MAP = new YamlTranslatorInfoMap();
 
+  /**
+   * generate detection alerter from YAML
+   * @param alertYamlConfigs yaml configuration of the alerter
+   * @param detectionConfigIds detection config ids that should be included in the detection alerter
+   * @param existingVectorClocks vector clocks that should be kept in the new alerter
+   * @return
+   */
   public DetectionAlertConfigDTO generateDetectionAlertConfig(Map<String, Object> alertYamlConfigs,
       Collection<Long> detectionConfigIds, Map<Long, Long> existingVectorClocks) {
     DetectionAlertConfigDTO alertConfigDTO = new DetectionAlertConfigDTO();
