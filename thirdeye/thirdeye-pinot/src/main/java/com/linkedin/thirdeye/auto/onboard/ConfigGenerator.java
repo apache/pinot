@@ -16,6 +16,7 @@
 
 package com.linkedin.thirdeye.auto.onboard;
 
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 public class ConfigGenerator {
 
   private static final String PDT_TIMEZONE = "US/Pacific";
+  private static final String BYTES_STRING = "BYTES";
 
   public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema,
       Map<String, String> customConfigs) {
@@ -84,7 +86,17 @@ public class ConfigGenerator {
     metricConfigDTO.setName(metric);
     metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(dataset, metric));
     metricConfigDTO.setDataset(dataset);
-    metricConfigDTO.setDatatype(MetricType.valueOf(metricFieldSpec.getDataType().toString()));
+
+    String dataTypeStr = metricFieldSpec.getDataType().toString();
+    if (BYTES_STRING.equals(dataTypeStr)) {
+      // Assume if the column is BYTES type, use the default TDigest function and set the return data type to double
+      metricConfigDTO.setDefaultAggFunction(MetricConfigBean.DEFAULT_TDIGEST_AGG_FUNCTION);
+      metricConfigDTO.setDatatype(MetricType.DOUBLE);
+    } else {
+      MetricType dataType = MetricType.valueOf(dataTypeStr);
+      metricConfigDTO.setDatatype(dataType);
+    }
+
     return metricConfigDTO;
   }
 

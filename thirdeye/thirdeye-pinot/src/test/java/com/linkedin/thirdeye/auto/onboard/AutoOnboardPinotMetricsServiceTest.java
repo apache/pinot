@@ -22,11 +22,13 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -89,6 +91,12 @@ public class AutoOnboardPinotMetricsServiceTest {
     for (MetricConfigDTO metricConfig : metricConfigs) {
       Assert.assertTrue(schemaMetricNames.contains(metricConfig.getName()));
       metricIds.add(metricConfig.getId());
+      if (metricConfig.getName().equals("latency_tdigest")) {
+        Assert.assertEquals(metricConfig.getDefaultAggFunction(), MetricConfigBean.DEFAULT_TDIGEST_AGG_FUNCTION);
+        Assert.assertEquals(metricConfig.getDatatype(), MetricType.DOUBLE);
+      } else {
+        Assert.assertEquals(metricConfig.getDefaultAggFunction(), MetricConfigBean.DEFAULT_AGG_FUNCTION);
+      }
     }
   }
 
