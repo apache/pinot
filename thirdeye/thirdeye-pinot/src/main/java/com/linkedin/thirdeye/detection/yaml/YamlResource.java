@@ -46,6 +46,7 @@ public class YamlResource {
   /**
    Set up a detection pipeline using a YAML config
    @param payload YAML config string
+   @return a message contains the saved detection config id & detection alert id
    */
   @POST
   public Response setUpDetectionPipeline(@ApiParam("payload") String payload) throws Exception {

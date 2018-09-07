@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.anomalydetection.function.RegressionGaussianScanFunction;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -22,7 +21,6 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -83,7 +81,7 @@ public class CompositePipelineConfigTranslatorTest {
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 2);
     Assert.assertEquals(algorithmPipelineProperties.get("anomalyFunctionClassName"),
-        RegressionGaussianScanFunction.class.getName());
+        "com.linkedin.anomalydetection.function.RegressionGaussianScanFunction");
     Assert.assertEquals(algorithmPipelineProperties.get("legacyAlertFilterClassName"),
         "com.linkedin.filter.AlphaBetaLogisticAlertFilterTwoSide");
     Assert.assertEquals(algorithmPipelineProperties.get("className"), LegacyAlertFilterWrapper.class.getName());
@@ -158,7 +156,7 @@ public class CompositePipelineConfigTranslatorTest {
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 1);
     Assert.assertEquals(algorithmPipelineProperties.get("anomalyFunctionClassName"),
-        RegressionGaussianScanFunction.class.getName());
+        "com.linkedin.anomalydetection.function.RegressionGaussianScanFunction");
     Assert.assertEquals(algorithmPipelineProperties.get("legacyAlertFilterClassName"),
         "com.linkedin.filter.AlphaBetaLogisticAlertFilterTwoSide");
     Assert.assertEquals(algorithmPipelineProperties.get("className"), LegacyAlertFilterWrapper.class.getName());
@@ -189,7 +187,7 @@ public class CompositePipelineConfigTranslatorTest {
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 2);
     Assert.assertEquals(algorithmPipelineProperties.get("anomalyFunctionClassName"),
-        RegressionGaussianScanFunction.class.getName());
+        "com.linkedin.anomalydetection.function.RegressionGaussianScanFunction");
     Assert.assertEquals(algorithmPipelineProperties.get("legacyAlertFilterClassName"),
         "com.linkedin.filter.AlphaBetaLogisticAlertFilterTwoSide");
     Assert.assertEquals(algorithmPipelineProperties.get("className"), LegacyAlertFilterWrapper.class.getName());
@@ -232,7 +230,7 @@ public class CompositePipelineConfigTranslatorTest {
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 2);
     Assert.assertEquals(algorithmPipelineProperties.get("anomalyFunctionClassName"),
-        RegressionGaussianScanFunction.class.getName());
+        "com.linkedin.anomalydetection.function.RegressionGaussianScanFunction");
     Assert.assertEquals(algorithmPipelineProperties.get("className"), LegacyMergeWrapper.class.getName());
     Assert.assertEquals(MapUtils.getMap(algorithmPipelineProperties, "specs").size(), 4);
     Assert.assertEquals(ruleDetectionPipelineProperties.get("className"), DimensionWrapper.class.getName());
@@ -275,7 +273,7 @@ public class CompositePipelineConfigTranslatorTest {
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 2);
     Assert.assertEquals(algorithmPipelineProperties.get("anomalyFunctionClassName"),
-        RegressionGaussianScanFunction.class.getName());
+        "com.linkedin.anomalydetection.function.RegressionGaussianScanFunction");
     Assert.assertEquals(algorithmPipelineProperties.get("legacyAlertFilterClassName"),
         "com.linkedin.filter.AlphaBetaLogisticAlertFilterTwoSide");
     Assert.assertEquals(MapUtils.getMap(algorithmPipelineProperties, "specs").size(), 5);

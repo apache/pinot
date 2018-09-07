@@ -33,6 +33,7 @@ public abstract class YamlDetectionConfigTranslator {
   /**
    * Convert Yaml configurations into detection properties. Can be customized and override by different detection flow.
    * @param yamlConfig yaml configuration of a detection pipeline flow type
+   * @return properties of the detection pipeline
    */
   abstract Map<String, Object> buildDetectionProperties(Map<String, Object> yamlConfig);
 

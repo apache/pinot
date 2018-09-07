@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -43,4 +44,8 @@ public class YamlDetectionConfigTranslatorTest {
     this.metricDAO = daoRegistry.getMetricConfigDAO();
   }
 
+  @AfterMethod
+  public void tearDown() {
+    this.testDAOProvider.cleanup();
+  }
 }

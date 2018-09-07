@@ -30,7 +30,7 @@ public class YamlDetectionAlertConfigTranslator {
    * @param alertYamlConfigs yaml configuration of the alerter
    * @param detectionConfigIds detection config ids that should be included in the detection alerter
    * @param existingVectorClocks vector clocks that should be kept in the new alerter
-   * @return
+   * @return a detection alert config
    */
   public DetectionAlertConfigDTO generateDetectionAlertConfig(Map<String, Object> alertYamlConfigs,
       Collection<Long> detectionConfigIds, Map<Long, Long> existingVectorClocks) {
