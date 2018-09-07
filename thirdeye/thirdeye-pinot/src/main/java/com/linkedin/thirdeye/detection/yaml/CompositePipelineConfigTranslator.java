@@ -1,11 +1,16 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.algorithm.LegacyAlertFilterWrapper;
 import com.linkedin.thirdeye.detection.algorithm.LegacyMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -90,6 +95,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_RULE_DETECTION = "ruleDetection";
   private static final String PROP_RULE_FILTER = "ruleFilter";
   private static final String PROP_DIMENSION_FILTER = "dimensionFilter";
+  private static final String PROP_FILTERS = "filters";
+  private static final String PROP_METRIC = "metric";
+  private static final String PROP_DATASET = "dataset";
 
   private static final String PROP_TYPE = "type";
   private static final String PROP_CLASS_NAME = "className";
@@ -103,7 +111,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final YamlTranslatorInfoMap YAML_TRANSLATOR_INFO_MAP = new YamlTranslatorInfoMap();
 
   @Override
-  Map<String, Object> buildDetectionProperties(String metricUrn, Map<String, Object> yamlConfig) {
+  Map<String, Object> buildDetectionProperties(Map<String, Object> yamlConfig) {
+    Preconditions.checkArgument(yamlConfig.containsKey(PROP_METRIC), "Property missing " + PROP_METRIC);
+    Preconditions.checkArgument(yamlConfig.containsKey(PROP_DATASET), "Property missing " + PROP_DATASET);
+    String metricUrn = generateMetricUrn(yamlConfig);
+
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, MergeWrapper.class.getName());
     properties.put(PROP_NESTED, new ArrayList<>());
@@ -176,5 +188,22 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         properties.put(entry.getKey(), entry.getValue());
       }
     }
+  }
+
+  private String generateMetricUrn(Map<String, Object> yamlConfig) {
+    Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
+
+    Multimap<String, String> filters = ArrayListMultimap.create();
+    if (filterMaps != null) {
+      for (Map.Entry<String, Collection<String>> entry : filterMaps.entrySet()) {
+        filters.putAll(entry.getKey(), entry.getValue());
+      }
+    }
+    MetricConfigDTO metricConfig = this.metricDAO.findByMetricAndDataset(MapUtils.getString(yamlConfig, PROP_METRIC),
+        MapUtils.getString(yamlConfig, PROP_DATASET));
+    Preconditions.checkNotNull(metricConfig, "Metric not found");
+
+    MetricEntity me = MetricEntity.fromMetric(1.0, metricConfig.getId(), filters);
+    return me.getUrn();
   }
 }

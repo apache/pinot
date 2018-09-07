@@ -18,16 +18,13 @@ import org.apache.commons.collections.MapUtils;
  */
 public abstract class YamlDetectionConfigTranslator {
   private static final String PROP_NAME = "name";
-  private static final String PROP_METRIC = "metric";
-  private static final String PROP_DATASET = "dataset";
   private static final String PROP_CRON = "cron";
-  private static final String PROP_FILTERS = "filters";
 
   private static final String CRON_SCHEDULE_DEFAULT = "0 0 14 * * ? *";
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private MetricConfigManager metricDAO;
+  MetricConfigManager metricDAO;
 
   public YamlDetectionConfigTranslator() {
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
@@ -35,8 +32,9 @@ public abstract class YamlDetectionConfigTranslator {
 
   /**
    * Convert Yaml configurations into detection properties. Can be customized and override by different detection flow.
+   * @param yamlConfig
    */
-  abstract Map<String, Object> buildDetectionProperties(String metricUrn, Map<String, Object> yamlConfig);
+  abstract Map<String, Object> buildDetectionProperties(Map<String, Object> yamlConfig);
 
   /**
    * Fill in common fields of detection config. Properties of the pipeline is filled by different detection flow translator.
@@ -45,30 +43,13 @@ public abstract class YamlDetectionConfigTranslator {
     DetectionConfigDTO config = new DetectionConfigDTO();
 
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "Property missing " + PROP_NAME);
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_METRIC), "Property missing " + PROP_METRIC);
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_DATASET), "Property missing " + PROP_DATASET);
 
     config.setName(MapUtils.getString(yamlConfig, PROP_NAME));
     config.setCron(MapUtils.getString(yamlConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     config.setLastTimestamp(System.currentTimeMillis());
     config.setActive(true);
 
-    Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
-
-    Multimap<String, String> filters = ArrayListMultimap.create();
-    if (filterMaps != null) {
-      for (Map.Entry<String, Collection<String>> entry : filterMaps.entrySet()) {
-        filters.putAll(entry.getKey(), entry.getValue());
-      }
-    }
-    MetricConfigDTO metricConfig = this.metricDAO.findByMetricAndDataset(MapUtils.getString(yamlConfig, PROP_METRIC),
-        MapUtils.getString(yamlConfig, PROP_DATASET));
-    Preconditions.checkNotNull(metricConfig, "Metric not found");
-
-    MetricEntity me = MetricEntity.fromMetric(1.0, metricConfig.getId(), filters);
-    String metricUrn = me.getUrn();
-
-    config.setProperties(buildDetectionProperties(metricUrn, yamlConfig));
+    config.setProperties(buildDetectionProperties(yamlConfig));
     return config;
   }
 }
