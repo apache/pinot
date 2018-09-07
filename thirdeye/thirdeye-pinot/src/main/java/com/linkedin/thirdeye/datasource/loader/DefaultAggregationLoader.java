@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.dashboard.resources.v2.aggregation;
+package com.linkedin.thirdeye.datasource.loader;
 
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -59,7 +59,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
     dimensions.removeAll(slice.getFilters().keySet());
     dimensions.remove(dataset.getTimeColumn());
 
-    LOG.info("Aggregating metric id {} with {} filters for dimensions {}", metricId, slice.getFilters().size(), dimensions);
+    LOG.info("De-Aggregating '{}' for dimensions '{}'", slice, dimensions);
 
     DataFrame dfAll = DataFrame
         .builder(COL_DIMENSION_NAME + ":STRING", COL_DIMENSION_VALUE + ":STRING", COL_VALUE + ":DOUBLE").build()
@@ -110,7 +110,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
       throw new IllegalArgumentException(String.format("Could not resolve dataset '%s'", metric.getDataset()));
     }
 
-    LOG.info("Summarizing metric id {} with {} filters", metricId, slice.getFilters().size());
+    LOG.info("Aggregating '{}'", slice);
 
     List<String> cols = new ArrayList<>();
     for (String dimName : dimensions) {

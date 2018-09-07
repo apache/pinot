@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.dashboard.resources.v2.timeseries;
+package com.linkedin.thirdeye.datasource.loader;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
@@ -29,13 +29,12 @@ public class DefaultTimeSeriesLoader implements TimeSeriesLoader {
    * Default implementation using metricDAO, datasetDAO, and QueryCache
    *
    * @param slice metric slice to fetch
-   * @return Dataframe with timestamps and metric values
+   * @return DataFrame with timestamps and metric values
    * @throws Exception
    */
   @Override
   public DataFrame load(MetricSlice slice) throws Exception {
-    LOG.info("Loading timeseries for metric id {} time range {}:{} with filters '{}' and granularity {}",
-        slice.getMetricId(), slice.getStart(), slice.getEnd(), slice.getFilters(), slice.getGranularity());
+    LOG.info("Loading time series for '{}'", slice);
 
     TimeSeriesRequestContainer rc = DataFrameUtils.makeTimeSeriesRequestAligned(slice, "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse response = this.cache.getQueryResult(rc.getRequest());
