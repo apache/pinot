@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.detection.algorithm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
@@ -16,6 +15,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -23,12 +23,14 @@ import org.apache.commons.collections.MapUtils;
  */
 public class LegacyDimensionWrapper extends DimensionWrapper {
   private static final String PROP_METRIC_URN = "metricUrn";
+  private static final String PROP_LOOKBACK = "lookback";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_SPEC = "specs";
   private static final String PROP_ANOMALY_FUNCTION_CLASS = "anomalyFunctionClassName";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  public static final String SPEC_METRIC_ID = "metricId";
-  public static final String SPEC_FILTERS = "filters";
+
+  private static final String SPEC_METRIC_ID = "metricId";
+  private static final String SPEC_FILTERS = "filters";
 
   private final BaseAnomalyFunction anomalyFunction;
   private final Map<String, Object> anomalyFunctionSpecs;
@@ -52,7 +54,7 @@ public class LegacyDimensionWrapper extends DimensionWrapper {
 
     String specs = OBJECT_MAPPER.writeValueAsString(this.anomalyFunctionSpecs);
     this.anomalyFunction.init(OBJECT_MAPPER.readValue(specs, AnomalyFunctionDTO.class));
-    if (this.anomalyFunction.getSpec().getExploreDimensions() != null) {
+    if (!StringUtils.isBlank(this.anomalyFunction.getSpec().getExploreDimensions())) {
       this.dimensions.add(this.anomalyFunction.getSpec().getExploreDimensions());
     }
 
@@ -94,6 +96,10 @@ public class LegacyDimensionWrapper extends DimensionWrapper {
       long metricId = MapUtils.getLongValue(spec, SPEC_METRIC_ID);
       Multimap<String, String> filters = ThirdEyeUtils.getFilterSet(MapUtils.getString(spec, SPEC_FILTERS));
       properties.put(PROP_METRIC_URN,MetricEntity.fromMetric(1.0, metricId, filters).getUrn());
+    }
+
+    if (!properties.containsKey(PROP_LOOKBACK)) {
+      properties.put(PROP_LOOKBACK, "0");
     }
 
     return properties;
