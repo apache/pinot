@@ -276,7 +276,7 @@ export default Route.extend({
           id: metricId,
           filters: config.filters,
           granularity: config.bucketUnit,
-          dimension: config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
+          dimension: 'All' // NOTE: avoid dimension explosion - config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
         })});
       })
       // Catch is not mandatory here due to our error action, but left it to add more context

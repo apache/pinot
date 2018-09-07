@@ -281,7 +281,7 @@ export default Controller.extend({
     } = this.getProperties('maxTime', 'selectedFilters', 'selectedDimension', 'selectedGranularity', 'selectedMetricOption');
 
     // Use key properties to derive the metric data url
-    const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension, granularity, id: metric.id });
+    const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension: 'All', granularity, id: metric.id }); // NOTE: avoid dimension explosion - dimension
 
     // Fetch new graph metric data
     // TODO: const metricData = await fetch(metricUrl).then(checkStatus)
