@@ -36,12 +36,9 @@ import com.linkedin.pinot.core.transport.ServerResponse;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -50,13 +47,11 @@ import org.slf4j.LoggerFactory;
  */
 @ThreadSafe
 public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandler {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SingleConnectionBrokerRequestHandler.class);
-
   private final QueryRouter _queryRouter;
 
-  public SingleConnectionBrokerRequestHandler(@Nonnull Configuration config, @Nonnull RoutingTable routingTable,
-      @Nonnull TimeBoundaryService timeBoundaryService, @Nonnull AccessControlFactory accessControlFactory,
-      @Nonnull TableQueryQuotaManager tableQueryQuotaManager, @Nonnull BrokerMetrics brokerMetrics) {
+  public SingleConnectionBrokerRequestHandler(Configuration config, RoutingTable routingTable,
+      TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
+      TableQueryQuotaManager tableQueryQuotaManager, BrokerMetrics brokerMetrics) {
     super(config, routingTable, timeBoundaryService, accessControlFactory, tableQueryQuotaManager, brokerMetrics);
     _queryRouter = new QueryRouter(_brokerId, brokerMetrics);
   }
@@ -70,12 +65,11 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     _queryRouter.shutDown();
   }
 
-  @Nonnull
   @Override
-  protected BrokerResponse processBrokerRequest(long requestId, @Nonnull BrokerRequest originalBrokerRequest,
+  protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs) throws Exception {
+      long timeoutMs, ServerStats serverStats) throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
@@ -86,6 +80,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     Map<Server, ServerResponse> response = asyncQueryResponse.getResponse();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);
+    serverStats.setServerStats(asyncQueryResponse.getStats());
 
     // TODO: do not convert Server to ServerInstance
     int numServersQueried = response.size();
@@ -122,7 +117,6 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     }
     _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalResponseSize);
 
-    LOGGER.info("Request {} response stats: {}", requestId, asyncQueryResponse.getStats());
     return brokerResponse;
   }
 }
