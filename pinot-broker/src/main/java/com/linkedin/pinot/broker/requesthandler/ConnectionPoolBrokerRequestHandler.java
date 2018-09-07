@@ -59,7 +59,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
@@ -84,10 +83,10 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
   private final KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> _connPool;
   private final ScatterGather _scatterGather;
 
-  public ConnectionPoolBrokerRequestHandler(@Nonnull Configuration config, @Nonnull RoutingTable routingTable,
-      @Nonnull TimeBoundaryService timeBoundaryService, @Nonnull AccessControlFactory accessControlFactory,
-      @Nonnull TableQueryQuotaManager tableQueryQuotaManager, @Nonnull BrokerMetrics brokerMetrics,
-      @Nonnull LiveInstancesChangeListenerImpl liveInstanceChangeListener, @Nonnull MetricsRegistry metricsRegistry) {
+  public ConnectionPoolBrokerRequestHandler(Configuration config, RoutingTable routingTable,
+      TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
+      TableQueryQuotaManager tableQueryQuotaManager, BrokerMetrics brokerMetrics,
+      LiveInstancesChangeListenerImpl liveInstanceChangeListener, MetricsRegistry metricsRegistry) {
     super(config, routingTable, timeBoundaryService, accessControlFactory, tableQueryQuotaManager, brokerMetrics);
     _liveInstanceChangeListener = liveInstanceChangeListener;
 
@@ -128,12 +127,11 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
     _eventLoopGroup.shutdownGracefully();
   }
 
-  @Nonnull
   @Override
-  protected BrokerResponse processBrokerRequest(long requestId, @Nonnull BrokerRequest originalBrokerRequest,
+  protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs) throws Exception {
+      long timeoutMs, ServerStats serverStats) throws Exception {
     ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
     PhaseTimes phaseTimes = new PhaseTimes();
 
@@ -181,6 +179,7 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
     }
     long gatherEndTimeNs = System.nanoTime();
     phaseTimes.addToGatherTime(gatherEndTimeNs - gatherStartTimeNs);
+    serverStats.setServerStats(scatterGatherStats.toString());
 
     //Step 3: deserialize the server responses
     int numServersResponded = 0;
@@ -224,7 +223,6 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
     _brokerMetrics.addMeteredQueryValue(originalBrokerRequest, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
         totalServerResponseSize);
 
-    LOGGER.info("Request {} ScatterGatherStats: {}", requestId, scatterGatherStats);
     return brokerResponse;
   }
 
@@ -233,9 +231,9 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
    *
    * @return composite future used to gather responses.
    */
-  private CompositeFuture<byte[]> scatterBrokerRequest(long requestId, @Nonnull BrokerRequest brokerRequest,
-      @Nonnull Map<String, List<String>> routingTable, boolean isOfflineTable, long timeoutMs,
-      @Nonnull ScatterGatherStats scatterGatherStats, @Nonnull PhaseTimes phaseTimes) throws InterruptedException {
+  private CompositeFuture<byte[]> scatterBrokerRequest(long requestId, BrokerRequest brokerRequest,
+      Map<String, List<String>> routingTable, boolean isOfflineTable, long timeoutMs,
+      ScatterGatherStats scatterGatherStats, PhaseTimes phaseTimes) throws InterruptedException {
     long scatterStartTimeNs = System.nanoTime();
     ScatterGatherRequest scatterRequest =
         new ScatterGatherRequestImpl(brokerRequest, routingTable, requestId, timeoutMs, _brokerId);
@@ -255,9 +253,9 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
    * @param processingExceptions list of processing exceptions.
    * @return server response map.
    */
-  private Map<ServerInstance, byte[]> gatherServerResponses(@Nonnull CompositeFuture<byte[]> compositeFuture,
-      @Nonnull ScatterGatherStats scatterGatherStats, boolean isOfflineTable, @Nonnull String tableNameWithType,
-      @Nonnull List<ProcessingException> processingExceptions) {
+  private Map<ServerInstance, byte[]> gatherServerResponses(CompositeFuture<byte[]> compositeFuture,
+      ScatterGatherStats scatterGatherStats, boolean isOfflineTable, String tableNameWithType,
+      List<ProcessingException> processingExceptions) {
     try {
       Map<ServerInstance, byte[]> serverResponseMap = compositeFuture.get();
       Iterator<Entry<ServerInstance, byte[]>> iterator = serverResponseMap.entrySet().iterator();
@@ -293,9 +291,9 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
    * @param processingExceptions list of processing exceptions.
    * @return total server response size.
    */
-  private long deserializeServerResponses(@Nonnull Map<ServerInstance, byte[]> responseMap, boolean isOfflineTable,
-      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull String tableNameWithType,
-      @Nonnull List<ProcessingException> processingExceptions) {
+  private long deserializeServerResponses(Map<ServerInstance, byte[]> responseMap, boolean isOfflineTable,
+      Map<ServerInstance, DataTable> dataTableMap, String tableNameWithType,
+      List<ProcessingException> processingExceptions) {
     long totalResponseSize = 0L;
     for (Entry<ServerInstance, byte[]> entry : responseMap.entrySet()) {
       ServerInstance serverInstance = entry.getKey();

@@ -17,7 +17,6 @@ package com.linkedin.pinot.broker.requesthandler;
 
 import com.linkedin.pinot.broker.api.RequesterIdentity;
 import com.linkedin.pinot.common.response.BrokerResponse;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.json.JSONObject;
@@ -30,7 +29,5 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
-  @Nonnull
-  BrokerResponse handleRequest(@Nonnull JSONObject request, @Nullable RequesterIdentity requesterIdentity)
-      throws Exception;
+  BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity) throws Exception;
 }

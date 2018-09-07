@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
@@ -77,9 +76,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final int _queryResponseLimit;
   protected final int _queryLogLength;
 
-  public BaseBrokerRequestHandler(@Nonnull Configuration config, @Nonnull RoutingTable routingTable,
-      @Nonnull TimeBoundaryService timeBoundaryService, @Nonnull AccessControlFactory accessControlFactory,
-      @Nonnull TableQueryQuotaManager tableQueryQuotaManager, @Nonnull BrokerMetrics brokerMetrics) {
+  public BaseBrokerRequestHandler(Configuration config, RoutingTable routingTable,
+      TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
+      TableQueryQuotaManager tableQueryQuotaManager, BrokerMetrics brokerMetrics) {
     _config = config;
     _routingTable = routingTable;
     _timeBoundaryService = timeBoundaryService;
@@ -105,9 +104,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
   }
 
-  @Nonnull
   @Override
-  public BrokerResponse handleRequest(@Nonnull JSONObject request, @Nullable RequesterIdentity requesterIdentity)
+  public BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     String query = request.getString(PQL);
@@ -254,9 +252,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Execute the query
     long remainingTimeMs = _brokerTimeoutMs - TimeUnit.NANOSECONDS.toMillis(routingEndTimeNs - compilationStartTimeNs);
+    ServerStats serverStats = new ServerStats();
     BrokerResponse brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs);
+            realtimeRoutingTable, remainingTimeMs, serverStats);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
@@ -267,11 +266,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
     // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
-    LOGGER.info("Request {}:{}, time:{}ms, docs:{}/{}, entries:{}/{}, servers:{}/{}, exceptions:{}, query:{}",
+    LOGGER.info(
+        "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, servers:{}/{}, exceptions:{}, serverStats:{}, query:{}",
         requestId, brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
         brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
         brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumServersResponded(),
-        brokerResponse.getNumServersQueried(), brokerResponse.getExceptionsSize(),
+        brokerResponse.getNumServersQueried(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
         StringUtils.substring(query, 0, _queryLogLength));
 
     return brokerResponse;
@@ -286,7 +286,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    *   <li>Value for 'LIMIT' for selection query <= configured value</li>
    * </ul>
    */
-  private void validateRequest(@Nonnull BrokerRequest brokerRequest) {
+  private void validateRequest(BrokerRequest brokerRequest) {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         long topN = brokerRequest.getGroupBy().getTopN();
@@ -308,7 +308,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Helper method to get the time column name for the OFFLINE table name from the time boundary service, or
    * <code>null</code> if the time boundary service does not have the information.
    */
-  private String getTimeColumnName(@Nonnull String offlineTableName) {
+  private String getTimeColumnName(String offlineTableName) {
     TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo =
         _timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName);
     return (timeBoundaryInfo != null) ? timeBoundaryInfo.getTimeColumn() : null;
@@ -318,7 +318,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Helper method to create an OFFLINE broker request from the given hybrid broker request.
    * <p>This step will attach the time boundary to the request.
    */
-  private BrokerRequest getOfflineBrokerRequest(@Nonnull BrokerRequest hybridBrokerRequest) {
+  private BrokerRequest getOfflineBrokerRequest(BrokerRequest hybridBrokerRequest) {
     BrokerRequest offlineRequest = hybridBrokerRequest.deepCopy();
     String rawTableName = hybridBrokerRequest.getQuerySource().getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -331,7 +331,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Helper method to create a REALTIME broker request from the given hybrid broker request.
    * <p>This step will attach the time boundary to the request.
    */
-  private BrokerRequest getRealtimeBrokerRequest(@Nonnull BrokerRequest hybridBrokerRequest) {
+  private BrokerRequest getRealtimeBrokerRequest(BrokerRequest hybridBrokerRequest) {
     BrokerRequest realtimeRequest = hybridBrokerRequest.deepCopy();
     String rawTableName = hybridBrokerRequest.getQuerySource().getTableName();
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
@@ -343,8 +343,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Helper method to attach time boundary to a broker request.
    */
-  private void attachTimeBoundary(@Nonnull String rawTableName, @Nonnull BrokerRequest brokerRequest,
-      boolean isOfflineRequest) {
+  private void attachTimeBoundary(String rawTableName, BrokerRequest brokerRequest, boolean isOfflineRequest) {
     TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo =
         _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
     if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null
@@ -392,9 +391,23 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Processes the optimized broker requests for both OFFLINE and REALTIME table.
    */
-  @Nonnull
-  protected abstract BrokerResponse processBrokerRequest(long requestId, @Nonnull BrokerRequest originalBrokerRequest,
+  protected abstract BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs) throws Exception;
+      long timeoutMs, ServerStats serverStats) throws Exception;
+
+  /**
+   * Helper class to pass the per server statistics.
+   */
+  protected static class ServerStats {
+    private String _serverStats;
+
+    public void setServerStats(String serverStats) {
+      _serverStats = serverStats;
+    }
+
+    public String getServerStats() {
+      return _serverStats;
+    }
+  }
 }
