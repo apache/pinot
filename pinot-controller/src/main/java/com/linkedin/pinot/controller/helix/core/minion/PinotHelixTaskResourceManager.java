@@ -138,7 +138,8 @@ public class PinotHelixTaskResourceManager {
   public synchronized void deleteTaskQueue(@Nonnull String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Deleting task queue: {} for task type: {}", helixJobQueueName, taskType);
-    _taskDriver.delete(helixJobQueueName);
+    // NOTE: set force delete to true to remove the task queue from ZooKeeper immediately
+    _taskDriver.delete(helixJobQueueName, true);
   }
 
   /**
