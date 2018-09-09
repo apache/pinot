@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
@@ -86,7 +87,7 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
+  public void fetchSegmentToLocal(final URI uri, final File tempFile) throws Exception {
     LOGGER.debug("starting to fetch segment from hdfs");
     final String dstFilePath = tempFile.getAbsolutePath();
     try {

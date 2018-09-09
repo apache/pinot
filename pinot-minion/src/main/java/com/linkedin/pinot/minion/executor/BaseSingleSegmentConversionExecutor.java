@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.common.MinionConstants;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import java.io.File;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -73,12 +74,12 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
-    String downloadURL = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
+    URI downloadURI = new URI(configs.get(MinionConstants.DOWNLOAD_URL_KEY));
     String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
     String originalSegmentCrc = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
 
     LOGGER.info("Start executing {} on table: {}, segment: {} with downloadURL: {}, uploadURL: {}", taskType,
-        tableNameWithType, segmentName, downloadURL, uploadURL);
+        tableNameWithType, segmentName, downloadURI.getPath(), uploadURL);
 
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + System.nanoTime());
     Preconditions.checkState(tempDataDir.mkdirs());
@@ -86,8 +87,8 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // Download the tarred segment file
       File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile");
       SegmentFetcherFactory.getInstance()
-          .getSegmentFetcherBasedOnURI(downloadURL)
-          .fetchSegmentToLocal(downloadURL, tarredSegmentFile);
+          .getSegmentFetcherBasedOnURI(downloadURI)
+          .fetchSegmentToLocal(downloadURI, tarredSegmentFile);
 
       // Un-tar the segment file
       File segmentDir = new File(tempDataDir, "segmentDir");

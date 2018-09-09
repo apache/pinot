@@ -84,8 +84,8 @@ public class SegmentFetcherFactory {
     return _segmentFetcherMap.containsKey(protocol);
   }
 
-  public SegmentFetcher getSegmentFetcherBasedOnURI(String uri) throws URISyntaxException {
-    String protocol = new URI(uri).getScheme();
+  public SegmentFetcher getSegmentFetcherBasedOnURI(URI uri) throws URISyntaxException {
+    String protocol = uri.getScheme();
     return _segmentFetcherMap.get(protocol);
   }
 

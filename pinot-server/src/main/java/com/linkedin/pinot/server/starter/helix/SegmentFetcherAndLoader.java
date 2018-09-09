@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
+import java.net.URI;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -134,7 +135,7 @@ public class SegmentFetcherAndLoader {
         } else {
           LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentName, tableNameWithType);
         }
-        String uri = newSegmentZKMetadata.getDownloadUrl();
+        URI uri = new URI(newSegmentZKMetadata.getDownloadUrl());
         // Retry will be done here.
         String localSegmentDir = downloadSegmentToLocal(uri, tableNameWithType, segmentName);
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
@@ -172,7 +173,7 @@ public class SegmentFetcherAndLoader {
   }
 
   @Nonnull
-  private String downloadSegmentToLocal(@Nonnull String uri, @Nonnull String tableName, @Nonnull String segmentName)
+  private String downloadSegmentToLocal(@Nonnull URI uri, @Nonnull String tableName, @Nonnull String segmentName)
       throws Exception {
     File tempDir = new File(new File(_instanceDataManager.getSegmentFileDirectory(), tableName),
         "tmp_" + segmentName + "_" + System.nanoTime());

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import java.io.File;
+import java.net.URI;
 import java.util.Collections;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
@@ -34,7 +35,7 @@ public class NoOpFetcher implements SegmentFetcher {
   }
 
   @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) {
+  public void fetchSegmentToLocal(URI uri, File tempFile) {
     throw new RuntimeException("NoOpFetcher cannot fetch any segments");
   }
 

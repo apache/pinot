@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import java.net.URI;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 
@@ -25,7 +26,7 @@ public interface SegmentFetcher {
 
   void init(Configuration configs);
 
-  void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
+  void fetchSegmentToLocal(URI uri, File tempFile) throws Exception;
 
   /**
    * Returns a list of config keys whose value should not be logged.

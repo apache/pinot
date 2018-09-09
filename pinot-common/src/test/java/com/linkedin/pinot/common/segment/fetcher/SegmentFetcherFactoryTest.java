@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.segment.fetcher;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -61,7 +62,7 @@ public class SegmentFetcherFactoryTest {
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("http"));
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("https"));
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("test"));
-    SegmentFetcher testSegmentFetcher = _segmentFetcherFactory.getSegmentFetcherBasedOnURI("test://something");
+    SegmentFetcher testSegmentFetcher = _segmentFetcherFactory.getSegmentFetcherBasedOnURI(new URI("test://something"));
     Assert.assertTrue(testSegmentFetcher instanceof TestSegmentFetcher);
     Assert.assertEquals(((TestSegmentFetcher) testSegmentFetcher).getInitCalled(), 1);
   }
@@ -71,14 +72,14 @@ public class SegmentFetcherFactoryTest {
     _segmentFetcherFactory.init(new PropertiesConfiguration(), new PropertiesConfiguration());
 
     Assert.assertTrue(
-        _segmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
+        _segmentFetcherFactory.getSegmentFetcherBasedOnURI(new URI("http://something:wer")) instanceof HttpSegmentFetcher);
     Assert.assertTrue(_segmentFetcherFactory.getSegmentFetcherBasedOnURI(
-        "file://a/asdf/wer/fd/e") instanceof PinotFSSegmentFetcher);
+        new URI("file://a/asdf/wer/fd/e")) instanceof PinotFSSegmentFetcher);
 
-    Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
-    Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("https://something"));
+    Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI(new URI("abc:///something")));
+    Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI(new URI("https://something")));
     try {
-      _segmentFetcherFactory.getSegmentFetcherBasedOnURI("https:");
+      _segmentFetcherFactory.getSegmentFetcherBasedOnURI(new URI("https:"));
       Assert.fail();
     } catch (URISyntaxException e) {
       // Expected
@@ -98,7 +99,7 @@ public class SegmentFetcherFactoryTest {
     }
 
     @Override
-    public void fetchSegmentToLocal(String uri, File tempFile) {
+    public void fetchSegmentToLocal(URI uri, File tempFile) {
     }
 
     @Override
