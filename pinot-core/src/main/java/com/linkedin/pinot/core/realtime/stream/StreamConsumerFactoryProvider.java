@@ -15,22 +15,23 @@
  */
 package com.linkedin.pinot.core.realtime.stream;
 
-import java.io.Closeable;
+import com.linkedin.pinot.common.Utils;
 
 
 /**
- * Interface that allows us to plugin different Kafka consumers. The default implementation is KafkaSimpleStreamConsumer.
+ * Constructs the {@link StreamConsumerFactory} from the {@link StreamMetadata::getConsumerFactoryName()} property and initializes it
  */
-public interface StreamConsumer extends Closeable {
+public abstract class StreamConsumerFactoryProvider {
 
-  /**
-   * Fetch messages from the stream between the specified offsets
-   * @param startOffset
-   * @param endOffset
-   * @param timeoutMillis
-   * @return
-   * @throws java.util.concurrent.TimeoutException
-   */
-  MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws java.util.concurrent.TimeoutException;
+  public static StreamConsumerFactory create(StreamMetadata streamMetadata) {
+    StreamConsumerFactory factory = null;
+    try {
+      factory = (StreamConsumerFactory) Class.forName(streamMetadata.getConsumerFactoryName()).newInstance();
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+    factory.init(streamMetadata);
+    return factory;
+  }
+
 }

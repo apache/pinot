@@ -49,6 +49,7 @@ import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
@@ -988,8 +989,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _streamMetadata = new StreamMetadata(indexingConfig.getStreamConfigs());
-    _streamConsumerFactory = StreamConsumerFactory.create(_streamMetadata);
-    _streamConsumerFactory.init(_streamMetadata);
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     _streamBootstrapNodes = indexingConfig.getStreamConfigs()

@@ -15,24 +15,16 @@
  */
 package com.linkedin.pinot.core.realtime.stream;
 
-import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 
 
+/**
+ * Factory for a stream which provides consumer and metadata provider
+ */
 public abstract class StreamConsumerFactory {
   protected StreamMetadata _streamMetadata;
 
-  public static StreamConsumerFactory create(StreamMetadata streamMetadata) {
-    StreamConsumerFactory factory = null;
-    try {
-      factory = (StreamConsumerFactory) Class.forName(streamMetadata.getConsumerFactoryName()).newInstance();
-    } catch (Exception e) {
-      Utils.rethrowException(e);
-    }
-    return factory;
-  }
-
-  public void init(StreamMetadata streamMetadata) {
+  void init(StreamMetadata streamMetadata) {
     _streamMetadata = streamMetadata;
   }
 

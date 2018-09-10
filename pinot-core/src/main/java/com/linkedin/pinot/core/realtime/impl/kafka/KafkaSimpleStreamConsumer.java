@@ -37,10 +37,10 @@ import org.slf4j.LoggerFactory;
 public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements StreamConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamConsumer.class);
 
-  public KafkaSimpleStreamConsumer(StreamMetadata streamMetadata, int partition, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+  public KafkaSimpleStreamConsumer(StreamMetadata streamMetadata, int partition,
+      KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(streamMetadata, partition, kafkaSimpleConsumerFactory);
   }
-
 
   /**
    * Fetch messages and the per-partition high watermark from Kafka between the specified offsets.
@@ -54,22 +54,23 @@ public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements
    * this partition.
    */
   @Override
-  public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(isPartitionProvided, "Cannot fetch messages from a metadata-only KafkaSimpleStreamConsumer");
+  public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
+      throws java.util.concurrent.TimeoutException {
+    Preconditions.checkState(isPartitionProvided,
+        "Cannot fetch messages from a metadata-only KafkaSimpleStreamConsumer");
     // TODO Improve error handling
 
     final long connectEndTime = System.currentTimeMillis() + _connectTimeoutMillis;
-    while(_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-        System.currentTimeMillis() < connectEndTime) {
+    while (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER
+        && System.currentTimeMillis() < connectEndTime) {
       _currentState.process();
     }
-    if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-        connectEndTime <= System.currentTimeMillis()) {
+    if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER
+        && connectEndTime <= System.currentTimeMillis()) {
       throw new java.util.concurrent.TimeoutException();
     }
 
-    FetchResponse fetchResponse = _kafkaSimpleConsumer.fetch(new FetchRequestBuilder()
-        .minBytes(100000)
+    FetchResponse fetchResponse = _kafkaSimpleConsumer.fetch(new FetchRequestBuilder().minBytes(100000)
         .maxWait(timeoutMillis)
         .addFetch(_topic, _partition, startOffset, 500000)
         .build());
@@ -85,18 +86,19 @@ public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements
     }
   }
 
-  private Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets, final long startOffset, final long endOffset) {
+  private Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets,
+      final long startOffset, final long endOffset) {
     return Iterables.filter(messageAndOffsets, new Predicate<MessageAndOffset>() {
       @Override
       public boolean apply(@Nullable MessageAndOffset input) {
         // Filter messages that are either null or have an offset ∉ [startOffset; endOffset[
-        if(input == null || input.offset() < startOffset || (endOffset <= input.offset() && endOffset != -1)) {
+        if (input == null || input.offset() < startOffset || (endOffset <= input.offset() && endOffset != -1)) {
           return false;
         }
 
         // Check the message's checksum
         // TODO We might want to have better handling of this situation, maybe try to fetch the message again?
-        if(!input.message().isValid()) {
+        if (!input.message().isValid()) {
           LOGGER.warn("Discarded message with invalid checksum in partition {} of topic {}", _partition, _topic);
           return false;
         }
@@ -109,8 +111,7 @@ public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements
   @Override
   /**
    * Closes this consumer.
-   */
-  public void close() throws IOException {
+   */ public void close() throws IOException {
     super.close();
   }
 }

@@ -21,7 +21,7 @@ import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 
 
 /**
- * A StreamConsumerFactory implementation for Kafka's Simple Consumer
+ * A {@link StreamConsumerFactory} implementation for Kafka's Simple Consumer
  */
 public class SimpleConsumerFactory extends StreamConsumerFactory {
 

@@ -46,7 +46,8 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
    * @param streamMetadata
    * @param partition
    */
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition,
+      KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(streamMetadata, partition, kafkaSimpleConsumerFactory);
   }
 
@@ -54,7 +55,8 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
    * Create a stream specific metadata provider
    * @param streamMetadata
    */
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata,
+      KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(streamMetadata, kafkaSimpleConsumerFactory);
   }
 
@@ -137,7 +139,8 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
   @Override
   public synchronized long fetchPartitionOffset(String requestedOffset, long timeoutMillis)
       throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(isPartitionProvided, "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
+    Preconditions.checkState(isPartitionProvided,
+        "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
     Preconditions.checkNotNull(requestedOffset);
 
     final long offsetRequestTime;
@@ -156,15 +159,15 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
 
     final long endTime = System.currentTimeMillis() + timeoutMillis;
 
-    while(System.currentTimeMillis() < endTime) {
+    while (System.currentTimeMillis() < endTime) {
       // Try to get into a state where we're connected to Kafka
-      while (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-          System.currentTimeMillis() < endTime) {
+      while (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER
+          && System.currentTimeMillis() < endTime) {
         _currentState.process();
       }
 
-      if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER &&
-          endTime <= System.currentTimeMillis()) {
+      if (_currentState.getStateValue() != KafkaConnectionHandler.ConsumerState.CONNECTED_TO_PARTITION_LEADER
+          && endTime <= System.currentTimeMillis()) {
         throw new TimeoutException();
       }
 

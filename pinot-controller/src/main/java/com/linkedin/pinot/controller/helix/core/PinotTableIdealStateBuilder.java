@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
@@ -233,8 +234,7 @@ public class PinotTableIdealStateBuilder {
         throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST + ":'"
             + bootstrapHosts + "'");
       }
-      StreamConsumerFactory streamConsumerFactory = StreamConsumerFactory.create(_streamMetadata);
-      streamConsumerFactory.init(_streamMetadata);
+      StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
       StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider();
       try {
         _partitionCount = streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
