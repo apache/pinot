@@ -309,9 +309,8 @@ public class PinotSegmentUploadRestletResource {
       }
 
       SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURI).fetchSegmentToLocal(downloadURI, tempEncryptedFile);
-      PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassHeader);
-      pinotCrypter.init(_controllerConf.subset(CommonConstants.Segment.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER));
-      pinotCrypter.decrypt(encryptedObject, tempDecryptedFile);
+
+      decryptFile(crypterClassHeader, tempDecryptedFile, encryptedObject);
 
       // Call metadata provider to extract metadata with file object uri
       SegmentMetadata segmentMetadata = MetadataProviderFactory.create(metadataProviderClass).extractMetadata(tempDecryptedFile, tempSegmentDir);
@@ -327,12 +326,8 @@ public class PinotSegmentUploadRestletResource {
           .validateSegment(segmentMetadata, tempSegmentDir);
 
       // Zk operations
-      String finalSegmentPath = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
-          URLEncoder.encode(segmentName, "UTF-8"));
-      URI finalSegmentLocationURI = new URI(finalSegmentPath);
-      ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
-      zkOperator.completeSegmentOperations(segmentMetadata, finalSegmentLocationURI, tempDecryptedFile, enableParallelPushProtection, headers,
-          provider);
+      completeZkOperations(enableParallelPushProtection, headers, tempDecryptedFile, provider, segmentMetadata,
+          segmentName);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + segmentMetadata.getTableName());
     } catch (WebApplicationException e) {
@@ -348,7 +343,23 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-@POST
+  private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempDecryptedFile,
+      FileUploadPathProvider provider, SegmentMetadata segmentMetadata, String segmentName) throws Exception {
+    String finalSegmentPath = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+        URLEncoder.encode(segmentName, "UTF-8"));
+    URI finalSegmentLocationURI = new URI(finalSegmentPath);
+    ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
+    zkOperator.completeSegmentOperations(segmentMetadata, finalSegmentLocationURI, tempDecryptedFile, enableParallelPushProtection, headers,
+        provider);
+  }
+
+  private void decryptFile(String crypterClassHeader, File tempDecryptedFile, Object encryptedObject) {
+    PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassHeader);
+    pinotCrypter.init(_controllerConf.subset(CommonConstants.Segment.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER));
+    pinotCrypter.decrypt(encryptedObject, tempDecryptedFile);
+  }
+
+  @POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
