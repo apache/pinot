@@ -100,6 +100,9 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
 
       for (MergedAnomalyResultDTO mergedAnomalyResultDTO: result.getAnomalies()) {
         this.anomalyDAO.save(mergedAnomalyResultDTO);
+        if (mergedAnomalyResultDTO.getId() == null) {
+          LOG.warn("Could not store anomaly:\n{}", mergedAnomalyResultDTO);
+        }
       }
 
       return Collections.emptyList();
