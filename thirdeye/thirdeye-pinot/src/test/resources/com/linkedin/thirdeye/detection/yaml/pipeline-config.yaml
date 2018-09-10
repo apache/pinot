@@ -1,6 +1,7 @@
 name: testPipeline
 metric: test_metric
 dataset: test_dataset
+pipelineType: Composite
 filters:
   D1:
     - v1
