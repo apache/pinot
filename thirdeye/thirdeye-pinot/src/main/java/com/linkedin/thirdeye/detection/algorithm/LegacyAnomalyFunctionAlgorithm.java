@@ -134,9 +134,8 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
         public MergedAnomalyResultDTO apply(AnomalyResult result) {
           MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
           anomaly.populateFrom(result);
-          anomaly.setDetectionConfigId(LegacyAnomalyFunctionAlgorithm.this.config.getId());
           anomaly.setFunctionId(null);
-          anomaly.setFunction(anomalyFunction.getSpec());
+          anomaly.setDetectionConfigId(LegacyAnomalyFunctionAlgorithm.this.config.getId());
           anomaly.setMetricUrn(metricEntity.getUrn());
           anomaly.setMetric(metricConfig.getName());
           anomaly.setCollection(metricConfig.getDataset());
