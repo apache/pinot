@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.segment.crypt;
+package com.linkedin.pinot.core.crypt;
 
 import java.io.File;
 import org.apache.commons.configuration.Configuration;

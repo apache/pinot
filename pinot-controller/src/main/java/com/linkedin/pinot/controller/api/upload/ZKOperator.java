@@ -85,22 +85,7 @@ public class ZKOperator {
     long existingCrc = existingSegmentZKMetadata.getCrc();
 
     // Check if CRC match when IF-MATCH header is set
-    String expectedCrcStr = headers.getHeaderString(HttpHeaders.IF_MATCH);
-    if (expectedCrcStr != null) {
-      long expectedCrc;
-      try {
-        expectedCrc = Long.parseLong(expectedCrcStr);
-      } catch (NumberFormatException e) {
-        throw new ControllerApplicationException(LOGGER,
-            "Caught exception for segment: " + segmentName + " of table: " + offlineTableName
-                + " while parsing IF-MATCH CRC: \"" + expectedCrcStr + "\"", Response.Status.PRECONDITION_FAILED);
-      }
-      if (expectedCrc != existingCrc) {
-        throw new ControllerApplicationException(LOGGER,
-            "For segment: " + segmentName + " of table: " + offlineTableName + ", expected CRC: " + expectedCrc
-                + " does not match existing CRC: " + existingCrc, Response.Status.PRECONDITION_FAILED);
-      }
-    }
+    checkCRC(headers, offlineTableName, segmentName, existingCrc);
 
     // Check segment upload start time when parallel push protection enabled
     if (enableParallelPushProtection) {
@@ -178,6 +163,25 @@ public class ZKOperator {
         LOGGER.error("Failed to update ZK metadata for segment: {} of table: {}", segmentName, offlineTableName);
       }
       throw e;
+    }
+  }
+
+  private void checkCRC(HttpHeaders headers, String offlineTableName, String segmentName, long existingCrc) {
+    String expectedCrcStr = headers.getHeaderString(HttpHeaders.IF_MATCH);
+    if (expectedCrcStr != null) {
+      long expectedCrc;
+      try {
+        expectedCrc = Long.parseLong(expectedCrcStr);
+      } catch (NumberFormatException e) {
+        throw new ControllerApplicationException(LOGGER,
+            "Caught exception for segment: " + segmentName + " of table: " + offlineTableName
+                + " while parsing IF-MATCH CRC: \"" + expectedCrcStr + "\"", Response.Status.PRECONDITION_FAILED);
+      }
+      if (expectedCrc != existingCrc) {
+        throw new ControllerApplicationException(LOGGER,
+            "For segment: " + segmentName + " of table: " + offlineTableName + ", expected CRC: " + expectedCrc
+                + " does not match existing CRC: " + existingCrc, Response.Status.PRECONDITION_FAILED);
+      }
     }
   }
 

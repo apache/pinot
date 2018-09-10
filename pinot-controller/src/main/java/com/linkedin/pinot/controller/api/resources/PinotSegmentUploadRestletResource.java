@@ -25,10 +25,10 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModi
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.crypt.DefaultPinotCrypter;
-import com.linkedin.pinot.common.segment.crypt.MultipartPinotCrypter;
-import com.linkedin.pinot.common.segment.crypt.PinotCrypter;
-import com.linkedin.pinot.common.segment.crypt.PinotCrypterFactory;
+import com.linkedin.pinot.core.crypt.DefaultPinotCrypter;
+import com.linkedin.pinot.core.crypt.MultipartPinotCrypter;
+import com.linkedin.pinot.core.crypt.PinotCrypter;
+import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.core.metadata.DefaultMetadataProvider;
