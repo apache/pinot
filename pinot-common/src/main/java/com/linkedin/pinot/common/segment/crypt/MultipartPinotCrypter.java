@@ -17,10 +17,12 @@ package com.linkedin.pinot.common.segment.crypt;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.IOUtils;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -35,12 +37,17 @@ public class MultipartPinotCrypter implements PinotCrypter {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultipartPinotCrypter.class);
 
   @Override
-  public void encrypt(Object decryptedObject, File encryptedFile) throws Exception {
+  public void init(Configuration config) {
+
+  }
+
+  @Override
+  public void encrypt(Object decryptedObject, File encryptedFile) {
     throw new UnsupportedOperationException("Multipart Pinot Crypter does not support encryption");
   }
 
   @Override
-  public void decrypt(Object encryptedObject, File decryptedFile) throws Exception {
+  public void decrypt(Object encryptedObject, File decryptedFile) {
     if (! (encryptedObject instanceof FormDataMultiPart)) {
       throw new RuntimeException("Expected multipart object for decryption");
     }
@@ -55,6 +62,8 @@ public class MultipartPinotCrypter implements PinotCrypter {
     try (InputStream inputStream = segmentMetadataBodyPart.getValueAs(InputStream.class);
         OutputStream outputStream = new FileOutputStream(decryptedFile)) {
       IOUtils.copyLarge(inputStream, outputStream);
+    } catch (IOException e) {
+      LOGGER.error("Could not decrypt to {}", decryptedFile.getAbsolutePath());
     }
     finally {
       multiPart.cleanup();

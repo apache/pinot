@@ -16,6 +16,8 @@
 package com.linkedin.pinot.common.segment.crypt;
 
 import java.io.File;
+import java.io.IOException;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 
 
@@ -24,13 +26,27 @@ import org.apache.commons.io.FileUtils;
  * copies the object to the given location.
  */
 public class DefaultPinotCrypter implements PinotCrypter {
+
   @Override
-  public void encrypt(Object decryptedObject, File encryptedFile) throws Exception {
-    FileUtils.copyFile((File) decryptedObject, encryptedFile);
+  public void init(Configuration config) {
+
   }
 
   @Override
-  public void decrypt(Object encryptedObject, File decryptedFile) throws Exception {
-    FileUtils.copyFile((File) encryptedObject, decryptedFile);
+  public void encrypt(Object decryptedObject, File encryptedFile) {
+    try {
+      FileUtils.copyFile((File) decryptedObject, encryptedFile);
+    } catch (IOException e) {
+      FileUtils.deleteQuietly(encryptedFile);
+    }
+  }
+
+  @Override
+  public void decrypt(Object encryptedObject, File decryptedFile) {
+    try {
+      FileUtils.copyFile((File) encryptedObject, decryptedFile);
+    } catch (IOException e) {
+      FileUtils.deleteQuietly(decryptedFile);
+    }
   }
 }

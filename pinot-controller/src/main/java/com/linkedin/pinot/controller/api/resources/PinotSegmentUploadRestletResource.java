@@ -27,6 +27,7 @@ import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.crypt.DefaultPinotCrypter;
 import com.linkedin.pinot.common.segment.crypt.MultipartPinotCrypter;
+import com.linkedin.pinot.common.segment.crypt.PinotCrypter;
 import com.linkedin.pinot.common.segment.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
@@ -251,6 +252,14 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private SuccessResponse uploadSegment(FormDataMultiPart multiPart, boolean enableParallelPushProtection, HttpHeaders headers, Request request) throws Exception {
+    if (headers != null) {
+      // TODO: Add these headers into open source hadoop jobs
+      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER,
+          headers.getRequestHeader(CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER));
+      LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
+          headers.getRequestHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER));
+    }
+
     // Get upload type
     String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
     FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
@@ -300,7 +309,9 @@ public class PinotSegmentUploadRestletResource {
       }
 
       SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURI).fetchSegmentToLocal(downloadURI, tempEncryptedFile);
-      PinotCrypterFactory.create(crypterClassHeader).decrypt(encryptedObject, tempDecryptedFile);
+      PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassHeader);
+      pinotCrypter.init(_controllerConf.subset(CommonConstants.Segment.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER));
+      pinotCrypter.decrypt(encryptedObject, tempDecryptedFile);
 
       // Call metadata provider to extract metadata with file object uri
       SegmentMetadata segmentMetadata = MetadataProviderFactory.create(metadataProviderClass).extractMetadata(tempDecryptedFile, tempSegmentDir);
@@ -365,7 +376,6 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-//      asyncResponse.resume(uploadSegmentInternal(multiPart, null, enableParallelPushProtection, headers, request, false));
        asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request));
     } catch (Throwable t) {
       asyncResponse.resume(t);

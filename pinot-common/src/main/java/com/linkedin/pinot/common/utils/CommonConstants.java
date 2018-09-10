@@ -360,6 +360,9 @@ public class CommonConstants {
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
 
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
+    public static final String LOCAL_SEGMENT_SCHEME = "file";
+
     public enum SegmentType {
       OFFLINE,
       REALTIME

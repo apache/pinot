@@ -36,6 +36,8 @@ import org.apache.helix.ZNRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.pinot.common.utils.CommonConstants.Segment.*;
+
 
 /**
  * The ZKOperator is a util class that is used during segment upload to set relevant metadata fields in zk. It will currently
@@ -64,25 +66,21 @@ public class ZKOperator {
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
       LOGGER.info("Adding new segment: {}", segmentName);
-      try {
-        moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
-        LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
-      } catch (Exception e) {
-        LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, rawTableName);
-        throw new RuntimeException(e);
-      }
-      if (finalSegmentLocationURI.getScheme().equals("file")) {
-        String downloadUrl = ControllerConf.constructDownloadUrl(rawTableName, segmentName, provider.getVip());
-        _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
-
-      } else {
-        _pinotHelixResourceManager.addNewSegment(segmentMetadata, finalSegmentLocationURI.toString());
-      }
+      processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, provider, rawTableName,
+          segmentName);
       return;
     }
 
     LOGGER.info("Segment {} already exists, refreshing if necessary", segmentName);
 
+    processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
+        enableParallelPushProtection, headers, provider, rawTableName, offlineTableName, segmentName, znRecord);
+  }
+
+  private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
+      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers,
+      FileUploadPathProvider provider, String rawTableName, String offlineTableName, String segmentName,
+      ZNRecord znRecord) throws Exception {
     OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
     long existingCrc = existingSegmentZKMetadata.getCrc();
 
@@ -167,7 +165,7 @@ public class ZKOperator {
             newCrc, existingCrc, segmentName);
         moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
         LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
-        if (finalSegmentLocationURI.getScheme().equals("file")) {
+        if (finalSegmentLocationURI.getScheme().equals(LOCAL_SEGMENT_SCHEME)) {
           String downloadUrl = ControllerConf.constructDownloadUrl(rawTableName, segmentName, provider.getVip());
           _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata, downloadUrl);
 
@@ -180,6 +178,24 @@ public class ZKOperator {
         LOGGER.error("Failed to update ZK metadata for segment: {} of table: {}", segmentName, offlineTableName);
       }
       throw e;
+    }
+  }
+
+  private void processNewSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
+      File currentSegmentLocation, FileUploadPathProvider provider, String rawTableName, String segmentName) {
+    try {
+      moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
+      LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
+    } catch (Exception e) {
+      LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, rawTableName, e);
+      throw new RuntimeException(e);
+    }
+    if (finalSegmentLocationURI.getScheme().equals(LOCAL_SEGMENT_SCHEME)) {
+      String downloadUrl = ControllerConf.constructDownloadUrl(rawTableName, segmentName, provider.getVip());
+      _pinotHelixResourceManager.addNewSegment(segmentMetadata, downloadUrl);
+
+    } else {
+      _pinotHelixResourceManager.addNewSegment(segmentMetadata, finalSegmentLocationURI.toString());
     }
   }
 

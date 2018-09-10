@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.segment.crypt;
 
 import java.io.File;
+import org.apache.commons.configuration.Configuration;
 
 
 /**
@@ -23,19 +24,26 @@ import java.io.File;
  * where segments cannot be stored unencrypted in storage.
  */
 public interface PinotCrypter {
+
   /**
-   * Encrypts the object into the file location provided
+   * Initializes a crypter with any configurations it might need.
+   * @param config
+   */
+  void init(Configuration config);
+
+  /**
+   * Encrypts the object into the file location provided. The implementation should clean up file after any failures.
    * @param decryptedObject
    * @param encryptedFile
    * @throws Exception
    */
-  void encrypt(Object decryptedObject, File encryptedFile) throws Exception;
+  void encrypt(Object decryptedObject, File encryptedFile);
 
   /**
-   * Decryptes object into file location provided
+   * Decrypts object into file location provided. The implementation should clean up file after any failures.
    * @param encryptedObject
    * @param decryptedFile
    * @throws Exception
    */
-  void decrypt(Object encryptedObject, File decryptedFile) throws Exception;
+  void decrypt(Object encryptedObject, File decryptedFile);
 }
