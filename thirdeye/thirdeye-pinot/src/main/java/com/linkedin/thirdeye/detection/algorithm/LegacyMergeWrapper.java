@@ -217,8 +217,10 @@ public class LegacyMergeWrapper extends DetectionPipeline {
       AnomalyFunctionDTO anomalyFunctionSpec = this.anomalyFunction.getSpec();
       for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
         try {
-          // anomaly meta data
-          mergedAnomalyResult.setFunction(anomalyFunctionSpec);
+          // re-populate anomaly meta data after partial erase from AnomalyTimeBasedSummarizer
+          mergedAnomalyResult.setFunctionId(null);
+          mergedAnomalyResult.setDetectionConfigId(this.config.getId());
+
           mergedAnomalyResult.setCollection(anomalyFunctionSpec.getCollection());
           mergedAnomalyResult.setMetric(anomalyFunctionSpec.getTopicMetric());
 
