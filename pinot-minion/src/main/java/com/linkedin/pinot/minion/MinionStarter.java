@@ -130,21 +130,15 @@ public class MinionStarter {
     // TODO: set the correct minion version
     minionContext.setMinionVersion("1.0");
 
-    Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
-    Configuration segmentFetcherFactoryConfig =
-        _config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
-
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
-    try {
-      PinotFSFactory.init(pinotFSConfig);
-    } catch (Exception e) {
-      Utils.rethrowException(e);
-    }
+    Configuration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    PinotFSFactory.init(pinotFSConfig);
 
     LOGGER.info("Initializing segment fetchers for all protocols");
-    SegmentFetcherFactory.getInstance()
-        .init(segmentFetcherFactoryConfig, pinotFSConfig);
+    Configuration segmentFetcherFactoryConfig =
+        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
 
     // Need to do this before we start receiving state transitions.
     LOGGER.info("Initializing ssl context for segment uploader");
