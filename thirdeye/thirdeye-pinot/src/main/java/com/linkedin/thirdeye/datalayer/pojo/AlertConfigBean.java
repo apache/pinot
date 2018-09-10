@@ -18,6 +18,7 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -46,6 +47,7 @@ public class AlertConfigBean extends AbstractBean {
   AlertGroupConfig alertGroupConfig;
   EmailFormatterConfig emailFormatterConfig;
   String recipients;
+  DetectionAlertFilterRecipients receiverAddresses;
   String fromAddress;
   SubjectType subjectType = SubjectType.ALERT;
 
@@ -75,6 +77,14 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setRecipients(String recipients) {
     this.recipients = recipients;
+  }
+
+  public DetectionAlertFilterRecipients getReceiverAddresses() {
+    return receiverAddresses;
+  }
+
+  public void setReceiverAddresses(DetectionAlertFilterRecipients receiverAddresses) {
+    this.receiverAddresses = receiverAddresses;
   }
 
   public void setCronExpression(String cronExpression) {
