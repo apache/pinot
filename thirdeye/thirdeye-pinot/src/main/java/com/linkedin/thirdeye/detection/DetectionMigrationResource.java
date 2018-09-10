@@ -52,11 +52,18 @@ public class DetectionMigrationResource {
   @POST
   public Response migrateToDetectionPipeline(
       @QueryParam("id") long anomalyFunctionId,
-      @QueryParam("name") String name) throws Exception {
+      @QueryParam("name") String name,
+      @QueryParam("lastTimestamp") Long lastTimestamp) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionId);
     DetectionConfigDTO config = this.translator.translate(anomalyFunctionDTO);
+
     if (!StringUtils.isBlank(name)) {
       config.setName(name);
+    }
+
+    config.setLastTimestamp(System.currentTimeMillis());
+    if (lastTimestamp != null) {
+      config.setLastTimestamp(lastTimestamp);
     }
 
     this.detectionConfigDAO.save(config);
