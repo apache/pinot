@@ -16,20 +16,31 @@
 package com.linkedin.pinot.common.segment.fetcher;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public interface SegmentFetcher {
+/**
+ * This class is provided as a means to "fetch" multipart segments. It is essentially a noop operation
+ */
+public class MultipartSegmentFetcher implements SegmentFetcher{
+  public static Logger LOGGER = LoggerFactory.getLogger(NoOpFetcher.class);
 
-  void init(Configuration configs);
+  @Override
+  public void init(Configuration configs) {
+    LOGGER.info("Multipart fetcher initialized.");
+  }
 
-  void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
+  @Override
+  public void fetchSegmentToLocal(String uri, File tempFile) {
 
-  /**
-   * Returns a list of config keys whose value should not be logged.
-   *
-   * @return List of protected config keys
-   */
-  Set<String> getProtectedConfigKeys();
+  }
+
+  @Override
+  public Set<String> getProtectedConfigKeys() {
+    return Collections.emptySet();
+  }
 }

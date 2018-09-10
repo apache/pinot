@@ -13,23 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.segment.fetcher;
+package com.linkedin.pinot.core.metadata;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import java.io.File;
-import java.util.Set;
-import org.apache.commons.configuration.Configuration;
 
 
-public interface SegmentFetcher {
-
-  void init(Configuration configs);
-
-  void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
-
+/**
+ * The metadata provider will take an input zipped .tar.gz file and extract and return the pinot segment metadata.
+ * This class is used during segment upload to get the metadata we need to store in zk.
+ */
+public interface MetadataProvider {
   /**
-   * Returns a list of config keys whose value should not be logged.
-   *
-   * @return List of protected config keys
+   * Returns a SegmentMetadata object from a tarred file
+   * @param tarredSegmentFile
+   * @param unzippedSegmentDir
+   * @return
+   * @throws Exception
    */
-  Set<String> getProtectedConfigKeys();
+  SegmentMetadata extractMetadata(File tarredSegmentFile, File unzippedSegmentDir) throws Exception;
 }

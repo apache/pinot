@@ -17,17 +17,13 @@ package com.linkedin.pinot.integration.tests;
 
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.net.URLEncoder;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,20 +34,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.io.FileUtils;
 import org.apache.htrace.fasterxml.jackson.databind.JsonNode;
 import org.apache.htrace.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.Header;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
@@ -68,8 +64,11 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class PinotSegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadIntegrationTest.class);
+/**
+ * Tests the URI upload path through a local file uri.
+ */
+public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotURIUploadIntegrationTest.class);
   private String _tableName;
   private File _metadataDir = new File(_segmentDir, "tmpMeta");
 
@@ -205,43 +204,24 @@ public class PinotSegmentUploadIntegrationTest extends BaseClusterIntegrationTes
   protected void uploadSegmentsDirectly(@Nonnull File segmentDir) throws Exception {
     String[] segmentNames = segmentDir.list();
     Assert.assertNotNull(segmentNames);
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      final URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentMetadataHttpURI(LOCAL_HOST, _controllerPort);
 
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       // Upload all segments in parallel
       int numSegments = segmentNames.length;
       ExecutorService executor = Executors.newFixedThreadPool(numSegments);
       List<Future<Integer>> tasks = new ArrayList<>(numSegments);
       for (final String segmentName : segmentNames) {
-        // Move segment file to final location
-        File finalTarredLocation = new File(new File(_controllerDataDir, getTableName()), segmentName);
         File segmentFile = new File(segmentDir, segmentName);
-        FileUtils.copyFile(segmentFile, finalTarredLocation);
-
-        String downloadUri = StringUtil.join("/", _controllerBaseApiUrl, "segments", _tableName, URLEncoder.encode(segmentName, "UTF-8"));
-
-        Header uploadTypeHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE, FileUploadDownloadClient.FileUploadType.URI.toString());
-        Header downloadUriHeader = new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI, downloadUri);
-        final List<Header> httpHeaders = Arrays.asList(uploadTypeHeader, downloadUriHeader);
-
-        List<Path> segmentMetadataFileList = Files.walk(_segmentDir.toPath())
-            .filter(s -> s.getFileName().toAbsolutePath().toString().contains(".properties") || s.getFileName().toAbsolutePath().toString().contains(".meta"))
-            .collect(Collectors.toList());
-
-        File segmentMetadataFile = new File(_metadataDir, segmentName.replace(".tar.gz", ""));
-        Assert.assertTrue(segmentMetadataFile.mkdirs(), "Make directory for segment metadata failed");
-        for (Path metadataPath : segmentMetadataFileList) {
-          FileUtils.copyFile(metadataPath.toFile(), new File(segmentMetadataFile, metadataPath.toFile().getName()));
-        }
-
-        TarGzCompressionUtils.createTarGzOfDirectory(segmentMetadataFile.getAbsolutePath());
-        Assert.assertTrue(getAllSegments(getTableName()).size() == 0);
+        // We are required to set the content type to application/json so it doesn't hit the multipart endpoint
+        Header contentTypeHeader = new BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json");
+        String downloadUri = segmentFile.toURI().toString();
+        final List<Header> httpHeaders = Arrays.asList(contentTypeHeader);
 
         tasks.add(executor.submit(new Callable<Integer>() {
           @Override
           public Integer call() throws Exception {
-            return fileUploadDownloadClient.uploadSegmentMetadata(uploadSegmentHttpURI, segmentName, new File(segmentMetadataFile.getAbsolutePath() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION), httpHeaders, null, 0)
-                .getStatusCode();
+            return fileUploadDownloadClient.sendSegmentUri(
+                FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort), downloadUri, httpHeaders, null, 122200000).getStatusCode();
           }
         }));
 
@@ -253,7 +233,6 @@ public class PinotSegmentUploadIntegrationTest extends BaseClusterIntegrationTes
 
       executor.shutdown();
     }
-
   }
 
   private List<String> getAllSegments(String tablename) throws IOException {

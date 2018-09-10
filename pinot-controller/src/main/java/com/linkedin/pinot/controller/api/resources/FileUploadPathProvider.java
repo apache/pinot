@@ -56,7 +56,7 @@ public class FileUploadPathProvider {
       String dataDirScheme = uri.getScheme();
       if (dataDirScheme ==  null) {
         // Assume local fs
-        dataDir = "file://" + _controllerConf.getDataDir();
+        dataDir = new URI("file", _controllerConf.getDataDir(), null).toString();
       } else {
         scheme = dataDirScheme;
       }

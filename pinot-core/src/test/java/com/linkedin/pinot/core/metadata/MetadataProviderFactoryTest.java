@@ -13,23 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.segment.fetcher;
+package com.linkedin.pinot.core.metadata;
 
-import java.io.File;
-import java.util.Set;
-import org.apache.commons.configuration.Configuration;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
-public interface SegmentFetcher {
-
-  void init(Configuration configs);
-
-  void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
-
-  /**
-   * Returns a list of config keys whose value should not be logged.
-   *
-   * @return List of protected config keys
-   */
-  Set<String> getProtectedConfigKeys();
+public class MetadataProviderFactoryTest {
+  @Test
+  public void testDefaultMetadataProvider() {
+    Assert.assertTrue(MetadataProviderFactory.create(null) instanceof DefaultMetadataProvider);
+  }
+  @Test
+  public void testConfiguredMetadataProvider() {
+    Assert.assertTrue(MetadataProviderFactory.create(DefaultMetadataProvider.class.getName()) instanceof DefaultMetadataProvider);
+  }
 }

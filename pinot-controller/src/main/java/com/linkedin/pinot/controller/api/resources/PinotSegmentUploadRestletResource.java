@@ -25,8 +25,13 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModi
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.crypt.DefaultPinotCrypter;
+import com.linkedin.pinot.common.segment.crypt.MultipartPinotCrypter;
+import com.linkedin.pinot.common.segment.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import com.linkedin.pinot.core.metadata.DefaultMetadataProvider;
+import com.linkedin.pinot.core.metadata.MetadataProviderFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -36,6 +41,8 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.access.AccessControl;
 import com.linkedin.pinot.controller.api.access.AccessControlFactory;
+import com.linkedin.pinot.controller.api.upload.SegmentValidator;
+import com.linkedin.pinot.controller.api.upload.ZKOperator;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.util.TableSizeReader;
@@ -56,6 +63,7 @@ import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -90,8 +98,6 @@ import org.glassfish.jersey.media.multipart.FormDataMultiPart;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.joda.time.Interval;
 import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -244,7 +250,112 @@ public class PinotSegmentUploadRestletResource {
         "All segments of table " + TableNameBuilder.forType(tableType).tableNameWithType(tableName) + " deleted");
   }
 
-  @POST
+  private SuccessResponse uploadSegment(FormDataMultiPart multiPart, boolean enableParallelPushProtection, HttpHeaders headers, Request request) throws Exception {
+    // Get upload type
+    String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
+    FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
+
+    // Get crypter class
+    String crypterClassHeader = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
+
+    // Get Download URI
+    String downloadURI = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
+
+    File tempEncryptedFile = null;
+    File tempDecryptedFile = null;
+    File tempSegmentDir = null;
+    try {
+      FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
+      String tempFileName = "tmp-" + System.nanoTime();
+      tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + "_encrypted");
+      tempDecryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
+      tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
+
+      // TODO: Change when metadata upload added
+      String metadataProviderClass = DefaultMetadataProvider.class.getName();
+
+      Object encryptedObject;
+      switch (uploadType) {
+        case URI:
+          if (downloadURI == null || downloadURI.isEmpty()) {
+            throw new ControllerApplicationException(LOGGER, "Failed to get downloadURI, needed for URI upload",
+                Response.Status.BAD_REQUEST);
+          }
+          if (crypterClassHeader == null) {
+            crypterClassHeader = DefaultPinotCrypter.class.getName();
+          }
+          encryptedObject = tempEncryptedFile;
+          break;
+        case TAR:
+          // In the case of TAR, we will use local file
+          if (crypterClassHeader == null) {
+            crypterClassHeader = MultipartPinotCrypter.class.getName();
+          }
+          downloadURI = "multipart://dummy";
+          encryptedObject = multiPart;
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
+
+      }
+
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURI).fetchSegmentToLocal(downloadURI, tempEncryptedFile);
+      PinotCrypterFactory.create(crypterClassHeader).decrypt(encryptedObject, tempDecryptedFile);
+
+      // Call metadata provider to extract metadata with file object uri
+      SegmentMetadata segmentMetadata = MetadataProviderFactory.create(metadataProviderClass).extractMetadata(tempDecryptedFile, tempSegmentDir);
+
+      String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
+      String segmentName = segmentMetadata.getName();
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
+      LOGGER.info("Processing upload request for segment: {} of table: {} from client: {}", segmentName,
+          offlineTableName, clientAddress);
+
+      // Validate segment
+      new SegmentValidator(_pinotHelixResourceManager, _controllerConf, _executor, _connectionManager, _controllerMetrics)
+          .validateSegment(segmentMetadata, tempSegmentDir);
+
+      // Zk operations
+      String finalSegmentPath = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+          URLEncoder.encode(segmentName, "UTF-8"));
+      URI finalSegmentLocationURI = new URI(finalSegmentPath);
+      ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
+      zkOperator.completeSegmentOperations(segmentMetadata, finalSegmentLocationURI, tempDecryptedFile, enableParallelPushProtection, headers,
+          provider);
+
+      return new SuccessResponse("Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + segmentMetadata.getTableName());
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, "Caught internal server exception while uploading segment",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    } finally {
+      FileUtils.deleteQuietly(tempEncryptedFile);
+      FileUtils.deleteQuietly(tempDecryptedFile);
+      FileUtils.deleteQuietly(tempSegmentDir);
+    }
+  }
+
+@POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/segments")
+  @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
+  // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
+  // request if a multipart object is not sent
+  public void uploadSegmentAsJson(String segmentJsonStr,
+    @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
+    @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+    try {
+      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request));
+    } catch (Throwable t) {
+      asyncResponse.resume(t);
+    }
+  }
+
+@POST
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -254,64 +365,8 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegmentInternal(multiPart, null, enableParallelPushProtection, headers, request, false));
-    } catch (Throwable t) {
-      asyncResponse.resume(t);
-    }
-  }
-
-  /**
-   * Will upload a Pinot segment without sending the file through the controller. If data is stored on a separate
-   * filesystem, eg: HDFS or Azure, and the segment file is already in its final location, users can call this method
-   * to change the state in zk. Note that the multipart file will be a zip of metadata.properties and creation.meta.
-   * @param multiPart
-   * @param enableParallelPushProtection
-   * @param headers
-   * @param request
-   * @param asyncResponse
-   */
-  @POST
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.MULTIPART_FORM_DATA)
-  @Path("/segmentmetadata")
-  @ApiOperation(value = "Upload a segment by sending metadata", notes = "Sends segment metadata as binary")
-  public void uploadSegmentAsMultiPartWithMetadata(FormDataMultiPart multiPart,
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
-    try {
-      if (multiPart == null) {
-        throw new ControllerApplicationException(LOGGER, "Segment metadata upload requires segment metadata", Response.Status.BAD_REQUEST);
-      }
-      if (headers == null) {
-        throw new ControllerApplicationException(LOGGER, "Segment upload type needs to be URI for metadata upload", Response.Status.BAD_REQUEST);
-      }
-      if (headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI) == null) {
-        throw new ControllerApplicationException(LOGGER, "Download URI needs to be set for metadata upload", Response.Status.BAD_REQUEST);
-      }
-      String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
-      FileUploadDownloadClient.FileUploadType uploadType = getUploadType(uploadTypeStr);
-      if (uploadType != FileUploadDownloadClient.FileUploadType.URI) {
-        throw new ControllerApplicationException(LOGGER, "Segment upload type needs to be URI for metadata upload", Response.Status.BAD_REQUEST);
-      }
-      asyncResponse.resume(uploadSegmentInternal(multiPart, null, enableParallelPushProtection, headers, request, true));
-    } catch (Throwable t) {
-      asyncResponse.resume(t);
-    }
-  }
-
-  @POST
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Consumes(MediaType.APPLICATION_JSON)
-  @Path("/segments")
-  @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
-  // TODO Does it even work if the segment is sent as a JSON body? Need to compare with the other API
-  public void uploadSegmentAsJson(String segmentJsonStr,    // If segment is present as json body
-      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
-    try {
-      asyncResponse.resume(uploadSegmentInternal(null, segmentJsonStr, enableParallelPushProtection, headers, request, false));
+//      asyncResponse.resume(uploadSegmentInternal(multiPart, null, enableParallelPushProtection, headers, request, false));
+       asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -345,7 +400,6 @@ public class PinotSegmentUploadRestletResource {
       SegmentMetadata segmentMetadata = null;
       String downloadURI = null;
       switch (uploadType) {
-        case JSON:
         case URI:
           // Get download URI
           try {
@@ -440,6 +494,7 @@ public class PinotSegmentUploadRestletResource {
       return FileUploadDownloadClient.FileUploadType.getDefaultUploadType();
     }
   }
+
   /**
    * Helper method to upload segment with the following steps:
    * <ul>
@@ -631,12 +686,6 @@ public class PinotSegmentUploadRestletResource {
     switch (uploadType) {
       case URI:
         return headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
-      case JSON:
-        // Get segmentJsonStr
-        JSONTokener tokener = new JSONTokener(segmentJsonStr);
-        JSONObject segmentJson = new JSONObject(tokener);
-        // Download segment from the given Uri
-        return segmentJson.getString(CommonConstants.Segment.Offline.DOWNLOAD_URL);
       default:
         break;
     }

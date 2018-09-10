@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.segment.crypt;
 
-import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,25 +23,20 @@ import org.slf4j.LoggerFactory;
  * This factory instantiates the PinotCrypter, which participates in encrypting and decrypting files.
  */
 public class PinotCrypterFactory {
-  private static final String CRYPTER_CLASS_CONFIG = "class";
-  private static String _crypterClass;
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotCrypterFactory.class);
 
   // Prevent factory from being instantiated
   private PinotCrypterFactory() {
 
   }
-  public static void init(Configuration config) {
-    _crypterClass = config.getString(CRYPTER_CLASS_CONFIG);
-  }
 
-  public static PinotCrypter create() {
-    String crypterClassName = _crypterClass;
+  public static PinotCrypter create(String crypterClassName) {
     try {
       LOGGER.info("Instantiating PinotCrypter class {}", crypterClassName);
       PinotCrypter pinotCrypter =  (PinotCrypter) Class.forName(crypterClassName).newInstance();
       return pinotCrypter;
     } catch (Exception e) {
+      LOGGER.warn("Unable to instantiate {}, creating default crypter {}", crypterClassName, DefaultPinotCrypter.class.getName());
       return new DefaultPinotCrypter();
     }
   }

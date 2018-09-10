@@ -15,17 +15,22 @@
  */
 package com.linkedin.pinot.common.segment.crypt;
 
-import java.net.URI;
+import java.io.File;
+import org.apache.commons.io.FileUtils;
 
 
+/**
+ * This class is the default implementation for the PinotCrypter. It assumes that the object given is a file and simply
+ * copies the object to the given location.
+ */
 public class DefaultPinotCrypter implements PinotCrypter {
   @Override
-  public void encrypt(URI uri) throws Exception {
-
+  public void encrypt(Object decryptedObject, File encryptedFile) throws Exception {
+    FileUtils.copyFile((File) decryptedObject, encryptedFile);
   }
 
   @Override
-  public void decrypt(URI uri) throws Exception {
-
+  public void decrypt(Object encryptedObject, File decryptedFile) throws Exception {
+    FileUtils.copyFile((File) encryptedObject, decryptedFile);
   }
 }

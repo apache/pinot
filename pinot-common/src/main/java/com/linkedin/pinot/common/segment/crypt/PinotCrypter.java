@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.common.segment.crypt;
 
-import java.net.URI;
+import java.io.File;
 
 
 /**
@@ -24,16 +24,18 @@ import java.net.URI;
  */
 public interface PinotCrypter {
   /**
-   * Encrypts data.
-   * @param uri location of data to be encrypted
-   * @Exception throws an Exception if encrypt fails
+   * Encrypts the object into the file location provided
+   * @param decryptedObject
+   * @param encryptedFile
+   * @throws Exception
    */
-  void encrypt(URI uri) throws Exception;
+  void encrypt(Object decryptedObject, File encryptedFile) throws Exception;
 
   /**
-   * Decrypts data.
-   * @param uri location of data to be decrypted
-   * @Exception throws an Exception if decrypt fails
+   * Decryptes object into file location provided
+   * @param encryptedObject
+   * @param decryptedFile
+   * @throws Exception
    */
-  void decrypt(URI uri) throws Exception;
+  void decrypt(Object encryptedObject, File decryptedFile) throws Exception;
 }
