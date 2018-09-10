@@ -57,26 +57,28 @@ public class YamlResource {
 
     // translate yaml to detection config
     YamlDetectionConfigTranslator translator = translatorLoader.from(yamlConfig);
-    DetectionConfigDTO config = translator.generateDetectionConfig(yamlConfig);
+    DetectionConfigDTO detectionConfig = translator.generateDetectionConfig(yamlConfig);
 
     // retrieve id if detection config already exists
     List<DetectionConfigDTO> detectionConfigDTOs =
         this.detectionConfigDAO.findByPredicate(Predicate.EQ("name", MapUtils.getString(yamlConfig, PROP_NAME)));
     if (!detectionConfigDTOs.isEmpty()) {
       DetectionConfigDTO existingDetectionConfig = detectionConfigDTOs.get(0);
-      config.setId(detectionConfigDTOs.get(0).getId());
-      config.setLastTimestamp(existingDetectionConfig.getLastTimestamp());
+      detectionConfig.setId(detectionConfigDTOs.get(0).getId());
+      detectionConfig.setLastTimestamp(existingDetectionConfig.getLastTimestamp());
     }
-    Long detectionConfigId = this.detectionConfigDAO.save(config);
+    Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
 
     Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
     DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
-    Long detectionAlertId = this.detectionAlertConfigDAO.save(alertConfigDTO);
-    Preconditions.checkNotNull(detectionConfigId, "Save detection alerter config failed");
+    Long detectionAlertConfig = this.detectionAlertConfigDAO.save(alertConfigDTO);
+    Preconditions.checkNotNull(detectionAlertConfig, "Save detection alerter config failed");
 
-    return Response.ok("detection pipeline:" + detectionConfigId + " and detection alerter " + detectionAlertId
-        + " saved into database").build();
+    Map<String, Object> result = new HashMap<>();
+    result.put("detectionConfig", detectionConfig);
+    result.put("detectionAlertConfig", detectionAlertConfig);
+    return Response.ok(result).build();
   }
 
   /**
