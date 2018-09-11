@@ -19,13 +19,13 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class MetadataProviderFactoryTest {
+public class MetadataExtractorFactoryTest {
   @Test
   public void testDefaultMetadataProvider() {
-    Assert.assertTrue(MetadataProviderFactory.create(null) instanceof DefaultMetadataProvider);
+    Assert.assertTrue(MetadataExtractorFactory.create(null) instanceof DefaultMetadataExtractor);
   }
   @Test
   public void testConfiguredMetadataProvider() {
-    Assert.assertTrue(MetadataProviderFactory.create(DefaultMetadataProvider.class.getName()) instanceof DefaultMetadataProvider);
+    Assert.assertTrue(MetadataExtractorFactory.create(DefaultMetadataExtractor.class.getName()) instanceof DefaultMetadataExtractor);
   }
 }

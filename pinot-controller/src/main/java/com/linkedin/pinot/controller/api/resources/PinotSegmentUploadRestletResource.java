@@ -25,14 +25,8 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModi
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.crypt.DefaultPinotCrypter;
-import com.linkedin.pinot.core.crypt.MultipartPinotCrypter;
-import com.linkedin.pinot.core.crypt.PinotCrypter;
-import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcher;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.core.metadata.DefaultMetadataProvider;
-import com.linkedin.pinot.core.metadata.MetadataProviderFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -48,6 +42,12 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
+import com.linkedin.pinot.core.crypt.DefaultPinotCrypter;
+import com.linkedin.pinot.core.crypt.MultipartPinotCrypter;
+import com.linkedin.pinot.core.crypt.PinotCrypter;
+import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
+import com.linkedin.pinot.core.metadata.DefaultMetadataExtractor;
+import com.linkedin.pinot.core.metadata.MetadataExtractorFactory;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
@@ -281,7 +281,7 @@ public class PinotSegmentUploadRestletResource {
       tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
 
       // TODO: Change when metadata upload added
-      String metadataProviderClass = DefaultMetadataProvider.class.getName();
+      String metadataProviderClass = DefaultMetadataExtractor.class.getName();
 
       Object encryptedObject;
       switch (uploadType) {
@@ -313,7 +313,7 @@ public class PinotSegmentUploadRestletResource {
       decryptFile(crypterClassHeader, tempDecryptedFile, encryptedObject);
 
       // Call metadata provider to extract metadata with file object uri
-      SegmentMetadata segmentMetadata = MetadataProviderFactory.create(metadataProviderClass).extractMetadata(tempDecryptedFile, tempSegmentDir);
+      SegmentMetadata segmentMetadata = MetadataExtractorFactory.create(metadataProviderClass).extractMetadata(tempDecryptedFile, tempSegmentDir);
 
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       String segmentName = segmentMetadata.getName();

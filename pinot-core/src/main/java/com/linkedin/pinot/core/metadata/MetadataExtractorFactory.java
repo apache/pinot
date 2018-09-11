@@ -20,26 +20,26 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * The MetadataProviderFactory will instantiate the MetadataProvider class, which is used to extract metadata from
+ * The MetadataExtractorFactory will instantiate the MetadataExtractor class, which is used to extract metadata from
  * a given file during segment upload.
  */
-public class MetadataProviderFactory {
-    public static final Logger LOGGER = LoggerFactory.getLogger(MetadataProviderFactory.class);
+public class MetadataExtractorFactory {
+    public static final Logger LOGGER = LoggerFactory.getLogger(MetadataExtractorFactory.class);
 
     // Prevent factory from being instantiated
-    private MetadataProviderFactory() {
+    private MetadataExtractorFactory() {
 
     }
 
-    public static MetadataProvider create(String metadataClassName) {
-      String metadataProviderClassName = metadataClassName;
+    public static MetadataExtractor create(String metadataClassName) {
+      String metadataExtractorClassName = metadataClassName;
       try {
-        LOGGER.info("Instantiating MetadataProvider class {}", metadataProviderClassName);
-        MetadataProvider metadataProvider =  (MetadataProvider) Class.forName(metadataProviderClassName).newInstance();
-        return metadataProvider;
+        LOGGER.info("Instantiating MetadataExtractor class {}", metadataExtractorClassName);
+        MetadataExtractor metadataExtractor =  (MetadataExtractor) Class.forName(metadataExtractorClassName).newInstance();
+        return metadataExtractor;
       } catch (Exception e) {
-        LOGGER.warn("No metadata provider class passed in, using default");
-        return new DefaultMetadataProvider();
+        LOGGER.warn("No metadata extractor class passed in, using default");
+        return new DefaultMetadataExtractor();
       }
     }
 }

@@ -23,10 +23,10 @@ import java.io.File;
 
 
 /**
- * DefaultMetadataProvider is an implementation of the MetadataProvider interface.
- * By default, the metadata provider we will use will assume that we are provided a .tar.gz pinot segment file.
+ * DefaultMetadataExtractor is an implementation of the MetadataExtractor interface.
+ * By default, the metadata extractor we will use will assume that we are provided a .tar.gz pinot segment file.
  */
-public class DefaultMetadataProvider implements MetadataProvider {
+public class DefaultMetadataExtractor implements MetadataExtractor {
   @Override
   public SegmentMetadata extractMetadata(File tarredSegmentFile, File unzippedSegmentDir) throws Exception {
     // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files
