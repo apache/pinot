@@ -132,5 +132,6 @@ public class LegacyMergeWrapperTest {
     Assert.assertEquals(result.getAnomalies().get(0).getEndTime(), 2300);
     Assert.assertEquals(result.getAnomalies().get(0).getDetectionConfigId(), PROP_ID_VALUE);
     Assert.assertNull(result.getAnomalies().get(0).getFunctionId());
+    Assert.assertNull(result.getAnomalies().get(0).getFunction());
   }
 }

@@ -233,20 +233,8 @@ public class LegacyMergeWrapper extends DetectionPipeline {
       AnomalyFunctionDTO anomalyFunctionSpec = this.anomalyFunction.getSpec();
       for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
         try {
-          // re-populate anomaly meta data after partial erase from AnomalyTimeBasedSummarizer
-          mergedAnomalyResult.setFunctionId(null);
-          mergedAnomalyResult.setDetectionConfigId(this.config.getId());
-
           mergedAnomalyResult.setCollection(anomalyFunctionSpec.getCollection());
           mergedAnomalyResult.setMetric(anomalyFunctionSpec.getTopicMetric());
-
-          SetMultimap<String, String> filters = HashMultimap.create(anomalyFunctionSpec.getFilterSet());
-          for (Map.Entry<String, String> dim : mergedAnomalyResult.getDimensions().entrySet()) {
-            filters.removeAll(dim.getKey()); // remove pre-existing filters
-            filters.put(dim.getKey(), dim.getValue());
-          }
-
-          mergedAnomalyResult.setMetricUrn(MetricEntity.fromMetric(1.0, anomalyFunctionSpec.getMetricId(), filters).getUrn());
 
           // update current and baseline estimates
           MetricTimeSeries metricTimeSeries = getMetricTimeSeries(entry.getKey());
@@ -262,6 +250,20 @@ public class LegacyMergeWrapper extends DetectionPipeline {
 
             mergedAnomalyResult.setImpactToGlobal(diffLocal / valGlobal);
           }
+
+          // re-populate anomaly meta data after partial override from
+          // AnomalyTimeBasedSummarizer and updateMergedAnomalyInfo()
+          SetMultimap<String, String> filters = HashMultimap.create(anomalyFunctionSpec.getFilterSet());
+          for (Map.Entry<String, String> dim : mergedAnomalyResult.getDimensions().entrySet()) {
+            filters.removeAll(dim.getKey()); // remove pre-existing filters
+            filters.put(dim.getKey(), dim.getValue());
+          }
+
+          mergedAnomalyResult.setMetricUrn(MetricEntity.fromMetric(1.0, anomalyFunctionSpec.getMetricId(), filters).getUrn());
+
+          mergedAnomalyResult.setFunctionId(null);
+          mergedAnomalyResult.setFunction(null);
+          mergedAnomalyResult.setDetectionConfigId(this.config.getId());
 
           mergedAnomalies.add(mergedAnomalyResult);
 
