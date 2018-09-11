@@ -144,7 +144,7 @@ public class SegmentGenerationWithBytesTypeTest {
 
   @Test
   public void testDictionary() {
-    ImmutableDictionaryReader dictionary = _segment.getDictionary(FIXED_BYTE_SORTED_COLUMN);
+    ImmutableDictionaryReader dictionary = (ImmutableDictionaryReader) _segment.getDictionary(FIXED_BYTE_SORTED_COLUMN);
     Assert.assertEquals(dictionary.length(), NUM_SORTED_VALUES);
 
     // Test dictionary indexing.

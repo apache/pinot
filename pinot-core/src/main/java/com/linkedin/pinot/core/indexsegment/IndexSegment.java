@@ -47,6 +47,13 @@ public interface IndexSegment {
   Set<String> getColumnNames();
 
   /**
+   * Returns all of the columns in the segment that are not provided by a virtual column provider.
+   *
+   * @return Set of column names
+   */
+  Set<String> getPhysicalColumnNames();
+
+  /**
    * Returns the {@link DataSource} for the given column.
    *
    * @param columnName Column name

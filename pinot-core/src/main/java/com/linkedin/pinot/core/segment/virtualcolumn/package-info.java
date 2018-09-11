@@ -13,21 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.index.column;
-
-import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
-
-
 /**
- * Interface for column index containers.
+ * Package with the virtual column API.
  */
-public interface ColumnIndexContainer {
-  DataFileReader getForwardIndex();
-
-  InvertedIndexReader getInvertedIndex();
-
-  Dictionary getDictionary();
-}
+package com.linkedin.pinot.core.segment.virtualcolumn;

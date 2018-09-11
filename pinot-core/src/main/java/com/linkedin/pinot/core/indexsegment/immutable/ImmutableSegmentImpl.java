@@ -27,6 +27,7 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionTyp
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
@@ -127,7 +128,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
-  public ImmutableDictionaryReader getDictionary(String column) {
+  public Dictionary getDictionary(String column) {
     return _indexContainerMap.get(column).getDictionary();
   }
 
@@ -167,13 +168,26 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public Set<String> getPhysicalColumnNames() {
+    HashSet<String> physicalColumnNames = new HashSet<>();
+
+    for (String columnName : getColumnNames()) {
+      if (!_segmentMetadata.getSchema().isVirtualColumn(columnName)) {
+        physicalColumnNames.add(columnName);
+      }
+    }
+
+    return physicalColumnNames;
+  }
+
+  @Override
   public void destroy() {
     LOGGER.info("Trying to destroy segment : {}", this.getSegmentName());
     for (String column : _indexContainerMap.keySet()) {
       ColumnIndexContainer columnIndexContainer = _indexContainerMap.get(column);
 
       try {
-        ImmutableDictionaryReader dictionary = columnIndexContainer.getDictionary();
+        Dictionary dictionary = columnIndexContainer.getDictionary();
         if (dictionary != null) {
           dictionary.close();
         }

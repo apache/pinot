@@ -630,4 +630,10 @@ public final class Schema {
     result = EqualityUtils.hashCodeOf(result, _dateTimeFieldSpecs);
     return result;
   }
+
+  public boolean isVirtualColumn(String columnName) {
+    return columnName.startsWith("$") ||
+        (getFieldSpecFor(columnName).getVirtualColumnProvider() != null &&
+            !getFieldSpecFor(columnName).getVirtualColumnProvider().isEmpty());
+  }
 }

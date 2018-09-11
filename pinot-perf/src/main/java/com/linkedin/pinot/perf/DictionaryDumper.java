@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import java.io.File;
 import java.util.Arrays;
@@ -39,7 +40,7 @@ public class DictionaryDumper {
       System.out.println("Loading " + indexDir.getName());
 
       ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.heap);
-      ImmutableDictionaryReader colDictionary = immutableSegment.getDictionary(args[1]);
+      Dictionary colDictionary = immutableSegment.getDictionary(args[1]);
       List<String> strIdList = Arrays.asList(args[2].split(","));
 
       for (String strId : strIdList) {

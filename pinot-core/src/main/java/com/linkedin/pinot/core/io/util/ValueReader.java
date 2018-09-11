@@ -13,21 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.index.column;
+package com.linkedin.pinot.core.io.util;
 
-import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
-import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
+import java.io.IOException;
 
 
 /**
- * Interface for column index containers.
+ * Interface for value readers, which read a value at a given index.
  */
-public interface ColumnIndexContainer {
-  DataFileReader getForwardIndex();
+public interface ValueReader {
+  int getInt(int index);
 
-  InvertedIndexReader getInvertedIndex();
+  long getLong(int index);
 
-  Dictionary getDictionary();
+  float getFloat(int index);
+
+  double getDouble(int index);
+
+  String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer);
+
+  String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
+
+  byte[] getBytes(int index, int numBytesPerValue, byte[] output);
+
+  void close() throws IOException;
 }

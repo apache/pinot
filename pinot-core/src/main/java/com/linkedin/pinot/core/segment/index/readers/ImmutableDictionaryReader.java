@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
+import com.linkedin.pinot.core.io.util.ValueReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.IOException;
 import java.util.Arrays;
@@ -26,7 +27,7 @@ import java.util.Arrays;
 
 @SuppressWarnings("Duplicates")
 public abstract class ImmutableDictionaryReader extends BaseDictionary {
-  private final FixedByteValueReaderWriter _valueReader;
+  private final ValueReader _valueReader;
   private final int _length;
   private final int _numBytesPerValue;
   private final byte _paddingByte;
@@ -37,6 +38,13 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     _length = length;
     _numBytesPerValue = numBytesPerValue;
     _paddingByte = paddingByte;
+  }
+
+  protected ImmutableDictionaryReader(ValueReader valueReader, int length) {
+    _valueReader = valueReader;
+    _length = length;
+    _numBytesPerValue = -1;
+    _paddingByte = 0;
   }
 
   /**

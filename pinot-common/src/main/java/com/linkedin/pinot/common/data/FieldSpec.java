@@ -37,6 +37,7 @@ import org.apache.commons.codec.binary.Hex;
  * <p>- <code>DataType</code>: type of the data stored (e.g. INTEGER, LONG, FLOAT, DOUBLE, STRING).
  * <p>- <code>IsSingleValueField</code>: single-value or multi-value field.
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
+ * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLifecycleAware {
@@ -72,6 +73,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
   // Transform function to generate this column, can be based on other columns
   protected String _transformFunction;
+
+  @ConfigKey("virtualColumnProvider")
+  protected String _virtualColumnProvider;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
@@ -124,6 +128,14 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setSingleValueField(boolean isSingleValueField) {
     _isSingleValueField = isSingleValueField;
+  }
+
+  public String getVirtualColumnProvider() {
+    return _virtualColumnProvider;
+  }
+
+  public void setVirtualColumnProvider(String virtualColumnProvider) {
+    _virtualColumnProvider = virtualColumnProvider;
   }
 
   @Nonnull

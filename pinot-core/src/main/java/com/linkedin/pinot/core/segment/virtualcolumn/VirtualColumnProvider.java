@@ -13,21 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.index.column;
+package com.linkedin.pinot.core.segment.virtualcolumn;
 
 import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 /**
- * Interface for column index containers.
+ * Virtual column provider interface, which is used to instantiate the various components (dictionary, reader, etc) that
+ * comprise a proper column.
  */
-public interface ColumnIndexContainer {
-  DataFileReader getForwardIndex();
-
-  InvertedIndexReader getInvertedIndex();
-
-  Dictionary getDictionary();
+public interface VirtualColumnProvider {
+  DataFileReader buildReader(VirtualColumnContext context);
+  Dictionary buildDictionary(VirtualColumnContext context);
+  ColumnMetadata buildMetadata(VirtualColumnContext context);
+  InvertedIndexReader buildInvertedIndex(VirtualColumnContext context);
+  ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context);
 }

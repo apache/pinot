@@ -21,29 +21,34 @@ import java.io.Closeable;
 import java.io.IOException;
 
 
-public final class FixedByteValueReaderWriter implements Closeable {
+public final class FixedByteValueReaderWriter implements Closeable, ValueReader {
   private final PinotDataBuffer _dataBuffer;
 
   public FixedByteValueReaderWriter(PinotDataBuffer dataBuffer) {
     _dataBuffer = dataBuffer;
   }
 
+  @Override
   public int getInt(int index) {
     return _dataBuffer.getInt(index * Integer.BYTES);
   }
 
+  @Override
   public long getLong(int index) {
     return _dataBuffer.getLong(index * Long.BYTES);
   }
 
+  @Override
   public float getFloat(int index) {
     return _dataBuffer.getFloat(index * Float.BYTES);
   }
 
+  @Override
   public double getDouble(int index) {
     return _dataBuffer.getDouble(index * Double.BYTES);
   }
 
+  @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
     int startOffset = index * numBytesPerValue;
     for (int i = 0; i < numBytesPerValue; i++) {
@@ -56,6 +61,7 @@ public final class FixedByteValueReaderWriter implements Closeable {
     return StringUtil.decodeUtf8(buffer);
   }
 
+  @Override
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
     int startOffset = index * numBytesPerValue;
     for (int i = 0; i < numBytesPerValue; i++) {
@@ -64,6 +70,7 @@ public final class FixedByteValueReaderWriter implements Closeable {
     return StringUtil.decodeUtf8(buffer);
   }
 
+  @Override
   public byte[] getBytes(int index, int numBytesPerValue, byte[] output) {
     assert output.length == numBytesPerValue;
     int startOffset = index * numBytesPerValue;

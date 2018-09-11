@@ -119,7 +119,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // Initialize creators for dictionary, forward index and inverted index
     for (FieldSpec fieldSpec : fieldSpecs) {
+
       String columnName = fieldSpec.getName();
+
+      // Ignore virtual columns
+      if (schema.isVirtualColumn(columnName)) {
+        continue;
+      }
+
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(indexCreationInfo, "Missing index creation info for column: %s", columnName);
 

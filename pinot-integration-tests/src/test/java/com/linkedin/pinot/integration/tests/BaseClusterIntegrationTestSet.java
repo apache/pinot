@@ -16,6 +16,8 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
+import com.linkedin.pinot.client.ResultSet;
+import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.util.TestUtils;
@@ -130,6 +132,22 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             + " AVG(CAST(CRSDepTime AS DOUBLE)) FROM mytable WHERE OriginCityName > 'Beaumont/Port Arthur, TX' OR "
             + "FlightDate IN ('2014-12-09', '2014-10-05') GROUP BY ActualElapsedTime, OriginStateFips "
             + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CAST(CRSDepTime AS DOUBLE)) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274"));
+  }
+
+  public void testVirtualColumnQueries() {
+    // Check that there are no virtual columns in the query results
+    ResultSetGroup resultSetGroup = getPinotConnection().execute("select * from mytable");
+    ResultSet resultSet = resultSetGroup.getResultSet(0);
+    for (int i = 0; i < resultSet.getColumnCount(); i++) {
+      Assert.assertFalse(resultSet.getColumnName(i).startsWith("$"), "Virtual column " + resultSet.getColumnName(i) + " is present in the results!");
+    }
+
+    // Check that the virtual columns work as expected (throws no exceptions)
+    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable");
+    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId < 5 limit 50");
+    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId = 5 limit 50");
+    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId > 19998 limit 50");
+    getPinotConnection().execute("select max($docId) from mytable group by $segmentName");
   }
 
   /**
