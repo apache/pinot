@@ -19,10 +19,15 @@ import com.linkedin.pinot.common.Utils;
 
 
 /**
- * Constructs the {@link StreamConsumerFactory} from the {@link StreamMetadata::getConsumerFactoryName()} property and initializes it
+ * Provider class for {@link StreamConsumerFactory}
  */
 public abstract class StreamConsumerFactoryProvider {
 
+  /**
+   * Constructs the {@link StreamConsumerFactory} using the {@link StreamMetadata::getConsumerFactoryName()} property and initializes it
+   * @param streamMetadata
+   * @return
+   */
   public static StreamConsumerFactory create(StreamMetadata streamMetadata) {
     StreamConsumerFactory factory = null;
     try {

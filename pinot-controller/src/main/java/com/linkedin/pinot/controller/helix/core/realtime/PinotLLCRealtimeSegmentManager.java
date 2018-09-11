@@ -86,7 +86,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -1329,7 +1328,6 @@ public class PinotLLCRealtimeSegmentManager {
     private StreamConsumerFactory _streamConsumerFactory;
     StreamMetadata _streamMetadata;
 
-
     private KafkaOffsetFetcher(final String offsetCriteria, int partitionId, StreamMetadata streamMetadata) {
       _offsetCriteria = offsetCriteria;
       _partitionId = partitionId;
@@ -1349,9 +1347,8 @@ public class PinotLLCRealtimeSegmentManager {
     @Override
     public Boolean call() throws Exception {
 
-      StreamMetadataProvider streamMetadataProvider =
-          _streamConsumerFactory.createPartitionMetadataProvider(_partitionId);
-      try {
+      try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
+          _partitionId)) {
         _offset =
             streamMetadataProvider.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {
@@ -1360,14 +1357,13 @@ public class PinotLLCRealtimeSegmentManager {
         }
         return Boolean.TRUE;
       } catch (TransientConsumerException e) {
-        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId, e.getMessage());
+        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId,
+            e.getMessage());
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
         _exception = e;
         throw e;
-      } finally {
-        IOUtils.closeQuietly(streamMetadataProvider);
       }
     }
   }

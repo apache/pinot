@@ -1136,6 +1136,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
+  /**
+   * Creates a new stream consumer
+   * @param reason
+   */
   private void makeStreamConsumer(String reason) {
     if (_streamConsumer != null) {
       try {
@@ -1148,6 +1152,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _streamConsumer = _streamConsumerFactory.createStreamConsumer(_streamPartitionId);
   }
 
+  /**
+   * Creates a new stream metadata provider
+   * @param reason
+   */
   private void makeStreamMetadataProvider(String reason) {
     if (_streamMetadataProvider != null) {
       try {

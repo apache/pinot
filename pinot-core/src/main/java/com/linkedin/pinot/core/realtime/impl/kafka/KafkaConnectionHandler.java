@@ -93,6 +93,11 @@ public class KafkaConnectionHandler {
     }
   }
 
+  /**
+   * Creates a kafka connection given the stream metadata
+   * @param streamMetadata
+   * @param kafkaSimpleConsumerFactory
+   */
   public KafkaConnectionHandler(StreamMetadata streamMetadata, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     _kafkaSimpleConsumerFactory = kafkaSimpleConsumerFactory;
     _clientId = KafkaConnectionHandler.class.getName() + "-" + streamMetadata.getKafkaTopicName();
@@ -107,6 +112,12 @@ public class KafkaConnectionHandler {
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
+  /**
+   * Creates a kafka connection given the stream metadata and partition
+   * @param streamMetadata
+   * @param partition
+   * @param kafkaSimpleConsumerFactory
+   */
   public KafkaConnectionHandler(StreamMetadata streamMetadata, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     _kafkaSimpleConsumerFactory = kafkaSimpleConsumerFactory;

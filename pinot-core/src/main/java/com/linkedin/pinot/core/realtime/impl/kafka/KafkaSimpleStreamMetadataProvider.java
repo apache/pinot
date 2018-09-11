@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Implementation of a stream metadata provider for a kafka simple stream
+ * Implementation of a stream metadata provider for a kafka stream using kafka'a simple consumer
  */
 public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler implements StreamMetadataProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamMetadataProvider.class);
@@ -46,15 +47,25 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
    * @param streamMetadata
    * @param partition
    */
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition,
-      KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    super(streamMetadata, partition, kafkaSimpleConsumerFactory);
+  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition) {
+    super(streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
   /**
    * Create a stream specific metadata provider
    * @param streamMetadata
    */
+  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata) {
+    super(streamMetadata, new KafkaSimpleConsumerFactoryImpl());
+  }
+
+  @VisibleForTesting
+  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition,
+      KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
+    super(streamMetadata, partition, kafkaSimpleConsumerFactory);
+  }
+
+  @VisibleForTesting
   public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(streamMetadata, kafkaSimpleConsumerFactory);

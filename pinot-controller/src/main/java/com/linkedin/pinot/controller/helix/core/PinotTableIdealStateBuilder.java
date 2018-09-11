@@ -33,7 +33,6 @@ import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
@@ -210,10 +209,12 @@ public class PinotTableIdealStateBuilder {
   private static class KafkaPartitionsCountFetcher implements Callable<Boolean> {
     private int _partitionCount = -1;
     private final StreamMetadata _streamMetadata;
+    private StreamConsumerFactory _streamConsumerFactory;
     private Exception _exception;
 
     private KafkaPartitionsCountFetcher(StreamMetadata streamMetadata) {
       _streamMetadata = streamMetadata;
+      _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
     }
 
     private int getPartitionCount() {
@@ -231,12 +232,11 @@ public class PinotTableIdealStateBuilder {
       if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
         LOGGER.warn("Could not get partition count for topic {}. Invalid config for bootstrap hosts:'{}'",
             kafkaTopicName, bootstrapHosts);
-        throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST + ":'"
-            + bootstrapHosts + "'");
+        throw new RuntimeException(
+            "Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST + ":'" + bootstrapHosts + "'");
       }
-      StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
-      StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider();
-      try {
+
+      try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider()) {
         _partitionCount = streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
         if (_exception != null) {
           // We had at least one failure, but succeeded now. Log an info
@@ -244,15 +244,13 @@ public class PinotTableIdealStateBuilder {
         }
         return Boolean.TRUE;
       } catch (TransientConsumerException e) {
-        LOGGER.warn("Could not get partition count for topic {}:{}", kafkaTopicName, e);
+        LOGGER.warn("Could not get partition count for topic {}", kafkaTopicName, e);
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
-        LOGGER.warn("Could not get partition count for topic {}:{}", kafkaTopicName, e);
+        LOGGER.warn("Could not get partition count for topic {}", kafkaTopicName, e);
         _exception = e;
         throw e;
-      } finally {
-        IOUtils.closeQuietly(streamMetadataProvider);
       }
     }
   }

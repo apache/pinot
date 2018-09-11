@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
@@ -32,11 +33,16 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
+ * Implementation of StreamConsumer using Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
 public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements StreamConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamConsumer.class);
 
+  public KafkaSimpleStreamConsumer(StreamMetadata streamMetadata, int partition) {
+    super(streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
+  }
+
+  @VisibleForTesting
   public KafkaSimpleStreamConsumer(StreamMetadata streamMetadata, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(streamMetadata, partition, kafkaSimpleConsumerFactory);

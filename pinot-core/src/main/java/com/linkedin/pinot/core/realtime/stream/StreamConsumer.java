@@ -19,7 +19,7 @@ import java.io.Closeable;
 
 
 /**
- * Interface that allows us to plugin different Kafka consumers. The default implementation is KafkaSimpleStreamConsumer.
+ * Interface for a Stream Consumer which fetches messages from the stream for given offsets
  */
 public interface StreamConsumer extends Closeable {
 

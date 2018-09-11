@@ -21,22 +21,22 @@ import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 
 
 /**
- * A {@link StreamConsumerFactory} implementation for Kafka's Simple Consumer
+ * A {@link StreamConsumerFactory} implementation for consuming a kafka stream using Kafka's Simple Consumer
  */
 public class SimpleConsumerFactory extends StreamConsumerFactory {
 
   @Override
   public StreamConsumer createStreamConsumer(int partition) {
-    return new KafkaSimpleStreamConsumer(_streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
+    return new KafkaSimpleStreamConsumer(_streamMetadata, partition);
   }
 
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(int partition) {
-    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
+    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, partition);
   }
 
   @Override
   public StreamMetadataProvider createStreamMetadataProvider() {
-    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, new KafkaSimpleConsumerFactoryImpl());
+    return new KafkaSimpleStreamMetadataProvider(_streamMetadata);
   }
 }
