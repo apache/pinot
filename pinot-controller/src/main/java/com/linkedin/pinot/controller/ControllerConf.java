@@ -39,6 +39,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
+  private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
   private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
@@ -118,11 +119,23 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(CONSOLE_WEBAPP_ROOT_PATH, path);
   }
 
-  public String getQueryConsole() {
+  public String getQueryConsoleWebappPath() {
     if (containsKey(CONSOLE_WEBAPP_ROOT_PATH)) {
       return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
     }
     return ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm();
+  }
+
+  public void setQueryConsoleUseHttps(boolean useHttps){
+    setProperty(CONSOLE_WEBAPP_USE_HTTPS, useHttps);
+  }
+
+  public boolean getQueryConsoleUseHttps() {
+    if (containsKey(CONSOLE_WEBAPP_USE_HTTPS)) {
+      return (boolean) getProperty(CONSOLE_WEBAPP_USE_HTTPS);
+    } else {
+      return false;
+    }
   }
 
   public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
