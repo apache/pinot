@@ -27,14 +27,14 @@ import org.apache.commons.lang3.builder.ToStringBuilder;
 public class DataSourceConfig {
 
   private String className;
-  private Map<String, String> properties;
+  private Map<String, Object> properties;
   private String autoLoadClassName = null;
 
 
   public DataSourceConfig() {
 
   }
-  public DataSourceConfig(String className, Map<String, String> properties, String autoLoadClassName) {
+  public DataSourceConfig(String className, Map<String, Object> properties, String autoLoadClassName) {
     this.className = className;
     this.properties = properties;
     this.autoLoadClassName = autoLoadClassName;
@@ -46,10 +46,10 @@ public class DataSourceConfig {
   public void setClassName(String className) {
     this.className = className;
   }
-  public Map<String, String> getProperties() {
+  public Map<String, Object> getProperties() {
     return properties;
   }
-  public void setProperties(Map<String, String> properties) {
+  public void setProperties(Map<String, Object> properties) {
     this.properties = properties;
   }
   public String getAutoLoadClassName() {

@@ -16,21 +16,17 @@
 
 package com.linkedin.thirdeye.datasource.pinot;
 
+import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Objects;
 import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.lang3.StringUtils;
-
-import com.google.common.base.MoreObjects;
-import com.google.common.base.MoreObjects.ToStringHelper;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -232,24 +228,23 @@ public class PinotThirdEyeDataSourceConfig {
    * @throws IllegalArgumentException is thrown if the property map does not contain all necessary fields, i.e.,
    *                                  controller host and port, cluster name, and the URL to zoo keeper.
    */
-  static PinotThirdEyeDataSourceConfig createFromProperties(Map<String, String> properties) {
-    ImmutableMap<String, String> processedProperties = processPropertyMap(properties);
+  static PinotThirdEyeDataSourceConfig createFromProperties(Map<String, Object> properties) {
+    ImmutableMap<String, Object> processedProperties = processPropertyMap(properties);
     if (processedProperties == null) {
       throw new IllegalArgumentException(
           "Invalid properties for data source: " + PinotThirdEyeDataSource.DATA_SOURCE_NAME + ", properties="
               + properties);
     }
 
-    String controllerHost = processedProperties.get(PinotThirdeyeDataSourceProperties.CONTROLLER_HOST.getValue());
-    int controllerPort =
-        Integer.valueOf(processedProperties.get(PinotThirdeyeDataSourceProperties.CONTROLLER_PORT.getValue()));
-    String controllerConnectionScheme =
-        processedProperties.get(PinotThirdeyeDataSourceProperties.CONTROLLER_CONNECTION_SCHEME.getValue());
-    String zookeeperUrl = processedProperties.get(PinotThirdeyeDataSourceProperties.ZOOKEEPER_URL.getValue());
-    String clusterName = processedProperties.get(PinotThirdeyeDataSourceProperties.CLUSTER_NAME.getValue());
+    String controllerHost = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.CONTROLLER_HOST.getValue());
+    int controllerPort = MapUtils.getInteger(processedProperties, PinotThirdeyeDataSourceProperties.CONTROLLER_PORT.getValue());
+    String controllerConnectionScheme = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.CONTROLLER_CONNECTION_SCHEME.getValue());
+    String zookeeperUrl = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.ZOOKEEPER_URL.getValue());
+    String clusterName = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.CLUSTER_NAME.getValue());
+
     // brokerUrl and tag are optional
-    String brokerUrl = processedProperties.get(PinotThirdeyeDataSourceProperties.BROKER_URL.getValue());
-    String tag = processedProperties.get(PinotThirdeyeDataSourceProperties.TAG.getValue());
+    String brokerUrl = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.BROKER_URL.getValue());
+    String tag = MapUtils.getString(processedProperties, PinotThirdeyeDataSourceProperties.TAG.getValue());
 
     Builder builder =
         PinotThirdEyeDataSourceConfig.builder().setControllerHost(controllerHost).setControllerPort(controllerPort)
@@ -276,7 +271,7 @@ public class PinotThirdEyeDataSourceConfig {
    *
    * @return a processed property map; null if the given property map cannot be validated successfully.
    */
-  static ImmutableMap<String, String> processPropertyMap(Map<String, String> properties) {
+  static ImmutableMap<String, Object> processPropertyMap(Map<String, Object> properties) {
     if (MapUtils.isEmpty(properties)) {
       LOG.error("PinotThirdEyeDataSource is missing properties {}", properties);
       return null;
@@ -292,9 +287,9 @@ public class PinotThirdEyeDataSourceConfig {
     // Validates required properties
     final String className = PinotControllerResponseCacheLoader.class.getSimpleName();
     boolean valid = true;
-    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
     for (PinotThirdeyeDataSourceProperties requiredProperty : requiredProperties) {
-      String propertyString = Strings.nullToEmpty(properties.get(requiredProperty.getValue())).trim();
+      String propertyString = nullToEmpty(properties.get(requiredProperty.getValue())).trim();
       if (Strings.isNullOrEmpty(propertyString)) {
         valid = false;
         LOG.error("{} is missing required property {}", className, requiredProperty);
@@ -306,7 +301,7 @@ public class PinotThirdEyeDataSourceConfig {
     if (valid) {
       // Copies optional properties
       for (PinotThirdeyeDataSourceProperties optionalProperty : optionalProperties) {
-        String propertyString = Strings.nullToEmpty(properties.get(optionalProperty.getValue())).trim();
+        String propertyString = nullToEmpty(properties.get(optionalProperty.getValue())).trim();
         if (!Strings.isNullOrEmpty(propertyString)) {
           builder.put(optionalProperty.getValue(), propertyString);
         }
@@ -316,5 +311,12 @@ public class PinotThirdEyeDataSourceConfig {
     } else {
       return null;
     }
+  }
+
+  private static String nullToEmpty(Object value) {
+    if (value == null) {
+      return "";
+    }
+    return value.toString();
   }
 }

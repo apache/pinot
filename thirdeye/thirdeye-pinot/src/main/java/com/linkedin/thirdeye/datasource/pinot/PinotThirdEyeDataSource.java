@@ -104,7 +104,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @param properties the property to initialize this data source.
    */
-  public PinotThirdEyeDataSource(Map<String, String> properties) throws Exception {
+  public PinotThirdEyeDataSource(Map<String, Object> properties) throws Exception {
     Preconditions.checkNotNull(properties, "Data source property cannot be empty.");
 
     PinotResponseCacheLoader pinotResponseCacheLoader = getCacheLoaderInstance(properties);
@@ -124,11 +124,11 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws Exception when an error occurs connecting to the Pinot controller.
    */
-  static PinotResponseCacheLoader getCacheLoaderInstance(Map<String, String> properties)
+  static PinotResponseCacheLoader getCacheLoaderInstance(Map<String, Object> properties)
       throws Exception {
     final String cacheLoaderClassName;
     if (properties.containsKey(CACHE_LOADER_CLASS_NAME_STRING)) {
-      cacheLoaderClassName = properties.get(CACHE_LOADER_CLASS_NAME_STRING);
+      cacheLoaderClassName = properties.get(CACHE_LOADER_CLASS_NAME_STRING).toString();
     } else {
       cacheLoaderClassName = PinotControllerResponseCacheLoader.class.getName();
     }

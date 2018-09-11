@@ -115,10 +115,10 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
    * @param properties the property to initialize this data source
    * @throws Exception the exception
    */
-  public CSVThirdEyeDataSource(Map<String, String> properties) throws Exception {
+  public CSVThirdEyeDataSource(Map<String, Object> properties) throws Exception {
     Map<String, DataFrame> dataframes = new HashMap<>();
-    for (Map.Entry<String, String> property : properties.entrySet()) {
-      try (InputStreamReader reader = new InputStreamReader(makeUrlFromPath(property.getValue()).openStream())) {
+    for (Map.Entry<String, Object> property : properties.entrySet()) {
+      try (InputStreamReader reader = new InputStreamReader(makeUrlFromPath(property.getValue().toString()).openStream())) {
         dataframes.put(property.getKey(), DataFrame.fromCsv(reader));
       }
     }

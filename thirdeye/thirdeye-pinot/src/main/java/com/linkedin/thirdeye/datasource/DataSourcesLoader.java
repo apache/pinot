@@ -60,7 +60,7 @@ public class DataSourcesLoader {
    Map<String, ThirdEyeDataSource> dataSourceMap = new HashMap<>();
    for (DataSourceConfig dataSourceConfig : dataSources.getDataSourceConfigs()) {
      String className = dataSourceConfig.getClassName();
-     Map<String, String> properties = dataSourceConfig.getProperties();
+     Map<String, Object> properties = dataSourceConfig.getProperties();
      try {
        LOG.info("Creating thirdeye datasource {} with properties '{}'", className, properties);
        Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
