@@ -22,8 +22,7 @@ import org.apache.commons.io.FileUtils;
 
 
 /**
- * This class is the default implementation for the PinotCrypter. It assumes that the object given is a file and simply
- * copies the object to the given location.
+ * This class is the default implementation for the PinotCrypter. It simply copies the file to the given location.
  */
 public class DefaultPinotCrypter implements PinotCrypter {
 
@@ -33,18 +32,18 @@ public class DefaultPinotCrypter implements PinotCrypter {
   }
 
   @Override
-  public void encrypt(Object decryptedObject, File encryptedFile) {
+  public void encrypt(File decryptedFile, File encryptedFile) {
     try {
-      FileUtils.copyFile((File) decryptedObject, encryptedFile);
+      FileUtils.copyFile(decryptedFile, encryptedFile);
     } catch (IOException e) {
       FileUtils.deleteQuietly(encryptedFile);
     }
   }
 
   @Override
-  public void decrypt(Object encryptedObject, File decryptedFile) {
+  public void decrypt(File encryptedFile, File decryptedFile) {
     try {
-      FileUtils.copyFile((File) encryptedObject, decryptedFile);
+      FileUtils.copyFile(encryptedFile, decryptedFile);
     } catch (IOException e) {
       FileUtils.deleteQuietly(decryptedFile);
     }

@@ -206,10 +206,7 @@ public class ZKOperator {
   private void moveSegmentToPermanentDirectory(File currentSegmentLocation, URI finalSegmentLocationURI) throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(finalSegmentLocationURI.getScheme());
 
-    // Overwrite current segment file
-    if (pinotFS.exists(finalSegmentLocationURI)) {
-      pinotFS.delete(finalSegmentLocationURI);
-    }
+    // Overwrites current segment file
     pinotFS.copyFromLocalFile(currentSegmentLocation, finalSegmentLocationURI);
   }
 }

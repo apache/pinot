@@ -32,18 +32,16 @@ public interface PinotCrypter {
   void init(Configuration config);
 
   /**
-   * Encrypts the object into the file location provided. The implementation should clean up file after any failures.
-   * @param decryptedObject
+   * Encrypts the file into the file location provided. The implementation should clean up file after any failures.
+   * @param decryptedFile
    * @param encryptedFile
-   * @throws Exception
    */
-  void encrypt(Object decryptedObject, File encryptedFile);
+  void encrypt(File decryptedFile, File encryptedFile);
 
   /**
-   * Decrypts object into file location provided. The implementation should clean up file after any failures.
-   * @param encryptedObject
+   * Decrypts file into file location provided. The implementation should clean up file after any failures.
+   * @param encryptedFile
    * @param decryptedFile
-   * @throws Exception
    */
-  void decrypt(Object encryptedObject, File decryptedFile);
+  void decrypt(File encryptedFile, File decryptedFile);
 }

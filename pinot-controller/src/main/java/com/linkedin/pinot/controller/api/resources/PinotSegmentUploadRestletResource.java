@@ -43,7 +43,6 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineSt
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
 import com.linkedin.pinot.core.crypt.DefaultPinotCrypter;
-import com.linkedin.pinot.core.crypt.MultipartPinotCrypter;
 import com.linkedin.pinot.core.crypt.PinotCrypter;
 import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.core.metadata.DefaultMetadataExtractor;
@@ -266,6 +265,9 @@ public class PinotSegmentUploadRestletResource {
 
     // Get crypter class
     String crypterClassHeader = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
+    if (crypterClassHeader == null) {
+      crypterClassHeader = DefaultPinotCrypter.class.getName();
+    }
 
     // Get Download URI
     String downloadURI = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
@@ -283,25 +285,16 @@ public class PinotSegmentUploadRestletResource {
       // TODO: Change when metadata upload added
       String metadataProviderClass = DefaultMetadataExtractor.class.getName();
 
-      Object encryptedObject;
       switch (uploadType) {
         case URI:
           if (downloadURI == null || downloadURI.isEmpty()) {
             throw new ControllerApplicationException(LOGGER, "Failed to get downloadURI, needed for URI upload",
                 Response.Status.BAD_REQUEST);
           }
-          if (crypterClassHeader == null) {
-            crypterClassHeader = DefaultPinotCrypter.class.getName();
-          }
-          encryptedObject = tempEncryptedFile;
           break;
         case TAR:
-          // In the case of TAR, we will use local file
-          if (crypterClassHeader == null) {
-            crypterClassHeader = MultipartPinotCrypter.class.getName();
-          }
-          downloadURI = "multipart://dummy";
-          encryptedObject = multiPart;
+          getFileFromMultipart(multiPart, tempDecryptedFile);
+          downloadURI = tempDecryptedFile.toURI().toString();
           break;
         default:
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
@@ -310,7 +303,7 @@ public class PinotSegmentUploadRestletResource {
 
       SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(downloadURI).fetchSegmentToLocal(downloadURI, tempEncryptedFile);
 
-      decryptFile(crypterClassHeader, tempDecryptedFile, encryptedObject);
+      decryptFile(crypterClassHeader, tempEncryptedFile, tempDecryptedFile);
 
       // Call metadata provider to extract metadata with file object uri
       SegmentMetadata segmentMetadata = MetadataExtractorFactory.create(metadataProviderClass).extractMetadata(tempDecryptedFile, tempSegmentDir);
@@ -353,10 +346,10 @@ public class PinotSegmentUploadRestletResource {
         provider);
   }
 
-  private void decryptFile(String crypterClassHeader, File tempDecryptedFile, Object encryptedObject) {
+  private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {
     PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassHeader);
     pinotCrypter.init(_controllerConf.subset(CommonConstants.Segment.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER));
-    pinotCrypter.decrypt(encryptedObject, tempDecryptedFile);
+    pinotCrypter.decrypt(tempEncryptedFile, tempDecryptedFile);
   }
 
   @POST
