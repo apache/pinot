@@ -94,5 +94,6 @@ public class LegacyAnomalyFunctionAlgorithmTest {
     Assert.assertEquals(anomalies.get(1).getEndTime(), 9);
     Assert.assertEquals(result.getAnomalies().get(0).getDetectionConfigId(), (Long) 125L);
     Assert.assertNull(result.getAnomalies().get(0).getFunctionId());
+    Assert.assertNull(result.getAnomalies().get(0).getFunction());
   }
 }
