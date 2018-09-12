@@ -74,15 +74,6 @@ public enum MetricType {
     public int byteSize() {
       return 8;
     }
-  },
-  BYTES {
-    public Number toNumber(String s) {
-      return -1;
-    }
-
-    public int byteSize() {
-      return 8;
-    }
   };
 
   public Number toNumber(String s) {
