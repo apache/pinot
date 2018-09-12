@@ -48,7 +48,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
@@ -199,7 +199,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
   private SegmentBuildDescriptor _segmentBuildDescriptor;
-  private PinotStreamConsumerFactory _pinotStreamConsumerFactory;
+  private StreamConsumerFactory _streamConsumerFactory;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -983,7 +983,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _streamMetadata = new StreamMetadata(indexingConfig.getStreamConfigs());
-    _pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(_streamMetadata);
+    _streamConsumerFactory = StreamConsumerFactory.create(_streamMetadata);
+    _streamConsumerFactory.init(_streamMetadata);
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     _streamBootstrapNodes = indexingConfig.getStreamConfigs()
@@ -1063,7 +1064,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setAggregateMetrics(indexingConfig.getAggregateMetrics());
 
     // Create message decoder
-    _messageDecoder = _pinotStreamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
+    _messageDecoder = _streamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
@@ -1138,7 +1139,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     segmentLogger.info("Creating new stream consumer wrapper, reason: {}", reason);
-    _consumerWrapper = _pinotStreamConsumerFactory.buildConsumer(_clientId, _streamPartitionId, _streamMetadata);
+    _consumerWrapper = _streamConsumerFactory.buildConsumer(_clientId, _streamPartitionId, _streamMetadata);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

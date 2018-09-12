@@ -20,20 +20,41 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import javax.annotation.Nonnull;
 
 
-public abstract class PinotStreamConsumerFactory {
-  public static PinotStreamConsumerFactory create(StreamMetadata streamMetadata) {
-    PinotStreamConsumerFactory factory = null;
+public abstract class StreamConsumerFactory {
+  protected StreamMetadata _streamMetadata;
+
+  public static StreamConsumerFactory create(StreamMetadata streamMetadata) {
+    StreamConsumerFactory factory = null;
     try {
-      factory = (PinotStreamConsumerFactory) Class.forName(streamMetadata.getConsumerFactoryName()).newInstance();
+      factory = (StreamConsumerFactory) Class.forName(streamMetadata.getConsumerFactoryName()).newInstance();
     } catch (Exception e) {
       Utils.rethrowException(e);
     }
     return factory;
   }
 
-  public abstract PinotStreamConsumer buildConsumer(@Nonnull String clientId, int partition, StreamMetadata streamMetadata);
+  public void init(StreamMetadata streamMetadata) {
+    _streamMetadata = streamMetadata;
+  }
 
+  public abstract PinotStreamConsumer buildConsumer(@Nonnull String clientId, int partition,
+      StreamMetadata streamMetadata);
+
+  // TODO: start using createMetadataProvider instead of buildMetadataFetcher once StreamMetadataProvider impl is done
   public abstract PinotStreamConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata);
+
+  /**
+   * Creates a metadata provider which provides partition specific metadata
+   * @param partition
+   * @return
+   */
+  public abstract StreamMetadataProvider createPartitionMetadataProvider(int partition);
+
+  /**
+   * Creates a metadata provider which provides stream specific metadata
+   * @return
+   */
+  public abstract StreamMetadataProvider createStreamMetadataProvider();
 
   // TODO First split KafkaLowLevelStreamProviderConfig to be kafka agnostic and kafka-specific and then rename.
   public StreamMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception {

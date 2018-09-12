@@ -49,8 +49,8 @@ public class SimpleConsumerWrapper extends KafkaConnectionHandler implements Pin
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleConsumerWrapper.class);
 
   public SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId, long connectTimeoutMillis) {
-    super(simpleConsumerFactory, bootstrapNodes, clientId, connectTimeoutMillis);
+      String clientId, String topic, long connectTimeoutMillis) {
+    super(simpleConsumerFactory, bootstrapNodes, clientId, topic, connectTimeoutMillis);
   }
 
   public SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
@@ -131,7 +131,7 @@ public class SimpleConsumerWrapper extends KafkaConnectionHandler implements Pin
    * this partition.
    */
   public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(!_metadataOnlyConsumer, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
+    Preconditions.checkState(_isPartitionMetadata, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
     // Ensure that we're connected to the leader
     // TODO Improve error handling
 

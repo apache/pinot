@@ -15,22 +15,36 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import javax.annotation.Nonnull;
 
 
-public class SimpleConsumerFactory extends PinotStreamConsumerFactory {
+public class SimpleConsumerFactory extends StreamConsumerFactory {
+
+  @Override
   public PinotStreamConsumer buildConsumer(String clientId, int partition, StreamMetadata streamMetadata) {
     KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(),
-        clientId, streamMetadata.getKafkaTopicName(), partition, streamMetadata.getKafkaConnectionTimeoutMillis());
+    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(), clientId,
+        streamMetadata.getKafkaTopicName(), partition, streamMetadata.getKafkaConnectionTimeoutMillis());
   }
 
+  @Override
   public PinotStreamConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata) {
     KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(),
-        clientId, streamMetadata.getKafkaConnectionTimeoutMillis());
+    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(), clientId,
+        streamMetadata.getKafkaTopicName(), streamMetadata.getKafkaConnectionTimeoutMillis());
+  }
+
+  @Override
+  public StreamMetadataProvider createPartitionMetadataProvider(int partition) {
+    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, partition);
+  }
+
+  @Override
+  public StreamMetadataProvider createStreamMetadataProvider() {
+    return new KafkaSimpleStreamMetadataProvider(_streamMetadata);
   }
 }

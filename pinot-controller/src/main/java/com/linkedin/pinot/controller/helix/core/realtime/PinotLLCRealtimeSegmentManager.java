@@ -54,7 +54,7 @@ import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
 import com.linkedin.pinot.core.realtime.segment.RealtimeSegmentAssignmentStrategy;
 import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -1325,14 +1325,15 @@ public class PinotLLCRealtimeSegmentManager {
 
     private Exception _exception = null;
     private long _offset = -1;
-    private PinotStreamConsumerFactory _pinotStreamConsumerFactory;
+    private StreamConsumerFactory _streamConsumerFactory;
     StreamMetadata _streamMetadata;
 
 
     private KafkaOffsetFetcher(final String offsetCriteria, int partitionId, StreamMetadata streamMetadata) {
       _offsetCriteria = offsetCriteria;
       _partitionId = partitionId;
-      _pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(streamMetadata);
+      _streamConsumerFactory = StreamConsumerFactory.create(streamMetadata);
+      _streamConsumerFactory.init(streamMetadata);
       _streamMetadata = streamMetadata;
       _topicName = streamMetadata.getKafkaTopicName();
     }
@@ -1349,7 +1350,7 @@ public class PinotLLCRealtimeSegmentManager {
     public Boolean call() throws Exception {
 
       PinotStreamConsumer
-          streamConsumer = _pinotStreamConsumerFactory.buildConsumer("dummyClientId", _partitionId, _streamMetadata);
+          streamConsumer = _streamConsumerFactory.buildConsumer("dummyClientId", _partitionId, _streamMetadata);
       try {
         _offset = streamConsumer.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {
