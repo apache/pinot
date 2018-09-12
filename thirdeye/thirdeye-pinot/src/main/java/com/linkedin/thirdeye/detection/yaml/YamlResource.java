@@ -16,8 +16,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.MapUtils;
 import org.yaml.snakeyaml.Yaml;
@@ -49,6 +52,8 @@ public class YamlResource {
    @return a message contains the saved detection config id & detection alert id
    */
   @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
   public Response setUpDetectionPipeline(@ApiParam("payload") String payload) throws Exception {
     if (Strings.isNullOrEmpty(payload)) {
       throw new IllegalArgumentException("Empty Payload");
@@ -72,12 +77,12 @@ public class YamlResource {
 
     Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
     DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
-    Long detectionAlertConfig = this.detectionAlertConfigDAO.save(alertConfigDTO);
-    Preconditions.checkNotNull(detectionAlertConfig, "Save detection alerter config failed");
+    Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfigDTO);
+    Preconditions.checkNotNull(detectionAlertConfigId, "Save detection alerter config failed");
 
     Map<String, Object> result = new HashMap<>();
     result.put("detectionConfig", detectionConfig);
-    result.put("detectionAlertConfig", detectionAlertConfig);
+    result.put("detectionAlertConfig", alertConfigDTO);
     return Response.ok(result).build();
   }
 
