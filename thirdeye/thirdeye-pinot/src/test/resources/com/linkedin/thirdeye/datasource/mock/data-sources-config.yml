@@ -1,0 +1,62 @@
+dataSourceConfigs:
+  - className: com.linkedin.thirdeye.datasource.mock.MockThirdEyeDataSource
+    properties:
+      datasets:
+        pageViews:
+          granularity: "1hour"
+          timezone: "America/Los_Angeles"
+          dimensions: [country, browser, platform]
+          generators:
+            us:
+              chrome:
+                desktop: [100, 20]
+                mobile:  [200, 50]
+              safari:
+                desktop: [70, 15]
+                mobile:  [250, 40]
+              firefox:
+                desktop: [30, 5]
+                mobile:  [20, 3]
+              edge:
+                desktop: [85, 18]
+            ca:
+              chrome:
+                desktop: [30, 5]
+                mobile:  [70,8]
+              safari:
+                desktop: [20, 3]
+                mobile:  [60, 8]
+              firefox:
+                desktop: [12, 2]
+                mobile:  [7, 1]
+              edge:
+                desktop: [32, 10]
+            mx:
+              chrome:
+                desktop: [40, 6]
+                mobile:  [80,10]
+              safari:
+                desktop: [20, 3]
+                mobile:  [65, 10]
+              firefox:
+                desktop: [15, 3]
+                mobile:  [12, 2]
+              edge:
+                desktop: [32, 9]
+        purchases:
+          granularity: "1day"
+          timezone: "America/Los_Angeles"
+          dimensions: [country, browser]
+          generators:
+            us:
+              chrome:  [16, 2]
+              safari:  [19, 3]
+              edge:    [4, 1]
+            ca:
+              chrome:  [5, 1]
+              safari:  [5, 2]
+              edge:    [1, 1]
+            mx:
+              chrome:  [3, 1]
+              safari:  [5, 2]
+              edge:    [2, 1]
