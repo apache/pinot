@@ -34,6 +34,9 @@ public class DetectionAlertFilterRecipients {
     this.bcc = bcc;
   }
 
+  public DetectionAlertFilterRecipients() {
+  }
+
   public Set<String> getTo() {
     return to;
   }
