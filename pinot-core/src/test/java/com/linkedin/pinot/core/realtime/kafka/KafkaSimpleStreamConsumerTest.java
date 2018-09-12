@@ -262,7 +262,7 @@ public class KafkaSimpleStreamConsumerTest {
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
   }
 
-  @Test
+  @Test(enabled = false)
   public void testFetchOffsets() throws Exception {
     String streamType = "kafka";
     String streamKafkaTopicName = "theTopic";
