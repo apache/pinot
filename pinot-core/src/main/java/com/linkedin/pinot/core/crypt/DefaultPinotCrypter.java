@@ -19,12 +19,15 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * This class is the default implementation for the PinotCrypter. It simply copies the file to the given location.
  */
 public class DefaultPinotCrypter implements PinotCrypter {
+  public static final Logger LOGGER = LoggerFactory.getLogger(DefaultPinotCrypter.class);
 
   @Override
   public void init(Configuration config) {
@@ -36,6 +39,7 @@ public class DefaultPinotCrypter implements PinotCrypter {
     try {
       FileUtils.copyFile(decryptedFile, encryptedFile);
     } catch (IOException e) {
+      LOGGER.warn("Could not encrypt file");
       FileUtils.deleteQuietly(encryptedFile);
     }
   }
@@ -45,6 +49,7 @@ public class DefaultPinotCrypter implements PinotCrypter {
     try {
       FileUtils.copyFile(encryptedFile, decryptedFile);
     } catch (IOException e) {
+      LOGGER.warn("Could not decrypt file");
       FileUtils.deleteQuietly(decryptedFile);
     }
   }

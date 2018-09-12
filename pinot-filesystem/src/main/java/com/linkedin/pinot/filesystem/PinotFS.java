@@ -108,7 +108,7 @@ public abstract class PinotFS {
    * @param dstUri location of dst on remote filesystem
    * @throws IOException for IO Error
    */
-  public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws IOException;
+  public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws Exception;
 
   /**
    * Performs the system-specific decoding of a uri
