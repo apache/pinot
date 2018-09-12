@@ -202,10 +202,22 @@ export default Component.extend({
   groupNameMessage: null,
 
   /**
-   * Temp storage for group recipients from text input
+   * Temp storage for recipients(to) from text input
    * @type {String}
    */
-  groupRecipients: null,
+  toAddresses: null,
+
+  /**
+   * Temp storage for recipients(cc) from text input
+   * @type {String}
+   */
+  ccAddresses: null,
+
+  /**
+   * Temp storage for recipients(bcc) from text input
+   * @type {String}
+   */
+  BccAddresses: null,
 
   /**
    * Group options available in database
@@ -474,9 +486,17 @@ export default Component.extend({
     /**
      * Handles recipient updates
      */
-    onRecipients () {
-      const recipients = get(this, 'groupRecipients');
-      set(this, 'group.recipients', recipients.replace(/[^!-~]+/g, '').replace(/,+/g, ','));
+    onToAddresses () {
+      const toAddresses = get(this, 'toAddresses');
+      set(this, 'group.receiverAddresses.to', toAddresses.replace(/[^!-~]+/g, '').replace(/,+/g, ',').split(','));
+    },
+    onCcAddresses () {
+      const ccAddresses = get(this, 'ccAddresses');
+      set(this, 'group.receiverAddresses.cc', ccAddresses.replace(/[^!-~]+/g, '').replace(/,+/g, ',').split(','));
+    },
+    onBccAddresses () {
+      const bccAddresses = get(this, 'bccAddresses');
+      set(this, 'group.receiverAddresses.bcc', bccAddresses.replace(/[^!-~]+/g, '').replace(/,+/g, ',').split(','));
     },
 
     /**
@@ -524,7 +544,9 @@ export default Component.extend({
       setProperties(this, {
         application: null,
         group: null,
-        groupRecipients: null,
+        toAddresses: null,
+        ccAddresses: null,
+        bccAddresses: null,
         showManageGroupsModal: false,
         changeCache: new Set(),
         groupNameMessage: null
@@ -551,7 +573,9 @@ export default Component.extend({
         .then(res => setProperties(this, {
           application: null,
           group: null,
-          groupRecipients: null,
+          toAddresses: null,
+          ccAddresses: null,
+          bccAddresses: null,
           showManageGroupsModal: false,
           changeCache: new Set(),
           groupNameMessage: null
@@ -574,7 +598,9 @@ export default Component.extend({
         application: group.application, // in case not set
         group,
         groupFunctionIds: (group.emailConfig.functionIds || []).join(', '),
-        groupRecipients: (group.recipients || '').split(',').join(', ')
+        toAddresses: (group.receiverAddresses.to || []).join(', '),
+        ccAddresses: (group.receiverAddresses.cc || []).join(', '),
+        bccAddresses: (group.receiverAddresses.bcc || []).join(', '),
       });
 
       this._validateGroupName(group);
@@ -623,7 +649,13 @@ export default Component.extend({
      */
     onApplication (applicationOption) {
       this._updateChangeCache();
-      setProperties(this, { application: applicationOption.application, group: null, groupRecipients: null, groupNameMessage: null });
+      setProperties(this, {
+        application: applicationOption.application,
+        group: null,
+        toAddresses: null,
+        ccAddresses: null,
+        bccAddresses: null,
+        groupNameMessage: null });
     },
 
     /**

@@ -46,7 +46,6 @@ public class AlertConfigBean extends AbstractBean {
   ReportConfigCollection reportConfigCollection;
   AlertGroupConfig alertGroupConfig;
   EmailFormatterConfig emailFormatterConfig;
-  String recipients;
   DetectionAlertFilterRecipients receiverAddresses;
   String fromAddress;
   SubjectType subjectType = SubjectType.ALERT;
@@ -69,14 +68,6 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setFromAddress(String fromAddress) {
     this.fromAddress = fromAddress;
-  }
-
-  public String getRecipients() {
-    return recipients;
-  }
-
-  public void setRecipients(String recipients) {
-    this.recipients = recipients;
   }
 
   public DetectionAlertFilterRecipients getReceiverAddresses() {
@@ -389,13 +380,13 @@ public class AlertConfigBean extends AbstractBean {
         .equals(getReportConfigCollection(), that.getReportConfigCollection()) && Objects
         .equals(getAlertGroupConfig(), that.getAlertGroupConfig()) && Objects
         .equals(getEmailFormatterConfig(), that.getEmailFormatterConfig()) && Objects
-        .equals(getRecipients(), that.getRecipients()) && Objects.equals(getFromAddress(), that.getFromAddress());
+        .equals(getReceiverAddresses(), that.getReceiverAddresses()) && Objects.equals(getFromAddress(), that.getFromAddress());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getName(), getApplication(), getCronExpression(), getHolidayCronExpression(), isActive(),
         getAnomalyFeedConfig(), getEmailConfig(), getReportConfigCollection(), getAlertGroupConfig(),
-        getEmailFormatterConfig(), getRecipients(), getFromAddress());
+        getEmailFormatterConfig(), getReceiverAddresses(), getFromAddress());
   }
 }

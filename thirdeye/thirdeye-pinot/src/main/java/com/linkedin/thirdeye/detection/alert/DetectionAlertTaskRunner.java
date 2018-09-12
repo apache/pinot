@@ -62,6 +62,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
@@ -170,9 +171,9 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
 
       if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
-        recipients.to.retainAll(this.thirdeyeConfig.getEmailWhitelist());
-        recipients.cc.retainAll(this.thirdeyeConfig.getEmailWhitelist());
-        recipients.bcc.retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.getTo().retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.getCc().retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.getBcc().retainAll(this.thirdeyeConfig.getEmailWhitelist());
       }
 
       if (recipients.to.isEmpty()) {
@@ -201,9 +202,13 @@ public class DetectionAlertTaskRunner implements TaskRunner {
 
       HtmlEmail email = emailEntity.getContent();
       email.setFrom(this.detectionAlertConfig.getFrom());
-      email.setTo(AlertUtils.toAddress(recipients.to));
-      email.setCc(AlertUtils.toAddress(recipients.cc));
-      email.setBcc(AlertUtils.toAddress(recipients.bcc));
+      email.setTo(AlertUtils.toAddress(recipients.getTo()));
+      if (CollectionUtils.isNotEmpty(recipients.getCc())) {
+        email.setCc(AlertUtils.toAddress(recipients.getCc()));
+      }
+      if (CollectionUtils.isNotEmpty(recipients.getBcc())) {
+        email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
+      }
 
       this.sendEmail(emailEntity);
     }

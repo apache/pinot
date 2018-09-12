@@ -46,6 +46,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -144,7 +145,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   }
 
   @Override
-  public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, String recipients, String subject,
+  public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, DetectionAlertFilterRecipients recipients, String subject,
       Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
     Map<String, Object> templateData = getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
 
@@ -278,13 +279,13 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    * Apply the parameter map to given email template, and format it as EmailEntity
    * @param paramMap
    * @param subject
-   * @param emailRecipients
+   * @param recipients
    * @param fromEmail
    * @param emailTemplate
    * @return
    */
-  public EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject, String emailRecipients,
-      String fromEmail, String emailTemplate) {
+  public EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject,
+      DetectionAlertFilterRecipients recipients, String fromEmail, String emailTemplate) {
     if (Strings.isNullOrEmpty(fromEmail)) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
@@ -314,7 +315,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
 
       emailEntity.setFrom(fromEmail);
-      emailEntity.setTo(EmailUtils.getValidEmailAddresses(emailRecipients));
+      emailEntity.setTo(recipients);
       emailEntity.setSubject(subject);
       email.setHtmlMsg(alertEmailHtml);
       emailEntity.setContent(email);

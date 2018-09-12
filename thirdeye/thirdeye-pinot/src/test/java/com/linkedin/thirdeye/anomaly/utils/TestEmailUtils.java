@@ -16,6 +16,8 @@
 
 package com.linkedin.thirdeye.anomaly.utils;
 
+import java.util.HashSet;
+import java.util.Set;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -35,9 +37,14 @@ public class TestEmailUtils {
   @Test
   public void testGetValidEmailAddresses() {
     String emailAddresses = "user1@host1.domain1,user2@host1.domain1";
-    Assert.assertEquals(EmailUtils.getValidEmailAddresses(emailAddresses), emailAddresses);
-    Assert.assertEquals(EmailUtils.getValidEmailAddresses(emailAddresses + ",user"), emailAddresses);
-    Assert.assertEquals(EmailUtils.getValidEmailAddresses(emailAddresses + ",user1@host1.domain1"), emailAddresses);
-    Assert.assertEquals(EmailUtils.getValidEmailAddresses(emailAddresses + ",, , user1@host1.domain1,  "), emailAddresses);
+
+    Set<String> emailAddressesExpected = new HashSet<>();
+    emailAddressesExpected.add("user1@host1.domain1");
+    emailAddressesExpected.add("user2@host1.domain1");
+
+    Assert.assertTrue(EmailUtils.getValidEmailAddresses(emailAddresses).equals(emailAddressesExpected));
+    Assert.assertTrue(EmailUtils.getValidEmailAddresses(emailAddresses + ",user").equals(emailAddressesExpected));
+    Assert.assertTrue(EmailUtils.getValidEmailAddresses(emailAddresses + ",user1@host1.domain1").equals(emailAddressesExpected));
+    Assert.assertTrue(EmailUtils.getValidEmailAddresses(emailAddresses + ",, , user1@host1.domain1,  ").equals(emailAddressesExpected));
   }
 }

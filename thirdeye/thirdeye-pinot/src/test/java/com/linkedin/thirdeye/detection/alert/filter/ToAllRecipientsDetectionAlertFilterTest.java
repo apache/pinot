@@ -51,7 +51,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
   private static final List<Long> PROP_ID_VALUE = Arrays.asList(1001L, 1002L);
   private static final String PROP_SEND_ONCE = "sendOnce";
 
-  private static final DetectionAlertFilterRecipients RECIPIENTS = new DetectionAlertFilterRecipients(new HashSet<>(PROP_TO_VALUE), new HashSet<>(PROP_CC_VALUE), new HashSet<>(PROP_BCC_VALUE));
+  private static final DetectionAlertFilterRecipients RECIPIENTS = new DetectionAlertFilterRecipients(
+      new HashSet<>(PROP_TO_VALUE), new HashSet<>(PROP_CC_VALUE), new HashSet<>(PROP_BCC_VALUE));
 
   private DetectionAlertFilter alertFilter;
   private List<MergedAnomalyResultDTO> detectedAnomalies;

@@ -92,7 +92,9 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
       alertConfig = new AlertConfigDTO();
     }
     templateData.put("application", returnValueOrDefault(alertConfig.getApplication(), DEFAULT_NULL_STRING_VALUE));
-    templateData.put("recipients", returnValueOrDefault(alertConfig.getRecipients(), DEFAULT_NULL_STRING_VALUE));
+    templateData.put("recipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getTo(), ','), DEFAULT_NULL_STRING_VALUE));
+    templateData.put("ccRecipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getCc(), ','), DEFAULT_NULL_STRING_VALUE));
+    templateData.put("bccRecipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getBcc(), ','), DEFAULT_NULL_STRING_VALUE));
   }
 
   private String returnValueOrDefault(String value, String defaultValue) {

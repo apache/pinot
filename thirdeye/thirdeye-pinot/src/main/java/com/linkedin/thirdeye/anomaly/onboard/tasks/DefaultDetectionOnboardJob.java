@@ -69,6 +69,8 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ALERT_CRON = "alertCron";
   public static final String ALERT_FROM = "alertSender";
   public static final String ALERT_TO = "alertRecipients";
+  public static final String ALERT_CC = "ccRecipients";
+  public static final String ALERT_BCC = "bccRecipients";
   public static final String ALERT_APPLICATION = "application";
   public static final String ANOMALY_FUNCTION_CONFIG = "anomalyFuncitonConfig";
   public static final String ALERT_CONFIG = "alertConfig";
@@ -207,6 +209,12 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     }
     if (this.properties.containsKey(ALERT_TO)) {
       taskConfigs.put(taskPrefix + ALERT_TO, this.properties.get(ALERT_TO));
+    }
+    if (this.properties.containsKey(ALERT_CC)) {
+      taskConfigs.put(taskPrefix + ALERT_CC, this.properties.get(ALERT_CC));
+    }
+    if (this.properties.containsKey(ALERT_BCC)) {
+      taskConfigs.put(taskPrefix + ALERT_BCC, this.properties.get(ALERT_BCC));
     }
     if (this.properties.containsKey(ALERT_APPLICATION)) {
       taskConfigs.put(taskPrefix + ALERT_APPLICATION, this.properties.get(ALERT_APPLICATION));

@@ -88,9 +88,7 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
             }
           });
 
-      result.addMapping(new DetectionAlertFilterRecipients(
-          new HashSet<>(Arrays.asList(this.alertConfig.getRecipients().split(","))), Collections.<String>emptySet(), Collections.<String>emptySet()), new HashSet<>(anomalies));
-
+      result.addMapping(this.alertConfig.getReceiverAddresses(), new HashSet<>(anomalies));
     }
 
     return result;

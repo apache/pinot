@@ -90,7 +90,8 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
 
     // generate recipients-anomalies mapping
     for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> entry : grouped.asMap().entrySet()) {
-      result.addMapping(new DetectionAlertFilterRecipients(this.makeGroupRecipients(entry.getKey()), this.cc, this.bcc), new HashSet<>(entry.getValue()));
+      result.addMapping(new DetectionAlertFilterRecipients(this.makeGroupRecipients(entry.getKey()), this.cc, this.bcc),
+          new HashSet<>(entry.getValue()));
     }
 
     return result;

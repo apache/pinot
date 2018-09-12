@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datalayer.DaoTestUtils;
@@ -31,6 +32,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.lang.reflect.Field;
@@ -115,7 +117,9 @@ public class TestOnboardingNotificationContentFormatter {
     context.setAlertConfig(alertConfigDTO);
     EmailContentFormatter contentFormatter = new OnboardingNotificationEmailContentFormatter();
     contentFormatter.init(new Properties(), EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(thirdeyeAnomalyConfig));
-    EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, "a@b.com", TEST,
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses("a@b.com"));
+    EmailEntity emailEntity = contentFormatter.getEmailEntity(alertConfigDTO, recipients, TEST,
         null, "", anomalies, context);
 
     String htmlPath = ClassLoader.getSystemResource("test-onboard-notification-email-content-formatter.html").getPath();

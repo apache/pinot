@@ -181,7 +181,7 @@ public class DetectionJobResource {
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
       @QueryParam("userDefinedPattern") @DefaultValue("UP") String userDefinedPattern,
       @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
       @QueryParam("smtpPort") Integer smtpPort, @QueryParam("phantomJsPath") String phantomJsPath) {
 
@@ -210,8 +210,8 @@ public class DetectionJobResource {
       String replayFailureSubject =
           new StringBuilder("Replay failed on metric: " + anomalyFunctionDAO.findById(id).getMetric()).toString();
       String replayFailureText = new StringBuilder("Failed on Function: " + id + "with Job Id: " + jobId).toString();
-      emailResource.sendEmailWithText(null, null, replayFailureSubject, replayFailureText,
-          smtpHost, smtpPort);
+      emailResource.sendEmailWithText(null, null, null,  null, replayFailureSubject,
+          replayFailureText, smtpHost, smtpPort);
       return Response.status(Status.BAD_REQUEST).entity("Replay job error with job status: {}" + jobStatus).build();
     } else {
       numReplayedAnomalies =
@@ -233,8 +233,8 @@ public class DetectionJobResource {
     String subject = new StringBuilder(
         "Replay results for " + anomalyFunctionDAO.findById(id).getFunctionName() + " is ready for review!").toString();
 
-    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject,
-        false, true, teHost, smtpHost, smtpPort, phantomJsPath);
+    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, ccAddr,
+        bccAddr, subject, false, true, teHost, smtpHost, smtpPort, phantomJsPath);
     LOG.info("Sent out email");
 
     return Response.ok("Replay, Tuning and Notification finished!").build();

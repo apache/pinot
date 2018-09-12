@@ -45,6 +45,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -66,6 +67,7 @@ import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailFormatterConfig
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportConfigCollection;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportMetricConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -81,6 +83,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TimeZone;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -252,7 +255,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           anomalyResultListOfGroup.add(anomaly);
         }
         // Append auxiliary recipients for this group
-        String recipientsForThisGroup = alertConfig.getRecipients();
+        DetectionAlertFilterRecipients recipientsForThisGroup = alertConfig.getReceiverAddresses();
         //   Get auxiliary email recipient from provider
         AlertGroupAuxiliaryInfoProvider auxiliaryInfoProvider =
             alertGroupAuxiliaryInfoProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
@@ -270,10 +273,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           emailSubjectBuilder.append(" (").append(auxiliaryInfo.getGroupTag()).append(") ");
         }
         // Append auxiliary recipients
-        if (StringUtils.isNotBlank(auxiliaryInfo.getAuxiliaryRecipients())) {
-          recipientsForThisGroup =
-              recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryInfo.getAuxiliaryRecipients();
-        }
+        recipientsForThisGroup.getTo().addAll(EmailUtils.getValidEmailAddresses(auxiliaryInfo.getAuxiliaryRecipients()));
+
         // Construct group name if dimensions of this group is not empty
         String groupName = null;
         if (dimensions.size() != 0) {
@@ -418,7 +419,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           Template template = freemarkerConfig.getTemplate("data-report-by-metric-dimension.ftl");
           template.process(templateData, out);
 
-          String recipients = alertConfig.getRecipients();
+          DetectionAlertFilterRecipients recipients = alertConfig.getReceiverAddresses();
           if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
             recipients = retainWhitelisted(recipients, thirdeyeConfig.getEmailWhitelist());
           }
@@ -456,7 +457,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     try {
       EmailHelper
           .sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
-              thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
+              thirdeyeConfig.getFailureFromAddress(), new DetectionAlertFilterRecipients(
+                  EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress())));
     } catch (EmailException e) {
       throw new JobExecutionException(e);
     }
@@ -575,20 +577,27 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   /**
    * Retain whitelisted email addresses for email recipient string only.
    *
-   * @param recipients email recipient string
+   * @param recipients email recipient
    * @param whitelist whitelisted recipients
-   * @return recipient string
+   * @return whitelisted recipients
    */
-  private static String retainWhitelisted(String recipients, Collection<String> whitelist) {
-    if (recipients.isEmpty()) {
-      return recipients;
+  private static DetectionAlertFilterRecipients retainWhitelisted(DetectionAlertFilterRecipients recipients, Collection<String> whitelist) {
+    if (recipients == null) {
+      return null;
     }
 
-    List<String> emails = new ArrayList<>(Arrays.asList(recipients.split(EmailHelper.EMAIL_ADDRESS_SEPARATOR)));
+    recipients.setTo(retainWhitelisted(recipients.getTo(), whitelist));
+    recipients.setCc(retainWhitelisted(recipients.getCc(), whitelist));
+    recipients.setBcc(retainWhitelisted(recipients.getBcc(), whitelist));
 
-    emails.retainAll(whitelist);
+    return recipients;
+  }
 
-    return StringUtils.join(emails, EmailHelper.EMAIL_ADDRESS_SEPARATOR);
+  private static Set<String> retainWhitelisted(Set<String> recipients, Collection<String> whitelist) {
+    if (recipients != null) {
+      recipients.retainAll(whitelist);
+    }
+    return recipients;
   }
 
   /**
