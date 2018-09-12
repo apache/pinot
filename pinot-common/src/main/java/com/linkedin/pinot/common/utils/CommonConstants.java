@@ -59,6 +59,10 @@ public class CommonConstants {
       }
     }
 
+    public static class ZkClient {
+      public static final long DEFAULT_CONNECT_TIMEOUT_SEC = 60L;
+    }
+
     public static class DataSource {
       public static final String SCHEMA = "schema";
       public static final String KAFKA = "kafka";
