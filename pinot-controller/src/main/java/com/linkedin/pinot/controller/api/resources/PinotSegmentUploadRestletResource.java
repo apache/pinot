@@ -106,6 +106,7 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotSegmentUploadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
+  public static final String TMP_DIR_PREFIX = "tmp-";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -292,7 +293,7 @@ public class PinotSegmentUploadRestletResource {
                 Response.Status.BAD_REQUEST);
           }
           break;
-        case TAR:
+        case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
           downloadURI = tempDecryptedFile.toURI().toString();
           break;
@@ -403,7 +404,7 @@ public class PinotSegmentUploadRestletResource {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
       // Note that these files could be either the segment file or the segment metadata zip containing only
       // creation.meta and metadata.properties
-      String tempFileName = "tmp-" + System.nanoTime();
+      String tempFileName = TMP_DIR_PREFIX + System.nanoTime();
       tempTarredFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
 
@@ -430,7 +431,7 @@ public class PinotSegmentUploadRestletResource {
           }
           break;
 
-        case TAR:
+        case SEGMENT:
           getFileFromMultipart(multiPart, tempTarredFile);
           break;
 

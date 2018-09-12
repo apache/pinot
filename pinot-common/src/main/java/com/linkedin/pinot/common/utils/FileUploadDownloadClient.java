@@ -76,10 +76,10 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   public enum FileUploadType {
-    URI, JSON, TAR;
+    URI, JSON, SEGMENT;
 
     public static FileUploadType getDefaultUploadType() {
-      return TAR;
+      return SEGMENT;
     }
   }
 
