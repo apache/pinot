@@ -58,7 +58,6 @@
       </div>
 
       {{#bs-accordion as |accordion|}}
-         {{log "filteredAnomalyMapping: " filteredAnomalyMapping}}
         {{#each-in filteredAnomalyMapping as |metric humanizedEntityList|}}
           {{#accordion.item value=metric as |aitem|}}
             {{#aitem.title}}
@@ -69,7 +68,7 @@
             {{/aitem.title}}
             {{#aitem.body collapsed=toggleCollapsed}}
               <div class="pull-left">
-                <i class="glyphicon glyphicon-edit dashboard-container__icon"></i> Report missing anomaly in </div>
+                <i class="glyphicon glyphicon-edit dashboard-container__icon"></i> Report missing anomaly in <span class="anomalies-table__text anomalies-table__text--stronger">alert page</span> for: </div>
               <div class="pull-left dashboard-container__alert-selector">
                 {{#with (get model.alertsByMetric metric) as |alertList|}}
                   {{#power-select
@@ -85,7 +84,6 @@
                   }}
                     {{alertOption}}
                   {{/power-select}}
-                  {{log "humanizedEntityList : " humanizedEntityList}}
                 {{/with}}
               </div>
               <div class="te-button te-button--outline pull-left dashboard-container__go-link">
