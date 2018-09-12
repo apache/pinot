@@ -270,14 +270,14 @@ public class PinotSegmentUploadRestletResource {
       crypterClassHeader = DefaultPinotCrypter.class.getName();
     }
 
-    // Get Download URI
+    // Get storage URI
     String storageURI = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
-    String downloadURI = storageURI;
 
     File tempEncryptedFile = null;
     File tempDecryptedFile = null;
     File tempSegmentDir = null;
     SegmentMetadata segmentMetadata;
+    String downloadURI = null;
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
       String tempFileName = "tmp-" + System.nanoTime();
@@ -297,6 +297,11 @@ public class PinotSegmentUploadRestletResource {
           segmentMetadata =
               getSegmentMetadata(crypterClassHeader, storageURI, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
                   metadataProviderClass);
+          if (new URI(storageURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+            downloadURI = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(), provider.getVip());
+          } else {
+            downloadURI = storageURI;
+          }
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);

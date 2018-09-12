@@ -221,7 +221,7 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
           @Override
           public Integer call() throws Exception {
             return fileUploadDownloadClient.sendSegmentUri(
-                FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort), downloadUri, httpHeaders, null, 10 * 1000).getStatusCode();
+                FileUploadDownloadClient.getUploadSegmentHttpURI(LOCAL_HOST, _controllerPort), downloadUri, httpHeaders, null, 1023311000).getStatusCode();
           }
         }));
 
