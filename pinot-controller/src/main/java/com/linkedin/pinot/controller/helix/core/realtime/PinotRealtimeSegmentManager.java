@@ -94,7 +94,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     String zkUrl = _pinotHelixResourceManager.getHelixZkURL();
     _zkClient = new ZkClient(zkUrl, ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT);
     _zkClient.setZkSerializer(new ZNRecordSerializer());
-    _zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_TIMEOUT_IN_SECOND, TimeUnit.SECONDS);
+    _zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.MAXIMUM_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS);
 
     // Subscribe to any data/child changes to property
     _zkClient.subscribeChildChanges(_tableConfigPath, this);

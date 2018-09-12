@@ -60,7 +60,8 @@ public class CommonConstants {
     }
 
     public static class ZkClient {
-      public static final long DEFAULT_TIMEOUT_IN_SECOND = 20L;
+      public static final long DEFAULT_CONNECT_TIMEOUT_SEC = 20L;
+      public static final long MAXIMUM_CONNECT_TIMEOUT_SEC = Integer.MAX_VALUE;
     }
 
     public static class DataSource {
