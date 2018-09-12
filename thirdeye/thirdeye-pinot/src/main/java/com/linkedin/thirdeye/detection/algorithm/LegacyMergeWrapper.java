@@ -241,16 +241,6 @@ public class LegacyMergeWrapper extends DetectionPipeline {
           this.anomalyFunction.updateMergedAnomalyInfo(mergedAnomalyResult, metricTimeSeries,
               new DateTime(mergedAnomalyResult.getStartTime()), new DateTime(mergedAnomalyResult.getEndTime()), retrievedAnomalies);
 
-          // global metric impact
-          if (!StringUtils.isBlank(anomalyFunctionSpec.getGlobalMetric())) {
-            MetricSlice slice = makeGlobalSlice(anomalyFunctionSpec, mergedAnomalyResult);
-
-            double valGlobal = this.provider.fetchAggregates(Collections.singleton(slice), Collections.<String>emptyList()).get(slice).getDouble(COL_VALUE, 0);
-            double diffLocal = mergedAnomalyResult.getAvgCurrentVal() - mergedAnomalyResult.getAvgBaselineVal();
-
-            mergedAnomalyResult.setImpactToGlobal(diffLocal / valGlobal);
-          }
-
           // re-populate anomaly meta data after partial override from
           // AnomalyTimeBasedSummarizer and updateMergedAnomalyInfo()
           SetMultimap<String, String> filters = HashMultimap.create(anomalyFunctionSpec.getFilterSet());
@@ -264,6 +254,16 @@ public class LegacyMergeWrapper extends DetectionPipeline {
           mergedAnomalyResult.setFunctionId(null);
           mergedAnomalyResult.setFunction(null);
           mergedAnomalyResult.setDetectionConfigId(this.config.getId());
+
+          // global metric impact
+          if (!StringUtils.isBlank(anomalyFunctionSpec.getGlobalMetric())) {
+            MetricSlice slice = makeGlobalSlice(anomalyFunctionSpec, mergedAnomalyResult);
+
+            double valGlobal = this.provider.fetchAggregates(Collections.singleton(slice), Collections.<String>emptyList()).get(slice).getDouble(COL_VALUE, 0);
+            double diffLocal = mergedAnomalyResult.getAvgCurrentVal() - mergedAnomalyResult.getAvgBaselineVal();
+
+            mergedAnomalyResult.setImpactToGlobal(diffLocal / valGlobal);
+          }
 
           mergedAnomalies.add(mergedAnomalyResult);
 
