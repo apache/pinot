@@ -17,6 +17,7 @@ package com.linkedin.pinot.filesystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
 
@@ -108,4 +109,13 @@ public abstract class PinotFS {
    * @throws IOException for IO Error
    */
   public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws IOException;
+
+  /**
+   * Performs the system-specific decoding of a uri
+   * @param uri
+   * @return
+   */
+  public String decodeURI(String uri) throws UnsupportedEncodingException {
+    throw new RuntimeException("Not implemented");
+  }
 }

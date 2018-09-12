@@ -44,7 +44,6 @@ public class SegmentFetcherFactoryTest {
     _segmentFetcherFactory.init(new PropertiesConfiguration(), new PropertiesConfiguration());
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("file"));
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("http"));
-    Assert.assertTrue(_segmentFetcherFactory.containsProtocol("multipart"));
     Assert.assertFalse(_segmentFetcherFactory.containsProtocol("https"));
     Assert.assertFalse(_segmentFetcherFactory.containsProtocol("hdfs"));
   }
@@ -75,9 +74,6 @@ public class SegmentFetcherFactoryTest {
         _segmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
     Assert.assertTrue(_segmentFetcherFactory.getSegmentFetcherBasedOnURI(
         "file://a/asdf/wer/fd/e") instanceof PinotFSSegmentFetcher);
-    Assert.assertTrue(
-        _segmentFetcherFactory.getSegmentFetcherBasedOnURI("multipart://something:wer:") instanceof MultipartSegmentFetcher);
-
     Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
     Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("https://something"));
     try {

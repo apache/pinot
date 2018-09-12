@@ -417,7 +417,7 @@ public class PinotSegmentUploadRestletResource {
         case URI:
           // Get download URI
           try {
-            downloadURI = getDownloadUri(uploadType, headers, segmentJsonStr);
+            downloadURI = getDownloadUri(uploadType, headers);
           } catch (Exception e) {
             throw new ControllerApplicationException(LOGGER, "Failed to get download URI", Response.Status.BAD_REQUEST,
                 e);
@@ -695,8 +695,7 @@ public class PinotSegmentUploadRestletResource {
     return ControllerConf.constructDownloadUrl(tableName, segmentName, provider.getVip());
   }
 
-  private String getDownloadUri(FileUploadDownloadClient.FileUploadType uploadType, HttpHeaders headers,
-      String segmentJsonStr) throws Exception {
+  private String getDownloadUri(FileUploadDownloadClient.FileUploadType uploadType, HttpHeaders headers) {
     switch (uploadType) {
       case URI:
         return headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);

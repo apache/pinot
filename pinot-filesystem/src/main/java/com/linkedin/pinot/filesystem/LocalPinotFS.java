@@ -17,7 +17,9 @@ package com.linkedin.pinot.filesystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLDecoder;
 import java.nio.file.Files;
 import java.util.Collection;
 import org.apache.commons.configuration.Configuration;
@@ -79,7 +81,7 @@ public class LocalPinotFS extends PinotFS {
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     File srcFile = new File(srcUri);
-    File dstFile = new File(dstUri);
+    File dstFile = new File(decodeURI(dstUri.getRawPath()));
     if (dstFile.exists()) {
       FileUtils.deleteQuietly(dstFile);
     }
@@ -124,5 +126,10 @@ public class LocalPinotFS extends PinotFS {
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri) throws IOException {
     copy(srcFile.toURI(), dstUri);
+  }
+
+  @Override
+  public String decodeURI(String uri) throws UnsupportedEncodingException {
+    return URLDecoder.decode(uri, "UTF-8");
   }
 }

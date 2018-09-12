@@ -42,7 +42,7 @@ public class SegmentFetcherFactory {
   }
 
   public static final String PROTOCOLS_KEY = "protocols";
-  public static final List<String> DEFAULT_PROTOCOLS = Collections.unmodifiableList(Arrays.asList("file", "http", "multipart"));
+  public static final List<String> DEFAULT_PROTOCOLS = Collections.unmodifiableList(Arrays.asList("file", "http"));
   public static final Map<String, String> DEFAULT_FETCHER_CLASS_MAP =
       Collections.unmodifiableMap(new HashMap<String, String>(5) {{
         put("http", HttpSegmentFetcher.class.getName());
@@ -50,7 +50,6 @@ public class SegmentFetcherFactory {
         put("hdfs", PinotFSSegmentFetcher.class.getName());
         put("adl", PinotFSSegmentFetcher.class.getName());
         put("file", PinotFSSegmentFetcher.class.getName());
-        put("multipart", MultipartSegmentFetcher.class.getName());
       }});
   public static final String FETCHER_CLASS_KEY_SUFFIX = ".class";
 

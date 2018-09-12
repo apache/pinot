@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.api.resources;
 
 import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
@@ -56,7 +57,7 @@ public class FileUploadPathProvider {
       String dataDirScheme = uri.getScheme();
       if (dataDirScheme ==  null) {
         // Assume local fs
-        dataDir = new URI("file", _controllerConf.getDataDir(), null).toString();
+        dataDir = new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, _controllerConf.getDataDir(), null).toString();
       } else {
         scheme = dataDirScheme;
       }
