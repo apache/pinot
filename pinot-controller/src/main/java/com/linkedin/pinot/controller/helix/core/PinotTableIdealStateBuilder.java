@@ -206,6 +206,7 @@ public class PinotTableIdealStateBuilder {
     return groupId;
   }
 
+  // TODO: move this class to kafka specific package
   private static class KafkaPartitionsCountFetcher implements Callable<Boolean> {
     private int _partitionCount = -1;
     private final StreamMetadata _streamMetadata;

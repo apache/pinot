@@ -99,7 +99,7 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
       // Send the metadata request to Kafka
       TopicMetadataResponse topicMetadataResponse = null;
       try {
-        topicMetadataResponse = _kafkaSimpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(_topic)));
+        topicMetadataResponse = _simpleConsumer.send(new TopicMetadataRequest(Collections.singletonList(_topic)));
       } catch (Exception e) {
         _currentState.handleConsumerException(e);
         continue;
@@ -187,7 +187,7 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
           new PartitionOffsetRequestInfo(offsetRequestTime, 1)), kafka.api.OffsetRequest.CurrentVersion(), _clientId);
       OffsetResponse offsetResponse;
       try {
-        offsetResponse = _kafkaSimpleConsumer.getOffsetsBefore(request);
+        offsetResponse = _simpleConsumer.getOffsetsBefore(request);
       } catch (Exception e) {
         _currentState.handleConsumerException(e);
         continue;

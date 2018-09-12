@@ -76,7 +76,7 @@ public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements
       throw new java.util.concurrent.TimeoutException();
     }
 
-    FetchResponse fetchResponse = _kafkaSimpleConsumer.fetch(new FetchRequestBuilder().minBytes(100000)
+    FetchResponse fetchResponse = _simpleConsumer.fetch(new FetchRequestBuilder().minBytes(100000)
         .maxWait(timeoutMillis)
         .addFetch(_topic, _partition, startOffset, 500000)
         .build());

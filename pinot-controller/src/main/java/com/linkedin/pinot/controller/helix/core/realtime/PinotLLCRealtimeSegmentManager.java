@@ -1318,6 +1318,7 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
+  // TODO: move this class to kafka specific package
   private static class KafkaOffsetFetcher implements Callable<Boolean> {
     private final String _topicName;
     private final String _offsetCriteria;
