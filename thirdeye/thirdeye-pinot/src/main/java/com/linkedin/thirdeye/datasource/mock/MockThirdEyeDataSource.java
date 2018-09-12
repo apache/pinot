@@ -24,6 +24,8 @@ import org.joda.time.DateTimeZone;
 public class MockThirdEyeDataSource implements ThirdEyeDataSource {
   private final Map<String, MockDataset> datasets;
 
+  private final Map<String, Map<String, List<String>>> dimensionFiltersCache;
+
   /**
    * This constructor is invoked by Java Reflection to initialize a ThirdEyeDataSource.
    *
@@ -31,13 +33,19 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
    * @throws Exception if properties cannot be parsed
    */
   public MockThirdEyeDataSource(Map<String, Object> properties) throws Exception {
+    // datasets
     this.datasets = new HashMap<>();
-
     Map<String, Object> config = ConfigUtils.getMap(properties.get("datasets"));
     for (Map.Entry<String, Object> entry : config.entrySet()) {
       this.datasets.put(entry.getKey(), MockDataset.fromMap(
-          ConfigUtils.<String, Object>getMap(entry.getValue())
+          entry.getKey(), ConfigUtils.<String, Object>getMap(entry.getValue())
       ));
+    }
+
+    // dimension filters
+    this.dimensionFiltersCache = new HashMap<>();
+    for (MockDataset dataset : this.datasets.values()) {
+      this.dimensionFiltersCache.put(dataset.name, extractDimensionFilters(dataset));
     }
   }
 
@@ -74,22 +82,26 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     if (!this.datasets.containsKey(dataset)) {
       throw new IllegalArgumentException(String.format("Could not resolve dataset '%s'", dataset));
     }
-
     return System.currentTimeMillis();
   }
 
   @Override
   public Map<String, List<String>> getDimensionFilters(String dataset) throws Exception {
-    if (!this.datasets.containsKey(dataset)) {
+    if (!this.dimensionFiltersCache.containsKey(dataset)) {
       throw new IllegalArgumentException(String.format("Could not resolve dataset '%s'", dataset));
     }
+    return this.dimensionFiltersCache.get(dataset);
+  }
 
-    MockDataset mockDataset = this.datasets.get(dataset);
+  private static Map<String, List<String>> extractDimensionFilters(MockDataset dataset) {
+    SetMultimap<String, String> allDimensions = HashMultimap.create();
 
-    SetMultimap<String, String> dimensions = extractDimensionValues(mockDataset.dimensions, mockDataset.generators, 0);
+    for (Map<String, Object> metric : dataset.metrics.values()) {
+      allDimensions.putAll(extractDimensionValues(dataset.dimensions, metric, 0));
+    }
 
     Map<String, List<String>> output = new HashMap<>();
-    for (Map.Entry<String, Collection<String>> entry : dimensions.asMap().entrySet()) {
+    for (Map.Entry<String, Collection<String>> entry : allDimensions.asMap().entrySet()) {
       List<String> values = new ArrayList<>(entry.getValue());
       Collections.sort(values);
       output.put(entry.getKey(), values);
@@ -98,7 +110,7 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     return output;
   }
 
-  private SetMultimap<String, String> extractDimensionValues(List<String> dimensions, Map<String, Object> map, int level) {
+  private static SetMultimap<String, String> extractDimensionValues(List<String> dimensions, Map<String, Object> map, int level) {
     SetMultimap<String, String> output = HashMultimap.create();
 
     String key = dimensions.get(level);
@@ -122,21 +134,21 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     final String name;
     final DateTimeZone timezone;
     final List<String> dimensions;
-    final Map<String, Object> generators;
+    final Map<String, Map<String, Object>> metrics;
 
-    MockDataset(String name, DateTimeZone timezone, List<String> dimensions, Map<String, Object> generators) {
+    MockDataset(String name, DateTimeZone timezone, List<String> dimensions, Map<String, Map<String, Object>> metrics) {
       this.name = name;
       this.timezone = timezone;
       this.dimensions = dimensions;
-      this.generators = generators;
+      this.metrics = metrics;
     }
 
-    static MockDataset fromMap(Map<String, Object> map) {
+    static MockDataset fromMap(String name, Map<String, Object> map) {
       return new MockDataset(
-          MapUtils.getString(map, "name"),
+          name,
           DateTimeZone.forID(MapUtils.getString(map, "timezone", "America/Los_Angeles")),
           ConfigUtils.<String>getList(map.get("dimensions")),
-          ConfigUtils.<String, Object>getMap(map.get("generators")));
+          ConfigUtils.<String, Map<String, Object>>getMap(map.get("metrics")));
     }
   }
 }

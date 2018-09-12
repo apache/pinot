@@ -37,7 +37,7 @@ public class MockThirdEyeDatasourceTest {
   @Test
   public void testGetMaxTime() throws Exception {
     long time = System.currentTimeMillis();
-    Assert.assertTrue(this.dataSource.getMaxDataTime("pageViews") >= time);
+    Assert.assertTrue(this.dataSource.getMaxDataTime("business") >= time);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -47,12 +47,12 @@ public class MockThirdEyeDatasourceTest {
 
   @Test
   public void testGetDatasets() throws Exception {
-    Assert.assertEquals(this.dataSource.getDatasets(), Arrays.asList("pageViews", "purchases"));
+    Assert.assertEquals(this.dataSource.getDatasets(), Arrays.asList("business", "tracking"));
   }
 
   @Test
-  public void testGetDimensionFiltersPageViews() throws Exception {
-    Map<String, List<String>> filters = this.dataSource.getDimensionFilters("pageViews");
+  public void testGetDimensionFiltersTracking() throws Exception {
+    Map<String, List<String>> filters = this.dataSource.getDimensionFilters("tracking");
     Assert.assertEquals(filters.keySet(), new HashSet<>(Arrays.asList("country", "browser", "platform")));
     Assert.assertEquals(filters.get("country"), Arrays.asList("ca", "mx", "us"));
     Assert.assertEquals(filters.get("browser"), Arrays.asList("chrome", "edge", "firefox", "safari"));
@@ -60,10 +60,15 @@ public class MockThirdEyeDatasourceTest {
   }
 
   @Test
-  public void testGetDimensionFiltersPurchases() throws Exception {
-    Map<String, List<String>> filters = this.dataSource.getDimensionFilters("purchases");
+  public void testGetDimensionFiltersBusiness() throws Exception {
+    Map<String, List<String>> filters = this.dataSource.getDimensionFilters("business");
     Assert.assertEquals(filters.keySet(), new HashSet<>(Arrays.asList("country", "browser")));
     Assert.assertEquals(filters.get("country"), Arrays.asList("ca", "mx", "us"));
     Assert.assertEquals(filters.get("browser"), Arrays.asList("chrome", "edge", "safari"));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGetDimensionFiltersInvalidDataset() throws Exception {
+    this.dataSource.getDimensionFilters("invalid");
   }
 }
