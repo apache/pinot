@@ -441,7 +441,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   static double reduce(double aggregate, double value, int prevCount, MetricAggFunction aggFunction) {
     if (aggFunction.equals(MetricAggFunction.SUM)) {
       return aggregate + value;
-    } else if (aggFunction.equals(MetricAggFunction.AVG) || aggFunction.isTDigest()) {
+    } else if (aggFunction.equals(MetricAggFunction.AVG) || aggFunction.isPercentile()) {
       return (aggregate * prevCount + value) / (prevCount + 1);
     } else if (aggFunction.equals(MetricAggFunction.MAX)) {
       return Math.max(aggregate, value);
