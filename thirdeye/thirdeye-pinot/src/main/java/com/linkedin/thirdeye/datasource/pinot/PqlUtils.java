@@ -16,6 +16,7 @@
 
 package com.linkedin.thirdeye.datasource.pinot;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
@@ -57,6 +58,7 @@ public class PqlUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
   private static final int DEFAULT_TOP = 100000;
+  private static final String PERCENTILE_TDIGEST_PREFIX = "percentileTDigest";
 
 
   /**
@@ -112,7 +114,7 @@ public class PqlUtils {
     } else {
       metricName = metricConfig.getName();
     }
-    builder.append(metricFunction.getFunctionName()).append("(").append(metricName).append(")");
+    builder.append(convertAggFunction(metricFunction.getFunctionName())).append("(").append(metricName).append(")");
     return builder.toString();
   }
 
@@ -331,5 +333,18 @@ public class PqlUtils {
       throw new IllegalArgumentException(String.format("Could not find quote char for expression: %s", value));
     }
     return String.format("%s%s%s", quoteChar, value, quoteChar);
+  }
+
+  /**
+   * Convert the name of the MetricAggFunction to the name expected by Pinot. See PQL Documentation for details.
+   *
+   * @param aggFunction function enum to convert
+   * @return a valid pinot function name
+   */
+  private static String convertAggFunction(MetricAggFunction aggFunction) {
+    if (aggFunction.isPercentile()) {
+      return aggFunction.name().replaceFirst(MetricAggFunction.PERCENTILE_PREFIX, PERCENTILE_TDIGEST_PREFIX);
+    }
+    return aggFunction.name();
   }
 }

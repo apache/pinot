@@ -17,5 +17,11 @@
 package com.linkedin.thirdeye.constant;
 
 public enum MetricAggFunction {
-  SUM, AVG, COUNT, MAX
+  SUM, AVG, COUNT, MAX, PCT50, PCT90, PCT95, PCT99;
+
+  public static final String PERCENTILE_PREFIX = "PCT";
+
+  public boolean isPercentile() {
+    return this.toString().startsWith(PERCENTILE_PREFIX);
+  }
 }

@@ -32,6 +32,7 @@ public class MetricConfigBean extends AbstractBean {
   public static final String URL_TEMPLATE_START_TIME = "startTime";
   public static final String URL_TEMPLATE_END_TIME = "endTime";
   public static final MetricAggFunction DEFAULT_AGG_FUNCTION = MetricAggFunction.SUM;
+  public static final MetricAggFunction DEFAULT_TDIGEST_AGG_FUNCTION = MetricAggFunction.PCT90;
   public static final String METRIC_PROPERTIES_SEPARATOR = ",";
 
   /**

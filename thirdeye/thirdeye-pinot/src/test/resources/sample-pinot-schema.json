@@ -38,6 +38,10 @@
       "dataType" : "DOUBLE",
       "delimiter" : null,
       "singleValueField" : true
+    },
+    {
+      "name" : "latency_tdigest",
+      "dataType" : "BYTES"
     }
    ],
   "schemaName" : "test-collection"
