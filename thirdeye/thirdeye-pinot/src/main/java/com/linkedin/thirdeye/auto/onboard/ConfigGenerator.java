@@ -93,8 +93,7 @@ public class ConfigGenerator {
       metricConfigDTO.setDefaultAggFunction(MetricConfigBean.DEFAULT_TDIGEST_AGG_FUNCTION);
       metricConfigDTO.setDatatype(MetricType.DOUBLE);
     } else {
-      MetricType dataType = MetricType.valueOf(dataTypeStr);
-      metricConfigDTO.setDatatype(dataType);
+      metricConfigDTO.setDatatype(MetricType.valueOf(dataTypeStr));
     }
 
     return metricConfigDTO;
