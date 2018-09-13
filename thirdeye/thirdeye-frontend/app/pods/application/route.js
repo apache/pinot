@@ -72,7 +72,7 @@ export default Route.extend(ApplicationRouteMixin, {
      */
     error: function(error, transition) {
       const notifications = this.get('notifications');
-      if (error.message === '401' || error.response.status === '401') {
+      if (error.message === '401' || (error.response && error.response.status === '401')) {
         this.set('session.store.errorMsg', 'Your session expired. Please login again.');
         this.transitionTo('logout');
       } else if (error.message === '500' || error.response.status === '500') {
