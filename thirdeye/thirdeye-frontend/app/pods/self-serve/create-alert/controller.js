@@ -905,9 +905,9 @@ export default Controller.extend({
      * @return {undefined}
      */
     onSelectConfigGroup(selectedObj) {
-      const toAddr = (selectedObj.receiverAddresses || []).to.join(", ");
-      const ccAddr = (selectedObj.receiverAddresses || []).cc.join(", ");
-      const bccAddr = (selectedObj.receiverAddresses || []).bcc.join(", ");
+      const toAddr = ((selectedObj.receiverAddresses || []).to || []).join(", ");
+      const ccAddr = ((selectedObj.receiverAddresses || []).cc || []).join(", ");
+      const bccAddr = ((selectedObj.receiverAddresses || []).bcc || []).join(", ");
       this.setProperties({
         selectedConfigGroup: selectedObj,
         newConfigGroupName: null,
@@ -1005,7 +1005,7 @@ export default Controller.extend({
         }
         this.setProperties({
           isDuplicateEmail,
-          duplicateEmails: badEmailArr.join()
+          duplicateEmails: badEmailArr.join(", ")
         });
       }
     },

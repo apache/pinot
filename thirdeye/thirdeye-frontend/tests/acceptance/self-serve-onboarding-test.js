@@ -13,7 +13,9 @@ module('Acceptance | create alert', function(hooks) {
   const id = '1';
   const selectedConfigGroup = `test_alert_${id}`;
   const selectedMetric = `test_collection_${id}::test_metric_${id}`;
-  const groupRecipient = 'simba@disney.com';
+  const toRecipients = 'kopa@disney.com, kiara@disney.com, kion@disney.com';
+  const ccRecipients = 'simba@disney.com, nala@disney.com';
+  const bccRecipients = 'scar@disney.com';
   const newRecipient = 'duane@therock.com';
   const selectedApp = 'the-lion-king';
   const alertNameGeneric = `test_function_${id}`;
@@ -124,15 +126,15 @@ module('Acceptance | create alert', function(hooks) {
     );
     assert.equal(
       $(selfServeConst.CONFIG_BLOCK).find('.control-label').get(0).innerText.replace(/\r?\n?/g, ''),
-      `Recipients in subscription group ${selectedConfigGroup}:${groupRecipient}`,
+      `Recipients in subscription group ${selectedConfigGroup}:To: ${toRecipients}Cc: ${ccRecipients}Bcc: ${bccRecipients}`,
       'Label and email for recipients is correctly rendered'
     );
 
-    await fillIn(selfServeConst.CONFIG_RECIPIENTS_INPUT, groupRecipient);
+    await fillIn(selfServeConst.CONFIG_RECIPIENTS_INPUT, toRecipients);
     await triggerKeyEvent(selfServeConst.CONFIG_RECIPIENTS_INPUT, 'keyup', '8');
     assert.equal(
       $(selfServeConst.EMAIL_WARNING).get(0).innerText,
-      `Warning: ${groupRecipient} is already included in this group.`,
+      `Warning: ${toRecipients} is already included in this group.`,
       'Duplicate email warning appears correctly.'
     );
 
