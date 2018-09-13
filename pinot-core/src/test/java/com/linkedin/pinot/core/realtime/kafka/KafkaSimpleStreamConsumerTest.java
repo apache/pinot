@@ -213,6 +213,7 @@ public class KafkaSimpleStreamConsumerTest {
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = "abcd:1234,bcde:2345";
     String streamKafkaConsumerType = "simple";
+    String clientId = "clientId";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -230,7 +231,8 @@ public class KafkaSimpleStreamConsumerTest {
         streamKafkaTopicName
     );
 
-    KafkaSimpleStreamMetadataProvider streamMetadataProvider = new KafkaSimpleStreamMetadataProvider(streamMetadata, mockKafkaSimpleConsumerFactory);
+    KafkaSimpleStreamMetadataProvider streamMetadataProvider =
+        new KafkaSimpleStreamMetadataProvider(clientId, streamMetadata, mockKafkaSimpleConsumerFactory);
     Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
   }
 
@@ -240,6 +242,7 @@ public class KafkaSimpleStreamConsumerTest {
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = "abcd:1234,bcde:2345";
     String streamKafkaConsumerType = "simple";
+    String clientId = "clientId";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -258,7 +261,8 @@ public class KafkaSimpleStreamConsumerTest {
     );
 
     int partition = 0;
-    KafkaSimpleStreamConsumer kafkaSimpleStreamConsumer = new KafkaSimpleStreamConsumer(streamMetadata, partition, mockKafkaSimpleConsumerFactory);
+    KafkaSimpleStreamConsumer kafkaSimpleStreamConsumer =
+        new KafkaSimpleStreamConsumer(clientId, streamMetadata, partition, mockKafkaSimpleConsumerFactory);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
   }
 
@@ -268,6 +272,7 @@ public class KafkaSimpleStreamConsumerTest {
     String streamKafkaTopicName = "theTopic";
     String streamKafkaBrokerList = "abcd:1234,bcde:2345";
     String streamKafkaConsumerType = "simple";
+    String clientId = "clientId";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
@@ -282,11 +287,11 @@ public class KafkaSimpleStreamConsumerTest {
         new long[] { 12345L, 23456L },
         new long[] { 23456L, 34567L },
         new int[] { 0, 1 },
-        streamKafkaTopicName
-    );
+        streamKafkaTopicName);
 
     int partition = 0;
-    KafkaSimpleStreamMetadataProvider kafkaSimpleStreamMetadataProvider = new KafkaSimpleStreamMetadataProvider(streamMetadata, partition, mockKafkaSimpleConsumerFactory);
+    KafkaSimpleStreamMetadataProvider kafkaSimpleStreamMetadataProvider =
+        new KafkaSimpleStreamMetadataProvider(clientId, streamMetadata, partition, mockKafkaSimpleConsumerFactory);
     kafkaSimpleStreamMetadataProvider.fetchPartitionOffset("smallest", 10000);
   }
 }

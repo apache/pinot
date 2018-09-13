@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
@@ -66,7 +65,7 @@ public class KafkaConnectionHandler {
   String _currentHost;
   int _currentPort;
 
-  final KafkaSimpleConsumerFactory _kafkaSimpleConsumerFactory;
+  final KafkaSimpleConsumerFactory _simpleConsumerFactory;
   SimpleConsumer _simpleConsumer;
 
   final Random _random = new Random();
@@ -96,11 +95,12 @@ public class KafkaConnectionHandler {
   /**
    * Creates a kafka connection given the stream metadata
    * @param streamMetadata
-   * @param kafkaSimpleConsumerFactory
+   * @param simpleConsumerFactory
    */
-  public KafkaConnectionHandler(StreamMetadata streamMetadata, KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    _kafkaSimpleConsumerFactory = kafkaSimpleConsumerFactory;
-    _clientId = KafkaConnectionHandler.class.getName() + "-" + streamMetadata.getKafkaTopicName();
+  public KafkaConnectionHandler(String clientId, StreamMetadata streamMetadata,
+      KafkaSimpleConsumerFactory simpleConsumerFactory) {
+    _simpleConsumerFactory = simpleConsumerFactory;
+    _clientId = clientId;
     _topic = streamMetadata.getKafkaTopicName();
     _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
     _simpleConsumer = null;
@@ -116,12 +116,12 @@ public class KafkaConnectionHandler {
    * Creates a kafka connection given the stream metadata and partition
    * @param streamMetadata
    * @param partition
-   * @param kafkaSimpleConsumerFactory
+   * @param simpleConsumerFactory
    */
-  public KafkaConnectionHandler(StreamMetadata streamMetadata, int partition,
-      KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    _kafkaSimpleConsumerFactory = kafkaSimpleConsumerFactory;
-    _clientId = partition + "-" + NetUtil.getHostnameOrAddress();
+  public KafkaConnectionHandler(String clientId, StreamMetadata streamMetadata, int partition,
+      KafkaSimpleConsumerFactory simpleConsumerFactory) {
+    _simpleConsumerFactory = simpleConsumerFactory;
+    _clientId = clientId;
     _topic = streamMetadata.getKafkaTopicName();
     _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
     _simpleConsumer = null;
@@ -212,9 +212,8 @@ public class KafkaConnectionHandler {
 
       try {
         LOGGER.info("Connecting to bootstrap host {}:{} for topic {}", _currentHost, _currentPort, _topic);
-        _simpleConsumer =
-            _kafkaSimpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
-                SOCKET_BUFFER_SIZE, _clientId);
+        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
+            SOCKET_BUFFER_SIZE, _clientId);
         setCurrentState(new ConnectedToBootstrapNode());
       } catch (Exception e) {
         handleConsumerException(e);
@@ -323,7 +322,7 @@ public class KafkaConnectionHandler {
       // Connect to the partition leader
       try {
         _simpleConsumer =
-            _kafkaSimpleConsumerFactory.buildSimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS,
+            _simpleConsumerFactory.buildSimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS,
                 SOCKET_BUFFER_SIZE, _clientId);
 
         setCurrentState(new ConnectedToPartitionLeader());

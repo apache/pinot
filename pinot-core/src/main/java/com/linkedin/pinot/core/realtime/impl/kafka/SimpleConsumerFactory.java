@@ -26,17 +26,17 @@ import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 public class SimpleConsumerFactory extends StreamConsumerFactory {
 
   @Override
-  public StreamConsumer createStreamConsumer(int partition) {
-    return new KafkaSimpleStreamConsumer(_streamMetadata, partition);
+  public StreamConsumer createStreamConsumer(String clientId, int partition) {
+    return new KafkaSimpleStreamConsumer(clientId, _streamMetadata, partition);
   }
 
   @Override
-  public StreamMetadataProvider createPartitionMetadataProvider(int partition) {
-    return new KafkaSimpleStreamMetadataProvider(_streamMetadata, partition);
+  public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+    return new KafkaSimpleStreamMetadataProvider(clientId, _streamMetadata, partition);
   }
 
   @Override
-  public StreamMetadataProvider createStreamMetadataProvider() {
-    return new KafkaSimpleStreamMetadataProvider(_streamMetadata);
+  public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+    return new KafkaSimpleStreamMetadataProvider(clientId, _streamMetadata);
   }
 }

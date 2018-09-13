@@ -1348,8 +1348,9 @@ public class PinotLLCRealtimeSegmentManager {
     @Override
     public Boolean call() throws Exception {
 
+      String clientId = PinotLLCRealtimeSegmentManager.class.getSimpleName() + "_" + _topicName + "_" + _partitionId;
       try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
-          _partitionId)) {
+          clientId, _partitionId)) {
         _offset =
             streamMetadataProvider.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {

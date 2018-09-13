@@ -33,6 +33,7 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
@@ -214,6 +215,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private Thread _consumerThread;
   private final String _streamTopic;
   private final int _streamPartitionId;
+  final String _clientId;
   private final LLCSegmentName _segmentName;
   private final PlainFieldExtractor _fieldExtractor;
   private StreamConsumer _streamConsumer = null;
@@ -1068,6 +1070,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create message decoder
     _messageDecoder = _streamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
+    _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
     _fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
@@ -1146,7 +1149,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
-    _streamConsumer = _streamConsumerFactory.createStreamConsumer(_streamPartitionId);
+    _streamConsumer = _streamConsumerFactory.createStreamConsumer(_clientId, _streamPartitionId);
   }
 
   /**
@@ -1162,7 +1165,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
     segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
-    _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_streamPartitionId);
+    _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPartitionId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

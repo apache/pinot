@@ -237,7 +237,8 @@ public class PinotTableIdealStateBuilder {
             "Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST + ":'" + bootstrapHosts + "'");
       }
 
-      try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider()) {
+      String clientId = PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName;
+      try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
         _partitionCount = streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
         if (_exception != null) {
           // We had at least one failure, but succeeded now. Log an info

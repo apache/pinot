@@ -38,14 +38,14 @@ import org.slf4j.LoggerFactory;
 public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements StreamConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamConsumer.class);
 
-  public KafkaSimpleStreamConsumer(StreamMetadata streamMetadata, int partition) {
-    super(streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
+  public KafkaSimpleStreamConsumer(String clientId, StreamMetadata streamMetadata, int partition) {
+    super(clientId, streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
   @VisibleForTesting
-  public KafkaSimpleStreamConsumer(StreamMetadata streamMetadata, int partition,
+  public KafkaSimpleStreamConsumer(String clientId, StreamMetadata streamMetadata, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    super(streamMetadata, partition, kafkaSimpleConsumerFactory);
+    super(clientId, streamMetadata, partition, kafkaSimpleConsumerFactory);
   }
 
   /**

@@ -47,28 +47,28 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
    * @param streamMetadata
    * @param partition
    */
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition) {
-    super(streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
+  public KafkaSimpleStreamMetadataProvider(String clientId, StreamMetadata streamMetadata, int partition) {
+    super(clientId, streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
   /**
    * Create a stream specific metadata provider
    * @param streamMetadata
    */
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata) {
-    super(streamMetadata, new KafkaSimpleConsumerFactoryImpl());
+  public KafkaSimpleStreamMetadataProvider(String clientId, StreamMetadata streamMetadata) {
+    super(clientId, streamMetadata, new KafkaSimpleConsumerFactoryImpl());
   }
 
   @VisibleForTesting
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata, int partition,
+  public KafkaSimpleStreamMetadataProvider(String clientId, StreamMetadata streamMetadata, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    super(streamMetadata, partition, kafkaSimpleConsumerFactory);
+    super(clientId, streamMetadata, partition, kafkaSimpleConsumerFactory);
   }
 
   @VisibleForTesting
-  public KafkaSimpleStreamMetadataProvider(StreamMetadata streamMetadata,
+  public KafkaSimpleStreamMetadataProvider(String clientId, StreamMetadata streamMetadata,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    super(streamMetadata, kafkaSimpleConsumerFactory);
+    super(clientId, streamMetadata, kafkaSimpleConsumerFactory);
   }
 
   /**

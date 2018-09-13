@@ -37,20 +37,20 @@ public abstract class StreamConsumerFactory {
    * @param partition
    * @return
    */
-  public abstract StreamConsumer createStreamConsumer(int partition);
+  public abstract StreamConsumer createStreamConsumer(String clientId, int partition);
 
   /**
    * Creates a metadata provider which provides partition specific metadata
    * @param partition
    * @return
    */
-  public abstract StreamMetadataProvider createPartitionMetadataProvider(int partition);
+  public abstract StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition);
 
   /**
    * Creates a metadata provider which provides stream specific metadata
    * @return
    */
-  public abstract StreamMetadataProvider createStreamMetadataProvider();
+  public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);
 
   // TODO First split KafkaLowLevelStreamProviderConfig to be kafka agnostic and kafka-specific and then rename.
   public StreamMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception {
