@@ -19,6 +19,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -69,7 +70,7 @@ public class KafkaConnectionHandler {
 
   final Random _random = new Random();
 
-  boolean _metadataOnlyConsumer;
+  boolean isPartitionProvided;
 
   /**
    * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
@@ -91,33 +92,44 @@ public class KafkaConnectionHandler {
     }
   }
 
-  public KafkaConnectionHandler(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId, long connectTimeoutMillis) {
+  /**
+   * Creates a kafka connection given the stream metadata
+   * @param streamMetadata
+   * @param simpleConsumerFactory
+   */
+  public KafkaConnectionHandler(String clientId, StreamMetadata streamMetadata,
+      KafkaSimpleConsumerFactory simpleConsumerFactory) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _connectTimeoutMillis = connectTimeoutMillis;
+    _topic = streamMetadata.getKafkaTopicName();
+    _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
     _simpleConsumer = null;
 
-    // Topic and partition are ignored for metadata-only consumers
-    _topic = null;
+    isPartitionProvided = false;
     _partition = Integer.MIN_VALUE;
-    _metadataOnlyConsumer = true;
 
-    initializeBootstrapNodeList(bootstrapNodes);
+    initializeBootstrapNodeList(streamMetadata.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
-  public KafkaConnectionHandler(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
-      String clientId, String topic, int partition, long connectTimeoutMillis) {
+  /**
+   * Creates a kafka connection given the stream metadata and partition
+   * @param streamMetadata
+   * @param partition
+   * @param simpleConsumerFactory
+   */
+  public KafkaConnectionHandler(String clientId, StreamMetadata streamMetadata, int partition,
+      KafkaSimpleConsumerFactory simpleConsumerFactory) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = topic;
-    _partition = partition;
-    _connectTimeoutMillis = connectTimeoutMillis;
-    _metadataOnlyConsumer = false;
+    _topic = streamMetadata.getKafkaTopicName();
+    _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
     _simpleConsumer = null;
 
-    initializeBootstrapNodeList(bootstrapNodes);
+    isPartitionProvided = true;
+    _partition = partition;
+
+    initializeBootstrapNodeList(streamMetadata.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
@@ -221,9 +233,7 @@ public class KafkaConnectionHandler {
 
     @Override
     void process() {
-      if (_metadataOnlyConsumer) {
-        // Nothing to do
-      } else {
+      if (isPartitionProvided) {
         // If we're consuming from a partition, we need to find the leader so that we can consume from it. By design,
         // Kafka only allows consumption from the leader and not one of the in-sync replicas.
         setCurrentState(new FetchingLeaderInformation());

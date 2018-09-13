@@ -47,10 +47,12 @@ import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
@@ -199,7 +201,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final SegmentVersion _segmentVersion;
   private final SegmentBuildTimeLeaseExtender _leaseExtender;
   private SegmentBuildDescriptor _segmentBuildDescriptor;
-  private PinotStreamConsumerFactory _pinotStreamConsumerFactory;
+  private StreamConsumerFactory _streamConsumerFactory;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -216,7 +218,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   final String _clientId;
   private final LLCSegmentName _segmentName;
   private final PlainFieldExtractor _fieldExtractor;
-  private PinotStreamConsumer _consumerWrapper = null;
+  private StreamConsumer _streamConsumer = null;
+  private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableName;
   private final String _timeColumnName;
@@ -315,7 +318,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     } else {
       segmentLogger.warn("Stream transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-      makeConsumerWrapper("Too many transient errors");
+      makeStreamConsumer("Too many transient errors");
     }
   }
 
@@ -334,10 +337,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     while(!_shouldStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
-      MessageBatch messageBatch = null;
+      MessageBatch messageBatch;
       try {
-        messageBatch = _consumerWrapper.fetchMessages(_currentOffset, _endOffset,
-            _streamMetadata.getKafkaFetchTimeoutMillis());
+        messageBatch =
+            _streamConsumer.fetchMessages(_currentOffset, _endOffset, _streamMetadata.getKafkaFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
@@ -368,7 +371,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         if (++idleCount > maxIdleCountBeforeStatUpdate) {
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
           idleCount = 0;
-          makeConsumerWrapper("Idle for too long");
+          makeStreamConsumer("Idle for too long");
         }
       }
     }
@@ -927,9 +930,14 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     _realtimeSegment.destroy();
     try {
-      _consumerWrapper.close();
+      _streamConsumer.close();
     } catch (Exception e) {
-      segmentLogger.warn("Could not close consumer wrapper", e);
+      segmentLogger.warn("Could not close stream consumer", e);
+    }
+    try {
+      _streamMetadataProvider.close();
+    } catch (Exception e) {
+      segmentLogger.warn("Could not close stream metadata provider", e);
     }
   }
 
@@ -983,7 +991,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _streamMetadata = new StreamMetadata(indexingConfig.getStreamConfigs());
-    _pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(_streamMetadata);
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     _streamBootstrapNodes = indexingConfig.getStreamConfigs()
@@ -1063,22 +1071,23 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setAggregateMetrics(indexingConfig.getAggregateMetrics());
 
     // Create message decoder
-    _messageDecoder = _pinotStreamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
+    _messageDecoder = _streamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
     _fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
-    makeConsumerWrapper("Starting");
+    makeStreamConsumer("Starting");
+    makeStreamMetadataProvider("Starting");
 
     SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
     if (segmentPartitionConfig != null) {
       try {
-        int nPartitions = _consumerWrapper.getPartitionCount(_streamTopic, /*maxWaitTimeMs=*/5000L);
+        int nPartitions = _streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs=*/5000L);
         segmentPartitionConfig.setNumPartitions(nPartitions);
         realtimeSegmentConfigBuilder.setSegmentPartitionConfig(segmentPartitionConfig);
       } catch (Exception e) {
         segmentLogger.warn("Couldn't get number of partitions in 5s, not using partition config {}", e.getMessage());
-        makeConsumerWrapper("Timeout getting number of partitions");
+        makeStreamMetadataProvider("Timeout getting number of partitions");
       }
     }
 
@@ -1129,16 +1138,36 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private void makeConsumerWrapper(String reason) {
-    if (_consumerWrapper != null) {
+  /**
+   * Creates a new stream consumer
+   * @param reason
+   */
+  private void makeStreamConsumer(String reason) {
+    if (_streamConsumer != null) {
       try {
-        _consumerWrapper.close();
+        _streamConsumer.close();
       } catch (Exception e) {
-        segmentLogger.warn("Could not close stream consumer wrapper");
+        segmentLogger.warn("Could not close stream consumer");
       }
     }
-    segmentLogger.info("Creating new stream consumer wrapper, reason: {}", reason);
-    _consumerWrapper = _pinotStreamConsumerFactory.buildConsumer(_clientId, _streamPartitionId, _streamMetadata);
+    segmentLogger.info("Creating new stream consumer, reason: {}", reason);
+    _streamConsumer = _streamConsumerFactory.createStreamConsumer(_clientId, _streamPartitionId);
+  }
+
+  /**
+   * Creates a new stream metadata provider
+   * @param reason
+   */
+  private void makeStreamMetadataProvider(String reason) {
+    if (_streamMetadataProvider != null) {
+      try {
+        _streamMetadataProvider.close();
+      } catch (Exception e) {
+        segmentLogger.warn("Could not close stream metadata provider");
+      }
+    }
+    segmentLogger.info("Creating new stream metadata provider, reason: {}", reason);
+    _streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPartitionId);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

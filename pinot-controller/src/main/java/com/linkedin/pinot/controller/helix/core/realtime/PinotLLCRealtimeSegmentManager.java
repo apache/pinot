@@ -53,9 +53,10 @@ import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdU
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
 import com.linkedin.pinot.core.realtime.segment.RealtimeSegmentAssignmentStrategy;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -85,7 +86,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
@@ -1318,6 +1318,7 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
+  // TODO: move this class to kafka specific package
   private static class KafkaOffsetFetcher implements Callable<Boolean> {
     private final String _topicName;
     private final String _offsetCriteria;
@@ -1325,14 +1326,13 @@ public class PinotLLCRealtimeSegmentManager {
 
     private Exception _exception = null;
     private long _offset = -1;
-    private PinotStreamConsumerFactory _pinotStreamConsumerFactory;
+    private StreamConsumerFactory _streamConsumerFactory;
     StreamMetadata _streamMetadata;
-
 
     private KafkaOffsetFetcher(final String offsetCriteria, int partitionId, StreamMetadata streamMetadata) {
       _offsetCriteria = offsetCriteria;
       _partitionId = partitionId;
-      _pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(streamMetadata);
+      _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamMetadata);
       _streamMetadata = streamMetadata;
       _topicName = streamMetadata.getKafkaTopicName();
     }
@@ -1348,23 +1348,24 @@ public class PinotLLCRealtimeSegmentManager {
     @Override
     public Boolean call() throws Exception {
 
-      PinotStreamConsumer
-          streamConsumer = _pinotStreamConsumerFactory.buildConsumer("dummyClientId", _partitionId, _streamMetadata);
-      try {
-        _offset = streamConsumer.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+      String clientId = PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + _topicName + "-" + _partitionId;
+      try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
+          clientId, _partitionId)) {
+        _offset =
+            streamMetadataProvider.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
         if (_exception != null) {
-          LOGGER.info("Successfully retrieved offset({}) for stream topic {} partition {}", _offset, _topicName, _partitionId);
+          LOGGER.info("Successfully retrieved offset({}) for stream topic {} partition {}", _offset, _topicName,
+              _partitionId);
         }
         return Boolean.TRUE;
       } catch (TransientConsumerException e) {
-        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId, e.getMessage());
+        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId,
+            e.getMessage());
         _exception = e;
         return Boolean.FALSE;
       } catch (Exception e) {
         _exception = e;
         throw e;
-      } finally {
-        IOUtils.closeQuietly(streamConsumer);
       }
     }
   }

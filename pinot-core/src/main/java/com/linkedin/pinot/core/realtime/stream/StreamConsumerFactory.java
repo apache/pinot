@@ -15,25 +15,42 @@
  */
 package com.linkedin.pinot.core.realtime.stream;
 
-import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import javax.annotation.Nonnull;
 
 
-public abstract class PinotStreamConsumerFactory {
-  public static PinotStreamConsumerFactory create(StreamMetadata streamMetadata) {
-    PinotStreamConsumerFactory factory = null;
-    try {
-      factory = (PinotStreamConsumerFactory) Class.forName(streamMetadata.getConsumerFactoryName()).newInstance();
-    } catch (Exception e) {
-      Utils.rethrowException(e);
-    }
-    return factory;
+/**
+ * Factory for a stream which provides a consumer and a metadata provider for the stream
+ */
+public abstract class StreamConsumerFactory {
+  protected StreamMetadata _streamMetadata;
+
+  /**
+   * Initializes the stream consumer factory with the stream metadata for the table
+   * @param streamMetadata
+   */
+  void init(StreamMetadata streamMetadata) {
+    _streamMetadata = streamMetadata;
   }
 
-  public abstract PinotStreamConsumer buildConsumer(@Nonnull String clientId, int partition, StreamMetadata streamMetadata);
+  /**
+   * Creates a stream consumer which can fetch stream messages
+   * @param partition
+   * @return
+   */
+  public abstract StreamConsumer createStreamConsumer(String clientId, int partition);
 
-  public abstract PinotStreamConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata);
+  /**
+   * Creates a metadata provider which provides partition specific metadata
+   * @param partition
+   * @return
+   */
+  public abstract StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition);
+
+  /**
+   * Creates a metadata provider which provides stream specific metadata
+   * @return
+   */
+  public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);
 
   // TODO First split KafkaLowLevelStreamProviderConfig to be kafka agnostic and kafka-specific and then rename.
   public StreamMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception {
