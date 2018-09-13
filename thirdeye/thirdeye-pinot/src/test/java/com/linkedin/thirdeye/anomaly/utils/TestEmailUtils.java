@@ -24,6 +24,8 @@ public class TestEmailUtils {
   @Test
   public void testIsValidEmailAddress() {
     Assert.assertTrue(EmailUtils.isValidEmailAddress("user@host.domain"));
+    Assert.assertTrue(EmailUtils.isValidEmailAddress("user+suffix@host.domain"));
+    Assert.assertTrue(EmailUtils.isValidEmailAddress("user+suffix-hyphen@host.domain"));
 
     Assert.assertFalse(EmailUtils.isValidEmailAddress(null));
     Assert.assertFalse(EmailUtils.isValidEmailAddress("    "));
