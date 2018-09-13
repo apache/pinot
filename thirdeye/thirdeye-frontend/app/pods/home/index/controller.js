@@ -126,7 +126,7 @@ export default Controller.extend({
               falseNegatives++;
             }
           }
-        })
+        });
       });
 
       const totalAnomaliesCount = get(this, 'anomaliesCount');
