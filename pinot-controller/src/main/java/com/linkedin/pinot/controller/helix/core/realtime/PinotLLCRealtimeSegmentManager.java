@@ -1348,7 +1348,7 @@ public class PinotLLCRealtimeSegmentManager {
     @Override
     public Boolean call() throws Exception {
 
-      String clientId = PinotLLCRealtimeSegmentManager.class.getSimpleName() + "_" + _topicName + "_" + _partitionId;
+      String clientId = PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + _topicName + "-" + _partitionId;
       try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
           clientId, _partitionId)) {
         _offset =
