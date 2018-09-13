@@ -15,6 +15,7 @@ const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
 export default Controller.extend({
   anomalyResponseObj: anomalyUtil.anomalyResponseObj,
   toggleCollapsed: false, /* hide/show accordians */
+  isReportAnomalyEnabled: false,
 
   /**
    * Overrides ember-models-table's css classes
