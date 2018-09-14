@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.*;
 
 
-public class HttpSegmentFetcher implements SegmentFetcher {
+public class HttpSegmentFetcher extends SegmentFetcher {
   protected final Logger _logger = LoggerFactory.getLogger(getClass().getSimpleName());
 
   protected FileUploadDownloadClient _httpClient;

@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -55,8 +56,10 @@ public class SegmentFetcherAndLoader {
     Configuration pinotFSConfig = config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
         config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    Configuration pinotCrypterConfig = config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER_FACTORY);
 
     PinotFSFactory.init(pinotFSConfig);
+    PinotCrypterFactory.init(pinotCrypterConfig);
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
   }
 
@@ -180,9 +183,12 @@ public class SegmentFetcherAndLoader {
     File tempTarFile = new File(tempDir, segmentName + ".tar.gz");
     File tempSegmentDir = new File(tempDir, segmentName);
     try {
-      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempTarFile);
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchEncryptedSegmentToLocal(uri, tempTarFile);
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           tableName, uri, tempTarFile, tempTarFile.length());
+      File decryptedFile = new File(tempTarFile.getParent(), tempTarFile.getName() + CommonConstants.Segment.DECRYPTED_SUFFIX);
+      PinotCrypterFactory.create().decrypt(tempTarFile, decryptedFile);
+      FileUtils.moveFile(decryptedFile, tempTarFile);
 
       // If an exception is thrown when untarring, it means the tar file is broken OR not found after the retry.
       // Thus, there's no need to retry again.

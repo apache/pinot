@@ -295,6 +295,7 @@ public class CommonConstants {
     public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
     public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER_FACTORY = "controller.crypter";
   }
 
   public static class Minion {
@@ -340,6 +341,7 @@ public class CommonConstants {
       public static final String REFRESH_TIME = "segment.offline.refresh.time";
     }
 
+    public static final String DECRYPTED_SUFFIX = "_decrypted";
     public static final String SEGMENT_NAME = "segment.name";
     public static final String TABLE_NAME = "segment.table.name";
     public static final String SEGMENT_TYPE = "segment.type";

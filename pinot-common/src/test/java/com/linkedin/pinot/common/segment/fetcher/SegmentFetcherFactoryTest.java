@@ -85,7 +85,7 @@ public class SegmentFetcherFactoryTest {
     }
   }
 
-  public static class TestSegmentFetcher implements SegmentFetcher {
+  public static class TestSegmentFetcher extends SegmentFetcher {
     public int initCalled = 0;
 
     @Override

@@ -15,22 +15,34 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import com.linkedin.pinot.common.segment.crypt.PinotCrypterFactory;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 
 import java.io.File;
 
+import static com.linkedin.pinot.common.utils.CommonConstants.Segment.*;
 
-public interface SegmentFetcher {
 
-  void init(Configuration configs);
+public abstract class SegmentFetcher {
 
-  void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
+  public abstract void init(Configuration configs);
+
+  public void fetchEncryptedSegmentToLocal(String uri, File tempFile) throws Exception {
+    fetchSegmentToLocal(uri, tempFile);
+    PinotCrypterFactory.create().decrypt(tempFile, new File(tempFile.getParentFile(), tempFile.getName() + DECRYPTED_SUFFIX));
+  }
+
+  /**
+   * Should use fetchEncryptedSegmentToLocal
+   */
+  @Deprecated
+  public abstract void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
 
   /**
    * Returns a list of config keys whose value should not be logged.
    *
    * @return List of protected config keys
    */
-  Set<String> getProtectedConfigKeys();
+  public abstract Set<String> getProtectedConfigKeys();
 }
