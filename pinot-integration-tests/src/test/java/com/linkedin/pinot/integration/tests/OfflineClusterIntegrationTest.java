@@ -17,8 +17,11 @@ package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -40,11 +43,17 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.*;
+
 
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+  private final TableConfig.Builder _offlineBuilder = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE);
+  private static final int NUM_BROKER_INSTANCES = 2;
+  private static final int NUM_SERVER_INSTANCES = 6;
+
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
 
@@ -136,6 +145,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
       Assert.assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
     }
+  }
+
+  @Test
+  public void testTableListForTenant() throws Exception {
+    JSONObject tableList = null;
+
+    // Add a table to the server
+    String createTableUrl = _controllerRequestURLBuilder.forTableCreate();
+
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(getHelixClusterName(),
+        ZkStarter.DEFAULT_ZK_STR, NUM_BROKER_INSTANCES, true);
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(getHelixClusterName(),
+        ZkStarter.DEFAULT_ZK_STR, NUM_SERVER_INSTANCES, true);
+
+    _offlineBuilder.setTableName("testOfflineTable")
+        .setTimeColumnName("timeColumn")
+        .setTimeType("DAYS")
+        .setRetentionTimeUnit("DAYS")
+        .setRetentionTimeValue("5");
+
+    TableConfig offlineTableConfig = _offlineBuilder.build();
+    offlineTableConfig.setTableName("valid_table_name");
+    String offlineTableJSONConfigString = offlineTableConfig.toJSONConfigString();
+    sendPostRequest(createTableUrl, offlineTableJSONConfigString);
+
+    // Try to make sure both kinds of tags work
+    tableList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("DefaultTenant")));
+    assertEquals(tableList.getJSONArray("tables").length(), 1, "Expected 1 table");
+    assertEquals(tableList.getJSONArray("tables").get(0), "mytable_OFFLINE");
   }
 
   @Test

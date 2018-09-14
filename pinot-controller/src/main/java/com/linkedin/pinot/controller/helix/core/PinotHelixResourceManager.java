@@ -257,6 +257,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get key builder
+   * @return
+   */
+  @Nonnull
+  public Builder getKeyBuilder() {
+    return _keyBuilder;
+  }
+
+  /**
    * Get the Helix instance config for the given instance Id.
    *
    * @param instanceId Instance Id

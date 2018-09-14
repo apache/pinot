@@ -74,6 +74,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances");
   }
 
+  public String forTablesFromTenant(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tenants", tenantName, "tables");
+  }
+
   public String forInstanceBulkCreate() {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", "bulkAdd");
   }
