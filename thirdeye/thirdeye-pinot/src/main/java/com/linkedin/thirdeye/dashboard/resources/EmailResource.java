@@ -22,6 +22,7 @@ import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
@@ -29,6 +30,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.EmailException;
@@ -209,11 +211,11 @@ public class EmailResource {
   }
 
   private Response generateAnomalyReportForAnomalies(AnomalyReportGenerator anomalyReportGenerator,
-      List<MergedAnomalyResultDTO> anomalies, boolean applyFilter, long startTime, long endTime, Long groupId, String groupName,
-      String subject, boolean includeSentAnomaliesOnly, String toAddr, String fromAddr, String alertName,
-      boolean includeSummary, String teHost, String smtpHost, int smtpPort) {
-    if (Strings.isNullOrEmpty(toAddr)) {
-      throw new WebApplicationException("Empty : list of recipients" + toAddr);
+      List<MergedAnomalyResultDTO> anomalies, boolean applyFilter, long startTime, long endTime, Long groupId,
+      String groupName, String subject, boolean includeSentAnomaliesOnly, DetectionAlertFilterRecipients recipients,
+      String fromAddr, String alertName, boolean includeSummary, String teHost, String smtpHost, int smtpPort) {
+    if (recipients.getTo().isEmpty()) {
+      throw new WebApplicationException("Empty : list of recipients" + recipients.getTo());
     }
     if(applyFilter){
       anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
@@ -232,7 +234,7 @@ public class EmailResource {
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
         .buildReport(startTime, endTime, groupId, groupName, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, alertName, dummyAlertConfig, includeSummary);
+            includeSentAnomaliesOnly, recipients, alertName, dummyAlertConfig, includeSummary);
     return Response.ok("Request to generate report-email accepted ").build();
   }
 
@@ -255,7 +257,8 @@ public class EmailResource {
   @Path("generate/datasets/{startTime}/{endTime}")
   public Response generateAndSendAlertForDatasets(@PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime, @QueryParam("datasets") String datasets,
-      @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
+      @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
       @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
@@ -284,8 +287,12 @@ public class EmailResource {
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
 
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses(toAddr),
+        EmailUtils.getValidEmailAddresses(ccAddr),
+        EmailUtils.getValidEmailAddresses(bccAddr));
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
-        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        null, subject, includeSentAnomaliesOnly, recipients, fromAddr, "Thirdeye Anomaly Report", true,
         teHost, smtpHost, smtpPort);
   }
 
@@ -310,7 +317,8 @@ public class EmailResource {
   public Response generateAndSendAlertForMetrics(
       @PathParam("startTime") Long startTime, @PathParam("endTime") Long endTime,
       @QueryParam("metrics") String metrics, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
+      @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
@@ -328,8 +336,12 @@ public class EmailResource {
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForMetrics(Arrays.asList(metricsArr), startTime, endTime);
 
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses(toAddr),
+        EmailUtils.getValidEmailAddresses(ccAddr),
+        EmailUtils.getValidEmailAddresses(bccAddr));
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
-        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        null, subject, includeSentAnomaliesOnly, recipients, fromAddr, "Thirdeye Anomaly Report", true,
         teHost, smtpHost, smtpPort);
   }
 
@@ -339,7 +351,8 @@ public class EmailResource {
   public Response generateAndSendAlertForFunctions(
       @PathParam("startTime") Long startTime, @PathParam("endTime") Long endTime,
       @QueryParam("functions") String functions, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
+      @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
@@ -373,8 +386,12 @@ public class EmailResource {
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForFunctions(functionList, startTime, endTime);
 
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses(toAddr),
+        EmailUtils.getValidEmailAddresses(ccAddr),
+        EmailUtils.getValidEmailAddresses(bccAddr));
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
-        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        null, subject, includeSentAnomaliesOnly, recipients, fromAddr, "Thirdeye Anomaly Report", true,
         teHost, smtpConfiguration.getSmtpHost(), smtpConfiguration.getSmtpPort());
   }
 
@@ -383,7 +400,8 @@ public class EmailResource {
   @Path("generate/app/{app}/{startTime}/{endTime}")
   public Response sendEmailForApp(@PathParam("app") String application, @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
+      @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
@@ -423,8 +441,12 @@ public class EmailResource {
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForFunctions(functionList, startTime, endTime);
 
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses(toAddr),
+        EmailUtils.getValidEmailAddresses(ccAddr),
+        EmailUtils.getValidEmailAddresses(bccAddr));
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
-        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, application, true,
+        null, subject, includeSentAnomaliesOnly, recipients, fromAddr, application, true,
         teHost, smtpHost, smtpPort);
   }
 
@@ -432,6 +454,8 @@ public class EmailResource {
   public Response sendEmailWithText(
       @QueryParam("from") String fromAddr,
       @QueryParam("to") String toAddr,
+      @QueryParam("cc") String ccAddr,
+      @QueryParam("bcc") String bccAddr,
       @QueryParam("subject") String subject,
       @QueryParam("text") String text,
       @QueryParam("smtpHost") String smtpHost,
@@ -458,8 +482,11 @@ public class EmailResource {
     HtmlEmail email = new HtmlEmail();
 
     try {
-      EmailHelper.sendEmailWithTextBody(email, smtpConfiguration, subject, text,
-         fromAddr, toAddr
+      EmailHelper.sendEmailWithTextBody(email, smtpConfiguration, subject, text, fromAddr,
+          new DetectionAlertFilterRecipients(
+              EmailUtils.getValidEmailAddresses(toAddr),
+              EmailUtils.getValidEmailAddresses(ccAddr),
+              EmailUtils.getValidEmailAddresses(bccAddr))
       );
     } catch (EmailException e) {
       return Response.ok("Exception in sending out message").build();

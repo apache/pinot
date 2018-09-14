@@ -18,7 +18,9 @@ package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -67,7 +69,8 @@ public class EmailScreenshotHelper {
       LOG.info("Finished with result: {}", result);
     } catch (Exception e) {
       LOG.error("Exception in fetching screenshot for anomaly id {}", anomalyId, e);
-      EmailHelper.sendFailureEmailForScreenshot(anomalyId, e.fillInStackTrace(), smtpConfiguration, failureFromAddress, failureToAddress);
+      EmailHelper.sendFailureEmailForScreenshot(anomalyId, e.fillInStackTrace(), smtpConfiguration, failureFromAddress,
+          new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses(failureToAddress)));
     }
     return result;
   }

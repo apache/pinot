@@ -139,7 +139,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask {
     context.setEnd(end);
 
     emailContentFormatter.init(new Properties(), emailFormatterConfig);
-    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getRecipients(),
+    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getReceiverAddresses(),
         subject, null, "", filteredAnomalyResults, context);
     try {
       EmailHelper.sendEmailWithEmailEntity(emailEntity, smtpConfiguration);

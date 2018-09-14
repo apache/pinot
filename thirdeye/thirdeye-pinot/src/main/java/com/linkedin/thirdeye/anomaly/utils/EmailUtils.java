@@ -16,11 +16,11 @@
 
 package com.linkedin.thirdeye.anomaly.utils;
 
+import com.google.api.client.util.Sets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 import javax.mail.internet.AddressException;
 import javax.mail.internet.InternetAddress;
 import org.apache.commons.lang.StringUtils;
@@ -49,23 +49,21 @@ public class EmailUtils {
   }
 
   /**
-   * Return a list of valid email addresses
+   * Parse and return a set of valid email addresses
    * @param emails comma separated list of emails
    * @return
    */
-  public static String getValidEmailAddresses(String emails) {
-    List<String> emailAddressList= new ArrayList<>();
-    Set<String> addedEmailAddresses = new HashSet<>();
+  public static Set<String> getValidEmailAddresses(String emails) {
+    Set<String> validEmailAddresses = new HashSet<>();
     List<String> invalidEmailAddresses = new ArrayList<>();
     if (StringUtils.isBlank(emails)) {
-      return null;
+      return Sets.newHashSet();
     } else {
       String[] emailArr = emails.split(",");
       for (String email : emailArr) {
         email = email.trim();
-        if (isValidEmailAddress(email) && !addedEmailAddresses.contains(email)) {
-          emailAddressList.add(email);
-          addedEmailAddresses.add(email);
+        if (isValidEmailAddress(email)) {
+          validEmailAddresses.add(email);
         } else {
           invalidEmailAddresses.add(email);
         }
@@ -74,6 +72,6 @@ public class EmailUtils {
     if (invalidEmailAddresses.size() > 0) {
       LOG.warn("Found invalid email addresses, please verify the email addresses: {}", invalidEmailAddresses);
     }
-    return StringUtils.join(emailAddressList, ",");
+    return validEmailAddresses;
   }
 }

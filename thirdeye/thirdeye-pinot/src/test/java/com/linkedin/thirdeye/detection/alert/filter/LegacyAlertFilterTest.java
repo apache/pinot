@@ -24,7 +24,6 @@ import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -42,10 +41,14 @@ public class LegacyAlertFilterTest {
   private static final String PROP_LEGACY_ALERT_FILTER_CONFIG = "legacyAlertFilterConfig";
   private static final String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
   private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
-  private static final String RECIPIENTS_VALUES = "test@example.com,mytest@example.org";
+  private static final String TO_RECIPIENTS_VALUES = "test@example.com,mytest@example.org";
+  private static final String CC_RECIPIENTS_VALUES = "iamcc@host.domain,iamcc2@host.domain";
+  private static final String BCC_RECIPIENTS_VALUES = "iambcc@host.domain";
 
-  private static final DetectionAlertFilterRecipients RECIPIENTS =
-      new DetectionAlertFilterRecipients(new HashSet<>(Arrays.asList("test@example.com", "mytest@example.org")), Collections.<String>emptySet(), Collections.<String>emptySet());
+  private static final DetectionAlertFilterRecipients RECEIVER_ADDRESSES = new DetectionAlertFilterRecipients(
+      new HashSet<>(Arrays.asList(TO_RECIPIENTS_VALUES)),
+      new HashSet<>(Arrays.asList(CC_RECIPIENTS_VALUES)),
+      new HashSet<>(Arrays.asList(BCC_RECIPIENTS_VALUES)));
 
   private List<MergedAnomalyResultDTO> detectedAnomalies;
   private LegacyAlertFilter legacyAlertFilter;
@@ -66,7 +69,7 @@ public class LegacyAlertFilterTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
     Map<String, Object> alertConfig = new HashMap<>();
-    alertConfig.put("recipients", RECIPIENTS_VALUES);
+    alertConfig.put("receiverAddresses", RECEIVER_ADDRESSES);
     properties.put(PROP_LEGACY_ALERT_CONFIG, alertConfig);
     properties.put(PROP_LEGACY_ALERT_FILTER_CLASS_NAME, "com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter");
     properties.put(PROP_LEGACY_ALERT_FILTER_CONFIG, "");
@@ -80,7 +83,7 @@ public class LegacyAlertFilterTest {
   @Test
   public void testRun() throws Exception {
     DetectionAlertFilterResult result = this.legacyAlertFilter.run();
-    Assert.assertEquals(result.getResult().get(RECIPIENTS),
+    Assert.assertEquals(result.getResult().get(RECEIVER_ADDRESSES),
         new HashSet<>(this.detectedAnomalies.subList(0, 4)));
   }
 }

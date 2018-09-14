@@ -16,12 +16,13 @@
 
 package com.linkedin.thirdeye.alert.commons;
 
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import org.apache.commons.mail.HtmlEmail;
 
 
 public class EmailEntity {
   private String from;
-  private String to;
+  private DetectionAlertFilterRecipients to;
   private String subject;
   private HtmlEmail content;
 
@@ -29,7 +30,7 @@ public class EmailEntity {
 
   }
 
-  public EmailEntity(String from, String to, String subject, HtmlEmail content) {
+  public EmailEntity(String from, DetectionAlertFilterRecipients to, String subject, HtmlEmail content) {
     this.from = from;
     this.to = to;
     this.subject = subject;
@@ -44,11 +45,11 @@ public class EmailEntity {
     this.from = from;
   }
 
-  public String getTo() {
+  public DetectionAlertFilterRecipients getTo() {
     return to;
   }
 
-  public void setTo(String to) {
+  public void setTo(DetectionAlertFilterRecipients to) {
     this.to = to;
   }
 

@@ -16,13 +16,16 @@
 
 package com.linkedin.thirdeye.tools.anomaly.report;
 
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+
+
 public class AnomalyReportConfig {
   private String startTimeIso;
   private String endTimeIso;
   private String thirdEyeConfigDirectoryPath;
   private String datasets;
   private String teBaseUrl;
-  private String emailRecipients;
+  private DetectionAlertFilterRecipients emailRecipients;
   private boolean includeNotifiedOnly = true;
 
   public String getEndTimeIso() {
@@ -65,11 +68,11 @@ public class AnomalyReportConfig {
     this.thirdEyeConfigDirectoryPath = thirdEyeConfigDirectoryPath;
   }
 
-  public String getEmailRecipients() {
+  public DetectionAlertFilterRecipients getEmailRecipients() {
     return emailRecipients;
   }
 
-  public void setEmailRecipients(String emailRecipients) {
+  public void setEmailRecipients(DetectionAlertFilterRecipients emailRecipients) {
     this.emailRecipients = emailRecipients;
   }
 

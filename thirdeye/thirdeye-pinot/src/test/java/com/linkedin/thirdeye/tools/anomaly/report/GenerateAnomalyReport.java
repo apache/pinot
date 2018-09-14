@@ -34,6 +34,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
@@ -69,11 +70,11 @@ public class GenerateAnomalyReport {
   List<String> collections;
   String dashboardUrl;
   SmtpConfiguration smtpConfiguration;
-  String emailRecipients;
+  DetectionAlertFilterRecipients emailRecipients;
 
   public GenerateAnomalyReport(Date startTime, Date endTime, File persistenceConfig,
       List<String> datasets, String dashboardUrl, SmtpConfiguration smtpConfiguration,
-      String emailRecipients) {
+      DetectionAlertFilterRecipients emailRecipients) {
     DaoProviderUtil.init(persistenceConfig);
     anomalyResultManager = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     metricConfigManager = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);

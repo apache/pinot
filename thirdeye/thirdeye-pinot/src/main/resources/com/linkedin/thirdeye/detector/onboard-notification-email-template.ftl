@@ -67,10 +67,18 @@
               </tr>
               <tr>
                 <td colspan="1" style="color: #606060; font-size: 14px; line-height: 20px;">
-                  Mailing list
+                  Mailing list (to)
                 </td>
                 <td colspan="1" style="color: #606060; font-size: 14px; line-height: 20px; font-weight: bold;">
                   ${recipients}
+                </td>
+              </tr>
+              <tr>
+                <td colspan="1" style="color: #606060; font-size: 14px; line-height: 20px;">
+                  Mailing list (cc)
+                </td>
+                <td colspan="1" style="color: #606060; font-size: 14px; line-height: 20px; font-weight: bold;">
+                ${ccRecipients}
                 </td>
               </tr>
             </table>

@@ -21,8 +21,11 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.mysql.jdbc.StringUtils;
 import java.util.Collection;
+import java.util.Collections;
 import javax.mail.internet.InternetAddress;
+import org.apache.commons.collections.CollectionUtils;
 
 
 public class AlertUtils {
@@ -45,11 +48,14 @@ public class AlertUtils {
    * Helper to convert a collection of email strings into {@code InternetAddress} instances, filtering
    * out invalid addresses and nulls.
    *
-   * @param strings email address strings
+   * @param emailCollection collection of email address strings
    * @return filtered collection of InternetAddress objects
    */
-  public static Collection<InternetAddress> toAddress(Collection<String> strings) {
-    return Collections2.filter(Collections2.transform(strings,
+  public static Collection<InternetAddress> toAddress(Collection<String> emailCollection) {
+    if (CollectionUtils.isEmpty(emailCollection)) {
+      return Collections.emptySet();
+    }
+    return Collections2.filter(Collections2.transform(emailCollection,
         new Function<String, InternetAddress>() {
           @Override
           public InternetAddress apply(String s) {

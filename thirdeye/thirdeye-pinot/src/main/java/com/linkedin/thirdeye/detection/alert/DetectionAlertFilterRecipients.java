@@ -16,8 +16,14 @@
 
 package com.linkedin.thirdeye.detection.alert;
 
+import com.google.common.base.MoreObjects;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
+import javax.validation.constraints.NotNull;
 
 
 /**
@@ -32,6 +38,10 @@ public class DetectionAlertFilterRecipients {
     this.to = to;
     this.cc = cc;
     this.bcc = bcc;
+  }
+
+  public DetectionAlertFilterRecipients(Set<String> to) {
+    this.to = to;
   }
 
   public DetectionAlertFilterRecipients() {
@@ -79,5 +89,14 @@ public class DetectionAlertFilterRecipients {
   @Override
   public int hashCode() {
     return Objects.hash(to, cc, bcc);
+  }
+
+  @Override
+  public String toString() {
+    return MoreObjects.toStringHelper(this)
+        .add("TO", Arrays.toString((getTo() != null) ? getTo().toArray() : new String[]{}))
+        .add("CC", Arrays.toString((getCc() != null) ? getCc().toArray() : new String[]{}))
+        .add("BCC", Arrays.toString((getBcc() != null) ? getBcc().toArray() : new String[]{}))
+        .toString();
   }
 }
