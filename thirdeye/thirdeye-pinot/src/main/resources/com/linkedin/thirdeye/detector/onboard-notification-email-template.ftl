@@ -81,14 +81,6 @@
                 ${ccRecipients}
                 </td>
               </tr>
-              <tr>
-                <td colspan="1" style="color: #606060; font-size: 14px; line-height: 20px;">
-                  Mailing list (bcc)
-                </td>
-                <td colspan="1" style="color: #606060; font-size: 14px; line-height: 20px; font-weight: bold;">
-                ${bccRecipients}
-                </td>
-              </tr>
             </table>
             </td>
           </tr>

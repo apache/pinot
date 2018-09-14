@@ -126,7 +126,7 @@ module('Acceptance | create alert', function(hooks) {
     );
     assert.equal(
       $(selfServeConst.CONFIG_BLOCK).find('.control-label').get(0).innerText.replace(/\r?\n?/g, ''),
-      `Recipients in subscription group ${selectedConfigGroup}:To: ${toRecipients}Cc: ${ccRecipients}Bcc: ${bccRecipients}`,
+      `Recipients in subscription group ${selectedConfigGroup}:To: ${toRecipients}Cc: ${ccRecipients}`,
       'Label and email for recipients is correctly rendered'
     );
 
