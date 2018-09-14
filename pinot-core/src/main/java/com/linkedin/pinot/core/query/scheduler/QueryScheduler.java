@@ -135,27 +135,28 @@ public abstract class QueryScheduler {
 
     // Log the statistics
     long numDocsScanned = 0;
-    long numDocsScannedInFilter = 0;
-    long numDocsScannedPostFilter = 0;
+    long numEntriesScannedInFilter = 0;
+    long numEntriesScannedPostFilter = 0;
     try {
       numDocsScanned = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_DOCS_SCANNED_METADATA_KEY));
-      numDocsScannedInFilter = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY));
-      numDocsScannedPostFilter = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY));
-    } catch (NumberFormatException ignored) {
-      // best effort conversion only
+      numEntriesScannedInFilter = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY));
+      numEntriesScannedPostFilter = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY));
+      serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
+      serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
+      serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+    } catch (NumberFormatException e) {
+      LOGGER.error("Encountered error converting to long ", e);
     }
+
     TimerContext timerContext = queryRequest.getTimerContext();
     LOGGER.info(
         "Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
         requestId, queryRequest.getTableNameWithType(), queryRequest.getSegmentsToQuery().size(),
         queryRequest.getSegmentCountAfterPruning(), timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(),
-        numDocsScanned, numDocsScannedInFilter, numDocsScannedPostFilter, name());
-    serverMetrics.setValueOfTableGauge(queryRequest.getTableNameWithType(), ServerGauge.NUM_SEGMENTS_SEARCHED,
+        numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+    serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.NUM_SEGMENTS_SEARCHED,
         queryRequest.getSegmentCountAfterPruning());
-    serverMetrics.addMeteredGlobalValue(ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
-    serverMetrics.addMeteredGlobalValue(ServerMeter.NUM_DOCS_SCANNED_IN_FILTER, numDocsScannedInFilter);
-    serverMetrics.addMeteredGlobalValue(ServerMeter.NUM_DOCS_SCANNED_POST_FILTER, numDocsScannedPostFilter);
 
     return responseData;
   }
