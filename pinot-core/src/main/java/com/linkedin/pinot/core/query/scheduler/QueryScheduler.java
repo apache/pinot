@@ -122,6 +122,8 @@ public abstract class QueryScheduler {
     try {
       dataTable = queryExecutor.processQuery(queryRequest, executorService);
     } catch (Exception e) {
+      LOGGER.error("Encountered exception while processing requestId {} from broker {}",
+          queryRequest.getRequestId(), queryRequest.getBrokerId(), e);
       // For not handled exceptions
       serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
       dataTable = new DataTableImplV2();
