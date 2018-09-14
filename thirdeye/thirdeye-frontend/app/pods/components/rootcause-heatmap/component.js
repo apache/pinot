@@ -322,17 +322,16 @@ export default Component.extend({
           const curr = val.current;
           const base = val.baseline;
           const size = val.size;
-
           const labelChange = transformation(curr, base, currTotal, baseTotal);
-
           const [value, labelValue] = this._makeValueLabel(val, labelChange);
+          const sizeRatioLabel = size/sizeTotal < 0.01 ? '' : labelValue;
 
           cells[n].push({
             index,
             role: val.role,
             dimName: val.dimName,
             dimValue: val.dimValue,
-            label: labelValue,
+            label: sizeRatioLabel,
             value,
             size: size / sizeTotal,
             inverse: isInverse,
