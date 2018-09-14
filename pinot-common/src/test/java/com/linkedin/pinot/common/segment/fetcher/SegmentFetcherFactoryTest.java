@@ -74,7 +74,6 @@ public class SegmentFetcherFactoryTest {
         _segmentFetcherFactory.getSegmentFetcherBasedOnURI("http://something:wer:") instanceof HttpSegmentFetcher);
     Assert.assertTrue(_segmentFetcherFactory.getSegmentFetcherBasedOnURI(
         "file://a/asdf/wer/fd/e") instanceof PinotFSSegmentFetcher);
-
     Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("abc:///something"));
     Assert.assertNull(_segmentFetcherFactory.getSegmentFetcherBasedOnURI("https://something"));
     try {

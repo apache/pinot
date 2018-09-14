@@ -68,6 +68,7 @@ public class FileUploadDownloadClient implements Closeable {
     public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
     public static final String SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER = "Pinot-SegmentZKMetadataCustomMapModifier";
+    public static final String CRYPTER = "CRYPTER";
   }
 
   public static class QueryParameters {
@@ -75,10 +76,10 @@ public class FileUploadDownloadClient implements Closeable {
   }
 
   public enum FileUploadType {
-    URI, JSON, TAR;
+    URI, JSON, SEGMENT;
 
     public static FileUploadType getDefaultUploadType() {
-      return TAR;
+      return SEGMENT;
     }
   }
 

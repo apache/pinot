@@ -13,19 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.segment.crypt;
+package com.linkedin.pinot.core.metadata;
 
-import java.net.URI;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
-public class DefaultPinotCrypter implements PinotCrypter {
-  @Override
-  public void encrypt(URI uri) throws Exception {
-
+public class MetadataExtractorFactoryTest {
+  @Test
+  public void testDefaultMetadataProvider() {
+    Assert.assertTrue(MetadataExtractorFactory.create(null) instanceof DefaultMetadataExtractor);
   }
-
-  @Override
-  public void decrypt(URI uri) throws Exception {
-
+  @Test
+  public void testConfiguredMetadataProvider() {
+    Assert.assertTrue(MetadataExtractorFactory.create(DefaultMetadataExtractor.class.getName()) instanceof DefaultMetadataExtractor);
   }
 }

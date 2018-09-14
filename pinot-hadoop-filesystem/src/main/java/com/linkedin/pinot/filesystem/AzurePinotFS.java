@@ -45,7 +45,7 @@ public class AzurePinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(AzurePinotFS.class);
   private ADLStoreClient _adlStoreClient;
 
-  private static final String AZURE_KEY = "azure";
+  private static final String AZURE_KEY = "adl";
   private static final String ACCOUNT_KEY = "account";
   private static final String AUTH_ENDPOINT_KEY = "authendpoint";
   private static final String CLIENT_ID_KEY = "clientid";
@@ -156,7 +156,7 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public void copyFromLocalFile(File srcFile, URI dstUri) throws IOException {
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     // TODO: Add this method. Not needed for now because of metadata upload
     throw new UnsupportedOperationException("Cannot copy from local to Azure");
   }

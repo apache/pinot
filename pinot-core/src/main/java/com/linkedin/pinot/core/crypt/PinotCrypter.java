@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.segment.crypt;
+package com.linkedin.pinot.core.crypt;
 
-import java.net.URI;
+import java.io.File;
+import org.apache.commons.configuration.Configuration;
 
 
 /**
@@ -23,17 +24,24 @@ import java.net.URI;
  * where segments cannot be stored unencrypted in storage.
  */
 public interface PinotCrypter {
-  /**
-   * Encrypts data.
-   * @param uri location of data to be encrypted
-   * @Exception throws an Exception if encrypt fails
-   */
-  void encrypt(URI uri) throws Exception;
 
   /**
-   * Decrypts data.
-   * @param uri location of data to be decrypted
-   * @Exception throws an Exception if decrypt fails
+   * Initializes a crypter with any configurations it might need.
+   * @param config
    */
-  void decrypt(URI uri) throws Exception;
+  void init(Configuration config);
+
+  /**
+   * Encrypts the file into the file location provided. The implementation should clean up file after any failures.
+   * @param decryptedFile
+   * @param encryptedFile
+   */
+  void encrypt(File decryptedFile, File encryptedFile);
+
+  /**
+   * Decrypts file into file location provided. The implementation should clean up file after any failures.
+   * @param encryptedFile
+   * @param decryptedFile
+   */
+  void decrypt(File encryptedFile, File decryptedFile);
 }

@@ -109,7 +109,7 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public void copyFromLocalFile(File srcFile, URI dstUri) throws IOException {
+    public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     }
   }
 }

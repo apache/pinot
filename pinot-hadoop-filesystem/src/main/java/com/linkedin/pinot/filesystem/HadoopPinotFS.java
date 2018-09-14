@@ -157,7 +157,7 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public void copyFromLocalFile(File srcFile, URI dstUri) throws IOException {
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     _hadoopFS.copyFromLocalFile(new Path(srcFile.toURI()), new Path(dstUri));
   }
 

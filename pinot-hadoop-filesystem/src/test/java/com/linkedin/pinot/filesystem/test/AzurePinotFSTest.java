@@ -68,7 +68,6 @@ public class AzurePinotFSTest {
     Assert.assertTrue(azurePinotFS.exists(new URI(_adlLocation)));
 
     File file = new File(_adlLocation, "testfile2");
-//    Assert.assertTrue(file.createNewFile(), "Could not create new file");
     MockADLFileInputStream adlFileInputStream = new MockADLFileInputStream(
         new ByteArrayInputStream(Files.readAllBytes(Paths.get(testFileURI))));
     when(adlStoreClient.getReadStream(anyString())).thenReturn(adlFileInputStream);

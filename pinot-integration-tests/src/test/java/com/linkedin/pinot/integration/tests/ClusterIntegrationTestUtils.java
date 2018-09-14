@@ -247,7 +247,7 @@ public class ClusterIntegrationTestUtils {
                 SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
 
             // Test segment with space and special character in the file name
-            segmentGeneratorConfig.setSegmentNamePostfix(segmentIndex + " %");
+            segmentGeneratorConfig.setSegmentNamePostfix(String.valueOf(segmentIndex) + " %");
 
             if (createStarTreeIndex) {
               segmentGeneratorConfig.enableStarTreeIndex(null);

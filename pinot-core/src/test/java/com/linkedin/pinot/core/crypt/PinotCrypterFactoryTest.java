@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.segment.crypt;
+package com.linkedin.pinot.core.crypt;
 
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -24,15 +22,10 @@ import org.testng.annotations.Test;
 public class PinotCrypterFactoryTest {
   @Test
   public void testDefaultPinotCrypter() {
-    Configuration configuration = new PropertiesConfiguration();
-    PinotCrypterFactory.init(configuration);
-    Assert.assertTrue(PinotCrypterFactory.create() instanceof DefaultPinotCrypter);
+    Assert.assertTrue(PinotCrypterFactory.create(null) instanceof DefaultPinotCrypter);
   }
   @Test
   public void testConfiguredPinotCrypter() {
-    Configuration configuration = new PropertiesConfiguration();
-    configuration.addProperty("class", DefaultPinotCrypter.class.getName());
-    PinotCrypterFactory.init(configuration);
-    Assert.assertTrue(PinotCrypterFactory.create() instanceof DefaultPinotCrypter);
+    Assert.assertTrue(PinotCrypterFactory.create(DefaultPinotCrypter.class.getName()) instanceof DefaultPinotCrypter);
   }
 }
