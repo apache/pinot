@@ -106,7 +106,8 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotSegmentUploadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadRestletResource.class);
-  public static final String TMP_DIR_PREFIX = "tmp-";
+  private static final String TMP_DIR_PREFIX = "tmp-";
+  private static final String ENCRYPTED_SUFFIX = "_encrypted";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -280,8 +281,8 @@ public class PinotSegmentUploadRestletResource {
     String downloadURI = null;
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
-      String tempFileName = "tmp-" + System.nanoTime();
-      tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + "_encrypted");
+      String tempFileName = TMP_DIR_PREFIX + System.nanoTime();
+      tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
       tempDecryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
 
