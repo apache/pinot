@@ -552,7 +552,7 @@ export default Route.extend({
     * Refresh route's model.
     */
     refreshModel() {
-      this.refresh();
+      this.replaceWith({ queryParams: { openReport: false } });
     },
 
     /**

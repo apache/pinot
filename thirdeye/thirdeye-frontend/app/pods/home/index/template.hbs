@@ -67,6 +67,30 @@
               </section>
             {{/aitem.title}}
             {{#aitem.body collapsed=toggleCollapsed}}
+              {{#if isReportAnomalyEnabled}}
+                <div class="pull-left">
+                  <i class="glyphicon glyphicon-edit dashboard-container__icon"></i> Report missing anomaly in <span class="anomalies-table__text anomalies-table__text--stronger">alert page</span> for: </div>
+                <div class="pull-left dashboard-container__alert-selector">
+                  {{#with (get model.alertsByMetric metric) as |alertList|}}
+                    {{#power-select
+                      triggerId=metric
+                      id=metric
+                      triggerClass="te-form__select te-form__select--shortened"
+                      renderInPlace=true
+                      options=alertList.names
+                      selected=alertList.names.firstObject
+                      searchEnabled=false
+                      onchange=(action "onSelectAlert" metric)
+                      as |alertOption|
+                    }}
+                      {{alertOption}}
+                    {{/power-select}}
+                  {{/with}}
+                </div>
+                <div class="te-button te-button--outline pull-left dashboard-container__go-link">
+                  <a class="thirdeye-link thirdeye-link--terciary" href="#" {{action "onClickReport" metric humanizedEntityList}}>GO</a>
+                </div>
+              {{/if}}
               {{models-table
                 data=humanizedEntityList
                 columns=columns

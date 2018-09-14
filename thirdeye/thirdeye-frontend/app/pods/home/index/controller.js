@@ -15,6 +15,7 @@ const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
 export default Controller.extend({
   anomalyResponseObj: anomalyUtil.anomalyResponseObj,
   toggleCollapsed: false, /* hide/show accordians */
+  isReportAnomalyEnabled: false,
 
   /**
    * Overrides ember-models-table's css classes
@@ -125,7 +126,7 @@ export default Controller.extend({
               falseNegatives++;
             }
           }
-        })
+        });
       });
 
       const totalAnomaliesCount = get(this, 'anomaliesCount');
@@ -160,6 +161,43 @@ export default Controller.extend({
   },
 
   actions: {
+
+    /**
+     * Sets the selected metric alert if user triggers power-select
+     * @param {String} metric - the metric group for the selection
+     * @param {String} alertNeme - name of selected alert
+     * @return {undefined}
+     */
+    onSelectAlert(metric, alertName) {
+      const targetMetricRecord = get(this.model, 'alertsByMetric')[metric];
+      if (targetMetricRecord.names.length > 1) {
+        targetMetricRecord.selectedIndex = targetMetricRecord.names.findIndex(alert => { return alert === alertName; });
+      }
+    },
+
+    /**
+     * Navigates to the alert page for selected alert for the purpose of reporting a missing anomaly
+     * @param {String} metric - the metric group for the selection
+     * @param {Array} anomalyList - array of anomalies for selected metric
+     * @return {undefined}
+     */
+    onClickReport(metric, anomalyList) {
+      const targetMetricRecord = get(this.model, 'alertsByMetric')[metric];
+      const targetId = targetMetricRecord.ids[targetMetricRecord.selectedIndex];
+      const duration = anomalyList[0].humanizedObject.queryDuration;
+      const startDate = anomalyList[0].humanizedObject.queryStart;
+      const endDate = anomalyList[0].humanizedObject.queryEnd;
+      // Navigate to alert page for selected alert
+      if (targetId) {
+        this.transitionToRoute('manage.alert', targetId, { queryParams: {
+          duration,
+          startDate,
+          endDate,
+          openReport: true
+        }});
+      }
+    },
+
     /**
      * Toggles the show/hide of the metric tables
      */
