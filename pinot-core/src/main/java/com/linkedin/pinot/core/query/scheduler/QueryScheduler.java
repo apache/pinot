@@ -20,7 +20,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
@@ -137,13 +136,14 @@ public abstract class QueryScheduler {
     long numDocsScanned = 0;
     long numEntriesScannedInFilter = 0;
     long numEntriesScannedPostFilter = 0;
+    String tableNameWithType = queryRequest.getTableNameWithType();
     try {
       numDocsScanned = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_DOCS_SCANNED_METADATA_KEY));
       numEntriesScannedInFilter = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY));
       numEntriesScannedPostFilter = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY));
-      serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
-      serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
-      serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
     } catch (NumberFormatException e) {
       LOGGER.error("Encountered error converting to long ", e);
     }
@@ -151,11 +151,11 @@ public abstract class QueryScheduler {
     TimerContext timerContext = queryRequest.getTimerContext();
     LOGGER.info(
         "Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
-        requestId, queryRequest.getTableNameWithType(), queryRequest.getSegmentsToQuery().size(),
+        requestId, tableNameWithType, queryRequest.getSegmentsToQuery().size(),
         queryRequest.getSegmentCountAfterPruning(), timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(),
         numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
-    serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.NUM_SEGMENTS_SEARCHED,
+    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_SEARCHED,
         queryRequest.getSegmentCountAfterPruning());
 
     return responseData;
