@@ -43,7 +43,6 @@ public class ObjectCustomSerDe {
   private ObjectCustomSerDe() {
   }
 
-
   /**
    * Given an object, serialize it into a byte array.
    */
@@ -105,7 +104,7 @@ public class ObjectCustomSerDe {
       case IntOpenHashSet:
         return (T) deserializeIntOpenHashSet(bytes);
       case TDigest:
-        return (T) MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
+        return (T) deserializeTDigest(bytes);
       default:
         throw new IllegalArgumentException("Illegal object type for de-serialization: " + objectType);
     }
@@ -360,12 +359,6 @@ public class ObjectCustomSerDe {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private static byte[] serializeTDigest(TDigest tDigest) {
-    ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
-    tDigest.asBytes(byteBuffer);
-    return byteBuffer.array(); // Only works since the byte-buffer is on-heap.
-  }
-
   /**
    * Helper method to de-serialize an {@link IntOpenHashSet} from a ByteBuffer.
    */
@@ -385,5 +378,15 @@ public class ObjectCustomSerDe {
    */
   private static IntOpenHashSet deserializeIntOpenHashSet(byte[] bytes) {
     return deserializeIntOpenHashSet(ByteBuffer.wrap(bytes));
+  }
+
+  public static byte[] serializeTDigest(TDigest tDigest) {
+    byte[] bytes = new byte[tDigest.byteSize()];
+    tDigest.asBytes(ByteBuffer.wrap(bytes));
+    return bytes;
+  }
+
+  public static TDigest deserializeTDigest(byte[] bytes) {
+    return MergingDigest.fromBytes(ByteBuffer.wrap(bytes));
   }
 }
