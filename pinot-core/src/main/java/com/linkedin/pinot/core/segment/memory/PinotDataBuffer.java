@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +70,7 @@ public abstract class PinotDataBuffer implements Closeable {
     final String _filePath;
     final String _description;
 
-    BufferContext(Type type, long size, String filePath, String description) {
+    BufferContext(Type type, long size, @Nullable String filePath, @Nullable String description) {
       _type = type;
       _size = size;
       _filePath = filePath;
@@ -105,7 +106,7 @@ public abstract class PinotDataBuffer implements Closeable {
    * @param description The description of the buffer
    * @return The buffer allocated
    */
-  public static PinotDataBuffer allocateDirect(long size, ByteOrder byteOrder, String description) {
+  public static PinotDataBuffer allocateDirect(long size, ByteOrder byteOrder, @Nullable String description) {
     PinotDataBuffer buffer;
     try {
       if (size <= Integer.MAX_VALUE) {
@@ -135,8 +136,8 @@ public abstract class PinotDataBuffer implements Closeable {
   /**
    * Allocates a buffer using direct memory and loads a file into the buffer.
    */
-  public static PinotDataBuffer loadFile(File file, long offset, long size, ByteOrder byteOrder, String description)
-      throws IOException {
+  public static PinotDataBuffer loadFile(File file, long offset, long size, ByteOrder byteOrder,
+      @Nullable String description) throws IOException {
     PinotDataBuffer buffer;
     try {
       if (size <= Integer.MAX_VALUE) {
@@ -177,7 +178,7 @@ public abstract class PinotDataBuffer implements Closeable {
    * <p>NOTE: If the file gets extended, the contents of the extended portion of the file are not defined.
    */
   public static PinotDataBuffer mapFile(File file, boolean readOnly, long offset, long size, ByteOrder byteOrder,
-      String description) throws IOException {
+      @Nullable String description) throws IOException {
     PinotDataBuffer buffer;
     try {
       if (size <= Integer.MAX_VALUE) {
@@ -352,13 +353,27 @@ public abstract class PinotDataBuffer implements Closeable {
 
   public abstract long size();
 
-  /**
-   * Creates a view of the range [start, end) of this buffer. Calling {@link #flush()} or {@link #close()} has no effect
-   * on view.
-   */
-  public abstract PinotDataBuffer view(long start, long end);
+  public abstract ByteOrder order();
 
-  public abstract ByteBuffer toDirectByteBuffer(long offset, int size);
+  /**
+   * Creates a view of the range [start, end) of this buffer with the given byte order. Calling {@link #flush()} or
+   * {@link #close()} has no effect on view.
+   */
+  public abstract PinotDataBuffer view(long start, long end, ByteOrder byteOrder);
+
+  /**
+   * Creates a view of the range [start, end) of this buffer with the current byte order. Calling {@link #flush()} or
+   * {@link #close()} has no effect on view.
+   */
+  public PinotDataBuffer view(long start, long end) {
+    return view(start, end, order());
+  }
+
+  public abstract ByteBuffer toDirectByteBuffer(long offset, int size, ByteOrder byteOrder);
+
+  public ByteBuffer toDirectByteBuffer(long offset, int size) {
+    return toDirectByteBuffer(offset, size, order());
+  }
 
   public abstract void flush();
 
