@@ -17,6 +17,7 @@
 package com.linkedin.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
@@ -192,6 +193,7 @@ public class DetectionResource {
     this.configDAO.update(config);
 
     for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
+      anomaly.setAnomalyResultSource(AnomalyResultSource.ANOMALY_REPLAY);
       this.anomalyDAO.save(anomaly);
     }
 
