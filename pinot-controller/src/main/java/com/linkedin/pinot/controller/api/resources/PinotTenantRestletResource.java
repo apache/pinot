@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
@@ -30,7 +31,6 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -46,7 +46,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.helix.PropertyKey;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -80,7 +79,6 @@ public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PinotTenantRestletResource.class);
   private static final String TENANT_NAME = "tenantName";
-  private static final String CURRENT_STATES_PATH = "/CURRENTSTATES";
   private static final String TABLES = "tables";
 
   @Inject
@@ -223,23 +221,13 @@ public class PinotTenantRestletResource {
       throws JSONException {
     Set<String> tables = new HashSet<String>();
     JSONObject resourceGetRet = new JSONObject();
-    Set<String> instances = pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName);
 
-    if (instances.size() == 0) {
-      throw new ControllerApplicationException(LOGGER, "Error: Tenant " + tenantName + " is not valid.",
-          Response.Status.BAD_REQUEST);
-    }
-
-    for (String instance : instances) {
-      PropertyKey propertyKey = pinotHelixResourceManager.getKeyBuilder().instance(instance  + CURRENT_STATES_PATH);
-      List<String> childNames = pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getChildNames(propertyKey);
-      if (childNames.size() == 0) {
-        continue;
+    for (String table : pinotHelixResourceManager.getAllTables()) {
+      TableConfig tableConfig = pinotHelixResourceManager.getTableConfig(table);
+      String tableConfigTenant = tableConfig.getTenantConfig().getServer();
+      if (tenantName.equals(tableConfigTenant)) {
+        tables.add(table);
       }
-      String child = childNames.get(0);
-      PropertyKey childPropertyKey = pinotHelixResourceManager.getKeyBuilder().instance(instance + CURRENT_STATES_PATH + "/" + child);
-      List<String> tableListZk = pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getChildNames(childPropertyKey);
-      tables.addAll(tableListZk);
     }
 
     resourceGetRet.put(TABLES, tables);
