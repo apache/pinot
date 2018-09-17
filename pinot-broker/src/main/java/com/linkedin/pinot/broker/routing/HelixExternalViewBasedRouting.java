@@ -573,4 +573,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
     return ret.toString(2);
   }
+
+  public void updateTimeboundaryForTable(String tableNameWithType) {
+    _timeBoundaryService.updateTimeBoundaryForTable(tableNameWithType);
+  }
 }

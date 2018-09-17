@@ -90,6 +90,19 @@ public class TimeBoundaryServiceTest {
     Assert.assertEquals(tbi.getTimeValue(), "49");
   }
 
+  @Test
+  public void testGetMinSegmentTimeForExternalViewBasedTimeBoundaryService() throws Exception {
+    addingTableToPropertyStore("testResource0");
+    HelixExternalViewBasedTimeBoundaryService tbs = new HelixExternalViewBasedTimeBoundaryService(_propertyStore);
+    addingSegmentsToPropertyStore(5, "testResource0");
+
+    tbs.updateTimeBoundaryForTable("testResource0");
+    TimeBoundaryInfo tbi = tbs.getTimeBoundaryInfoFor("testResource0");
+    Assert.assertEquals(tbi.getTimeColumn(), "timestamp");
+    // Segment with end time of 0 is ignored so the 1 is the smallest segment end time.
+    Assert.assertEquals(tbi.getTimeValue(), "1");
+  }
+
   private ExternalView constructExternalView(String tableName) {
     ExternalView externalView = new ExternalView(tableName);
     List<OfflineSegmentZKMetadata> offlineResourceZKMetadataListForResource =

@@ -38,6 +38,7 @@ import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.exception.TableNotFoundException;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
+import com.linkedin.pinot.common.messages.TimeboundaryRefreshMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -1509,12 +1510,51 @@ public class PinotHelixResourceManager {
       // We return success even if we are not able to send messages (which can happen if no servers are alive).
       // For segment validation errors we would have returned earlier.
       sendSegmentRefreshMessage(offlineSegmentZKMetadata);
+      // Send a message to the brokers to update the table's time boundary info.
+      sendTimeboundaryRefreshMessageToBrokers(offlineSegmentZKMetadata);
     } else {
       // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
       if (!updateExistedSegment(offlineSegmentZKMetadata)) {
         LOGGER.error("Failed to refresh segment: {} of table: {} by the ONLINE->OFFLINE->ONLINE state transition",
             segmentName, offlineTableName);
       }
+    }
+  }
+
+  // Send a message to the pinot brokers to notify them to update its Timeboundary Info.
+  private void sendTimeboundaryRefreshMessageToBrokers(OfflineSegmentZKMetadata segmentZKMetadata) {
+    final String segmentName = segmentZKMetadata.getSegmentName();
+    final String rawTableName = segmentZKMetadata.getTableName();
+    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    final int timeoutMs = -1; // Infinite timeout on the recipient.
+
+    TimeboundaryRefreshMessage refreshMessage = new TimeboundaryRefreshMessage(offlineTableName, segmentName);
+
+    Criteria recipientCriteria = new Criteria();
+    // Currently Helix does not support send message to a Spectator. So we walk around the problem by sending the
+    // message to participants. Note that brokers are also participants.
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setSessionSpecific(true);
+    // Explicitly set the data source to IDEALSTATES to overwrite the default value: EXTERNALVIEW.
+    // Otherwise, the brokers will not receive the message because they are NOT listed in EXTERNALVIEW.
+    recipientCriteria.setDataSource(Criteria.DataSource.IDEALSTATES);
+    // The brokerResource field in the IDEALSTATE stores the offline table name in the Partition subfield.
+    recipientCriteria.setPartition(offlineTableName);
+
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    LOGGER.info("Sending refresh message for segment {} of table {}:{} to recipients {}", segmentName, rawTableName,
+            refreshMessage, recipientCriteria);
+    // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
+    int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, timeoutMs);
+    if (nMsgsSent > 0) {
+      // TODO Would be nice if we can get the name of the instances to which messages were sent.
+      LOGGER.info("Sent {} msgs to refresh segment {} of table {}", nMsgsSent, segmentName, rawTableName);
+    } else {
+      // May be the case when none of the brokers are up yet. That is OK, because when they come up they will get
+      // the latest time boundary info.
+      LOGGER.warn("Unable to send time boundary refresh message for {} of table {}, nMsgs={}", segmentName,
+              offlineTableName, nMsgsSent);
     }
   }
 

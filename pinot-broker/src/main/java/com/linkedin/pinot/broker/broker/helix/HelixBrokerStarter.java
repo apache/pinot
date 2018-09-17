@@ -41,6 +41,7 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.PreConnectCallback;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.Message;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -136,6 +137,11 @@ public class HelixBrokerStarter {
     stateMachineEngine.registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
+    TimeboundaryRefreshMessageHandlerFactory messageHandlerFactory = new TimeboundaryRefreshMessageHandlerFactory
+            (_helixExternalViewBasedRouting);
+    _helixManager.getMessagingService().registerMessageHandlerFactory(
+            Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
+
     addInstanceTagIfNeeded(helixClusterName, brokerId);
 
     // Register the service status handler
