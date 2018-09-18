@@ -32,6 +32,7 @@ import javax.net.ssl.SSLContext;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpVersion;
 import org.apache.http.NameValuePair;
 import org.apache.http.StatusLine;
@@ -207,7 +208,8 @@ public class FileUploadDownloadClient implements Closeable {
     RequestBuilder requestBuilder = RequestBuilder.post(uri)
         .setVersion(HttpVersion.HTTP_1_1)
         .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.URI.toString())
-        .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri);
+        .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri)
+        .setHeader(HttpHeaders.CONTENT_TYPE, "application/json");
     addHeadersAndParameters(requestBuilder, headers, parameters);
     setTimeout(requestBuilder, socketTimeoutMs);
     return requestBuilder.build();

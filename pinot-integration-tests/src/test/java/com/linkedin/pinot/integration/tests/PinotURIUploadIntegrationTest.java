@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -45,13 +44,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.htrace.fasterxml.jackson.databind.JsonNode;
 import org.apache.htrace.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.Header;
-import org.apache.http.HttpHeaders;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -212,10 +209,8 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
       List<Future<Integer>> tasks = new ArrayList<>(numSegments);
       for (final String segmentName : segmentNames) {
         File segmentFile = new File(segmentDir, segmentName);
-        // We are required to set the content type to application/json so it doesn't hit the multipart endpoint
-        Header contentTypeHeader = new BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json");
         String downloadUri = segmentFile.toURI().toString();
-        final List<Header> httpHeaders = Arrays.asList(contentTypeHeader);
+        final List<Header> httpHeaders = null;
 
         tasks.add(executor.submit(new Callable<Integer>() {
           @Override
