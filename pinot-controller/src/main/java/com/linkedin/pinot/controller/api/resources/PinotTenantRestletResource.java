@@ -200,7 +200,7 @@ public class PinotTenantRestletResource {
 
   /**
    * This method expects a tenant name and will return a list of tables tagged on that tenant. It assumes that the
-   * tagname is for server tenants only. This method will only read CURRENTSTATES in zk.
+   * tagname is for server tenants only.
    * @param tenantName
    * @return
    */

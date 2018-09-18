@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import org.json.JSONObject;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -94,5 +95,11 @@ public class PinotTenantRestletResourceTest extends ControllerTest {
     tableList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forTablesFromTenant("DefaultTenant")));
     assertEquals(tableList.getJSONArray("tables").length(), 1, "Expected 1 table");
     assertEquals(tableList.getJSONArray("tables").get(0), "mytable_OFFLINE");
+  }
+
+  @AfterClass
+  public void tearDown() {
+    stopController();
+    stopZk();
   }
 }
