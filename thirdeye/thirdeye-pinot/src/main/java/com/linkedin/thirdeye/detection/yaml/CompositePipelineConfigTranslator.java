@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.algorithm.LegacyAlertFilterWrapper;
 import com.linkedin.thirdeye.detection.algorithm.LegacyMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
+import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStageWrapper;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -98,6 +99,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_FILTERS = "filters";
   private static final String PROP_METRIC = "metric";
   private static final String PROP_DATASET = "dataset";
+  private static final String PROP_STAGE_CLASSNAME = "stageClassName";
 
   private static final String PROP_TYPE = "type";
   private static final String PROP_CLASS_NAME = "className";
@@ -173,11 +175,24 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       Map<String, Object> ruleFilterYamlConfigs = MapUtils.getMap(yamlConfig, PROP_RULE_FILTER);
       Preconditions.checkArgument(ruleFilterYamlConfigs.containsKey(PROP_TYPE),
           PROP_RULE_FILTER + " property missing: " + PROP_TYPE);
-      fillInProperties(ruleFilterProperties, ruleFilterYamlConfigs);
+      fillInStageSpecs(ruleFilterProperties, ruleFilterYamlConfigs);
+      ruleFilterProperties.put(PROP_CLASS_NAME, AnomalyFilterStageWrapper.class.getName());
       ruleFilterProperties.put(PROP_NESTED, Collections.singletonList(properties));
       properties = ruleFilterProperties;
     }
     return properties;
+  }
+
+  private void fillInStageSpecs(Map<String, Object> properties, Map<String, Object> yamlConfigs) {
+    Map<String, Object> specs = new HashMap<>();
+    for (Map.Entry<String, Object> entry : yamlConfigs.entrySet()) {
+      if (entry.getKey().equals(PROP_TYPE)) {
+        properties.put(PROP_STAGE_CLASSNAME, YAML_TRANSLATOR_INFO_MAP.get(MapUtils.getString(yamlConfigs, PROP_TYPE)));
+      } else {
+        specs.put(entry.getKey(), entry.getValue());
+      }
+    }
+    properties.put(PROP_SPEC, specs);
   }
 
   private void fillInProperties(Map<String, Object> properties, Map<String, Object> yamlConfigs) {

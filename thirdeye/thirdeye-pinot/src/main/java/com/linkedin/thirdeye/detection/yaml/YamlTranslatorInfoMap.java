@@ -5,8 +5,8 @@ import com.linkedin.thirdeye.anomalydetection.function.MinMaxThresholdFunction;
 import com.linkedin.thirdeye.anomalydetection.function.WeekOverWeekRuleFunction;
 import com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
 import com.linkedin.thirdeye.detection.algorithm.BaselineAlgorithm;
-import com.linkedin.thirdeye.detection.algorithm.BaselineRuleFilterWrapper;
 import com.linkedin.thirdeye.detection.algorithm.MovingWindowAlgorithm;
+import com.linkedin.thirdeye.detection.algorithm.stage.BaselineRuleFilterStage;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AverageChangeThresholdAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
@@ -20,7 +20,7 @@ import java.util.Map;
 public class YamlTranslatorInfoMap {
   private static final Map<String, String> YAML_INFO_MAP = ImmutableMap.<String, String>builder()
       // rule filter
-      .put("BUSINESS_RULE_FILTER", BaselineRuleFilterWrapper.class.getName())
+      .put("BUSINESS_RULE_FILTER", BaselineRuleFilterStage.class.getName())
       // rule detection
       .put("BASELINE", String.valueOf(BaselineAlgorithm.class.getName()))
       .put("MOVING_WINDOW", MovingWindowAlgorithm.class.getName())

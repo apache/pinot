@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
@@ -37,9 +36,9 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**
- * This filter wrapper filters the anomalies if either the absolute change, percentage change or site wide impact does not pass the threshold.
+ * This filter stage filters the anomalies if either the absolute change, percentage change or site wide impact does not pass the threshold.
  */
-public class BaselineRuleFilterWrapper extends RuleBasedFilterWrapper {
+public class BaselineRuleFilterStage implements AnomalyFilterStage {
   private static final String PROP_WEEKS = "weeks";
   private static final int PROP_WEEKS_DEFAULT = 1;
 
@@ -62,29 +61,13 @@ public class BaselineRuleFilterWrapper extends RuleBasedFilterWrapper {
   private double siteWideImpactThreshold;
   private String siteWideMetricUrn;
 
-  public BaselineRuleFilterWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
-    super(provider, config, startTime, endTime);
-    int weeks = MapUtils.getIntValue(config.getProperties(), PROP_WEEKS, PROP_WEEKS_DEFAULT);
-    DateTimeZone timezone =
-        DateTimeZone.forID(MapUtils.getString(this.config.getProperties(), PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
-    this.baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, weeks, 1, timezone);
-    // percentage change
-    this.change = MapUtils.getDoubleValue(config.getProperties(), PROP_CHANGE, PROP_CHANGE_DEFAULT);
-    // absolute change
-    this.difference = MapUtils.getDoubleValue(config.getProperties(), PROP_DIFFERENCE, PROP_DIFFERENCE_DEFAULT);
-    // site wide impact
-    this.siteWideImpactThreshold = MapUtils.getDoubleValue(config.getProperties(), PROP_SITEWIDE_THRESHOLD, PROP_SITEWIDE_THRESHOLD_DEFAULT);
-    this.siteWideMetricUrn = MapUtils.getString(config.getProperties(), PROP_SITEWIDE_METRIC);
-  }
-
-  @Override
-  boolean isQualified(MergedAnomalyResultDTO anomaly) {
+  public boolean isQualified(MergedAnomalyResultDTO anomaly, DataProvider provider) {
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
     MetricSlice currentSlice =
         MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
     MetricSlice baselineSlice = this.baseline.scatter(currentSlice).get(0);
 
-    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(Arrays.asList(currentSlice, baselineSlice), Collections.<String>emptyList());
+    Map<MetricSlice, DataFrame> aggregates = provider.fetchAggregates(Arrays.asList(currentSlice, baselineSlice), Collections.<String>emptyList());
     double currentValue = getValueFromAggregates(currentSlice, aggregates);
     double baselineValue = getValueFromAggregates(baselineSlice, aggregates);
     if (!Double.isNaN(this.difference) && Math.abs(currentValue - baselineValue) < this.difference) {
@@ -99,7 +82,7 @@ public class BaselineRuleFilterWrapper extends RuleBasedFilterWrapper {
       MetricSlice siteWideSlice = this.baseline.scatter(
           MetricSlice.from(siteWideEntity.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters())).get(0);
       double siteWideBaselineValue = getValueFromAggregates(siteWideSlice,
-          this.provider.fetchAggregates(Collections.singleton(siteWideSlice), Collections.<String>emptyList()));
+          provider.fetchAggregates(Collections.singleton(siteWideSlice), Collections.<String>emptyList()));
 
       if (siteWideBaselineValue != 0 && (Math.abs(currentValue - baselineValue) / siteWideBaselineValue) < this.siteWideImpactThreshold) {
         return false;
@@ -107,6 +90,22 @@ public class BaselineRuleFilterWrapper extends RuleBasedFilterWrapper {
     }
     return true;
   }
+
+  @Override
+  public void init(Map<String, Object> properties) {
+    int weeks = MapUtils.getIntValue(properties, PROP_WEEKS, PROP_WEEKS_DEFAULT);
+    DateTimeZone timezone =
+        DateTimeZone.forID(MapUtils.getString(properties, PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
+    this.baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, weeks, 1, timezone);
+    // percentage change
+    this.change = MapUtils.getDoubleValue(properties, PROP_CHANGE, PROP_CHANGE_DEFAULT);
+    // absolute change
+    this.difference = MapUtils.getDoubleValue(properties, PROP_DIFFERENCE, PROP_DIFFERENCE_DEFAULT);
+    // site wide impact
+    this.siteWideImpactThreshold = MapUtils.getDoubleValue(properties, PROP_SITEWIDE_THRESHOLD, PROP_SITEWIDE_THRESHOLD_DEFAULT);
+    this.siteWideMetricUrn = MapUtils.getString(properties, PROP_SITEWIDE_METRIC);
+  }
+
 
   double getValueFromAggregates(MetricSlice slice, Map<MetricSlice, DataFrame> aggregates) {
     return aggregates.get(slice).getDouble(COL_VALUE, 0);

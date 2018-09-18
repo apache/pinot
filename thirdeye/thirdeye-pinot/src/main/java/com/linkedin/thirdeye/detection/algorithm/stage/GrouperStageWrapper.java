@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.ConfigUtils;
@@ -29,24 +27,33 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
+import org.apache.commons.collections.MapUtils;
+
 
 /**
- * This abstract filter wrapper allows user to plug in exclusion filter business rules in the detection pipeline.
+ * The grouper stage wrapper runs the grouper stage and return a list of anomalies has the dimensions grouped.
  */
-public abstract class RuleBasedFilterWrapper extends DetectionPipeline {
+public class GrouperStageWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
-
+  private static final String PROP_STAGE_CLASSNAME = "stageClassName";
+  private static final String PROP_SPECS = "specs";
   private final List<Map<String, Object>> nestedProperties;
+  private GrouperStage grouperStage;
 
-  public RuleBasedFilterWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
+  public GrouperStageWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
+      throws Exception {
     super(provider, config, startTime, endTime);
-    this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    Map<String, Object> properties = config.getProperties();
+    this.nestedProperties = ConfigUtils.getList(properties.get(PROP_NESTED));
+    Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
+
+    this.grouperStage = loadGroupingStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
+    this.grouperStage.init(MapUtils.getMap(properties, PROP_SPECS));
   }
 
   /**
-   * Runs the nested pipelines and calls the isQualified method to check if an anomaly passes the rule filter.
+   * Runs the nested pipelines and calls the group method to groups the anomalies by dimension.
    * @return the detection pipeline result
    * @throws Exception
    */
@@ -67,21 +74,12 @@ public abstract class RuleBasedFilterWrapper extends DetectionPipeline {
       candidates.addAll(intermediate.getAnomalies());
     }
 
-    Collection<MergedAnomalyResultDTO> anomalies =
-        Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
-          @Override
-          public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomaly) {
-            return mergedAnomaly != null && !mergedAnomaly.isChild() && isQualified(mergedAnomaly);
-          }
-        });
+    Collection<MergedAnomalyResultDTO> anomalies = this.grouperStage.group(candidates);
 
     return new DetectionPipelineResult(new ArrayList<>(anomalies));
   }
 
-  /**
-   * Sub-classes override this method to check if anomaly passes the filter wrapper.
-   * @param anomaly
-   * @return if the anomaly passes the filter
-   */
-  abstract boolean isQualified(MergedAnomalyResultDTO anomaly);
+  private GrouperStage loadGroupingStage(String className) throws Exception {
+    return (GrouperStage) Class.forName(className).newInstance();
+  }
 }

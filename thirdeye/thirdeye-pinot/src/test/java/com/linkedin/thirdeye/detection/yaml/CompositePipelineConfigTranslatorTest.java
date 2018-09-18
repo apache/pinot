@@ -6,11 +6,11 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.algorithm.BaselineAlgorithm;
-import com.linkedin.thirdeye.detection.algorithm.BaselineRuleFilterWrapper;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.algorithm.LegacyAlertFilterWrapper;
 import com.linkedin.thirdeye.detection.algorithm.LegacyMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
+import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStageWrapper;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -60,8 +60,8 @@ public class CompositePipelineConfigTranslatorTest {
     List<Map<String, Object>> ruleNestedProperties = ConfigUtils.getList(ruleDetectionPipelineProperties.get("nested"));
     Map<String, Object> baselineAlgorithmProperties = ruleNestedProperties.get(0);
 
-    Assert.assertEquals(properties.get("siteWideImpactThreshold"), 0.05);
-    Assert.assertEquals(properties.get("className"), BaselineRuleFilterWrapper.class.getName());
+    Assert.assertEquals(MapUtils.getMap(properties, "specs").get("siteWideImpactThreshold"), 0.05);
+    Assert.assertEquals(properties.get("className"), AnomalyFilterStageWrapper.class.getName());
     Assert.assertEquals(nestedProperties.size(), 1);
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 2);
@@ -92,8 +92,8 @@ public class CompositePipelineConfigTranslatorTest {
     List<Map<String, Object>> ruleNestedProperties = ConfigUtils.getList(ruleDetectionPipelineProperties.get("nested"));
     Map<String, Object> baselineAlgorithmProperties = ruleNestedProperties.get(0);
 
-    Assert.assertEquals(properties.get("siteWideImpactThreshold"), 0.05);
-    Assert.assertEquals(properties.get("className"), BaselineRuleFilterWrapper.class.getName());
+    Assert.assertEquals(MapUtils.getMap(properties, "specs").get("siteWideImpactThreshold"), 0.05);
+    Assert.assertEquals(properties.get("className"), AnomalyFilterStageWrapper.class.getName());
     Assert.assertEquals(nestedProperties.size(), 1);
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 1);
@@ -117,8 +117,8 @@ public class CompositePipelineConfigTranslatorTest {
     List<Map<String, Object>> mergerNestedProperties = ConfigUtils.getList(mergerProperties.get("nested"));
     Map<String, Object> algorithmPipelineProperties = mergerNestedProperties.get(0);
 
-    Assert.assertEquals(properties.get("siteWideImpactThreshold"), 0.05);
-    Assert.assertEquals(properties.get("className"), BaselineRuleFilterWrapper.class.getName());
+    Assert.assertEquals(MapUtils.getMap(properties, "specs").get("siteWideImpactThreshold"), 0.05);
+    Assert.assertEquals(properties.get("className"), AnomalyFilterStageWrapper.class.getName());
     Assert.assertEquals(nestedProperties.size(), 1);
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 1);
@@ -173,8 +173,8 @@ public class CompositePipelineConfigTranslatorTest {
     List<Map<String, Object>> ruleNestedProperties = ConfigUtils.getList(ruleDetectionPipelineProperties.get("nested"));
     Map<String, Object> baselineAlgorithmProperties = ruleNestedProperties.get(0);
 
-    Assert.assertEquals(properties.get("siteWideImpactThreshold"), 0.05);
-    Assert.assertEquals(properties.get("className"), BaselineRuleFilterWrapper.class.getName());
+    Assert.assertEquals(MapUtils.getMap(properties, "specs").get("siteWideImpactThreshold"), 0.05);
+    Assert.assertEquals(properties.get("className"), AnomalyFilterStageWrapper.class.getName());
     Assert.assertEquals(nestedProperties.size(), 1);
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 2);
@@ -207,8 +207,8 @@ public class CompositePipelineConfigTranslatorTest {
     List<Map<String, Object>> ruleNestedProperties = ConfigUtils.getList(ruleDetectionPipelineProperties.get("nested"));
     Map<String, Object> baselineAlgorithmProperties = ruleNestedProperties.get(0);
 
-    Assert.assertEquals(properties.get("siteWideImpactThreshold"), 0.05);
-    Assert.assertEquals(properties.get("className"), BaselineRuleFilterWrapper.class.getName());
+    Assert.assertEquals(MapUtils.getMap(properties, "specs").get("siteWideImpactThreshold"), 0.05);
+    Assert.assertEquals(properties.get("className"), AnomalyFilterStageWrapper.class.getName());
     Assert.assertEquals(nestedProperties.size(), 1);
     Assert.assertEquals(mergerProperties.get("className"), MergeWrapper.class.getName());
     Assert.assertEquals(mergerNestedProperties.size(), 2);
