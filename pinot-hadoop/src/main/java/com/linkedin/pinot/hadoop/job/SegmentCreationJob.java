@@ -77,7 +77,7 @@ public class SegmentCreationJob extends Configured {
     _outputDir = getOutputDir();
     _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
-    String _readerConfigFile = _properties.getProperty(JobConfigConstants.PATH_TO_READER_CONFIG);
+    _readerConfigFile = _properties.getProperty(JobConfigConstants.PATH_TO_READER_CONFIG);
     String hostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
     String portString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
 
@@ -96,7 +96,7 @@ public class SegmentCreationJob extends Configured {
     LOGGER.info("path.to.deps.jar: {}", _depsJarPath);
     LOGGER.info("path.to.output: {}", _outputDir);
     LOGGER.info("path.to.schema: {}", schemaFilePath);
-    if (_readerConfigFile != null){
+    if (_readerConfigFile != null) {
       LOGGER.info("path.to.reader.config: {}", _readerConfigFile);
     }
     if (schemaFilePath != null) {
