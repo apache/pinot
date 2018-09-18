@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
@@ -133,7 +132,9 @@ public final class ColumnDataSource extends DataSource {
       }
 
       @Override
-      public int getCardinality() { return _cardinality;}
+      public int getCardinality() {
+        return _cardinality;
+      }
     };
   }
 
@@ -152,15 +153,13 @@ public final class ColumnDataSource extends DataSource {
     return _dictionary;
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   protected Block getNextBlock() {
     if (_isSingleValue) {
-      return new SingleValueBlock((SingleColumnSingleValueReader<? super ReaderContext>) _forwardIndex, _numDocs,
-          _dataType, _dictionary);
+      return new SingleValueBlock((SingleColumnSingleValueReader) _forwardIndex, _numDocs, _dataType, _dictionary);
     } else {
-      return new MultiValueBlock((SingleColumnMultiValueReader<? super ReaderContext>) _forwardIndex, _numDocs,
-          _maxNumMultiValues, _dataType, _dictionary);
+      return new MultiValueBlock((SingleColumnMultiValueReader) _forwardIndex, _numDocs, _maxNumMultiValues, _dataType,
+          _dictionary);
     }
   }
 

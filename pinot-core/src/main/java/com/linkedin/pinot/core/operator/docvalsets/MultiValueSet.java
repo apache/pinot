@@ -18,17 +18,16 @@ package com.linkedin.pinot.core.operator.docvalsets;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.operator.docvaliterators.MultiValueIterator;
 
 
 public final class MultiValueSet extends BaseBlockValSet {
-  private final SingleColumnMultiValueReader<? super ReaderContext> _reader;
+  private final SingleColumnMultiValueReader _reader;
   private final int _numDocs;
   private final DataType _dataType;
 
-  public MultiValueSet(SingleColumnMultiValueReader<? super ReaderContext> reader, int numDocs, DataType dataType) {
+  public MultiValueSet(SingleColumnMultiValueReader reader, int numDocs, DataType dataType) {
     _reader = reader;
     _numDocs = numDocs;
     _dataType = dataType;
