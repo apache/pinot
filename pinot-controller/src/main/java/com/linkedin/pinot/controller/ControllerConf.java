@@ -131,11 +131,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public boolean getQueryConsoleUseHttps() {
-    if (containsKey(CONSOLE_WEBAPP_USE_HTTPS)) {
-      return (boolean) getProperty(CONSOLE_WEBAPP_USE_HTTPS);
-    } else {
-      return false;
-    }
+    return containsKey(CONSOLE_WEBAPP_USE_HTTPS) && getBoolean(CONSOLE_WEBAPP_USE_HTTPS);
   }
 
   public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
