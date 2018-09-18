@@ -17,11 +17,10 @@ package com.linkedin.pinot.core.segment.memory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import javax.annotation.concurrent.ThreadSafe;
 import xerial.larray.buffer.LBuffer;
 import xerial.larray.buffer.LBufferAPI;
-import xerial.larray.buffer.WrappedLBuffer;
 import xerial.larray.mmap.MMapBuffer;
 import xerial.larray.mmap.MMapMode;
 
@@ -48,7 +47,7 @@ public class PinotNonNativeOrderLBuffer extends BasePinotLBuffer {
     }
   }
 
-  private PinotNonNativeOrderLBuffer(LBufferAPI buffer, boolean closeable, boolean flushable) {
+  PinotNonNativeOrderLBuffer(LBufferAPI buffer, boolean closeable, boolean flushable) {
     super(buffer, closeable, flushable);
   }
 
@@ -173,14 +172,7 @@ public class PinotNonNativeOrderLBuffer extends BasePinotLBuffer {
   }
 
   @Override
-  public PinotDataBuffer view(long start, long end) {
-    // Workaround to handle cases where offset is not page-aligned or view of view
-    return new PinotNonNativeOrderLBuffer(
-        new WrappedLBuffer(_buffer.m, start + _buffer.address() - _buffer.m.address(), end - start), false, false);
-  }
-
-  @Override
-  public ByteBuffer toDirectByteBuffer(long offset, int size) {
-    return _buffer.toDirectByteBuffer(offset, size).order(NON_NATIVE_ORDER);
+  public ByteOrder order() {
+    return NON_NATIVE_ORDER;
   }
 }
