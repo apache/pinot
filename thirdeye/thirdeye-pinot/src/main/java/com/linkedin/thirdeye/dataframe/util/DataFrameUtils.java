@@ -43,8 +43,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeFieldType;
@@ -318,7 +320,7 @@ public class DataFrameUtils {
 
     MetricSlice alignedSlice = MetricSlice.from(slice.metricId, start.getMillis(), end.getMillis(), slice.filters, slice.granularity);
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, metric, dataset, expressions)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(alignedSlice, metric, dataset, expressions, metricDAO)
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
@@ -359,7 +361,7 @@ public class DataFrameUtils {
     DateTime start = new DateTime(slice.start, timezone).withFields(makeOrigin(period.getPeriodType()));
     DateTime end = new DateTime(slice.end, timezone).withFields(makeOrigin(period.getPeriodType()));
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions, metricDAO)
         .setGroupByTimeGranularity(granularity)
         .build(reference);
 
@@ -406,7 +408,7 @@ public class DataFrameUtils {
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(),
         metric.getDefaultAggFunction(), metric.getDataset());
 
-    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions)
+    ThirdEyeRequest request = makeThirdEyeRequestBuilder(slice, metric, dataset, expressions, metricDAO)
         .setGroupBy(dimensions)
         .build(reference);
 
@@ -470,16 +472,23 @@ public class DataFrameUtils {
   }
 
   /**
-   * Helper: Returns a pre-populated ThirdeyeRequestBuilder instance.
+   * Helper: Returns a pre-populated ThirdeyeRequestBuilder instance. Removes invalid filter values.
    *
    * @param slice metric data slice
    * @param metric metric dto
    * @param dataset dataset dto
    * @param expressions metric expressions
+   * @param metricDAO metric config DAO
    * @return ThirdeyeRequestBuilder
    * @throws ExecutionException
    */
-  private static ThirdEyeRequest.ThirdEyeRequestBuilder makeThirdEyeRequestBuilder(MetricSlice slice, MetricConfigDTO metric, DatasetConfigDTO dataset, List<MetricExpression> expressions) throws ExecutionException {
+  private static ThirdEyeRequest.ThirdEyeRequestBuilder makeThirdEyeRequestBuilder(MetricSlice slice, MetricConfigDTO metric, DatasetConfigDTO dataset, List<MetricExpression> expressions, MetricConfigManager metricDAO) throws ExecutionException {
+    List<MetricConfigDTO> datasetMetrics = metricDAO.findByDataset(dataset.getDataset());
+    Set<String> metricNames = new HashSet<>();
+    for (MetricConfigDTO metricDTO : datasetMetrics) {
+      metricNames.add(metricDTO.getName());
+    }
+
     List<MetricFunction> functions = new ArrayList<>();
     for(MetricExpression exp : expressions) {
       functions.addAll(exp.computeMetricFunctions());
@@ -487,7 +496,8 @@ public class DataFrameUtils {
 
     Multimap<String, String> effectiveFilters = ArrayListMultimap.create();
     for (String dimName : slice.filters.keySet()) {
-      if (dataset.getDimensions().contains(dimName)) {
+      if (dataset.getDimensions().contains(dimName)
+          || metricNames.contains(dimName)) {
         effectiveFilters.putAll(dimName, slice.filters.get(dimName));
       }
     }

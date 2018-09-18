@@ -16,6 +16,8 @@
 
 package com.linkedin.thirdeye.datasource.pinot;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -83,5 +85,56 @@ public class PqlUtilsTest {
             timeSpecFormat),
         expected
     };
+  }
+
+  @Test
+  public void testGetDimensionWhereClause() {
+    Multimap<String, String> dimensions = ArrayListMultimap.create();
+    dimensions.put("key", "value");
+    dimensions.put("key", "!value");
+    dimensions.put("key", "<value");
+    dimensions.put("key", "<=value");
+    dimensions.put("key", ">value");
+    dimensions.put("key", ">=value");
+    dimensions.put("key1", "value11");
+    dimensions.put("key1", "value12");
+    dimensions.put("key2", "!value21");
+    dimensions.put("key2", "!value22");
+    dimensions.put("key3", "<value3");
+    dimensions.put("key4", "<=value4");
+    dimensions.put("key5", ">value5");
+    dimensions.put("key6", ">=value6");
+    dimensions.put("key7", "value71\'");
+    dimensions.put("key7", "value72\"");
+
+    String output = PqlUtils.getDimensionWhereClause(dimensions);
+
+    Assert.assertEquals(output, ""
+        + "key < \"value\" AND "
+        + "key <= \"value\" AND "
+        + "key > \"value\" AND "
+        + "key >= \"value\" AND "
+        + "key IN (\"value\") AND "
+        + "key NOT IN (\"value\") AND "
+        + "key1 IN (\"value11\", \"value12\") AND "
+        + "key2 NOT IN (\"value21\", \"value22\") AND "
+        + "key3 < \"value3\" AND "
+        + "key4 <= \"value4\" AND "
+        + "key5 > \"value5\" AND "
+        + "key6 >= \"value6\" AND "
+        + "key7 IN (\"value71\'\", \'value72\"\')");
+  }
+
+  @Test
+  public  void testQuote() {
+    Assert.assertEquals(PqlUtils.quote("123"), "123");
+    Assert.assertEquals(PqlUtils.quote("abc"), "\"abc\"");
+    Assert.assertEquals(PqlUtils.quote("123\'"), "\"123\'\"");
+    Assert.assertEquals(PqlUtils.quote("abc\""), "\'abc\"\'");
+  }
+  
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public  void testQuoteFail() {
+    PqlUtils.quote("123\"\'");
   }
 }
