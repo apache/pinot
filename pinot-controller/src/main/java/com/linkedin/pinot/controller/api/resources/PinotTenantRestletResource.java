@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.api.resources;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
@@ -78,6 +79,7 @@ public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(
       PinotTenantRestletResource.class);
   private static final String TENANT_NAME = "tenantName";
+  private static final String TABLES = "tables";
 
   @Inject
   PinotHelixResourceManager pinotHelixResourceManager;
@@ -196,6 +198,42 @@ public class PinotTenantRestletResource {
     }
   }
 
+  /**
+   * This method expects a tenant name and will return a list of tables tagged on that tenant. It assumes that the
+   * tagname is for server tenants only.
+   * @param tenantName
+   * @return
+   */
+  @GET
+  @Path("/tenants/{tenantName}/tables")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "List tables on a a server tenant")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Error reading list")
+  })
+  public String getTablesOnTenant(
+      @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName) {
+    return getTablesServedFromTenant(tenantName);
+  }
+
+  private String getTablesServedFromTenant(String tenantName)
+      throws JSONException {
+    Set<String> tables = new HashSet<String>();
+    JSONObject resourceGetRet = new JSONObject();
+
+    for (String table : pinotHelixResourceManager.getAllTables()) {
+      TableConfig tableConfig = pinotHelixResourceManager.getTableConfig(table);
+      String tableConfigTenant = tableConfig.getTenantConfig().getServer();
+      if (tenantName.equals(tableConfigTenant)) {
+        tables.add(table);
+      }
+    }
+
+    resourceGetRet.put(TABLES, tables);
+    return resourceGetRet.toString();
+  }
+
   private String toggleTenantState(String tenantName, String stateStr, @Nullable String tenantType) throws JSONException{
     Set<String> serverInstances = new HashSet<String>();
     Set<String> brokerInstances = new HashSet<String>();
@@ -237,10 +275,6 @@ public class PinotTenantRestletResource {
 
   private String listInstancesForTenant(String tenantName, String tenantType)
       throws JSONException {
-    Set<String> serverInstances = new HashSet<String>();
-    Set<String> brokerInstances = new HashSet<String>();
-    JSONObject instanceResult = new JSONObject();
-
     JSONObject resourceGetRet = new JSONObject();
     if (tenantType == null) {
       resourceGetRet.put("ServerInstances", pinotHelixResourceManager.getAllInstancesForServerTenant(tenantName));

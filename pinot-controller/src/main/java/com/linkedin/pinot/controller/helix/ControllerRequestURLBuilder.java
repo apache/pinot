@@ -29,6 +29,8 @@ import com.linkedin.pinot.common.utils.StringUtil;
 
 public class ControllerRequestURLBuilder {
   private final String _baseUrl;
+  private static final String TABLES = "tables";
+  private static final String TENANTS = "tenants";
 
   private ControllerRequestURLBuilder(String baseUrl) {
     _baseUrl = baseUrl;
@@ -72,6 +74,10 @@ public class ControllerRequestURLBuilder {
 
   public String forInstanceList() {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances");
+  }
+
+  public String forTablesFromTenant(String tenantName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), TENANTS, tenantName, TABLES);
   }
 
   public String forInstanceBulkCreate() {
