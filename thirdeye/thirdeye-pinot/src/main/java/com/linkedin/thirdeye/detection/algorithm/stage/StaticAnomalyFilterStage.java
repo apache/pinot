@@ -50,7 +50,7 @@ public abstract class StaticAnomalyFilterStage implements AnomalyFilterStage {
   abstract boolean isQualified(MergedAnomalyResultDTO anomaly, StaticDetectionPipelineData data);
 
   @Override
-  public boolean isQualified(MergedAnomalyResultDTO anomaly, DataProvider provider) {
+  public final boolean isQualified(MergedAnomalyResultDTO anomaly, DataProvider provider) {
     StaticDetectionPipelineModel model = this.getModel();
     Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(model.getTimeseriesSlices());
     Map<MetricSlice, DataFrame> aggregates = provider.fetchAggregates(model.getAggregateSlices(), Collections.<String>emptyList());
