@@ -44,12 +44,12 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
     Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
 
     this.anomalyDetectionStage = loadAnomalyDetectorStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
-    this.anomalyDetectionStage.init(MapUtils.getMap(properties, PROP_SPECS));
+    this.anomalyDetectionStage.init(MapUtils.getMap(properties, PROP_SPECS), startTime, endTime);
   }
 
   @Override
   public DetectionPipelineResult run() {
-    List<MergedAnomalyResultDTO> anomalies = this.anomalyDetectionStage.runDetection(this.startTime, this.endTime, this.provider);
+    List<MergedAnomalyResultDTO> anomalies = this.anomalyDetectionStage.runDetection(this.provider);
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());
     }

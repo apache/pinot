@@ -29,8 +29,6 @@ import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.MockPipeline;
 import com.linkedin.thirdeye.detection.MockPipelineLoader;
 import com.linkedin.thirdeye.detection.MockPipelineOutput;
-import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStageWrapper;
-import com.linkedin.thirdeye.detection.algorithm.stage.ThresholdRuleFilterStage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;

@@ -92,7 +92,7 @@ public class BaselineRuleFilterStage implements AnomalyFilterStage {
   }
 
   @Override
-  public void init(Map<String, Object> properties) {
+  public void init(Map<String, Object> properties, long startTime, long endTime) {
     int weeks = MapUtils.getIntValue(properties, PROP_WEEKS, PROP_WEEKS_DEFAULT);
     DateTimeZone timezone =
         DateTimeZone.forID(MapUtils.getString(properties, PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));

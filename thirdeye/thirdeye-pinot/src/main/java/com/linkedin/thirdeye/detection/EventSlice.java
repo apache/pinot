@@ -24,7 +24,7 @@ import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 /**
  * Selector for events based on (optionally) start time, end time, and dimension filters.
  */
-class EventSlice {
+public class EventSlice {
   final long start;
   final long end;
   final Multimap<String, String> filters;

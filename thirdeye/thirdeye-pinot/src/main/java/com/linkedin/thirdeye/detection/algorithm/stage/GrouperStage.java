@@ -17,10 +17,12 @@
 package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.DataProvider;
 import java.util.List;
 
 /**
- * The anomaly grouping stage
+ * The anomaly grouping stage. Low level interface of grouper stage.
+ * User use data provider to fetch the data they want.
  */
 public interface GrouperStage extends BaseDetectionStage {
   /**
@@ -29,5 +31,5 @@ public interface GrouperStage extends BaseDetectionStage {
    * @param anomalies list of anomalies
    * @return list of anomalies, with grouped dimensions
    */
-  List<MergedAnomalyResultDTO> group(List<MergedAnomalyResultDTO> anomalies);
+  List<MergedAnomalyResultDTO> group(List<MergedAnomalyResultDTO> anomalies, DataProvider provider);
 }

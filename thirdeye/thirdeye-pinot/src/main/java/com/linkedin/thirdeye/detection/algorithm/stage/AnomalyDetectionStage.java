@@ -22,15 +22,14 @@ import java.util.List;
 
 
 /**
- * The anomaly detection stage
+ * The anomaly detection stage interface. Low level interface of anomaly detection stage.
+ * User use data provider to fetch the data they want.
  */
 public interface AnomalyDetectionStage extends BaseDetectionStage {
   /**
    * Run detection in the specified time range and return a list of anomalies
-   * @param startTime start time stamp
-   * @param endTime end time stamp
    * @param provider centralized data source for time series, anomalies, events, etc.
    * @return list of anomalies
    */
-  List<MergedAnomalyResultDTO> runDetection(long startTime, long endTime, DataProvider provider);
+  List<MergedAnomalyResultDTO> runDetection(DataProvider provider);
 }
