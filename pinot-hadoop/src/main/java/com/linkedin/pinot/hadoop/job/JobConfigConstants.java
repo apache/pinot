@@ -35,4 +35,6 @@ public class JobConfigConstants {
   public static final String PUSH_TO_PORT = "push.to.port";
 
   public static final String TABLE_CONFIG = "table.config";
+
+  public static final String DEFAULT_PERMISSIONS = "fs.permissions.umask-mode";
 }
