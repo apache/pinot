@@ -17,6 +17,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.config.CombinedConfig;
 import com.linkedin.pinot.common.config.CombinedConfigLoader;
 import com.linkedin.pinot.common.config.Serializer;
@@ -24,6 +25,7 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.InputStream;
+import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -47,8 +49,11 @@ public class ApplyTableConfigCommand extends AbstractBaseAdminCommand implements
   @Option(name = "-tableConfigFile", required = true, metaVar = "<string>", usage = "Table configuration file to use.")
   private String _tableConfigFile = null;
 
-  @Option(name = "-profile", required = true, metaVar = "<string>", usage = "Comma separated list of configuration profiles to use.")
+  @Option(name = "-profile", required = false, metaVar = "<string>", usage = "Comma separated list of configuration profiles to use.")
   private String _profileList = null;
+
+  @Option(name = "-showComputedConfig", required = false, usage = "Only display the computed configuration, without attempting to upload it")
+  private boolean _showComputedConfig = false;
 
   @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
       usage = "Print this message.")
@@ -56,8 +61,17 @@ public class ApplyTableConfigCommand extends AbstractBaseAdminCommand implements
 
   @Override
   public boolean execute() throws Exception {
+    // Split the profile list, if present
+    String[] configurationProfiles;
+
+    if (_profileList != null) {
+      configurationProfiles = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(_profileList).toArray(new String[0]);
+    } else {
+      configurationProfiles = new String[0];
+    }
+
     // Load the config
-    CombinedConfig combinedConfig = CombinedConfigLoader.loadCombinedConfig(new File(_tableConfigFile), _profileList);
+    CombinedConfig combinedConfig = CombinedConfigLoader.loadCombinedConfig(new File(_tableConfigFile), configurationProfiles);
     String tableName;
     if (combinedConfig.getOfflineTableConfig() != null) {
       tableName = combinedConfig.getOfflineTableConfig().getTableName();
@@ -67,9 +81,17 @@ public class ApplyTableConfigCommand extends AbstractBaseAdminCommand implements
       throw new RuntimeException("Table config does not contain a valid offline or realtime table definition.");
     }
 
+    String computedConfig = Serializer.serializeToString(combinedConfig);
+
+    if (_showComputedConfig) {
+      System.out.println(computedConfig);
+      return true;
+    }
+
     // Build the upload URL
     ControllerRequestURLBuilder urlBuilder = ControllerRequestURLBuilder.baseUrl(_controllerUrl);
     String uploadUrl = urlBuilder.forNewUpdateTableConfig(tableName);
+    String createUrl = urlBuilder.forNewTableCreate();
 
     // Check if the table already exists
     boolean tableExists;
@@ -89,11 +111,13 @@ public class ApplyTableConfigCommand extends AbstractBaseAdminCommand implements
     HttpEntityEnclosingRequestBase request;
     if (tableExists) {
       request = new HttpPut(uploadUrl);
+      System.out.println("Table " + tableName + " exists, will update its configuration.");
     } else {
-      request = new HttpPost(uploadUrl);
+      request = new HttpPost(createUrl);
+      System.out.println("Table " + tableName + " does not exist, creating.");
     }
 
-    request.setEntity(new StringEntity(Serializer.serializeToString(combinedConfig), Charsets.UTF_8));
+    request.setEntity(new StringEntity(computedConfig, Charsets.UTF_8));
     response = client.execute(request);
     statusCode = response.getStatusLine().getStatusCode();
 
