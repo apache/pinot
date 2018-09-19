@@ -10,12 +10,29 @@ import org.apache.helix.model.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-// Handle the TimeboundaryRefresh message.
+import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
+
+// Handle the TimeboundaryRefresh message. The Timeboundary refresh requests are handled asynchronous: i.e., they are
+// first put into a request map first. The map dedups requests by their tables thus multiple requests for the same
+// table only needs to be executed once. A background thread periodically checks the map and performs refreshing for
+// all the tables in the map.
 public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerFactory {
     private static final Logger LOGGER = LoggerFactory.getLogger(TimeboundaryRefreshMessageHandlerFactory.class);
     private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
-    public TimeboundaryRefreshMessageHandlerFactory(HelixExternalViewBasedRouting helixExternalViewBasedRouting) {
+    // A map to store the unique requests (i.e., the table names) to refresh the TimeBoundaryInfo of a pinot table.
+    private static ConcurrentHashMap<String, String> _tablesToRefreshmap = new ConcurrentHashMap<>();
+
+    /**
+     *
+     * @param helixExternalViewBasedRouting The underlying Routing object to execute TimeboundaryInfo refreshing.
+     * @param sleepTimeInMilliseconds The sleep time for the background thread to execute TimeboundaryInfo refreshing.
+     */
+    public TimeboundaryRefreshMessageHandlerFactory(HelixExternalViewBasedRouting helixExternalViewBasedRouting,
+                                                    long sleepTimeInMilliseconds) {
         _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
+        // Start a background thread to execute the TimeboundaryInfo update requests.
+        new Thread(new TimeboundaryRefreshMessageExecutor(sleepTimeInMilliseconds)).start();
     }
 
     @Override
@@ -23,7 +40,7 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
         String msgSubType = message.getMsgSubType();
         switch (msgSubType) {
             case TimeboundaryRefreshMessage.REFRESH_TIME_BOUNDARY_MSG_SUB_TYPE:
-                LOGGER.warn("time refresh msg received");
+                LOGGER.info("time refresh msg received {}", message);
                 return new TimeboundaryRefreshMessageHandler(new TimeboundaryRefreshMessage(message), context);
             default:
                 throw new UnsupportedOperationException("Unsupported user defined message sub type: " + msgSubType);
@@ -47,28 +64,52 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
 
         public TimeboundaryRefreshMessageHandler(TimeboundaryRefreshMessage message, NotificationContext context) {
             super(message, context);
-            _tableNameWithType = (message.getResourceName() != null && message.getResourceName().length() > 0) ?
-                    message.getResourceName() :
-                    message.getRecord().getSimpleField("TableName");
+            // The partition name field stores the table name.
+            _tableNameWithType = message.getPartitionName();
             _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + TimeboundaryRefreshMessageHandler.class);
         }
 
         @Override
-        public HelixTaskResult handleMessage() throws InterruptedException {
-            // Update the timeboundary of the pinot table after receiving the segment refresh message.
+        public HelixTaskResult handleMessage() {
             HelixTaskResult result = new HelixTaskResult();
-            _logger.info("Handling message: {}", _message);
-            try {
-                _helixExternalViewBasedRouting.updateTimeboundaryForTable(_tableNameWithType);
-                result.setSuccess(true);
-            } finally {
-            }
+            // Put the segment refresh request to a request queue instead of executing immediately. This will reduce the
+            // burst of requests when a large number of segments are updated in a short time span.
+            _tablesToRefreshmap.put(_tableNameWithType, _tableNameWithType);
+            result.setSuccess(true);
             return result;
         }
 
         @Override
         public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
             _logger.error("onError: {}, {}", errorType, errorCode, e);
+        }
+    }
+    private class TimeboundaryRefreshMessageExecutor implements Runnable {
+        private long _sleepTimeInMilliseconds;
+        private final Logger _logger = LoggerFactory.getLogger(TimeboundaryRefreshMessageExecutor.class);;
+        public TimeboundaryRefreshMessageExecutor(long sleepTimeInMilliseconds) {
+            _sleepTimeInMilliseconds = sleepTimeInMilliseconds;
+        }
+        @Override
+        public void run() {
+            while(true) {
+                try {
+                    ConcurrentHashMap.KeySetView<String,String> tables = _tablesToRefreshmap.keySet();
+                    Iterator<String> tableItr = tables.iterator();
+                    while(tableItr.hasNext()) {
+                        String table = tableItr.next();
+                        _logger.warn("Update time boundary info for table {} ", table);
+                        _helixExternalViewBasedRouting.updateTimeBoundary(table);
+                        // Remove the table name from the underlying hashmap.
+                        tableItr.remove();
+                    }
+                    Thread.sleep(_sleepTimeInMilliseconds);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    // It is OK for us to break out the loop early because the TimeboundInfo refresh is best effort.
+                    break;
+                }
+            }
         }
     }
 }

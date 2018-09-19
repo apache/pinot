@@ -324,6 +324,10 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     LOGGER.info("Routing table update for table {} completed in {} ms", tableNameWithType, updateTime);
   }
 
+  public void updateTimeBoundary(String tableName) {
+    updateTimeBoundary(tableName,fetchExternalView(tableName));
+  }
+
   protected void updateTimeBoundary(String tableName, ExternalView externalView) {
     LOGGER.info("Trying to compute time boundary service for table {}", tableName);
     long timeBoundaryUpdateStart = System.currentTimeMillis();
@@ -572,9 +576,5 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     ret.put("host", NetUtil.getHostnameOrAddress());
 
     return ret.toString(2);
-  }
-
-  public void updateTimeboundaryForTable(String tableNameWithType) {
-    _timeBoundaryService.updateTimeBoundaryForTable(tableNameWithType);
   }
 }

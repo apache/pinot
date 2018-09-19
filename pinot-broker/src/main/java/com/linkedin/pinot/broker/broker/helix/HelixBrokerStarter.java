@@ -138,7 +138,10 @@ public class HelixBrokerStarter {
         stateModelFactory);
     _helixManager.connect();
     TimeboundaryRefreshMessageHandlerFactory messageHandlerFactory = new TimeboundaryRefreshMessageHandlerFactory
-            (_helixExternalViewBasedRouting);
+            (_helixExternalViewBasedRouting,
+                    _pinotHelixProperties.getLong(
+                            CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL,
+                            CommonConstants.Broker.DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS));
     _helixManager.getMessagingService().registerMessageHandlerFactory(
             Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 

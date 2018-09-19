@@ -15,9 +15,6 @@ public class TimeboundaryRefreshMessage extends Message {
         setMsgSubType(REFRESH_TIME_BOUNDARY_MSG_SUB_TYPE);
         // Give it infinite time to process the message, as long as session is alive
         setExecutionTimeout(-1);
-        // Put the table name in the ZNRecord under a separate key. Some Helix Message service (e.g.,
-        // DefaultMessagingService) may overwrite the ResourceName field.
-        _record.setSimpleField("TableName", tableName);
     }
 
     public TimeboundaryRefreshMessage(Message message) {

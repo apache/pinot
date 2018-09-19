@@ -74,6 +74,8 @@ public class HelixBrokerStarterTest {
 
     final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     pinotHelixBrokerProperties.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
+    pinotHelixBrokerProperties.addProperty(
+            CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL, 100L);
     _helixBrokerStarter =
         new HelixBrokerStarter(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, pinotHelixBrokerProperties);
 
@@ -220,7 +222,7 @@ public class HelixBrokerStarterTest {
   @Test
   public void testTableSegmentRefresh() throws Exception {
     // This test verifies that when the segments of an offline table are refreshed, the TimeBoundaryInfo is also updated
-    // to the new timestamp: i.e., the min(latest_segment_end_ime of all segments).
+    // to a newer timestamp.
     TimeBoundaryService.TimeBoundaryInfo tbi =
             _helixBrokerStarter.getHelixExternalViewBasedRouting().
                     getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
@@ -228,23 +230,28 @@ public class HelixBrokerStarterTest {
     Assert.assertEquals(tbi.getTimeValue(), "10");
 
     List<String> segmentNames = _pinotResourceManager.getSegmentsFor(DINING_TABLE_NAME);
+    long endTime = 20L;
+    // Refresh all 5 segments.
     for (String segment : segmentNames) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
               _pinotResourceManager.getOfflineSegmentZKMetadata(RAW_DINING_TABLE_NAME, segment);
       Assert.assertNotNull(offlineSegmentZKMetadata);
       _pinotResourceManager.refreshSegment(
-              SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_DINING_TABLE_NAME, segment, 20L),
+              SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_DINING_TABLE_NAME, segment, endTime ++),
               offlineSegmentZKMetadata,
               "downloadUrl");
     }
+    // Due to the asynchronous nature of the TimeboundaryInfo update and thread scheduling, the updated time boundary
+    // may not always be the max endtime of segments. We do not expect such exact update either as long as the timestamp
+    // is updated to some newer value.
     waitForPredicate(() -> {
       TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo = _helixBrokerStarter.getHelixExternalViewBasedRouting().
               getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
-      return "20".equals(timeBoundaryInfo.getTimeValue());
+      return 10 < Long.parseLong(timeBoundaryInfo.getTimeValue());
     }, 30000L);
     tbi = _helixBrokerStarter.getHelixExternalViewBasedRouting().
             getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
-    Assert.assertEquals(tbi.getTimeValue(), "20");
+    Assert.assertTrue(10 < Long.parseLong(tbi.getTimeValue()));
   }
 
   private void waitForPredicate(Callable<Boolean> predicate, long timeout) {

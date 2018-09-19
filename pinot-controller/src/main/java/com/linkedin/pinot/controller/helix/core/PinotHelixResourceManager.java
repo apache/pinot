@@ -1536,10 +1536,8 @@ public class PinotHelixResourceManager {
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setSessionSpecific(true);
-    // Explicitly set the data source to IDEALSTATES to overwrite the default value: EXTERNALVIEW.
-    // Otherwise, the brokers will not receive the message because they are NOT listed in EXTERNALVIEW.
-    recipientCriteria.setDataSource(Criteria.DataSource.IDEALSTATES);
-    // The brokerResource field in the IDEALSTATE stores the offline table name in the Partition subfield.
+    recipientCriteria.setDataSource(Criteria.DataSource.EXTERNALVIEW);
+    // The brokerResource field in the EXTERNALVIEW stores the offline table name in the Partition subfield.
     recipientCriteria.setPartition(offlineTableName);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
