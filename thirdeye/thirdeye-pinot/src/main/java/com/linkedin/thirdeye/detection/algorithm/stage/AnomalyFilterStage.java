@@ -22,7 +22,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 
 /**
  * The anomaly filter stage. Low level interface of anomaly filter stage.
- *  * User use data provider to fetch the data they want.
+ * User uses data provider to fetch the data they need to filter anomalies.
  */
 public interface AnomalyFilterStage extends BaseDetectionStage {
   /**

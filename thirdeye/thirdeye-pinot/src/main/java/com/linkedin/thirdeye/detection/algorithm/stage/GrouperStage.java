@@ -22,7 +22,7 @@ import java.util.List;
 
 /**
  * The anomaly grouping stage. Low level interface of grouper stage.
- * User use data provider to fetch the data they want.
+ * User use data provider to fetch the data they need to group anomalies.
  */
 public interface GrouperStage extends BaseDetectionStage {
   /**

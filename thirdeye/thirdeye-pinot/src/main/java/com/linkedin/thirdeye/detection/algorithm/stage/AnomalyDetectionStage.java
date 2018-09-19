@@ -23,7 +23,7 @@ import java.util.List;
 
 /**
  * The anomaly detection stage interface. Low level interface of anomaly detection stage.
- * User use data provider to fetch the data they want.
+ * User uses data provider to fetch the data they need to perform the detection.
  */
 public interface AnomalyDetectionStage extends BaseDetectionStage {
   /**
