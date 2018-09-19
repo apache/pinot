@@ -247,9 +247,9 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
   }
 
   private void checkMetricChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
-
     LOG.info("Checking for metric changes in {}", dataset);
-    List<MetricFieldSpec> schemaMetricSpecs = schema.getMetricFieldSpecs();
+
+    // Fetch metrics stored in Thirdeye DB
     List<MetricConfigDTO> datasetMetricConfigs = DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset);
     Set<String> datasetMetricNames = new HashSet<>();
     for (MetricConfigDTO metricConfig : datasetMetricConfigs) {
@@ -264,15 +264,17 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
         datasetMetricNames.add(metricConfig.getName());
       }
     }
-    List<Long> metricsToAdd = new ArrayList<>();
 
+    // Fetch fresh metrics from Pinot
+    List<MetricFieldSpec> schemaMetricSpecs = schema.getMetricFieldSpecs();
+
+    // Update Thirdeye DB with all the new metrics
     for (MetricFieldSpec metricSpec : schemaMetricSpecs) {
-      // metrics which are new in pinot schema, create them
       String metricName = metricSpec.getName();
       if (!datasetMetricNames.contains(metricName)) {
         MetricConfigDTO metricConfigDTO = ConfigGenerator.generateMetricConfig(metricSpec, dataset);
         LOG.info("Creating metric {} for {}", metricName, dataset);
-        metricsToAdd.add(DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO));
+        DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO);
       }
     }
 
