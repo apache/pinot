@@ -88,6 +88,9 @@ public class MetricConfigBean extends AbstractBean {
 
   private String alias;
 
+  // Represents how relevant and critical a metric is.
+  private Integer tierLevel;
+
   private MetricType datatype;
 
   private boolean derived = false;
@@ -126,6 +129,14 @@ public class MetricConfigBean extends AbstractBean {
 
   public void setDataset(String dataset) {
     this.dataset = dataset;
+  }
+
+  public Integer getTierLevel() {
+    return tierLevel;
+  }
+
+  public void setTierLevel(Integer tierLevel) {
+    this.tierLevel = tierLevel;
   }
 
   public String getAlias() {
