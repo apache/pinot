@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryScheduler.class);
+  private static final String INVALID_NUM_SCANNED = "-1";
 
   protected final ServerMetrics serverMetrics;
   protected final QueryExecutor queryExecutor;
@@ -135,19 +136,23 @@ public abstract class QueryScheduler {
     byte[] responseData = serializeDataTable(queryRequest, dataTable);
 
     // Log the statistics
-    long numDocsScanned = 0;
-    long numEntriesScannedInFilter = 0;
-    long numEntriesScannedPostFilter = 0;
     String tableNameWithType = queryRequest.getTableNameWithType();
-    try {
-      numDocsScanned = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_DOCS_SCANNED_METADATA_KEY));
-      numEntriesScannedInFilter = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY));
-      numEntriesScannedPostFilter = Long.parseLong(getMetadataValue(dataTableMetadata, DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY));
+    long numDocsScanned =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, INVALID_NUM_SCANNED));
+    long numEntriesScannedInFilter = Long.parseLong(
+        dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
+    long numEntriesScannedPostFilter = Long.parseLong(
+        dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
+    if (numDocsScanned > 0) {
       serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
-      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER, numEntriesScannedPostFilter);
-    } catch (NumberFormatException e) {
-      LOGGER.error("Encountered error converting to long ", e);
+    }
+    if (numEntriesScannedInFilter > 0) {
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER,
+          numEntriesScannedInFilter);
+    }
+    if (numEntriesScannedPostFilter > 0) {
+      serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER,
+          numEntriesScannedPostFilter);
     }
 
     TimerContext timerContext = queryRequest.getTimerContext();
@@ -155,17 +160,12 @@ public abstract class QueryScheduler {
         "Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
         requestId, tableNameWithType, queryRequest.getSegmentsToQuery().size(),
         queryRequest.getSegmentCountAfterPruning(), timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
-        timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(),
-        numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+        timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
+        numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_SEARCHED,
         queryRequest.getSegmentCountAfterPruning());
 
     return responseData;
-  }
-
-  protected String getMetadataValue(Map<String, String> metadata, String key) {
-    String val = metadata.get(key);
-    return (val == null) ? "" : val;
   }
 
   /**
