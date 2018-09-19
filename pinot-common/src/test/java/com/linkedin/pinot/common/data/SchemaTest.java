@@ -18,8 +18,11 @@ package com.linkedin.pinot.common.data;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -308,5 +311,27 @@ public class SchemaTest {
     Schema schemaFromJson = Schema.fromString(jsonSchema);
     Assert.assertEquals(schemaFromJson, schema);
     Assert.assertEquals(schemaFromJson.hashCode(), schema.hashCode());
+  }
+
+  @Test
+  public void testByteType() throws DecoderException, IOException {
+    Schema expectedSchema = new Schema();
+    byte[] expectedEmptyDefault = new byte[0];
+    byte[] expectedNonEmptyDefault = Hex.decodeHex("abcd1234".toCharArray());
+
+    expectedSchema.addField(new MetricFieldSpec("noDefault", FieldSpec.DataType.BYTES));
+    expectedSchema.addField(new MetricFieldSpec("emptyDefault", FieldSpec.DataType.BYTES, expectedEmptyDefault));
+    expectedSchema.addField(new MetricFieldSpec("nonEmptyDefault", FieldSpec.DataType.BYTES, expectedNonEmptyDefault));
+
+    // Ensure that schema can be serialized and de-serialized (ie byte[] converted to String and back).
+    String jsonSchema = expectedSchema.getJSONSchema();
+    Schema actualSchema = Schema.fromString(jsonSchema);
+
+    Assert.assertEquals(actualSchema.getFieldSpecFor("noDefault").getDefaultNullValue(), expectedEmptyDefault);
+    Assert.assertEquals(actualSchema.getFieldSpecFor("emptyDefault").getDefaultNullValue(), expectedEmptyDefault);
+    Assert.assertEquals(actualSchema.getFieldSpecFor("nonEmptyDefault").getDefaultNullValue(), expectedNonEmptyDefault);
+
+    Assert.assertEquals(actualSchema, expectedSchema);
+    Assert.assertEquals(actualSchema.hashCode(), expectedSchema.hashCode());
   }
 }
