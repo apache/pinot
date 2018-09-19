@@ -16,6 +16,8 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
+import com.linkedin.pinot.common.config.CombinedConfig;
+import com.linkedin.pinot.common.config.Serializer;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -24,6 +26,7 @@ import com.linkedin.pinot.util.TestUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -366,5 +369,27 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         }
       }
     }, 60_000L, errorMessage);
+  }
+
+  protected void completeTableConfiguration() {
+    if (isUsingNewConfigFormat()) {
+      CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
+      try {
+        sendPostRequest(_controllerRequestURLBuilder.forNewTableCreate(), Serializer.serializeToString(combinedConfig));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  protected void updateTableConfiguration() {
+    if (isUsingNewConfigFormat()) {
+      CombinedConfig combinedConfig = new CombinedConfig(_offlineTableConfig, _realtimeTableConfig, _schema);
+      try {
+        sendPutRequest(_controllerRequestURLBuilder.forNewUpdateTableConfig(_offlineTableConfig.getTableName()), Serializer.serializeToString(combinedConfig));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 }
