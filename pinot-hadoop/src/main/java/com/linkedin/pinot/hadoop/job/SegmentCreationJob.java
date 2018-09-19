@@ -62,6 +62,8 @@ public class SegmentCreationJob extends Configured {
   private final String _outputDir;
   private final String _tableName;
 
+  private final String _defaultPermissions;
+
   private String[] _hosts;
   private int _port;
 
@@ -78,6 +80,8 @@ public class SegmentCreationJob extends Configured {
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
     String hostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
     String portString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
+
+    _defaultPermissions = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS, null);
 
     // For backwards compatibility, we want to allow users to create segments without setting push location parameters
     // in their creation jobs.
@@ -128,7 +132,9 @@ public class SegmentCreationJob extends Configured {
       fs.delete(stagingDir, true);
     }
     fs.mkdirs(stagingDir);
-    FileSystem.get(getConf()).setPermission(stagingDir, new FsPermission("755"));
+    if (_defaultPermissions != null) {
+      FileSystem.get(getConf()).setPermission(stagingDir, new FsPermission(_defaultPermissions));
+    }
     fs.mkdirs(new Path(_stagingDir + "/input/"));
 
     if (fs.exists(outputDir)) {
