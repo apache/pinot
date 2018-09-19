@@ -20,17 +20,18 @@ import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 
 
+@SuppressWarnings("unchecked")
 public final class SingleValueIterator extends BlockSingleValIterator {
-  private SingleColumnSingleValueReader<? super ReaderContext> _reader;
+  private final SingleColumnSingleValueReader _reader;
   private final int _numDocs;
   private final ReaderContext _context;
+
   private int _nextDocId;
 
-  public SingleValueIterator(SingleColumnSingleValueReader<? super ReaderContext> reader, int numDocs) {
+  public SingleValueIterator(SingleColumnSingleValueReader reader, int numDocs) {
     _reader = reader;
     _numDocs = numDocs;
     _context = _reader.createContext();
-    _nextDocId = 0;
   }
 
   @Override

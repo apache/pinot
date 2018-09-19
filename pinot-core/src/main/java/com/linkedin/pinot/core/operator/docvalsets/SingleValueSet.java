@@ -23,12 +23,13 @@ import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.docvaliterators.SingleValueIterator;
 
 
+@SuppressWarnings("unchecked")
 public final class SingleValueSet extends BaseBlockValSet {
-  private final SingleColumnSingleValueReader<? super ReaderContext> _reader;
+  private final SingleColumnSingleValueReader _reader;
   private final int _numDocs;
   private final DataType _dataType;
 
-  public SingleValueSet(SingleColumnSingleValueReader<? super ReaderContext> reader, int numDocs, DataType dataType) {
+  public SingleValueSet(SingleColumnSingleValueReader reader, int numDocs, DataType dataType) {
     _reader = reader;
     _numDocs = numDocs;
     _dataType = dataType;
