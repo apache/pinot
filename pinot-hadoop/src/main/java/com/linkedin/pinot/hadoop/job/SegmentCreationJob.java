@@ -32,6 +32,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobContext;
@@ -119,19 +120,22 @@ public class SegmentCreationJob extends Configured {
 
     FileSystem fs = FileSystem.get(getConf());
     Path inputPathPattern = new Path(_inputSegmentDir);
+    Path stagingDir = new Path(_stagingDir);
+    Path outputDir = new Path(_outputDir);
 
-    if (fs.exists(new Path(_stagingDir))) {
+    if (fs.exists(stagingDir)) {
       LOGGER.warn("Found the temp folder, deleting it");
-      fs.delete(new Path(_stagingDir), true);
+      fs.delete(stagingDir, true);
     }
-    fs.mkdirs(new Path(_stagingDir));
+    fs.mkdirs(stagingDir);
+    FileSystem.get(getConf()).setPermission(stagingDir, new FsPermission("755"));
     fs.mkdirs(new Path(_stagingDir + "/input/"));
 
-    if (fs.exists(new Path(_outputDir))) {
+    if (fs.exists(outputDir)) {
       LOGGER.warn("Found the output folder {}, deleting it", _outputDir);
-      fs.delete(new Path(_outputDir), true);
+      fs.delete(outputDir, true);
     }
-    fs.mkdirs(new Path(_outputDir));
+    fs.mkdirs(outputDir);
 
     List<FileStatus> inputDataFiles = new ArrayList<FileStatus>();
     FileStatus[] fileStatusArr = fs.globStatus(inputPathPattern);
