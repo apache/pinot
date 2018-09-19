@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datasource.mock;
 
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Arrays;
@@ -10,6 +11,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
+
+import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class MockThirdEyeDatasourceTest {
@@ -70,5 +73,30 @@ public class MockThirdEyeDatasourceTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testGetDimensionFiltersInvalidDataset() throws Exception {
     this.dataSource.getDimensionFilters("invalid");
+  }
+
+  @Test
+  public void testDataGenerator() {
+    Assert.assertEquals(this.dataSource.data.size(), 30);
+  }
+
+  @Test
+  public void testDataGeneratorHourly() {
+    MockThirdEyeDataSource.Tuple path = new MockThirdEyeDataSource.Tuple(new String[] { "tracking", "metrics", "pageViews", "mx", "chrome", "mobile" });
+    DataFrame data = this.dataSource.data.get(path);
+
+    // allow for DST
+    Assert.assertTrue(data.getDoubles(COL_VALUE).count() >= 28 * 24 - 1);
+    Assert.assertTrue(data.getDoubles(COL_VALUE).count() <= 28 * 24 + 1);
+
+    Assert.assertTrue(data.getDoubles(COL_VALUE).sum().doubleValue() > 0);
+  }
+
+  @Test
+  public void testDataGeneratorDaily() {
+    MockThirdEyeDataSource.Tuple path = new MockThirdEyeDataSource.Tuple(new String[] { "business", "metrics", "purchases", "ca", "safari" });
+    DataFrame data = this.dataSource.data.get(path);
+    Assert.assertEquals(data.getDoubles(COL_VALUE).count(), 28);
+    Assert.assertTrue(data.getDoubles(COL_VALUE).sum().doubleValue() > 0);
   }
 }

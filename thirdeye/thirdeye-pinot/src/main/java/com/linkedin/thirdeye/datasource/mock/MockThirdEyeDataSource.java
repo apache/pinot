@@ -2,18 +2,31 @@ package com.linkedin.thirdeye.datasource.mock;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.math3.distribution.NormalDistribution;
+import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
+import org.joda.time.PeriodType;
+
+import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**
@@ -22,9 +35,11 @@ import org.joda.time.DateTimeZone;
  * testing and demo purposes.
  */
 public class MockThirdEyeDataSource implements ThirdEyeDataSource {
-  private final Map<String, MockDataset> datasets;
+  final Map<String, MockDataset> datasets;
 
-  private final Map<String, Map<String, List<String>>> dimensionFiltersCache;
+  final Map<String, Map<String, List<String>>> dimensionFiltersCache;
+
+  final Map<Tuple, DataFrame> data;
 
   /**
    * This constructor is invoked by Java Reflection to initialize a ThirdEyeDataSource.
@@ -46,6 +61,26 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     this.dimensionFiltersCache = new HashMap<>();
     for (MockDataset dataset : this.datasets.values()) {
       this.dimensionFiltersCache.put(dataset.name, extractDimensionFilters(dataset));
+    }
+
+    // mock data
+    final long tEnd = System.currentTimeMillis();
+    final long tStart = tEnd - TimeUnit.DAYS.toMillis(28);
+
+    this.data = new HashMap<>();
+    for (MockDataset dataset : this.datasets.values()) {
+      for (String metric : dataset.metrics.keySet()) {
+        String[] basePrefix = new String[] { dataset.name, "metrics", metric };
+
+        List<Tuple> paths = makeTuples(dataset.metrics.get(metric), basePrefix, dataset.dimensions.size() + basePrefix.length);
+        for (Tuple path : paths) {
+          Map<String, Object> metricConfig = resolveTuple(config, path);
+          this.data.put(path, makeData(metricConfig,
+              new DateTime(tStart, dataset.timezone),
+              new DateTime(tEnd, dataset.timezone),
+              dataset.granularity));
+        }
+      }
     }
   }
 
@@ -93,6 +128,12 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     return this.dimensionFiltersCache.get(dataset);
   }
 
+  /**
+   * Returns a full filter multimap for a given MockDataset.
+   *
+   * @param dataset mock dataset config
+   * @return filter multimap
+   */
   private static Map<String, List<String>> extractDimensionFilters(MockDataset dataset) {
     SetMultimap<String, String> allDimensions = HashMultimap.create();
 
@@ -110,6 +151,14 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     return output;
   }
 
+  /**
+   * Recursively extracts dimension names and values from a metric config
+   *
+   * @param dimensions  dimension levels to explore
+   * @param map nested config with metric generators
+   * @param level current recursion depth
+   * @return multimap with dimension filters
+   */
   private static SetMultimap<String, String> extractDimensionValues(List<String> dimensions, Map<String, Object> map, int level) {
     SetMultimap<String, String> output = HashMultimap.create();
 
@@ -128,6 +177,87 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
   }
 
   /**
+   * Returns a DataFrame populated with mock data for a given config and time range.
+   *
+   * @param config metric generator config
+   * @param start start time
+   * @param end end time
+   * @param interval time granularity
+   * @return DataFrame with mock data
+   */
+  private static DataFrame makeData(Map<String, Object> config, DateTime start, DateTime end, Period interval) {
+    List<Long> timestamps = new ArrayList<>();
+    List<Double> values = new ArrayList<>();
+
+    double mean = MapUtils.getDoubleValue(config, "mean", 0);
+    double std = MapUtils.getDoubleValue(config, "std", 1);
+    NormalDistribution dist = new NormalDistribution(mean, std);
+
+    DateTime origin = start.withFields(DataFrameUtils.makeOrigin(PeriodType.days()));
+    while (origin.isBefore(end)) {
+      if (origin.isBefore(start)) {
+        origin = origin.plus(interval);
+        continue;
+      }
+
+      timestamps.add(origin.getMillis());
+      values.add(Math.max(dist.sample(), 0));
+      origin = origin.plus(interval);
+    }
+
+    return new DataFrame()
+        .addSeries(COL_TIME, ArrayUtils.toPrimitive(timestamps.toArray(new Long[0])))
+        .addSeries(COL_VALUE, ArrayUtils.toPrimitive(values.toArray(new Double[0])))
+        .setIndex(COL_TIME);
+  }
+
+  /**
+   * Returns list of tuples for (a metric's) nested generator configs.
+   *
+   * @param map nested config with generator configs
+   * @param maxDepth max expected level of depth
+   * @return metric tuples
+   */
+  private static List<Tuple> makeTuples(Map<String, Object> map, String[] basePrefix, int maxDepth) {
+    List<Tuple> tuples = new ArrayList<>();
+
+    LinkedList<MetricTuple> stack = new LinkedList<>();
+    stack.push(new MetricTuple(basePrefix, map));
+
+    while (!stack.isEmpty()) {
+      MetricTuple tuple = stack.pop();
+      if (tuple.prefix.length >= maxDepth) {
+        tuples.add(new Tuple(tuple.prefix));
+
+      } else {
+        for (Map.Entry<String, Object> entry : tuple.map.entrySet()) {
+          Map<String, Object> nested = (Map<String, Object>) entry.getValue();
+          String[] prefix = Arrays.copyOf(tuple.prefix, tuple.prefix.length + 1);
+          prefix[prefix.length - 1] = entry.getKey();
+
+          stack.push(new MetricTuple(prefix, nested));
+        }
+      }
+    }
+
+    return tuples;
+  }
+
+  /**
+   * Returns the bottom-level config for a given metric tuple from the root of a nested generator config
+   *
+   * @param map nested config with generator configs
+   * @param path metric generator path
+   * @return generator config
+   */
+  private static Map<String, Object> resolveTuple(Map<String, Object> map, Tuple path) {
+    for (String element : path.values) {
+      map = (Map<String, Object>) map.get(element);
+    }
+    return map;
+  }
+
+  /**
    * Container class for datasets and their generator configs
    */
   static final class MockDataset {
@@ -135,12 +265,14 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     final DateTimeZone timezone;
     final List<String> dimensions;
     final Map<String, Map<String, Object>> metrics;
+    final Period granularity;
 
-    MockDataset(String name, DateTimeZone timezone, List<String> dimensions, Map<String, Map<String, Object>> metrics) {
+    MockDataset(String name, DateTimeZone timezone, List<String> dimensions, Map<String, Map<String, Object>> metrics, Period granularity) {
       this.name = name;
       this.timezone = timezone;
       this.dimensions = dimensions;
       this.metrics = metrics;
+      this.granularity = granularity;
     }
 
     static MockDataset fromMap(String name, Map<String, Object> map) {
@@ -148,7 +280,62 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
           name,
           DateTimeZone.forID(MapUtils.getString(map, "timezone", "America/Los_Angeles")),
           ConfigUtils.<String>getList(map.get("dimensions")),
-          ConfigUtils.<String, Map<String, Object>>getMap(map.get("metrics")));
+          ConfigUtils.<String, Map<String, Object>>getMap(map.get("metrics")),
+          ConfigUtils.parsePeriod(MapUtils.getString(map, "granularity", "1hour")));
+    }
+  }
+
+  static final class MetricTuple {
+    final String[] prefix;
+    final Map<String, Object> map;
+
+    MetricTuple(String[] prefix, Map<String, Object> map) {
+      this.prefix = prefix;
+      this.map = map;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      MetricTuple that = (MetricTuple) o;
+      return Arrays.equals(prefix, that.prefix) && Objects.equals(map, that.map);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(map);
+      result = 31 * result + Arrays.hashCode(prefix);
+      return result;
+    }
+  }
+
+  static final class Tuple {
+    final String[] values;
+
+    public Tuple(String[] values) {
+      this.values = values;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      Tuple tuple = (Tuple) o;
+      return Arrays.equals(values, tuple.values);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(values);
     }
   }
 }

@@ -10,40 +10,82 @@ dataSourceConfigs:
             pageViews:
               us:
                 chrome:
-                  desktop: [100, 20]
-                  mobile:  [200, 50]
+                  desktop:
+                    mean: 100
+                    std: 20
+                  mobile:
+                    mean: 200
+                    std: 50
                 safari:
-                  desktop: [70, 15]
-                  mobile:  [250, 40]
+                  desktop:
+                    mean: 70
+                    std: 15
+                  mobile:
+                    mean: 250
+                    std: 40
                 firefox:
-                  desktop: [30, 5]
-                  mobile:  [20, 3]
+                  desktop:
+                    mean: 30
+                    std: 5
+                  mobile:
+                    mean: 20
+                    std: 3
                 edge:
-                  desktop: [85, 18]
+                  desktop:
+                    mean: 85
+                    std: 18
               ca:
                 chrome:
-                  desktop: [30, 5]
-                  mobile:  [70,8]
+                  desktop:
+                    mean: 30
+                    std: 5
+                  mobile:
+                    mean: 70
+                    std: 8
                 safari:
-                  desktop: [20, 3]
-                  mobile:  [60, 8]
+                  desktop:
+                    mean: 20
+                    std: 3
+                  mobile:
+                    mean: 60
+                    std: 8
                 firefox:
-                  desktop: [12, 2]
-                  mobile:  [7, 1]
+                  desktop:
+                    mean: 12
+                    std: 2
+                  mobile:
+                    mean: 7
+                    std: 1
                 edge:
-                  desktop: [32, 10]
+                  desktop:
+                    mean: 32
+                    std: 10
               mx:
                 chrome:
-                  desktop: [40, 6]
-                  mobile:  [80,10]
+                  desktop:
+                    mean: 40
+                    std: 6
+                  mobile:
+                    mean: 80
+                    std: 10
                 safari:
-                  desktop: [20, 3]
-                  mobile:  [65, 10]
+                  desktop:
+                    mean: 20
+                    std: 3
+                  mobile:
+                    mean: 65
+                    std: 10
                 firefox:
-                  desktop: [15, 3]
-                  mobile:  [12, 2]
+                  desktop:
+                    mean: 15
+                    std: 3
+                  mobile:
+                    mean: 12
+                    std: 2
                 edge:
-                  desktop: [32, 9]
+                  desktop:
+                    mean: 32
+                    std: 9
         business:
           granularity: "1day"
           timezone: "America/Los_Angeles"
@@ -51,14 +93,32 @@ dataSourceConfigs:
           metrics:
             purchases:
               us:
-                chrome:  [16, 2]
-                safari:  [19, 3]
-                edge:    [4, 1]
+                chrome:
+                  mean: 16
+                  std: 2
+                safari:
+                  mean: 19
+                  std: 3
+                edge:
+                  mean: 4
+                  std: 1
               ca:
-                chrome:  [5, 1]
-                safari:  [5, 2]
-                edge:    [1, 1]
+                chrome:
+                  mean: 5
+                  std: 1
+                safari:
+                  mean: 5
+                  std: 2
+                edge:
+                  mean: 1
+                  std: 1
               mx:
-                chrome:  [3, 1]
-                safari:  [5, 2]
-                edge:    [2, 1]
+                chrome:
+                  mean: 3
+                  std: 1
+                safari:
+                  mean: 5
+                  std: 2
+                edge:
+                  mean: 2
+                  std: 1
