@@ -93,7 +93,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
-    _stringDefaultNullValue = defaultNullValue.toString();
+    _stringDefaultNullValue = getStringValue(defaultNullValue);
     _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
@@ -141,6 +141,21 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   @Nonnull
   public Object getDefaultNullValue() {
     return _defaultNullValue;
+  }
+
+  /**
+   * Helper method to return the String value for the given object.
+   * This is required as not all data types have a toString() (eg byte[]).
+   *
+   * @param value Value for which String value needs to be returned
+   * @return String value for the object.
+   */
+  private String getStringValue(Object value) {
+    if (value instanceof byte[]) {
+      return Hex.encodeHexString((byte[]) value);
+    } else {
+      return value.toString();
+    }
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
@@ -259,7 +274,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
       if (_defaultNullValue instanceof Number) {
         jsonObject.add("defaultNullValue", new JsonPrimitive((Number) _defaultNullValue));
       } else {
-        jsonObject.addProperty("defaultNullValue", _defaultNullValue.toString());
+        jsonObject.addProperty("defaultNullValue", getStringValue(_defaultNullValue));
       }
     }
   }
@@ -310,8 +325,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
     FieldSpec that = (FieldSpec) o;
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
-        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(_defaultNullValue,
-        that._defaultNullValue);
+        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(
+        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue));
   }
 
   @Override
@@ -319,7 +334,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     int result = EqualityUtils.hashCodeOf(_name);
     result = EqualityUtils.hashCodeOf(result, _dataType);
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
-    result = EqualityUtils.hashCodeOf(result, _defaultNullValue);
+    result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     return result;
   }
 
