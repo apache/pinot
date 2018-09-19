@@ -25,7 +25,7 @@ import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
 
 
 /**
- * The anomaly filter stage
+ * Static anomaly filter stage. High level interface for anomaly filter.
  */
 public abstract class StaticAnomalyFilterStage implements AnomalyFilterStage {
   /**

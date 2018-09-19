@@ -24,7 +24,9 @@ import java.util.List;
 
 import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
 
-
+/**
+ * Static Grouper stage. High level interface for grouper stage.
+ */
 public abstract class StaticGrouperStage implements GrouperStage {
   /**
    * Returns a data model describing all required data(time series, aggregates, existing anomalies) to perform a stage.
