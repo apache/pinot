@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datasource.mock;
 
+import com.google.common.base.Predicate;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -7,6 +9,7 @@ import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,8 +21,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.math3.distribution.NormalDistribution;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -39,7 +44,12 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
   final Map<String, Map<String, List<String>>> dimensionFiltersCache;
 
-  final Map<Tuple, DataFrame> data;
+  final Map<Tuple, DataFrame> dimensionData;
+
+  final Map<String, DataFrame> datasetData;
+  final Map<Long, String> metricNameMap;
+
+  final CSVThirdEyeDataSource delegate;
 
   /**
    * This constructor is invoked by Java Reflection to initialize a ThirdEyeDataSource.
@@ -67,21 +77,39 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     final long tEnd = System.currentTimeMillis();
     final long tStart = tEnd - TimeUnit.DAYS.toMillis(28);
 
-    this.data = new HashMap<>();
+    this.dimensionData = new HashMap<>();
     for (MockDataset dataset : this.datasets.values()) {
       for (String metric : dataset.metrics.keySet()) {
         String[] basePrefix = new String[] { dataset.name, "metrics", metric };
 
-        List<Tuple> paths = makeTuples(dataset.metrics.get(metric), basePrefix, dataset.dimensions.size() + basePrefix.length);
+        Collection<Tuple> paths = makeTuples(dataset.metrics.get(metric), basePrefix, dataset.dimensions.size() + basePrefix.length);
         for (Tuple path : paths) {
           Map<String, Object> metricConfig = resolveTuple(config, path);
-          this.data.put(path, makeData(metricConfig,
+          this.dimensionData.put(path, makeData(metricConfig,
               new DateTime(tStart, dataset.timezone),
               new DateTime(tEnd, dataset.timezone),
               dataset.granularity));
         }
       }
     }
+    
+    long metricNameCounter = 0;
+    this.datasetData = new HashMap<>();
+    this.metricNameMap = new HashMap<>();
+    for (MockDataset dataset : this.datasets.values()) {
+      String[] prefix = new String[] { dataset.name };
+      Collection<Tuple> tuples = filterTuples(this.dimensionData.keySet(), prefix);
+      List<DataFrame> dataFrames = new ArrayList<>();
+
+      for (Tuple tuple : tuples) {
+        this.metricNameMap.put(metricNameCounter++, tuple.values[2]);
+        dataFrames.add(this.dimensionData.get(tuple));
+      }
+
+      this.datasetData.put(dataset.name, DataFrame.concatenate(dataFrames));
+    }
+
+    this.delegate = CSVThirdEyeDataSource.fromDataFrame(this.datasetData, this.metricNameMap);
   }
 
   @Override
@@ -255,6 +283,32 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
       map = (Map<String, Object>) map.get(element);
     }
     return map;
+  }
+
+  /**
+   * Returns a filtered collection of tuples for a given prefix
+   *
+   * @param tuples collections of tuples
+   * @param prefix reuquired prefix
+   * @return filtered collection of tuples
+   */
+  private static Collection<Tuple> filterTuples(Collection<Tuple> tuples, final String[] prefix) {
+    return Collections2.filter(tuples, new Predicate<Tuple>() {
+      @Override
+      public boolean apply(@Nullable Tuple tuple) {
+        if (tuple == null || tuple.values.length < prefix.length) {
+          return false;
+        }
+
+        for (int i = 0; i < prefix.length; i++) {
+          if (!StringUtils.equals(tuple.values[i], prefix[i])) {
+            return false;
+          }
+        }
+
+        return true;
+      }
+    });
   }
 
   /**
