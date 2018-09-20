@@ -19,7 +19,7 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineModel;
+import com.linkedin.thirdeye.detection.InputDataSpec;
 import java.util.List;
 
 import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
@@ -31,22 +31,22 @@ import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
 public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionStage {
 
   /**
-   * Returns a data model describing all required data(time series, aggregates, existing anomalies) to perform a stage.
+   * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to perform a stage.
    * Data is retrieved in one pass and cached between executions if possible.
-   * @return detection data model
+   * @return input data spec
    */
-  abstract StaticDetectionPipelineModel getModel();
+  abstract InputDataSpec getInputDataSpec();
 
   /**
    * Run detection in the specified time range and return a list of anomalies
-   * @param data data(time series, anomalies, etc.) as described by data model
+   * @param data data(time series, anomalies, etc.) as described by data spec
    * @return list of anomalies
    */
   abstract List<MergedAnomalyResultDTO> runDetection(StaticDetectionPipelineData data);
 
   @Override
   public final List<MergedAnomalyResultDTO> runDetection(DataProvider provider) {
-    return this.runDetection(getDataForModel(provider, this.getModel()));
+    return this.runDetection(getDataForSpec(provider, this.getInputDataSpec()));
   }
 
 }

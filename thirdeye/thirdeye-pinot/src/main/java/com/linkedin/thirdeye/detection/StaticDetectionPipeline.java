@@ -32,7 +32,7 @@ import java.util.Map;
  * Execution takes place in three stages:
  * <ul>
  *   <li>constructor: receives configuration parameters and detection time range</li>
- *   <li>model: describes all data required to perform detection</li>
+ *   <li>dataSpec: describes all data required to perform detection</li>
  *   <li>execution: performs any computation necessary to arrive at the detection result</li>
  * </ul>
  *
@@ -52,17 +52,17 @@ public abstract class StaticDetectionPipeline extends DetectionPipeline {
   }
 
   /**
-   * Returns a data model describing all required data to perform detection. Data is retrieved
+   * Returns a data spec describing all required data to perform detection. Data is retrieved
    * in one pass and cached between executions if possible.
    *
-   * @return detection data model
+   * @return detection data spec
    */
-  public abstract StaticDetectionPipelineModel getModel();
+  public abstract InputDataSpec getInputDataSpec();
 
   /**
-   * Returns a detection result using the data described by the data model.
+   * Returns a detection result using the data described by the data dataSpec.
    *
-   * @param data data as described by data model
+   * @param data data as described by data dataSpec
    * @return detection result
    * @throws Exception on execution errors
    */
@@ -70,14 +70,14 @@ public abstract class StaticDetectionPipeline extends DetectionPipeline {
 
   @Override
   public final DetectionPipelineResult run() throws Exception {
-    StaticDetectionPipelineModel model = this.getModel();
-    Map<MetricSlice, DataFrame> timeseries = this.provider.fetchTimeseries(model.timeseriesSlices);
-    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(model.aggregateSlices, Collections.<String>emptyList());
-    Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(model.anomalySlices);
-    Multimap<EventSlice, EventDTO> events = this.provider.fetchEvents(model.eventSlices);
+    InputDataSpec dataSpec = this.getInputDataSpec();
+    Map<MetricSlice, DataFrame> timeseries = this.provider.fetchTimeseries(dataSpec.timeseriesSlices);
+    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(dataSpec.aggregateSlices, Collections.<String>emptyList());
+    Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(dataSpec.anomalySlices);
+    Multimap<EventSlice, EventDTO> events = this.provider.fetchEvents(dataSpec.eventSlices);
 
     StaticDetectionPipelineData data = new StaticDetectionPipelineData(
-        model, timeseries, aggregates, anomalies, events);
+        dataSpec, timeseries, aggregates, anomalies, events);
 
     return this.run(data);
   }

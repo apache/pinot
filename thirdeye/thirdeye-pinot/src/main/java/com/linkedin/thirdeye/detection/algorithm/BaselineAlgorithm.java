@@ -26,7 +26,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
 import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineModel;
+import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
@@ -94,11 +94,11 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
   }
 
   @Override
-  public StaticDetectionPipelineModel getModel() {
+  public InputDataSpec getInputDataSpec() {
     List<MetricSlice> slices = new ArrayList<>(this.baseline.scatter(this.slice));
     slices.add(this.slice);
 
-    return new StaticDetectionPipelineModel()
+    return new InputDataSpec()
         .withTimeseriesSlices(slices);
   }
 

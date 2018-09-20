@@ -25,26 +25,26 @@ import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.EventSlice;
 import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineModel;
+import com.linkedin.thirdeye.detection.InputDataSpec;
 import java.util.Collections;
 import java.util.Map;
 
 
 public class StageUtils {
   /**
-   * Get the data for a pipeline model from provider
+   * Get the data for a data spec from provider
    * @param provider the data provider
-   * @param model the data model
+   * @param inputDataSpec the spec of input data for the detection stage
    * @return data
    */
-  public static StaticDetectionPipelineData getDataForModel(DataProvider provider, StaticDetectionPipelineModel model) {
-    Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(model.getTimeseriesSlices());
+  public static StaticDetectionPipelineData getDataForSpec(DataProvider provider, InputDataSpec inputDataSpec) {
+    Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(inputDataSpec.getTimeseriesSlices());
     Map<MetricSlice, DataFrame> aggregates =
-        provider.fetchAggregates(model.getAggregateSlices(), Collections.<String>emptyList());
+        provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList());
     Multimap<AnomalySlice, MergedAnomalyResultDTO> existingAnomalies =
-        provider.fetchAnomalies(model.getAnomalySlices());
-    Multimap<EventSlice, EventDTO> events = provider.fetchEvents(model.getEventSlices());
+        provider.fetchAnomalies(inputDataSpec.getAnomalySlices());
+    Multimap<EventSlice, EventDTO> events = provider.fetchEvents(inputDataSpec.getEventSlices());
 
-    return new StaticDetectionPipelineData(model, timeseries, aggregates, existingAnomalies, events);
+    return new StaticDetectionPipelineData(inputDataSpec, timeseries, aggregates, existingAnomalies, events);
   }
 }

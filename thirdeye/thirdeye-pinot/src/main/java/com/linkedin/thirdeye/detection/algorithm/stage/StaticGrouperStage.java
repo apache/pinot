@@ -19,7 +19,7 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineModel;
+import com.linkedin.thirdeye.detection.InputDataSpec;
 import java.util.List;
 
 import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
@@ -29,11 +29,11 @@ import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
  */
 public abstract class StaticGrouperStage implements GrouperStage {
   /**
-   * Returns a data model describing all required data(time series, aggregates, existing anomalies) to perform a stage.
+   * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to perform a stage.
    * Data is retrieved in one pass and cached between executions if possible.
-   * @return detection data model
+   * @return input data spec
    */
-  abstract StaticDetectionPipelineModel getModel();
+  abstract InputDataSpec getInputDataSpec();
 
   /**
    * group anomalies.
@@ -45,6 +45,6 @@ public abstract class StaticGrouperStage implements GrouperStage {
 
   @Override
   public final List<MergedAnomalyResultDTO> group(List<MergedAnomalyResultDTO> anomalies, DataProvider provider) {
-    return this.group(anomalies, getDataForModel(provider, this.getModel()));
+    return this.group(anomalies, getDataForSpec(provider, this.getInputDataSpec()));
   }
 }

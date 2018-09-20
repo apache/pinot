@@ -25,24 +25,24 @@ import java.util.Map;
 
 
 public class StaticDetectionPipelineData {
-  final StaticDetectionPipelineModel model;
+  final InputDataSpec dataSpec;
   final Map<MetricSlice, DataFrame> timeseries;
   final Map<MetricSlice, DataFrame> aggregates;
   final Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies;
   final Multimap<EventSlice, EventDTO> events;
 
-  public StaticDetectionPipelineData(StaticDetectionPipelineModel model, Map<MetricSlice, DataFrame> timeseries,
+  public StaticDetectionPipelineData(InputDataSpec spec, Map<MetricSlice, DataFrame> timeseries,
       Map<MetricSlice, DataFrame> aggregates, Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies,
       Multimap<EventSlice, EventDTO> events) {
-    this.model = model;
+    this.dataSpec = spec;
     this.timeseries = timeseries;
     this.aggregates = aggregates;
     this.anomalies = anomalies;
     this.events = events;
   }
 
-  public StaticDetectionPipelineModel getModel() {
-    return model;
+  public InputDataSpec getDataSpec() {
+    return dataSpec;
   }
 
   public Map<MetricSlice, DataFrame> getTimeseries() {

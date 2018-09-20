@@ -36,16 +36,16 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 /**
- * This filter stage filters the anomalies if either the absolute change, percentage change or site wide impact does not pass the threshold.
+ * This filter stage filters the anomalies if either the absolute changeThreshold, percentage changeThreshold or site wide impact does not pass the threshold.
  */
 public class BaselineRuleFilterStage implements AnomalyFilterStage {
   private static final String PROP_WEEKS = "weeks";
   private static final int PROP_WEEKS_DEFAULT = 1;
 
-  private static final String PROP_CHANGE = "change";
+  private static final String PROP_CHANGE = "changeThreshold";
   private static final double PROP_CHANGE_DEFAULT = Double.NaN;
 
-  private static final String PROP_DIFFERENCE = "difference";
+  private static final String PROP_DIFFERENCE = "differenceThreshold";
   private static final double PROP_DIFFERENCE_DEFAULT = Double.NaN;
 
   private static final String PROP_TIMEZONE = "timezone";
@@ -56,8 +56,8 @@ public class BaselineRuleFilterStage implements AnomalyFilterStage {
   private static final double PROP_SITEWIDE_THRESHOLD_DEFAULT = Double.NaN;
 
   private Baseline baseline;
-  private double change;
-  private double difference;
+  private double changeThreshold;
+  private double differenceThreshold;
   private double siteWideImpactThreshold;
   private String siteWideMetricUrn;
 
@@ -70,17 +70,17 @@ public class BaselineRuleFilterStage implements AnomalyFilterStage {
     Map<MetricSlice, DataFrame> aggregates = provider.fetchAggregates(Arrays.asList(currentSlice, baselineSlice), Collections.<String>emptyList());
     double currentValue = getValueFromAggregates(currentSlice, aggregates);
     double baselineValue = getValueFromAggregates(baselineSlice, aggregates);
-    if (!Double.isNaN(this.difference) && Math.abs(currentValue - baselineValue) < this.difference) {
+    if (!Double.isNaN(this.differenceThreshold) && Math.abs(currentValue - baselineValue) < this.differenceThreshold) {
       return false;
     }
-    if (!Double.isNaN(this.change) && baselineValue != 0 && Math.abs(currentValue / baselineValue - 1) < this.change) {
+    if (!Double.isNaN(this.changeThreshold) && baselineValue != 0 && Math.abs(currentValue / baselineValue - 1) < this.changeThreshold) {
       return false;
     }
     if (!Double.isNaN(this.siteWideImpactThreshold)) {
       String siteWideImpactMetricUrn = Strings.isNullOrEmpty(this.siteWideMetricUrn) ? anomaly.getMetricUrn() : this.siteWideMetricUrn;
       MetricEntity siteWideEntity = MetricEntity.fromURN(siteWideImpactMetricUrn).withFilters(ArrayListMultimap.<String, String>create());
       MetricSlice siteWideSlice = this.baseline.scatter(
-          MetricSlice.from(siteWideEntity.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters())).get(0);
+          MetricSlice.from(siteWideEntity.getId(), anomaly.getStartTime(), anomaly.getEndTime())).get(0);
       double siteWideBaselineValue = getValueFromAggregates(siteWideSlice,
           provider.fetchAggregates(Collections.singleton(siteWideSlice), Collections.<String>emptyList()));
 
@@ -97,10 +97,10 @@ public class BaselineRuleFilterStage implements AnomalyFilterStage {
     DateTimeZone timezone =
         DateTimeZone.forID(MapUtils.getString(properties, PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
     this.baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, weeks, 1, timezone);
-    // percentage change
-    this.change = MapUtils.getDoubleValue(properties, PROP_CHANGE, PROP_CHANGE_DEFAULT);
-    // absolute change
-    this.difference = MapUtils.getDoubleValue(properties, PROP_DIFFERENCE, PROP_DIFFERENCE_DEFAULT);
+    // percentage changeThreshold
+    this.changeThreshold = MapUtils.getDoubleValue(properties, PROP_CHANGE, PROP_CHANGE_DEFAULT);
+    // absolute changeThreshold
+    this.differenceThreshold = MapUtils.getDoubleValue(properties, PROP_DIFFERENCE, PROP_DIFFERENCE_DEFAULT);
     // site wide impact
     this.siteWideImpactThreshold = MapUtils.getDoubleValue(properties, PROP_SITEWIDE_THRESHOLD, PROP_SITEWIDE_THRESHOLD_DEFAULT);
     this.siteWideMetricUrn = MapUtils.getString(properties, PROP_SITEWIDE_METRIC);
