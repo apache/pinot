@@ -40,12 +40,6 @@ public class PinotFSFactory {
   }
 
   public static void init(Configuration fsConfig) {
-    Iterator<String> keys2 = fsConfig.getKeys();
-
-    while (keys2.hasNext()) {
-      LOGGER.info("Next key: {}", keys2.next());
-    }
-
     // Get schemes and their respective classes
     Iterator<String> keys = fsConfig.subset(CLASS).getKeys();
     if (!keys.hasNext()) {
@@ -53,7 +47,7 @@ public class PinotFSFactory {
     }
     while (keys.hasNext()) {
       String key = keys.next();
-      String fsClassName = (String) fsConfig.getProperty(key);
+      String fsClassName = (String) fsConfig.getProperty(CLASS + "." + key);
       LOGGER.info("Got scheme {}, classname {}, starting to initialize", key, fsClassName);
 
       try {

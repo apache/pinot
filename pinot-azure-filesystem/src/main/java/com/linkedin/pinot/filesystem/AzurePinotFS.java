@@ -46,8 +46,6 @@ public class AzurePinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(AzurePinotFS.class);
   private ADLStoreClient _adlStoreClient;
 
-  private static final String AZURE_KEY = "adl";
-
   public AzurePinotFS() {
 
   }
@@ -59,16 +57,15 @@ public class AzurePinotFS extends PinotFS {
 
   @Override
   public void init(Configuration config) {
-    Configuration azureConfigs = config.subset(AZURE_KEY);
     // The ADL account id. Example: {@code mystore.azuredatalakestore.net}.
-    String account = azureConfigs.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.ACCOUNT_ID);
+    String account = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.ACCOUNT_ID);
     // The endpoint that should be used for authentication.
     // Usually of the form {@code https://login.microsoftonline.com/<tenant-id>/oauth2/token}.
-    String authEndpoint = azureConfigs.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.AUTH_ENDPOINT);
+    String authEndpoint = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.AUTH_ENDPOINT);
     // The clientId used to authenticate this application
-    String clientId = azureConfigs.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.CLIENT_ID);
+    String clientId = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.CLIENT_ID);
     // The secret key used to authenticate this application
-    String clientSecret = azureConfigs.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.CLIENT_SECRET);
+    String clientSecret = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.CLIENT_SECRET);
 
     AccessTokenProvider tokenProvider =
         new ClientCredsTokenProvider(authEndpoint, clientId, clientSecret);
