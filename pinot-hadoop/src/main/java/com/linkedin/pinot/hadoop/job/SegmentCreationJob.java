@@ -61,10 +61,10 @@ public class SegmentCreationJob extends Configured {
   private final String _depsJarPath;
   private final String _outputDir;
   private final String _tableName;
-  
+
   private final String _readerConfigFile;
 
-  private final String _defaultPermissions;
+  private final String _defaultPermissionsMask;
 
   private String[] _hosts;
   private int _port;
@@ -84,7 +84,7 @@ public class SegmentCreationJob extends Configured {
     String hostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
     String portString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
 
-    _defaultPermissions = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS, null);
+    _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK, null);
 
     // For backwards compatibility, we want to allow users to create segments without setting push location parameters
     // in their creation jobs.
@@ -134,12 +134,15 @@ public class SegmentCreationJob extends Configured {
     Path outputDir = new Path(_outputDir);
 
     if (fs.exists(stagingDir)) {
-      LOGGER.warn("Found the temp folder, deleting it");
+      LOGGER.warn("Found the temp folder {}, deleting it", stagingDir);
       fs.delete(stagingDir, true);
     }
     fs.mkdirs(stagingDir);
-    if (_defaultPermissions != null) {
-      FileSystem.get(getConf()).setPermission(stagingDir, new FsPermission(_defaultPermissions));
+
+    if (_defaultPermissionsMask != null) {
+      FsPermission umask = new FsPermission(_defaultPermissionsMask);
+      FsPermission permission = FsPermission.getDefault().applyUMask(umask);
+      FileSystem.get(getConf()).setPermission(stagingDir, permission);
     }
     fs.mkdirs(new Path(_stagingDir + "/input/"));
 
