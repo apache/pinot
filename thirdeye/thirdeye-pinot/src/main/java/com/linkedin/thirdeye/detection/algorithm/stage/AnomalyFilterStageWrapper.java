@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -30,23 +30,34 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.MapUtils;
+
 
 /**
- * This abstract filter wrapper allows user to plug in exclusion filter business rules in the detection pipeline.
+ * This anomaly filter wrapper allows user to plug in filter rules in the detection pipeline.
  */
-public abstract class RuleBasedFilterWrapper extends DetectionPipeline {
+public class AnomalyFilterStageWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_STAGE_CLASSNAME = "stageClassName";
+  private static final String PROP_SPECS = "specs";
 
   private final List<Map<String, Object>> nestedProperties;
+  private AnomalyFilterStage anomalyFilter;
 
-  public RuleBasedFilterWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
+  public AnomalyFilterStageWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
+      throws Exception {
     super(provider, config, startTime, endTime);
-    this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    Map<String, Object> properties = config.getProperties();
+    this.nestedProperties = ConfigUtils.getList(properties.get(PROP_NESTED));
+    Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
+
+    this.anomalyFilter = loadAnomalyFilterStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
+    this.anomalyFilter.init(MapUtils.getMap(properties, PROP_SPECS), config.getId(), startTime, endTime);
   }
 
   /**
-   * Runs the nested pipelines and calls the isQualified method to check if an anomaly passes the rule filter.
+   * Runs the nested pipelines and calls the isQualified method in the anomaly filter stage to check if an anomaly passes the filter.
    * @return the detection pipeline result
    * @throws Exception
    */
@@ -71,17 +82,15 @@ public abstract class RuleBasedFilterWrapper extends DetectionPipeline {
         Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
           @Override
           public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomaly) {
-            return mergedAnomaly != null && !mergedAnomaly.isChild() && isQualified(mergedAnomaly);
+            return mergedAnomaly != null && !mergedAnomaly.isChild() && anomalyFilter.isQualified(mergedAnomaly,
+                provider);
           }
         });
 
     return new DetectionPipelineResult(new ArrayList<>(anomalies));
   }
 
-  /**
-   * Sub-classes override this method to check if anomaly passes the filter wrapper.
-   * @param anomaly
-   * @return if the anomaly passes the filter
-   */
-  abstract boolean isQualified(MergedAnomalyResultDTO anomaly);
+  private AnomalyFilterStage loadAnomalyFilterStage(String className) throws Exception {
+    return (AnomalyFilterStage) Class.forName(className).newInstance();
+  }
 }

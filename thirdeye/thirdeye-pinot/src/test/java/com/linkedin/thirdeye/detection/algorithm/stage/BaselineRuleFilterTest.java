@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package com.linkedin.thirdeye.detection.algorithm.stage;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -29,6 +31,9 @@ import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.MockPipeline;
 import com.linkedin.thirdeye.detection.MockPipelineLoader;
 import com.linkedin.thirdeye.detection.MockPipelineOutput;
+import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
+import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
+import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -36,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -43,27 +49,36 @@ import org.testng.annotations.Test;
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
-public class ThresholdRuleFilterTest {
+public class BaselineRuleFilterTest {
   private static final String METRIC_URN = "thirdeye:metric:123";
 
   private List<MergedAnomalyResultDTO> anomalies;
   private MockPipelineLoader loader;
   private List<MockPipeline> runs;
   private DataProvider testDataProvider;
-  private RuleBasedFilterWrapper thresholdRuleFilter;
+  private AnomalyFilterStageWrapper baselineRulefilterWrapper;
   private Map<String, Object> properties;
   private DetectionConfigDTO config;
+  private Map<String, Object> specs;
+  private Baseline baseline;
 
   @BeforeMethod
   public void beforeMethod() {
+    this.baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, 1, 1, DateTimeZone.forID("UTC"));
+
+    MetricSlice slice1 = MetricSlice.from(123L, 0, 2);
+    MetricSlice baselineSlice1 = this.baseline.scatter(slice1).get(0);
+    MetricSlice slice2 = MetricSlice.from(123L, 4, 6);
+    MetricSlice baselineSlice2 = this.baseline.scatter(slice2).get(0);
+
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
-    aggregates.put(MetricSlice.from(123L, 0, 2),
-        new DataFrame().addSeries(COL_VALUE, 0));
-    aggregates.put(MetricSlice.from(123L, 4, 6),
+    aggregates.put(slice1,
+        new DataFrame().addSeries(COL_VALUE, 150));
+    aggregates.put(baselineSlice1,
         new DataFrame().addSeries(COL_VALUE, 200));
-    aggregates.put(MetricSlice.from(123L, 6, 8),
+    aggregates.put(slice2,
         new DataFrame().addSeries(COL_VALUE, 500));
-    aggregates.put(MetricSlice.from(123L, 8, 10),
+    aggregates.put(baselineSlice2,
         new DataFrame().addSeries(COL_VALUE, 1000));
 
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
@@ -82,9 +97,13 @@ public class ThresholdRuleFilterTest {
     this.config.setId(125L);
     this.properties = new HashMap<>();
     this.properties.put("nested", Collections.singletonList(Collections.singletonMap("className", "dummy")));
+    this.properties.put("stageClassName", BaselineRuleFilterStage.class.getName());
+    this.specs = new HashMap<>();
+
+    this.properties.put("specs", specs);
     this.config.setProperties(this.properties);
 
-    this.anomalies = Arrays.asList(makeAnomaly(0, 2), makeAnomaly(4, 6), makeAnomaly(6, 8), makeAnomaly(8, 10));
+    this.anomalies = Arrays.asList(makeAnomaly(0, 2), makeAnomaly(4, 6));
 
     this.runs = new ArrayList<>();
 
@@ -96,67 +115,59 @@ public class ThresholdRuleFilterTest {
         .setMetrics(Collections.singletonList(metricConfigDTO))
         .setDatasets(Collections.singletonList(datasetConfigDTO))
         .setAggregates(aggregates);
-
   }
 
   @Test
-  public void testThresholdRuleFilterNone() throws Exception {
-    this.thresholdRuleFilter = new ThresholdRuleFilterWrapper(this.testDataProvider, this.config, 0, 10);
+  public void testBaselineRuleFilterNone() throws Exception {
+    this.baselineRulefilterWrapper = new AnomalyFilterStageWrapper(this.testDataProvider, this.config, 0, 10);
 
-    DetectionPipelineResult result = this.thresholdRuleFilter.run();
+    DetectionPipelineResult result = this.baselineRulefilterWrapper.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 10);
-    Assert.assertEquals(anomalies.size(), 4);
-    Assert.assertEquals(anomalies.get(0), this.anomalies.get(0));
-    Assert.assertEquals(anomalies.get(1), this.anomalies.get(1));
-    Assert.assertEquals(anomalies.get(2), this.anomalies.get(2));
-    Assert.assertEquals(anomalies.get(3), this.anomalies.get(3));
-  }
-
-  @Test
-  public void testThresholdRuleFilterMin() throws Exception {
-    this.properties.put("min", 200);
-    this.thresholdRuleFilter = new ThresholdRuleFilterWrapper(this.testDataProvider, this.config, 0, 10);
-
-    DetectionPipelineResult result = this.thresholdRuleFilter.run();
-    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 10);
-    Assert.assertEquals(anomalies.size(), 3);
-    Assert.assertEquals(anomalies.get(0), this.anomalies.get(1));
-    Assert.assertEquals(anomalies.get(1), this.anomalies.get(2));
-    Assert.assertEquals(anomalies.get(2), this.anomalies.get(3));
-  }
-
-  @Test
-  public void testThresholdRuleFilterMax() throws Exception {
-    this.properties.put("max", 500);
-    this.thresholdRuleFilter = new ThresholdRuleFilterWrapper(this.testDataProvider, this.config, 0, 10);
-
-    DetectionPipelineResult result = this.thresholdRuleFilter.run();
-    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 8);
-    Assert.assertEquals(anomalies.size(), 3);
-    Assert.assertEquals(anomalies.get(0), this.anomalies.get(0));
-    Assert.assertEquals(anomalies.get(1), this.anomalies.get(1));
-    Assert.assertEquals(anomalies.get(2), this.anomalies.get(2));
-  }
-
-  @Test
-  public void testThresholdRuleFilterBoth() throws Exception {
-    this.properties.put("min", 200);
-    this.properties.put("max", 500);
-    this.thresholdRuleFilter = new ThresholdRuleFilterWrapper(this.testDataProvider, this.config, 0, 10);
-
-    DetectionPipelineResult result = this.thresholdRuleFilter.run();
-    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 8);
+    Assert.assertEquals(result.getLastTimestamp(), 6);
     Assert.assertEquals(anomalies.size(), 2);
+    Assert.assertEquals(anomalies.get(0), this.anomalies.get(0));
+    Assert.assertEquals(anomalies.get(1), this.anomalies.get(1));
+  }
+
+  @Test
+  public void testBaselineRuleFilterChangePercentage() throws Exception {
+    this.specs.put("changeThreshold", 0.5);
+    this.baselineRulefilterWrapper = new AnomalyFilterStageWrapper(this.testDataProvider, this.config, 0, 10);
+
+    DetectionPipelineResult result = this.baselineRulefilterWrapper.run();
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
+    Assert.assertEquals(result.getLastTimestamp(), 6);
+    Assert.assertEquals(anomalies.size(), 1);
     Assert.assertEquals(anomalies.get(0), this.anomalies.get(1));
-    Assert.assertEquals(anomalies.get(1), this.anomalies.get(2));
+  }
+
+  @Test
+  public void testBaselineRuleFilterDifference() throws Exception {
+    this.specs.put("differenceThreshold", 100);
+    this.baselineRulefilterWrapper = new AnomalyFilterStageWrapper(this.testDataProvider, this.config, 0, 10);
+
+    DetectionPipelineResult result = this.baselineRulefilterWrapper.run();
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
+    Assert.assertEquals(result.getLastTimestamp(), 6);
+    Assert.assertEquals(anomalies.size(), 1);
+    Assert.assertEquals(anomalies.get(0), this.anomalies.get(1));
+  }
+
+  @Test
+  public void testSiteWideImpactRuleFilter() throws Exception {
+    this.specs.put("siteWideImpactThreshold", 0.5);
+    this.baselineRulefilterWrapper = new AnomalyFilterStageWrapper(this.testDataProvider, this.config, 0, 10);
+
+    DetectionPipelineResult result = this.baselineRulefilterWrapper.run();
+    List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
+    Assert.assertEquals(result.getLastTimestamp(), 6);
+    Assert.assertEquals(anomalies.size(), 1);
+    Assert.assertEquals(anomalies.get(0), this.anomalies.get(1));
   }
 
   private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
-    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(125L, start, end);
+    Map<String, String> dimensions = new HashMap<>();
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(125L, start, end, dimensions);
     anomaly.setMetricUrn(METRIC_URN);
     return anomaly;
   }

@@ -24,8 +24,8 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineModel;
+import com.linkedin.thirdeye.detection.InputData;
+import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.List;
@@ -57,13 +57,13 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
   }
 
   @Override
-  public StaticDetectionPipelineModel getModel() {
-    return new StaticDetectionPipelineModel()
+  public InputDataSpec getInputDataSpec() {
+    return new InputDataSpec()
         .withTimeseriesSlices(Collections.singletonList(this.slice));
   }
 
   @Override
-  public DetectionPipelineResult run(StaticDetectionPipelineData data) {
+  public DetectionPipelineResult run(InputData data) {
     DataFrame df = data.getTimeseries().get(this.slice);
 
     // defaults
