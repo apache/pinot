@@ -191,8 +191,11 @@
         value=toAddresses
         class="te-modal__input te-modal__input--fullwidth"
         disabled=cannotEdit
-        change=(action "onToAddresses")
+        key-up=(action "onToAddresses")
       }}
+      {{#if toAddrWarning}}
+        ({{toAddrWarning}})
+      {{/if}}
     </div>
   </div>
 

@@ -202,6 +202,12 @@ export default Component.extend({
   groupNameMessage: null,
 
   /**
+   * Error message container for to-recipients
+   * @type {string}
+   */
+  toAddrWarning: null,
+
+  /**
    * Temp storage for recipients(to) from text input
    * @type {String}
    */
@@ -482,12 +488,45 @@ export default Component.extend({
     }
   },
 
+  /**
+   * Check for at least one recipient
+   *
+   * @param toAddr {String} comma separated email addresses
+   * @private
+   */
+  _validateRecipient(toAddr) {
+    if (!_.isEmpty(toAddr)) {
+      var emailArray = toAddr.split(',');
+      for (var index = 0; index < emailArray.length; index++) {
+        if (this._validateEmail(emailArray[index].trim())) {
+          set(this, 'toAddrWarning', null);
+          return;
+        }
+      }
+    }
+
+    set(this, 'toAddrWarning', 'Please enter at least one valid recipient');
+  },
+
+  /**
+   * Verify if string is a valid email address
+   *
+   * @param email {String} email address
+   * @private
+   */
+  _validateEmail(email) {
+    var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    return re.test(String(email).toLowerCase());
+  },
+
   actions: {
     /**
      * Handles recipient updates
      */
     onToAddresses () {
       const toAddresses = get(this, 'toAddresses');
+      this._validateRecipient(toAddresses);
+
       set(this, 'group.receiverAddresses.to', toAddresses.replace(/[^!-~]+/g, '').replace(/,+/g, ',').split(','));
     },
     onCcAddresses () {
@@ -549,7 +588,8 @@ export default Component.extend({
         bccAddresses: null,
         showManageGroupsModal: false,
         changeCache: new Set(),
-        groupNameMessage: null
+        groupNameMessage: null,
+        toAddrWarning: null
       });
 
       if (onExit) { onExit(); }
@@ -578,13 +618,14 @@ export default Component.extend({
           bccAddresses: null,
           showManageGroupsModal: false,
           changeCache: new Set(),
-          groupNameMessage: null
+          groupNameMessage: null,
+          toAddrWarning: null
         }))
         .then(res => {
           if (onSave) { onSave(group); }
         })
         .catch(err => set(this, 'message', err));
-     },
+    },
 
     /**
      * Handles group selection
@@ -600,7 +641,7 @@ export default Component.extend({
         groupFunctionIds: (group.emailConfig.functionIds || []).join(', '),
         toAddresses: (group.receiverAddresses.to || []).join(', '),
         ccAddresses: (group.receiverAddresses.cc || []).join(', '),
-        bccAddresses: (group.receiverAddresses.bcc || []).join(', '),
+        bccAddresses: (group.receiverAddresses.bcc || []).join(', ')
       });
 
       this._validateGroupName(group);
@@ -655,7 +696,9 @@ export default Component.extend({
         toAddresses: null,
         ccAddresses: null,
         bccAddresses: null,
-        groupNameMessage: null });
+        groupNameMessage: null,
+        toAddrWarning: null
+      });
     },
 
     /**
