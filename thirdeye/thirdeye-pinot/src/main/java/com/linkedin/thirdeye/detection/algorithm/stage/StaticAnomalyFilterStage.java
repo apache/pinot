@@ -18,7 +18,7 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
+import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 
 import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
@@ -41,7 +41,7 @@ public abstract class StaticAnomalyFilterStage implements AnomalyFilterStage {
    * @param data data(time series, anomalies, etc.) as described by data spec
    * @return a boolean value to suggest if the anomaly should be filtered
    */
-  abstract boolean isQualified(MergedAnomalyResultDTO anomaly, StaticDetectionPipelineData data);
+  abstract boolean isQualified(MergedAnomalyResultDTO anomaly, InputData data);
 
   @Override
   public final boolean isQualified(MergedAnomalyResultDTO anomaly, DataProvider provider) {

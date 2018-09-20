@@ -29,5 +29,5 @@ public interface BaseDetectionStage {
    * @param startTime start time of this detection window
    * @param endTime end time of this detection window
    */
-  void init(Map<String, Object> specs, long startTime, long endTime);
+  void init(Map<String, Object> specs, long configId, long startTime, long endTime);
 }

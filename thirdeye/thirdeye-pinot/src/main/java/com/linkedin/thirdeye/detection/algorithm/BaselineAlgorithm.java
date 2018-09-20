@@ -25,7 +25,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
+import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
@@ -103,7 +103,7 @@ public class BaselineAlgorithm extends StaticDetectionPipeline {
   }
 
   @Override
-  public DetectionPipelineResult run(StaticDetectionPipelineData data) {
+  public DetectionPipelineResult run(InputData data) {
     DataFrame dfCurr = data.getTimeseries().get(this.slice).renameSeries(COL_VALUE, COL_CURR);
     DataFrame dfBase = this.baseline.gather(this.slice, data.getTimeseries()).renameSeries(COL_VALUE, COL_BASE);
 

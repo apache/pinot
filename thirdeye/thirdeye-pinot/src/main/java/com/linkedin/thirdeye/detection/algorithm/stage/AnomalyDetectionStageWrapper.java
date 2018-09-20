@@ -44,7 +44,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
     Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
 
     this.anomalyDetectionStage = loadAnomalyDetectorStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
-    this.anomalyDetectionStage.init(MapUtils.getMap(properties, PROP_SPECS), startTime, endTime);
+    this.anomalyDetectionStage.init(MapUtils.getMap(properties, PROP_SPECS), config.getId(), startTime, endTime);
   }
 
   @Override

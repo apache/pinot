@@ -25,9 +25,28 @@ import java.util.Collections;
  * The data spec to describe all the input data for a detection stage perform the detection.
  */
 public class InputDataSpec {
+  /*
+    Specs for time series. Describe what time series to fetch.
+    Each slice defines the time range, granularity, metric id, and filters of each time series to fetch.
+  */
   final Collection<MetricSlice> timeseriesSlices;
+
+  /*
+    Specs for aggregates. Describe what aggregate values to fetch.
+    Each slice defines the time range, granularity, metric id, and filters of each aggregate values to fetch.
+  */
   final Collection<MetricSlice> aggregateSlices;
+
+  /*
+    Specs for anomalies. Describe what anomalies to fetch.
+    Each slice defines the time range and pipeline config id of the anomalies to fetch.
+  */
   final Collection<AnomalySlice> anomalySlices;
+
+  /*
+    Specs for events. Describe what events to fetch.
+    Each slice defines the time range and dimensions of the events to fetch.
+  */
   final Collection<EventSlice> eventSlices;
 
   public InputDataSpec() {

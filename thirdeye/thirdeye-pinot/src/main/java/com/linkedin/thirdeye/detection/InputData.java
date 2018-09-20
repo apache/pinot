@@ -24,14 +24,17 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Map;
 
 
-public class StaticDetectionPipelineData {
+/**
+ * Input data for each detection stage
+ */
+public class InputData {
   final InputDataSpec dataSpec;
   final Map<MetricSlice, DataFrame> timeseries;
   final Map<MetricSlice, DataFrame> aggregates;
   final Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies;
   final Multimap<EventSlice, EventDTO> events;
 
-  public StaticDetectionPipelineData(InputDataSpec spec, Map<MetricSlice, DataFrame> timeseries,
+  public InputData(InputDataSpec spec, Map<MetricSlice, DataFrame> timeseries,
       Map<MetricSlice, DataFrame> aggregates, Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies,
       Multimap<EventSlice, EventDTO> events) {
     this.dataSpec = spec;

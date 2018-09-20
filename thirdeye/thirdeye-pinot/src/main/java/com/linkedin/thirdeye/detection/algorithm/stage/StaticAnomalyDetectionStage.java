@@ -18,7 +18,7 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
+import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import java.util.List;
 
@@ -42,7 +42,7 @@ public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionSta
    * @param data data(time series, anomalies, etc.) as described by data spec
    * @return list of anomalies
    */
-  abstract List<MergedAnomalyResultDTO> runDetection(StaticDetectionPipelineData data);
+  abstract List<MergedAnomalyResultDTO> runDetection(InputData data);
 
   @Override
   public final List<MergedAnomalyResultDTO> runDetection(DataProvider provider) {

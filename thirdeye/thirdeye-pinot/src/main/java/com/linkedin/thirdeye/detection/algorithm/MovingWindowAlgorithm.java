@@ -33,7 +33,7 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
+import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
@@ -159,7 +159,7 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
   }
 
   @Override
-  public DetectionPipelineResult run(StaticDetectionPipelineData data) throws Exception {
+  public DetectionPipelineResult run(InputData data) throws Exception {
     DataFrame dfInput = data.getTimeseries().get(this.sliceData);
 
     // log transform

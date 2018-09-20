@@ -24,7 +24,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.EventSlice;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
+import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import java.util.Collections;
 import java.util.Map;
@@ -37,7 +37,7 @@ public class StageUtils {
    * @param inputDataSpec the spec of input data for the detection stage
    * @return data
    */
-  public static StaticDetectionPipelineData getDataForSpec(DataProvider provider, InputDataSpec inputDataSpec) {
+  public static InputData getDataForSpec(DataProvider provider, InputDataSpec inputDataSpec) {
     Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(inputDataSpec.getTimeseriesSlices());
     Map<MetricSlice, DataFrame> aggregates =
         provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList());
@@ -45,6 +45,6 @@ public class StageUtils {
         provider.fetchAnomalies(inputDataSpec.getAnomalySlices());
     Multimap<EventSlice, EventDTO> events = provider.fetchEvents(inputDataSpec.getEventSlices());
 
-    return new StaticDetectionPipelineData(inputDataSpec, timeseries, aggregates, existingAnomalies, events);
+    return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events);
   }
 }

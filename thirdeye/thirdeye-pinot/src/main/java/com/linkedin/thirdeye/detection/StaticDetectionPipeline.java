@@ -66,7 +66,7 @@ public abstract class StaticDetectionPipeline extends DetectionPipeline {
    * @return detection result
    * @throws Exception on execution errors
    */
-  public abstract DetectionPipelineResult run(StaticDetectionPipelineData data) throws Exception;
+  public abstract DetectionPipelineResult run(InputData data) throws Exception;
 
   @Override
   public final DetectionPipelineResult run() throws Exception {
@@ -76,7 +76,7 @@ public abstract class StaticDetectionPipeline extends DetectionPipeline {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(dataSpec.anomalySlices);
     Multimap<EventSlice, EventDTO> events = this.provider.fetchEvents(dataSpec.eventSlices);
 
-    StaticDetectionPipelineData data = new StaticDetectionPipelineData(
+    InputData data = new InputData(
         dataSpec, timeseries, aggregates, anomalies, events);
 
     return this.run(data);

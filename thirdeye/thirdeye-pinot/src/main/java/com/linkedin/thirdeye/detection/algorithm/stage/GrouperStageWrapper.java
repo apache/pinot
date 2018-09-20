@@ -49,7 +49,7 @@ public class GrouperStageWrapper extends DetectionPipeline {
     Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
 
     this.grouperStage = loadGroupingStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
-    this.grouperStage.init(MapUtils.getMap(properties, PROP_SPECS), startTime, endTime);
+    this.grouperStage.init(MapUtils.getMap(properties, PROP_SPECS), config.getId(), startTime, endTime);
   }
 
   /**
