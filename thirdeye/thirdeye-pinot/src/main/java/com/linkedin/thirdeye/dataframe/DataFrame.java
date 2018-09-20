@@ -812,6 +812,37 @@ public class DataFrame {
   }
 
   /**
+   * Retains a series from the DataFrame in-place.
+   *
+   * @param seriesNames
+   * @throws IllegalArgumentException if the series does not exist
+   * @return reference to the modified DataFrame (this)
+   */
+  public DataFrame retainSeries(String... seriesNames) {
+    return this.retainSeries(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Retains a series from the DataFrame in-place.
+   *
+   * @param seriesNames
+   * @throws IllegalArgumentException if the series does not exist
+   * @return reference to the modified DataFrame (this)
+   */
+  public DataFrame retainSeries(List<String> seriesNames) {
+    assertSeriesExist(seriesNames);
+
+    Set<String> deleted = new HashSet<>(this.series.keySet());
+    deleted.removeAll(seriesNames);
+
+    for (String name : deleted) {
+      this.series.remove(name);
+      this.indexNames.remove(name);
+    }
+    return this;
+  }
+
+  /**
    * Renames a series in the DataFrame in-place. If a series with name {@code newName} already
    * exists it is replaced by the series referenced by {@code oldName}.
    *

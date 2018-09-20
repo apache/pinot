@@ -4018,6 +4018,28 @@ public class DataFrameTest {
     Assert.assertEquals(dfOut.getSeriesNames(), new HashSet<>(Arrays.asList("a", "c", "d")));
   }
 
+  @Test
+  public void testDropSeries() {
+    Assert.assertEquals(this.df.dropSeries("long", "boolean").getSeriesNames(),
+        new HashSet<>(Arrays.asList("double", "string", "object", "index")));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDropSeriesFail() {
+    new DataFrame("a", LongSeries.empty()).dropSeries("b");
+  }
+
+  @Test
+  public void testRetainSeries() {
+    Assert.assertEquals(this.df.retainSeries("long", "boolean").getSeriesNames(),
+        new HashSet<>(Arrays.asList("long", "boolean")));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testRetainSeriesFail() {
+    new DataFrame("a", LongSeries.empty()).retainSeries("b");
+  }
+
   /* **************************************************************************
    * Helpers
    ***************************************************************************/
