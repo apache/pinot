@@ -19,7 +19,7 @@ package com.linkedin.pinot.hadoop.job;
 public class JobConfigConstants {
   public static final String PATH_TO_INPUT = "path.to.input";
   public static final String PATH_TO_OUTPUT = "path.to.output";
-
+  public static final String PATH_TO_READER_CONFIG = "path.to.reader.config";
   // Leave this for backward compatibility. We prefer to use the schema fetched from the controller.
   public static final String PATH_TO_SCHEMA = "path.to.schema";
 

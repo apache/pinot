@@ -39,7 +39,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.codehaus.jackson.map.ObjectMapper;
 
 public class HadoopSegmentCreationMapReduceJob {
 
@@ -56,6 +56,7 @@ public class HadoopSegmentCreationMapReduceJob {
     private String _outputPath;
     private String _tableName;
     private String _postfix;
+    private String _readerConfigFile;
 
     // Temporary local disk path for current working directory
     private String _currentDiskWorkDir;
@@ -95,7 +96,7 @@ public class HadoopSegmentCreationMapReduceJob {
       _outputPath = _properties.get(JobConfigConstants.PATH_TO_OUTPUT);
       _tableName = _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME);
       _postfix = _properties.get(SEGMENT_NAME_POSTFIX, null);
-
+      _readerConfigFile = _properties.get(JobConfigConstants.PATH_TO_READER_CONFIG);
       if (_outputPath == null || _tableName == null) {
         throw new RuntimeException(
             "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
@@ -273,12 +274,19 @@ public class HadoopSegmentCreationMapReduceJob {
       return segmentName;
     }
 
-    private RecordReaderConfig getReaderConfig(FileFormat fileFormat) {
+    private RecordReaderConfig getReaderConfig(FileFormat fileFormat) throws IOException {
       RecordReaderConfig readerConfig = null;
       switch (fileFormat) {
         case CSV:
-          readerConfig = new CSVRecordReaderConfig();
-          break;
+          if(_readerConfigFile == null) {
+            readerConfig = new CSVRecordReaderConfig();
+	  }
+	  else {
+	    LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
+	    readerConfig = new ObjectMapper().readValue(new File(_readerConfigFile), CSVRecordReaderConfig.class);
+	    LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
+          }
+	  break;
         case AVRO:
           break;
         case JSON:
