@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.microsoft.azure.datalake.store;
+package com.microsoft.azure.datalake.store.store;
 
 import java.io.IOException;
 import java.io.InputStream;

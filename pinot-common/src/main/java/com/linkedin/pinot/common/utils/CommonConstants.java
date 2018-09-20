@@ -283,14 +283,12 @@ public class CommonConstants {
         "com.linkedin.pinot.server.request.SimpleRequestHandlerFactory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
-    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "controller.storage.factory";
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
   }
 
   public static class Controller {
-    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "controller.storage.factory";
-    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.controller.segment.fetcher";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.controller.storage.factory";
     public static final String HOST_HTTP_HEADER = "Pinot-Controller-Host";
     public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
@@ -379,6 +377,13 @@ public class CommonConstants {
       public static final String PRINCIPAL = "hadoop.kerberos.principle";
       public static final String KEYTAB = "hadoop.kerberos.keytab";
       public static final String HADOOP_CONF_PATH = "hadoop.conf.path";
+    }
+
+    public static class AzureSegmentOperations {
+      public static final String ACCOUNT_ID = "accountId";
+      public static final String AUTH_ENDPOINT = "authEndpoint";
+      public static final String CLIENT_ID = "clientId";
+      public static final String CLIENT_SECRET = "clientSecret";
     }
 
     public static final String RETRY = "retry.count";
