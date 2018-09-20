@@ -2,9 +2,8 @@ package com.linkedin.thirdeye.datasource.mock;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -14,7 +13,6 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -30,6 +28,8 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -40,11 +40,9 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * testing and demo purposes.
  */
 public class MockThirdEyeDataSource implements ThirdEyeDataSource {
+  private static final Logger LOG = LoggerFactory.getLogger(MockThirdEyeDataSource.class);
+
   final Map<String, MockDataset> datasets;
-
-  final Map<String, Map<String, List<String>>> dimensionFiltersCache;
-
-  final Map<Tuple, DataFrame> dimensionData;
 
   final Map<String, DataFrame> datasetData;
   final Map<Long, String> metricNameMap;
@@ -67,46 +65,94 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
       ));
     }
 
-    // dimension filters
-    this.dimensionFiltersCache = new HashMap<>();
-    for (MockDataset dataset : this.datasets.values()) {
-      this.dimensionFiltersCache.put(dataset.name, extractDimensionFilters(dataset));
-    }
+    LOG.info("Found {} datasets: {}", this.datasets.size(), this.datasets.keySet());
 
     // mock data
     final long tEnd = System.currentTimeMillis();
     final long tStart = tEnd - TimeUnit.DAYS.toMillis(28);
 
-    this.dimensionData = new HashMap<>();
+    LOG.info("Generating data for time range {} to {}", tStart, tEnd);
+
+    // mock data per sub-dimension
+    Map<Tuple, DataFrame> rawData = new HashMap<>();
     for (MockDataset dataset : this.datasets.values()) {
       for (String metric : dataset.metrics.keySet()) {
         String[] basePrefix = new String[] { dataset.name, "metrics", metric };
 
         Collection<Tuple> paths = makeTuples(dataset.metrics.get(metric), basePrefix, dataset.dimensions.size() + basePrefix.length);
         for (Tuple path : paths) {
+          LOG.info("Generating '{}'", Arrays.asList(path.values));
+
           Map<String, Object> metricConfig = resolveTuple(config, path);
-          this.dimensionData.put(path, makeData(metricConfig,
+          rawData.put(path, makeData(metricConfig,
               new DateTime(tStart, dataset.timezone),
               new DateTime(tEnd, dataset.timezone),
               dataset.granularity));
         }
       }
     }
-    
+
+    // merge data
     long metricNameCounter = 0;
     this.datasetData = new HashMap<>();
     this.metricNameMap = new HashMap<>();
-    for (MockDataset dataset : this.datasets.values()) {
-      String[] prefix = new String[] { dataset.name };
-      Collection<Tuple> tuples = filterTuples(this.dimensionData.keySet(), prefix);
-      List<DataFrame> dataFrames = new ArrayList<>();
 
-      for (Tuple tuple : tuples) {
-        this.metricNameMap.put(metricNameCounter++, tuple.values[2]);
-        dataFrames.add(this.dimensionData.get(tuple));
+    // per dataset
+    for (MockDataset dataset : this.datasets.values()) {
+      Map<String, DataFrame> metricData = new HashMap<>();
+
+      List<String> indexes = new ArrayList<>();
+      indexes.add(COL_TIME);
+      indexes.addAll(dataset.dimensions);
+
+      // per metric
+      for (String metric : dataset.metrics.keySet()) {
+        this.metricNameMap.put(metricNameCounter++, metric);
+
+        String[] prefix = new String[] { dataset.name, "metrics", metric };
+        Collection<Tuple> tuples = filterTuples(rawData.keySet(), prefix);
+
+        // per dimension
+        List<DataFrame> dimensionData = new ArrayList<>();
+        for (Tuple tuple : tuples) {
+          String metricName = tuple.values[2]; // ["dataset", "metrics", "metric", ...]
+
+          DataFrame dfExpanded = new DataFrame(rawData.get(tuple)).renameSeries(COL_VALUE, metricName);
+
+          for (int i = 0; i < dataset.dimensions.size(); i++) {
+            String dimValue = tuple.values[i + 3];
+            String dimName = dataset.dimensions.get(i);
+            dfExpanded.addSeries(dimName, StringSeries.fillValues(dfExpanded.size(), dimValue));
+          }
+
+          dfExpanded.setIndex(indexes);
+
+          dimensionData.add(dfExpanded);
+        }
+
+        metricData.put(metric, DataFrame.concatenate(dimensionData));
       }
 
-      this.datasetData.put(dataset.name, DataFrame.concatenate(dataFrames));
+      List<String> fields = new ArrayList<>();
+      fields.add(COL_TIME + ":LONG");
+      for (String name : dataset.dimensions) {
+        fields.add(name + ":STRING");
+      }
+      for (String name : dataset.metrics.keySet()) {
+        fields.add(name + ":DOUBLE");
+      }
+
+      DataFrame dfDataset = DataFrame.builder(fields).build().setIndex(indexes);
+      for (Map.Entry<String, DataFrame> entry : metricData.entrySet()) {
+        String metricName = entry.getKey();
+        dfDataset = dfDataset.joinOuter(entry.getValue())
+            .renameSeries(metricName + "_right", metricName)
+            .dropSeries(metricName + "_left");
+      }
+
+      this.datasetData.put(dataset.name, dfDataset);
+
+      LOG.info("Merged '{}' with {} rows and {} columns", dataset.name, dfDataset.size(), dfDataset.getSeriesNames().size());
     }
 
     this.delegate = CSVThirdEyeDataSource.fromDataFrame(this.datasetData, this.metricNameMap);
@@ -119,10 +165,7 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
   @Override
   public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    // TODO implement execution
-    // TODO implement data generation
-    // TODO implement data caching
-    throw new IllegalStateException("Not implemented yet");
+    return this.delegate.execute(request);
   }
 
   @Override
@@ -142,66 +185,12 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
   @Override
   public long getMaxDataTime(String dataset) throws Exception {
-    if (!this.datasets.containsKey(dataset)) {
-      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s'", dataset));
-    }
-    return System.currentTimeMillis();
+    return this.delegate.getMaxDataTime(dataset);
   }
 
   @Override
   public Map<String, List<String>> getDimensionFilters(String dataset) throws Exception {
-    if (!this.dimensionFiltersCache.containsKey(dataset)) {
-      throw new IllegalArgumentException(String.format("Could not resolve dataset '%s'", dataset));
-    }
-    return this.dimensionFiltersCache.get(dataset);
-  }
-
-  /**
-   * Returns a full filter multimap for a given MockDataset.
-   *
-   * @param dataset mock dataset config
-   * @return filter multimap
-   */
-  private static Map<String, List<String>> extractDimensionFilters(MockDataset dataset) {
-    SetMultimap<String, String> allDimensions = HashMultimap.create();
-
-    for (Map<String, Object> metric : dataset.metrics.values()) {
-      allDimensions.putAll(extractDimensionValues(dataset.dimensions, metric, 0));
-    }
-
-    Map<String, List<String>> output = new HashMap<>();
-    for (Map.Entry<String, Collection<String>> entry : allDimensions.asMap().entrySet()) {
-      List<String> values = new ArrayList<>(entry.getValue());
-      Collections.sort(values);
-      output.put(entry.getKey(), values);
-    }
-
-    return output;
-  }
-
-  /**
-   * Recursively extracts dimension names and values from a metric config
-   *
-   * @param dimensions  dimension levels to explore
-   * @param map nested config with metric generators
-   * @param level current recursion depth
-   * @return multimap with dimension filters
-   */
-  private static SetMultimap<String, String> extractDimensionValues(List<String> dimensions, Map<String, Object> map, int level) {
-    SetMultimap<String, String> output = HashMultimap.create();
-
-    String key = dimensions.get(level);
-    output.putAll(key, map.keySet());
-
-    if (level + 1 >= dimensions.size()) {
-      return output;
-    }
-
-    for (String value : map.keySet()) {
-      output.putAll(extractDimensionValues(dimensions, (Map<String, Object>) map.get(value), level + 1));
-    }
-
-    return output;
+    return this.delegate.getDimensionFilters(dataset);
   }
 
   /**
@@ -229,7 +218,7 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
       }
 
       timestamps.add(origin.getMillis());
-      values.add(Math.max(dist.sample(), 0));
+      values.add((double) Math.max(Math.round(dist.sample()), 0));
       origin = origin.plus(interval);
     }
 
@@ -339,6 +328,9 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     }
   }
 
+  /**
+   * Helper class for depth-first iteration of metric dimensions
+   */
   static final class MetricTuple {
     final String[] prefix;
     final Map<String, Object> map;
@@ -368,6 +360,9 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     }
   }
 
+  /**
+   * Helper class for comparable tuples
+   */
   static final class Tuple {
     final String[] values;
 

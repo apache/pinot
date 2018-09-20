@@ -1,26 +1,31 @@
 package com.linkedin.thirdeye.datasource.mock;
 
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
-
 
 public class MockThirdEyeDatasourceTest {
-  private MockThirdEyeDataSource dataSource;
+  private static final String COL_PURCHASES = "purchases";
+  private static final String COL_REVENUE = "revenue";
+  private static final String COL_PAGE_VIEWS = "pageViews";
+  private static final String COL_AD_IMPRESSIONS = "adImpressions";
 
-  // TODO execution tests
-  // TODO generation tests
-  // TODO caching consistency tests
+  private MockThirdEyeDataSource dataSource;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -40,7 +45,7 @@ public class MockThirdEyeDatasourceTest {
   @Test
   public void testGetMaxTime() throws Exception {
     long time = System.currentTimeMillis();
-    Assert.assertTrue(this.dataSource.getMaxDataTime("business") >= time);
+    Assert.assertTrue(this.dataSource.getMaxDataTime("business") <= time);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -50,24 +55,24 @@ public class MockThirdEyeDatasourceTest {
 
   @Test
   public void testGetDatasets() throws Exception {
-    Assert.assertEquals(this.dataSource.getDatasets(), Arrays.asList("business", "tracking"));
+    Assert.assertEquals(this.dataSource.getDatasets(), new HashSet<>(Arrays.asList("business", "tracking")));
   }
 
   @Test
   public void testGetDimensionFiltersTracking() throws Exception {
     Map<String, List<String>> filters = this.dataSource.getDimensionFilters("tracking");
     Assert.assertEquals(filters.keySet(), new HashSet<>(Arrays.asList("country", "browser", "platform")));
-    Assert.assertEquals(filters.get("country"), Arrays.asList("ca", "mx", "us"));
-    Assert.assertEquals(filters.get("browser"), Arrays.asList("chrome", "edge", "firefox", "safari"));
-    Assert.assertEquals(filters.get("platform"), Arrays.asList("desktop", "mobile"));
+    Assert.assertEquals(new HashSet<>(filters.get("country")), new HashSet<>(Arrays.asList("ca", "mx", "us")));
+    Assert.assertEquals(new HashSet<>(filters.get("browser")), new HashSet<>(Arrays.asList("chrome", "edge", "firefox", "safari")));
+    Assert.assertEquals(new HashSet<>(filters.get("platform")), new HashSet<>(Arrays.asList("desktop", "mobile")));
   }
 
   @Test
   public void testGetDimensionFiltersBusiness() throws Exception {
     Map<String, List<String>> filters = this.dataSource.getDimensionFilters("business");
     Assert.assertEquals(filters.keySet(), new HashSet<>(Arrays.asList("country", "browser")));
-    Assert.assertEquals(filters.get("country"), Arrays.asList("ca", "mx", "us"));
-    Assert.assertEquals(filters.get("browser"), Arrays.asList("chrome", "edge", "safari"));
+    Assert.assertEquals(new HashSet<>(filters.get("country")), new HashSet<>(Arrays.asList("ca", "mx", "us")));
+    Assert.assertEquals(new HashSet<>(filters.get("browser")), new HashSet<>(Arrays.asList("chrome", "edge", "safari")));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -77,26 +82,68 @@ public class MockThirdEyeDatasourceTest {
 
   @Test
   public void testDataGenerator() {
-    Assert.assertEquals(this.dataSource.data.size(), 30);
+    Assert.assertEquals(this.dataSource.datasetData.size(), 2);
+    Assert.assertEquals(this.dataSource.datasetData.get("business").size(), 28 * 9);
+    Assert.assertTrue(this.dataSource.datasetData.get("tracking").size() > 27 * 21); // allow for DST
   }
 
   @Test
   public void testDataGeneratorHourly() {
-    MockThirdEyeDataSource.Tuple path = new MockThirdEyeDataSource.Tuple(new String[] { "tracking", "metrics", "pageViews", "mx", "chrome", "mobile" });
-    DataFrame data = this.dataSource.data.get(path);
+    DataFrame data = this.dataSource.datasetData.get("tracking");
+
+    System.out.println(data.getDoubles(COL_PAGE_VIEWS).count());
 
     // allow for DST
-    Assert.assertTrue(data.getDoubles(COL_VALUE).count() >= 28 * 24 - 1);
-    Assert.assertTrue(data.getDoubles(COL_VALUE).count() <= 28 * 24 + 1);
+    Assert.assertTrue(data.getDoubles(COL_PAGE_VIEWS).count() >= (28 * 24 - 1) * 21); // allow for DST
+    Assert.assertTrue(data.getDoubles(COL_PAGE_VIEWS).count() <= (28 * 24 + 1) * 21);
+    Assert.assertTrue(data.getDoubles(COL_AD_IMPRESSIONS).count() >= (28 * 24 - 1) * 7); // allow for DST
+    Assert.assertTrue(data.getDoubles(COL_AD_IMPRESSIONS).count() <= (28 * 24 + 1) * 7);
 
-    Assert.assertTrue(data.getDoubles(COL_VALUE).sum().doubleValue() > 0);
+    Assert.assertTrue(data.getDoubles(COL_PAGE_VIEWS).sum().doubleValue() > 0);
+    Assert.assertTrue(data.getDoubles(COL_AD_IMPRESSIONS).sum().doubleValue() > 0);
   }
 
   @Test
   public void testDataGeneratorDaily() {
-    MockThirdEyeDataSource.Tuple path = new MockThirdEyeDataSource.Tuple(new String[] { "business", "metrics", "purchases", "ca", "safari" });
-    DataFrame data = this.dataSource.data.get(path);
-    Assert.assertEquals(data.getDoubles(COL_VALUE).count(), 28);
-    Assert.assertTrue(data.getDoubles(COL_VALUE).sum().doubleValue() > 0);
+    DataFrame data = this.dataSource.datasetData.get("business");
+    Assert.assertEquals(data.getDoubles(COL_PURCHASES).count(), 28 * 9);
+    Assert.assertEquals(data.getDoubles(COL_REVENUE).count(), 28 * 9);
+
+    Assert.assertTrue(data.getDoubles(COL_PURCHASES).sum().doubleValue() > 0);
+    Assert.assertTrue(data.getDoubles(COL_REVENUE).sum().doubleValue() > 0);
+  }
+
+  @Test
+  public void testExecute() throws Exception {
+    long time = System.currentTimeMillis();
+
+    // reverse lookup hack for metric id
+    Long metricId = null;
+    for (Map.Entry<Long, String> entry : this.dataSource.metricNameMap.entrySet()) {
+      if (COL_PAGE_VIEWS.equals(entry.getValue())) {
+        metricId = entry.getKey();
+      }
+    }
+
+    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.SUM, COL_PAGE_VIEWS, metricId, "tracking", null, null);
+
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .setStartTimeInclusive(time - TimeUnit.DAYS.toMillis(1))
+        .setEndTimeExclusive(time)
+        .addMetricFunction(metricFunction)
+        .setGroupBy("browser")
+        .build("ref");
+
+    ThirdEyeResponse response = this.dataSource.execute(request);
+
+    Assert.assertEquals(response.getNumRows(), 4);
+
+    Set<String> resultDimensions = new HashSet<>();
+    for (int i = 0; i < response.getNumRows(); i++) {
+      Assert.assertTrue(response.getRow(i).getMetrics().get(0) > 0);
+      resultDimensions.add(response.getRow(i).getDimensions().get(0));
+    }
+
+    Assert.assertEquals(resultDimensions, new HashSet<>(Arrays.asList("chrome", "edge", "firefox", "safari")));
   }
 }

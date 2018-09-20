@@ -86,6 +86,35 @@ dataSourceConfigs:
                   desktop:
                     mean: 32
                     std: 9
+
+            adImpressions:
+              us:
+                chrome:
+                  desktop:
+                    mean: 50
+                    std: 10
+                  mobile:
+                    mean: 100
+                    std: 25
+                safari:
+                  desktop:
+                    mean: 35
+                    std: 7
+                  mobile:
+                    mean: 125
+                    std: 20
+                firefox:
+                  desktop:
+                    mean: 15
+                    std: 2
+                  mobile:
+                    mean: 10
+                    std: 1
+                edge:
+                  desktop:
+                    mean: 42
+                    std: 9
+
         business:
           granularity: "1day"
           timezone: "America/Los_Angeles"
@@ -122,3 +151,35 @@ dataSourceConfigs:
                 edge:
                   mean: 2
                   std: 1
+
+            revenue:
+              us:
+                chrome:
+                  mean: 160
+                  std: 20
+                safari:
+                  mean: 190
+                  std: 30
+                edge:
+                  mean: 40
+                  std: 10
+              ca:
+                chrome:
+                  mean: 50
+                  std: 10
+                safari:
+                  mean: 50
+                  std: 15
+                edge:
+                  mean: 10
+                  std: 2
+              mx:
+                chrome:
+                  mean: 30
+                  std: 6
+                safari:
+                  mean: 50
+                  std: 15
+                edge:
+                  mean: 20
+                  std: 3
