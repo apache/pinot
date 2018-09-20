@@ -40,6 +40,7 @@ import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -172,6 +173,10 @@ public abstract class ControllerTest {
 
   public static String sendGetRequest(String urlString) throws IOException {
     return constructResponse(new URL(urlString).openStream());
+  }
+
+  public static String sendGetRequestRaw(String urlString) throws IOException {
+    return IOUtils.toString(new URL(urlString).openStream());
   }
 
   public static String sendPostRequest(String urlString, String payload) throws IOException {
