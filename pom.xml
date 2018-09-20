@@ -39,6 +39,7 @@
     <module>pinot-minion</module>
     <module>pinot-filesystem</module>
     <module>pinot-hadoop-filesystem</module>
+    <module>pinot-azure-filesystem</module>
   </modules>
   <licenses>
     <license>
@@ -256,6 +257,11 @@
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
         <artifactId>pinot-hadoop-filesystem</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>pinot-azure-filesystem</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

@@ -25,12 +25,12 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import org.apache.commons.io.FileUtils;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.mockito.Mockito.*;
 
 
 /**
@@ -58,9 +58,9 @@ public class AzurePinotFSTest {
 
   @Test
   public void testFS() throws Exception {
-    ADLStoreClient adlStoreClient = mock(ADLStoreClient.class);
-    when(adlStoreClient.checkExists(_adlLocation)).thenReturn(true);
-    when(adlStoreClient.checkExists(_testFile.getPath())).thenReturn(true);
+    ADLStoreClient adlStoreClient = Mockito.mock(ADLStoreClient.class);
+    Mockito.when(adlStoreClient.checkExists(_adlLocation)).thenReturn(true);
+    Mockito.when(adlStoreClient.checkExists(_testFile.getPath())).thenReturn(true);
 
     AzurePinotFS azurePinotFS = new AzurePinotFS(adlStoreClient);
     URI testFileURI = _testFile.toURI();
@@ -70,7 +70,7 @@ public class AzurePinotFSTest {
     File file = new File(_adlLocation, "testfile2");
     MockADLFileInputStream adlFileInputStream = new MockADLFileInputStream(
         new ByteArrayInputStream(Files.readAllBytes(Paths.get(testFileURI))));
-    when(adlStoreClient.getReadStream(anyString())).thenReturn(adlFileInputStream);
+    Mockito.when(adlStoreClient.getReadStream(ArgumentMatchers.anyString())).thenReturn(adlFileInputStream);
     azurePinotFS.copyToLocalFile(testFileURI, file);
     Assert.assertTrue(file.exists());
   }
