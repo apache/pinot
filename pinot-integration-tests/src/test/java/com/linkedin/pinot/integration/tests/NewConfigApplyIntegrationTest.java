@@ -51,7 +51,7 @@ public class NewConfigApplyIntegrationTest extends BaseClusterIntegrationTest {
     startServer();
   }
 
-  @Test
+  @Test(enabled = false)
   public void testTableOperations() throws Exception {
     // Unpack the table configs if necessary
     List<String> configs = Lists.newArrayList("mytable.conf", "mytable-updated.conf", "profiles/test1.conf", "profiles/test2.conf");
