@@ -284,7 +284,8 @@ public class HadoopSegmentCreationMapReduceJob {
 	  else {
 	    LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
 	    readerConfig = new ObjectMapper().readValue(new File(_readerConfigFile), CSVRecordReaderConfig.class);
-	  }
+	    LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
+          }
 	  break;
         case AVRO:
           break;
