@@ -36,9 +36,11 @@ import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,6 +59,7 @@ import org.slf4j.LoggerFactory;
 public class AutoOnboardPinotDataSource extends AutoOnboard {
   private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardPinotDataSource.class);
 
+  private static final Set<String> DIMENSION_SUFFIX_BLACKLIST = new HashSet<>(Arrays.asList("_topk", "_approximate", "_tDigest"));
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private final DatasetConfigManager datasetDAO;
@@ -196,10 +199,21 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
   }
 
   private void checkDimensionChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
-
     LOG.info("Checking for dimensions changes in {}", dataset);
     List<String> schemaDimensions = schema.getDimensionNames();
     List<String> datasetDimensions = datasetConfig.getDimensions();
+
+    // remove blacklisted dimensions
+    Iterator<String> itDimension = schemaDimensions.iterator();
+    while (itDimension.hasNext()) {
+      String dimName = itDimension.next();
+      for (String suffix : DIMENSION_SUFFIX_BLACKLIST) {
+        if (dimName.endsWith(suffix)) {
+          itDimension.remove();
+          break;
+        }
+      }
+    }
 
     // in dimensionAsMetric case, the dimension name will be used in the METRIC_NAMES_COLUMNS property of the metric
     List<String> dimensionsAsMetrics = new ArrayList<>();
@@ -215,6 +229,8 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
         }
       }
     }
+
+    // create diff
     List<String> dimensionsToAdd = new ArrayList<>();
     List<String> dimensionsToRemove = new ArrayList<>();
 
@@ -224,12 +240,15 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
         dimensionsToAdd.add(dimensionName);
       }
     }
+
     // dimensions which are removed from pinot schema
     for (String dimensionName : datasetDimensions) {
       if (!schemaDimensions.contains(dimensionName)) {
         dimensionsToRemove.add(dimensionName);
       }
     }
+
+    // apply diff
     if (CollectionUtils.isNotEmpty(dimensionsToAdd) || CollectionUtils.isNotEmpty(dimensionsToRemove)) {
       datasetDimensions.addAll(dimensionsToAdd);
       datasetDimensions.removeAll(dimensionsToRemove);
@@ -249,32 +268,39 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
   private void checkMetricChanges(String dataset, DatasetConfigDTO datasetConfig, Schema schema) {
     LOG.info("Checking for metric changes in {}", dataset);
 
-    // Fetch metrics stored in Thirdeye DB
+    // Fetch metrics from Thirdeye
     List<MetricConfigDTO> datasetMetricConfigs = DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset);
+
+    // Fetch metrics from Pinot
+    List<MetricFieldSpec> schemaMetricSpecs = schema.getMetricFieldSpecs();
+
+    // Index metric names
     Set<String> datasetMetricNames = new HashSet<>();
     for (MetricConfigDTO metricConfig : datasetMetricConfigs) {
-      // In dimensionAsMetric case, the metric name will be used in the METRIC_VALUES_COLUMN property of the metric
-      if (metricConfig.isDimensionAsMetric()) {
-        Map<String, String> metricProperties = metricConfig.getMetricProperties();
-        if (MapUtils.isNotEmpty(metricProperties)) {
-          String metricValuesColumn = metricProperties.get(DimensionAsMetricProperties.METRIC_VALUES_COLUMN.toString());
-          datasetMetricNames.add(metricValuesColumn);
-        }
-      } else {
-        datasetMetricNames.add(metricConfig.getName());
+      datasetMetricNames.add(getColumnName(metricConfig));
+    }
+
+    Set<String> schemaMetricNames = new HashSet<>();
+    for (MetricFieldSpec metricSpec : schemaMetricSpecs) {
+      schemaMetricNames.add(metricSpec.getName());
+    }
+
+    // add new metrics to ThirdEye
+    for (MetricFieldSpec metricSpec : schemaMetricSpecs) {
+      if (!datasetMetricNames.contains(metricSpec.getName())) {
+        MetricConfigDTO metricConfigDTO = ConfigGenerator.generateMetricConfig(metricSpec, dataset);
+        LOG.info("Creating metric {} in {}", metricSpec.getName(), dataset);
+        DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO);
       }
     }
 
-    // Fetch fresh metrics from Pinot
-    List<MetricFieldSpec> schemaMetricSpecs = schema.getMetricFieldSpecs();
-
-    // Update Thirdeye DB with all the new metrics
-    for (MetricFieldSpec metricSpec : schemaMetricSpecs) {
-      String metricName = metricSpec.getName();
-      if (!datasetMetricNames.contains(metricName)) {
-        MetricConfigDTO metricConfigDTO = ConfigGenerator.generateMetricConfig(metricSpec, dataset);
-        LOG.info("Creating metric {} for {}", metricName, dataset);
-        DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO);
+    // remove deleted metrics from ThirdEye
+    for (MetricConfigDTO metricConfig : datasetMetricConfigs) {
+      if (!metricConfig.isDerived()) {
+        if (!schemaMetricNames.contains(getColumnName(metricConfig))) {
+          LOG.info("Deleting metric {} in {}", metricConfig.getName(), dataset);
+          DAO_REGISTRY.getMetricConfigDAO().delete(metricConfig);
+        }
       }
     }
 
@@ -348,6 +374,24 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     }
   }
 
+  /**
+   * Returns the metric column name
+   *
+   * @param metricConfig metric config
+   * @return column name
+   */
+  private static String getColumnName(MetricConfigDTO metricConfig) {
+    // In dimensionAsMetric case, the metric name will be used in the METRIC_VALUES_COLUMN property of the metric
+    if (metricConfig.isDimensionAsMetric()) {
+      Map<String, String> metricProperties = metricConfig.getMetricProperties();
+      if (MapUtils.isNotEmpty(metricProperties)) {
+        return metricProperties.get(DimensionAsMetricProperties.METRIC_VALUES_COLUMN.toString());
+      }
+    } else {
+      return metricConfig.getName();
+    }
+    throw new IllegalArgumentException(String.format("Could not resolve column name for '%s'", metricConfig));
+  }
 
   @Override
   public void runAdhoc() {
