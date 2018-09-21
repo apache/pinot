@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 public class PinotFSFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotFSFactory.class);
   private static final String DEFAULT_FS_SCHEME = "file";
+  private static final String CLASS = "class";
 
   private static Map<String, PinotFS> _fileSystemMap = new HashMap<>();
 
@@ -39,15 +40,21 @@ public class PinotFSFactory {
   }
 
   public static void init(Configuration fsConfig) {
-    Iterator<String> keys = fsConfig.getKeys();
+    // Get schemes and their respective classes
+    Iterator<String> keys = fsConfig.subset(CLASS).getKeys();
+    if (!keys.hasNext()) {
+      LOGGER.info("Did not find any fs classes in the configuration");
+    }
     while (keys.hasNext()) {
       String key = keys.next();
-      String fsClassName = (String) fsConfig.getProperty(key);
+      String fsClassName = (String) fsConfig.getProperty(CLASS + "." + key);
+      LOGGER.info("Got scheme {}, classname {}, starting to initialize", key, fsClassName);
 
       try {
         PinotFS pinotFS = (PinotFS) Class.forName(fsClassName).newInstance();
-        pinotFS.init(fsConfig.subset("config"));
+        pinotFS.init(fsConfig.subset(key));
 
+        LOGGER.info("Initializing PinotFS for scheme {}, classname {}", key, fsClassName);
         _fileSystemMap.put(key, pinotFS);
       } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
         LOGGER.error("Could not instantiate file system for class {}", fsClassName, e);
@@ -56,7 +63,7 @@ public class PinotFSFactory {
     }
 
     if (!_fileSystemMap.containsKey(DEFAULT_FS_SCHEME)) {
-      LOGGER.info("Pinot file system not configured, configuring LocalPinotFS as default");
+      LOGGER.info("LocalPinotFS not configured, adding as default");
       _fileSystemMap.put(DEFAULT_FS_SCHEME, new LocalPinotFS());
     }
   }

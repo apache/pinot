@@ -16,6 +16,7 @@
 package com.linkedin.pinot.filesystem;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.microsoft.azure.datalake.store.ADLFileInputStream;
 import com.microsoft.azure.datalake.store.ADLFileOutputStream;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
@@ -45,12 +46,6 @@ public class AzurePinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(AzurePinotFS.class);
   private ADLStoreClient _adlStoreClient;
 
-  private static final String AZURE_KEY = "adl";
-  private static final String ACCOUNT_KEY = "account";
-  private static final String AUTH_ENDPOINT_KEY = "authendpoint";
-  private static final String CLIENT_ID_KEY = "clientid";
-  private static final String CLIENT_SECRET_KEY = "clientsecret";
-
   public AzurePinotFS() {
 
   }
@@ -62,16 +57,15 @@ public class AzurePinotFS extends PinotFS {
 
   @Override
   public void init(Configuration config) {
-    Configuration azureConfigs = config.subset(AZURE_KEY);
     // The ADL account id. Example: {@code mystore.azuredatalakestore.net}.
-    String account = azureConfigs.getString(ACCOUNT_KEY);
+    String account = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.ACCOUNT_ID);
     // The endpoint that should be used for authentication.
     // Usually of the form {@code https://login.microsoftonline.com/<tenant-id>/oauth2/token}.
-    String authEndpoint = azureConfigs.getString(AUTH_ENDPOINT_KEY);
+    String authEndpoint = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.AUTH_ENDPOINT);
     // The clientId used to authenticate this application
-    String clientId = azureConfigs.getString(CLIENT_ID_KEY);
+    String clientId = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.CLIENT_ID);
     // The secret key used to authenticate this application
-    String clientSecret = azureConfigs.getString(CLIENT_SECRET_KEY);
+    String clientSecret = config.getString(CommonConstants.SegmentOperations.AzureSegmentOperations.CLIENT_SECRET);
 
     AccessTokenProvider tokenProvider =
         new ClientCredsTokenProvider(authEndpoint, clientId, clientSecret);

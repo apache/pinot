@@ -38,16 +38,16 @@ public class PinotFSFactoryTest {
   }
 
   @Test
-  public void testDefaultPinotFSFactory() throws Exception {
+  public void testDefaultPinotFSFactory() {
     _pinotFSFactory.init(new PropertiesConfiguration());
     Assert.assertTrue(_pinotFSFactory.create("file") instanceof LocalPinotFS);
   }
 
   @Test
-  public void testCustomizedSegmentFetcherFactory() throws Exception {
+  public void testCustomizedSegmentFetcherFactory() {
     Configuration config = new PropertiesConfiguration();
-    config.addProperty("file", LocalPinotFS.class.getName());
-    config.addProperty("test", TestPinotFS.class.getName());
+    config.addProperty("class.file", LocalPinotFS.class.getName());
+    config.addProperty("class.test", TestPinotFS.class.getName());
     PinotFSFactory.init(config);
     PinotFS testPinotFS = PinotFSFactory.create("test");
 
