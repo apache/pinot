@@ -96,7 +96,6 @@ public class PinotAdministrator {
       @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
       @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
       @SubCommand(name = "ApplyTableConfig", impl = ApplyTableConfigCommand.class),
-      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
       @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class)
   })
   Command _subCommand;
