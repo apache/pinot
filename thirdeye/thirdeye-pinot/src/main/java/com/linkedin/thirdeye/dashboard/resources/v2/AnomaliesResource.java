@@ -1117,10 +1117,10 @@ public class AnomaliesResource {
     Collection<MetricSlice> slicesAnomalyBaseline = baseline.scatter(sliceAnomalyCurrent);
     Map<MetricSlice, DataFrame> anomalyBaselineMap = new HashMap<>();
     for (MetricSlice slice : slicesAnomalyBaseline) {
-      anomalyBaselineMap.put(slice, fixTimestamp(this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList()), slice.getStart()));
+      anomalyBaselineMap.put(slice, fixTimestamp(this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1), slice.getStart()));
     }
 
-    details.setCurrent(makeStringValue(this.aggregationLoader.loadAggregate(sliceAnomalyCurrent, Collections.<String>emptyList())));
+    details.setCurrent(makeStringValue(this.aggregationLoader.loadAggregate(sliceAnomalyCurrent, Collections.<String>emptyList(), -1)));
     details.setBaseline(makeStringValue(baseline.gather(sliceAnomalyCurrent, anomalyBaselineMap)));
 
     AnomalyOffset offsets = BaseAnomalyFunction.getDefaultOffsets(dataset);

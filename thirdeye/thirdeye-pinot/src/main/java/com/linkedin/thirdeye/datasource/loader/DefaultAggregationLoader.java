@@ -57,7 +57,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
   }
 
   @Override
-  public DataFrame loadBreakdown(MetricSlice slice) throws Exception {
+  public DataFrame loadBreakdown(MetricSlice slice, int limit) throws Exception {
     final long metricId = slice.getMetricId();
 
     // fetch meta data
@@ -86,7 +86,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
 
     // submit requests
     for (String dimension : dimensions) {
-      RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.singletonList(dimension), "ref", this.metricDAO, this.datasetDAO);
+      RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, Collections.singletonList(dimension), limit, "ref", this.metricDAO, this.datasetDAO);
       Future<ThirdEyeResponse> res = this.cache.getQueryResultAsync(rc.getRequest());
 
       requests.put(dimension, rc);
@@ -112,7 +112,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
   }
 
   @Override
-  public DataFrame loadAggregate(MetricSlice slice, List<String> dimensions) throws Exception {
+  public DataFrame loadAggregate(MetricSlice slice, List<String> dimensions, int limit) throws Exception {
     final long metricId = slice.getMetricId();
 
     // fetch meta data
@@ -141,7 +141,7 @@ public class DefaultAggregationLoader implements AggregationLoader {
       return dfEmpty;
     }
 
-    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, new ArrayList<>(dimensions), "ref", this.metricDAO, this.datasetDAO);
+    RequestContainer rc = DataFrameUtils.makeAggregateRequest(slice, new ArrayList<>(dimensions), limit, "ref", this.metricDAO, this.datasetDAO);
     ThirdEyeResponse res = this.cache.getQueryResult(rc.getRequest());
     return DataFrameUtils.evaluateResponse(res, rc);
   }

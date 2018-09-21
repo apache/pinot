@@ -88,8 +88,9 @@ export default Service.extend({
     const range = context.anomalyRange;
     const offset = toAbsoluteUrn(urn, context.compareMode).split(':')[2].toLowerCase();
     const timezone = 'America/Los_Angeles';
+    const limit = offset === 'current' ? 100 : 200; // heuristically over-fetch baseline for heat map
 
-    const url = `/rootcause/metric/breakdown?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}`;
+    const url = `/rootcause/metric/breakdown?urn=${metricUrn}&start=${range[0]}&end=${range[1]}&offset=${offset}&timezone=${timezone}&limit=${limit}`;
     return fetch(url)
       .then(checkStatus)
       .then(res => this._extractBreakdowns(res, urn))

@@ -103,7 +103,7 @@ public class DefaultDataProvider implements DataProvider {
         futures.put(slice, this.executor.submit(new Callable<DataFrame>() {
           @Override
           public DataFrame call() throws Exception {
-            return DefaultDataProvider.this.aggregationLoader.loadAggregate(slice, dimensions);
+            return DefaultDataProvider.this.aggregationLoader.loadAggregate(slice, dimensions, -1);
           }
         }));
       }

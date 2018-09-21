@@ -122,7 +122,7 @@ public class CurrentAndBaselineLoader {
 
   private double getAggregate(MetricSlice slice) {
     try {
-      return this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList()).getDouble(COL_VALUE, 0);
+      return this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1).getDouble(COL_VALUE, 0);
     } catch (Exception e) {
       return Double.NaN;
     }

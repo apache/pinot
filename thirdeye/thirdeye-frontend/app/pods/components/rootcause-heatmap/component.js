@@ -32,6 +32,8 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 const ROOTCAUSE_ROLLUP_RANGE = [0, 100];
 const ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION = 0.95;
 
+const ROOTCAUSE_VALUE_OTHER = 'OTHER';
+
 const ROOTCAUSE_MODE_MAPPING = {
   'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
   'Change in Contribution': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF,
@@ -273,8 +275,10 @@ export default Component.extend({
         let sum = this._sum(head.map(v => sizeMetricCurrent[n][v]));
         let i = range[0];
         while (i < range[1] && sum < cutoff) {
-          sum += sizeMetricCurrent[n][all[i]];
-          visible.push(all[i]);
+          if (all[i] !== ROOTCAUSE_VALUE_OTHER) {
+            sum += sizeMetricCurrent[n][all[i]];
+            visible.push(all[i]);
+          }
           i++;
         }
 
