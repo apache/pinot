@@ -28,12 +28,10 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
@@ -119,22 +117,24 @@ public class AzurePinotFS extends PinotFS {
 
   @Override
   public String[] listFiles(URI fileUri) throws IOException {
-    // list directory contents recursively
-    List<String> finalFileList = new ArrayList<>();
     DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
-    if (rootDir.type.equals(DirectoryEntryType.DIRECTORY)) {
-      for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(fileUri.getPath())) {
-        try {
-          finalFileList.addAll(Arrays.asList(listFiles(new URI(directoryEntry.fullName))));
-        } catch (URISyntaxException e) {
-          throw new RuntimeException("Could not convert " + directoryEntry.fullName + " to URI");
-        }
+    if (rootDir == null) {
+      return new String[0];
+    }
+    List<DirectoryEntry> fileList = new ArrayList<>();
+    List<DirectoryEntry> directoryEntries = listFiles(rootDir, fileList);
+    return (String[]) directoryEntries.stream().map(dirEntry -> dirEntry.fullName).toArray();
+  }
+
+  private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry, List<DirectoryEntry> fileList) throws IOException {
+    if (origDirEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
+      for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
+        fileList.addAll(listFiles(directoryEntry, fileList));
       }
     } else {
-      finalFileList.add(rootDir.fullName);
+      fileList.add(origDirEntry);
     }
-
-    return finalFileList.toArray(new String[finalFileList.size()]);
+    return fileList;
   }
 
   @Override
