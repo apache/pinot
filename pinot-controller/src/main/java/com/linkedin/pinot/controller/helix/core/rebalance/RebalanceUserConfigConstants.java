@@ -23,7 +23,10 @@ public class RebalanceUserConfigConstants {
   public static final String DRYRUN = "dryRun";
   /** Whether consuming segments should also be rebalanced or not */
   public static final String INCLUDE_CONSUMING = "includeConsuming";
+  /** Whether rebalance can have downtime */
+  public static final String DOWNTIME = "downtime";
 
   public static final boolean DEFAULT_DRY_RUN = true;
   public static final boolean DEFAULT_INCLUDE_CONSUMING = false;
+  public static final boolean DEFAULT_DOWNTIME = false;
 }

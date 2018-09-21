@@ -38,13 +38,13 @@ public interface RebalanceSegmentStrategy {
       Configuration rebalanceUserConfig) throws InvalidConfigException;
 
   /**
-   * Rebalances segments and writes ideal state of table
+   * Rebalances segments and returns the rebalanced ideal state.
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
    * @param rebalanceUserConfig custom user configs for specific rebalance strategies
    * @param newPartitionAssignment new rebalaned partition assignments as part of the resource rebalance
    * @return rebalanced ideal state
    */
-  IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig, Configuration rebalanceUserConfig,
+  IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig, Configuration rebalanceUserConfig,
       PartitionAssignment newPartitionAssignment) throws InvalidConfigException;
 }

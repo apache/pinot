@@ -128,7 +128,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
    * @return
    */
   @Override
-  public IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig,
+  public IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig,
       Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment) {
 
     String tableNameWithType = tableConfig.getTableName();
@@ -148,43 +148,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       targetNumReplicas = Integer.parseInt(tableConfig.getValidationConfig().getReplication());
     }
 
-    // update if not dryRun
-    boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
-    IdealState newIdealState;
-    if (!dryRun) {
-      LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      newIdealState = rebalanceAndUpdateIdealState(tableConfig, targetNumReplicas, rebalanceUserConfig,
-          newPartitionAssignment);
-    } else {
-      LOGGER.info("Dry run. Skip writing ideal state");
-      newIdealState = rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
-          newPartitionAssignment);
-    }
-    return newIdealState;
-  }
-
-  /**
-   * Rebalances the ideal state object and also updates it
-   * @param tableConfig
-   * @param targetNumReplicas
-   * @param rebalanceUserConfig
-   * @param newPartitionAssignment
-   */
-  private IdealState rebalanceAndUpdateIdealState(final TableConfig tableConfig,
-      final int targetNumReplicas, final Configuration rebalanceUserConfig,
-      final PartitionAssignment newPartitionAssignment) {
-
-    final Function<IdealState, IdealState> updaterFunction = new Function<IdealState, IdealState>() {
-      @Nullable
-      @Override
-      public IdealState apply(@Nullable IdealState idealState) {
-        return rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
-            newPartitionAssignment);
-      }
-    };
-    HelixHelper.updateIdealState(_helixManager, tableConfig.getTableName(), updaterFunction,
-        RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
-    return  _helixAdmin.getResourceIdealState(_helixClusterName, tableConfig.getTableName());
+    return rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
+        newPartitionAssignment);
   }
 
   /**
