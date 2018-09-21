@@ -43,6 +43,7 @@ public class FileUploadPathProvider {
   private final URI _baseDataDirURI;
   private final URI _tmpUntarredPathURI;
   private final URI _schemasTmpDirURI;
+  private final URI _localTempDirURI;
   private final String _vip;
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
@@ -66,22 +67,32 @@ public class FileUploadPathProvider {
       Utils.rethrowException(e);
     }
 
+    String localTempDir = _controllerConf.getLocalTempDir();
+    if (localTempDir == null) {
+      LOGGER.warn("Local temp directory not set, setting to data dir {}", dataDir);
+      localTempDir = dataDir;
+    }
+
     PinotFS pinotFS = PinotFSFactory.create(scheme);
 
     try {
+      _localTempDirURI = new URI(localTempDir);
+      if (!pinotFS.exists(_localTempDirURI)) {
+        pinotFS.mkdir(_localTempDirURI);
+      }
       _baseDataDirURI = new URI(dataDir);
       if (!pinotFS.exists(_baseDataDirURI)) {
         pinotFS.mkdir(_baseDataDirURI);
       }
-      _fileUploadTmpDirURI = new URI(_baseDataDirURI + FILE_UPLOAD_TEMP_PATH);
+      _fileUploadTmpDirURI = new URI(_localTempDirURI + FILE_UPLOAD_TEMP_PATH);
       if (!pinotFS.exists(_fileUploadTmpDirURI)) {
         pinotFS.mkdir(_fileUploadTmpDirURI);
       }
-      _tmpUntarredPathURI = new URI(_fileUploadTmpDirURI + UNTARRED_PATH);
+      _tmpUntarredPathURI = new URI(_localTempDirURI + UNTARRED_PATH);
       if (!pinotFS.exists(_tmpUntarredPathURI)) {
         pinotFS.mkdir(_tmpUntarredPathURI);
       }
-      _schemasTmpDirURI = new URI(_baseDataDirURI + SCHEMAS_TEMP);
+      _schemasTmpDirURI = new URI(_localTempDirURI + SCHEMAS_TEMP);
       if (!pinotFS.exists(_schemasTmpDirURI)) {
         pinotFS.mkdir(_schemasTmpDirURI);
       }
@@ -93,6 +104,10 @@ public class FileUploadPathProvider {
 
   public String getVip() {
     return _vip;
+  }
+
+  public URI getLocalTempDirURI() {
+    return _localTempDirURI;
   }
 
   public URI getFileUploadTmpDirURI() {

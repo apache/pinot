@@ -301,7 +301,9 @@ public class PinotSegmentUploadRestletResource {
           if (new URI(storageURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
             downloadURI = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(), provider.getVip());
           } else {
-            downloadURI = storageURI;
+            LOGGER.info("Using storage dir {}", _controllerConf.getDataDir());
+            downloadURI = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+                URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
           }
           break;
         case SEGMENT:
