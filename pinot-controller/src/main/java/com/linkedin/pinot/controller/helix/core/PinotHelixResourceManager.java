@@ -62,6 +62,7 @@ import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
@@ -129,6 +130,7 @@ public class PinotHelixResourceManager {
   private HelixDataAccessor _helixDataAccessor;
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
+  private IdealStateUpdater _idealStateUpdater;
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis,
@@ -167,6 +169,7 @@ public class PinotHelixResourceManager {
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
+    _idealStateUpdater = new IdealStateUpdater(_helixZkManager, _helixAdmin, _helixClusterName);
   }
 
   /**
@@ -2082,10 +2085,14 @@ public class PinotHelixResourceManager {
           RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
       PartitionAssignment newPartitionAssignment =
           rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+      // get the new ideal state
       IdealState newIdealState =
-          rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig,
+          rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig,
               newPartitionAssignment);
-
+      // update it as needed
+      if (!rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN)) {
+        _idealStateUpdater.update(idealState, tableConfig, rebalanceUserConfig);
+      }
       jsonObject.put("partitionAssignment", newPartitionAssignment.getPartitionToInstances());
       jsonObject.put("idealState", newIdealState.getRecord().getMapFields());
     } catch (JSONException e) {

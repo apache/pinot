@@ -95,6 +95,7 @@ public class ReplicaGroupRebalanceStrategyTest extends ControllerTest {
   public void testReplicaGroupRebalanceStrategy() throws Exception {
     Configuration rebalanceUserConfig = new PropertyListConfiguration();
     rebalanceUserConfig.setProperty(RebalanceUserConfigConstants.DRYRUN, false);
+    rebalanceUserConfig.setProperty(RebalanceUserConfigConstants.DOWNTIME, true);
 
     int numInstancesPerPartition = 3;
     ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig();
