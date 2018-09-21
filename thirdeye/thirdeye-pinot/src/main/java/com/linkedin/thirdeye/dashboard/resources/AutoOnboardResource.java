@@ -17,13 +17,17 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.auto.onboard.AutoOnboard;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardUtility;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.DataSources;
 import com.linkedin.thirdeye.datasource.DataSourcesLoader;
+import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import java.lang.reflect.Constructor;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -43,30 +47,11 @@ import org.slf4j.LoggerFactory;
 @Path(value = "/autoOnboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class AutoOnboardResource {
-  private Map<String, AutoOnboard> dataSourceToOnboardMap = new HashMap<>();
 
-  private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardResource.class);
+  private Map<String, List<AutoOnboard>> dataSourceToOnboardMap;
 
   public AutoOnboardResource(ThirdEyeConfiguration thirdeyeConfig) {
-    URL dataSourcesUrl = thirdeyeConfig.getDataSourcesAsUrl();
-    DataSources dataSources = DataSourcesLoader.fromDataSourcesUrl(dataSourcesUrl);
-    if (dataSources == null) {
-      throw new IllegalStateException("Could not create data sources config from path " + dataSourcesUrl);
-    }
-    for (DataSourceConfig dataSourceConfig : dataSources.getDataSourceConfigs()) {
-      String autoLoadClassName = dataSourceConfig.getAutoLoadClassName();
-      if (StringUtils.isNotBlank(autoLoadClassName)) {
-        try {
-          Constructor<?> constructor = Class.forName(autoLoadClassName).getConstructor(DataSourceConfig.class);
-          AutoOnboard autoOnboardConstructor = (AutoOnboard) constructor.newInstance(dataSourceConfig);
-          String datasourceClassName = dataSourceConfig.getClassName();
-          String dataSource = datasourceClassName.substring(datasourceClassName.lastIndexOf(".") + 1, datasourceClassName.length());
-          dataSourceToOnboardMap.put(dataSource, autoOnboardConstructor);
-        } catch (Exception e) {
-          LOG.error("Exception in creating autoload constructor {}", autoLoadClassName);
-        }
-      }
-    }
+    dataSourceToOnboardMap = AutoOnboardUtility.getDataSourceToAutoOnboardMap(thirdeyeConfig.getDataSourcesAsUrl());
   }
 
   @POST
@@ -76,7 +61,10 @@ public class AutoOnboardResource {
       return Response.status(Status.INTERNAL_SERVER_ERROR)
           .entity(String.format("Data source %s does not exist in config", datasource)).build();
     }
-    dataSourceToOnboardMap.get(datasource).runAdhoc();
+
+    for (AutoOnboard autoOnboard : dataSourceToOnboardMap.get(datasource)) {
+      autoOnboard.runAdhoc();
+    }
     return Response.ok().build();
   }
 

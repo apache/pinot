@@ -21,10 +21,12 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.DataSources;
 import com.linkedin.thirdeye.datasource.DataSourcesLoader;
+import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.commons.lang3.StringUtils;
@@ -38,9 +40,8 @@ import org.slf4j.LoggerFactory;
 public class AutoOnboardService implements Runnable {
   private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardService.class);
 
-
   private ScheduledExecutorService scheduledExecutorService;
-  private DataSources dataSources;
+
   private List<AutoOnboard> autoOnboardServices = new ArrayList<>();
   private TimeGranularity runFrequency;
 
@@ -52,22 +53,10 @@ public class AutoOnboardService implements Runnable {
     this.runFrequency = config.getAutoOnboardConfiguration().getRunFrequency();
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-    URL dataSourcesUrl = config.getDataSourcesAsUrl();
-    dataSources = DataSourcesLoader.fromDataSourcesUrl(dataSourcesUrl);
-    if (dataSources == null) {
-      throw new IllegalStateException("Could not create data sources config from path " + dataSourcesUrl);
-    }
-    for (DataSourceConfig dataSourceConfig : dataSources.getDataSourceConfigs()) {
-      String autoLoadClassName = dataSourceConfig.getAutoLoadClassName();
-      if (StringUtils.isNotBlank(autoLoadClassName)) {
-        try {
-          Constructor<?> constructor = Class.forName(autoLoadClassName).getConstructor(DataSourceConfig.class);
-          AutoOnboard autoOnboardConstructor = (AutoOnboard) constructor.newInstance(dataSourceConfig);
-          autoOnboardServices.add(autoOnboardConstructor);
-        } catch (Exception e) {
-          LOG.error("Exception in creating autoload constructor {}", autoLoadClassName);
-        }
-      }
+    Map<String, List<AutoOnboard>> dataSourceToOnboardMap = AutoOnboardUtility
+        .getDataSourceToAutoOnboardMap(config.getDataSourcesAsUrl());
+    for (List<AutoOnboard> autoOnboards : dataSourceToOnboardMap.values()) {
+      autoOnboardServices.addAll(autoOnboards);
     }
   }
 
@@ -76,13 +65,19 @@ public class AutoOnboardService implements Runnable {
   }
 
   public void shutdown() {
+    LOG.info("Shutting down AutoOnboardService");
     scheduledExecutorService.shutdown();
   }
 
+  @Override
   public void run() {
     for (AutoOnboard autoOnboard : autoOnboardServices) {
-      autoOnboard.run();
+      LOG.info("Running auto load for {}", autoOnboard.getClass().getSimpleName());
+      try {
+        autoOnboard.run();
+      } catch (Exception e) {
+        LOG.error("There was an exception running AutoOnboard for {}", autoOnboard.getClass().getSimpleName(), e);
+      }
     }
   }
-
 }

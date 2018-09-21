@@ -88,7 +88,6 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
   }
 
   public void run() {
-    LOG.info("Running auto load for {}", AutoOnboardPinotDataSource.class.getSimpleName());
     try {
       List<String> allDatasets = new ArrayList<>();
       Map<String, Schema> allSchemas = new HashMap<>();
