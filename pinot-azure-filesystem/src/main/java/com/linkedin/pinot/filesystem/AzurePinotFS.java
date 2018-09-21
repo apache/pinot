@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 public class AzurePinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(AzurePinotFS.class);
   private ADLStoreClient _adlStoreClient;
+  private static final String[] EMPTY_ARR = new String[0];
 
   public AzurePinotFS() {
 
@@ -119,11 +120,16 @@ public class AzurePinotFS extends PinotFS {
   public String[] listFiles(URI fileUri) throws IOException {
     DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
     if (rootDir == null) {
-      return new String[0];
+      return EMPTY_ARR;
     }
     List<DirectoryEntry> fileList = new ArrayList<>();
     List<DirectoryEntry> directoryEntries = listFiles(rootDir, fileList);
-    return (String[]) directoryEntries.stream().map(dirEntry -> dirEntry.fullName).toArray();
+
+    List<String> fullFilePaths = new ArrayList<String>();
+    for (DirectoryEntry directoryEntry : directoryEntries) {
+      fullFilePaths.add(directoryEntry.fullName);
+    }
+    return fullFilePaths.toArray(new String[fullFilePaths.size()]);
   }
 
   private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry, List<DirectoryEntry> fileList) throws IOException {
