@@ -227,11 +227,17 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
             }
           }
           df.renameSeries(inputName, outputName);
+
         } else {
           // group by columns only
           df = dataFrameGrouping.aggregate(aggregationExps);
           df.dropSeries("key");
           df.renameSeries(inputName, outputName);
+          df = df.sortedBy(outputName).reverse();
+
+          if (request.getLimit() > 0) {
+            df = df.head(request.getLimit());
+          }
         }
 
         //
