@@ -30,6 +30,7 @@ import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricPr
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
+import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import java.io.IOException;
 import java.security.KeyManagementException;
@@ -67,11 +68,11 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
   private AutoOnboardPinotMetricsUtils autoLoadPinotMetricsUtils;
 
-  public AutoOnboardPinotDataSource(DataSourceConfig dataSourceConfig)
+  public AutoOnboardPinotDataSource(MetadataSourceConfig metadataSourceConfig)
       throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
-    super(dataSourceConfig);
+    super(metadataSourceConfig);
     try {
-      autoLoadPinotMetricsUtils = new AutoOnboardPinotMetricsUtils(dataSourceConfig);
+      autoLoadPinotMetricsUtils = new AutoOnboardPinotMetricsUtils(metadataSourceConfig);
       LOG.info("Created {}", AutoOnboardPinotDataSource.class.getName());
     } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
       throw e;
@@ -80,8 +81,8 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
   }
 
-  public AutoOnboardPinotDataSource(DataSourceConfig dataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
-    super(dataSourceConfig);
+  public AutoOnboardPinotDataSource(MetadataSourceConfig metadataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
+    super(metadataSourceConfig);
     autoLoadPinotMetricsUtils = utils;
     this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();

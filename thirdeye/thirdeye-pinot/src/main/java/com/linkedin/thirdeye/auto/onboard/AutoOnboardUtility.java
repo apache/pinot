@@ -30,10 +30,12 @@ public class AutoOnboardUtility {
       if (metadataSourceConfigs != null) {
         for (MetadataSourceConfig metadataSourceConfig : metadataSourceConfigs) {
           String metadataSourceClassName = metadataSourceConfig.getClassName();
+          // Inherit properties from Data Source
+          metadataSourceConfig.getProperties().putAll(dataSourceConfig.getProperties());
           if (StringUtils.isNotBlank(metadataSourceClassName)) {
             try {
-              Constructor<?> constructor = Class.forName(metadataSourceClassName).getConstructor(DataSourceConfig.class);
-              AutoOnboard autoOnboardConstructor = (AutoOnboard) constructor.newInstance(dataSourceConfig);
+              Constructor<?> constructor = Class.forName(metadataSourceClassName).getConstructor(MetadataSourceConfig.class);
+              AutoOnboard autoOnboardConstructor = (AutoOnboard) constructor.newInstance(metadataSourceConfig);
               String datasourceClassName = dataSourceConfig.getClassName();
               String dataSource =
                   datasourceClassName.substring(datasourceClassName.lastIndexOf(".") + 1, datasourceClassName.length());

@@ -53,8 +53,8 @@ public class AutoOnboardService implements Runnable {
     this.runFrequency = config.getAutoOnboardConfiguration().getRunFrequency();
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
-    Map<String, List<AutoOnboard>> dataSourceToOnboardMap = AutoOnboardUtility
-        .getDataSourceToAutoOnboardMap(config.getDataSourcesAsUrl());
+    Map<String, List<AutoOnboard>> dataSourceToOnboardMap = AutoOnboardUtility.getDataSourceToAutoOnboardMap(
+        config.getDataSourcesAsUrl());
     for (List<AutoOnboard> autoOnboards : dataSourceToOnboardMap.values()) {
       autoOnboardServices.addAll(autoOnboards);
     }
