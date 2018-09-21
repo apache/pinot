@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import java.util.ArrayList;
@@ -34,16 +35,19 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Int;
 
 
 /**
@@ -111,7 +115,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
    * @return a rebalanced idealstate
    */
   @Override
-  public IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig,
+  public IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig,
       Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment) throws InvalidConfigException {
     // Currently, only offline table is supported
     if (tableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
@@ -119,21 +123,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     }
     ReplicaGroupPartitionAssignment newReplicaGroupPartitionAssignment =
         (ReplicaGroupPartitionAssignment) newPartitionAssignment;
-    String tableNameWithType = tableConfig.getTableName();
-
-    // update if not dryRun
-    boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN,
-        RebalanceUserConfigConstants.DEFAULT_DRY_RUN);
-    IdealState newIdealState;
-    if (!dryRun) {
-      LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      newIdealState = rebalanceSegmentsAndUpdateIdealState(tableConfig, newReplicaGroupPartitionAssignment);
-    } else {
-      newIdealState = rebalanceSegments(idealState, tableConfig, newReplicaGroupPartitionAssignment);
-      LOGGER.info("Dry run. Skip writing ideal state");
-    }
-
-    return newIdealState;
+    return rebalanceSegments(idealState, tableConfig, newReplicaGroupPartitionAssignment);
   }
 
   /**
