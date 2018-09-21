@@ -16,36 +16,67 @@
 
 package com.linkedin.thirdeye.datasource.pinot;
 
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.cache.MetricDataset;
+import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import com.google.common.cache.LoadingCache;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datasource.pinot.PqlUtils;
-
 public class PqlUtilsTest {
+  private static final String COLLECTION = "collection";
+  private static final MetricDataset METRIC = new MetricDataset("metric", COLLECTION);
+
+  private DAOTestBase base;
+  private Long metricId;
+
+  @BeforeMethod
+  public void beforeMethod() throws Exception {
+    this.base = DAOTestBase.getInstance();
+
+    LoadingCache<String, DatasetConfigDTO> mockDatasetConfigCache = Mockito.mock(LoadingCache.class);
+    Mockito.when(mockDatasetConfigCache.get(COLLECTION)).thenReturn(new DatasetConfigDTO());
+
+    LoadingCache<MetricDataset, MetricConfigDTO> mockMetricConfigCache = Mockito.mock(LoadingCache.class);
+    Mockito.when(mockMetricConfigCache.get(METRIC)).thenReturn(new MetricConfigDTO());
+
+    ThirdEyeCacheRegistry.getInstance().registerDatasetConfigCache(mockDatasetConfigCache);
+    ThirdEyeCacheRegistry.getInstance().registerMetricConfigCache(mockMetricConfigCache);
+
+    MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
+    metricConfigDTO.setDataset(COLLECTION);
+    metricConfigDTO.setName(METRIC.getMetricName());
+    metricConfigDTO.setAlias(METRIC.getDataset() + "::" + METRIC.getMetricName());
+
+    this.metricId = DAORegistry.getInstance().getMetricConfigDAO().save(metricConfigDTO);
+  }
+
+  @AfterMethod
+  public void afterMethod() {
+    try { this.base.cleanup(); } catch (Exception ignore) {}
+  }
 
   @Test(dataProvider = "betweenClauseArgs")
-  public void getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec,
-      String expected) throws ExecutionException {
-    String collection = "collection";
-    DatasetConfigDTO datasetConfig = new DatasetConfigDTO();
-    LoadingCache<String, DatasetConfigDTO> mockDatasetConfigCache = Mockito.mock(LoadingCache.class);
-    Mockito.when(mockDatasetConfigCache.get(collection)).thenReturn(datasetConfig);
-    ThirdEyeCacheRegistry.getInstance().registerDatasetConfigCache(mockDatasetConfigCache);
-
+  public void getBetweenClause(DateTime start, DateTime end, TimeSpec timeFieldSpec, String expected) throws ExecutionException {
     String betweenClause = PqlUtils.getBetweenClause(start, end, timeFieldSpec, "collection");
     Assert.assertEquals(betweenClause, expected);
   }
@@ -132,9 +163,46 @@ public class PqlUtilsTest {
     Assert.assertEquals(PqlUtils.quote("123\'"), "\"123\'\"");
     Assert.assertEquals(PqlUtils.quote("abc\""), "\'abc\"\'");
   }
-  
+
   @Test(expectedExceptions = IllegalArgumentException.class)
   public  void testQuoteFail() {
     PqlUtils.quote("123\"\'");
+  }
+
+  @Test
+  public void testLimit() throws Exception {
+    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.AVG, METRIC.getMetricName(), this.metricId, COLLECTION, null, null);
+
+    TimeSpec timeSpec = new TimeSpec(METRIC.getMetricName(), TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
+
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .setMetricFunctions(Collections.singletonList(metricFunction))
+        .setStartTimeInclusive(1000)
+        .setEndTimeExclusive(2000)
+        .setGroupBy("dimension")
+        .setLimit(12345)
+        .build("ref");
+
+    String pql = PqlUtils.getPql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
+
+    Assert.assertEquals(pql, "SELECT AVG(metric) FROM collection_OFFLINE WHERE  metric >= 1 AND metric < 2 GROUP BY dimension TOP 12345");
+  }
+
+  @Test
+  public void testLimitDefault() throws Exception {
+    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.AVG, METRIC.getMetricName(), this.metricId, COLLECTION, null, null);
+
+    TimeSpec timeSpec = new TimeSpec(METRIC.getMetricName(), TimeGranularity.fromString("1_SECONDS"), TimeSpec.SINCE_EPOCH_FORMAT);
+
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .setMetricFunctions(Collections.singletonList(metricFunction))
+        .setStartTimeInclusive(1000)
+        .setEndTimeExclusive(2000)
+        .setGroupBy("dimension")
+        .build("ref");
+
+    String pql = PqlUtils.getPql(request, metricFunction, ArrayListMultimap.<String, String>create(), timeSpec);
+
+    Assert.assertEquals(pql, "SELECT AVG(metric) FROM collection_OFFLINE WHERE  metric >= 1 AND metric < 2 GROUP BY dimension TOP 100000");
   }
 }

@@ -55,6 +55,7 @@ public class ThirdEyeRequest {
   private final List<String> metricNames;
   private final String dataSource;
   private final String requestReference;
+  private final int limit;
 
   private ThirdEyeRequest(String requestReference, ThirdEyeRequestBuilder builder) {
     this.requestReference = requestReference;
@@ -70,6 +71,7 @@ public class ThirdEyeRequest {
     for (MetricFunction metric : metricFunctions) {
       metricNames.add(metric.toString());
     }
+    this.limit = builder.limit;
   }
 
   public static ThirdEyeRequestBuilder newBuilder() {
@@ -118,6 +120,10 @@ public class ThirdEyeRequest {
     return dataSource;
   }
 
+  public int getLimit() {
+    return limit;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -131,13 +137,14 @@ public class ThirdEyeRequest {
         .equals(endTime, that.endTime) && Objects.equals(filterSet, that.filterSet) && Objects.equals(filterClause,
         that.filterClause) && Objects.equals(groupByDimensions, that.groupByDimensions) && Objects.equals(
         groupByTimeGranularity, that.groupByTimeGranularity) && Objects.equals(metricNames, that.metricNames) && Objects
-        .equals(dataSource, that.dataSource) && Objects.equals(requestReference, that.requestReference);
+        .equals(dataSource, that.dataSource) && Objects.equals(requestReference, that.requestReference) &&
+        Objects.equals(requestReference, that.requestReference);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(metricFunctions, startTime, endTime, filterSet, filterClause, groupByDimensions,
-        groupByTimeGranularity, metricNames, dataSource, requestReference);
+        groupByTimeGranularity, metricNames, dataSource, requestReference, limit);
   }
 
   @Override
@@ -145,7 +152,8 @@ public class ThirdEyeRequest {
     return "ThirdEyeRequest{" + "metricFunctions=" + metricFunctions + ", startTime=" + startTime + ", endTime="
         + endTime + ", filterSet=" + filterSet + ", filterClause='" + filterClause + '\'' + ", groupByDimensions="
         + groupByDimensions + ", groupByTimeGranularity=" + groupByTimeGranularity + ", metricNames=" + metricNames
-        + ", dataSource='" + dataSource + '\'' + ", requestReference='" + requestReference + '\'' + '}';
+        + ", dataSource='" + dataSource + '\'' + ", requestReference='" + requestReference + '\'' +
+        ", limit='" + limit + '\'' + '}';
   }
 
   public static class ThirdEyeRequestBuilder {
@@ -159,6 +167,7 @@ public class ThirdEyeRequest {
     private final List<String> groupBy;
     private TimeGranularity groupByTimeGranularity;
     private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;
+    private int limit;
 
     public ThirdEyeRequestBuilder() {
       this.filterSet = LinkedListMultimap.create();
@@ -257,6 +266,11 @@ public class ThirdEyeRequest {
 
     public ThirdEyeRequestBuilder setDataSource(String dataSource) {
       this.dataSource = dataSource;
+      return this;
+    }
+
+    public ThirdEyeRequestBuilder setLimit(int limit) {
+      this.limit = limit;
       return this;
     }
 

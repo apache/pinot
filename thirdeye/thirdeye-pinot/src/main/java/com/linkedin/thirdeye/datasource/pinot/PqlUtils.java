@@ -86,13 +86,13 @@ public class PqlUtils {
     // TODO handle request.getFilterClause()
 
     return getPql(metricFunction, request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
-        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec);
+        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec, request.getLimit());
   }
 
 
   private static String getPql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec) throws ExecutionException {
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, int limit) throws ExecutionException {
 
     MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricFunction.getMetricId());
     String dataset = metricFunction.getDataset();
@@ -111,10 +111,14 @@ public class PqlUtils {
       sb.append(" AND ").append(dimensionWhereClause);
     }
 
+    if (limit <= 0) {
+      limit = DEFAULT_TOP;
+    }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      sb.append(" TOP ").append(DEFAULT_TOP);
+      sb.append(" TOP ").append(limit);
     }
 
     return sb.toString();
@@ -172,7 +176,7 @@ public class PqlUtils {
     String dimensionAsMetricPql = getDimensionAsMetricPql(metricFunction,
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
-        metricNamesList, metricNamesColumnsList, metricValuesColumn);
+        metricNamesList, metricNamesColumnsList, metricValuesColumn, request.getLimit());
 
     return dimensionAsMetricPql;
   }
@@ -180,8 +184,8 @@ public class PqlUtils {
 
   private static String getDimensionAsMetricPql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec,
-      List<String> metricNames, List<String> metricNamesColumns, String metricValuesColumn)
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, List<String> metricNames, List<String> metricNamesColumns,
+      String metricValuesColumn, int limit)
           throws ExecutionException {
 
     MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
@@ -204,10 +208,14 @@ public class PqlUtils {
       sb.append(" AND ").append(dimensionWhereClause);
     }
 
+    if (limit <= 0) {
+      limit = DEFAULT_TOP;
+    }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      sb.append(" TOP ").append(DEFAULT_TOP);
+      sb.append(" TOP ").append(limit);
     }
 
     return sb.toString();
