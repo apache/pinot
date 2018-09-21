@@ -21,16 +21,19 @@ import com.microsoft.azure.datalake.store.ADLFileInputStream;
 import com.microsoft.azure.datalake.store.ADLFileOutputStream;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
+import com.microsoft.azure.datalake.store.DirectoryEntryType;
 import com.microsoft.azure.datalake.store.oauth2.AccessTokenProvider;
 import com.microsoft.azure.datalake.store.oauth2.ClientCredsTokenProvider;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
@@ -116,13 +119,22 @@ public class AzurePinotFS extends PinotFS {
 
   @Override
   public String[] listFiles(URI fileUri) throws IOException {
-    // list directory contents
-    List<DirectoryEntry> list = _adlStoreClient.enumerateDirectory(fileUri.getPath(), Integer.MAX_VALUE);
-    List<String> fileNames = new ArrayList<>();
-    for (DirectoryEntry directoryEntry : list) {
-      fileNames.add(directoryEntry.name);
+    // list directory contents recursively
+    List<String> finalFileList = new ArrayList<>();
+    DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
+    if (rootDir.type.equals(DirectoryEntryType.DIRECTORY)) {
+      for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(fileUri.getPath())) {
+        try {
+          finalFileList.addAll(Arrays.asList(listFiles(new URI(directoryEntry.fullName))));
+        } catch (URISyntaxException e) {
+          throw new RuntimeException("Could not convert " + directoryEntry.fullName + " to URI");
+        }
+      }
+    } else {
+      finalFileList.add(rootDir.fullName);
     }
-    return fileNames.toArray(new String[fileNames.size()]);
+
+    return finalFileList.toArray(new String[finalFileList.size()]);
   }
 
   @Override
