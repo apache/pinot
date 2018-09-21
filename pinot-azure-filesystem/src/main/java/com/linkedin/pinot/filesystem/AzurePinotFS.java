@@ -21,6 +21,7 @@ import com.microsoft.azure.datalake.store.ADLFileInputStream;
 import com.microsoft.azure.datalake.store.ADLFileOutputStream;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
+import com.microsoft.azure.datalake.store.DirectoryEntryType;
 import com.microsoft.azure.datalake.store.oauth2.AccessTokenProvider;
 import com.microsoft.azure.datalake.store.oauth2.ClientCredsTokenProvider;
 import java.io.File;
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 public class AzurePinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(AzurePinotFS.class);
   private ADLStoreClient _adlStoreClient;
+  private static final String[] EMPTY_ARR = new String[0];
 
   public AzurePinotFS() {
 
@@ -116,13 +118,29 @@ public class AzurePinotFS extends PinotFS {
 
   @Override
   public String[] listFiles(URI fileUri) throws IOException {
-    // list directory contents
-    List<DirectoryEntry> list = _adlStoreClient.enumerateDirectory(fileUri.getPath(), Integer.MAX_VALUE);
-    List<String> fileNames = new ArrayList<>();
-    for (DirectoryEntry directoryEntry : list) {
-      fileNames.add(directoryEntry.name);
+    DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
+    if (rootDir == null) {
+      return EMPTY_ARR;
     }
-    return fileNames.toArray(new String[fileNames.size()]);
+    List<DirectoryEntry> fileList = new ArrayList<>();
+    List<DirectoryEntry> directoryEntries = listFiles(rootDir, fileList);
+
+    List<String> fullFilePaths = new ArrayList<String>();
+    for (DirectoryEntry directoryEntry : directoryEntries) {
+      fullFilePaths.add(directoryEntry.fullName);
+    }
+    return fullFilePaths.toArray(new String[fullFilePaths.size()]);
+  }
+
+  private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry, List<DirectoryEntry> fileList) throws IOException {
+    if (origDirEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
+      for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
+        fileList.addAll(listFiles(directoryEntry, fileList));
+      }
+    } else {
+      fileList.add(origDirEntry);
+    }
+    return fileList;
   }
 
   @Override

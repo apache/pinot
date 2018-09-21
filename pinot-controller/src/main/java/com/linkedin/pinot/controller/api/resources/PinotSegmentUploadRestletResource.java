@@ -367,6 +367,7 @@ public class PinotSegmentUploadRestletResource {
 
   private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {
     PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassHeader);
+    LOGGER.info("Using crypter class {}", pinotCrypter.getClass().getName());
     pinotCrypter.init(_controllerConf.subset(CommonConstants.Segment.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER));
     pinotCrypter.decrypt(tempEncryptedFile, tempDecryptedFile);
   }
