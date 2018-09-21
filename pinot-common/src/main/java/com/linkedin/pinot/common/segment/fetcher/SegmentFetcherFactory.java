@@ -54,12 +54,10 @@ public class SegmentFetcherFactory {
   public static final String FETCHER_CLASS_KEY_SUFFIX = ".class";
 
   private final Map<String, SegmentFetcher> _segmentFetcherMap = new HashMap<>();
-  private Configuration _pinotFSConfig;
 
   /**
    * Initiate the segment fetcher factory. This method should only be called once.
    * @param segmentFetcherClassConfig Segment fetcher factory config
-   * @param pinotFSConfig
    *
    */
   public void init(Configuration segmentFetcherClassConfig, Configuration pinotFSConfig) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
@@ -77,7 +75,6 @@ public class SegmentFetcherFactory {
       segmentFetcher.init(segmentFetcherConfig);
       _segmentFetcherMap.put(protocol, segmentFetcher);
     }
-    _pinotFSConfig = pinotFSConfig;
   }
 
   public boolean containsProtocol(String protocol) {

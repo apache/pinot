@@ -22,11 +22,15 @@ import com.microsoft.azure.datalake.store.ADLFileOutputStream;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
 import com.microsoft.azure.datalake.store.DirectoryEntryType;
+import com.microsoft.azure.datalake.store.IfExists;
 import com.microsoft.azure.datalake.store.oauth2.AccessTokenProvider;
 import com.microsoft.azure.datalake.store.oauth2.ClientCredsTokenProvider;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +39,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,20 +127,20 @@ public class AzurePinotFS extends PinotFS {
     if (rootDir == null) {
       return EMPTY_ARR;
     }
-    List<DirectoryEntry> fileList = new ArrayList<>();
-    List<DirectoryEntry> directoryEntries = listFiles(rootDir, fileList);
+    List<DirectoryEntry> directoryEntries = listFiles(rootDir);
 
-    List<String> fullFilePaths = new ArrayList<String>();
+    List<String> fullFilePaths = new ArrayList<>();
     for (DirectoryEntry directoryEntry : directoryEntries) {
       fullFilePaths.add(directoryEntry.fullName);
     }
     return fullFilePaths.toArray(new String[fullFilePaths.size()]);
   }
 
-  private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry, List<DirectoryEntry> fileList) throws IOException {
+  private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry) throws IOException {
+    List<DirectoryEntry> fileList = new ArrayList<>();
     if (origDirEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
       for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
-        fileList.addAll(listFiles(directoryEntry, fileList));
+        fileList.addAll(listFiles(directoryEntry));
       }
     } else {
       fileList.add(origDirEntry);
@@ -169,7 +174,10 @@ public class AzurePinotFS extends PinotFS {
 
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
-    // TODO: Add this method. Not needed for now because of metadata upload
-    throw new UnsupportedOperationException("Cannot copy from local to Azure");
+    OutputStream stream = _adlStoreClient.createFile(dstUri.getPath(), IfExists.OVERWRITE);
+    PrintStream out = new PrintStream(stream);
+    byte[] inputStream = IOUtils.toByteArray(new FileInputStream(srcFile));
+    out.write(inputStream);
+    out.close();
   }
 }
