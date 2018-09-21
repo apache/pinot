@@ -15,7 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
-
 public interface SingleValueForwardIndexCreator extends ForwardIndexCreator {
-  void index(int docId, int dictionaryIndex);
+
+  /**
+   * For single-valued column, adds the dictionary Id to the document.
+   *
+   * @param docId Document Id
+   * @param dictId Dictionary Id
+   */
+  void index(int docId, int dictId);
 }

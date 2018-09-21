@@ -332,20 +332,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       // Single-value column.
 
       SingleValueSortedForwardIndexCreator svFwdIndexCreator =
-          new SingleValueSortedForwardIndexCreator(_indexDir, 1/*cardinality*/, fieldSpec);
+          new SingleValueSortedForwardIndexCreator(_indexDir, fieldSpec.getName(), 1/*cardinality*/);
       for (int docId = 0; docId < totalDocs; docId++) {
-        svFwdIndexCreator.add(0/*dictionaryId*/, docId);
+        svFwdIndexCreator.index(docId, 0/*dictionaryId*/);
       }
       svFwdIndexCreator.close();
     } else {
       // Multi-value column.
 
       MultiValueUnsortedForwardIndexCreator mvFwdIndexCreator =
-          new MultiValueUnsortedForwardIndexCreator(fieldSpec, _indexDir, 1/*cardinality*/, totalDocs/*numDocs*/,
-              totalDocs/*totalNumberOfValues*/, false/*hasNulls*/);
-      int[] dictionaryIds = {0};
+          new MultiValueUnsortedForwardIndexCreator(_indexDir, fieldSpec.getName(), 1/*cardinality*/,
+              totalDocs/*numDocs*/, totalDocs/*totalNumberOfValues*/);
+      int[] dictIds = {0};
       for (int docId = 0; docId < totalDocs; docId++) {
-        mvFwdIndexCreator.index(docId, dictionaryIds);
+        mvFwdIndexCreator.index(docId, dictIds);
       }
       mvFwdIndexCreator.close();
     }

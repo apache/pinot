@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
-
 public interface MultiValueForwardIndexCreator extends ForwardIndexCreator {
+
   /**
-   * Add the multi-value dictionary IDs to the doc.
+   * For multi-valued column, adds the dictionary Ids to the document.
    *
-   * @param docId of the doc to add
-   * @param dictionaryIndices Sorted dictionary indices
+   * @param docId Document Id
+   * @param dictIds Array of dictionary Ids
    */
-  void index(int docId, int[] dictionaryIndices);
+  void index(int docId, int[] dictIds);
 }
