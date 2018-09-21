@@ -169,13 +169,13 @@ public class CallGraphPipeline extends Pipeline {
     try {
       // prepare requests
       RequestContainer rcCurrCount = DataFrameUtils
-          .makeAggregateRequest(sliceCurrCount, explore, "currCount", this.metricDAO, this.datasetDAO);
+          .makeAggregateRequest(sliceCurrCount, explore, -1, "currCount", this.metricDAO, this.datasetDAO);
       RequestContainer rcCurrLatency = DataFrameUtils
-          .makeAggregateRequest(sliceCurrLatency, explore, "currLatency", this.metricDAO, this.datasetDAO);
+          .makeAggregateRequest(sliceCurrLatency, explore, -1, "currLatency", this.metricDAO, this.datasetDAO);
       RequestContainer rcBaseCount = DataFrameUtils
-          .makeAggregateRequest(sliceBaseCount, explore, "baseCount", this.metricDAO, this.datasetDAO);
+          .makeAggregateRequest(sliceBaseCount, explore, -1, "baseCount", this.metricDAO, this.datasetDAO);
       RequestContainer rcBaseLatency = DataFrameUtils
-          .makeAggregateRequest(sliceBaseLatency, explore, "baseLatency", this.metricDAO, this.datasetDAO);
+          .makeAggregateRequest(sliceBaseLatency, explore, -1, "baseLatency", this.metricDAO, this.datasetDAO);
 
       // send requests
       Future<ThirdEyeResponse> resCurrCount = this.cache.getQueryResultAsync(rcCurrCount.getRequest());

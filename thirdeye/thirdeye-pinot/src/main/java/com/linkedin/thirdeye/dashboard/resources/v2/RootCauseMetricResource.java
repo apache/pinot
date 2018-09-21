@@ -20,7 +20,6 @@ import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -54,6 +53,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
@@ -83,13 +83,15 @@ public class RootCauseMetricResource {
   private static final String COL_VALUE = TimeSeriesLoader.COL_VALUE;
   private static final String COL_DIMENSION_NAME = AggregationLoader.COL_DIMENSION_NAME;
   private static final String COL_DIMENSION_VALUE = AggregationLoader.COL_DIMENSION_VALUE;
-  public static final String TOP_K_POSTFIX = "_topk";
+
+  private static final String ROLLUP_NAME = "OTHER";
 
   private static final long TIMEOUT = 60000;
 
   private static final String OFFSET_DEFAULT = "current";
   private static final String TIMEZONE_DEFAULT = "UTC";
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
+  private static final int LIMIT_DEFAULT = 100;
 
   private static final Pattern PATTERN_NONE = Pattern.compile("none");
   private static final Pattern PATTERN_PREDICTED = Pattern.compile("predicted");
@@ -241,7 +243,7 @@ public class RootCauseMetricResource {
    * @param end end time (in millis)
    * @param offset offset identifier (e.g. "current", "wo2w")
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
-   * @param rollup limit results to the top k elements, plus an 'OTHER' rollup element
+   * @param limit limit results to the top k elements, plus a rollup element
    *
    * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
    *
@@ -263,8 +265,8 @@ public class RootCauseMetricResource {
       @QueryParam("offset") String offset,
       @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")")
       @QueryParam("timezone") String timezone,
-      @ApiParam(value = "limit results to the top k elements, plus an 'OTHER' rollup element")
-      @QueryParam("rollup") Long rollup) throws Exception {
+      @ApiParam(value = "limit results to the top k elements, plus 'OTHER' rollup element")
+      @QueryParam("limit") Integer limit) throws Exception {
 
     if (StringUtils.isBlank(offset)) {
       offset = OFFSET_DEFAULT;
@@ -274,8 +276,8 @@ public class RootCauseMetricResource {
       timezone = TIMEZONE_DEFAULT;
     }
 
-    if (rollup != null) {
-      throw new IllegalArgumentException("rollup not implemented yet");
+    if (limit == null) {
+      limit = LIMIT_DEFAULT;
     }
 
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
@@ -284,11 +286,13 @@ public class RootCauseMetricResource {
     List<MetricSlice> slices = range.scatter(baseSlice);
     logSlices(baseSlice, slices);
 
-    Map<MetricSlice, DataFrame> data = fetchBreakdowns(slices);
+    Map<MetricSlice, DataFrame> dataBreakdown = fetchBreakdowns(slices, limit);
+    Map<MetricSlice, DataFrame> dataAggregate = fetchAggregates(slices);
 
-    DataFrame result = range.gather(baseSlice, data);
+    DataFrame resultBreakdown = range.gather(baseSlice, dataBreakdown);
+    DataFrame resultAggregate = range.gather(baseSlice, dataAggregate);
 
-    return makeBreakdownMap(result);
+    return makeBreakdownMap(resultBreakdown, resultAggregate);
   }
 
   /**
@@ -417,28 +421,43 @@ public class RootCauseMetricResource {
    * Returns a map of maps (keyed by dimension name, keyed by dimension value) derived from the
    * breakdown results dataframe.
    *
-   * @param data (transformed) query results
+   * @param dataBreakdown (transformed) breakdown query results
+   * @param dataAggregate (transformed) aggregate query results
    * @return map of maps of value (keyed by dimension name, keyed by dimension value)
    */
-  private static Map<String, Map<String, Double>> makeBreakdownMap(DataFrame data) {
+  private static Map<String, Map<String, Double>> makeBreakdownMap(DataFrame dataBreakdown, DataFrame dataAggregate) {
     Map<String, Map<String, Double>> output = new TreeMap<>();
 
-    data = data.dropNull();
+    dataBreakdown = dataBreakdown.dropNull();
+    dataAggregate = dataAggregate.dropNull();
 
-    StringSeries dimNames = data.getStrings(COL_DIMENSION_NAME);
-    for (int i = 0; i < data.size(); i++) {
-      final String dimName = data.getString(COL_DIMENSION_NAME, i);
-      final String dimValue = data.getString(COL_DIMENSION_VALUE, i);
-      final double value = data.getDouble(COL_VALUE, i);
-      // remove group by dimensions which also have topk
-      if (dimNames.contains(dimName + TOP_K_POSTFIX)) {
-        continue;
-      }
+    Map<String, Double> dimensionTotals = new HashMap<>();
+
+    for (int i = 0; i < dataBreakdown.size(); i++) {
+      final String dimName = dataBreakdown.getString(COL_DIMENSION_NAME, i);
+      final String dimValue = dataBreakdown.getString(COL_DIMENSION_VALUE, i);
+      final double value = dataBreakdown.getDouble(COL_VALUE, i);
+
+      // cell
       if (!output.containsKey(dimName)) {
         output.put(dimName, new HashMap<String, Double>());
       }
       output.get(dimName).put(dimValue, value);
+
+      // total
+      dimensionTotals.put(dimName, MapUtils.getDoubleValue(dimensionTotals, dimName, 0) + value);
     }
+
+    // add rollup column
+    if (!dataAggregate.isEmpty()) {
+      double total = dataAggregate.getDouble(COL_VALUE, 0);
+      for (Map.Entry<String, Double> entry : dimensionTotals.entrySet()) {
+        if (entry.getValue() < total) {
+          output.get(entry.getKey()).put(ROLLUP_NAME, total - entry.getValue());
+        }
+      }
+    }
+
     return output;
   }
 
@@ -456,7 +475,7 @@ public class RootCauseMetricResource {
       futures.put(slice, this.executor.submit(new Callable<Double>() {
         @Override
         public Double call() throws Exception {
-          DataFrame df = RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList());
+          DataFrame df = RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1);
           if (df.isEmpty()) {
             return Double.NaN;
           }
@@ -482,18 +501,19 @@ public class RootCauseMetricResource {
    * Returns breakdowns (de-aggregations) for a given set of metric slices.
    *
    * @param slices metric slices
+   * @param limit top k elements limit
    * @return map of dataframes (keyed by metric slice,
    *         columns: [COL_TIME(1), COL_DIMENSION_NAME, COL_DIMENSION_VALUE, COL_VALUE])
    * @throws Exception on catch-all execution failure
    */
-  private Map<MetricSlice, DataFrame> fetchBreakdowns(List<MetricSlice> slices) throws Exception {
+  private Map<MetricSlice, DataFrame> fetchBreakdowns(List<MetricSlice> slices, final int limit) throws Exception {
     Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
 
     for (final MetricSlice slice : slices) {
       futures.put(slice, this.executor.submit(new Callable<DataFrame>() {
         @Override
         public DataFrame call() throws Exception {
-          return RootCauseMetricResource.this.aggregationLoader.loadBreakdown(slice);
+          return RootCauseMetricResource.this.aggregationLoader.loadBreakdown(slice, limit);
         }
       }));
     }
