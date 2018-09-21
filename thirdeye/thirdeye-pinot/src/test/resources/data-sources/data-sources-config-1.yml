@@ -16,8 +16,10 @@ dataSourceConfigs:
             password: 'password'
       - className: com.linkedin.thirdeye.auto.onboard.AutoOnboardAnotherDummyDataSource
         properties:
-            dataSourceHost: 'host'
-            dataSourcePort: 9999'
+            host: 'host'
+            port: 9999
   - className: com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource
+    properties:
+        business: business.csv
     metadataSourceConfigs:
       - className: com.linkedin.thirdeye.auto.onboard.AutoOnboardAnotherRandomDataSource
