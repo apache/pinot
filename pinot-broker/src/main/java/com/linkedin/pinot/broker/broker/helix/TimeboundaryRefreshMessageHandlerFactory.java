@@ -17,6 +17,7 @@ package com.linkedin.pinot.broker.broker.helix;
 
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.common.messages.TimeboundaryRefreshMessage;
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.messaging.handling.HelixTaskResult;
 import org.apache.helix.messaging.handling.MessageHandler;
@@ -28,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
-// Handle the TimeboundaryRefresh message. The Timeboundary refresh requests are handled asynchronous: i.e., they are
+// Handle the TimeboundaryRefresh message. The Timeboundary refresh requests are handled asynchronously: i.e., they are
 // first put into a request map first. The map dedups requests by their tables thus multiple requests for the same
 // table only needs to be executed once. A background thread periodically checks the map and performs refreshing for
 // all the tables in the map.
@@ -36,7 +37,8 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
     private static final Logger LOGGER = LoggerFactory.getLogger(TimeboundaryRefreshMessageHandlerFactory.class);
     private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
     // A map to store the unique requests (i.e., the table names) to refresh the TimeBoundaryInfo of a pinot table.
-    private static ConcurrentHashMap<String, String> _tablesToRefreshmap = new ConcurrentHashMap<>();
+    // Ideally a Hashset will suffice but Java util currently does not have Hashset.
+    private static ConcurrentHashMap<String, Boolean> _tablesToRefreshmap = new ConcurrentHashMap<>();
 
     /**
      *
@@ -89,7 +91,7 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
             HelixTaskResult result = new HelixTaskResult();
             // Put the segment refresh request to a request queue instead of executing immediately. This will reduce the
             // burst of requests when a large number of segments are updated in a short time span.
-            _tablesToRefreshmap.put(_tableNameWithType, _tableNameWithType);
+            _tablesToRefreshmap.put(_tableNameWithType, true);
             result.setSuccess(true);
             return result;
         }
@@ -109,11 +111,11 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
         public void run() {
             while(true) {
                 try {
-                    ConcurrentHashMap.KeySetView<String,String> tables = _tablesToRefreshmap.keySet();
+                    ConcurrentHashMap.KeySetView<String, Boolean> tables = _tablesToRefreshmap.keySet();
                     Iterator<String> tableItr = tables.iterator();
                     while(tableItr.hasNext()) {
                         String table = tableItr.next();
-                        _logger.warn("Update time boundary info for table {} ", table);
+                        _logger.info("Update time boundary info for table {} ", table);
                         _helixExternalViewBasedRouting.updateTimeBoundary(table);
                         // Remove the table name from the underlying hashmap.
                         tableItr.remove();
