@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
@@ -39,9 +42,15 @@ import org.slf4j.LoggerFactory;
  * In the first mode, care is taken to ensure that there is atleast one replica
  * of any segment online at all times - this mode kicks off a background thread
  * and steps through the ideal-state transformation.
- * In the down-time mode, the idea-state is replaced in one go and there are
+ * In the down-time mode, the ideal-state is replaced in one go and there are
  * no guarantees around replica availability. This mode returns immediately,
  * however the actual update by Helix can take an unbounded amount of time.
+ *
+ * Limitations:
+ * 1. Currently, if the controller that handles the rebalance goes down/restarted
+ *    the rebalance isn't automatically resumed by other controllers.
+ * 2. There is no feedback to the user on the progress of the rebalance. Controller logs will
+ *    provide updates on progress.
  */
 public class IdealStateUpdater {
 
@@ -72,7 +81,7 @@ public class IdealStateUpdater {
 
     if (rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
         RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
-      updateFullState(targetIdealState, config);
+        updateFullState(targetIdealState, config);
     } else {
       _executorService.submit(new Runnable() {
         @Override public void run() {
@@ -93,58 +102,81 @@ public class IdealStateUpdater {
   }
 
   /**
-   * Update idealstate without downtime. In this approach, we first add the assignments that place
-   * segments on the expected targets. This should take at most as many iterations as the number of
-   * replicas. After this, the ideal is updated to remove the previous assignments (if any). This
-   * ensures that the segments are being served by the target servers and hence there will be no
-   * downtime. The downside of this approach is that some servers could temporarily host more
-   * segments. The impact of this can be reduced by the number of iterations we make before replacing
-   * idealstate (ie, iterations can be set to 1 to minimize duration segment imbalance).
+   * Update idealstate without downtime. In this approach, we first ensure that the ideal state
+   * is updated such that there is atleast one serving replica. Care is taken to ensure that 
+   * the number of replicas for a segment does not change from the current assignment -ie, if
+   * a segment currently has 2 replicas and target has 3, the first transition will ensure that
+   * ideal-state reflects 2 replicas by replacing an existing one if needed.
+   * After the first step, the ideal is updated fully to reflect the target assignment.
    */
   public void updateWithoutDowntime(IdealState target, TableConfig tableConfig)
       throws InterruptedException {
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableConfig.getTableName());
+
     long startTime = System.nanoTime();
-    int iterations = tableConfig.getValidationConfig().getReplicationNumber();
     String tableName = tableConfig.getTableName();
-    Map<String, Map<String, String>> targetMapFields = target.getRecord().getMapFields();
-    while (--iterations >= 0) {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
 
-      // handle any new assignments
-      HelixHelper.updateIdealState(_helixManager, tableName,
-          new com.google.common.base.Function<IdealState, IdealState>() {
-            @Nullable @Override public IdealState apply(@Nullable IdealState idealState) {
+    ensureAtleastOneServingReplica(target, tableName);
 
-              int updated = 0;
-              Map<String, Map<String, String>> srcMapFields = idealState.getRecord().getMapFields();
-              // for each segment, make atmost one transition
-              for (String segmentId : targetMapFields.keySet()) {
-                Map<String, String> targetMap = targetMapFields.get(segmentId);
-                Map<String, String> srcMap = srcMapFields.get(segmentId);
-
-                for (String instanceId : targetMap.keySet()) {
-                  if (!srcMap.containsKey(instanceId) || !srcMap.get(instanceId)
-                      .equals(targetMap.get(instanceId))) {
-                    idealState.setPartitionState(segmentId, instanceId, targetMap.get(instanceId));
-                    updated++;
-                    break;
-                  }
-                }
-              }
-              LOGGER.info("Updated idealstate for " + updated + " segments");
-              return idealState;
-            }
-          }, RetryPolicies
-              .exponentialBackoffRetryPolicy(MAX_UPDATE_ATTEMPTS, INITIAL_RETRY_DELAY_MS,
-                  DELAY_SCALE_FACTOR));
-      LOGGER.info("Waiting for external view to catch up for rebalancing table " + tableName);
-      waitForStable(tableName);
-    }
-
-    // handle removal of previous assignments in one go
+    // update to reflect the target state
     updateFullState(target, tableConfig);
+    waitForStable(tableName);
     LOGGER.info("Finished rebalancing table " + tableName + " in " + TimeUnit.NANOSECONDS
         .toMillis(System.nanoTime() - startTime) + "ms");
+  }
+
+
+  private void ensureAtleastOneServingReplica(IdealState target, String tableName)
+      throws InterruptedException {
+    Map<String, Map<String, String>> targetMapFields = target.getRecord().getMapFields();
+    HelixHelper.updateIdealState(_helixManager, tableName,
+        new com.google.common.base.Function<IdealState, IdealState>() {
+          @Nullable @Override public IdealState apply(@Nullable IdealState idealState) {
+
+            int updated = 0;
+            Map<String, Map<String, String>> srcMapFields = idealState.getRecord().getMapFields();
+
+            for (String segmentId : targetMapFields.keySet()) {
+              if (updateSegmentIfNeeded(segmentId, srcMapFields.get(segmentId),
+                  targetMapFields.get(segmentId), idealState)) {
+                updated++;
+              }
+            }
+
+            LOGGER.info("Updated ideal state for " + updated + " segments");
+            return idealState;
+          }
+        }, RetryPolicies.exponentialBackoffRetryPolicy(MAX_UPDATE_ATTEMPTS, INITIAL_RETRY_DELAY_MS,
+            DELAY_SCALE_FACTOR));
+    LOGGER.info("Waiting for external view to catch up for rebalancing table " + tableName);
+    waitForStable(tableName);
+  }
+
+  @VisibleForTesting
+  public boolean updateSegmentIfNeeded(String segmentId, Map<String, String> srcMap,
+      Map<String, String> targetMap, IdealState current) {
+
+    if (srcMap == null) {
+      //segment can be missing if retention manager has deleted it
+      LOGGER.info("Segment " + segmentId + " missing from current idealState. Skipping it.");
+      return false;
+    }
+    MapDifference difference = Maps.difference(targetMap, srcMap);
+    if (!difference.entriesInCommon().isEmpty()) {
+      // if there are entries in common, there won't be downtime
+      LOGGER.info(
+          "Segment " + segmentId + " has common entries between current and expected ideal state");
+      return false;
+    }
+
+    // remove one entry
+    current.getInstanceStateMap(segmentId).remove(srcMap.keySet().stream().findFirst().get());
+    // add an entry from the target state
+    String instanceId = targetMap.keySet().stream().findFirst().get();
+    current.setPartitionState(segmentId, instanceId, targetMap.get(instanceId));
+    LOGGER.info("Adding " + instanceId + " to serve segment " + segmentId);
+
+    return true;
   }
 
   /**
@@ -159,22 +191,37 @@ public class IdealStateUpdater {
 
             for (String segmentId : targetMapFields.keySet()) {
               Map<String, String> instanceStateMap = targetMapFields.get(segmentId);
-
-              idealState.getInstanceStateMap(segmentId).clear();
+              Map<String, String> srcInstanceStateMap = idealState.getInstanceStateMap(segmentId);
+              if (srcInstanceStateMap == null) {
+                //segment can be missing if retention manager has deleted it
+                LOGGER.info("Segment " + segmentId + " missing from current idealState. Skipping it.");
+                continue;
+              }
+              srcInstanceStateMap.clear();
               for (String instanceId : instanceStateMap.keySet()) {
                 idealState
                     .setPartitionState(segmentId, instanceId, instanceStateMap.get(instanceId));
               }
             }
+
+            // log a message to inform if further rebalancing is needed
+            // TODO: consider if rebalance should be called automatically if so
+            Map<String, Map<String, String>> mapFieldsIS = idealState.getRecord().getMapFields();
+            MapDifference diff = Maps.difference(mapFieldsIS, targetIdealState.getRecord().getMapFields());
+            int newSegments = diff.entriesOnlyOnLeft().size();
+            if (newSegments > 0) {
+              LOGGER.info("Found " + newSegments + " new segments in idealstate for " + tableName + " that were not rebalanced. If they need to be rebalanced, invoke rebalance again.");
+            }
+
             return idealState;
           }
         }, RetryPolicies.exponentialBackoffRetryPolicy(MAX_UPDATE_ATTEMPTS, INITIAL_RETRY_DELAY_MS,
             DELAY_SCALE_FACTOR));
+
   }
 
   /**
-   * return true if IdealState = ExternalView
-   * @return
+   * Check if IdealState = ExternalView. If its not equal, return the number of differing segments.
    */
   public int isStable(String tableName) {
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
@@ -199,8 +246,6 @@ public class IdealStateUpdater {
 
   /**
    * Wait till state has stabilized {@link #isStable(String)}
-   * @param resourceName
-   * @throws InterruptedException
    */
   private void waitForStable(String resourceName) throws InterruptedException {
     int diff;
