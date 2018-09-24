@@ -238,6 +238,33 @@ public class CSVThirdEyeDataSourceTest {
   }
 
   @Test
+  public void testExecuteMultiFilterAggregation() throws Exception {
+    Multimap<String, String> filter = ArrayListMultimap.create();
+    filter.put("country", "us");
+    filter.put("country", "cn");
+    filter.put("browser", "chrome");
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
+        .setDataSource("source")
+        .setFilterSet(filter)
+        .setStartTimeInclusive(3600000)
+        .setEndTimeExclusive(11000000)
+        .build("ref");
+
+    ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
+        request,
+        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
+        new DataFrame()
+            .addSeries("SUM_views", 7009d)
+            .addSeries("timestamp", -1L)
+    );
+
+    ThirdEyeResponse response = dataSource.execute(request);
+    Assert.assertEquals(response, expectedResponse);
+
+  }
+
+  @Test
   public void testExecuteGroupByColumns() throws Exception {
 
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()

@@ -36,9 +36,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class CSVThirdEyeDataSourceIntergrationTest {
-
-
+public class CSVThirdEyeDataSourceIntegrationTest {
   private DAOTestBase testDAOProvider;
   private DAORegistry daoRegistry;
 
@@ -84,7 +82,7 @@ public class CSVThirdEyeDataSourceIntergrationTest {
 
 
     MetricSlice slice = MetricSlice.from(configDTO.getId(), 0, 7200000);
-    RequestContainer requestContainer = DataFrameUtils.makeAggregateRequest(slice, Collections.<String>emptyList(),"ref");
+    RequestContainer requestContainer = DataFrameUtils.makeAggregateRequest(slice, Collections.<String>emptyList(), -1, "ref");
     ThirdEyeResponse response = cacheRegistry.getQueryCache().getQueryResult(requestContainer.getRequest());
     DataFrame df = DataFrameUtils.evaluateResponse(response, requestContainer);
 

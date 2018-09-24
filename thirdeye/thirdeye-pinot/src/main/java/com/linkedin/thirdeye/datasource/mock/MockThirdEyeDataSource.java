@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -98,7 +99,12 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     this.metricNameMap = new HashMap<>();
 
     // per dataset
-    for (MockDataset dataset : this.datasets.values()) {
+    List<String> sortedDatasets = new ArrayList<>(this.datasets.keySet());
+    Collections.sort(sortedDatasets);
+
+    for (String datasetName : sortedDatasets) {
+      MockDataset dataset = this.datasets.get(datasetName);
+
       Map<String, DataFrame> metricData = new HashMap<>();
 
       List<String> indexes = new ArrayList<>();
@@ -106,8 +112,11 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
       indexes.addAll(dataset.dimensions);
 
       // per metric
-      for (String metric : dataset.metrics.keySet()) {
-        this.metricNameMap.put(metricNameCounter++, metric);
+      List<String> sortedMetrics = new ArrayList<>(dataset.metrics.keySet());
+      Collections.sort(sortedMetrics);
+
+      for (String metric : sortedMetrics) {
+        this.metricNameMap.put(1 + metricNameCounter++, metric);
 
         String[] prefix = new String[] { dataset.name, "metrics", metric };
         Collection<Tuple> tuples = filterTuples(rawData.keySet(), prefix);

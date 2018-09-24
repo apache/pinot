@@ -146,4 +146,12 @@ public class MockThirdEyeDataSourceTest {
 
     Assert.assertEquals(resultDimensions, new HashSet<>(Arrays.asList("chrome", "edge", "firefox", "safari")));
   }
+
+  @Test
+  public void testDeterministicMetricOrder() {
+    Assert.assertEquals(this.dataSource.metricNameMap.get(1L), "purchases");
+    Assert.assertEquals(this.dataSource.metricNameMap.get(2L), "revenue");
+    Assert.assertEquals(this.dataSource.metricNameMap.get(3L), "adImpressions");
+    Assert.assertEquals(this.dataSource.metricNameMap.get(4L), "pageViews");
+  }
 }
