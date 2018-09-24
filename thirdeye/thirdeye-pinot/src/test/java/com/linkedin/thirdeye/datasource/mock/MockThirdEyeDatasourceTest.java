@@ -19,7 +19,7 @@ import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
 
 
-public class MockThirdEyeDatasourceTest {
+public class MockThirdEyeDataSourceTest {
   private static final String COL_PURCHASES = "purchases";
   private static final String COL_REVENUE = "revenue";
   private static final String COL_PAGE_VIEWS = "pageViews";
