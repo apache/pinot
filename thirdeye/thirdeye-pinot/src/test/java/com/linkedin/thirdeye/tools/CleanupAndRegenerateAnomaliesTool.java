@@ -174,7 +174,7 @@ public class CleanupAndRegenerateAnomaliesTool {
 
       String response =
           detectionResourceHttpUtils.runBackfillAnomalyFunction(String.valueOf(functionId), monitoringWindowStartTime,
-              monitoringWindowEndTime, forceBackfill);
+              monitoringWindowEndTime, forceBackfill, false);
       LOG.info("Response {}", response);
     }
   }
