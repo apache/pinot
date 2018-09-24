@@ -83,7 +83,6 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -2212,17 +2211,4 @@ public class PinotHelixResourceManager {
   }
    */
 
-public static void main(String[] args) {
-
-  PinotHelixResourceManager mgr = new PinotHelixResourceManager("localhost:12913/pinot-perf", "pinot", "" ,"" );
-  try {
-    mgr.start();
-    RebalanceSegmentStrategyFactory.createInstance(mgr._helixZkManager);
-    Configuration props = new PropertiesConfiguration();
-    props.setProperty(RebalanceUserConfigConstants.DRYRUN, "true");
-    mgr.rebalanceTable("employerEngagementExtTest", TableType.OFFLINE, new PropertiesConfiguration());
-  } catch (Exception e) {
-      e.printStackTrace();
-  }
-}
 }
