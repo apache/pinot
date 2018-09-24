@@ -85,6 +85,7 @@ public class SegmentCreationJob extends Configured {
     String portString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
 
     _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK, null);
+    LOGGER.info("Default permissions mask is {}", _defaultPermissionsMask);
 
     // For backwards compatibility, we want to allow users to create segments without setting push location parameters
     // in their creation jobs.
@@ -141,10 +142,12 @@ public class SegmentCreationJob extends Configured {
 
     if (_defaultPermissionsMask != null) {
       FsPermission umask = new FsPermission(_defaultPermissionsMask);
-      FsPermission permission = FsPermission.getDefault().applyUMask(umask);
+      FsPermission permission = FsPermission.getDirDefault().applyUMask(umask);
       FileSystem.get(getConf()).setPermission(stagingDir, permission);
     }
-    fs.mkdirs(new Path(_stagingDir + "/input/"));
+    Path stagingDirInputPath = new Path(_stagingDir + "/input/");
+    fs.mkdirs(stagingDirInputPath);
+    LOGGER.info("Staging dir input path is {}", stagingDirInputPath);
 
     if (fs.exists(outputDir)) {
       LOGGER.warn("Found the output folder {}, deleting it", _outputDir);
