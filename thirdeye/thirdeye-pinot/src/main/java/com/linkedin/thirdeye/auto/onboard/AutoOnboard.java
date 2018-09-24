@@ -16,20 +16,21 @@
 
 package com.linkedin.thirdeye.auto.onboard;
 
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
+import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
+
 
 /**
  * This is the abstract parent class for all auto onboard services for various datasources
  */
 public abstract class AutoOnboard {
-  private DataSourceConfig dataSourceConfig;
+  private MetadataSourceConfig metadataSourceConfig;
 
-  public AutoOnboard(DataSourceConfig dataSourceConfig) {
-    this.dataSourceConfig = dataSourceConfig;
+  public AutoOnboard(MetadataSourceConfig metadataSourceConfig) {
+    this.metadataSourceConfig = metadataSourceConfig;
   }
 
-  public DataSourceConfig getDataSourceConfig() {
-    return dataSourceConfig;
+  public MetadataSourceConfig getMetadataSourceConfig() {
+    return metadataSourceConfig;
   }
 
   /**

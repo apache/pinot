@@ -31,10 +31,10 @@ public class DataSources {
   public List<DataSourceConfig> getDataSourceConfigs() {
     return dataSourceConfigs;
   }
+
   public void setDataSourceConfigs(List<DataSourceConfig> dataSourceConfigs) {
     this.dataSourceConfigs = dataSourceConfigs;
   }
-
 
   @Override
   public String toString() {

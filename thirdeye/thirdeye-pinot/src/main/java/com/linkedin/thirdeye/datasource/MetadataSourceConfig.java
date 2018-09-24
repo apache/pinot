@@ -16,22 +16,27 @@
 
 package com.linkedin.thirdeye.datasource;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.lang3.builder.ToStringBuilder;
 
 /**
- * This class defines the config of a single datasource used in thirdeye
- * Eg: PinotThirdeyeDataSource
+ * This class defines the config of a metadata loader used in thirdeye
+ * Eg: UMPMetadataLoader
  */
-public class DataSourceConfig {
+public class MetadataSourceConfig {
 
   private String className;
   private Map<String, Object> properties = new HashMap<>();
-  private List<MetadataSourceConfig> metadataSourceConfigs = new ArrayList<>();
+
+  public MetadataSourceConfig() {
+
+  }
+
+  public MetadataSourceConfig(String className, Map<String, Object> properties) {
+    this.className = className;
+    this.properties = properties;
+  }
 
   public String getClassName() {
     return className;
@@ -47,14 +52,6 @@ public class DataSourceConfig {
 
   public void setProperties(Map<String, Object> properties) {
     this.properties = properties;
-  }
-
-  public List<MetadataSourceConfig> getMetadataSourceConfigs() {
-    return metadataSourceConfigs;
-  }
-
-  public void setMetadataSourceConfigs(List<MetadataSourceConfig> metadataSourceConfigs) {
-    this.metadataSourceConfigs = metadataSourceConfigs;
   }
 
   @Override

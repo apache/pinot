@@ -1,0 +1,16 @@
+dataSourceConfigs:
+  - className: com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource
+    properties:
+        zookeeperUrl: 'dummy-url'
+        clusterName: 'dummy-cluster'
+        controllerConnectionScheme: 'https'
+        controllerHost: 'dummy-host'
+        controllerPort: 99999
+        d2PinotProxyHost: 'dummy-host'
+        d2PinotProxyPort: 9999
+        cacheLoaderClassName: dummy-cache
+    metadataSourceConfigs:
+      - className: com.linkedin.thirdeye.auto.onboard.AutoOnboardClassNotFoundDataSource
+        properties:
+            username: 'username'
+            password: 'password'

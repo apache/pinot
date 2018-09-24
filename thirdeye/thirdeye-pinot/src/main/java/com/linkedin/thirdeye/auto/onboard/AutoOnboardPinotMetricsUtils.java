@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
+import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,10 +62,10 @@ public class AutoOnboardPinotMetricsUtils {
   private CloseableHttpClient pinotControllerClient;
   private HttpHost pinotControllerHost;
 
-  public AutoOnboardPinotMetricsUtils(DataSourceConfig dataSourceConfig)
+  public AutoOnboardPinotMetricsUtils(MetadataSourceConfig metadataSourceConfig)
       throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
     PinotThirdEyeDataSourceConfig pinotThirdeyeDataSourceConfig =
-        PinotThirdEyeDataSourceConfig.createFromDataSourceConfig(dataSourceConfig);
+        PinotThirdEyeDataSourceConfig.createFromMetadataSourceConfig(metadataSourceConfig);
 
     String controllerConnectionScheme = pinotThirdeyeDataSourceConfig.getControllerConnectionScheme();
     if (PinotThirdEyeDataSourceConfig.HTTPS_SCHEME.equals(controllerConnectionScheme)) {
