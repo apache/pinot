@@ -36,5 +36,5 @@ public class JobConfigConstants {
 
   public static final String TABLE_CONFIG = "table.config";
 
-  public static final String DEFAULT_PERMISSIONS = "fs.permissions.umask-mode";
+  public static final String DEFAULT_PERMISSIONS_MASK = "fs.permissions.umask-mode";
 }
