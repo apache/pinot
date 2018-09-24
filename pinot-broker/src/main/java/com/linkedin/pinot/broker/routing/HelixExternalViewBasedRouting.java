@@ -87,7 +87,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     _routingTableBuilderMap = new HashMap<>();
     _helixManager = helixManager;
-    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore);
+    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore, _brokerMetrics);
   }
 
   @Override
@@ -112,7 +112,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     String tableName = tableConfig.getTableName();
 
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig);
-    routingTableBuilder.init(_configuration, tableConfig, _propertyStore);
+    routingTableBuilder.init(_configuration, tableConfig, _propertyStore, _brokerMetrics);
     LOGGER.info("Initialized routingTableBuilder: {} for table {}", routingTableBuilder.getClass().getName(), tableName);
     _routingTableBuilderMap.put(tableName, routingTableBuilder);
 

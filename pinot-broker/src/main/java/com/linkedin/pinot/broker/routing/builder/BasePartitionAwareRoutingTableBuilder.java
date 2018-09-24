@@ -20,6 +20,8 @@ import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -64,14 +66,19 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
   protected Random _random = new Random();
   protected volatile int _numReplicas;
 
+  private BrokerMetrics _brokerMetrics;
+  private String _tableName;
+
   protected void setSegmentToReplicaToServerMap(Map<String, Map<Integer, String>> segmentToReplicaToServerMap) {
     _segmentToReplicaToServerMap = segmentToReplicaToServerMap;
   }
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
     _propertyStore = propertyStore;
 
+    _tableName = tableConfig.getTableName();
+    _brokerMetrics = brokerMetrics;
     // TODO: We need to specify the type of pruners via config instead of hardcoding.
     _pruner = new SegmentZKMetadataPrunerService(new String[]{PARTITION_METADATA_PRUNER});
   }
@@ -100,8 +107,7 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
           if (!replicaIdToServerMap.isEmpty()) {
             serverName = replicaIdToServerMap.values().iterator().next();
           } else {
-            // No server is found for this segment.
-            LOGGER.warn("No server is found for the segment {}.", segmentName);
+            handleNoServingHost(segmentName);
             continue;
           }
         }
@@ -120,5 +126,13 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
   @Override
   public List<Map<String, List<String>>> getRoutingTables() {
     throw new UnsupportedOperationException("Partition aware routing table cannot be pre-computed");
+  }
+
+  protected void handleNoServingHost(String segmentName) {
+
+    LOGGER.error("Found no server hosting segment {} for table {}", segmentName, _tableName);
+    if (_brokerMetrics != null) {
+      _brokerMetrics.addMeteredTableValue(_tableName, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
+    }
   }
 }

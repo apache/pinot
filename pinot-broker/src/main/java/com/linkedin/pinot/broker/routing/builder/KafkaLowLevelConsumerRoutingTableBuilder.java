@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
@@ -41,8 +42,14 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
 
   private int _targetNumServersPerQuery = 8;
 
+  private String _tableName;
+  private BrokerMetrics _brokerMetrics;
+
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+    _tableName = tableConfig.getTableName();
+    _brokerMetrics = brokerMetrics;
+
     // TODO jfim This is a broker-level configuration for now, until we refactor the configuration of the routing table to allow per-table routing settings
     if (configuration.containsKey("realtimeTargetServerCountPerQuery")) {
       final String targetServerCountPerQuery = configuration.getString("realtimeTargetServerCountPerQuery");
@@ -137,6 +144,8 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
 
           if (!validServers.isEmpty()) {
             _segmentToServersMap.put(segmentNameStr, validServers);
+          } else {
+            handleNoServingHost(segmentNameStr, _tableName, _brokerMetrics);
           }
 
           // If this segment is the segment allowed in CONSUMING state, don't process segments after it in that Kafka

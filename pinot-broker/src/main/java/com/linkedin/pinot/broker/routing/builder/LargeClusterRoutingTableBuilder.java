@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,6 +39,8 @@ public class LargeClusterRoutingTableBuilder extends GeneratorBasedRoutingTableB
 
   /** Number of servers to hit for each query (this is a soft limit, not a hard limit) */
   private int _targetNumServersPerQuery = 20;
+  private BrokerMetrics _brokerMetrics;
+  private String _tableName;
 
   @Override
   protected RoutingTableGenerator buildRoutingTableGenerator() {
@@ -64,6 +67,8 @@ public class LargeClusterRoutingTableBuilder extends GeneratorBasedRoutingTableB
         }
         if (!serversForSegment.isEmpty()) {
           _segmentToServersMap.put(segmentName, serversForSegment);
+        } else {
+          handleNoServingHost(segmentName, _tableName, _brokerMetrics);
         }
       }
     }
@@ -75,7 +80,9 @@ public class LargeClusterRoutingTableBuilder extends GeneratorBasedRoutingTableB
   }
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+    _brokerMetrics = brokerMetrics;
+    _tableName = tableConfig.getTableName();
     // TODO jfim This is a broker-level configuration for now, until we refactor the configuration of the routing table to allow per-table routing settings
     if (configuration.containsKey("offlineTargetServerCountPerQuery")) {
       final String targetServerCountPerQuery = configuration.getString("offlineTargetServerCountPerQuery");

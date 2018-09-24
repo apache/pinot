@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,11 +36,13 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
   private static final int DEFAULT_NUM_ROUTING_TABLES = 10;
   private static final String NUM_ROUTING_TABLES_KEY = "numOfRoutingTables";
 
+  private BrokerMetrics _brokerMetrics;
   private int _numRoutingTables = DEFAULT_NUM_ROUTING_TABLES;
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
     _numRoutingTables = configuration.getInt(NUM_ROUTING_TABLES_KEY, DEFAULT_NUM_ROUTING_TABLES);
+    _brokerMetrics = brokerMetrics;
   }
 
   @Override
@@ -67,6 +70,8 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
           // Assign the segment to the server with least segments assigned
           routingTable.get(getServerWithLeastSegmentsAssigned(servers, routingTable)).add(segmentName);
         }
+      } else {
+        handleNoServingHost(tableName, segmentName, _brokerMetrics);
       }
     }
 

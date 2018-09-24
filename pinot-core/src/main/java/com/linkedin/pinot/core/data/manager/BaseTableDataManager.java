@@ -169,7 +169,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
     for (String segmentName : segmentNames) {
       SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
-      if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
+      if (segmentDataManager == null) {
+        handleMissingSegment(segmentName);
+      }
+      else if (segmentDataManager.increaseReferenceCount()) {
         segmentDataManagers.add(segmentDataManager);
       }
     }
@@ -179,11 +182,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public SegmentDataManager acquireSegment(@Nonnull String segmentName) {
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
-    if (segmentDataManager != null && segmentDataManager.increaseReferenceCount()) {
-      return segmentDataManager;
-    } else {
+    if (segmentDataManager == null) {
+      handleMissingSegment(segmentName);
       return null;
     }
+    return segmentDataManager.increaseReferenceCount() ? segmentDataManager : null;
+  }
+
+  private void handleMissingSegment(String segmentName) {
+    // could not find segment
+    LOGGER.error("Could not find segment " + segmentName + " for table " + _tableNameWithType);
+    _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.MISSING_SEGMENT_COUNT, 1);
   }
 
   @Override

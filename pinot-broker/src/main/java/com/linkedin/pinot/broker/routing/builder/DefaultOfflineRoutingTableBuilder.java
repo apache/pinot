@@ -17,6 +17,7 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -46,7 +47,7 @@ public class DefaultOfflineRoutingTableBuilder extends BaseRoutingTableBuilder {
   private int _minReplicaCountForLargeCluster = 4;
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
     _largeClusterRoutingTableBuilder = new LargeClusterRoutingTableBuilder();
     _smallClusterRoutingTableBuilder = new BalancedRandomRoutingTableBuilder();
     if (configuration.containsKey("minServerCountForLargeCluster")) {
@@ -77,8 +78,8 @@ public class DefaultOfflineRoutingTableBuilder extends BaseRoutingTableBuilder {
       LOGGER.info("Using default value for large cluster min replica count of {}", _minReplicaCountForLargeCluster);
     }
 
-    _largeClusterRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
-    _smallClusterRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
+    _largeClusterRoutingTableBuilder.init(configuration, tableConfig, propertyStore, brokerMetrics);
+    _smallClusterRoutingTableBuilder.init(configuration, tableConfig, propertyStore, brokerMetrics);
   }
 
   @Override
