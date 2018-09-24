@@ -274,11 +274,9 @@ export default Component.extend({
         const cutoff = this._sum(all.map(v => sizeMetricCurrent[n][v])) * ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION;
         let sum = this._sum(head.map(v => sizeMetricCurrent[n][v]));
         let i = range[0];
-        while (i < range[1] && sum < cutoff) {
-          if (all[i] !== ROOTCAUSE_VALUE_OTHER) {
-            sum += sizeMetricCurrent[n][all[i]];
-            visible.push(all[i]);
-          }
+        while (i < range[1] && sum < cutoff && all[i] !== ROOTCAUSE_VALUE_OTHER) {
+          sum += sizeMetricCurrent[n][all[i]];
+          visible.push(all[i]);
           i++;
         }
 
@@ -421,7 +419,14 @@ export default Component.extend({
     if (!dimNameObj) {
       return [];
     }
-    return Object.keys(dimNameObj).map(v => [dimNameObj[v], v]).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(t => t[1]);
+    return Object.keys(dimNameObj)
+      .map(v => [dimNameObj[v], v])
+      .sort((a, b) => {
+        if (a[1] === ROOTCAUSE_VALUE_OTHER) { return parseFloat("inf"); }
+        if (b[1] === ROOTCAUSE_VALUE_OTHER) { return parseFloat("-inf"); }
+        return parseFloat(a[0]) - parseFloat(b[0]);
+      })
+      .map(t => t[1]);
   },
 
   _sum(arr) {
