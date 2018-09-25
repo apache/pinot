@@ -111,8 +111,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       List<InstanceConfig> instanceConfigList) {
     String tableName = tableConfig.getTableName();
 
-    RoutingTableBuilder routingTableBuilder = _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig);
-    routingTableBuilder.init(_configuration, tableConfig, _propertyStore, _brokerMetrics);
+    RoutingTableBuilder routingTableBuilder = _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig, _brokerMetrics);
     LOGGER.info("Initialized routingTableBuilder: {} for table {}", routingTableBuilder.getClass().getName(), tableName);
     _routingTableBuilderMap.put(tableName, routingTableBuilder);
 

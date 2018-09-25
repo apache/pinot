@@ -48,6 +48,7 @@ public class DefaultOfflineRoutingTableBuilder extends BaseRoutingTableBuilder {
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+
     _largeClusterRoutingTableBuilder = new LargeClusterRoutingTableBuilder();
     _smallClusterRoutingTableBuilder = new BalancedRandomRoutingTableBuilder();
     if (configuration.containsKey("minServerCountForLargeCluster")) {

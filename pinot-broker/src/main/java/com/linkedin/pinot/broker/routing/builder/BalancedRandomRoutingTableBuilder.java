@@ -41,8 +41,8 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+    super.init(configuration, tableConfig, propertyStore, brokerMetrics);
     _numRoutingTables = configuration.getInt(NUM_ROUTING_TABLES_KEY, DEFAULT_NUM_ROUTING_TABLES);
-    _brokerMetrics = brokerMetrics;
   }
 
   @Override
@@ -71,7 +71,7 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
           routingTable.get(getServerWithLeastSegmentsAssigned(servers, routingTable)).add(segmentName);
         }
       } else {
-        handleNoServingHost(tableName, segmentName, _brokerMetrics);
+        handleNoServingHost(segmentName);
       }
     }
 

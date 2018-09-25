@@ -25,6 +25,7 @@ import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTa
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
@@ -57,7 +58,7 @@ public class RoutingTableBuilderFactory {
     _propertyStore = propertyStore;
   }
 
-  public RoutingTableBuilder createRoutingTableBuilder(TableConfig tableConfig) {
+  public RoutingTableBuilder createRoutingTableBuilder(TableConfig tableConfig, BrokerMetrics brokerMetrics) {
     String builderName = null;
     if (tableConfig.getRoutingConfig() != null) {
       builderName = tableConfig.getRoutingConfig().getRoutingTableBuilderName();
@@ -134,6 +135,7 @@ public class RoutingTableBuilderFactory {
         }
         break;
     }
+    builder.init(_configuration, tableConfig, _propertyStore, brokerMetrics);
     return builder;
   }
 }
