@@ -394,35 +394,41 @@ public class HelixHelper {
     updateIdealState(helixManager, tableNameWithType, updater, DEFAULT_RETRY_POLICY);
   }
 
-  public static List<String> getEnabledInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName,
-      String instanceTag) {
-    List<String> instances = helixAdmin.getInstancesInCluster(helixClusterName);
-    List<String> enabledInstances = new ArrayList<>();
-    for (String instance : instances) {
-      try {
-        InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instance);
-        if (instanceConfig.containsTag(instanceTag) && instanceConfig.getInstanceEnabled()) {
-          enabledInstances.add(instance);
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while fetching instance config for instance: {}", instance, e);
+  /**
+   * Helper method which fetches all instance configs and returns the instance names which contain the instance tag and are enabled
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  public static List<String> getEnabledInstancesWithTag(final HelixManager helixManager, String instanceTag) {
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    List<InstanceConfig> instanceConfigs =
+        helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
+
+    List<String> enabledInstancesWithTag = new ArrayList<>();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      if (instanceConfig.getInstanceEnabled() && instanceConfig.containsTag(instanceTag)) {
+        enabledInstancesWithTag.add(instanceConfig.getInstanceName());
       }
     }
-    return enabledInstances;
+    return enabledInstancesWithTag;
   }
 
-  public static List<String> getInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName,
-      String instanceTag) {
-    List<String> instances = helixAdmin.getInstancesInCluster(helixClusterName);
+  /**
+   * Helper method which fetches all instance configs and returns the instance names which contain the instance tag
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  public static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag) {
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    List<InstanceConfig> instanceConfigs =
+        helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
+
     List<String> instancesWithTag = new ArrayList<>();
-    for (String instance : instances) {
-      try {
-        InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instance);
-        if (instanceConfig.containsTag(instanceTag)) {
-          instancesWithTag.add(instance);
-        }
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while fetching instance config for instance: {}", instance, e);
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      if (instanceConfig.containsTag(instanceTag)) {
+        instancesWithTag.add(instanceConfig.getInstanceName());
       }
     }
     return instancesWithTag;

@@ -169,9 +169,7 @@ public class StreamPartitionAssignmentGenerator {
   protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
     String consumingServerTag = realtimeTagConfig.getConsumingServerTag();
-    List<String> consumingTaggedInstances =
-        HelixHelper.getInstancesWithTag(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
-            consumingServerTag);
+    List<String> consumingTaggedInstances = HelixHelper.getInstancesWithTag(_helixManager, consumingServerTag);
     if (consumingTaggedInstances.isEmpty()) {
       throw new IllegalStateException("No instances found with tag " + consumingServerTag);
     }
