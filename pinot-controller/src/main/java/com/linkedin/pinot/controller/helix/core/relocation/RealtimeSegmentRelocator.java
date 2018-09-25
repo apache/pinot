@@ -142,13 +142,13 @@ public class RealtimeSegmentRelocator {
     final String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
 
     List<String> consumingServers =
-        helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeTagConfig.getConsumingServerTag());
+        HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, realtimeTagConfig.getConsumingServerTag());
     if (consumingServers.isEmpty()) {
       throw new IllegalStateException(
           "Found no realtime consuming servers with tag " + realtimeTagConfig.getConsumingServerTag());
     }
     List<String> completedServers =
-        helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeTagConfig.getCompletedServerTag());
+        HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, realtimeTagConfig.getCompletedServerTag());
     if (completedServers.isEmpty()) {
       throw new IllegalStateException(
           "Found no realtime completed servers with tag " + realtimeTagConfig.getCompletedServerTag());

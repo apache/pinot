@@ -161,7 +161,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableName, partitions, states);
 
     String serverTenant = TableNameBuilder.forType(tableType).tableNameWithType(tenantName);
-    List<String> instancesInClusterWithTag = helixAdmin.getInstancesInClusterWithTag(clusterName, serverTenant);
+    List<String> instancesInClusterWithTag = HelixHelper.getInstancesWithTag(helixAdmin, clusterName, serverTenant);
     List<String> enabledInstancesWithTag =
         HelixHelper.getEnabledInstancesWithTag(helixAdmin, clusterName, serverTenant);
     LOGGER.info("Current nodes: {}", currentHosts);

@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -168,8 +169,9 @@ public class StreamPartitionAssignmentGenerator {
   protected List<String> getConsumingTaggedInstances(TableConfig tableConfig) {
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
     String consumingServerTag = realtimeTagConfig.getConsumingServerTag();
-    List<String> consumingTaggedInstances = _helixManager.getClusterManagmentTool()
-        .getInstancesInClusterWithTag(_helixManager.getClusterName(), consumingServerTag);
+    List<String> consumingTaggedInstances =
+        HelixHelper.getInstancesWithTag(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
+            consumingServerTag);
     if (consumingTaggedInstances.isEmpty()) {
       throw new IllegalStateException("No instances found with tag " + consumingServerTag);
     }

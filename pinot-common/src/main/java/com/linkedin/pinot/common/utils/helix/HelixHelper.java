@@ -410,4 +410,22 @@ public class HelixHelper {
     }
     return enabledInstances;
   }
+
+  public static List<String> getInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName,
+      String instanceTag) {
+    List<String> instances = helixAdmin.getInstancesInCluster(helixClusterName);
+    List<String> instancesWithTag = new ArrayList<>();
+    for (String instance : instances) {
+      try {
+        InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instance);
+        if (instanceConfig.containsTag(instanceTag)) {
+          instancesWithTag.add(instance);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while fetching instance config for instance: {}", instance, e);
+      }
+    }
+    return instancesWithTag;
+  }
+
 }

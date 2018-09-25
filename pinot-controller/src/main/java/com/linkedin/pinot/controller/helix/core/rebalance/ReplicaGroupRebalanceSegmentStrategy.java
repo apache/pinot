@@ -162,7 +162,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
 
     OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
     List<String> serverInstances =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, offlineTagConfig.getOfflineServerTag());
+        HelixHelper.getInstancesWithTag(_helixAdmin, _helixClusterName, offlineTagConfig.getOfflineServerTag());
 
     // Perform the basic validation
     if (targetNumReplicaGroup <= 0 || targetNumInstancesPerPartition <= 0

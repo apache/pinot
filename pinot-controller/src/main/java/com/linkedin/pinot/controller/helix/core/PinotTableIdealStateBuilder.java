@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
@@ -103,8 +104,8 @@ public class PinotTableIdealStateBuilder {
       TableConfig realtimeTableConfig, HelixAdmin helixAdmin, String helixClusterName,
       ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig);
-    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
-        realtimeTagConfig.getConsumingServerTag());
+    final List<String> realtimeInstances =
+        HelixHelper.getInstancesWithTag(helixAdmin, helixClusterName, realtimeTagConfig.getConsumingServerTag());
     IdealState idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, 1);
     if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
       throw new RuntimeException(
