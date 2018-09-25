@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
@@ -46,7 +47,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
     Random random = new Random();
 
     KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
-    routingTableBuilder.init(new BaseConfiguration(), null, null);
+    routingTableBuilder.init(new BaseConfiguration(), new TableConfig(), null, null);
 
     long totalNanos = 0L;
 
@@ -154,7 +155,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
     final int CONSUMING_SEGMENT_COUNT = SEGMENT_COUNT - ONLINE_SEGMENT_COUNT;
 
     KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
-    routingTableBuilder.init(new BaseConfiguration(), null, null);
+    routingTableBuilder.init(new BaseConfiguration(), new TableConfig(), null, null);
 
     List<SegmentName> segmentNames = new ArrayList<SegmentName>();
     for(int i = 0; i < SEGMENT_COUNT; ++i) {
