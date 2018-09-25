@@ -1,15 +1,17 @@
 /**
  * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
- * in compliance with the License. You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software distributed under the License
- * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
- * or implied. See the License for the specific language governing permissions and limitations under
- * the License.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package com.linkedin.pinot.broker.routing;
 
@@ -48,6 +50,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /*
  * TODO
  * Would be better to not have the external view based routing not aware of the fact that there are HLC and LLC
@@ -61,8 +64,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private final Map<String, RoutingTableBuilder> _routingTableBuilderMap;
 
   private final Map<String, Integer> _lastKnownExternalViewVersionMap = new ConcurrentHashMap<>();
-  private final Map<String, Map<String, InstanceConfig>> _lastKnownInstanceConfigsForTable =
-      new ConcurrentHashMap<>();
+  private final Map<String, Map<String, InstanceConfig>> _lastKnownInstanceConfigsForTable = new ConcurrentHashMap<>();
   private final Map<String, InstanceConfig> _lastKnownInstanceConfigs = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> _tablesForInstance = new ConcurrentHashMap<>();
 
@@ -78,8 +80,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private RoutingTableBuilderFactory _routingTableBuilderFactory;
 
-  public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      HelixManager helixManager, Configuration configuration) {
+  public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore, HelixManager helixManager,
+      Configuration configuration) {
     _propertyStore = propertyStore;
     _configuration = configuration;
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
@@ -88,13 +90,15 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore);
   }
 
-  @Override public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+  @Override
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
     String tableName = request.getTableName();
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
     return routingTableBuilder.getRoutingTable(request);
   }
 
-  @Override public boolean routingTableExists(String tableName) {
+  @Override
+  public boolean routingTableExists(String tableName) {
     return _routingTableBuilderMap.containsKey(tableName);
   }
 
@@ -108,8 +112,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
     RoutingTableBuilder routingTableBuilder =
         _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig, _brokerMetrics);
-    LOGGER.info("Initialized routingTableBuilder: {} for table {}",
-        routingTableBuilder.getClass().getName(), tableName);
+    LOGGER.info("Initialized routingTableBuilder: {} for table {}", routingTableBuilder.getClass().getName(),
+        tableName);
     _routingTableBuilderMap.put(tableName, routingTableBuilder);
 
     // Build the routing table
@@ -131,8 +135,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
     // Do we know about this table?
     if (!_lastKnownExternalViewVersionMap.containsKey(tableName)) {
-      LOGGER.info("Routing table for table {} requires rebuild due to it being newly added",
-          tableName);
+      LOGGER.info("Routing table for table {} requires rebuild due to it being newly added", tableName);
       return true;
     }
 
@@ -149,12 +152,9 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     }
 
     // Check if there are relevant instance config changes
-    Map<String, InstanceConfig> lastKnownInstanceConfigs =
-        _lastKnownInstanceConfigsForTable.get(tableName);
+    Map<String, InstanceConfig> lastKnownInstanceConfigs = _lastKnownInstanceConfigsForTable.get(tableName);
     if (lastKnownInstanceConfigs == null || lastKnownInstanceConfigs.isEmpty()) {
-      LOGGER.info(
-          "Routing table for table {} requires rebuild due to empty/null previous instance configs",
-          tableName);
+      LOGGER.info("Routing table for table {} requires rebuild due to empty/null previous instance configs", tableName);
       return true;
     }
 
@@ -182,8 +182,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       InstanceConfig currentInstanceConfig = currentRelevantInstanceConfigs.get(instanceName);
 
       // If it's the same znode, don't bother comparing the contents of the instance configs
-      if (previousInstanceConfig.getRecord().getVersion() == currentInstanceConfig.getRecord()
-          .getVersion()) {
+      if (previousInstanceConfig.getRecord().getVersion() == currentInstanceConfig.getRecord().getVersion()) {
         continue;
       }
 
@@ -191,13 +190,13 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       boolean wasEnabled = previousInstanceConfig.getInstanceEnabled();
       boolean isEnabled = currentInstanceConfig.getInstanceEnabled();
 
-      String wasShuttingDown = previousInstanceConfig.getRecord()
-          .getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
-      String isShuttingDown = currentInstanceConfig.getRecord()
-          .getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
+      String wasShuttingDown =
+          previousInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
+      String isShuttingDown =
+          currentInstanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS);
 
-      boolean instancesChanged = !EqualityUtils.isEqual(wasEnabled, isEnabled) || !EqualityUtils
-          .isEqual(wasShuttingDown, isShuttingDown);
+      boolean instancesChanged =
+          !EqualityUtils.isEqual(wasEnabled, isEnabled) || !EqualityUtils.isEqual(wasShuttingDown, isShuttingDown);
 
       if (instancesChanged) {
         LOGGER.info(
@@ -208,8 +207,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         // Update the instance config in our last known instance config, since it hasn't changed
         _lastKnownInstanceConfigs.put(instanceName, currentInstanceConfig);
         for (String tableForInstance : _tablesForInstance.get(instanceName)) {
-          _lastKnownInstanceConfigsForTable.get(tableForInstance)
-              .put(instanceName, currentInstanceConfig);
+          _lastKnownInstanceConfigsForTable.get(tableForInstance).put(instanceName, currentInstanceConfig);
         }
       }
     }
@@ -230,22 +228,18 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       //TODO: warn
       return;
     }
-    CommonConstants.Helix.TableType tableType =
-        TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
 
-    LOGGER.info("Trying to compute routing table for table {} using {}", tableNameWithType,
-        routingTableBuilder);
+    LOGGER.info("Trying to compute routing table for table {} using {}", tableNameWithType, routingTableBuilder);
     long startTimeMillis = System.currentTimeMillis();
 
     try {
       Map<String, InstanceConfig> relevantInstanceConfigs = new HashMap<>();
 
-      routingTableBuilder
-          .computeRoutingTableFromExternalView(tableNameWithType, externalView, instanceConfigs);
+      routingTableBuilder.computeRoutingTableFromExternalView(tableNameWithType, externalView, instanceConfigs);
 
       // Keep track of the instance configs that are used in that routing table
-      updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs,
-          externalView);
+      updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs, externalView);
 
       // Save the instance configs used so that we can avoid unnecessary routing table updates later
       _lastKnownInstanceConfigsForTable.put(tableNameWithType, relevantInstanceConfigs);
@@ -274,8 +268,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         tablesForCurrentInstance.add(tableNameWithType);
       }
     } catch (Exception e) {
-      _brokerMetrics
-          .addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_REBUILD_FAILURES, 1L);
+      _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.ROUTING_TABLE_REBUILD_FAILURES, 1L);
       LOGGER.error("Failed to compute/update the routing table for {}", tableNameWithType, e);
 
       // Mark the routing table as needing a rebuild
@@ -292,8 +285,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
       if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
         // Does a realtime table exist?
-        String realtimeTableName = TableNameBuilder.REALTIME
-            .tableNameWithType(TableNameBuilder.extractRawTableName(tableNameWithType));
+        String realtimeTableName =
+            TableNameBuilder.REALTIME.tableNameWithType(TableNameBuilder.extractRawTableName(tableNameWithType));
         if (_routingTableBuilderMap.containsKey(realtimeTableName)) {
           tableForTimeBoundaryUpdate = tableNameWithType;
           externalViewForTimeBoundaryUpdate = externalView;
@@ -302,8 +295,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
       if (tableType == CommonConstants.Helix.TableType.REALTIME) {
         // Does an offline table exist?
-        String offlineTableName = TableNameBuilder.OFFLINE
-            .tableNameWithType(TableNameBuilder.extractRawTableName(tableNameWithType));
+        String offlineTableName =
+            TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableNameWithType));
         if (_routingTableBuilderMap.containsKey(offlineTableName)) {
           // Is there no time boundary?
           if (_timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName) == null) {
@@ -325,12 +318,10 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     long updateTime = System.currentTimeMillis() - startTimeMillis;
 
     if (_brokerMetrics != null) {
-      _brokerMetrics
-          .addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTime, TimeUnit.MILLISECONDS);
+      _brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_TIME, updateTime, TimeUnit.MILLISECONDS);
     }
 
-    LOGGER.info("Routing table update for table {} completed in {} ms", tableNameWithType,
-        updateTime);
+    LOGGER.info("Routing table update for table {} completed in {} ms", tableNameWithType, updateTime);
   }
 
   protected void updateTimeBoundary(String tableName, ExternalView externalView) {
@@ -347,9 +338,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         _helixManager.getClusterName(), table);
   }
 
-  private void updateInstanceConfigsMapFromExternalView(
-      Map<String, InstanceConfig> relevantInstanceConfigs, List<InstanceConfig> instanceConfigs,
-      ExternalView externalView) {
+  private void updateInstanceConfigsMapFromExternalView(Map<String, InstanceConfig> relevantInstanceConfigs,
+      List<InstanceConfig> instanceConfigs, ExternalView externalView) {
     Set<String> relevantInstanceNames = new HashSet<>();
 
     // Gather all the instance names contained in the external view
@@ -383,7 +373,6 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
           iterator.remove();
         }
       }
-
     }
   }
 
@@ -409,8 +398,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
     // Get znode stats for all tables that we're serving
     long statStartTime = System.currentTimeMillis();
-    Stat[] externalViewStats = helixDataAccessor.getBaseDataAccessor()
-        .getStats(externalViewPaths, AccessOption.PERSISTENT);
+    Stat[] externalViewStats =
+        helixDataAccessor.getBaseDataAccessor().getStats(externalViewPaths, AccessOption.PERSISTENT);
     long statEndTime = System.currentTimeMillis();
 
     // Make a list of external views that changed
@@ -437,16 +426,14 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     if (!tablesThatChanged.isEmpty()) {
       // Fetch instance configs
       long icFetchStart = System.currentTimeMillis();
-      List<InstanceConfig> instanceConfigs =
-          helixDataAccessor.getChildValues(propertyKeyBuilder.instanceConfigs());
+      List<InstanceConfig> instanceConfigs = helixDataAccessor.getChildValues(propertyKeyBuilder.instanceConfigs());
       long icFetchEnd = System.currentTimeMillis();
       icFetchTime = icFetchEnd - icFetchStart;
 
       for (String tableThatChanged : tablesThatChanged) {
         // We ignore the external views given by Helix on external view change and fetch the latest version as our
         // version of Helix (0.6.5) does not batch external view change messages.
-        ExternalView externalView =
-            helixDataAccessor.getProperty(propertyKeyBuilder.externalView(tableThatChanged));
+        ExternalView externalView = helixDataAccessor.getProperty(propertyKeyBuilder.externalView(tableThatChanged));
 
         buildRoutingTable(tableThatChanged, externalView, instanceConfigs);
       }
@@ -456,9 +443,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     long endTime = System.currentTimeMillis();
     LOGGER.info(
         "Processed external view change in {} ms (stat {} ms, EV check {} ms, IC fetch {} ms, rebuild {} ms), routing tables rebuilt for tables {}, {} / {} routing tables rebuilt",
-        (endTime - startTime), (statEndTime - statStartTime), (evCheckEndTime - evCheckStartTime),
-        icFetchTime, (rebuildEndTime - rebuildStartTime), tablesThatChanged,
-        tablesThatChanged.size(), tablesServed.size());
+        (endTime - startTime), (statEndTime - statStartTime), (evCheckEndTime - evCheckStartTime), icFetchTime,
+        (rebuildEndTime - rebuildStartTime), tablesThatChanged, tablesThatChanged.size(), tablesServed.size());
   }
 
   public void processInstanceConfigChange() {
@@ -494,8 +480,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       if (instanceConfigStat != null) {
         String instanceName = instancesUsed.get(i);
         int currentInstanceConfigVersion = instanceConfigStat.getVersion();
-        int lastKnownInstanceConfigVersion =
-            _lastKnownInstanceConfigs.get(instanceName).getRecord().getVersion();
+        int lastKnownInstanceConfigVersion = _lastKnownInstanceConfigs.get(instanceName).getRecord().getVersion();
 
         if (currentInstanceConfigVersion != lastKnownInstanceConfigVersion) {
           instancesThatChanged.add(instanceName);
@@ -519,8 +504,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     int routingTablesRebuiltCount = 0;
     if (!affectedTables.isEmpty()) {
       long icFetchStart = System.currentTimeMillis();
-      List<InstanceConfig> instanceConfigs =
-          helixDataAccessor.getChildValues(propertyKeyBuilder.instanceConfigs());
+      List<InstanceConfig> instanceConfigs = helixDataAccessor.getChildValues(propertyKeyBuilder.instanceConfigs());
       // Helix does not set the version field, we need to set it explicitly
       for (InstanceConfig instanceConfig : instanceConfigs) {
         Stat stat = instanceConfigStatMap.get(instanceConfig.getInstanceName());
@@ -533,8 +517,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
       for (String tableName : affectedTables) {
         long evFetchStart = System.currentTimeMillis();
-        ExternalView externalView =
-            helixDataAccessor.getProperty(propertyKeyBuilder.externalView(tableName));
+        ExternalView externalView = helixDataAccessor.getProperty(propertyKeyBuilder.externalView(tableName));
         long evFetchEnd = System.currentTimeMillis();
         evFetchTime += evFetchEnd - evFetchStart;
 
@@ -557,16 +540,16 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
     LOGGER.info(
         "Processed instance config change in {} ms (stat {} ms, IC check {} ms, IC fetch {} ms, EV fetch {} ms, rebuild check {} ms, rebuild {} ms), {} / {} routing tables rebuilt",
-        (endTime - startTime), (statFetchEnd - statFetchStart),
-        (icConfigCheckEnd - icConfigCheckStart), icFetchTime, evFetchTime, rebuildCheckTime,
-        buildTime, routingTablesRebuiltCount, _lastKnownExternalViewVersionMap.size());
+        (endTime - startTime), (statFetchEnd - statFetchStart), (icConfigCheckEnd - icConfigCheckStart), icFetchTime,
+        evFetchTime, rebuildCheckTime, buildTime, routingTablesRebuiltCount, _lastKnownExternalViewVersionMap.size());
   }
 
   public TimeBoundaryService getTimeBoundaryService() {
     return _timeBoundaryService;
   }
 
-  @Override public String dumpSnapshot(String tableName) throws Exception {
+  @Override
+  public String dumpSnapshot(String tableName) throws Exception {
     JSONObject ret = new JSONObject();
     JSONArray routingTableSnapshot = new JSONArray();
 
