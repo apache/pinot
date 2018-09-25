@@ -25,7 +25,6 @@ import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTa
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
@@ -43,8 +42,6 @@ public class RoutingTableBuilderFactory {
 
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  private BrokerMetrics _brokerMetrics;
-
   enum RoutingTableBuilderName {
     DefaultOffline,
     DefaultRealtime,
@@ -55,10 +52,9 @@ public class RoutingTableBuilderFactory {
     PartitionAwareRealtime
   }
 
-  public RoutingTableBuilderFactory(Configuration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public RoutingTableBuilderFactory(Configuration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _configuration = configuration;
     _propertyStore = propertyStore;
-    _brokerMetrics = brokerMetrics;
   }
 
   public RoutingTableBuilder createRoutingTableBuilder(TableConfig tableConfig) {
@@ -138,7 +134,6 @@ public class RoutingTableBuilderFactory {
         }
         break;
     }
-    builder.init(_configuration, tableConfig, _propertyStore, _brokerMetrics);
     return builder;
   }
 }

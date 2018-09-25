@@ -87,7 +87,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     _routingTableBuilderMap = new HashMap<>();
     _helixManager = helixManager;
-    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore, _brokerMetrics);
+    _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore);
   }
 
   @Override
