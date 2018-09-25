@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
@@ -33,12 +34,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.json.JSONException;
 import org.testng.Assert;
@@ -50,13 +50,34 @@ import static org.mockito.Mockito.*;
 
 public class DefaultRebalanceStrategyTest {
 
-  private HelixManager mockHelixManager = mock(HelixManager.class);
-  private HelixAdmin mockHelixAdmin = mock(HelixAdmin.class);
-  private InstanceConfig mockInstanceConfig = mock(InstanceConfig.class);
+  private class TestDefaultRebalanceStrategy extends DefaultRebalanceSegmentStrategy {
 
+    private Map<String, List<String>> tagToInstances;
+
+    public TestDefaultRebalanceStrategy(HelixManager helixManager) {
+      super(helixManager);
+      tagToInstances = new HashedMap();
+    }
+
+    void setTagToInstances(String tag, List<String> instances) {
+      tagToInstances.put(tag, instances);
+    }
+
+    @Override
+    protected List<String> getInstancesWithTag(String tag) {
+      return tagToInstances.get(tag);
+    }
+
+    @Override
+    protected List<String> getEnabledInstancesWithTag(String tag) {
+      return tagToInstances.get(tag);
+    }
+  }
+
+  private HelixManager _mockHelixManager;
   private String[] serverNames;
   private String[] consumingServerNames;
-  private DefaultRebalanceSegmentStrategy _rebalanceSegmentsStrategy;
+  private TestDefaultRebalanceStrategy _rebalanceSegmentsStrategy;
 
   private List<String> getInstanceList(final int nServers) {
     Assert.assertTrue(nServers <= serverNames.length);
@@ -123,12 +144,8 @@ public class DefaultRebalanceStrategyTest {
 
   @BeforeClass
   public void setUp() throws Exception {
-    when(mockInstanceConfig.containsTag(anyString())).thenReturn(true);
-    when(mockInstanceConfig.getInstanceEnabled()).thenReturn(true);
-    when(mockHelixAdmin.getInstanceConfig(anyString(), anyString())).thenReturn(mockInstanceConfig);
-    when(mockHelixManager.getClusterManagmentTool()).thenReturn(mockHelixAdmin);
-    when(mockHelixManager.getClusterName()).thenReturn("mockClusterName");
-    _rebalanceSegmentsStrategy = new DefaultRebalanceSegmentStrategy(mockHelixManager);
+    _mockHelixManager = mock(HelixManager.class);
+    _rebalanceSegmentsStrategy = new TestDefaultRebalanceStrategy(_mockHelixManager);
 
     final int maxInstances = 20;
     serverNames = new String[maxInstances];
@@ -268,9 +285,10 @@ public class DefaultRebalanceStrategyTest {
     int nReplicas = 2;
     int nSegments = 5;
     int nInstances = 6;
+    String serverTenant = "aServerTenant";
+    String offlineServerTag = TagNameUtils.getOfflineTagForTenant(serverTenant);
     List<String> instances = getInstanceList(nInstances);
-    when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
-    when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
+    _rebalanceSegmentsStrategy.setTagToInstances(offlineServerTag, instances);
 
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(offlineTableName);
     customModeIdealStateBuilder.setStateModel(
@@ -291,15 +309,14 @@ public class DefaultRebalanceStrategyTest {
 
     // rebalance with no change
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(offlineTableName)
-        .setNumReplicas(targetNumReplicas)
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
         .build();
     rebalancedIdealState =
         testRebalance(idealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances, false);
 
     // increase i (i > n*r)
     instances = getInstanceList(12);
-    when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
-    when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
+    _rebalanceSegmentsStrategy.setTagToInstances(offlineServerTag, instances);
     rebalancedIdealState =
         testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
             true);
@@ -318,16 +335,14 @@ public class DefaultRebalanceStrategyTest {
     String serverToRemove = instances.get(0);
     instances = getInstanceList(12);
     instances.remove(serverToRemove);
-    when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
-    when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
+    _rebalanceSegmentsStrategy.setTagToInstances(offlineServerTag, instances);
     rebalancedIdealState =
         testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
             false);
 
     // remove used servers
     instances = getInstanceList(8);
-    when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
-    when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
+    _rebalanceSegmentsStrategy.setTagToInstances(offlineServerTag, instances);
     rebalancedIdealState =
         testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
             true);
@@ -335,8 +350,7 @@ public class DefaultRebalanceStrategyTest {
     // replace servers
     String removedServer = instances.remove(0);
     instances.add(removedServer + "_replaced_server");
-    when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(instances);
-    when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(instances);
+    _rebalanceSegmentsStrategy.setTagToInstances(offlineServerTag, instances);
     rebalancedIdealState =
         testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
             true);
@@ -344,7 +358,7 @@ public class DefaultRebalanceStrategyTest {
     // reduce targetNumReplicas
     targetNumReplicas = 1;
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(offlineTableName)
-        .setNumReplicas(targetNumReplicas)
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
         .build();
     rebalancedIdealState =
         testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
@@ -353,7 +367,7 @@ public class DefaultRebalanceStrategyTest {
     // increase targetNumReplicas
     targetNumReplicas = 3;
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(offlineTableName)
-        .setNumReplicas(targetNumReplicas)
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
         .build();
     testRebalance(rebalancedIdealState, tableConfig, rebalanceUserConfig, targetNumReplicas, nSegments, instances,
         true);
@@ -373,10 +387,11 @@ public class DefaultRebalanceStrategyTest {
     int nCompletedSegments = nPartitions * nIterationsCompleted;
     int nCompletedInstances = 6;
     int nConsumingInstances = 3;
+    String serverTenant = "aServerTenant";
+    String realtimeTagForTenant = TagNameUtils.getRealtimeTagForTenant(serverTenant);
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(realtimeTableName);
     List<String> completedInstances = getInstanceList(nCompletedInstances);
-    when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(completedInstances);
-    when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(completedInstances);
+  _rebalanceSegmentsStrategy.setTagToInstances(realtimeTagForTenant, completedInstances);
 
     List<String> consumingInstances = getConsumingInstanceList(nConsumingInstances);
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeTableName);
@@ -400,7 +415,7 @@ public class DefaultRebalanceStrategyTest {
     int targetNumReplicas = nReplicas;
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName)
         .setLLC(true)
-        .setNumReplicas(targetNumReplicas)
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
         .build();
 
     // no change
@@ -415,7 +430,7 @@ public class DefaultRebalanceStrategyTest {
     }
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName)
         .setLLC(true)
-        .setNumReplicas(targetNumReplicas)
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
         .build();
     rebalancedIdealState =
         testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
@@ -426,7 +441,7 @@ public class DefaultRebalanceStrategyTest {
     setPartitionAssignment(newPartitionAssignment, targetNumReplicas, consumingInstances);
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(realtimeTableName)
         .setLLC(true)
-        .setNumReplicas(targetNumReplicas)
+        .setNumReplicas(targetNumReplicas).setServerTenant(serverTenant)
         .build();
     rebalancedIdealState =
         testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
@@ -435,8 +450,7 @@ public class DefaultRebalanceStrategyTest {
     // remove completed server
     nCompletedInstances = 4;
     completedInstances = getInstanceList(nCompletedInstances);
-    when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(completedInstances);
-    when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(completedInstances);
+    _rebalanceSegmentsStrategy.setTagToInstances(realtimeTagForTenant, completedInstances);
     rebalancedIdealState =
         testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
@@ -444,8 +458,7 @@ public class DefaultRebalanceStrategyTest {
     // add completed server
     nCompletedInstances = 6;
     completedInstances = getInstanceList(nCompletedInstances);
-    when(mockHelixAdmin.getInstancesInClusterWithTag(anyString(), anyString())).thenReturn(completedInstances);
-    when(mockHelixAdmin.getInstancesInCluster(anyString())).thenReturn(completedInstances);
+    _rebalanceSegmentsStrategy.setTagToInstances(realtimeTagForTenant, completedInstances);
     rebalancedIdealState =
         testRebalanceRealtime(rebalancedIdealState, tableConfig, rebalanceUserConfig, newPartitionAssignment,
             targetNumReplicas, nCompletedSegments, nConsumingSegments, completedInstances, consumingInstances);
