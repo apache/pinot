@@ -75,12 +75,16 @@ public class CSVThirdEyeResponse extends BaseThirdEyeResponse {
     if(rowId >= dataframe.size()){
       throw new IllegalArgumentException();
     }
-    long time = dataframe.getLong(COL_TIMESTAMP, rowId);
-    int timeBucketId = TimeRangeUtils.computeBucketIndex(
-        dataTimeSpec.getDataGranularity(),
-        request.getStartTimeInclusive(),
-        new DateTime(time)
-    );
+    int timeBucketId = -1;
+
+    if (dataframe.contains(COL_TIMESTAMP)) {
+      long time = dataframe.getLong(COL_TIMESTAMP, rowId);
+      timeBucketId = TimeRangeUtils.computeBucketIndex(
+              dataTimeSpec.getDataGranularity(),
+              request.getStartTimeInclusive(),
+              new DateTime(time));
+    }
+
     List<String> dimensions = new ArrayList<>();
     for (String dimension : request.getGroupBy()){
       dimensions.add(dataframe.getString(dimension, rowId));
