@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.api.resources;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.filesystem.LocalPinotFS;
 import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
@@ -43,6 +44,7 @@ public class FileUploadPathProvider {
   private final URI _baseDataDirURI;
   private final URI _tmpUntarredPathURI;
   private final URI _schemasTmpDirURI;
+  private final URI _localTempDirURI;
   private final String _vip;
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
@@ -66,24 +68,37 @@ public class FileUploadPathProvider {
       Utils.rethrowException(e);
     }
 
-    PinotFS pinotFS = PinotFSFactory.create(scheme);
+    String localTempDir = _controllerConf.getLocalTempDir();
+    if (localTempDir == null) {
+      localTempDir = dataDir;
+    }
+
 
     try {
+      // Remote storage will use PinotFS with the proper scheme
+      PinotFS pinotFS = PinotFSFactory.create(scheme);
       _baseDataDirURI = new URI(dataDir);
       if (!pinotFS.exists(_baseDataDirURI)) {
         pinotFS.mkdir(_baseDataDirURI);
       }
-      _fileUploadTmpDirURI = new URI(_baseDataDirURI + FILE_UPLOAD_TEMP_PATH);
-      if (!pinotFS.exists(_fileUploadTmpDirURI)) {
-        pinotFS.mkdir(_fileUploadTmpDirURI);
-      }
-      _tmpUntarredPathURI = new URI(_fileUploadTmpDirURI + UNTARRED_PATH);
-      if (!pinotFS.exists(_tmpUntarredPathURI)) {
-        pinotFS.mkdir(_tmpUntarredPathURI);
-      }
       _schemasTmpDirURI = new URI(_baseDataDirURI + SCHEMAS_TEMP);
       if (!pinotFS.exists(_schemasTmpDirURI)) {
         pinotFS.mkdir(_schemasTmpDirURI);
+      }
+
+      // All directories that are always local
+      PinotFS localPinotFS = new LocalPinotFS();
+      _localTempDirURI = new URI(localTempDir);
+      if (!localPinotFS.exists(_localTempDirURI)) {
+        localPinotFS.mkdir(_localTempDirURI);
+      }
+      _fileUploadTmpDirURI = new URI(_localTempDirURI + FILE_UPLOAD_TEMP_PATH);
+      if (!localPinotFS.exists(_fileUploadTmpDirURI)) {
+        localPinotFS.mkdir(_fileUploadTmpDirURI);
+      }
+      _tmpUntarredPathURI = new URI(_fileUploadTmpDirURI + UNTARRED_PATH);
+      if (!localPinotFS.exists(_tmpUntarredPathURI)) {
+        localPinotFS.mkdir(_tmpUntarredPathURI);
       }
       _vip = _controllerConf.generateVipUrl();
     } catch (Exception e) {
@@ -93,6 +108,10 @@ public class FileUploadPathProvider {
 
   public String getVip() {
     return _vip;
+  }
+
+  public URI getLocalTempDirURI() {
+    return _localTempDirURI;
   }
 
   public URI getFileUploadTmpDirURI() {

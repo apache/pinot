@@ -34,6 +34,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String DATA_DIR = "controller.data.dir";
+  // Potentially same as data dir if local
+  private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
   private static final String ZK_STR = "controller.zk.str";
   private static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model"; // boolean: Update the statemodel on boot?
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
@@ -101,6 +103,14 @@ public class ControllerConf extends PropertiesConfiguration {
       // Shouldn't happen
       throw new AssertionError("Encountered error while encoding in UTF-8 format", e);
     }
+  }
+
+  public void setLocalTempDir(String localTempDir) {
+    setProperty(LOCAL_TEMP_DIR, localTempDir);
+  }
+
+  public String getLocalTempDir() {
+    return getString(LOCAL_TEMP_DIR, null);
   }
 
   public void setPinotFSFactoryClasses(Configuration pinotFSFactoryClasses) {
