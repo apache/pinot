@@ -87,7 +87,6 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   protected void handleNoServingHost(String segmentName) {
-
     LOGGER.error("Found no server hosting segment {} for table {}", segmentName, _tableName);
     if (_brokerMetrics != null) {
       _brokerMetrics.addMeteredTableValue(_tableName, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);

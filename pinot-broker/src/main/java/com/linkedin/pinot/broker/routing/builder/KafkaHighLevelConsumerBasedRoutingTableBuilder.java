@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
-import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
@@ -24,18 +22,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 public class KafkaHighLevelConsumerBasedRoutingTableBuilder extends BaseRoutingTableBuilder {
-
-  @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
-  }
 
   @Override
   public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,

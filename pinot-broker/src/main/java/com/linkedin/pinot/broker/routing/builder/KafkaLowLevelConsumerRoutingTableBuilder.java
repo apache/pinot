@@ -42,14 +42,9 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
 
   private int _targetNumServersPerQuery = 8;
 
-  private String _tableName;
-  private BrokerMetrics _brokerMetrics;
-
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
-
     super.init(configuration, tableConfig, propertyStore, brokerMetrics);
-
     // TODO jfim This is a broker-level configuration for now, until we refactor the configuration of the routing table to allow per-table routing settings
     if (configuration.containsKey("realtimeTargetServerCountPerQuery")) {
       final String targetServerCountPerQuery = configuration.getString("realtimeTargetServerCountPerQuery");

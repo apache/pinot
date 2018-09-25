@@ -36,7 +36,6 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
   private static final int DEFAULT_NUM_ROUTING_TABLES = 10;
   private static final String NUM_ROUTING_TABLES_KEY = "numOfRoutingTables";
 
-  private BrokerMetrics _brokerMetrics;
   private int _numRoutingTables = DEFAULT_NUM_ROUTING_TABLES;
 
   @Override
