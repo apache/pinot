@@ -111,10 +111,10 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
   void removeDeletedDataset(List<String> allDatasets) {
     LOG.info("Removing deleted Pinot datasets");
-    List<DatasetConfigDTO> allExsistingDataset = this.datasetDAO.findAll();
+    List<DatasetConfigDTO> allExistingDataset = this.datasetDAO.findAll();
     Set<String> datasets = new HashSet<>(allDatasets);
 
-    Collection<DatasetConfigDTO> filtered = Collections2.filter(allExsistingDataset, new com.google.common.base.Predicate<DatasetConfigDTO>() {
+    Collection<DatasetConfigDTO> filtered = Collections2.filter(allExistingDataset, new com.google.common.base.Predicate<DatasetConfigDTO>() {
       @Override
       public boolean apply(@Nullable DatasetConfigDTO datasetConfigDTO) {
         return datasetConfigDTO.getDataSource().equals(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
