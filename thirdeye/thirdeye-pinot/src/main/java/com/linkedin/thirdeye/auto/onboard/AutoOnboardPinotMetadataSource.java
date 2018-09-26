@@ -29,7 +29,6 @@ import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricProperties;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 import java.io.IOException;
@@ -57,8 +56,8 @@ import org.slf4j.LoggerFactory;
  * The run method is invoked periodically by the AutoOnboardService, and it checks for new tables in pinot, to add to thirdeye
  * It also looks for any changes in dimensions or metrics to the existing tables
  */
-public class AutoOnboardPinotDataSource extends AutoOnboard {
-  private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardPinotDataSource.class);
+public class AutoOnboardPinotMetadataSource extends AutoOnboard {
+  private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardPinotMetadataSource.class);
 
   private static final Set<String> DIMENSION_SUFFIX_BLACKLIST = new HashSet<>(Arrays.asList("_topk", "_approximate", "_tDigest"));
 
@@ -68,12 +67,12 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
 
   private AutoOnboardPinotMetricsUtils autoLoadPinotMetricsUtils;
 
-  public AutoOnboardPinotDataSource(MetadataSourceConfig metadataSourceConfig)
+  public AutoOnboardPinotMetadataSource(MetadataSourceConfig metadataSourceConfig)
       throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
     super(metadataSourceConfig);
     try {
       autoLoadPinotMetricsUtils = new AutoOnboardPinotMetricsUtils(metadataSourceConfig);
-      LOG.info("Created {}", AutoOnboardPinotDataSource.class.getName());
+      LOG.info("Created {}", AutoOnboardPinotMetadataSource.class.getName());
     } catch (NoSuchAlgorithmException | KeyStoreException | KeyManagementException e) {
       throw e;
     }
@@ -81,7 +80,7 @@ public class AutoOnboardPinotDataSource extends AutoOnboard {
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
   }
 
-  public AutoOnboardPinotDataSource(MetadataSourceConfig metadataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
+  public AutoOnboardPinotMetadataSource(MetadataSourceConfig metadataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
     super(metadataSourceConfig);
     autoLoadPinotMetricsUtils = utils;
     this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
