@@ -395,32 +395,32 @@ public class HelixHelper {
   }
 
   /**
-   * Helper method which fetches all instance configs and returns the instance names which contain the instance tag and are enabled
+   * Helper method which gets all instances which are enabled and contains the instanceTag
    * @param helixManager
    * @param instanceTag
    * @return
    */
   public static List<String> getEnabledInstancesWithTag(final HelixManager helixManager, String instanceTag) {
-    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-    List<InstanceConfig> instanceConfigs =
-        helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
-
-    List<String> enabledInstancesWithTag = new ArrayList<>();
-    for (InstanceConfig instanceConfig : instanceConfigs) {
-      if (instanceConfig.getInstanceEnabled() && instanceConfig.containsTag(instanceTag)) {
-        enabledInstancesWithTag.add(instanceConfig.getInstanceName());
-      }
-    }
-    return enabledInstancesWithTag;
+    return getInstancesWithTag(helixManager, instanceTag, true);
   }
 
   /**
-   * Helper method which fetches all instance configs and returns the instance names which contain the instance tag
+   * Helper method which gets all instances which contain the instanceTag
    * @param helixManager
    * @param instanceTag
    * @return
    */
   public static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag) {
+    return getInstancesWithTag(helixManager, instanceTag, false);
+  }
+
+  /**
+   * Helper method which fetches all instance configs and applies instanceTag and enabled filtering
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  private static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag, boolean isEnabled) {
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
     List<InstanceConfig> instanceConfigs =
         helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
@@ -428,7 +428,9 @@ public class HelixHelper {
     List<String> instancesWithTag = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
       if (instanceConfig.containsTag(instanceTag)) {
-        instancesWithTag.add(instanceConfig.getInstanceName());
+        if (!isEnabled || (isEnabled && instanceConfig.getInstanceEnabled())) {
+          instancesWithTag.add(instanceConfig.getInstanceName());
+        }
       }
     }
     return instancesWithTag;
