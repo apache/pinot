@@ -1,0 +1,78 @@
+frameworks:
+    identity:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.NullPipeline
+
+    metricRelated:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.MetricMappingPipeline
+
+    metricAnalysis:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.MetricAnalysisPipeline
+
+    metricBreakdown:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.MetricBreakdownPipeline
+
+    metricComponentAnalysis:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.MetricComponentAnalysisPipeline
+          properties:
+              excludeDimensions: ["environment", "continent"]
+              parallelism: 5
+              k: 5
+
+    eventExperiment:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
+
+    eventHoliday:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
+          properties:
+              strategy: COMPOUND
+              k: 500
+              eventType: holiday
+
+    eventCustom:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
+          properties:
+              strategy: COMPOUND
+              k: 500
+              eventType: custom
+
+    eventAnomaly:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.AnomalyEventsPipeline
+          properties:
+              strategyClass: com.linkedin.thirdeye.rootcause.impl.AnomalyEventsPipeline$TimeRangeScoreStrategy
+              strategyProperties:
+                  type: HYPERBOLA
+              k: 500
+
+    eventIssue:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
+
+    eventChange:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
+
+    eventDeployment:
+        - outputName: OUTPUT
+          inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
+

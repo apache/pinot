@@ -1,0 +1,36 @@
+authConfig:
+  authEnabled: false
+  authKey: ""
+  ldapUrl: ""
+  domainSuffix: []
+  cacheTTL: 3600
+  cookieTTL: 604800
+resourceConfig: []
+rootCause:
+  definitionsPath: rca.yml
+  parallelism: 5
+  formatters:
+    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.AnomalyEventFormatter
+    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.ThirdEyeEventFormatter
+    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.MetricEntityFormatter
+    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DimensionEntityFormatter
+    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.ServiceEntityFormatter
+    - com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEventEntityFormatter
+dashboardHost: "http://localhost:1426"
+failureFromAddress: thirdeye@localhost
+failureToAddress: user@localhost
+smtpConfiguration:
+  smtpHost: localhost
+  smtpPort: 25
+server:
+  type: default
+  applicationConnectors:
+    - type: http
+      port: 1426
+  adminConnectors:
+    - type: http
+      port: 1427
+whitelistDatasets: []
+swagger:
+  resourcePackage: "com.linkedin.thirdeye.dashboard.resources,com.linkedin.thirdeye.dashboard.resources.v2,com.linkedin.thirdeye.anomaly.onboard"
+
