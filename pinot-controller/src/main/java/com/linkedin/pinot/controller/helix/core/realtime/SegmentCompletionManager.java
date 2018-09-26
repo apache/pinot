@@ -204,7 +204,7 @@ public class SegmentCompletionManager {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
       response = fsm.segmentCommitStart(instanceId, offset);
     } catch (Exception e) {
-      // Return failed response
+      LOGGER.error("Caught exception in segmentCommitStart for segment {}", segmentNameStr, e);
     }
     if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -229,7 +229,7 @@ public class SegmentCompletionManager {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
       response = fsm.extendBuildTime(instanceId, offset, extTimeSec);
     } catch (Exception e) {
-      // Return failed response
+      LOGGER.error("Caught exception in extendBuildTime for segment {}", segmentNameStr, e);
     }
     if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -260,7 +260,7 @@ public class SegmentCompletionManager {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING);
       response = fsm.stoppedConsuming(instanceId, offset, reason);
     } catch (Exception e) {
-      // Return failed response
+      LOGGER.error("Caught exception in segmentStoppedConsuming for segment {}", segmentNameStr, e);
     }
     if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -292,7 +292,7 @@ public class SegmentCompletionManager {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
       response = fsm.segmentCommitEnd(reqParams, success, isSplitCommit);
     } catch (Exception e) {
-      // Return failed response
+      LOGGER.error("Caught exception in segmentCommitEnd for segment {}", segmentNameStr, e);
     }
     if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
