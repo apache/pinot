@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
@@ -53,6 +54,8 @@ public class DatasetConfigBean extends AbstractBean {
   private String timezone = TimeSpec.DEFAULT_TIMEZONE;
 
   private String dataSource;
+
+  private Set<String> owners;
 
   private boolean active = true;
 
@@ -171,6 +174,14 @@ public class DatasetConfigBean extends AbstractBean {
 
   public void setDataSource(String dataSource) {
     this.dataSource = dataSource;
+  }
+
+  public Set<String> getOwners() {
+    return owners;
+  }
+
+  public void setOwners(Set<String> owners) {
+    this.owners = owners;
   }
 
   public boolean isActive() {

@@ -43,7 +43,7 @@ import org.testng.annotations.Test;
 
 public class AutoOnboardPinotMetricsServiceTest {
 
-  private AutoOnboardPinotDataSource testAutoLoadPinotMetricsService;
+  private AutoOnboardPinotMetadataSource testAutoLoadPinotMetricsService;
   private String dataset = "test-collection";
   private Schema schema;
 
@@ -57,7 +57,7 @@ public class AutoOnboardPinotMetricsServiceTest {
     DAORegistry daoRegistry = DAORegistry.getInstance();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
-    testAutoLoadPinotMetricsService = new AutoOnboardPinotDataSource(null, null);
+    testAutoLoadPinotMetricsService = new AutoOnboardPinotMetadataSource(null, null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     Map<String, String> pinotCustomConfigs = new HashMap<>();
     pinotCustomConfigs.put("configKey1", "configValue1");
