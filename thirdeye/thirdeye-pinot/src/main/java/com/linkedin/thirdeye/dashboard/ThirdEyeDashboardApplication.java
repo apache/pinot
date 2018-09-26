@@ -308,10 +308,12 @@ public class ThirdEyeDashboardApplication
    * @throws Exception the exception
    */
   public static void main(String[] args) throws Exception {
-    if (args.length == 0) {
-      throw new IllegalArgumentException("Please provide config directory as parameter");
+    String thirdEyeConfigDir = "./config";
+    if (args.length >= 1) {
+      thirdEyeConfigDir = args[0];
     }
-    String thirdEyeConfigDir = args[0];
+    LOG.info("Using config path '{}'", thirdEyeConfigDir);
+
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
     String dashboardApplicationConfigFile = thirdEyeConfigDir + "/" + "dashboard.yml";
     new ThirdEyeDashboardApplication().run("server", dashboardApplicationConfigFile);
