@@ -61,7 +61,7 @@ public class ThresholdRuleFilterStage implements AnomalyFilterStage {
     }
 
     @Override
-    public void init(Map<String, Object> properties, long configId, long startTime, long endTime) {
+    public void init(Map<String, Object> properties, Long configId, long startTime, long endTime) {
       this.min = MapUtils.getDoubleValue(properties, PROP_MIN, PROP_MIN_DEFAULT);
       this.max = MapUtils.getDoubleValue(properties, PROP_MAX, PROP_MAX_DEFAULT);
     }
