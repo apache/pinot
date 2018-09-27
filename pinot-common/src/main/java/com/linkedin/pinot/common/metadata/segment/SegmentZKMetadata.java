@@ -53,6 +53,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private SegmentPartitionMetadata _partitionMetadata;
   private long _segmentUploadStartTime = -1;
   private Map<String, String> _customMap;
+  private String _crypterName;
 
   public SegmentZKMetadata() {
   }
@@ -60,6 +61,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   public SegmentZKMetadata(ZNRecord znRecord) {
     _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
     _tableName = znRecord.getSimpleField(CommonConstants.Segment.TABLE_NAME);
+    _crypterName = znRecord.getSimpleField(CommonConstants.Segment.CRYPTER_NAME);
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
     _endTime = znRecord.getLongField(CommonConstants.Segment.END_TIME, -1);
@@ -158,6 +160,14 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _segmentType = segmentType;
   }
 
+  public String getCrypterName() {
+    return _crypterName;
+  }
+
+  public void setCrypterName(String crypterName) {
+    _crypterName = crypterName;
+  }
+
   public long getTotalRawDocs() {
     return _totalRawDocs;
   }
@@ -217,18 +227,19 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
 
     SegmentZKMetadata metadata = (SegmentZKMetadata) segmentMetadata;
-    return isEqual(_segmentName, metadata._segmentName) && isEqual(_tableName, metadata._tableName) && isEqual(
-        _indexVersion, metadata._indexVersion) && isEqual(_timeUnit, metadata._timeUnit) && isEqual(_startTime,
-        metadata._startTime) && isEqual(_endTime, metadata._endTime) && isEqual(_segmentType, metadata._segmentType)
-        && isEqual(_totalRawDocs, metadata._totalRawDocs) && isEqual(_crc, metadata._crc) && isEqual(_creationTime,
-        metadata._creationTime) && isEqual(_partitionMetadata, metadata._partitionMetadata) && isEqual(
-        _segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(_customMap, metadata._customMap);
+    return isEqual(_segmentName, metadata._segmentName) && isEqual(_crypterName, metadata._crypterName) && isEqual(_tableName,
+        metadata._tableName) && isEqual(_indexVersion, metadata._indexVersion) && isEqual(_timeUnit, metadata._timeUnit)
+        && isEqual(_startTime, metadata._startTime) && isEqual(_endTime, metadata._endTime) && isEqual(_segmentType,
+        metadata._segmentType) && isEqual(_totalRawDocs, metadata._totalRawDocs) && isEqual(_crc, metadata._crc)
+        && isEqual(_creationTime, metadata._creationTime) && isEqual(_partitionMetadata, metadata._partitionMetadata)
+        && isEqual(_segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(_customMap, metadata._customMap);
   }
 
   @Override
   public int hashCode() {
     int result = hashCodeOf(_segmentName);
     result = hashCodeOf(result, _tableName);
+    result = hashCodeOf(result, _crypterName);
     result = hashCodeOf(result, _segmentType);
     result = hashCodeOf(result, _startTime);
     result = hashCodeOf(result, _endTime);
@@ -248,6 +259,11 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     ZNRecord znRecord = new ZNRecord(_segmentName);
     znRecord.setSimpleField(CommonConstants.Segment.SEGMENT_NAME, _segmentName);
     znRecord.setSimpleField(CommonConstants.Segment.TABLE_NAME, _tableName);
+
+    if (_crypterName != null) {
+      znRecord.setSimpleField(CommonConstants.Segment.CRYPTER_NAME, _crypterName);
+    }
+
     znRecord.setEnumField(CommonConstants.Segment.SEGMENT_TYPE, _segmentType);
     if (_timeUnit == null) {
       znRecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, NULL);

@@ -342,6 +342,7 @@ public class CommonConstants {
     public static final String SEGMENT_NAME = "segment.name";
     public static final String TABLE_NAME = "segment.table.name";
     public static final String SEGMENT_TYPE = "segment.type";
+    public static final String CRYPTER_NAME = "segment.crypter";
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String START_TIME = "segment.start.time";
     public static final String END_TIME = "segment.end.time";

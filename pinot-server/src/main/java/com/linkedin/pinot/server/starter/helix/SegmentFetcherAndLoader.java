@@ -24,6 +24,8 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.core.crypt.PinotCrypter;
+import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
@@ -43,6 +45,9 @@ import org.slf4j.LoggerFactory;
 
 public class SegmentFetcherAndLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherAndLoader.class);
+
+  private static final String TAR_GZ_SUFFIX = ".tar.gz";
+  private static final String ENCODED_SUFFIX = ".enc";
 
   private final InstanceDataManager _instanceDataManager;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -135,8 +140,11 @@ public class SegmentFetcherAndLoader {
           LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentName, tableNameWithType);
         }
         String uri = newSegmentZKMetadata.getDownloadUrl();
+        String crypterName = newSegmentZKMetadata.getCrypterName();
+        PinotCrypter crypter = (crypterName != null) ? PinotCrypterFactory.create(crypterName) : null;
+
         // Retry will be done here.
-        String localSegmentDir = downloadSegmentToLocal(uri, tableNameWithType, segmentName);
+        String localSegmentDir = downloadSegmentToLocal(uri, crypter, tableNameWithType, segmentName);
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
         _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, new File(localSegmentDir));
         LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentName, tableNameWithType,
@@ -172,15 +180,22 @@ public class SegmentFetcherAndLoader {
   }
 
   @Nonnull
-  private String downloadSegmentToLocal(@Nonnull String uri, @Nonnull String tableName, @Nonnull String segmentName)
+  private String downloadSegmentToLocal(@Nonnull String uri, PinotCrypter crypter, @Nonnull String tableName, @Nonnull String segmentName)
       throws Exception {
     File tempDir = new File(new File(_instanceDataManager.getSegmentFileDirectory(), tableName),
         "tmp_" + segmentName + "_" + System.nanoTime());
     FileUtils.forceMkdir(tempDir);
-    File tempTarFile = new File(tempDir, segmentName + ".tar.gz");
+    File tempDownloadFile = new File(tempDir, segmentName + ENCODED_SUFFIX);
+    File tempTarFile = new File(tempDir, segmentName + TAR_GZ_SUFFIX);
     File tempSegmentDir = new File(tempDir, segmentName);
     try {
-      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempTarFile);
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempDownloadFile);
+      if (crypter != null) {
+        crypter.decrypt(tempDownloadFile, tempTarFile);
+      } else {
+        tempTarFile = tempDownloadFile;
+      }
+
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           tableName, uri, tempTarFile, tempTarFile.length());
 
