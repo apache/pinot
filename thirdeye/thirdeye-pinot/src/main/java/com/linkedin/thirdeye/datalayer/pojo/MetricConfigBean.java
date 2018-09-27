@@ -22,6 +22,8 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class MetricConfigBean extends AbstractBean {
@@ -88,8 +90,7 @@ public class MetricConfigBean extends AbstractBean {
 
   private String alias;
 
-  // Represents how relevant and critical a metric is.
-  private Integer tierLevel;
+  private Set<String> tags;
 
   private MetricType datatype;
 
@@ -131,12 +132,12 @@ public class MetricConfigBean extends AbstractBean {
     this.dataset = dataset;
   }
 
-  public Integer getTierLevel() {
-    return tierLevel;
+  public Set<String> getTags() {
+    return tags;
   }
 
-  public void setTierLevel(Integer tierLevel) {
-    this.tierLevel = tierLevel;
+  public void setTags(Set<String> tags) {
+    this.tags = tags;
   }
 
   public String getAlias() {
