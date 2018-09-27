@@ -16,6 +16,7 @@
 
 package com.linkedin.thirdeye.tools;
 
+import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -52,6 +53,7 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
@@ -391,6 +393,21 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void deleteAllJobsAndTasks() {
+    List<TaskDTO> tasks = taskDAO.findByStatusWithinDays(TaskConstants.TaskStatus.WAITING, 30);
+    tasks.addAll(taskDAO.findByStatusWithinDays(TaskConstants.TaskStatus.RUNNING, 30));
+
+    for (TaskDTO task : tasks) {
+      taskDAO.delete(task);
+    }
+    tasks.clear();;
+
+    List<JobDTO> jobs = jobDAO.findByStatusWithinDays(JobConstants.JobStatus.SCHEDULED, 30);
+    for (JobDTO job : jobs) {
+      jobDAO.delete(job);
+    }
+  }
+
   private void deactivateDataset(String dataset) {
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
     for (MetricConfigDTO metricConfig : metricConfigs) {
@@ -441,6 +458,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+    dq.deleteAllJobsAndTasks();
 
   }
 

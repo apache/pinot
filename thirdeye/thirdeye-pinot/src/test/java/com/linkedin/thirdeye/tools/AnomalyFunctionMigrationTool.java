@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.tools.migrate.ConfidenceIntervalSignTestFunctionMigrater;
+import com.linkedin.thirdeye.tools.migrate.GenericSplineFunctionMigrater;
 import com.linkedin.thirdeye.tools.migrate.MovingAverageSignTestFunctionMigrater;
 import com.linkedin.thirdeye.tools.migrate.RegressianGaussianScanFunctionMigrater;
 import com.linkedin.thirdeye.tools.migrate.SignTestFunctionMigrater;
@@ -35,7 +36,10 @@ import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
+import org.jfree.data.time.Day;
 import org.joda.time.DateTime;
+import org.joda.time.Days;
+import org.joda.time.Duration;
 import org.joda.time.Months;
 import org.joda.time.ReadablePeriod;
 import org.joda.time.format.DateTimeFormatter;
@@ -52,6 +56,7 @@ public class AnomalyFunctionMigrationTool {
   private static final String COMMA = ",";
   private static final ReadablePeriod MAX_ANOMALY_CLONE_OFFSET = Months.THREE;
   private static final int TASK_WAITING_LATENCY_IN_MINUTES = 1;
+  private static final int TASK_WAITING_LATENCY_IN_SECONDS = 10;
 
   public enum Action {
       CLONE, DELETE, MIGRATE, REPLAY, REPLAY_ORIGIN, EXPORT
@@ -114,7 +119,7 @@ public class AnomalyFunctionMigrationTool {
           case REPLAY_ORIGIN:
             LOG.info("Replay anomaly functions in range");
             for (long functionId : originalFunctionIds) {
-              deleteAnomaliesForFunction(functionId, this.monitoringWindowStartTime, this.monitoringWindowEndTime);
+              deleteAnomaliesForFunction(functionId, this.monitoringWindowStartTime.minus(Days.days(120)), this.monitoringWindowEndTime);
               removeFunction(functionId);
             }
             isReplayed = true;
@@ -167,8 +172,8 @@ public class AnomalyFunctionMigrationTool {
         break;
       }
       try {
-        LOG.info("Wait for {} minute(s)", TASK_WAITING_LATENCY_IN_MINUTES);
-        TimeUnit.MINUTES.sleep(TASK_WAITING_LATENCY_IN_MINUTES);
+        LOG.info("Wait for {} seconds(s)", TASK_WAITING_LATENCY_IN_SECONDS);
+        TimeUnit.SECONDS.sleep(TASK_WAITING_LATENCY_IN_SECONDS);
       } catch (InterruptedException e) {
         LOG.warn("Sleep is interrupted by InterruptedException", e);
       }
@@ -184,8 +189,8 @@ public class AnomalyFunctionMigrationTool {
         LOG.info("Task {} is done with Status {}", task.getId(), taskStatus);
         taskIterator.remove();
       } else {
-        LOG.info("Task {} is still running/waiting, sleep for {} minute(s)", task.getId(),
-            TASK_WAITING_LATENCY_IN_MINUTES);
+        LOG.info("Task {} is still running/waiting, sleep for {} second(s)", task.getId(),
+            TASK_WAITING_LATENCY_IN_SECONDS);
       }
     }
   }
@@ -202,7 +207,7 @@ public class AnomalyFunctionMigrationTool {
 
   private void deleteAnomalies() throws IOException {
     for (long functionId : this.functionIds) {
-      deleteAnomaliesForFunction(functionId, monitoringWindowStartTime, monitoringWindowEndTime);
+      deleteAnomaliesForFunction(functionId, monitoringWindowStartTime.minus(Days.days(120)), monitoringWindowEndTime);
     }
   }
 
@@ -309,7 +314,7 @@ public class AnomalyFunctionMigrationTool {
         LOG.info("Function migrated: {}", anomalyFunction);
         break;
       case "SPLINE_REGRESSION_VANILLA":
-        new SplineRegressionFunctionMigrater().migrate(anomalyFunction);
+        new GenericSplineFunctionMigrater().migrate(anomalyFunction);
         LOG.info("Function migrated: {}", anomalyFunction);
         break;
       default:
@@ -504,20 +509,7 @@ public class AnomalyFunctionMigrationTool {
         exportPath,
         token);
 
-    tool.cloneFunctions();
-    for (long functionId : tool.originalFunctionIds) {
-      tool.deleteAnomaliesForFunction(functionId, monitorStart.minusMonths(4), monitorEnd);
-      tool.replayByFunction(functionId, monitorStart, monitorEnd, true);
-    }
-    for (long functionId : tool.functionIds) {
-      tool.deleteAnomaliesForFunction(functionId, monitorStart.minusMonths(4), monitorEnd);
-      tool.migrateAnomalyFunction(functionId);
-      tool.replayByFunction(functionId, monitorStart, monitorEnd, true);
-    }
-    tool.waitForFunctionTasksDone();
-    tool.exportAnomalyResultComparison();
-
-//    tool.run(actions);
+    tool.run(actions);
     System.exit(0);
   }
 }
