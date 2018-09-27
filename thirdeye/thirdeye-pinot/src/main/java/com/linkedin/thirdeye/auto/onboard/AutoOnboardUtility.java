@@ -48,7 +48,7 @@ public class AutoOnboardUtility {
                 dataSourceToOnboardMap.put(dataSource, autoOnboardServices);
               }
             } catch (Exception e) {
-              LOG.error("Exception in creating metadata constructor {}", metadataSourceClassName);
+              LOG.error("Exception in creating metadata constructor {}", metadataSourceClassName, e);
             }
           }
         }

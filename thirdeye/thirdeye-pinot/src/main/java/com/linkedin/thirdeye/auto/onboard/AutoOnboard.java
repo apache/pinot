@@ -20,7 +20,7 @@ import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 
 
 /**
- * This is the abstract parent class for all auto onboard services for various datasources
+ * This is the abstract parent class for all auto-onboard metadata services for various datasources
  */
 public abstract class AutoOnboard {
   private MetadataSourceConfig metadataSourceConfig;
