@@ -20,6 +20,7 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardPinotMetadataSource;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import java.util.Arrays;
@@ -205,7 +206,7 @@ public class PinotThirdEyeDataSourceConfig {
   }
 
   /**
-   * Returns pinot thirdeye datasource config given datasource config. There can be only ONE datasource of pinot type
+   * Returns pinot thirdeye datasource config given metadatasource config. There can be only ONE datasource of pinot type
    *
    * @param metadataSourceConfig
    *
@@ -213,7 +214,7 @@ public class PinotThirdEyeDataSourceConfig {
    */
   public static PinotThirdEyeDataSourceConfig createFromMetadataSourceConfig(MetadataSourceConfig metadataSourceConfig) {
     if (metadataSourceConfig == null || !metadataSourceConfig.getClassName()
-        .equals(PinotThirdEyeDataSource.class.getCanonicalName())) {
+        .equals(AutoOnboardPinotMetadataSource.class.getCanonicalName())) {
       throw new IllegalStateException("Metadata source config is not of type pinot " + metadataSourceConfig);
     }
     return createFromProperties(metadataSourceConfig.getProperties());
