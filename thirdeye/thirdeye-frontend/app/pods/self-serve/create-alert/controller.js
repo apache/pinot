@@ -444,7 +444,7 @@ export default Controller.extend({
         'alertGroupNewRecipient',
         'selectedConfigGroup'
       );
-      const hasRecipients = _.has(groupRecipients, 'recipients');
+      const existingRecipients = groupRecipients ? getWithDefault(groupRecipients, 'receiverAddresses.to', []) : [];
       // Any missing required field values?
       for (var field of requiredFields) {
         if (isBlank(this.get(field))) {
@@ -460,7 +460,7 @@ export default Controller.extend({
         isDisabled = true;
       }
       // For alert group email recipients, require presence only if group recipients is empty
-      if (isBlank(alertGroupNewRecipient) && !hasRecipients) {
+      if (isBlank(alertGroupNewRecipient) && !existingRecipients.length) {
         isDisabled = true;
       }
       // Disable after submit clicked
