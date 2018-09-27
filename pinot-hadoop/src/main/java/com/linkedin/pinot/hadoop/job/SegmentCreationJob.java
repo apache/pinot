@@ -140,11 +140,6 @@ public class SegmentCreationJob extends Configured {
     }
     fs.mkdirs(stagingDir);
 
-    if (_defaultPermissionsMask != null) {
-      FsPermission umask = new FsPermission(_defaultPermissionsMask);
-      FsPermission permission = FsPermission.getDirDefault().applyUMask(umask);
-      FileSystem.get(getConf()).setPermission(stagingDir, permission);
-    }
     Path stagingDirInputPath = new Path(_stagingDir + "/input/");
     fs.mkdirs(stagingDirInputPath);
     LOGGER.info("Staging dir input path is {}", stagingDirInputPath);
@@ -154,6 +149,15 @@ public class SegmentCreationJob extends Configured {
       fs.delete(outputDir, true);
     }
     fs.mkdirs(outputDir);
+
+    if (_defaultPermissionsMask != null) {
+      FsPermission umask = new FsPermission(_defaultPermissionsMask);
+      FsPermission permission = FsPermission.getDirDefault().applyUMask(umask);
+
+      setDirPermission(stagingDir, permission);
+      setDirPermission(stagingDirInputPath, permission);
+      setDirPermission(outputDir, permission);
+    }
 
     List<FileStatus> inputDataFiles = new ArrayList<FileStatus>();
     FileStatus[] fileStatusArr = fs.globStatus(inputPathPattern);
@@ -226,6 +230,11 @@ public class SegmentCreationJob extends Configured {
     LOGGER.info("Cleanup the working directory.");
     LOGGER.info("Deleting the dir: {}", _stagingDir);
     fs.delete(new Path(_stagingDir), true);
+  }
+
+  private void setDirPermission(Path directory, FsPermission permission) throws IOException {
+    FileSystem.get(getConf()).setPermission(directory, permission);
+    LOGGER.info("Setting permissions '{}' for directory: '{}'", permission, directory);
   }
 
   protected void setAdditionalJobProperties(Job job) throws Exception {
