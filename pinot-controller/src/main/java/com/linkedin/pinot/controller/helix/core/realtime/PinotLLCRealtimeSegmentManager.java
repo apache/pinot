@@ -53,11 +53,8 @@ import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdU
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
 import com.linkedin.pinot.core.realtime.segment.RealtimeSegmentAssignmentStrategy;
-import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
+import com.linkedin.pinot.core.realtime.stream.PartitionOffsetFetcher;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
-import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -77,7 +74,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -100,7 +96,6 @@ import org.slf4j.LoggerFactory;
 
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
-  private static final int STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
   private static final String KAFKA_SMALLEST_OFFSET = "smallest";
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
@@ -699,16 +694,16 @@ public class PinotLLCRealtimeSegmentManager {
     return getPartitionOffset(offsetCriteria, partitionId, streamMetadata);
   }
 
-  private long getPartitionOffset(final String offsetCriteria, int partitionId,
-      StreamMetadata streamMetadata) {
-    KafkaOffsetFetcher kafkaOffsetFetcher = new KafkaOffsetFetcher(offsetCriteria, partitionId, streamMetadata);
+  private long getPartitionOffset(final String offsetCriteria, int partitionId, StreamMetadata streamMetadata) {
+    PartitionOffsetFetcher partitionOffsetFetcher =
+        new PartitionOffsetFetcher(offsetCriteria, partitionId, streamMetadata);
     try {
-      RetryPolicies.fixedDelayRetryPolicy(3, 1000L).attempt(kafkaOffsetFetcher);
-      return kafkaOffsetFetcher.getOffset();
+      RetryPolicies.fixedDelayRetryPolicy(3, 1000L).attempt(partitionOffsetFetcher);
+      return partitionOffsetFetcher.getOffset();
     } catch (Exception e) {
-      Exception fetcherException = kafkaOffsetFetcher.getException();
-      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}",
-          streamMetadata.getKafkaTopicName(), partitionId, offsetCriteria, fetcherException);
+      Exception fetcherException = partitionOffsetFetcher.getException();
+      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}", streamMetadata.getKafkaTopicName(),
+          partitionId, offsetCriteria, fetcherException);
       throw new RuntimeException(fetcherException);
     }
   }
@@ -1316,57 +1311,5 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     return idealState;
-  }
-
-  // TODO: move this class to kafka specific package
-  private static class KafkaOffsetFetcher implements Callable<Boolean> {
-    private final String _topicName;
-    private final String _offsetCriteria;
-    private final int _partitionId;
-
-    private Exception _exception = null;
-    private long _offset = -1;
-    private StreamConsumerFactory _streamConsumerFactory;
-    StreamMetadata _streamMetadata;
-
-    private KafkaOffsetFetcher(final String offsetCriteria, int partitionId, StreamMetadata streamMetadata) {
-      _offsetCriteria = offsetCriteria;
-      _partitionId = partitionId;
-      _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamMetadata);
-      _streamMetadata = streamMetadata;
-      _topicName = streamMetadata.getKafkaTopicName();
-    }
-
-    private long getOffset() {
-      return _offset;
-    }
-
-    private Exception getException() {
-      return _exception;
-    }
-
-    @Override
-    public Boolean call() throws Exception {
-
-      String clientId = PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + _topicName + "-" + _partitionId;
-      try (StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
-          clientId, _partitionId)) {
-        _offset =
-            streamMetadataProvider.fetchPartitionOffset(_offsetCriteria, STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
-        if (_exception != null) {
-          LOGGER.info("Successfully retrieved offset({}) for stream topic {} partition {}", _offset, _topicName,
-              _partitionId);
-        }
-        return Boolean.TRUE;
-      } catch (TransientConsumerException e) {
-        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId,
-            e.getMessage());
-        _exception = e;
-        return Boolean.FALSE;
-      } catch (Exception e) {
-        _exception = e;
-        throw e;
-      }
-    }
   }
 }

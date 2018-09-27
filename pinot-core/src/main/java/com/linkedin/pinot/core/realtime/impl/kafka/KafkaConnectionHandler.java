@@ -31,6 +31,7 @@ import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.TopicMetadataResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.common.protocol.Errors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,14 +135,14 @@ public class KafkaConnectionHandler {
   }
 
   void initializeBootstrapNodeList(String bootstrapNodes) {
-    ArrayList<String> hostsAndPorts =
-        Lists.newArrayList(Splitter.on(',').trimResults().omitEmptyStrings().split(bootstrapNodes));
 
-    final int bootstrapHostCount = hostsAndPorts.size();
-    if (bootstrapHostCount < 1) {
+    if (StringUtils.isBlank(bootstrapNodes)) {
       throw new IllegalArgumentException("Need at least one bootstrap host");
     }
 
+    ArrayList<String> hostsAndPorts =
+        Lists.newArrayList(Splitter.on(',').trimResults().omitEmptyStrings().split(bootstrapNodes));
+    final int bootstrapHostCount = hostsAndPorts.size();
     _bootstrapHosts = new String[bootstrapHostCount];
     _bootstrapPorts = new int[bootstrapHostCount];
 
