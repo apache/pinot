@@ -25,11 +25,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
 import org.testng.Assert;
@@ -41,9 +40,8 @@ import static org.mockito.Mockito.*;
 
 public class RealtimeSegmentRelocatorTest {
 
-  private RealtimeSegmentRelocator _realtimeSegmentRelocator;
+  private TestRealtimeSegmentRelocator _realtimeSegmentRelocator;
   private HelixManager _mockHelixManager;
-  private MockHelixAdmin _mockHelixAdmin;
 
   private String[] serverNames;
   private String[] consumingServerNames;
@@ -64,12 +62,9 @@ public class RealtimeSegmentRelocatorTest {
   public void setup() {
     PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     _mockHelixManager = mock(HelixManager.class);
-    _mockHelixAdmin = new MockHelixAdmin(null);
     when(mockPinotHelixResourceManager.getHelixZkManager()).thenReturn(_mockHelixManager);
-    when(mockPinotHelixResourceManager.getHelixAdmin()).thenReturn(_mockHelixAdmin);
     ControllerConf controllerConfig = new ControllerConf();
-    _realtimeSegmentRelocator =
-        new RealtimeSegmentRelocator(mockPinotHelixResourceManager, controllerConfig);
+    _realtimeSegmentRelocator = new TestRealtimeSegmentRelocator(mockPinotHelixResourceManager, controllerConfig);
 
     final int maxInstances = 20;
     serverNames = new String[maxInstances];
@@ -108,8 +103,8 @@ public class RealtimeSegmentRelocatorTest {
     ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
 
     // no consuming instances found
-    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, new ArrayList<String>());
-    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantConsuming, new ArrayList<>());
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
     boolean exception = false;
     try {
       _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
@@ -120,8 +115,8 @@ public class RealtimeSegmentRelocatorTest {
     exception = false;
 
     // no completed instances found
-    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, consumingInstanceList);
-    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, new ArrayList<String>());
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantConsuming, consumingInstanceList);
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, new ArrayList<String>());
     try {
       _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     } catch (Exception e) {
@@ -130,8 +125,8 @@ public class RealtimeSegmentRelocatorTest {
     Assert.assertTrue(exception);
 
     // empty ideal state
-    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantConsuming, consumingInstanceList);
-    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantConsuming, consumingInstanceList);
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
     IdealState prevIdealState = new IdealState(
         (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
@@ -184,7 +179,7 @@ public class RealtimeSegmentRelocatorTest {
     // 1 replica ONLINE on consuming, 2 already relocated. relocate the 3rd replica.
     // However, only 2 completed servers, which is less than num replicas
     completedInstanceList = getInstanceList(2);
-    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
     prevIdealState = new IdealState(
         (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     exception = false;
@@ -197,7 +192,7 @@ public class RealtimeSegmentRelocatorTest {
 
     // Revise list of completed servers to 3. Now we have enough completed servers for all replicas
     completedInstanceList = getInstanceList(3);
-    _mockHelixAdmin.setInstanceInClusterWithTag(serverTenantCompleted, completedInstanceList);
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
     prevIdealState = new IdealState(
         (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
@@ -258,23 +253,22 @@ public class RealtimeSegmentRelocatorTest {
     }
   }
 
-  private class MockHelixAdmin extends ZKHelixAdmin {
+  private class TestRealtimeSegmentRelocator extends RealtimeSegmentRelocator {
 
-    Map<String, List<String>> tagToInstances;
+    private Map<String, List<String>> tagToInstances;
 
-    MockHelixAdmin(ZkClient zkClient) {
-      super(zkClient);
-      tagToInstances = new HashMap<>();
+    public TestRealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+      super(pinotHelixResourceManager, config);
+      tagToInstances = new HashedMap();
     }
 
     @Override
-    public List<String> getInstancesInClusterWithTag(String clusterName, String tag) {
-      return tagToInstances.get(tag);
+    protected List<String> getInstancesWithTag(HelixManager helixManager, String instanceTag) {
+      return tagToInstances.get(instanceTag);
     }
 
-    void setInstanceInClusterWithTag(String tag, List<String> instances) {
+    void setTagToInstance(String tag, List<String> instances) {
       tagToInstances.put(tag, instances);
     }
   }
-
 }

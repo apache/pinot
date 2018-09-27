@@ -305,8 +305,7 @@ public class PinotHelixResourceManager {
         brokerTenantName = realtimeTableConfig.getTenantConfig().getBroker();
       }
     }
-    return _helixAdmin.getInstancesInClusterWithTag(_helixClusterName,
-        TagNameUtils.getBrokerTagForTenant(brokerTenantName));
+    return HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getBrokerTagForTenant(brokerTenantName));
   }
 
   /**
@@ -540,7 +539,7 @@ public class PinotHelixResourceManager {
   public PinotResourceManagerResponse updateBrokerTenant(Tenant tenant) {
     String brokerTenantTag = TagNameUtils.getBrokerTagForTenant(tenant.getTenantName());
     List<String> instancesInClusterWithTag =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantTag);
+        HelixHelper.getInstancesWithTag(_helixZkManager, brokerTenantTag);
     if (instancesInClusterWithTag.size() > tenant.getNumberOfInstances()) {
       return scaleDownBroker(tenant, brokerTenantTag, instancesInClusterWithTag);
     }
@@ -667,9 +666,9 @@ public class PinotHelixResourceManager {
 
   public PinotResourceManagerResponse updateServerTenant(Tenant serverTenant) {
     String realtimeServerTag = TagNameUtils.getRealtimeTagForTenant(serverTenant.getTenantName());
-    List<String> taggedRealtimeServers = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeServerTag);
+    List<String> taggedRealtimeServers = HelixHelper.getInstancesWithTag(_helixZkManager, realtimeServerTag);
     String offlineServerTag = TagNameUtils.getOfflineTagForTenant(serverTenant.getTenantName());
-    List<String> taggedOfflineServers = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, offlineServerTag);
+    List<String> taggedOfflineServers = HelixHelper.getInstancesWithTag(_helixZkManager, offlineServerTag);
     Set<String> allServingServers = new HashSet<>();
     allServingServers.addAll(taggedOfflineServers);
     allServingServers.addAll(taggedRealtimeServers);
@@ -766,15 +765,15 @@ public class PinotHelixResourceManager {
   }
 
   public boolean isTenantExisted(String tenantName) {
-    if (!_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getBrokerTagForTenant(tenantName))
+    if (!HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getBrokerTagForTenant(tenantName))
         .isEmpty()) {
       return true;
     }
-    if (!_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getOfflineTagForTenant(tenantName))
+    if (!HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getOfflineTagForTenant(tenantName))
         .isEmpty()) {
       return true;
     }
-    if (!_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getRealtimeTagForTenant(tenantName))
+    if (!HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getRealtimeTagForTenant(tenantName))
         .isEmpty()) {
       return true;
     }
@@ -783,7 +782,7 @@ public class PinotHelixResourceManager {
 
   public boolean isBrokerTenantDeletable(String tenantName) {
     String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantName);
-    Set<String> taggedInstances = new HashSet<>(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTag));
+    Set<String> taggedInstances = new HashSet<>(HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag));
     String brokerName = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
     IdealState brokerIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, brokerName);
     for (String partition : brokerIdealState.getPartitionSet()) {
@@ -798,9 +797,9 @@ public class PinotHelixResourceManager {
 
   public boolean isServerTenantDeletable(String tenantName) {
     Set<String> taggedInstances = new HashSet<>(
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getOfflineTagForTenant(tenantName)));
+        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getOfflineTagForTenant(tenantName)));
     taggedInstances.addAll(
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getRealtimeTagForTenant(tenantName)));
+        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getRealtimeTagForTenant(tenantName)));
     for (String resourceName : getAllResources()) {
       if (!TableNameBuilder.isTableResource(resourceName)) {
         continue;
@@ -926,7 +925,7 @@ public class PinotHelixResourceManager {
   public PinotResourceManagerResponse deleteOfflineServerTenantFor(String tenantName) {
     String offlineTenantTag = TagNameUtils.getOfflineTagForTenant(tenantName);
     List<String> instancesInClusterWithTag =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, offlineTenantTag);
+        HelixHelper.getInstancesWithTag(_helixZkManager, offlineTenantTag);
     for (String instanceName : instancesInClusterWithTag) {
       _helixAdmin.removeInstanceTag(_helixClusterName, instanceName, offlineTenantTag);
       if (getTagsForInstance(instanceName).isEmpty()) {
@@ -939,7 +938,7 @@ public class PinotHelixResourceManager {
   public PinotResourceManagerResponse deleteRealtimeServerTenantFor(String tenantName) {
     String realtimeTenantTag = TagNameUtils.getRealtimeTagForTenant(tenantName);
     List<String> instancesInClusterWithTag =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeTenantTag);
+        HelixHelper.getInstancesWithTag(_helixZkManager, realtimeTenantTag);
     for (String instanceName : instancesInClusterWithTag) {
       _helixAdmin.removeInstanceTag(_helixClusterName, instanceName, realtimeTenantTag);
       if (getTagsForInstance(instanceName).isEmpty()) {
@@ -951,7 +950,7 @@ public class PinotHelixResourceManager {
 
   public PinotResourceManagerResponse deleteBrokerTenantFor(String tenantName) {
     String brokerTag = TagNameUtils.getBrokerTagForTenant(tenantName);
-    List<String> instancesInClusterWithTag = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTag);
+    List<String> instancesInClusterWithTag = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTag);
     for (String instance : instancesInClusterWithTag) {
       retagInstance(instance, brokerTag, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     }
@@ -961,16 +960,16 @@ public class PinotHelixResourceManager {
   public Set<String> getAllInstancesForServerTenant(String tenantName) {
     Set<String> instancesSet = new HashSet<>();
     instancesSet.addAll(
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getOfflineTagForTenant(tenantName)));
+        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getOfflineTagForTenant(tenantName)));
     instancesSet.addAll(
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getRealtimeTagForTenant(tenantName)));
+        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getRealtimeTagForTenant(tenantName)));
     return instancesSet;
   }
 
   public Set<String> getAllInstancesForBrokerTenant(String tenantName) {
     Set<String> instancesSet = new HashSet<>();
     instancesSet.addAll(
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, TagNameUtils.getBrokerTagForTenant(tenantName)));
+        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getBrokerTagForTenant(tenantName)));
     return instancesSet;
   }
 
@@ -1044,14 +1043,14 @@ public class PinotHelixResourceManager {
     // Check if tenant exists before creating the table
     TableType tableType = tableConfig.getTableType();
     String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker());
-    List<String> brokersForTenant = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);
+    List<String> brokersForTenant = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTenantName);
     if (brokersForTenant.isEmpty()) {
       throw new InvalidTableConfigException(
           "Broker tenant: " + brokerTenantName + " does not exist for table: " + tableNameWithType);
     }
     String serverTenantName =
         TagNameUtils.getTagFromTenantAndServerType(tenantConfig.getServer(), tableType.getServerType());
-    if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenantName).isEmpty()) {
+    if (HelixHelper.getInstancesWithTag(_helixZkManager, serverTenantName).isEmpty()) {
       throw new InvalidTableConfigException(
           "Server tenant: " + serverTenantName + " does not exist for table: " + tableNameWithType);
     }
@@ -1063,7 +1062,7 @@ public class PinotHelixResourceManager {
           throw new InvalidTableConfigException(
               "Invalid realtime consuming tag: " + realtimeConsumingTag + ". Must have suffix _REALTIME or _OFFLINE");
         }
-        if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeConsumingTag).isEmpty()) {
+        if (HelixHelper.getInstancesWithTag(_helixZkManager, realtimeConsumingTag).isEmpty()) {
           throw new InvalidTableConfigException(
               "No instances found with overridden realtime consuming tag: " + realtimeConsumingTag + " for table: "
                   + tableNameWithType);
@@ -1076,7 +1075,7 @@ public class PinotHelixResourceManager {
           throw new InvalidTableConfigException(
               "Invalid realtime completed tag: " + realtimeCompletedTag + ". Must have suffix _REALTIME or _OFFLINE");
         }
-        if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, realtimeCompletedTag).isEmpty()) {
+        if (HelixHelper.getInstancesWithTag(_helixZkManager, realtimeCompletedTag).isEmpty()) {
           throw new InvalidTableConfigException(
               "No instances found with overridden realtime completed tag: " + realtimeCompletedTag + " for table: "
                   + tableNameWithType);
@@ -1244,9 +1243,8 @@ public class PinotHelixResourceManager {
   private void createHelixEntriesForHighLevelConsumer(TableConfig config, String realtimeTableName,
       IdealState idealState) {
     if (idealState == null) {
-      idealState =
-          PinotTableIdealStateBuilder.buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, config, _helixAdmin,
-              _helixClusterName, _propertyStore);
+      idealState = PinotTableIdealStateBuilder.buildInitialHighLevelRealtimeIdealStateFor(realtimeTableName, config,
+          _helixZkManager, _propertyStore);
       LOGGER.info("Adding helix resource with empty HLC IdealState for {}", realtimeTableName);
       _helixAdmin.addResource(_helixClusterName, realtimeTableName, idealState);
     } else {
@@ -1644,8 +1642,8 @@ public class PinotHelixResourceManager {
     SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(
         offlineTableConfig.getValidationConfig().getSegmentAssignmentStrategy());
     List<String> assignedInstances =
-        segmentAssignmentStrategy.getAssignedInstances(_helixAdmin, _propertyStore, _helixClusterName, segmentMetadata,
-            numReplicas, serverTenant);
+        segmentAssignmentStrategy.getAssignedInstances(_helixZkManager, _helixAdmin, _propertyStore, _helixClusterName,
+            segmentMetadata, numReplicas, serverTenant);
 
     HelixHelper.addSegmentToIdealState(_helixZkManager, offlineTableName, segmentName, assignedInstances);
   }
@@ -1945,13 +1943,13 @@ public class PinotHelixResourceManager {
     if (TableType.OFFLINE.equals(tableType)) {
       OfflineTagConfig tagConfig = new OfflineTagConfig(tableConfig);
       serverInstances.addAll(
-          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getOfflineServerTag()));
+          HelixHelper.getInstancesWithTag(_helixZkManager, tagConfig.getOfflineServerTag()));
     } else if (TableType.REALTIME.equals(tableType)) {
       RealtimeTagConfig tagConfig = new RealtimeTagConfig(tableConfig);
       serverInstances.addAll(
-          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getConsumingServerTag()));
+          HelixHelper.getInstancesWithTag(_helixZkManager, tagConfig.getConsumingServerTag()));
       serverInstances.addAll(
-          _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tagConfig.getCompletedServerTag()));
+          HelixHelper.getInstancesWithTag(_helixZkManager, tagConfig.getCompletedServerTag()));
     }
     return Lists.newArrayList(serverInstances);
   }
@@ -1959,7 +1957,7 @@ public class PinotHelixResourceManager {
   public List<String> getBrokerInstancesForTable(String tableName, TableType tableType) {
     TableConfig tableConfig = getTableConfig(tableName, tableType);
     String brokerTenantName = TagNameUtils.getBrokerTagForTenant(tableConfig.getTenantConfig().getBroker());
-    List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);
+    List<String> serverInstances = HelixHelper.getInstancesWithTag(_helixZkManager, brokerTenantName);
     return serverInstances;
   }
 
@@ -2121,7 +2119,7 @@ public class PinotHelixResourceManager {
   public List<String> getOnlineUnTaggedBrokerInstanceList() {
 
     final List<String> instanceList =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
+        HelixHelper.getInstancesWithTag(_helixZkManager, CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE);
     final List<String> liveInstances = _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
     instanceList.retainAll(liveInstances);
     return instanceList;
@@ -2133,7 +2131,7 @@ public class PinotHelixResourceManager {
    */
   public List<String> getOnlineUnTaggedServerInstanceList() {
     final List<String> instanceList =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
+        HelixHelper.getInstancesWithTag(_helixZkManager, CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE);
     final List<String> liveInstances = _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
     instanceList.retainAll(liveInstances);
     return instanceList;

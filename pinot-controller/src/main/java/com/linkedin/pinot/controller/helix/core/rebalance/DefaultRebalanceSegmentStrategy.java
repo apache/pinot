@@ -369,7 +369,18 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
       tag = offlineTagConfig.getOfflineServerTag();
     }
-    servingInstances.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tag));
-    enabledServingInstances.addAll(HelixHelper.getEnabledInstancesWithTag(_helixAdmin, _helixClusterName, tag));
+    servingInstances.addAll(getInstancesWithTag(tag));
+    enabledServingInstances.addAll(getEnabledInstancesWithTag(tag));
   }
+
+  @VisibleForTesting
+  protected List<String> getInstancesWithTag(String tag) {
+    return HelixHelper.getInstancesWithTag(_helixManager, tag);
+  }
+
+  @VisibleForTesting
+  protected List<String> getEnabledInstancesWithTag(String tag) {
+    return HelixHelper.getEnabledInstancesWithTag(_helixManager, tag);
+  }
+
 }

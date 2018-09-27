@@ -394,20 +394,46 @@ public class HelixHelper {
     updateIdealState(helixManager, tableNameWithType, updater, DEFAULT_RETRY_POLICY);
   }
 
-  public static List<String> getEnabledInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName,
-      String instanceTag) {
-    List<String> instances = helixAdmin.getInstancesInCluster(helixClusterName);
-    List<String> enabledInstances = new ArrayList<>();
-    for (String instance : instances) {
-      try {
-        InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instance);
-        if (instanceConfig.containsTag(instanceTag) && instanceConfig.getInstanceEnabled()) {
-          enabledInstances.add(instance);
+  /**
+   * Helper method which gets all instances which are enabled and contains the instanceTag
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  public static List<String> getEnabledInstancesWithTag(final HelixManager helixManager, String instanceTag) {
+    return getInstancesWithTag(helixManager, instanceTag, true);
+  }
+
+  /**
+   * Helper method which gets all instances which contain the instanceTag
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  public static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag) {
+    return getInstancesWithTag(helixManager, instanceTag, false);
+  }
+
+  /**
+   * Helper method which fetches all instance configs and applies instanceTag and enabled filtering
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  private static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag, boolean isEnabled) {
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    List<InstanceConfig> instanceConfigs =
+        helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
+
+    List<String> instancesWithTag = new ArrayList<>();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      if (instanceConfig.containsTag(instanceTag)) {
+        if (!isEnabled || (isEnabled && instanceConfig.getInstanceEnabled())) {
+          instancesWithTag.add(instanceConfig.getInstanceName());
         }
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while fetching instance config for instance: {}", instance, e);
       }
     }
-    return enabledInstances;
+    return instancesWithTag;
   }
+
 }

@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
@@ -100,11 +102,10 @@ public class PinotTableIdealStateBuilder {
   }
 
   public static IdealState buildInitialHighLevelRealtimeIdealStateFor(String realtimeTableName,
-      TableConfig realtimeTableConfig, HelixAdmin helixAdmin, String helixClusterName,
-      ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
+      TableConfig realtimeTableConfig, HelixManager helixManager, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig);
-    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
-        realtimeTagConfig.getConsumingServerTag());
+    final List<String> realtimeInstances =
+        HelixHelper.getInstancesWithTag(helixManager, realtimeTagConfig.getConsumingServerTag());
     IdealState idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, 1);
     if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
       throw new RuntimeException(

@@ -439,7 +439,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     if (destHostsFile.isEmpty()) {
       String serverTenant = getServerTenantName(tableName) + "_OFFLINE";
       LOGGER.debug("Using server tenant: {}", serverTenant);
-      return HelixHelper.getEnabledInstancesWithTag(helix, zkPath, serverTenant);
+      return HelixHelper.getEnabledInstancesWithTag(zkChanger.getHelixManager(), serverTenant);
     } else {
       return readHostsFromFile(destHostsFile);
     }
