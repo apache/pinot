@@ -20,7 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
-import com.linkedin.pinot.core.realtime.stream.StreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.io.IOException;
 import javax.annotation.Nullable;
@@ -33,17 +33,17 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Implementation of StreamConsumer using Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
+ * Implementation of PartitionLevelConsumer using Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
-public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements StreamConsumer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamConsumer.class);
+public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implements PartitionLevelConsumer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
-  public KafkaSimpleStreamConsumer(String clientId, StreamMetadata streamMetadata, int partition) {
+  public KafkaPartitionLevelConsumer(String clientId, StreamMetadata streamMetadata, int partition) {
     super(clientId, streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
   @VisibleForTesting
-  public KafkaSimpleStreamConsumer(String clientId, StreamMetadata streamMetadata, int partition,
+  public KafkaPartitionLevelConsumer(String clientId, StreamMetadata streamMetadata, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(clientId, streamMetadata, partition, kafkaSimpleConsumerFactory);
   }
@@ -63,7 +63,7 @@ public class KafkaSimpleStreamConsumer extends KafkaConnectionHandler implements
   public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
     Preconditions.checkState(isPartitionProvided,
-        "Cannot fetch messages from a metadata-only KafkaSimpleStreamConsumer");
+        "Cannot fetch messages from a metadata-only KafkaPartitionLevelConsumer");
     // TODO Improve error handling
 
     final long connectEndTime = System.currentTimeMillis() + _connectTimeoutMillis;

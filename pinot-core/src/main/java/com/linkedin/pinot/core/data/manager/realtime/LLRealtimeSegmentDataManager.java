@@ -47,7 +47,7 @@ import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
-import com.linkedin.pinot.core.realtime.stream.StreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
@@ -218,7 +218,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   final String _clientId;
   private final LLCSegmentName _segmentName;
   private final PlainFieldExtractor _fieldExtractor;
-  private StreamConsumer _streamConsumer = null;
+  private PartitionLevelConsumer _partitionLevelConsumer = null;
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableName;
@@ -340,7 +340,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       MessageBatch messageBatch;
       try {
         messageBatch =
-            _streamConsumer.fetchMessages(_currentOffset, _endOffset, _streamMetadata.getKafkaFetchTimeoutMillis());
+            _partitionLevelConsumer.fetchMessages(_currentOffset, _endOffset, _streamMetadata.getKafkaFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
@@ -930,7 +930,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     _realtimeSegment.destroy();
     try {
-      _streamConsumer.close();
+      _partitionLevelConsumer.close();
     } catch (Exception e) {
       segmentLogger.warn("Could not close stream consumer", e);
     }
@@ -1143,15 +1143,15 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
    * @param reason
    */
   private void makeStreamConsumer(String reason) {
-    if (_streamConsumer != null) {
+    if (_partitionLevelConsumer != null) {
       try {
-        _streamConsumer.close();
+        _partitionLevelConsumer.close();
       } catch (Exception e) {
         segmentLogger.warn("Could not close stream consumer");
       }
     }
     segmentLogger.info("Creating new stream consumer, reason: {}", reason);
-    _streamConsumer = _streamConsumerFactory.createStreamConsumer(_clientId, _streamPartitionId);
+    _partitionLevelConsumer = _streamConsumerFactory.createPartitionLevelConsumer(_clientId, _streamPartitionId);
   }
 
   /**

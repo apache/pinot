@@ -16,16 +16,17 @@
 package com.linkedin.pinot.core.realtime;
 
 import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelConsumerStreamProvider;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
 
 
 /**
  * Factory for StreamProviders, so that they can be overridden for unit tests.
  */
 public class StreamProviderFactory {
-  private static Class<? extends StreamProvider> streamProviderClass = KafkaHighLevelConsumerStreamProvider.class;
+  private static Class<? extends StreamLevelConsumer> streamProviderClass = KafkaStreamLevelConsumer.class;
 
-  public static StreamProvider buildStreamProvider() {
+  public static StreamLevelConsumer buildStreamProvider() {
     try {
       return streamProviderClass.newInstance();
     } catch (Exception e) {
@@ -34,11 +35,11 @@ public class StreamProviderFactory {
     }
   }
 
-  public static Class<? extends StreamProvider> getStreamProviderClass() {
+  public static Class<? extends StreamLevelConsumer> getStreamProviderClass() {
     return streamProviderClass;
   }
 
-  public static void setStreamProviderClass(Class<? extends StreamProvider> clazz) {
+  public static void setStreamProviderClass(Class<? extends StreamLevelConsumer> clazz) {
     streamProviderClass = clazz;
   }
 }

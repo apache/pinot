@@ -39,15 +39,15 @@ import org.slf4j.LoggerFactory;
 /**
  * Implementation of a stream metadata provider for a kafka stream using kafka'a simple consumer
  */
-public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler implements StreamMetadataProvider {
-  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaSimpleStreamMetadataProvider.class);
+public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implements StreamMetadataProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaStreamMetadataProvider.class);
 
   /**
    * Create a partition specific metadata provider
    * @param streamMetadata
    * @param partition
    */
-  public KafkaSimpleStreamMetadataProvider(String clientId, StreamMetadata streamMetadata, int partition) {
+  public KafkaStreamMetadataProvider(String clientId, StreamMetadata streamMetadata, int partition) {
     super(clientId, streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
@@ -55,18 +55,18 @@ public class KafkaSimpleStreamMetadataProvider extends KafkaConnectionHandler im
    * Create a stream specific metadata provider
    * @param streamMetadata
    */
-  public KafkaSimpleStreamMetadataProvider(String clientId, StreamMetadata streamMetadata) {
+  public KafkaStreamMetadataProvider(String clientId, StreamMetadata streamMetadata) {
     super(clientId, streamMetadata, new KafkaSimpleConsumerFactoryImpl());
   }
 
   @VisibleForTesting
-  public KafkaSimpleStreamMetadataProvider(String clientId, StreamMetadata streamMetadata, int partition,
+  public KafkaStreamMetadataProvider(String clientId, StreamMetadata streamMetadata, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(clientId, streamMetadata, partition, kafkaSimpleConsumerFactory);
   }
 
   @VisibleForTesting
-  public KafkaSimpleStreamMetadataProvider(String clientId, StreamMetadata streamMetadata,
+  public KafkaStreamMetadataProvider(String clientId, StreamMetadata streamMetadata,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(clientId, streamMetadata, kafkaSimpleConsumerFactory);
   }
