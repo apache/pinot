@@ -251,7 +251,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const anomalyRangeStart = moment(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
         const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
 
-        const analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
+        const analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').add(5, 'milliseconds').valueOf();
         const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
         const analysisRangeStart = moment(anomalyRangeEnd).add(analysisRangeStartOffset, 'day').valueOf();
         const analysisRange = [analysisRangeStart, analysisRangeEnd];
@@ -279,7 +279,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10)];
 
         // align to local end of day
-        const analysisRangeEnd = moment(anomalyRange[1]).startOf('day').add(1, 'day').valueOf();
+        const analysisRangeEnd = moment(anomalyRange[1]).startOf('day').add(1, 'day').add(5, 'milliseconds').valueOf();
         const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
         const analysisRangeStart = moment(anomalyRange[0]).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
         const analysisRange = [analysisRangeStart, analysisRangeEnd];
@@ -300,7 +300,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
           const anomalyFunctionUrnRaw = `frontend:anomalyfunction:${anomalyEntity.attributes['functionId'][0]}`;
           anomalyFunctionUrns.pushObject(appendFilters(anomalyFunctionUrnRaw, anomalyFilters));
         }
-
 
         context = {
           urns: new Set([anomalyMetricUrn]),
