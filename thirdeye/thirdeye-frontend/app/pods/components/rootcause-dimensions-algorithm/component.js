@@ -287,6 +287,7 @@ export default Component.extend({
 
   /**
    * Prepare new rows for table to display rolled up totals for sub-dimensions
+   * TODO: Remove this prototype if not needed. Else, dry it out some more (smcclung)
    * @method  _insertDimensionTotalRows
    * @param {Array} dimensionRows - array of dimension records
    * @private
@@ -316,6 +317,7 @@ export default Component.extend({
   /**
    * Adds up total contribution values by dimension group and sub-group, creating a row for "Total" or "All"
    * It does this by adding rows to our existing dimension array.
+   * TODO: Remove this prototype if not needed. Else, dry it out some more (smcclung)
    * @method  _rollUpSubDimensionTotals
    * @param {Array} dimensionRows - array of dimension records
    * @param {Array} dimSubGroup - filtered set of dimension rows to add up
