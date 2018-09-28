@@ -15,61 +15,46 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
 
 public class SingleValueSortedForwardIndexCreator implements SingleValueForwardIndexCreator {
-  private FixedByteSingleValueMultiColWriter indexWriter;
-  private int[] mins;
-  private int[] maxs;
-  private int cardinality;
+  private final FixedByteSingleValueMultiColWriter _writer;
+  private final int[] _minDocIds;
+  private final int[] _maxDocIds;
 
-  public SingleValueSortedForwardIndexCreator(File indexDir, int cardinality, FieldSpec spec) throws Exception {
-    File indexFile = new File(indexDir, spec.getName() + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-    indexWriter = new FixedByteSingleValueMultiColWriter(indexFile, cardinality, 2, new int[]{4, 4});
-    mins = new int[cardinality];
-    maxs = new int[cardinality];
-
-    for (int i = 0; i < mins.length; i++) {
-      mins[i] = Integer.MAX_VALUE;
-    }
-    for (int i = 0; i < maxs.length; i++) {
-      maxs[i] = -1;
-    }
-    this.cardinality = cardinality;
-  }
-
-  public void add(int dictionaryId, int docId) {
-
-    if (mins[dictionaryId] > docId) {
-      mins[dictionaryId] = docId;
-    }
-    if (maxs[dictionaryId] < docId) {
-      maxs[dictionaryId] = docId;
-    }
-  }
-
-  public void seal() throws IOException {
-    for (int i = 0; i < cardinality; i++) {
-      indexWriter.setInt(i, 0, mins[i]);
-      indexWriter.setInt(i, 1, maxs[i]);
-    }
-
-    indexWriter.close();
+  public SingleValueSortedForwardIndexCreator(File outputDir, String column, int cardinality) throws Exception {
+    File indexFile = new File(outputDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+    _writer =
+        new FixedByteSingleValueMultiColWriter(indexFile, cardinality, 2, new int[]{Integer.BYTES, Integer.BYTES});
+    _minDocIds = new int[cardinality];
+    _maxDocIds = new int[cardinality];
+    Arrays.fill(_minDocIds, Integer.MAX_VALUE);
+    Arrays.fill(_maxDocIds, Integer.MIN_VALUE);
   }
 
   @Override
-  public void index(int docId, int dictionaryIndex) {
-    add(dictionaryIndex, docId);
+  public void index(int docId, int dictId) {
+    if (_minDocIds[dictId] > docId) {
+      _minDocIds[dictId] = docId;
+    }
+    if (_maxDocIds[dictId] < docId) {
+      _maxDocIds[dictId] = docId;
+    }
   }
 
   @Override
   public void close() throws IOException {
-    seal();
+    int cardinality = _maxDocIds.length;
+    for (int i = 0; i < cardinality; i++) {
+      _writer.setInt(i, 0, _minDocIds[i]);
+      _writer.setInt(i, 1, _maxDocIds[i]);
+    }
+    _writer.close();
   }
 }
