@@ -83,7 +83,6 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -2185,26 +2184,30 @@ public class PinotHelixResourceManager {
   }
 
   /*
-   * Uncomment and use for testing on a real cluster */
-
+   * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {
-    final String testZk = "localhost:12913/pinot-perf";
-    final String clusterName = "pinot";
+    final String testZk = "test1.zk.com:12345/pinot-cluster";
+    final String realZk = "test2.zk.com:12345/pinot-cluster";
+    final String zkURL = realZk;
+    final String clusterName = "mpSprintDemoCluster";
     final String helixClusterName = clusterName;
     final String controllerInstanceId = "local-hostname";
     final String localDiskDir = "/var/tmp/Controller";
+    final long externalViewOnlineToOfflineTimeoutMillis = 100L;
+    final boolean isSingleTenantCluster = false;
+    final boolean isUpdateStateModel = false;
+    MetricsRegistry metricsRegistry = new MetricsRegistry();
     final boolean dryRun = true;
-    final String tableName = "employerEngagementExtTest";
+    final String tableName = "testTable";
     final TableType tableType = TableType.OFFLINE;
-
     PinotHelixResourceManager helixResourceManager =
-        new PinotHelixResourceManager(testZk, helixClusterName, controllerInstanceId, localDiskDir,
-            100, false, false);
+        new PinotHelixResourceManager(zkURL, helixClusterName, controllerInstanceId, localDiskDir,
+            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel);
     helixResourceManager.start();
-    RebalanceSegmentStrategyFactory.createInstance(helixResourceManager._helixZkManager);
-    Configuration conf = new PropertiesConfiguration();
-    conf.setProperty(RebalanceUserConfigConstants.DRYRUN, false);
-    helixResourceManager.rebalanceTable(tableName, tableType, conf);
+    ZNRecord record = helixResourceManager.rebalanceTable(tableName, dryRun, tableType);
+    ObjectMapper mapper = new ObjectMapper();
+    System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(record));
   }
+   */
 
 }
