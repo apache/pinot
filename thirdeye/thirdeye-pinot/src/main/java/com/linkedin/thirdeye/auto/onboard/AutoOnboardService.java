@@ -18,18 +18,11 @@ package com.linkedin.thirdeye.auto.onboard;
 
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.datasource.DataSourceConfig;
-import com.linkedin.thirdeye.datasource.DataSources;
-import com.linkedin.thirdeye.datasource.DataSourcesLoader;
-import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
-import java.lang.reflect.Constructor;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,8 +68,9 @@ public class AutoOnboardService implements Runnable {
       LOG.info("Running auto load for {}", autoOnboard.getClass().getSimpleName());
       try {
         autoOnboard.run();
-      } catch (Exception e) {
-        LOG.error("There was an exception running AutoOnboard for {}", autoOnboard.getClass().getSimpleName(), e);
+      } catch (Throwable t) {
+        LOG.error("Uncaught exception is detected while running AutoOnboard for {}", autoOnboard.getClass().getSimpleName());
+        t.printStackTrace();
       }
     }
   }
