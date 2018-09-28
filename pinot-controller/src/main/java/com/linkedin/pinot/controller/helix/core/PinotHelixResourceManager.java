@@ -83,6 +83,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
@@ -177,6 +178,7 @@ public class PinotHelixResourceManager {
    */
   public synchronized void stop() {
     _segmentDeletionManager.stop();
+    _idealStateUpdater.stop();
     _helixZkManager.disconnect();
   }
 
@@ -2087,16 +2089,16 @@ public class PinotHelixResourceManager {
           RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
       PartitionAssignment newPartitionAssignment =
           rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
-      // get the new ideal state
-      IdealState newIdealState =
-          rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig,
-              newPartitionAssignment);
+      IdealState targetState =
+          rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig);
+
       // update it as needed
       if (!rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN)) {
-        _idealStateUpdater.update(idealState, tableConfig, rebalanceUserConfig);
+        // call the updater providing it a reference to the strategy so it can recompute target state if needed
+        _idealStateUpdater.update(targetState, tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
       }
       jsonObject.put("partitionAssignment", newPartitionAssignment.getPartitionToInstances());
-      jsonObject.put("idealState", newIdealState.getRecord().getMapFields());
+      jsonObject.put("idealState", targetState.getRecord().getMapFields());
     } catch (JSONException e) {
       LOGGER.error("Exception in constructing json response for rebalance table {}", tableNameWithType, e);
       throw e;
@@ -2183,32 +2185,26 @@ public class PinotHelixResourceManager {
   }
 
   /*
-   * Uncomment and use for testing on a real cluster
+   * Uncomment and use for testing on a real cluster */
 
   public static void main(String[] args) throws Exception {
-    final String testZk = "test1.zk.com:12345/pinot-cluster";
-    final String realZk = "test2.zk.com:12345/pinot-cluster";
-    final String zkURL = realZk;
-    final String clusterName = "mpSprintDemoCluster";
+    final String testZk = "localhost:12913/pinot-perf";
+    final String clusterName = "pinot";
     final String helixClusterName = clusterName;
     final String controllerInstanceId = "local-hostname";
     final String localDiskDir = "/var/tmp/Controller";
-    final long externalViewOnlineToOfflineTimeoutMillis = 100L;
-    final boolean isSingleTenantCluster = false;
-    final boolean isUpdateStateModel = false;
-    MetricsRegistry metricsRegistry = new MetricsRegistry();
     final boolean dryRun = true;
-    final String tableName = "testTable";
+    final String tableName = "employerEngagementExtTest";
     final TableType tableType = TableType.OFFLINE;
 
     PinotHelixResourceManager helixResourceManager =
-        new PinotHelixResourceManager(zkURL, helixClusterName, controllerInstanceId, localDiskDir,
-            externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel);
+        new PinotHelixResourceManager(testZk, helixClusterName, controllerInstanceId, localDiskDir,
+            100, false, false);
     helixResourceManager.start();
-    ZNRecord record = helixResourceManager.rebalanceTable(tableName, dryRun, tableType);
-    ObjectMapper mapper = new ObjectMapper();
-    System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(record));
+    RebalanceSegmentStrategyFactory.createInstance(helixResourceManager._helixZkManager);
+    Configuration conf = new PropertiesConfiguration();
+    conf.setProperty(RebalanceUserConfigConstants.DRYRUN, false);
+    helixResourceManager.rebalanceTable(tableName, tableType, conf);
   }
-   */
 
 }

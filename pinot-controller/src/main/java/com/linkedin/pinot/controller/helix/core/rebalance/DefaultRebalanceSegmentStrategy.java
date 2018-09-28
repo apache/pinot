@@ -16,7 +16,6 @@
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.OfflineTagConfig;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
@@ -29,7 +28,6 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.Realtime
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,7 +37,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -119,8 +116,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
   }
 
   /**
-   * If realtime table and includeConsuming=true, rebalance consuming segments. NewPartitionAssignment will be used only in this case
-   * Always rebalance completed (online) segments, NewPartitionAssignment unused in this case
+   * If realtime table and includeConsuming=true, rebalance consuming segments. NewPartitionAssignment will be used only
+   * in this case. Always rebalance completed (online) segments, NewPartitionAssignment unused in this case
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
    * @param rebalanceUserConfig custom user configs for specific rebalance strategies
@@ -148,8 +145,21 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       targetNumReplicas = Integer.parseInt(tableConfig.getValidationConfig().getReplication());
     }
 
-    return rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
-        newPartitionAssignment);
+    return rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
+  }
+
+  /**
+   * Rebalance the table after calculating the new partition assignment.
+   * @param idealState old ideal state
+   * @param tableConfig table config of table tor rebalance
+   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
+   * @return new idealstate
+   */
+  @Override
+  public IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig,
+      Configuration rebalanceUserConfig) throws InvalidConfigException {
+    return getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig,
+        rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig));
   }
 
   /**

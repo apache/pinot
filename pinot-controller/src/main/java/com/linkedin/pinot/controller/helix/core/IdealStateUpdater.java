@@ -20,21 +20,30 @@ import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
+import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.configuration.Configuration;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 /**
  * A class that handles updating ideal state for a given table. 2 modes of
@@ -57,9 +66,6 @@ public class IdealStateUpdater {
   private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateUpdater.class);
 
   private static final int MAX_THREADS = 10;
-  private static final int MAX_UPDATE_ATTEMPTS = 5;
-  private static final int INITIAL_RETRY_DELAY_MS = 500;
-  private static final float DELAY_SCALE_FACTOR = 2.0f;
   private static final int EXTERNAL_VIEW_CHECK_INTERVAL_MS = 30000;
 
   private final ExecutorService _executorService;
@@ -76,148 +82,181 @@ public class IdealStateUpdater {
         new ThreadFactoryBuilder().setNameFormat("idealstate-updater-thread-%d").build());
   }
 
-  public void update(IdealState targetIdealState, TableConfig config,
+  /**
+   * Updates idealstate to be rebalanced. The update is handled in a background thread to track the progress of the
+   * update.
+   */
+  public void update(IdealState targetState, TableConfig config, RebalanceSegmentStrategy strategy,
       Configuration rebalanceUserConfig) {
 
-    if (rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
-        RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
-        updateFullState(targetIdealState, config);
-    } else {
-      _executorService.submit(new Runnable() {
-        @Override public void run() {
-          try {
-            updateWithoutDowntime(targetIdealState, config);
-          } catch (InterruptedException e) {
-            LOGGER.error("Got interrupted while updating idealstate for table {}",
-                config.getTableName());
-            Thread.currentThread().interrupt();
-          } catch (Throwable t) {
-            LOGGER
-                .error("Caught error while updating idealstate for table {}", config.getTableName(),
-                    t);
-          }
+    _executorService.submit(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          updateState(config, strategy, rebalanceUserConfig);
+        } catch (Throwable t) {
+          // catch all throwables to prevent losing the thread
+          LOGGER.error("Caught error while updating idealstate for table {}", config.getTableName(), t);
         }
-      });
+      }
+    });
+  }
+
+  public void stop() {
+    _executorService.shutdown();
+  }
+
+  /**
+   * Update idealstate to the target rebalanced state honoring the downtime/no-downtime configuration.
+   *
+   * In case of no-downtime mode, we first ensure that the ideal state is updated such that there is atleast one serving
+   * replica. Once we confirm that atleast one serving replica is available, we switch to the target state in one
+   * step. Since the ideal state update is now broken into multiple steps, in each step we check to see if additional
+   * rebalancing is required (incase there are new segments or other changes to the cluster). This is done by comparing
+   * the IdealState that was used to generate the target in each step.
+   *
+   * Note: we don't use {@link com.linkedin.pinot.common.utils.helix.HelixHelper} directly as we would like to manage
+   * the main logic and retries according to the update algorithm. Some amount of code is duplicated from HelixHelper.
+   */
+  private void updateState(TableConfig tableConfig, RebalanceSegmentStrategy strategy, Configuration rebalanceConfig)
+      throws InvalidConfigException {
+
+    long startTime = System.nanoTime();
+
+    String tableName = tableConfig.getTableName();
+    HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
+    ZkBaseDataAccessor zkBaseDataAccessor = (ZkBaseDataAccessor) dataAccessor.getBaseDataAccessor();
+
+    PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableName);
+    IdealState previousIdealState = dataAccessor.getProperty(idealStateKey);
+
+    IdealState targetIdealState = null;
+    long retryDelayMs = 60000; // 1 min
+    while (true) {
+      IdealState currentIdealState = dataAccessor.getProperty(idealStateKey);
+
+      if (targetIdealState == null || !EqualityUtils.isEqual(previousIdealState, currentIdealState)) {
+
+        // we need to recompute target state
+
+        // Make a copy of the the idealState above to pass it to the rebalancer
+        // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
+        // list fields
+        ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
+        IdealState idealStateCopy = new IdealState(
+            (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(currentIdealState.getRecord())));
+        // rebalance; can throw InvalidConfigException - in which case we bail out
+        targetIdealState = strategy.getRebalancedIdealState(idealStateCopy, tableConfig, rebalanceConfig);
+      }
+
+      if (EqualityUtils.isEqual(targetIdealState, currentIdealState)) {
+        LOGGER.info("Table {} is rebalanced.", tableName);
+
+        LOGGER.info("Finished rebalancing table {} in {} ms.", tableName,
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime) + "ms");
+        return;
+      }
+
+      // if ideal state needs to change, get the next 'safe' state (based on whether downtime is OK or not)
+      IdealState nextIdealState = getNextState(currentIdealState, targetIdealState, rebalanceConfig);
+
+      // If the ideal state is large enough, enable compression
+      if (HelixHelper.MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE < nextIdealState.getPartitionSet().size()) {
+        nextIdealState.getRecord().setBooleanField("enableCompression", true);
+      }
+
+      // Check version and set ideal state
+      try {
+        if (zkBaseDataAccessor.set(idealStateKey.getPath(), nextIdealState.getRecord(),
+            currentIdealState.getRecord().getVersion(), AccessOption.PERSISTENT)) {
+          // if we succeeded, wait for the change to stabilize
+          waitForStable(tableName);
+          continue;
+        }
+        // in case of any error, we retry - currently an unbounded number of times
+      } catch (ZkBadVersionException e) {
+        LOGGER.warn("Version changed while updating ideal state for resource: {}", tableName);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while updating ideal state for resource: {}", tableName, e);
+      }
+
+      previousIdealState = currentIdealState;
+      // wait before retrying
+      try {
+        Thread.sleep(retryDelayMs);
+      } catch (InterruptedException e) {
+        LOGGER.error("Got interrupted while rebalancing table {}", tableName);
+        Thread.currentThread().interrupt();
+        return;
+      }
     }
   }
 
   /**
-   * Update idealstate without downtime. In this approach, we first ensure that the ideal state
-   * is updated such that there is atleast one serving replica. Care is taken to ensure that 
-   * the number of replicas for a segment does not change from the current assignment -ie, if
-   * a segment currently has 2 replicas and target has 3, the first transition will ensure that
-   * ideal-state reflects 2 replicas by replacing an existing one if needed.
-   * After the first step, the ideal is updated fully to reflect the target assignment.
+   * Gets the next ideal state based on the target (rebalanced) state. If no downtime is desired, the next state
+   * is set such that there is always atleast one common replica for each segment between current and next state.
    */
-  public void updateWithoutDowntime(IdealState target, TableConfig tableConfig)
-      throws InterruptedException {
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableConfig.getTableName());
+  private IdealState getNextState(IdealState currentState, IdealState targetState, Configuration rebalanceUserConfig) {
 
-    long startTime = System.nanoTime();
-    String tableName = tableConfig.getTableName();
+    // make a copy of the ideal state so it can be updated
+    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
+    IdealState idealStateCopy = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(currentState.getRecord())));
 
-    ensureAtleastOneServingReplica(target, tableName);
+    Map<String, Map<String, String>> currentMapFields = currentState.getRecord().getMapFields();
+    Map<String, Map<String, String>> targetMapFields = targetState.getRecord().getMapFields();
 
-    // update to reflect the target state
-    updateFullState(target, tableConfig);
-    waitForStable(tableName);
-    LOGGER.info("Finished rebalancing table " + tableName + " in " + TimeUnit.NANOSECONDS
-        .toMillis(System.nanoTime() - startTime) + "ms");
+    for (String segmentId : targetMapFields.keySet()) {
+      updateSegmentIfNeeded(segmentId, currentMapFields.get(segmentId), targetMapFields.get(segmentId), idealStateCopy,
+          rebalanceUserConfig);
+    }
+
+    return idealStateCopy;
   }
 
-
-  private void ensureAtleastOneServingReplica(IdealState target, String tableName)
-      throws InterruptedException {
-    Map<String, Map<String, String>> targetMapFields = target.getRecord().getMapFields();
-    HelixHelper.updateIdealState(_helixManager, tableName,
-        new com.google.common.base.Function<IdealState, IdealState>() {
-          @Nullable @Override public IdealState apply(@Nullable IdealState idealState) {
-
-            int updated = 0;
-            Map<String, Map<String, String>> srcMapFields = idealState.getRecord().getMapFields();
-
-            for (String segmentId : targetMapFields.keySet()) {
-              if (updateSegmentIfNeeded(segmentId, srcMapFields.get(segmentId),
-                  targetMapFields.get(segmentId), idealState)) {
-                updated++;
-              }
-            }
-
-            LOGGER.info("Updated ideal state for " + updated + " segments");
-            return idealState;
-          }
-        }, RetryPolicies.exponentialBackoffRetryPolicy(MAX_UPDATE_ATTEMPTS, INITIAL_RETRY_DELAY_MS,
-            DELAY_SCALE_FACTOR));
-    LOGGER.info("Waiting for external view to catch up for rebalancing table " + tableName);
-    waitForStable(tableName);
-  }
-
+  /**
+   * Updates a segment mapping if needed. In "downtime" mode or if there are common elements between source and
+   * target mapping, the segment mapping is set to the target mapping directly.
+   * In a no-downtime, if there are no commmon elements, one element of the source mapping is replaced with one
+   * from the target mapping.
+   */
   @VisibleForTesting
-  public boolean updateSegmentIfNeeded(String segmentId, Map<String, String> srcMap,
-      Map<String, String> targetMap, IdealState current) {
+  public void updateSegmentIfNeeded(String segmentId, Map<String, String> srcMap, Map<String, String> targetMap,
+      IdealState idealState, Configuration rebalanceUserConfig) {
 
     if (srcMap == null) {
       //segment can be missing if retention manager has deleted it
       LOGGER.info("Segment " + segmentId + " missing from current idealState. Skipping it.");
-      return false;
+      return;
     }
+
+    if (rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DOWNTIME,
+        RebalanceUserConfigConstants.DEFAULT_DOWNTIME)) {
+      setTargetState(idealState, segmentId, targetMap);
+      return;
+    }
+
     MapDifference difference = Maps.difference(targetMap, srcMap);
     if (!difference.entriesInCommon().isEmpty()) {
       // if there are entries in common, there won't be downtime
-      LOGGER.info(
-          "Segment " + segmentId + " has common entries between current and expected ideal state");
-      return false;
+      LOGGER.info("Segment " + segmentId + " has common entries between current and expected ideal state");
+      setTargetState(idealState, segmentId, targetMap);
+    } else {
+      // remove one entry
+      idealState.getInstanceStateMap(segmentId).remove(srcMap.keySet().stream().findFirst().get());
+      // add an entry from the target state to ensure there is no downtime
+      String instanceId = targetMap.keySet().stream().findFirst().get();
+      idealState.setPartitionState(segmentId, instanceId, targetMap.get(instanceId));
+      LOGGER.info("Adding " + instanceId + " to serve segment " + segmentId);
     }
-
-    // remove one entry
-    current.getInstanceStateMap(segmentId).remove(srcMap.keySet().stream().findFirst().get());
-    // add an entry from the target state
-    String instanceId = targetMap.keySet().stream().findFirst().get();
-    current.setPartitionState(segmentId, instanceId, targetMap.get(instanceId));
-    LOGGER.info("Adding " + instanceId + " to serve segment " + segmentId);
-
-    return true;
   }
 
   /**
-   * Updates entire idealstate in one pass.
+   * Sets the idealstate for a given segment to the target mapping
    */
-  private void updateFullState(IdealState targetIdealState, TableConfig config) {
-    Map<String, Map<String, String>> targetMapFields = targetIdealState.getRecord().getMapFields();
-    String tableName = config.getTableName();
-    HelixHelper.updateIdealState(_helixManager, tableName,
-        new com.google.common.base.Function<IdealState, IdealState>() {
-          @Nullable @Override public IdealState apply(@Nullable IdealState idealState) {
-
-            for (String segmentId : targetMapFields.keySet()) {
-              Map<String, String> instanceStateMap = targetMapFields.get(segmentId);
-              Map<String, String> srcInstanceStateMap = idealState.getInstanceStateMap(segmentId);
-              if (srcInstanceStateMap == null) {
-                //segment can be missing if retention manager has deleted it
-                LOGGER.info("Segment " + segmentId + " missing from current idealState. Skipping it.");
-                continue;
-              }
-              srcInstanceStateMap.clear();
-              for (String instanceId : instanceStateMap.keySet()) {
-                idealState
-                    .setPartitionState(segmentId, instanceId, instanceStateMap.get(instanceId));
-              }
-            }
-
-            // log a message to inform if further rebalancing is needed
-            // TODO: consider if rebalance should be called automatically if so
-            Map<String, Map<String, String>> mapFieldsIS = idealState.getRecord().getMapFields();
-            MapDifference diff = Maps.difference(mapFieldsIS, targetIdealState.getRecord().getMapFields());
-            int newSegments = diff.entriesOnlyOnLeft().size();
-            if (newSegments > 0) {
-              LOGGER.info("Found " + newSegments + " new segments in idealstate for " + tableName + " that were not rebalanced. If they need to be rebalanced, invoke rebalance again.");
-            }
-
-            return idealState;
-          }
-        }, RetryPolicies.exponentialBackoffRetryPolicy(MAX_UPDATE_ATTEMPTS, INITIAL_RETRY_DELAY_MS,
-            DELAY_SCALE_FACTOR));
-
+  private void setTargetState(IdealState idealState, String segmentId, Map<String, String> targetMap) {
+    idealState.getInstanceStateMap(segmentId).clear();
+    idealState.setInstanceStateMap(segmentId, targetMap);
   }
 
   /**
@@ -256,8 +295,9 @@ public class IdealStateUpdater {
       if (diff == 0) {
         break;
       } else {
-        LOGGER.info("Waiting for externalView to match idealstate for table:" + resourceName
-            + " Num segments difference:" + diff);
+        LOGGER.info(
+            "Waiting for externalView to match idealstate for table:" + resourceName + " Num segments difference:"
+                + diff);
         Thread.sleep(EXTERNAL_VIEW_CHECK_INTERVAL_MS);
       }
     } while (diff > 0);

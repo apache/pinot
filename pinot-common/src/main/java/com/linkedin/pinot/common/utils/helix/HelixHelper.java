@@ -47,9 +47,9 @@ import org.slf4j.LoggerFactory;
 
 
 public class HelixHelper {
+  public static final int MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE = 1000;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
-  private static final int MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE = 1000;
 
   private static final String ONLINE = "ONLINE";
   private static final String OFFLINE = "OFFLINE";
