@@ -142,7 +142,7 @@ public class ValidationManagerTest {
 
     // Refresh the segment
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
-    _pinotHelixResourceManager.refreshSegment(segmentMetadata, offlineSegmentZKMetadata, "http://dummy/");
+    _pinotHelixResourceManager.refreshSegment(segmentMetadata, offlineSegmentZKMetadata);
 
     offlineSegmentZKMetadata =
         _pinotHelixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);

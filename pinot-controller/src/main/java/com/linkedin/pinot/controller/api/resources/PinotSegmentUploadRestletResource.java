@@ -321,7 +321,7 @@ public class PinotSegmentUploadRestletResource {
           .validateSegment(segmentMetadata, tempSegmentDir);
 
       // Zk operations
-      completeZkOperations(enableParallelPushProtection, headers, tempDecryptedFile, provider, segmentMetadata,
+      completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
           segmentName, zkDownloadUri);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + segmentMetadata.getTableName());

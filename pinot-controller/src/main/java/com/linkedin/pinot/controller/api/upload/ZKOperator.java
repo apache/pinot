@@ -46,14 +46,16 @@ public class ZKOperator {
   private ControllerConf _controllerConf;
   private ControllerMetrics _controllerMetrics;
 
-  public ZKOperator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf, ControllerMetrics controllerMetrics) {
+  public ZKOperator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf,
+      ControllerMetrics controllerMetrics) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
   }
 
-  public void completeSegmentOperations(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI, File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers,
-      String zkDownloadURI) throws Exception {
+  public void completeSegmentOperations(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
+      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI)
+      throws Exception {
     String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
@@ -63,23 +65,31 @@ public class ZKOperator {
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
       LOGGER.info("Adding new segment: {}", segmentName);
-      processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, rawTableName,
-          segmentName);
+      String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
+      processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, crypter,
+          rawTableName, segmentName);
       return;
     }
 
     LOGGER.info("Segment {} already exists, refreshing if necessary", segmentName);
 
     processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
-        enableParallelPushProtection, headers, zkDownloadURI, rawTableName, offlineTableName, segmentName, znRecord);
+        enableParallelPushProtection, headers, zkDownloadURI, offlineTableName, segmentName, znRecord);
   }
 
   private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
-      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers,
-      String downloadURI, String rawTableName, String offlineTableName, String segmentName,
-      ZNRecord znRecord) throws Exception {
+      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String downloadURI,
+      String offlineTableName, String segmentName, ZNRecord znRecord) throws Exception {
+
     OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
     long existingCrc = existingSegmentZKMetadata.getCrc();
+
+    // Set the download URL.
+    existingSegmentZKMetadata.setDownloadUrl(downloadURI);
+
+    // Set the crypter name (even if null, so it can be removed from metadata).
+    String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
+    existingSegmentZKMetadata.setCrypterName(crypter);
 
     // Check if CRC match when IF-MATCH header is set
     checkCRC(headers, offlineTableName, segmentName, existingCrc);
@@ -135,7 +145,8 @@ public class ZKOperator {
       // Update ZK metadata and refresh the segment if necessary
       long newCrc = Long.valueOf(segmentMetadata.getCrc());
       if (newCrc == existingCrc) {
-        LOGGER.info("New segment crc {} is same as existing segment crc {} for segment {}. Updating ZK metadata without refreshing the segment {}",
+        LOGGER.info(
+            "New segment crc {} is same as existing segment crc {} for segment {}. Updating ZK metadata without refreshing the segment {}",
             newCrc, existingCrc, segmentName);
         if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
           throw new RuntimeException(
@@ -143,12 +154,14 @@ public class ZKOperator {
         }
       } else {
         // New segment is different with the existing one, update ZK metadata and refresh the segment
-        LOGGER.info("New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing segment {}",
+        LOGGER.info(
+            "New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing segment {}",
             newCrc, existingCrc, segmentName);
         moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
-        LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
+        LOGGER.info("Moved segment {} from temp location {} to {}", segmentName,
+            currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
 
-        _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata, downloadURI);
+        _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata);
       }
     } catch (Exception e) {
       if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
@@ -178,18 +191,20 @@ public class ZKOperator {
   }
 
   private void processNewSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
-      File currentSegmentLocation, String zkDownloadURI, String rawTableName, String segmentName) {
+      File currentSegmentLocation, String zkDownloadURI, String crypter, String rawTableName, String segmentName) {
     try {
       moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
-      LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
+      LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(),
+          finalSegmentLocationURI.getPath());
     } catch (Exception e) {
       LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, rawTableName, e);
       throw new RuntimeException(e);
     }
-    _pinotHelixResourceManager.addNewSegment(segmentMetadata, zkDownloadURI);
+    _pinotHelixResourceManager.addNewSegment(segmentMetadata, zkDownloadURI, crypter);
   }
 
-  private void moveSegmentToPermanentDirectory(File currentSegmentLocation, URI finalSegmentLocationURI) throws Exception {
+  private void moveSegmentToPermanentDirectory(File currentSegmentLocation, URI finalSegmentLocationURI)
+      throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(finalSegmentLocationURI.getScheme());
 
     // Overwrites current segment file
