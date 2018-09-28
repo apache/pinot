@@ -1,5 +1,5 @@
 {{#if fetchDimensionAnalysisData.isRunning}}
-  {{ember-spinner}}
+  <div class="spinner-wrapper-self-serve">{{ember-spinner}}</div>
 {{/if}}
 
 <a class="te-self-serve__side-link te-self-serve__side-link--tall" {{action "onClickDimensionOptions" this}}>
