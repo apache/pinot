@@ -18,11 +18,10 @@ package com.linkedin.pinot.core.startree;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.util.Iterator;
 
+import static com.linkedin.pinot.core.startree.StarTreeBuilderUtils.*;
+
 
 public class OffHeapStarTreeNode implements StarTreeNode {
-  public static final int INVALID_INDEX = -1;
-
-  // Number of fields and serializable size of the node
   public static final int NUM_SERIALIZABLE_FIELDS = 7;
   public static final int SERIALIZABLE_SIZE_IN_BYTES = Integer.BYTES * NUM_SERIALIZABLE_FIELDS;
 
@@ -32,9 +31,8 @@ public class OffHeapStarTreeNode implements StarTreeNode {
   private final int _startDocId;
   private final int _endDocId;
   private final int _aggregatedDocId;
-  private final int _childrenStartIndex;
-  // Inclusive
-  private final int _childrenEndIndex;
+  private final int _firstChildId;
+  private final int _lastChildId;
 
   public OffHeapStarTreeNode(PinotDataBuffer dataBuffer, int nodeId) {
     _dataBuffer = dataBuffer;
@@ -55,10 +53,10 @@ public class OffHeapStarTreeNode implements StarTreeNode {
     _aggregatedDocId = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
 
-    _childrenStartIndex = dataBuffer.getInt(offset);
+    _firstChildId = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
 
-    _childrenEndIndex = dataBuffer.getInt(offset);
+    _lastChildId = dataBuffer.getInt(offset);
   }
 
   @Override
@@ -73,10 +71,10 @@ public class OffHeapStarTreeNode implements StarTreeNode {
 
   @Override
   public int getChildDimensionId() {
-    if (_childrenStartIndex == INVALID_INDEX) {
-      return INVALID_INDEX;
+    if (_firstChildId == INVALID_ID) {
+      return INVALID_ID;
     } else {
-      return _dataBuffer.getInt(_childrenStartIndex * SERIALIZABLE_SIZE_IN_BYTES);
+      return _dataBuffer.getInt(_firstChildId * SERIALIZABLE_SIZE_IN_BYTES);
     }
   }
 
@@ -97,16 +95,16 @@ public class OffHeapStarTreeNode implements StarTreeNode {
 
   @Override
   public int getNumChildren() {
-    if (_childrenStartIndex == INVALID_INDEX) {
+    if (_firstChildId == INVALID_ID) {
       return 0;
     } else {
-      return _childrenEndIndex - _childrenStartIndex + 1;
+      return _lastChildId - _firstChildId + 1;
     }
   }
 
   @Override
   public boolean isLeaf() {
-    return _childrenStartIndex == INVALID_INDEX;
+    return _firstChildId == INVALID_ID;
   }
 
   @Override
@@ -117,7 +115,7 @@ public class OffHeapStarTreeNode implements StarTreeNode {
 
     // Specialize star node for performance
     if (dimensionValue == ALL) {
-      OffHeapStarTreeNode firstNode = new OffHeapStarTreeNode(_dataBuffer, _childrenStartIndex);
+      OffHeapStarTreeNode firstNode = new OffHeapStarTreeNode(_dataBuffer, _firstChildId);
       if (firstNode.getDimensionValue() == ALL) {
         return firstNode;
       } else {
@@ -126,8 +124,8 @@ public class OffHeapStarTreeNode implements StarTreeNode {
     }
 
     // Binary search
-    int low = _childrenStartIndex;
-    int high = _childrenEndIndex;
+    int low = _firstChildId;
+    int high = _lastChildId;
 
     while (low <= high) {
       int mid = (low + high) / 2;
@@ -148,13 +146,11 @@ public class OffHeapStarTreeNode implements StarTreeNode {
   @Override
   public Iterator<OffHeapStarTreeNode> getChildrenIterator() {
     return new Iterator<OffHeapStarTreeNode>() {
-      // Inclusive
-      private final int _endChildId = _childrenEndIndex;
-      private int _currentChildId = _childrenStartIndex;
+      private int _currentChildId = _firstChildId;
 
       @Override
       public boolean hasNext() {
-        return _currentChildId <= _endChildId;
+        return _currentChildId <= _lastChildId;
       }
 
       @Override

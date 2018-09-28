@@ -31,32 +31,18 @@ import java.util.Map;
 
 
 /**
- * LBuffer based implementation of star tree.
+ * The {@code OffHeapStarTree} class implements the star-tree using off-heap memory.
  */
 public class OffHeapStarTree implements StarTree {
   public static final long MAGIC_MARKER = 0xBADDA55B00DAD00DL;
   public static final int VERSION = 1;
 
-  private static final int DIMENSION_NAME_MAX_LENGTH = 4096;
-
   private final PinotDataBuffer _dataBuffer;
   private final OffHeapStarTreeNode _root;
   private final List<String> _dimensionNames;
 
-  /**
-   * Constructor for the class.
-   * - Reads in the header
-   * - Loads/MMap's the OffHeapStarTreeNode array.
-   */
-  public OffHeapStarTree(File starTreeFile, ReadMode readMode) throws IOException {
-    // Backward-compatible: star-tree file is always little-endian
-    if (readMode.equals(ReadMode.mmap)) {
-      _dataBuffer = PinotDataBuffer.mapFile(starTreeFile, true, 0, starTreeFile.length(), ByteOrder.LITTLE_ENDIAN,
-          "OffHeapStarTree");
-    } else {
-      _dataBuffer =
-          PinotDataBuffer.loadFile(starTreeFile, 0, starTreeFile.length(), ByteOrder.LITTLE_ENDIAN, "OffHeapStarTree");
-    }
+  public OffHeapStarTree(PinotDataBuffer dataBuffer) {
+    _dataBuffer = dataBuffer;
 
     long offset = 0L;
     Preconditions.checkState(MAGIC_MARKER == _dataBuffer.getLong(offset), "Invalid magic marker in Star Tree file");
@@ -72,32 +58,43 @@ public class OffHeapStarTree implements StarTree {
     offset += Integer.BYTES;
 
     String[] dimensionNames = new String[numDimensions];
-    byte[] dimensionNameBytes = new byte[DIMENSION_NAME_MAX_LENGTH];
     for (int i = 0; i < numDimensions; i++) {
-      // NOTE: In old version, index might not be stored in order
+      // NOTE: this is for backward-compatibility. In old version, index might not be stored in order
       int dimensionId = _dataBuffer.getInt(offset);
       offset += Integer.BYTES;
 
-      int dimensionLength = _dataBuffer.getInt(offset);
-      Preconditions.checkState(dimensionLength < DIMENSION_NAME_MAX_LENGTH);
+      int numBytes = _dataBuffer.getInt(offset);
       offset += Integer.BYTES;
-
-      _dataBuffer.copyTo(offset, dimensionNameBytes, 0, dimensionLength);
-      offset += dimensionLength;
-
-      String dimensionName = StringUtil.decodeUtf8(dimensionNameBytes, 0, dimensionLength);
-      dimensionNames[dimensionId] = dimensionName;
+      byte[] bytes = new byte[numBytes];
+      _dataBuffer.copyTo(offset, bytes);
+      offset += numBytes;
+      dimensionNames[dimensionId] = StringUtil.decodeUtf8(bytes);
     }
     _dimensionNames = Arrays.asList(dimensionNames);
 
     int numNodes = _dataBuffer.getInt(offset);
     offset += Integer.BYTES;
     Preconditions.checkState(offset == rootNodeOffset, "Error reading Star Tree file, header length mis-match");
-    long fileLength = starTreeFile.length();
-    Preconditions.checkState(offset + numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES == fileLength,
-        "Error reading Star Tree file, file length mis-match");
+    long bufferSize = _dataBuffer.size();
+    Preconditions.checkState(offset + numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES == bufferSize,
+        "Error reading Star Tree file, buffer size mis-match");
 
-    _root = new OffHeapStarTreeNode(_dataBuffer.view(rootNodeOffset, fileLength), 0);
+    _root = new OffHeapStarTreeNode(_dataBuffer.view(rootNodeOffset, bufferSize), 0);
+  }
+
+  public OffHeapStarTree(File starTreeFile, ReadMode readMode) throws IOException {
+    this(getDataBuffer(starTreeFile, readMode));
+  }
+
+  private static PinotDataBuffer getDataBuffer(File starTreeFile, ReadMode readMode) throws IOException {
+    // Backward-compatible: star-tree file is always little-endian
+    if (readMode == ReadMode.mmap) {
+      return PinotDataBuffer.mapFile(starTreeFile, true, 0, starTreeFile.length(), ByteOrder.LITTLE_ENDIAN,
+          "OffHeapStarTree");
+    } else {
+      return PinotDataBuffer.loadFile(starTreeFile, 0, starTreeFile.length(), ByteOrder.LITTLE_ENDIAN,
+          "OffHeapStarTree");
+    }
   }
 
   @Override
