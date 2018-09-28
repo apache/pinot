@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
@@ -45,7 +46,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readInt(int docId) {
+  public Object readInt(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -55,7 +56,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readLong(int docId) {
+  public Object readLong(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -65,7 +66,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readFloat(int docId) {
+  public Object readFloat(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -75,7 +76,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readDouble(int docId) {
+  public Object readDouble(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -85,7 +86,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readString(int docId) {
+  public Object readString(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -95,7 +96,7 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object readBytes(int docId) {
+  public Object readBytes(int docId) {
     SingleColumnSingleValueReader svReader = (SingleColumnSingleValueReader) _reader;
     if (_dictionary != null) {
       int dictId = svReader.getInt(docId, _readerContext);
@@ -105,7 +106,26 @@ public class PinotSegmentColumnReader {
     }
   }
 
-  Object[] readMV(int docId) {
+  public Object readSV(int docId, DataType dataType) {
+    switch (dataType) {
+      case INT:
+        return readInt(docId);
+      case LONG:
+        return readLong(docId);
+      case FLOAT:
+        return readFloat(docId);
+      case DOUBLE:
+        return readDouble(docId);
+      case STRING:
+        return readString(docId);
+      case BYTES:
+        return readBytes(docId);
+      default:
+        throw new IllegalStateException("Unsupported data type: " + dataType);
+    }
+  }
+
+  public Object[] readMV(int docId) {
     SingleColumnMultiValueReader mvReader = (SingleColumnMultiValueReader) _reader;
     int numValues = mvReader.getIntArray(docId, _mvBuffer, _readerContext);
     Object[] values = new Object[numValues];
