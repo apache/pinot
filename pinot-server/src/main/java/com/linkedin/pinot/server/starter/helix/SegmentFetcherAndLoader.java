@@ -51,6 +51,7 @@ public class SegmentFetcherAndLoader {
 
   private final InstanceDataManager _instanceDataManager;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private final Configuration _crypterConfig;
 
   public SegmentFetcherAndLoader(@Nonnull Configuration config, @Nonnull InstanceDataManager instanceDataManager,
       @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore) throws Exception {
@@ -63,6 +64,8 @@ public class SegmentFetcherAndLoader {
 
     PinotFSFactory.init(pinotFSConfig);
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
+
+    _crypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
   }
 
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {
@@ -191,6 +194,8 @@ public class SegmentFetcherAndLoader {
     try {
       SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempDownloadFile);
       if (crypter != null) {
+        // TODO: We should not need to initialize crypter each time, instead Factory should have an initialized version ready.
+        crypter.init(_crypterConfig);
         crypter.decrypt(tempDownloadFile, tempTarFile);
       } else {
         tempTarFile = tempDownloadFile;
