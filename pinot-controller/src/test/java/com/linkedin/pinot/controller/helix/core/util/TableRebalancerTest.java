@@ -81,7 +81,7 @@ public class TableRebalancerTest {
 
   // no-downtime rebalance without common elements - target state is updated to have one up replica
   @Test
-  public void NoDowntimeUpdateWithNoCommonElements() {
+  public void noDowntimeUpdateWithNoCommonElements() {
     Map<String, String> targetMap = new HashMap<>();
     targetMap.put("host4", "ONLINE");
     targetMap.put("host3", "ONLINE");

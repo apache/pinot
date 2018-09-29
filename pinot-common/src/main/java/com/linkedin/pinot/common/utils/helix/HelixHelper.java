@@ -50,6 +50,7 @@ public class HelixHelper {
   public static final int MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE = 1000;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
+  private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
   private static final String ONLINE = "ONLINE";
   private static final String OFFLINE = "OFFLINE";
@@ -57,9 +58,8 @@ public class HelixHelper {
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
   public static IdealState cloneIdealState(IdealState idealState) {
-    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
     return new IdealState(
-        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+        (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
   }
 
   /**

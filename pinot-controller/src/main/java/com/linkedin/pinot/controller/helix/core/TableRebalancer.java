@@ -88,6 +88,7 @@ public class TableRebalancer {
   public void rebalance(TableConfig config, RebalanceSegmentStrategy strategy,
       Configuration rebalanceUserConfig) {
 
+    LOGGER.info("Rebalancing table {}", config.getTableName());
     _executorService.submit(new Runnable() {
       @Override
       public void run() {
