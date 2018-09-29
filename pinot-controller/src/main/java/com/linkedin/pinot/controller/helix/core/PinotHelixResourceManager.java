@@ -130,7 +130,7 @@ public class PinotHelixResourceManager {
   private HelixDataAccessor _helixDataAccessor;
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
-  private IdealStateUpdater _idealStateUpdater;
+  private TableRebalancer _tableRebalancer;
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis,
@@ -169,7 +169,7 @@ public class PinotHelixResourceManager {
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
-    _idealStateUpdater = new IdealStateUpdater(_helixZkManager, _helixAdmin, _helixClusterName);
+    _tableRebalancer = new TableRebalancer(_helixZkManager, _helixAdmin, _helixClusterName);
   }
 
   /**
@@ -177,7 +177,7 @@ public class PinotHelixResourceManager {
    */
   public synchronized void stop() {
     _segmentDeletionManager.stop();
-    _idealStateUpdater.stop();
+    _tableRebalancer.stop();
     _helixZkManager.disconnect();
   }
 
@@ -2086,18 +2086,20 @@ public class PinotHelixResourceManager {
     try {
       RebalanceSegmentStrategy rebalanceSegmentsStrategy =
           RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
-      PartitionAssignment newPartitionAssignment =
-          rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
-      IdealState targetState =
-          rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig);
-
-      // update it as needed
+      // rebalance it as needed
       if (!rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN)) {
         // call the updater providing it a reference to the strategy so it can recompute target state if needed
-        _idealStateUpdater.update(targetState, tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
+        _tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
+        jsonObject.put("status", "Rebalance triggered. Check logs for progress");
+      } else {
+        // dry run mode: return the target partition assignment and idealstate mapping
+        PartitionAssignment newPartitionAssignment =
+            rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
+        IdealState targetState =
+            rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig);
+        jsonObject.put("partitionAssignment", newPartitionAssignment.getPartitionToInstances());
+        jsonObject.put("idealState", targetState.getRecord().getMapFields());
       }
-      jsonObject.put("partitionAssignment", newPartitionAssignment.getPartitionToInstances());
-      jsonObject.put("idealState", targetState.getRecord().getMapFields());
     } catch (JSONException e) {
       LOGGER.error("Exception in constructing json response for rebalance table {}", tableNameWithType, e);
       throw e;

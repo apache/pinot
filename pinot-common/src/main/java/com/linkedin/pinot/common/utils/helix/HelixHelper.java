@@ -56,6 +56,12 @@ public class HelixHelper {
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
 
+  public static IdealState cloneIdealState(IdealState idealState) {
+    ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
+    return new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+  }
+
   /**
    * Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
    *
@@ -77,9 +83,7 @@ public class HelixHelper {
           // Make a copy of the the idealState above to pass it to the updater
           // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
           // list fields
-          ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
-          IdealState idealStateCopy = new IdealState(
-              (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+          IdealState idealStateCopy = cloneIdealState(idealState);
 
           IdealState updatedIdealState;
           try {

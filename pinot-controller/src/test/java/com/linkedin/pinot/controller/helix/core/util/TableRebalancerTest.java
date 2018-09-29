@@ -16,7 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.util;
 
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.controller.helix.core.IdealStateUpdater;
+import com.linkedin.pinot.controller.helix.core.TableRebalancer;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -30,7 +30,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-public class IdealStateUpdaterTest {
+public class TableRebalancerTest {
 
   private IdealState current;
   private final String segmentId = "segment1";
@@ -47,7 +47,7 @@ public class IdealStateUpdaterTest {
     noDowntime.setProperty(RebalanceUserConfigConstants.DOWNTIME, false);
   }
 
-  // no-downtime update with common elements - target state is set in one go
+  // no-downtime rebalance with common elements - target state is set in one go
   @Test
   public void noDowntimeUpdateWithCommonElements() {
     Map<String, String> targetMap = new HashMap<>();
@@ -56,14 +56,14 @@ public class IdealStateUpdaterTest {
 
     Map<String, String> srcMap = current.getRecord().getMapField(segmentId);
     Assert.assertEquals(srcMap.size(), 2);
-    IdealStateUpdater updater = new IdealStateUpdater(null, null, null);
+    TableRebalancer updater = new TableRebalancer(null, null, null);
     updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, noDowntime);
 
     Map<String, String> tempMap = current.getRecord().getMapField(segmentId);
     Assert.assertTrue(EqualityUtils.isEqual(tempMap, targetMap));
   }
 
-  // downtime update with common elements - target state is set in one go
+  // downtime rebalance with common elements - target state is set in one go
   @Test
   public void downtimeUpdateWithCommonElements() {
     Map<String, String> targetMap = new HashMap<>();
@@ -72,14 +72,14 @@ public class IdealStateUpdaterTest {
 
     Map<String, String> srcMap = current.getRecord().getMapField(segmentId);
     Assert.assertEquals(srcMap.size(), 2);
-    IdealStateUpdater updater = new IdealStateUpdater(null, null, null);
+    TableRebalancer updater = new TableRebalancer(null, null, null);
     updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, downtime);
 
     Map<String, String> tempMap = current.getRecord().getMapField(segmentId);
     Assert.assertTrue(EqualityUtils.isEqual(tempMap, targetMap));
   }
 
-  // no-downtime update without common elements - target state is updated to have one up replica
+  // no-downtime rebalance without common elements - target state is updated to have one up replica
   @Test
   public void NoDowntimeUpdateWithNoCommonElements() {
     Map<String, String> targetMap = new HashMap<>();
@@ -87,7 +87,7 @@ public class IdealStateUpdaterTest {
     targetMap.put("host3", "ONLINE");
 
     Map<String, String> srcMap = current.getRecord().getMapField(segmentId);
-    IdealStateUpdater updater = new IdealStateUpdater(null, null, null);
+    TableRebalancer updater = new TableRebalancer(null, null, null);
     updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, noDowntime);
 
     Map<String, String> tempMap = current.getRecord().getMapField(segmentId);
@@ -99,7 +99,7 @@ public class IdealStateUpdaterTest {
     }
   }
 
-  // downtime update without common elements - target state is set in one go
+  // downtime rebalance without common elements - target state is set in one go
   @Test
   public void downtimeUpdateWithNoCommonElements() {
     Map<String, String> targetMap = new HashMap<>();
@@ -107,7 +107,7 @@ public class IdealStateUpdaterTest {
     targetMap.put("host3", "ONLINE");
 
     Map<String, String> srcMap = current.getRecord().getMapField(segmentId);
-    IdealStateUpdater updater = new IdealStateUpdater(null, null, null);
+    TableRebalancer updater = new TableRebalancer(null, null, null);
     updater.updateSegmentIfNeeded(segmentId, srcMap, targetMap, current, downtime);
 
     Map<String, String> tempMap = current.getRecord().getMapField(segmentId);

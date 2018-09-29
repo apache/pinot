@@ -449,6 +449,11 @@ public class PinotTableRestletResource {
     LOGGER.info("Finished validating tables config for Table: {}", rawTableName);
   }
 
+  /**
+   * Rebalance a table.
+   * @return if in DRY_RUN, the target idealstate/partition-map is returned. Else an indication of success/failure in
+   *         triggering the rebalance is returned.
+   */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
@@ -457,7 +462,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
       @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
       @ApiParam(value = "true|false") @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
-      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming) {
+      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
+      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("downtime") Boolean downtime) {
 
     if (tableType != null && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
@@ -466,6 +472,7 @@ public class PinotTableRestletResource {
     Configuration rebalanceUserConfig = new PropertiesConfiguration();
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
+    rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DOWNTIME, downtime);
 
     TableType type = TableType.valueOf(tableType.toUpperCase());
     if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
