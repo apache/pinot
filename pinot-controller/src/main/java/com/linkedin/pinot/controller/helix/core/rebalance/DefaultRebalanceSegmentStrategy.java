@@ -149,20 +149,6 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
   }
 
   /**
-   * Rebalance the table after calculating the new partition assignment.
-   * @param idealState old ideal state
-   * @param tableConfig table config of table tor rebalance
-   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
-   * @return new idealstate
-   */
-  @Override
-  public IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig) throws InvalidConfigException {
-    return getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig,
-        rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig));
-  }
-
-  /**
    * Rebalances ideal state object without updating it
    * @param idealState
    * @param tableConfig

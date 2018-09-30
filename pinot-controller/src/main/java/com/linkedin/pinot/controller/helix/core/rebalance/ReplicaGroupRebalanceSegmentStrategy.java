@@ -123,21 +123,6 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
   }
 
   /**
-   * Rebalance the segments for replica group tables after getting the new partition assignment.
-   * @param idealState old ideal state
-   * @param tableConfig table config of table tor rebalance
-   * @param rebalanceUserConfig custom user configs for specific rebalance strategies
-   * @return a rebalanced idealstate
-   */
-  @Override
-  public IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig,
-      Configuration rebalanceUserConfig) throws InvalidConfigException {
-
-    return getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig,
-        rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig));
-  }
-
-  /**
    * Compute the new replica group mapping based on the new configurations
    * @param tableConfig a talbe config
    * @param partitionAssignmentGenerator partition assignment generator

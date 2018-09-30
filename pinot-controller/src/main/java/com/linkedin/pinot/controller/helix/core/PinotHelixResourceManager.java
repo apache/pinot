@@ -35,6 +35,7 @@ import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.exception.TableNotFoundException;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -43,9 +44,9 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
+import com.linkedin.pinot.common.restlet.resources.RebalanceResult;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
@@ -62,7 +63,6 @@ import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
-import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategy;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyEnum;
 import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrategyFactory;
@@ -101,8 +101,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,7 +175,6 @@ public class PinotHelixResourceManager {
    */
   public synchronized void stop() {
     _segmentDeletionManager.stop();
-    _tableRebalancer.stop();
     _helixZkManager.disconnect();
   }
 
@@ -2075,39 +2072,25 @@ public class PinotHelixResourceManager {
   }
 
   @Nonnull
-  public JSONObject rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig)
-      throws JSONException, InvalidConfigException {
+  public RebalanceResult rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig)
+      throws InvalidConfigException, TableNotFoundException {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
+    if (tableConfig == null) {
+      throw new TableNotFoundException("Table " + rawTableName + " of type " + tableType.toString() + " not found");
+    }
     String tableNameWithType = tableConfig.getTableName();
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
 
-    JSONObject jsonObject = new JSONObject();
+    RebalanceResult result;
     try {
       RebalanceSegmentStrategy rebalanceSegmentsStrategy =
           RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
-      // rebalance it as needed
-      if (!rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN)) {
-        // call the updater providing it a reference to the strategy so it can recompute target state if needed
-        _tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
-        jsonObject.put("status", "Rebalance triggered. Check logs for progress");
-      } else {
-        // dry run mode: return the target partition assignment and idealstate mapping
-        PartitionAssignment newPartitionAssignment =
-            rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
-        IdealState targetState =
-            rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig);
-        jsonObject.put("partitionAssignment", newPartitionAssignment.getPartitionToInstances());
-        jsonObject.put("idealState", targetState.getRecord().getMapFields());
-      }
-    } catch (JSONException e) {
-      LOGGER.error("Exception in constructing json response for rebalance table {}", tableNameWithType, e);
-      throw e;
+      result = _tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
     } catch (InvalidConfigException e) {
       LOGGER.error("Exception in rebalancing config for table {}", tableNameWithType, e);
       throw e;
     }
-    return jsonObject;
+    return result;
   }
 
   /**

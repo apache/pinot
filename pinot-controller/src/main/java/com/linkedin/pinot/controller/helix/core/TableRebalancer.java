@@ -18,16 +18,15 @@ package com.linkedin.pinot.controller.helix.core;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
+import com.linkedin.pinot.common.restlet.resources.RebalanceResult;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy;
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceUserConfigConstants;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.exception.ZkBadVersionException;
 import org.apache.commons.configuration.Configuration;
@@ -63,11 +62,9 @@ public class TableRebalancer {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableRebalancer.class);
 
-  private static final int MAX_THREADS = 10;
   private static final int MAX_RETRIES = 10;
   private static final int EXTERNAL_VIEW_CHECK_INTERVAL_MS = 30000;
 
-  private final ExecutorService _executorService;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final String _helixClusterName;
@@ -76,34 +73,6 @@ public class TableRebalancer {
     _helixManager = mgr;
     _helixAdmin = admin;
     _helixClusterName = helixClusterName;
-
-    _executorService = Executors.newFixedThreadPool(MAX_THREADS,
-        new ThreadFactoryBuilder().setNameFormat("idealstate-updater-thread-%d").build());
-  }
-
-  /**
-   * Rebalances a table and udpates idealstate. The rebalance is handled in a background thread to track the progress of the
-   * rebalance.
-   */
-  public void rebalance(TableConfig config, RebalanceSegmentStrategy strategy,
-      Configuration rebalanceUserConfig) {
-
-    LOGGER.info("Rebalancing table {}", config.getTableName());
-    _executorService.submit(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          rebalanceAndUpdate(config, strategy, rebalanceUserConfig);
-        } catch (Throwable t) {
-          // catch all throwables to prevent losing the thread
-          LOGGER.error("Caught error while updating idealstate for table {}", config.getTableName(), t);
-        }
-      }
-    });
-  }
-
-  public void stop() {
-    _executorService.shutdown();
   }
 
   /**
@@ -118,10 +87,10 @@ public class TableRebalancer {
    * Note: we don't use {@link com.linkedin.pinot.common.utils.helix.HelixHelper} directly as we would like to manage
    * the main logic and retries according to the rebalance algorithm. Some amount of code is duplicated from HelixHelper.
    */
-  private void rebalanceAndUpdate(TableConfig tableConfig, RebalanceSegmentStrategy strategy, Configuration rebalanceConfig)
-      throws InvalidConfigException {
+  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceSegmentStrategy strategy,
+      Configuration rebalanceConfig) throws InvalidConfigException{
 
-    long startTime = System.nanoTime();
+    RebalanceResult result = new RebalanceResult();
 
     String tableName = tableConfig.getTableName();
     HelixDataAccessor dataAccessor = _helixManager.getHelixDataAccessor();
@@ -130,7 +99,20 @@ public class TableRebalancer {
     PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(tableName);
     IdealState previousIdealState = dataAccessor.getProperty(idealStateKey);
 
+    if(rebalanceConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, RebalanceUserConfigConstants.DEFAULT_DRY_RUN)) {
+      PartitionAssignment partitionAssignment = strategy.rebalancePartitionAssignment(previousIdealState, tableConfig,
+          rebalanceConfig );
+      IdealState idealState = strategy.getRebalancedIdealState(previousIdealState, tableConfig, rebalanceConfig,
+          partitionAssignment);
+      result.setIdealStateMapping(idealState.getRecord().getMapFields());
+      result.setPartitionAssignment(partitionAssignment);
+      return result;
+    }
+
+    long startTime = System.nanoTime();
     IdealState targetIdealState = null;
+    PartitionAssignment targetPartitionAssignment = null;
+
     long retryDelayMs = 60000; // 1 min
     int retries = 0;
     while (true) {
@@ -146,7 +128,10 @@ public class TableRebalancer {
         // list fields
         IdealState idealStateCopy = HelixHelper.cloneIdealState(currentIdealState);
         // rebalance; can throw InvalidConfigException - in which case we bail out
-        targetIdealState = strategy.getRebalancedIdealState(idealStateCopy, tableConfig, rebalanceConfig);
+        targetPartitionAssignment = strategy.rebalancePartitionAssignment(previousIdealState, tableConfig,
+            rebalanceConfig );
+        targetIdealState = strategy.getRebalancedIdealState(idealStateCopy, tableConfig, rebalanceConfig,
+            targetPartitionAssignment);
       }
 
       if (EqualityUtils.isEqual(targetIdealState, currentIdealState)) {
@@ -154,7 +139,9 @@ public class TableRebalancer {
 
         LOGGER.info("Finished rebalancing table {} in {} ms.", tableName,
             TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
-        return;
+        result.setIdealStateMapping(targetIdealState.getRecord().getMapFields());
+        result.setPartitionAssignment(targetPartitionAssignment);
+        return result;
       }
 
       // if ideal state needs to change, get the next 'safe' state (based on whether downtime is OK or not)
@@ -186,7 +173,7 @@ public class TableRebalancer {
       previousIdealState = currentIdealState;
       if (retries++ > MAX_RETRIES) {
         LOGGER.error("Unable to rebalance table {} in {} attempts. Giving up", tableName, MAX_RETRIES);
-        return;
+        return result;
       }
       // wait before retrying
       try {
@@ -194,7 +181,7 @@ public class TableRebalancer {
       } catch (InterruptedException e) {
         LOGGER.error("Got interrupted while rebalancing table {}", tableName);
         Thread.currentThread().interrupt();
-        return;
+        return result;
       }
     }
   }

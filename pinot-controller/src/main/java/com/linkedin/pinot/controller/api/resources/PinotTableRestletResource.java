@@ -20,8 +20,10 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.exception.TableNotFoundException;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.restlet.resources.RebalanceResult;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -36,6 +38,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -91,6 +94,9 @@ public class PinotTableRestletResource {
 
   @Inject
   ControllerMetrics _controllerMetrics;
+
+  @Inject
+  ExecutorService _executorService;
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
@@ -475,20 +481,31 @@ public class PinotTableRestletResource {
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DOWNTIME, downtime);
 
     TableType type = TableType.valueOf(tableType.toUpperCase());
-    if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
-        || type == TableType.REALTIME && (!_pinotHelixResourceManager.hasRealtimeTable(tableName))) {
-      throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
-          Response.Status.NOT_FOUND);
-    }
 
-    JSONObject jsonObject;
+    RebalanceResult result;
     try {
-      jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
-    } catch (JSONException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+      if (dryRun) {
+        result = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
+      } else {
+        _executorService.submit(new Runnable() {
+          @Override
+          public void run() {
+            try {
+              _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
+            } catch (Throwable e) {
+              // catch all throwables to prevent losing the thread
+              LOGGER.error("Encountered error during rebalance for table {}", tableName, e);
+            }
+          }
+        });
+        result = new RebalanceResult();
+        result.setStatus("Rebalance for table " + tableName + " in progress. Check controller logs for updates.");
+      }
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
-    return jsonObject.toString();
+    return result.toString();
   }
 }
