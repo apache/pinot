@@ -26,6 +26,8 @@ import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.Calendar;
 import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.Event;
+import com.google.common.collect.ImmutableMap;
+import com.ibm.icu.util.TimeZone;
 import com.linkedin.thirdeye.anomaly.HolidayEventsLoaderConfiguration;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
@@ -216,6 +218,11 @@ public class HolidayEventsLoader implements Runnable {
 
   private static final String NO_COUNTRY_CODE = "no country code";
 
+  /**
+   * Override the time zone code for a country
+   */
+  private static Map<String, String> COUNTRY_TO_TIMEZONE = ImmutableMap.of("US", "PST");
+
   static {
     try {
       HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
@@ -251,6 +258,7 @@ public class HolidayEventsLoader implements Runnable {
   }
 
   public void loadHolidays(long start, long end) {
+    LOG.info("Loading holidays between {} and {}", start, end);
     List<Event> newHolidays = null;
     try {
       newHolidays = getAllHolidays(start, end);
@@ -274,19 +282,40 @@ public class HolidayEventsLoader implements Runnable {
 
     // Convert Google Event Type to holiday events and aggregates the country code list
     for (Event holiday : newHolidays) {
+      String countryCode = getCountryCode(holiday);
+      String timeZone = getTimeZoneForCountry(countryCode);
       HolidayEvent holidayEvent =
-          new HolidayEvent(holiday.getSummary(), EventType.HOLIDAY.toString(), holiday.getStart().getDate().getValue(),
-              holiday.getEnd().getDate().getValue());
-
+          new HolidayEvent(holiday.getSummary(), EventType.HOLIDAY.toString(),
+              getUtcTimeStamp(holiday.getStart().getDate().getValue(), timeZone),
+              getUtcTimeStamp(holiday.getEnd().getDate().getValue(), timeZone));
       if (!newHolidayEventToCountryCodes.containsKey(holidayEvent)) {
         newHolidayEventToCountryCodes.put(holidayEvent, new HashSet<String>());
       }
-      String countryCode = getCountryCode(holiday);
       if (!countryCode.equals(NO_COUNTRY_CODE)) {
         newHolidayEventToCountryCodes.get(holidayEvent).add(countryCode);
       }
+      LOG.info("Get holiday event {} in country {} between {} and {} in timezone {} ", holidayEvent.getName(),
+          countryCode, holidayEvent.getStartTime(), holidayEvent.getEndTime(), timeZone);
     }
     return newHolidayEventToCountryCodes;
+  }
+
+  private long getUtcTimeStamp(long timeStamp, String timeZone){
+    return timeStamp - TimeZone.getTimeZone(timeZone).getOffset(timeStamp);
+  }
+
+  private String getTimeZoneForCountry(String countryCode) {
+    // if time zone of a country is set explicitly
+    if (COUNTRY_TO_TIMEZONE.containsKey(countryCode)) {
+      return COUNTRY_TO_TIMEZONE.get(countryCode);
+    }
+    // guess the time zone from country code
+    String timeZone = "GMT";
+    String[] timeZones = TimeZone.getAvailableIDs(countryCode);
+    if (timeZones.length != 0) {
+      timeZone = timeZones[0];
+    }
+    return timeZone;
   }
 
   Map<String, List<EventDTO>> getHolidayNameToEventDtoMap(
