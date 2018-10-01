@@ -37,7 +37,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Utility class to obtain the status of the Pinot instance running in this JVM.
  */
-@SuppressWarnings("unused")
 public class ServiceStatus {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServiceStatus.class);
 
@@ -89,6 +88,19 @@ public class ServiceStatus {
     }
   }
 
+  public static boolean checkServiceStatus(boolean shuttingDownStatus) {
+    if (ServiceStatus.serviceStatusCallback instanceof MultipleCallbackServiceStatusCallback) {
+      MultipleCallbackServiceStatusCallback multipleCallbackServiceStatusCallback =
+          (MultipleCallbackServiceStatusCallback)serviceStatusCallback;
+      return multipleCallbackServiceStatusCallback.checkServiceStatus(shuttingDownStatus);
+    } else if (ServiceStatus.serviceStatusCallback instanceof IdealStateAndExternalViewMatchServiceStatusCallback) {
+      IdealStateAndExternalViewMatchServiceStatusCallback idealStateAndExternalViewMatchServiceStatusCallback =
+          (IdealStateAndExternalViewMatchServiceStatusCallback)serviceStatusCallback;
+      return idealStateAndExternalViewMatchServiceStatusCallback.checkServiceStatus(shuttingDownStatus);
+    }
+    return true;
+  }
+
   public static class MultipleCallbackServiceStatusCallback implements ServiceStatusCallback {
     private final List<? extends ServiceStatusCallback> _statusCallbacks;
 
@@ -120,6 +132,19 @@ public class ServiceStatus {
             .append(";");
       }
       return statusDescription.toString();
+    }
+
+    public boolean checkServiceStatus(boolean shuttingDownStatus) {
+      boolean allGood = true;
+      for (ServiceStatusCallback statusCallback : _statusCallbacks) {
+
+        if (statusCallback instanceof IdealStateMatchServiceStatusCallback) {
+          IdealStateMatchServiceStatusCallback idealStateMatchServiceStatusCallback =
+              (IdealStateMatchServiceStatusCallback)statusCallback;
+          allGood &= idealStateMatchServiceStatusCallback.checkServiceStatus(shuttingDownStatus);
+        }
+      }
+      return allGood;
     }
   }
 
@@ -185,6 +210,39 @@ public class ServiceStatus {
     protected abstract T getState(String resourceName);
 
     protected abstract Map<String, String> getPartitionStateMap(T state);
+
+    public boolean checkServiceStatus(boolean isShutdown) {
+      if (_resourcesToMonitor.isEmpty()) {
+        return true;
+      }
+      Iterator<String> iterator = _resourcesToMonitor.iterator();
+      while (iterator.hasNext()) {
+        String resourceName = iterator.next();
+        IdealState idealState = getResourceIdealState(resourceName);
+
+        // If the resource has been removed or disabled, ignore it
+        if (idealState == null || !idealState.isEnabled()) {
+          continue;
+        }
+
+        String descriptionSuffix = String.format("resource=%s, numResourcesLeft=%d, numTotalResources=%d", resourceName,
+            _resourcesToMonitor.size(), _numTotalResourcesToMonitor);
+        T helixState = getState(resourceName);
+        if (helixState == null) {
+          _statusDescription = "Helix state does not exist: " + descriptionSuffix;
+          continue;
+        }
+
+        Map<String, String> partitionStateMap = getPartitionStateMap(helixState);
+        for (String partitionName : idealState.getPartitionSet()) {
+          String currentStateStatus = partitionStateMap.get(partitionName);
+          if (isShutdown == "ONLINE".equals(currentStateStatus)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
 
     @Override
     public synchronized Status getServiceStatus() {

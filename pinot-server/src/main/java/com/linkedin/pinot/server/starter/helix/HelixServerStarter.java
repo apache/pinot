@@ -69,6 +69,7 @@ public class HelixServerStarter {
   private final Configuration _helixServerConfig;
   private final String _instanceId;
   private final long _maxQueryTimeMs;
+  private final long _maxWaitTimeMs;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final ServerInstance _serverInstance;
@@ -95,6 +96,8 @@ public class HelixServerStarter {
 
     _maxQueryTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    _maxWaitTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_WAIT_TIME,
+        CommonConstants.Server.DEFAULT_MAX_WAIT_TIME_MS);
 
     LOGGER.info("Connecting Helix components");
     setupHelixSystemProperties(_helixServerConfig);
@@ -132,7 +135,6 @@ public class HelixServerStarter {
         CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
     _adminApiApplication = new AdminApiApplication(_serverInstance);
     _adminApiApplication.start(adminApiPort);
-    updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
@@ -154,6 +156,9 @@ public class HelixServerStarter {
 
     ControllerLeaderLocator.create(_helixManager);
 
+
+    waitForServiceStatusChange(false /*shutDownStatus*/);
+    updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
     LOGGER.info("Pinot server ready");
 
     // Create metrics for mmap stuff
@@ -216,12 +221,26 @@ public class HelixServerStarter {
 
   public void stop() {
     _adminApiApplication.stop();
-    setShuttingDownStatus(true);
     if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, true)) {
       Uninterruptibles.sleepUninterruptibly(_maxQueryTimeMs, TimeUnit.MILLISECONDS);
     }
     _helixManager.disconnect();
     _serverInstance.shutDown();
+
+    waitForServiceStatusChange(true /*shutDownStatus*/);
+    setShuttingDownStatus(true);
+  }
+
+  private void waitForServiceStatusChange(boolean shuttingDownStatus) {
+    long startTime = System.currentTimeMillis();
+
+    while (!ServiceStatus.checkServiceStatus(shuttingDownStatus)) {
+      if (System.currentTimeMillis() - startTime > _maxWaitTimeMs) {
+        LOGGER.error("Timeout waiting for all service status to change when {} Pinot server {}! Max waiting time: {}",
+            shuttingDownStatus ? "shutting down" : "starting up", _instanceId, _maxWaitTimeMs);
+        break;
+      }
+    }
   }
 
   /**
