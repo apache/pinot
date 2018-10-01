@@ -164,7 +164,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (!resourceTmpDir.exists()) {
       resourceTmpDir.mkdirs();
     }
-    // create and init stream provider
+    // create and init stream level consumer
     _streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
     _kafkaStreamLevelConsumer = _streamConsumerFactory.createStreamLevelConsumer(

@@ -17,9 +17,9 @@ package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.linkedin.pinot.core.realtime.StreamProviderFactory;
 import java.util.Random;
 import org.testng.annotations.BeforeClass;
 
@@ -28,14 +28,12 @@ import org.testng.annotations.BeforeClass;
  * Integration test that simulates a flaky Kafka consumer.
  */
 public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
-  private static final Class<? extends StreamLevelConsumer> ORIGINAL_STREAM_PROVIDER =
-      StreamProviderFactory.getStreamProviderClass();
+  private static final Class<? extends StreamLevelConsumer> ORIGINAL_STREAM_LEVEL_CONSUMER =
+      KafkaStreamLevelConsumer.class;
 
   @BeforeClass
   @Override
-  public void setUp()
-      throws Exception {
-    StreamProviderFactory.setStreamProviderClass(FlakyStreamLevelConsumer.class);
+  public void setUp() throws Exception {
     super.setUp();
   }
 
@@ -43,9 +41,8 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     private StreamLevelConsumer _streamLevelConsumer;
     private Random _random = new Random();
 
-    public FlakyStreamLevelConsumer()
-        throws Exception {
-      _streamLevelConsumer = ORIGINAL_STREAM_PROVIDER.newInstance();
+    public FlakyStreamLevelConsumer() throws Exception {
+      _streamLevelConsumer = ORIGINAL_STREAM_LEVEL_CONSUMER.newInstance();
     }
 
     @Override
@@ -73,7 +70,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
       if (randomValue == 0) {
         return null;
       } else if (randomValue == 1) {
-        throw new RuntimeException("Flaky stream provider exception");
+        throw new RuntimeException("Flaky stream level consumer exception");
       } else {
         return _streamLevelConsumer.next(destination);
       }
@@ -95,7 +92,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
       boolean failToCommit = _random.nextBoolean();
 
       if (failToCommit) {
-        throw new RuntimeException("Flaky stream provider exception");
+        throw new RuntimeException("Flaky stream level consumer exception");
       } else {
         _streamLevelConsumer.commit();
       }
