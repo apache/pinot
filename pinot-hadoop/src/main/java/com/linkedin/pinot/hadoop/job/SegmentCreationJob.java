@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -49,7 +50,6 @@ public class SegmentCreationJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationJob.class);
 
   private static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
-  private static final String TEMP = "temp";
   private static final String APPEND = "APPEND";
 
   private final String _jobName;
@@ -78,7 +78,7 @@ public class SegmentCreationJob extends Configured {
     _inputSegmentDir = _properties.getProperty(JobConfigConstants.PATH_TO_INPUT);
     String schemaFilePath = _properties.getProperty(JobConfigConstants.PATH_TO_SCHEMA);
     _outputDir = getOutputDir();
-    _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
+    _stagingDir = new File(_outputDir, UUID.randomUUID().toString()).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
     _readerConfigFile = _properties.getProperty(JobConfigConstants.PATH_TO_READER_CONFIG);
     String hostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
@@ -134,6 +134,12 @@ public class SegmentCreationJob extends Configured {
     Path stagingDir = new Path(_stagingDir);
     Path outputDir = new Path(_outputDir);
 
+    if (fs.exists(outputDir)) {
+      LOGGER.warn("Found the output folder {}, deleting it", _outputDir);
+      fs.delete(outputDir, true);
+    }
+    fs.mkdirs(outputDir);
+
     if (fs.exists(stagingDir)) {
       LOGGER.warn("Found the temp folder {}, deleting it", stagingDir);
       fs.delete(stagingDir, true);
@@ -144,19 +150,13 @@ public class SegmentCreationJob extends Configured {
     fs.mkdirs(stagingDirInputPath);
     LOGGER.info("Staging dir input path is {}", stagingDirInputPath);
 
-    if (fs.exists(outputDir)) {
-      LOGGER.warn("Found the output folder {}, deleting it", _outputDir);
-      fs.delete(outputDir, true);
-    }
-    fs.mkdirs(outputDir);
-
     if (_defaultPermissionsMask != null) {
       FsPermission umask = new FsPermission(_defaultPermissionsMask);
       FsPermission permission = FsPermission.getDirDefault().applyUMask(umask);
 
-      setDirPermission(stagingDir, permission);
-      setDirPermission(stagingDirInputPath, permission);
-      setDirPermission(outputDir, permission);
+      setDirPermission(stagingDir, permission, fs);
+      setDirPermission(stagingDirInputPath, permission, fs);
+      setDirPermission(outputDir, permission, fs);
     }
 
     List<FileStatus> inputDataFiles = new ArrayList<FileStatus>();
@@ -232,8 +232,8 @@ public class SegmentCreationJob extends Configured {
     fs.delete(new Path(_stagingDir), true);
   }
 
-  private void setDirPermission(Path directory, FsPermission permission) throws IOException {
-    FileSystem.get(getConf()).setPermission(directory, permission);
+  private void setDirPermission(Path directory, FsPermission permission, FileSystem fs) throws IOException {
+    fs.setPermission(directory, permission);
     LOGGER.info("Setting permissions '{}' for directory: '{}'", permission, directory);
   }
 
