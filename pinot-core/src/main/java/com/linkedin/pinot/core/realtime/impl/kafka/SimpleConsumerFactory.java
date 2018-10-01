@@ -28,21 +28,43 @@ import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 // We cannot change this because open source usages of this factory will need to change the class name defined in their stream configs inside table configs
 public class SimpleConsumerFactory extends StreamConsumerFactory {
 
+  /**
+   * Creates a partition level consumer for fetching from a partition of a kafka stream
+   * @param clientId
+   * @param partition
+   * @return
+   */
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
     return new KafkaPartitionLevelConsumer(clientId, _streamMetadata, partition);
   }
 
+  /**
+   * Creates a stream level consumer for a kafka stream
+   * @param clientId
+   * @return
+   */
   @Override
   public StreamLevelConsumer createStreamLevelConsumer(String clientId) {
     return new KafkaStreamLevelConsumer();
   }
 
+  /**
+   * Creates a partition metadata provider for a kafka stream
+   * @param clientId
+   * @param partition
+   * @return
+   */
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
     return new KafkaStreamMetadataProvider(clientId, _streamMetadata, partition);
   }
 
+  /**
+   * Creates a stream metadata provider for a kafka stream
+   * @param clientId
+   * @return
+   */
   @Override
   public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
     return new KafkaStreamMetadataProvider(clientId, _streamMetadata);

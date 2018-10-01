@@ -29,7 +29,7 @@ import kafka.javaapi.consumer.ConsumerConnector;
 
 
 /**
- *
+ * An implementation of a {@link StreamLevelConsumer} which consumes from the kafka stream
  */
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaStreamLevelConsumer.class);
