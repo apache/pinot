@@ -16,14 +16,11 @@
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.io.IOException;
-import javax.annotation.Nullable;
 import kafka.api.FetchRequestBuilder;
 import kafka.javaapi.FetchResponse;
 import kafka.javaapi.message.ByteBufferMessageSet;
@@ -62,8 +59,6 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
   @Override
   public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException {
-    Preconditions.checkState(isPartitionProvided,
-        "Cannot fetch messages from a metadata-only KafkaPartitionLevelConsumer");
     // TODO Improve error handling
 
     final long connectEndTime = System.currentTimeMillis() + _connectTimeoutMillis;
@@ -94,23 +89,20 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
 
   private Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets,
       final long startOffset, final long endOffset) {
-    return Iterables.filter(messageAndOffsets, new Predicate<MessageAndOffset>() {
-      @Override
-      public boolean apply(@Nullable MessageAndOffset input) {
-        // Filter messages that are either null or have an offset ∉ [startOffset; endOffset[
-        if (input == null || input.offset() < startOffset || (endOffset <= input.offset() && endOffset != -1)) {
-          return false;
-        }
-
-        // Check the message's checksum
-        // TODO We might want to have better handling of this situation, maybe try to fetch the message again?
-        if (!input.message().isValid()) {
-          LOGGER.warn("Discarded message with invalid checksum in partition {} of topic {}", _partition, _topic);
-          return false;
-        }
-
-        return true;
+    return Iterables.filter(messageAndOffsets, input -> {
+      // Filter messages that are either null or have an offset ∉ [startOffset; endOffset[
+      if (input == null || input.offset() < startOffset || (endOffset <= input.offset() && endOffset != -1)) {
+        return false;
       }
+
+      // Check the message's checksum
+      // TODO We might want to have better handling of this situation, maybe try to fetch the message again?
+      if (!input.message().isValid()) {
+        LOGGER.warn("Discarded message with invalid checksum in partition {} of topic {}", _partition, _topic);
+        return false;
+      }
+
+      return true;
     });
   }
 
