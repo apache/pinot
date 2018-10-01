@@ -242,10 +242,15 @@
       <artifactId>dropwizard-swagger</artifactId>
     </dependency>
 
-    <!-- Google Calendar API -->
+    <!-- Holiday loader dependencies -->
     <dependency>
       <groupId>com.google.apis</groupId>
       <artifactId>google-api-services-calendar</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.ibm.icu</groupId>
+      <artifactId>icu4j</artifactId>
+      <version>62.1</version>
     </dependency>
   </dependencies>
 
