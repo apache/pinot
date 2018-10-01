@@ -18,8 +18,6 @@ package com.linkedin.pinot.core.query.aggregation.function.customobject;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Throwables;
 import com.google.common.base.Ticker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
@@ -28,40 +26,37 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.PeekingIterator;
 import com.google.common.util.concurrent.AtomicDouble;
-import java.io.ByteArrayInputStream;
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.DataOutput;
-import java.io.Externalizable;
-import java.io.IOException;
-import java.io.ObjectInput;
-import java.io.ObjectOutput;
-import java.io.ObjectStreamException;
-import java.io.Serializable;
-import java.util.ArrayDeque;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.annotation.concurrent.NotThreadSafe;
 
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
-import static java.lang.String.format;
+import static com.google.common.base.Preconditions.*;
+import static java.lang.String.*;
 
 
 /**
  * Re-implement io.airlift.stats.QuantileDigest with additional methods facilitating serialization.
  */
-@NotThreadSafe
-public class QuantileDigest implements Serializable {
+public class QuantileDigest {
   private static final int MAX_BITS = 64;
   private static final double MAX_SIZE_FACTOR = 1.5;
+
+  private static final int HEADER_BYTE_SIZE = Double.BYTES  // Max error
+      + Double.BYTES                                        // Alpha
+      + Long.BYTES                                          // Landmark
+      + Long.BYTES                                          // Min
+      + Long.BYTES                                          // Max
+      + Integer.BYTES;                                      // Node count
+  private static final int NODE_BYTE_SIZE = Byte.BYTES      // Flags
+      + Byte.BYTES                                          // Level
+      + Long.BYTES                                          // Value
+      + Double.BYTES;                                       // Weight
 
   // needs to be such that Math.exp(alpha * seconds) does not grow too big
   static final long RESCALE_THRESHOLD_SECONDS = 50;
@@ -238,13 +233,13 @@ public class QuantileDigest implements Serializable {
   }
 
   /*
-  * Get the exponentially-decayed approximate counts of values in multiple buckets. The elements in
-  * the provided list denote the upper bound each of the buckets and must be sorted in ascending
-  * order.
-  *
-  * The approximate count in each bucket is guaranteed to be within 2 * totalCount * maxError of
-  * the real count.
-  */
+   * Get the exponentially-decayed approximate counts of values in multiple buckets. The elements in
+   * the provided list denote the upper bound each of the buckets and must be sorted in ascending
+   * order.
+   *
+   * The approximate count in each bucket is guaranteed to be within 2 * totalCount * maxError of
+   * the real count.
+   */
   public List<Bucket> getHistogram(List<Long> bucketUpperBounds) {
     checkArgument(Ordering.natural().isOrdered(bucketUpperBounds), "buckets must be sorted in increasing order");
 
@@ -324,49 +319,28 @@ public class QuantileDigest implements Serializable {
     return Math.min(max, chosen.get());
   }
 
-  public int estimatedSerializedSizeInBytes() {
-    int estimatedNodeSize = SizeOf.BYTE + // flags
-        SizeOf.BYTE + // level
-        SizeOf.LONG + // value
-        SizeOf.DOUBLE; // weight
-
-    return SizeOf.DOUBLE + // maxError
-        SizeOf.DOUBLE + // alpha
-        SizeOf.LONG + // landmark
-        SizeOf.LONG + // min
-        SizeOf.LONG + // max
-        SizeOf.INTEGER + // node count
-        totalNodeCount * estimatedNodeSize;
+  public int getByteSize() {
+    return HEADER_BYTE_SIZE + totalNodeCount * NODE_BYTE_SIZE;
   }
 
-  public void serialize(final DataOutput output) {
-    try {
-      output.writeDouble(maxError);
-      output.writeDouble(alpha);
-      output.writeLong(landmarkInSeconds);
-      output.writeLong(min);
-      output.writeLong(max);
-      output.writeInt(totalNodeCount);
-
-      postOrderTraversal(root, new Callback() {
-        @Override
-        public boolean process(Node node) {
-          try {
-            serializeNode(output, node);
-          } catch (IOException e) {
-            Throwables.propagate(e);
-          }
-          return true;
-        }
-      });
-    } catch (IOException e) {
-      Throwables.propagate(e);
-    }
+  public byte[] toBytes() {
+    byte[] bytes = new byte[getByteSize()];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    byteBuffer.putDouble(maxError);
+    byteBuffer.putDouble(alpha);
+    byteBuffer.putLong(landmarkInSeconds);
+    byteBuffer.putLong(min);
+    byteBuffer.putLong(max);
+    byteBuffer.putInt(totalNodeCount);
+    postOrderTraversal(root, node -> {
+      serializeNode(byteBuffer, node);
+      return true;
+    });
+    return bytes;
   }
 
-  private void serializeNode(DataOutput output, Node node)
-      throws IOException {
-    int flags = 0;
+  private void serializeNode(ByteBuffer byteBuffer, Node node) {
+    byte flags = 0;
     if (node.left != null) {
       flags |= Flags.HAS_LEFT;
     }
@@ -374,63 +348,56 @@ public class QuantileDigest implements Serializable {
       flags |= Flags.HAS_RIGHT;
     }
 
-    output.writeByte(flags);
-    output.writeByte(node.level);
-    output.writeLong(node.bits);
-    output.writeDouble(node.weightedCount);
+    byteBuffer.put(flags);
+    byteBuffer.put((byte) node.level);
+    byteBuffer.putLong(node.bits);
+    byteBuffer.putDouble(node.weightedCount);
   }
 
-  public static QuantileDigest deserialize(DataInput input) {
-    try {
-      double maxError = input.readDouble();
-      double alpha = input.readDouble();
+  public static QuantileDigest fromBytes(byte[] bytes) {
+    return fromByteBuffer(ByteBuffer.wrap(bytes));
+  }
 
-      QuantileDigest result = new QuantileDigest(maxError, alpha);
+  public static QuantileDigest fromByteBuffer(ByteBuffer byteBuffer) {
+    double maxError = byteBuffer.getDouble();
+    double alpha = byteBuffer.getDouble();
 
-      result.landmarkInSeconds = input.readLong();
-      result.min = input.readLong();
-      result.max = input.readLong();
-      result.totalNodeCount = input.readInt();
-
-      Deque<Node> stack = new ArrayDeque<>();
-      for (int i = 0; i < result.totalNodeCount; i++) {
-        int flags = input.readByte();
-
-        Node node = deserializeNode(input);
-
-        if ((flags & Flags.HAS_RIGHT) != 0) {
-          node.right = stack.pop();
-        }
-
-        if ((flags & Flags.HAS_LEFT) != 0) {
-          node.left = stack.pop();
-        }
-
-        stack.push(node);
-        result.weightedCount += node.weightedCount;
-        if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
-          result.nonZeroNodeCount++;
-        }
-      }
-
-      if (!stack.isEmpty()) {
-        Preconditions.checkArgument(stack.size() == 1, "Tree is corrupted. Expected a single root node");
-        result.root = stack.pop();
-      }
-
-      return result;
-    } catch (IOException e) {
-      throw Throwables.propagate(e);
+    QuantileDigest quantileDigest = new QuantileDigest(maxError, alpha);
+    quantileDigest.landmarkInSeconds = byteBuffer.getLong();
+    quantileDigest.min = byteBuffer.getLong();
+    quantileDigest.max = byteBuffer.getLong();
+    int numNodes = byteBuffer.getInt();
+    quantileDigest.totalNodeCount = numNodes;
+    if (numNodes == 0) {
+      return quantileDigest;
     }
-  }
 
-  private static Node deserializeNode(DataInput input)
-      throws IOException {
-    int level = input.readUnsignedByte();
-    long value = input.readLong();
-    double weight = input.readDouble();
+    Stack<Node> stack = new Stack<>();
+    for (int i = 0; i < numNodes; i++) {
+      int flags = byteBuffer.get();
+      int level = byteBuffer.get() & 0xFF;
+      long bits = byteBuffer.getLong();
+      double weightedCount = byteBuffer.getDouble();
 
-    return new Node(value, level, weight);
+      Node node = new Node(bits, level, weightedCount);
+      if ((flags & Flags.HAS_RIGHT) != 0) {
+        node.right = stack.pop();
+      }
+      if ((flags & Flags.HAS_LEFT) != 0) {
+        node.left = stack.pop();
+      }
+      stack.push(node);
+
+      quantileDigest.weightedCount += weightedCount;
+      if (node.weightedCount >= ZERO_WEIGHT_THRESHOLD) {
+        quantileDigest.nonZeroNodeCount++;
+      }
+    }
+
+    checkState(stack.size() == 1, "Tree is corrupted, expecting a single root node");
+    quantileDigest.root = stack.pop();
+
+    return quantileDigest;
   }
 
   @VisibleForTesting
@@ -759,12 +726,8 @@ public class QuantileDigest implements Serializable {
   public boolean equivalent(QuantileDigest other) {
     rescaleToCommonLandmark(this, other);
 
-    return (totalNodeCount == other.totalNodeCount &&
-        nonZeroNodeCount == other.nonZeroNodeCount &&
-        min == other.min &&
-        max == other.max &&
-        weightedCount == other.weightedCount &&
-        Objects.equal(root, other.root));
+    return (totalNodeCount == other.totalNodeCount && nonZeroNodeCount == other.nonZeroNodeCount && min == other.min
+        && max == other.max && weightedCount == other.weightedCount && Objects.equal(root, other.root));
   }
 
   private void rescaleToCommonLandmark(QuantileDigest one, QuantileDigest two) {
@@ -856,9 +819,8 @@ public class QuantileDigest implements Serializable {
     long branch = child.bits & (1L << (parent.level - 1));
     checkState(branch == 0 && isLeft || branch != 0 && !isLeft, "Value of child node is inconsistent with its branch");
 
-    Preconditions.checkState(parent.weightedCount >= ZERO_WEIGHT_THRESHOLD ||
-            child.weightedCount >= ZERO_WEIGHT_THRESHOLD || otherChild != null,
-        "Found a linear chain of zero-weight nodes");
+    checkState(parent.weightedCount >= ZERO_WEIGHT_THRESHOLD || child.weightedCount >= ZERO_WEIGHT_THRESHOLD
+        || otherChild != null, "Found a linear chain of zero-weight nodes");
   }
 
   public String toGraphviz() {
@@ -1057,11 +1019,9 @@ public class QuantileDigest implements Serializable {
         return false;
       }
       final Node other = (Node) obj;
-      return Objects.equal(this.weightedCount, other.weightedCount) &&
-          Objects.equal(this.level, other.level) &&
-          Objects.equal(this.bits, other.bits) &&
-          Objects.equal(this.left, other.left) &&
-          Objects.equal(this.right, other.right);
+      return Objects.equal(this.weightedCount, other.weightedCount) && Objects.equal(this.level, other.level) && Objects
+          .equal(this.bits, other.bits) && Objects.equal(this.left, other.left) && Objects.equal(this.right,
+          other.right);
     }
   }
 
@@ -1071,14 +1031,6 @@ public class QuantileDigest implements Serializable {
      * @return true if processing should continue
      */
     boolean process(Node node);
-  }
-
-  private static class SizeOf {
-    public static final int BYTE = 1;
-    public static final int INTEGER = 4;
-    public static final int LONG = 8;
-
-    public static final int DOUBLE = 8;
   }
 
   private static class Flags {
@@ -1110,85 +1062,5 @@ public class QuantileDigest implements Serializable {
     }
 
     return ret;
-  }
-
-  private Object writeReplace()
-      throws ObjectStreamException {
-    return new SerializationHolder(this);
-  }
-
-  private void writeBytes(DataOutput buf)
-      throws IOException {
-    serialize(buf);
-  }
-
-  /**
-   * This class exists to support Externalizable semantics for
-   * HyperLogLog objects without having to expose a public
-   * constructor, public write/read methods, or pretend final
-   * fields aren't final.
-   * <p>
-   * In short, Externalizable allows you to skip some of the more
-   * verbose meta-data default Serializable gets you, but still
-   * includes the class name. In that sense, there is some cost
-   * to this holder object because it has a longer class name. I
-   * imagine people who care about optimizing for that have their
-   * own work-around for long class names in general, or just use
-   * a custom serialization framework. Therefore we make no attempt
-   * to optimize that here (eg. by raising this from an inner class
-   * and giving it an unhelpful name).
-   */
-  private static class SerializationHolder implements Externalizable {
-    QuantileDigest holder;
-
-    public SerializationHolder(QuantileDigest holder) {
-      this.holder = holder;
-    }
-
-    /**
-     * required for Externalizable
-     */
-    public SerializationHolder() {
-
-    }
-
-    @Override
-    public void writeExternal(ObjectOutput out)
-        throws IOException {
-      holder.writeBytes(out);
-    }
-
-    @Override
-    public void readExternal(ObjectInput in)
-        throws IOException, ClassNotFoundException {
-      holder = Builder.build(in);
-    }
-
-    private Object readResolve() {
-      return holder;
-    }
-  }
-
-  public static class Builder implements Serializable {
-    private double rsd;
-
-    public Builder(double rsd) {
-      this.rsd = rsd;
-    }
-
-    public QuantileDigest build() {
-      return new QuantileDigest(rsd);
-    }
-
-    public static QuantileDigest build(byte[] bytes)
-        throws IOException {
-      ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-      return build(new DataInputStream(bais));
-    }
-
-    public static QuantileDigest build(DataInput buf)
-        throws IOException {
-      return QuantileDigest.deserialize(buf);
-    }
   }
 }

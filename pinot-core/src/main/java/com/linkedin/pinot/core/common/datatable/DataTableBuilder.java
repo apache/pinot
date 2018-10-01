@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
@@ -170,9 +171,10 @@ public class DataTableBuilder {
   public void setColumn(int colId, @Nonnull Object value) throws IOException {
     _currentRowDataByteBuffer.position(_columnOffsets[colId]);
     _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
-    byte[] bytes = ObjectCustomSerDe.serialize(value);
+    int objectTypeValue = ObjectSerDeUtils.ObjectType.getObjectType(value).getValue();
+    byte[] bytes = ObjectSerDeUtils.serialize(value, objectTypeValue);
     _currentRowDataByteBuffer.putInt(bytes.length);
-    _variableSizeDataOutputStream.writeInt(ObjectCustomSerDe.getObjectType(value).getValue());
+    _variableSizeDataOutputStream.writeInt(objectTypeValue);
     _variableSizeDataByteArrayOutputStream.write(bytes);
   }
 

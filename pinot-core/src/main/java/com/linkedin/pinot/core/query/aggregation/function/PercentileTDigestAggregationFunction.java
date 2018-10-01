@@ -18,14 +18,15 @@ package com.linkedin.pinot.core.query.aggregation.function;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import com.tdunning.math.stats.MergingDigest;
 import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import javax.annotation.Nonnull;
+
 
 /**
  * TDigest based Percentile aggregation function.
@@ -88,7 +89,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
         // Serialized TDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          tDigest.add(MergingDigest.fromBytes(ByteBuffer.wrap(bytesValues[i])));
+          tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i])));
         }
         break;
       default:
@@ -116,7 +117,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
           TDigest tDigest = getTDigest(groupByResultHolder, groupKeyArray[i]);
-          tDigest.add(MergingDigest.fromBytes(ByteBuffer.wrap(bytesValues[i])));
+          tDigest.add(ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i])));
         }
         break;
       default:
@@ -145,7 +146,7 @@ public class PercentileTDigestAggregationFunction implements AggregationFunction
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         for (int i = 0; i < length; i++) {
-          TDigest value = MergingDigest.fromBytes(ByteBuffer.wrap(bytesValues[i]));
+          TDigest value = ObjectSerDeUtils.TDIGEST_SER_DE.deserialize(ByteBuffer.wrap(bytesValues[i]));
           for (int groupKey : groupKeysArray[i]) {
             TDigest tDigest = getTDigest(groupByResultHolder, groupKey);
             tDigest.add(value);

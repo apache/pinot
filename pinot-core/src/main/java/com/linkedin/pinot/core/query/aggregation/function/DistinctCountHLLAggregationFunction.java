@@ -20,15 +20,16 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.startree.hll.HllConstants;
 import javax.annotation.Nonnull;
 
 
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
+  public static final int DEFAULT_LOG2M = 8;
 
   @Nonnull
   @Override
@@ -101,7 +102,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
-            hyperLogLog.addAll(HyperLogLog.Builder.build(bytesValues[i]));
+            hyperLogLog.addAll(ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
           }
         } catch (Exception e) {
           throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
@@ -152,7 +153,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
-            setValueForGroupKey(groupByResultHolder, groupKeyArray[i], HyperLogLog.Builder.build(bytesValues[i]));
+            setValueForGroupKey(groupByResultHolder, groupKeyArray[i],
+                ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
           }
         } catch (Exception e) {
           throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
@@ -203,7 +205,8 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
-            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], HyperLogLog.Builder.build(bytesValues[i]));
+            setValueForGroupKeys(groupByResultHolder, groupKeysArray[i],
+                ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(bytesValues[i]));
           }
         } catch (Exception e) {
           throw new RuntimeException("Caught exception while aggregating HyperLogLog", e);
@@ -219,7 +222,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   public HyperLogLog extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
-      return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      return new HyperLogLog(DEFAULT_LOG2M);
     } else {
       return hyperLogLog;
     }
@@ -230,7 +233,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   public HyperLogLog extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
-      return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      return new HyperLogLog(DEFAULT_LOG2M);
     } else {
       return hyperLogLog;
     }
@@ -327,7 +330,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   protected static HyperLogLog getHyperLogLog(@Nonnull AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      hyperLogLog = new HyperLogLog(DEFAULT_LOG2M);
       aggregationResultHolder.setValue(hyperLogLog);
     }
     return hyperLogLog;
@@ -343,7 +346,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   protected static HyperLogLog getHyperLogLog(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      hyperLogLog = new HyperLogLog(DEFAULT_LOG2M);
       groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
     }
     return hyperLogLog;
