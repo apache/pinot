@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.server.api.resources;
+package com.linkedin.pinot.common.restlet.resources;
 
 import java.io.IOException;
 import javax.ws.rs.WebApplicationException;
@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Util class for server APIs.
+ * Util class for Pinot APIs.
  */
 public class ResourceUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtils.class);

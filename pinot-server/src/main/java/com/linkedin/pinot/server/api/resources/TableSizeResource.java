@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
+import com.linkedin.pinot.common.restlet.resources.ResourceUtils;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;

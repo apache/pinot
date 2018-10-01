@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
+import com.linkedin.pinot.common.restlet.resources.ResourceUtils;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;

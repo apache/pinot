@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.exception.TableNotFoundException;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.restlet.resources.RebalanceResult;
+import com.linkedin.pinot.common.restlet.resources.ResourceUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -481,12 +482,19 @@ public class PinotTableRestletResource {
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DOWNTIME, downtime);
 
     TableType type = TableType.valueOf(tableType.toUpperCase());
+    if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
+        || type == TableType.REALTIME && (!_pinotHelixResourceManager.hasRealtimeTable(tableName))) {
+      throw new ControllerApplicationException(LOGGER, "Table " + tableName + " does not exist",
+          Response.Status.NOT_FOUND);
+    }
 
     RebalanceResult result;
     try {
       if (dryRun) {
         result = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
+        result.setStatus("Rebalance attempted in dry-run mode.");
       } else {
+        // run rebalance asynchronously
         _executorService.submit(new Runnable() {
           @Override
           public void run() {
@@ -506,6 +514,6 @@ public class PinotTableRestletResource {
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
-    return result.toString();
+    return ResourceUtils.convertToJsonString(result);
   }
 }
