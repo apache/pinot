@@ -76,6 +76,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances");
   }
 
+  public String forTableList() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables");
+  }
+
   public String forTablesFromTenant(String tenantName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), TENANTS, tenantName, TABLES);
   }
