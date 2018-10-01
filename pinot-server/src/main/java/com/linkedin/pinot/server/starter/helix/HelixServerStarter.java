@@ -232,15 +232,17 @@ public class HelixServerStarter {
   }
 
   private void waitForServiceStatusChange(boolean shuttingDownStatus) {
+    LOGGER.info("Waiting upto {}ms to have services complete their status change...", _maxWaitTimeMs);
     long startTime = System.currentTimeMillis();
 
     while (!ServiceStatus.checkServiceStatus(shuttingDownStatus)) {
       if (System.currentTimeMillis() - startTime > _maxWaitTimeMs) {
         LOGGER.error("Timeout waiting for all service status to change when {} Pinot server {}! Max waiting time: {}",
             shuttingDownStatus ? "shutting down" : "starting up", _instanceId, _maxWaitTimeMs);
-        break;
+        return;
       }
     }
+    LOGGER.info("Service status change completed. Time to take: {}ms", (System.currentTimeMillis() - startTime));
   }
 
   /**
