@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
  */
 public class LocalPinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(LocalPinotFS.class);
+  private static final String DEFAULT_ENCODING = "UTF-8";
 
   public LocalPinotFS() {
   }
@@ -120,17 +121,19 @@ public class LocalPinotFS extends PinotFS {
 
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
-    copy(srcUri, new URI(URLEncoder.encode(dstFile.getAbsolutePath(), "UTF-8")));
-    LOGGER.info("Copy file from {} to {}; Length of file: {}", srcUri, dstFile, dstFile.length());
+    copy(srcUri, new URI(encodeURI(dstFile.getAbsolutePath())));
   }
 
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
-    copy(new URI(URLEncoder.encode(srcFile.getAbsolutePath(), "UTF-8")), dstUri);
+    copy(new URI(encodeURI(srcFile.getAbsolutePath())), dstUri);
   }
 
-  @Override
-  public String decodeURI(String uri) throws UnsupportedEncodingException {
-    return URLDecoder.decode(uri, "UTF-8");
+  private String encodeURI(String uri) throws UnsupportedEncodingException {
+    return URLEncoder.encode(uri, DEFAULT_ENCODING);
+  }
+
+  private String decodeURI(String uri) throws UnsupportedEncodingException {
+    return URLDecoder.decode(uri, DEFAULT_ENCODING);
   }
 }
