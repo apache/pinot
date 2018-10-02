@@ -241,6 +241,13 @@ public class HelixServerStarter {
             shuttingDownStatus ? "shutting down" : "starting up", _instanceId, _maxWaitTimeMs);
         return;
       }
+
+      try {
+        // Sleep for 1 second.
+        Thread.sleep(1_000L);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
     }
     LOGGER.info("Service status change completed. Time to take: {}ms", (System.currentTimeMillis() - startTime));
   }
