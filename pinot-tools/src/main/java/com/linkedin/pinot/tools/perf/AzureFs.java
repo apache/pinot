@@ -87,8 +87,10 @@ public class AzureFs extends AbstractBaseCommand implements Command {
     System.out.println(fs.length(new URI(uriExists)));
 
     // copy
-    URI newURI = new URI("/PINOTDATA.tar.gz");
+    URI newURI = new URI("adl:/PINOTDATA.tar.gz");
     fs.copy(new URI(uriExists), newURI);
+    System.out.println("length old : " + fs.length(new URI(uriExists)));
+    System.out.println("length : " + fs.length(newURI));
 
     System.out.println("should exist " + fs.exists(newURI));
 
@@ -96,7 +98,7 @@ public class AzureFs extends AbstractBaseCommand implements Command {
     fs.delete(newURI);
 
     System.out.println("should not exist" + fs.exists(newURI));
-    
+
     // move
     fs.move(new URI(uriExists), newURI);
     System.out.println("should exist " + fs.exists(newURI));
