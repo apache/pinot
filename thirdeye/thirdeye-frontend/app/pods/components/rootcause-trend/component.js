@@ -1,5 +1,9 @@
-import { computed, getProperties, set } from '@ember/object';
-import Component from '@ember/component';
+import {
+  get,
+  set,
+  computed,
+  getProperties
+} from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
@@ -10,6 +14,7 @@ import {
   toColorDirection,
   makeSortable
 } from 'thirdeye-frontend/utils/rca-utils';
+import Component from '@ember/component';
 import { humanizeChange } from 'thirdeye-frontend/utils/utils';
 import moment from 'moment';
 import _ from 'lodash';
@@ -94,7 +99,7 @@ export default Component.extend({
    * @type {string}
    */
   startTimeFormatted: computed('startTime', function () {
-    const { startTime } = getProperties(this, 'startTime');
+    const startTime = get(this, 'startTime');
     return this._formatTime(startTime);
   }),
 
@@ -102,7 +107,7 @@ export default Component.extend({
    * Start time options for dropdown
    */
   startTimeOptions: computed('availableBuckets', function () {
-    const { availableBuckets } = getProperties(this, 'availableBuckets');
+    const availableBuckets = get(this, 'availableBuckets');
 
     const options = [];
     for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
@@ -116,7 +121,7 @@ export default Component.extend({
    * Reverse lookup mapping for start time options for dropdown
    */
   startTimeOptionsMapping: computed('availableBuckets', function () {
-    const { availableBuckets } = getProperties(this, 'availableBuckets');
+    const availableBuckets = get(this, 'availableBuckets');
 
     const options = {};
     for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
@@ -131,7 +136,7 @@ export default Component.extend({
    * @type {int[]}
    */
   availableBuckets: computed('context', function () {
-    const { context } = getProperties(this, 'context');
+    const context = get(this, 'context');
 
     const buckets = [];
     const [stepSize, stepUnit] = context.granularity.split('_').map(s => s.toLowerCase());
@@ -167,7 +172,7 @@ export default Component.extend({
    * @type {object[]}
    */
   columns: computed('buckets', function () {
-    const { buckets } = getProperties(this, 'buckets');
+    const buckets = get(this, 'buckets');
 
     const columns = [
       {
@@ -307,7 +312,7 @@ export default Component.extend({
    * }
    */
   links: computed('entities', function() {
-    const { entities } = getProperties(this, 'entities');
+    const entities = get(this, 'entities');
     let metricUrlMapping = {};
 
     filterPrefix(Object.keys(entities), 'thirdeye:metric:')
@@ -376,7 +381,7 @@ export default Component.extend({
      * Triggered by drop down on change of selection
      */
     startTimeChanged(timestamp) {
-      const { lookup } = getProperties(this, 'startTimeOptionsMapping');
+      const lookup = get(this, 'startTimeOptionsMapping');
       set(this, 'desiredStartTime', lookup[timestamp]);
     }
   }
