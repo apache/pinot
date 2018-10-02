@@ -17,8 +17,6 @@ package com.linkedin.pinot.filesystem;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.microsoft.azure.datalake.store.ADLFileInputStream;
-import com.microsoft.azure.datalake.store.ADLFileOutputStream;
 import com.microsoft.azure.datalake.store.ADLStoreClient;
 import com.microsoft.azure.datalake.store.DirectoryEntry;
 import com.microsoft.azure.datalake.store.DirectoryEntryType;
@@ -50,6 +48,7 @@ import org.slf4j.LoggerFactory;
  */
 public class AzurePinotFS extends PinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(AzurePinotFS.class);
+  private static final int BUFFER_SIZE = 4096;
   private ADLStoreClient _adlStoreClient;
   private static final String[] EMPTY_ARR = new String[0];
 
@@ -100,12 +99,23 @@ public class AzurePinotFS extends PinotFS {
     if (exists(dstUri)) {
       delete(dstUri);
     }
+
     _adlStoreClient.createEmptyFile(dstUri.getPath());
-    ADLFileOutputStream appendStream = _adlStoreClient.getAppendStream(dstUri.getPath());
-    ADLFileInputStream readStream = _adlStoreClient.getReadStream(srcUri.getPath());
-    appendStream.write(readStream.read());
-    appendStream.close();
-    readStream.close();
+    try {
+      InputStream inputStream = _adlStoreClient.getReadStream(srcUri.getPath());
+      OutputStream outputStream = _adlStoreClient.getAppendStream(dstUri.getPath());
+
+      int bytesRead;
+      byte[] buffer = new byte[BUFFER_SIZE];
+      while ((bytesRead = inputStream.read(buffer)) != -1) {
+        outputStream.write(buffer, 0, bytesRead);
+      }
+      inputStream.close();
+      outputStream.close();
+    } catch (IOException e) {
+      LOGGER.error("Exception encountered during copy, input: '{}', output: '{}'.", srcUri.toString(),
+          dstUri.toString(), e);
+    }
     return true;
   }
 
