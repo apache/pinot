@@ -13,20 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.controller.helix.core.rebalance;
+package com.linkedin.pinot.common.exception;
 
-/**
- * Constants for rebalance user config properties
- */
-public class RebalanceUserConfigConstants {
+public class TableNotFoundException extends Exception {
 
-  public static final String DRYRUN = "dryRun";
-  /** Whether consuming segments should also be rebalanced or not */
-  public static final String INCLUDE_CONSUMING = "includeConsuming";
-  /** Whether rebalance can have downtime */
-  public static final String DOWNTIME = "downtime";
+  public TableNotFoundException(String message) {
+    super(message);
+  }
 
-  public static final boolean DEFAULT_DRY_RUN = true;
-  public static final boolean DEFAULT_INCLUDE_CONSUMING = false;
-  public static final boolean DEFAULT_DOWNTIME = false;
 }

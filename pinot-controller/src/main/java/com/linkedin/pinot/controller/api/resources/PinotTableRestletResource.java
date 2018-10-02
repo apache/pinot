@@ -20,8 +20,11 @@ import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.exception.TableNotFoundException;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.restlet.resources.RebalanceResult;
+import com.linkedin.pinot.common.restlet.resources.ResourceUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -36,6 +39,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -91,6 +95,9 @@ public class PinotTableRestletResource {
 
   @Inject
   ControllerMetrics _controllerMetrics;
+
+  @Inject
+  ExecutorService _executorService;
 
   @POST
   @Produces(MediaType.APPLICATION_JSON)
@@ -449,6 +456,11 @@ public class PinotTableRestletResource {
     LOGGER.info("Finished validating tables config for Table: {}", rawTableName);
   }
 
+  /**
+   * Rebalance a table.
+   * @return if in DRY_RUN, the target idealstate/partition-map is returned. Else an indication of success/failure in
+   *         triggering the rebalance is returned.
+   */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/tables/{tableName}/rebalance")
@@ -457,7 +469,8 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Name of the table to rebalance") @Nonnull @PathParam("tableName") String tableName,
       @ApiParam(value = "offline|realtime") @Nonnull @QueryParam("type") String tableType,
       @ApiParam(value = "true|false") @Nonnull @DefaultValue("true") @QueryParam("dryrun") Boolean dryRun,
-      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming) {
+      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("includeConsuming") Boolean includeConsuming,
+      @ApiParam(value = "true|false") @DefaultValue("false") @QueryParam("downtime") Boolean downtime) {
 
     if (tableType != null && !EnumUtils.isValidEnum(CommonConstants.Helix.TableType.class, tableType.toUpperCase())) {
       throw new ControllerApplicationException(LOGGER, "Illegal table type " + tableType, Response.Status.BAD_REQUEST);
@@ -466,6 +479,7 @@ public class PinotTableRestletResource {
     Configuration rebalanceUserConfig = new PropertiesConfiguration();
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, dryRun);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, includeConsuming);
+    rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DOWNTIME, downtime);
 
     TableType type = TableType.valueOf(tableType.toUpperCase());
     if (type == TableType.OFFLINE && (!_pinotHelixResourceManager.hasOfflineTable(tableName))
@@ -474,14 +488,32 @@ public class PinotTableRestletResource {
           Response.Status.NOT_FOUND);
     }
 
-    JSONObject jsonObject;
+    RebalanceResult result;
     try {
-      jsonObject = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
-    } catch (JSONException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+      if (dryRun) {
+        result = _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
+        result.setStatus("Rebalance attempted in dry-run mode.");
+      } else {
+        // run rebalance asynchronously
+        _executorService.submit(new Runnable() {
+          @Override
+          public void run() {
+            try {
+              _pinotHelixResourceManager.rebalanceTable(tableName, type, rebalanceUserConfig);
+            } catch (Throwable e) {
+              // catch all throwables to prevent losing the thread
+              LOGGER.error("Encountered error during rebalance for table {}", tableName, e);
+            }
+          }
+        });
+        result = new RebalanceResult();
+        result.setStatus("Rebalance for table " + tableName + " in progress. Check controller logs for updates.");
+      }
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
     }
-    return jsonObject.toString();
+    return ResourceUtils.convertToJsonString(result);
   }
 }

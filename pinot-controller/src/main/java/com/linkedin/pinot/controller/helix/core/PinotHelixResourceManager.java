@@ -35,6 +35,7 @@ import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.exception.TableNotFoundException;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -43,9 +44,9 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignment;
 import com.linkedin.pinot.common.partition.ReplicaGroupPartitionAssignmentGenerator;
+import com.linkedin.pinot.common.restlet.resources.RebalanceResult;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.BrokerOnlineOfflineStateModel;
@@ -100,8 +101,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.zookeeper.data.Stat;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -129,6 +128,7 @@ public class PinotHelixResourceManager {
   private HelixDataAccessor _helixDataAccessor;
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
+  private TableRebalancer _tableRebalancer;
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
       @Nonnull String controllerInstanceId, String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis,
@@ -167,6 +167,7 @@ public class PinotHelixResourceManager {
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
+    _tableRebalancer = new TableRebalancer(_helixZkManager, _helixAdmin, _helixClusterName);
   }
 
   /**
@@ -2071,33 +2072,25 @@ public class PinotHelixResourceManager {
   }
 
   @Nonnull
-  public JSONObject rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig)
-      throws JSONException, InvalidConfigException {
+  public RebalanceResult rebalanceTable(final String rawTableName, TableType tableType, Configuration rebalanceUserConfig)
+      throws InvalidConfigException, TableNotFoundException {
 
     TableConfig tableConfig = getTableConfig(rawTableName, tableType);
+    if (tableConfig == null) {
+      throw new TableNotFoundException("Table " + rawTableName + " of type " + tableType.toString() + " not found");
+    }
     String tableNameWithType = tableConfig.getTableName();
-    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
 
-    JSONObject jsonObject = new JSONObject();
+    RebalanceResult result;
     try {
       RebalanceSegmentStrategy rebalanceSegmentsStrategy =
           RebalanceSegmentStrategyFactory.getInstance().getRebalanceSegmentsStrategy(tableConfig);
-      PartitionAssignment newPartitionAssignment =
-          rebalanceSegmentsStrategy.rebalancePartitionAssignment(idealState, tableConfig, rebalanceUserConfig);
-      IdealState newIdealState =
-          rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig,
-              newPartitionAssignment);
-
-      jsonObject.put("partitionAssignment", newPartitionAssignment.getPartitionToInstances());
-      jsonObject.put("idealState", newIdealState.getRecord().getMapFields());
-    } catch (JSONException e) {
-      LOGGER.error("Exception in constructing json response for rebalance table {}", tableNameWithType, e);
-      throw e;
+      result = _tableRebalancer.rebalance(tableConfig, rebalanceSegmentsStrategy, rebalanceUserConfig);
     } catch (InvalidConfigException e) {
       LOGGER.error("Exception in rebalancing config for table {}", tableNameWithType, e);
       throw e;
     }
-    return jsonObject;
+    return result;
   }
 
   /**
@@ -2177,7 +2170,6 @@ public class PinotHelixResourceManager {
 
   /*
    * Uncomment and use for testing on a real cluster
-
   public static void main(String[] args) throws Exception {
     final String testZk = "test1.zk.com:12345/pinot-cluster";
     final String realZk = "test2.zk.com:12345/pinot-cluster";
@@ -2193,7 +2185,6 @@ public class PinotHelixResourceManager {
     final boolean dryRun = true;
     final String tableName = "testTable";
     final TableType tableType = TableType.OFFLINE;
-
     PinotHelixResourceManager helixResourceManager =
         new PinotHelixResourceManager(zkURL, helixClusterName, controllerInstanceId, localDiskDir,
             externalViewOnlineToOfflineTimeoutMillis, isSingleTenantCluster, isUpdateStateModel);
@@ -2203,4 +2194,5 @@ public class PinotHelixResourceManager {
     System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(record));
   }
    */
+
 }

@@ -303,6 +303,7 @@ public class DefaultRebalanceStrategyTest {
     Configuration rebalanceUserConfig = new PropertiesConfiguration();
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.DRYRUN, true);
     rebalanceUserConfig.addProperty(RebalanceUserConfigConstants.INCLUDE_CONSUMING, false);
+    rebalanceUserConfig.setProperty(RebalanceUserConfigConstants.DOWNTIME, true);
 
     IdealState rebalancedIdealState;
     int targetNumReplicas = nReplicas;
@@ -509,7 +510,7 @@ public class DefaultRebalanceStrategyTest {
       int targetNumReplicas, int nSegments, List<String> instances, boolean changeExpected) {
     Map<String, Map<String, String>> prevAssignment = getPrevAssignment(idealState);
     IdealState rebalancedIdealState =
-        _rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig, null);
+        _rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig, null);
     validateIdealState(rebalancedIdealState, nSegments, targetNumReplicas, instances, prevAssignment, changeExpected);
     return rebalancedIdealState;
   }
@@ -519,7 +520,7 @@ public class DefaultRebalanceStrategyTest {
       int nSegmentsCompleted, int nSegmentsConsuming, List<String> instancesCompleted,
       List<String> instancesConsuming) {
     IdealState rebalancedIdealState =
-        _rebalanceSegmentsStrategy.rebalanceIdealState(idealState, tableConfig, rebalanceUserConfig,
+        _rebalanceSegmentsStrategy.getRebalancedIdealState(idealState, tableConfig, rebalanceUserConfig,
             newPartitionAssignment);
     validateIdealStateRealtime(rebalancedIdealState, nSegmentsCompleted, nSegmentsConsuming, targetNumReplicas,
         instancesCompleted, instancesConsuming, rebalanceUserConfig);

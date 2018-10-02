@@ -297,6 +297,15 @@
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-filesystem</artifactId>
     </dependency>
+    <dependency>
+      <groupId>javax.servlet</groupId>
+      <artifactId>javax.servlet-api</artifactId>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jersey.core</groupId>
+      <artifactId>jersey-server</artifactId>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>
