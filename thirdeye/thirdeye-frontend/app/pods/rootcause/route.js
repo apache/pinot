@@ -250,7 +250,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
         const anomalyRangeStart = moment(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
         const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
-
         const analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').add(5, 'milliseconds').valueOf();
         const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
         const analysisRangeStart = moment(anomalyRangeEnd).add(analysisRangeStartOffset, 'day').valueOf();

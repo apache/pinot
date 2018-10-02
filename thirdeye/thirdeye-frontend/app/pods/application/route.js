@@ -75,13 +75,13 @@ export default Route.extend(ApplicationRouteMixin, {
       if (error.message === '401' || (error.response && error.response.status === '401')) {
         this.set('session.store.errorMsg', 'Your session expired. Please login again.');
         this.transitionTo('logout');
-      } else if (error.message === '500' || error.response.status === '500') {
+      } else if (error.message === '500' || (error.response && error.response.status === '500')) {
         notifications.error('Something went wrong with a request. Please try again or come back later.', '500 error detected', {
           timeOut: '4000',
           positionClass: 'toast-bottom-right'
         });
       } else {
-        const errorStatus = error.response.status || 'Unknown';
+        const errorStatus = error.response && error.response.status || 'Unknown';
         notifications.error('Something went wrong with a request. Please try again or come back later.', `${errorStatus} error detected`, {
           timeOut: '4000',
           positionClass: 'toast-bottom-right'
