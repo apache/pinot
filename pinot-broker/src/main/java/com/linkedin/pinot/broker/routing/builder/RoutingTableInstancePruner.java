@@ -30,12 +30,11 @@ import org.slf4j.LoggerFactory;
 public class RoutingTableInstancePruner {
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutingTableInstancePruner.class);
 
-  private Map<String, InstanceConfig> instanceConfigMap;
+  private final Map<String, InstanceConfig> _instanceConfigMap = new HashMap<>();
 
-  public RoutingTableInstancePruner(List<InstanceConfig> instanceConfigList) {
-    instanceConfigMap = new HashMap<String, InstanceConfig>();
-    for (InstanceConfig config : instanceConfigList) {
-      instanceConfigMap.put(config.getInstanceName(), config);
+  public RoutingTableInstancePruner(List<InstanceConfig> instanceConfigs) {
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      _instanceConfigMap.put(instanceConfig.getInstanceName(), instanceConfig);
     }
   }
 
@@ -49,38 +48,23 @@ public class RoutingTableInstancePruner {
    * @return True if instance is disabled in helix, or is being shutdown, False otherwise.
    */
   public boolean isInactive(String instanceName) {
-    if (!instanceConfigMap.containsKey(instanceName)) {
+    InstanceConfig instanceConfig = _instanceConfigMap.get(instanceName);
+    if (instanceConfig == null) {
+      LOGGER.error("Instance config for instance '{}' does not exist", instanceName);
       return true;
     }
 
-    // If the instance is not enabled, return false.
-    InstanceConfig instanceConfig = instanceConfigMap.get(instanceName);
     if (!instanceConfig.getInstanceEnabled()) {
-      LOGGER.info("Instance '{}' is disabled in the config map.", instanceName);
+      LOGGER.info("Instance '{}' is disabled", instanceName);
       return true;
     }
 
-    boolean status = false;
-    if (instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS) != null) {
-      try {
-        if (instanceConfig.getRecord() == null) {
-          LOGGER.info("Config record not found for instance '{}'.", instanceName);
-          return true;
-        }
-        if (instanceConfig.getRecord()
-            .getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS) != null) {
-          status =
-              Boolean.valueOf(instanceConfig.getRecord()
-                  .getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS));
-          if (status == true) {
-            LOGGER.info("found an instance : '{}' in shutting down state", instanceName);
-          }
-        }
-      } catch (Exception e) {
-        LOGGER.error("unknown value found while parsing boolean isShuttingDownField ", e);
-      }
+    if (Boolean.parseBoolean(
+        instanceConfig.getRecord().getSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS))) {
+      LOGGER.info("Instance '{}' is shutting down", instanceName);
+      return true;
     }
 
-    return status;
+    return false;
   }
 }
