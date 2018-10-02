@@ -221,14 +221,13 @@ public class HelixServerStarter {
 
   public void stop() {
     _adminApiApplication.stop();
+    setShuttingDownStatus(true);
     if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, true)) {
       Uninterruptibles.sleepUninterruptibly(_maxQueryTimeMs, TimeUnit.MILLISECONDS);
     }
+    waitForServiceStatusChange(true /*shutDownStatus*/);
     _helixManager.disconnect();
     _serverInstance.shutDown();
-
-    waitForServiceStatusChange(true /*shutDownStatus*/);
-    setShuttingDownStatus(true);
   }
 
   private void waitForServiceStatusChange(boolean shuttingDownStatus) {
