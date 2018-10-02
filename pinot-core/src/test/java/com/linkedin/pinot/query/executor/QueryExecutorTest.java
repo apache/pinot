@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.query.executor;
 
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
@@ -147,6 +148,21 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
+  }
+
+  @Test
+  public void testMissingSegments() {
+    List<String> segmentsToQuery = new ArrayList<>(_segmentNames);
+    segmentsToQuery.add("dummySegment1");
+    segmentsToQuery.add("dummySegment2");
+
+    String query = "SELECT COUNT(*) FROM " + TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(segmentsToQuery);
+    DataTable instanceResponse = _queryExecutor.processQuery(getQueryRequest(instanceRequest), QUERY_RUNNERS);
+    Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
+    Assert.assertTrue(instanceResponse.getMetadata()
+        .containsKey(DataTable.EXCEPTION_METADATA_KEY + QueryException.MISSING_SEGMENTS_ERROR_CODE));
   }
 
   @AfterClass

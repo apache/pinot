@@ -38,11 +38,14 @@ import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
 import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.request.context.TimerContext;
 import com.linkedin.pinot.core.util.trace.TraceContext;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -120,7 +123,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(queryRequest.getSegmentsToQuery());
+    List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery);
+    Set<String> missingSegments = computeMissingSegments(segmentsToQuery, segmentDataManagers);
+
     boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
       TraceContext.register(requestId);
@@ -135,6 +141,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       int numSegmentsMatched = segmentDataManagers.size();
       queryRequest.setSegmentCountAfterPruning(numSegmentsMatched);
       LOGGER.debug("Matched {} segments", numSegmentsMatched);
+
       if (numSegmentsMatched == 0) {
         dataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
         Map<String, String> metadata = dataTable.getMetadata();
@@ -175,6 +182,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       dataTable = new DataTableImplV2();
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     } finally {
+      // Handle missing segments
+      if (!missingSegments.isEmpty()) {
+        handleMissingSegments(missingSegments, tableDataManager.getTableName(), dataTable);
+      }
+
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
@@ -219,6 +231,42 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     return totalRawDocs;
+  }
+
+  /**
+   * Helper method to compute missing segments
+   *
+   * @param segmentsToQuery segments that need to be queried according to server query request
+   * @param segmentDataManagers acquired segment data managers from table data manager
+   * @return a list of missing segments
+   */
+  private Set<String> computeMissingSegments(List<String> segmentsToQuery,
+      List<SegmentDataManager> segmentDataManagers) {
+    Set<String> missingSegments = new HashSet<>(segmentsToQuery);
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      missingSegments.remove(segmentDataManager.getSegmentName());
+    }
+    return missingSegments;
+  }
+
+  /**
+   * Helper method to handle missing segments
+   *
+   * @param missingSegments a list of missing segments
+   * @param tableNameWithType table name with type
+   * @param dataTable data table result
+   */
+  private void handleMissingSegments(Set<String> missingSegments, String tableNameWithType, DataTable dataTable) {
+    String errorMsg = "Could not find segment " + String.join(",", missingSegments) + " for table " + tableNameWithType;
+
+    // Bump up the missing segment metric
+    _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, missingSegments.size());
+
+    // Add the exception to data table in order to return the exception to broker
+    dataTable.addException(QueryException.getException(QueryException.MISSING_SEGMENTS_ERROR, errorMsg));
+
+    // Log the segment missing error on the server side
+    LOGGER.error(errorMsg);
   }
 
   @Override
