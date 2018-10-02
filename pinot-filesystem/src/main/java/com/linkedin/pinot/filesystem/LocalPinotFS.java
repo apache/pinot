@@ -122,7 +122,6 @@ public class LocalPinotFS extends PinotFS {
   @Override
   public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     copy(srcUri, new URI(encodeURI(dstFile.getAbsolutePath())));
-    LOGGER.info("Copy file from {} to {}; Length of file: {}", srcUri, dstFile, dstFile.length());
   }
 
   @Override
