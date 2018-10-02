@@ -890,8 +890,6 @@ export default Controller.extend({
         selectedUrns: new Set(selectedUrns),
         sessionModified: true
       });
-
-
     },
 
     /**
