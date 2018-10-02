@@ -17,7 +17,6 @@ package com.linkedin.pinot.filesystem;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
 
@@ -33,7 +32,7 @@ public abstract class PinotFS {
   public abstract void init(Configuration config);
 
   /**
-   * Creates a new directory.
+   * Creates a new directory. If parent directories are not created, it will create them.
    */
   public abstract boolean mkdir(URI uri) throws IOException;
 
@@ -109,13 +108,4 @@ public abstract class PinotFS {
    * @throws IOException for IO Error
    */
   public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws Exception;
-
-  /**
-   * Performs the system-specific decoding of a uri
-   * @param uri
-   * @return
-   */
-  public String decodeURI(String uri) throws UnsupportedEncodingException {
-    throw new RuntimeException("Not implemented");
-  }
 }
