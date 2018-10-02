@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
@@ -388,14 +389,10 @@ public class DataTableImplV2 implements DataTable {
   @Override
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
-    ObjectType objectType = ObjectType.getObjectType(_variableSizeData.getInt());
+    int objectTypeValue = _variableSizeData.getInt();
     ByteBuffer byteBuffer = _variableSizeData.slice();
     byteBuffer.limit(size);
-    try {
-      return ObjectCustomSerDe.deserialize(byteBuffer, objectType);
-    } catch (IOException e) {
-      throw new RuntimeException("Caught exception while de-serializing object.", e);
-    }
+    return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
   }
 
   @Nonnull

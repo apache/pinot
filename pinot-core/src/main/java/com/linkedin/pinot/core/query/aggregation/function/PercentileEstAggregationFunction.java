@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.query.aggregation.function;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
@@ -85,7 +86,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
-            quantileDigest.merge(QuantileDigest.Builder.build(bytesValues[i]));
+            quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
           }
         } catch (Exception e) {
           throw new RuntimeException("Caught exception while aggregating QuantileDigest", e);
@@ -117,7 +118,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
         try {
           for (int i = 0; i < length; i++) {
             QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
-            quantileDigest.merge(QuantileDigest.Builder.build(bytesValues[i]));
+            quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
           }
         } catch (Exception e) {
           throw new RuntimeException("Caught exception while aggregating QuantileDigest", e);
@@ -150,7 +151,7 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
         try {
           for (int i = 0; i < length; i++) {
-            QuantileDigest value = QuantileDigest.Builder.build(bytesValues[i]);
+            QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
             for (int groupKey : groupKeysArray[i]) {
               QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
               quantileDigest.merge(value);
