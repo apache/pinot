@@ -17,11 +17,16 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.CaseFormat;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
+import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.api.Constants;
@@ -39,14 +44,18 @@ import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
@@ -61,8 +70,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
@@ -106,6 +117,7 @@ public class AnomalyResource {
   private static final String DEFAULT_FUNCTION_TYPE = "WEEK_OVER_WEEK_RULE";
 
   private AnomalyFunctionManager anomalyFunctionDAO;
+  private TaskManager taskDAO;
   private MergedAnomalyResultManager anomalyMergedResultDAO;
   private AlertConfigManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
@@ -114,13 +126,16 @@ public class AnomalyResource {
   private DatasetConfigManager datasetConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
+  private AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
   private LoadingCache<String, String> dimensionFiltersCache;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
+  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory,
+      AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.taskDAO = DAO_REGISTRY.getTaskDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
@@ -129,6 +144,7 @@ public class AnomalyResource {
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;
+    this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
   }
@@ -286,7 +302,6 @@ public class AnomalyResource {
       @QueryParam("windowDelayUnit") String windowDelayUnit, @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters, @QueryParam("dataGranularity") String userInputDataGranularity,
       @NotNull @QueryParam("properties") String properties, @QueryParam("isActive") boolean isActive) throws Exception {
-
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || properties == null) {
       throw new IllegalArgumentException(String.format("Received nulll or emtpy String for one of the mandatory params: "
@@ -377,6 +392,7 @@ public class AnomalyResource {
     anomalyFunctionSpec.setCron(cron);
 
     Long id = anomalyFunctionDAO.save(anomalyFunctionSpec);
+
     return Response.ok(id).build();
   }
 

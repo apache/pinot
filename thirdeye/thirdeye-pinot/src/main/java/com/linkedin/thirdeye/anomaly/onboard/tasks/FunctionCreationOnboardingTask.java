@@ -74,6 +74,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String EXPLORE_DIMENSION = DefaultDetectionOnboardJob.EXPLORE_DIMENSION;
   public static final String FILTERS = DefaultDetectionOnboardJob.FILTERS;
   public static final String FUNCTION_TYPE = DefaultDetectionOnboardJob.FUNCTION_TYPE;
+  public static final String IS_LEGACY = DefaultDetectionOnboardJob.IS_LEGACY;
   public static final String METRIC_FUNCTION = DefaultDetectionOnboardJob.METRIC_FUNCTION;
   public static final String WINDOW_SIZE = DefaultDetectionOnboardJob.WINDOW_SIZE;
   public static final String WINDOW_UNIT = DefaultDetectionOnboardJob.WINDOW_UNIT;
@@ -192,7 +193,8 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
 
     // create function
     try {
-      AnomalyFunctionDTO defaultFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
+      AnomalyFunctionDTO defaultFunctionSpec =
+          getDefaultFunctionSpec(configuration.getBoolean(IS_LEGACY, true), dataGranularity);
 
       // Merge user properties with default properties; the user assigned property can override default property
       Properties userAssignedFunctionProperties = com.linkedin.thirdeye.datalayer.util.StringUtils
@@ -264,12 +266,34 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     if (configuration.containsKey(ALERT_ID)) {
       alertConfig = alertConfigDAO.findById(configuration.getLong(ALERT_ID));
       EmailConfig emailConfig = alertConfig.getEmailConfig();
-      emailConfig.getFunctionIds().add(anomalyFunction.getId());
+      if (emailConfig == null) {
+        EmailConfig emailConf = new EmailConfig();
+        emailConf.setFunctionIds(Arrays.asList(anomalyFunction.getId()));
+      } else {
+        emailConfig.getFunctionIds().add(anomalyFunction.getId());
+      }
+      alertConfig.setEmailConfig(emailConfig);
 
       // Add recipients to existing alert group
-      alertConfig.getReceiverAddresses().getTo().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_TO)));
-      alertConfig.getReceiverAddresses().getCc().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_CC)));
-      alertConfig.getReceiverAddresses().getBcc().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_BCC)));
+      DetectionAlertFilterRecipients recipients = alertConfig.getReceiverAddresses();
+      Set<String> toAddr = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_TO));
+      if (recipients.getTo() == null) {
+        recipients.setTo(toAddr);
+      } else {
+        recipients.getTo().addAll(toAddr);
+      }
+      Set<String> ccAddr = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_CC));
+      if (recipients.getCc() == null) {
+        recipients.setCc(ccAddr);
+      } else {
+        recipients.getCc().addAll(ccAddr);
+      }
+      Set<String> bccAddr = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_BCC));
+      if (recipients.getBcc() == null) {
+        recipients.setBcc(bccAddr);
+      } else {
+        recipients.getBcc().addAll(bccAddr);
+      }
 
       alertConfigDAO.update(alertConfig);
     } else {
@@ -296,6 +320,21 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       alertConfigDAO.save(alertConfig);
     }
     executionContext.setExecutionResult(ALERT_CONFIG, alertConfig);
+  }
+
+  private AnomalyFunctionDTO getDefaultFunctionSpec(boolean isLegacy, TimeGranularity dataGranularity) {
+    AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
+    if (isLegacy) {
+      anomalyFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
+    } else {
+      anomalyFunctionSpec.setType("SPLINE_REGRESSION_WRAPPER");
+      anomalyFunctionSpec.setCron("0 0 14 * * ? *");
+      anomalyFunctionSpec.setWindowSize(1);
+      anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
+      anomalyFunctionSpec.setProperties("variables.continuumOffset=P90D;module.training=parametric.GenericSplineTrainingModule;variables.numberOfKnots=0;variables.degree=3;variables.predictionMode=TRENDING;variables.anomalyRemovalThreshold=0.6,-0.6;module.data=ContinuumDataModule;variables.pValueThreshold=0.025;function=ConfigurableAnomalyDetectionFunction;variables.seasonalities=DAILY_SEASONALITY;module.detection=ConfidenceIntervalDetectionModule;module.testingPreprocessors=DummyPreprocessModule;variables.recentPeriod=P14D;module.trainingPreprocessors=AnomalyRemovalByWeight;variables.r2Cutoff=0.9");
+      anomalyFunctionSpec.setRequiresCompletenessCheck(true);
+    }
+    return anomalyFunctionSpec;
   }
 
   protected AnomalyFunctionDTO getDefaultFunctionSpecByTimeGranularity(TimeGranularity timeGranularity) {

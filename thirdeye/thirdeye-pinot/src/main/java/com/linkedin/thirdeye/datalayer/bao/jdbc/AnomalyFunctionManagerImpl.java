@@ -55,6 +55,21 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
     return result;
   }
 
+  @Override
+  public List<AnomalyFunctionDTO> findAllByMetricAndCollection(String metric, String collection) {
+    Predicate predicate = Predicate.AND(
+        Predicate.EQ("metric", metric),
+        Predicate.EQ("collection", collection)
+    );
+    List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
+    List<AnomalyFunctionDTO> result = new ArrayList<>();
+    for (AnomalyFunctionBean abstractBean : list) {
+      AnomalyFunctionDTO dto = MODEL_MAPPER.map(abstractBean, AnomalyFunctionDTO.class);
+      result.add(dto);
+    }
+    return result;
+  }
+
   /**
    * Get the list of anomaly functions under the given application
    * @param application name of the application

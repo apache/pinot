@@ -145,7 +145,7 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask {
       EmailHelper.sendEmailWithEmailEntity(emailEntity, smtpConfiguration);
     } catch (EmailException e) {
       LOG.error("Unable to send out email to recipients");
-      throw new IllegalStateException("Unable to send out email to recipients");
+      throw new IllegalStateException("Unable to send out email to recipients", e);
     }
 
     // Set the alert to be active after everything is successful

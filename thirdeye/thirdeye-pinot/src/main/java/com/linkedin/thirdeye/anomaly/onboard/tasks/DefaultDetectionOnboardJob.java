@@ -73,6 +73,7 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
   public static final String ALERT_BCC = "bccRecipients";
   public static final String ALERT_APPLICATION = "application";
   public static final String ANOMALY_FUNCTION_CONFIG = "anomalyFuncitonConfig";
+  public static final String IS_LEGACY = "isLegacy";
   public static final String ALERT_CONFIG = "alertConfig";
   public static final String AUTOTUNE_PATTERN = DetectionJobResource.AUTOTUNE_PATTERN_KEY;
   public static final String AUTOTUNE_TYPE = "autoTuneType";
@@ -160,6 +161,9 @@ public class DefaultDetectionOnboardJob extends BaseDetectionOnboardJob {
     }
     if (this.properties.containsKey(METRIC_FUNCTION)) {
       taskConfigs.put(taskPrefix + METRIC_FUNCTION, this.properties.get(METRIC_FUNCTION));
+    }
+    if (this.properties.containsKey(IS_LEGACY)) {
+      taskConfigs.put(taskPrefix + IS_LEGACY, this.properties.get(IS_LEGACY));
     }
     if (this.properties.containsKey(WINDOW_SIZE)) {
       taskConfigs.put(taskPrefix + WINDOW_SIZE, this.properties.get(WINDOW_SIZE));
