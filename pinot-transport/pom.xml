@@ -16,16 +16,17 @@
     limitations under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>0.1.078</version>
+    <version>0.1.078-SNAPSHOT</version>
   </parent>
   <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-transport</artifactId>
-  <version>0.1.078</version>
+  <version>0.1.078-SNAPSHOT</version>
   <name>pinot-transport</name>
   <url>http://maven.apache.org</url>
   <properties>
