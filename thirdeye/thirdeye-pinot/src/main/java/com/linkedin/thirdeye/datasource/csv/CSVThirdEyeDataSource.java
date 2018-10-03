@@ -21,12 +21,9 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.ObjectSeries;
 import com.linkedin.thirdeye.dataframe.Series;
-import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricFunction;
@@ -246,6 +243,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
       } else {
         if (request.getGroupByTimeGranularity() != null) {
           // group by time granularity only
+          // TODO handle non-UTC time zone gracefully
           df = data.groupByInterval(COL_TIMESTAMP, request.getGroupByTimeGranularity().toMillis())
               .aggregate(inputName + ":sum");
           df.renameSeries(inputName, outputName);
@@ -255,11 +253,17 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
           df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
         }
       }
+
+      df = df.dropNull(outputName);
     }
 
-    CSVThirdEyeResponse response = new CSVThirdEyeResponse(request,
-        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT), df);
-    return response;
+    // TODO handle non-dataset granularity gracefully
+    TimeSpec timeSpec = new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT);
+    if (request.getGroupByTimeGranularity() != null) {
+      timeSpec = new TimeSpec("timestamp", request.getGroupByTimeGranularity(), TimeSpec.SINCE_EPOCH_FORMAT);
+    }
+
+    return new CSVThirdEyeResponse(request, timeSpec, df);
   }
 
   @Override

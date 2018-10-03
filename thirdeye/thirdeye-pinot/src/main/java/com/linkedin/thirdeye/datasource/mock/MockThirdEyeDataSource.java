@@ -5,6 +5,7 @@ import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
+import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
@@ -43,6 +44,11 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 public class MockThirdEyeDataSource implements ThirdEyeDataSource {
   private static final Logger LOG = LoggerFactory.getLogger(MockThirdEyeDataSource.class);
 
+  private static final String PROP_POPULATE_META_DATA = "populateMetaData";
+  private static final String PROP_LOOKBACK = "lookback";
+  private static final String PROP_DATASETS = "datasets";
+  private static final String PROP_DATASET_METRICS = "metrics";
+
   final Map<String, MockDataset> datasets;
 
   final Map<String, DataFrame> datasetData;
@@ -59,7 +65,7 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
   public MockThirdEyeDataSource(Map<String, Object> properties) throws Exception {
     // datasets
     this.datasets = new HashMap<>();
-    Map<String, Object> config = ConfigUtils.getMap(properties.get("datasets"));
+    Map<String, Object> config = ConfigUtils.getMap(properties.get(PROP_DATASETS));
     for (Map.Entry<String, Object> entry : config.entrySet()) {
       this.datasets.put(entry.getKey(), MockDataset.fromMap(
           entry.getKey(), ConfigUtils.<String, Object>getMap(entry.getValue())
@@ -69,8 +75,9 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     LOG.info("Found {} datasets: {}", this.datasets.size(), this.datasets.keySet());
 
     // mock data
+    final long lookback = MapUtils.getLongValue(properties, PROP_LOOKBACK, 28);
     final long tEnd = System.currentTimeMillis();
-    final long tStart = tEnd - TimeUnit.DAYS.toMillis(28);
+    final long tStart = tEnd - TimeUnit.DAYS.toMillis(lookback);
 
     LOG.info("Generating data for time range {} to {}", tStart, tEnd);
 
@@ -78,7 +85,7 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     Map<Tuple, DataFrame> rawData = new HashMap<>();
     for (MockDataset dataset : this.datasets.values()) {
       for (String metric : dataset.metrics.keySet()) {
-        String[] basePrefix = new String[] { dataset.name, "metrics", metric };
+        String[] basePrefix = new String[] { dataset.name, PROP_DATASET_METRICS, metric };
 
         Collection<Tuple> paths = makeTuples(dataset.metrics.get(metric), basePrefix, dataset.dimensions.size() + basePrefix.length);
         for (Tuple path : paths) {
@@ -104,7 +111,6 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
     for (String datasetName : sortedDatasets) {
       MockDataset dataset = this.datasets.get(datasetName);
-
       Map<String, DataFrame> metricData = new HashMap<>();
 
       List<String> indexes = new ArrayList<>();
@@ -118,7 +124,7 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
       for (String metric : sortedMetrics) {
         this.metricNameMap.put(1 + metricNameCounter++, metric);
 
-        String[] prefix = new String[] { dataset.name, "metrics", metric };
+        String[] prefix = new String[] { dataset.name, PROP_DATASET_METRICS, metric };
         Collection<Tuple> tuples = filterTuples(rawData.keySet(), prefix);
 
         // per dimension
@@ -155,8 +161,8 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
       for (Map.Entry<String, DataFrame> entry : metricData.entrySet()) {
         String metricName = entry.getKey();
         dfDataset = dfDataset.joinOuter(entry.getValue())
-            .renameSeries(metricName + "_right", metricName)
-            .dropSeries(metricName + "_left");
+            .renameSeries(metricName + DataFrame.COLUMN_JOIN_RIGHT, metricName)
+            .dropSeries(metricName + DataFrame.COLUMN_JOIN_LEFT);
       }
 
       this.datasetData.put(dataset.name, dfDataset);
@@ -165,6 +171,16 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
     }
 
     this.delegate = CSVThirdEyeDataSource.fromDataFrame(this.datasetData, this.metricNameMap);
+
+    // auto onboarding support
+    if (MapUtils.getBooleanValue(properties, PROP_POPULATE_META_DATA, false)) {
+      MetadataSourceConfig metadataSourceConfig = new MetadataSourceConfig();
+      metadataSourceConfig.setProperties(properties);
+
+      AutoOnboardMockDataSource onboarding = new AutoOnboardMockDataSource(metadataSourceConfig);
+
+      onboarding.runAdhoc();
+    }
   }
 
   @Override
