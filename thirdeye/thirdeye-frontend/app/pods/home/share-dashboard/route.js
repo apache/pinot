@@ -31,8 +31,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
   },
   appName: null,
   startDate: moment().subtract(1, 'day').utc().valueOf(), //taylored for Last 24 hours vs Today -> moment().startOf('day').utc().valueOf(),
-  endDate: moment().utc().valueOf(),//taylored for Last 24 hours
-  duration: '1d',//taylored for Last 24 hours
+  endDate: moment().utc().valueOf(),//Last 24 hours
+  duration: '1d',//Last 24 hours
   feedbackType: 'All Resolutions',
   shareId: null,
 
@@ -70,7 +70,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
     return new RSVP.Promise(async (resolve, reject) => {
       try {
-
         const anomalyMapping = appName ? await get(this, '_getAnomalyMapping').perform(model) : [];//DEMO:
         const shareMetaData = shareId ? await get(this, 'shareDashboardApiService').queryShareMetaById(shareId) : [];
         const defaultParams = {
@@ -106,6 +105,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     applicationAnomalies.forEach(anomaly => {
       const metricName = get(anomaly, 'metricName');
       const metricId = get(anomaly, 'metricId');
+      const id = get(anomaly, 'id');
       const functionName = get(anomaly, 'functionName');
       const functionId = get(anomaly, 'functionId');
       //Grouping the anomalies of the same metric name
@@ -113,7 +113,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         anomalyMapping[metricName] = { 'metricId': metricId, items: {}, count: index };
         index++;
       }
-
+      //By Alert first time
       if(!anomalyMapping[metricName].items[functionName]) {
         anomalyMapping[metricName].items[functionName] = { 'functionId': functionId, items: [] };
       }
@@ -149,7 +149,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
    */
   setupController(controller, model) {
     this._super(...arguments);
-
     //set and reset controller props as needed
     controller.setProperties({
       columns,
