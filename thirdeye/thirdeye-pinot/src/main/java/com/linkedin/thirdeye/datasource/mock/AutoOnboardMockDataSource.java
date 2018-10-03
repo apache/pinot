@@ -43,7 +43,6 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
   @Override
   public void run() {
     MetadataSourceConfig config = this.getMetadataSourceConfig();
-    LOG.info("{}", config.getProperties());
 
     List<DatasetConfigDTO> datasetConfigs = new ArrayList<>();
     List<MetricConfigDTO> metricConfigs = new ArrayList<>();

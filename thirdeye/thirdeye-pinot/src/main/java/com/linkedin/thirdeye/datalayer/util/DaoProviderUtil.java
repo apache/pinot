@@ -52,6 +52,8 @@ import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
 import java.io.FileReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
 import java.sql.Connection;
 import javax.validation.Validation;
@@ -99,12 +101,12 @@ public abstract class DaoProviderUtil {
         scriptRunner.setDelimiter(";", true);
 
         LOG.info("Dropping existing schema");
-        URL dropSchemaUrl = DaoProviderUtil.class.getResource("/schema/drop-tables.sql");
-        scriptRunner.runScript(new FileReader(dropSchemaUrl.getFile()));
+        InputStream dropSchema = DaoProviderUtil.class.getResourceAsStream("/schema/drop-tables.sql");
+        scriptRunner.runScript(new InputStreamReader(dropSchema));
 
         LOG.info("Creating new schema");
-        URL createSchemaUrl = DaoProviderUtil.class.getResource("/schema/create-schema.sql");
-        scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
+        InputStream createSchema = DaoProviderUtil.class.getResourceAsStream("/schema/create-schema.sql");
+        scriptRunner.runScript(new InputStreamReader(createSchema));
 
       } catch (Exception e) {
         LOG.error("Could not re-create database schema. Attempting to use existing.", e);
