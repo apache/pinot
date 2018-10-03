@@ -26,6 +26,8 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.common.utils.ServiceStatus.Status;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
@@ -42,15 +44,20 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationUtils;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.StateMachineEngine;
@@ -145,7 +152,7 @@ public class HelixServerStarter {
         CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
     _adminApiApplication = new AdminApiApplication(_serverInstance);
     _adminApiApplication.start(adminApiPort);
-    updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
+    setAdminApiPort(adminApiPort);
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
@@ -167,6 +174,8 @@ public class HelixServerStarter {
 
     ControllerLeaderLocator.create(_helixManager);
 
+    waitForAllSegmentsLoaded();
+    setShuttingDownStatus(false);
     LOGGER.info("Pinot server ready");
 
     // Create metrics for mmap stuff
@@ -177,9 +186,97 @@ public class HelixServerStarter {
     serverMetrics.addCallbackGauge("memory.allocationFailureCount", PinotDataBuffer::getAllocationFailureCount);
   }
 
-  private void updateInstanceConfigInHelix(int adminApiPort, boolean shuttingDown) {
+  private void waitForAllSegmentsLoaded() {
+    if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK, CommonConstants.Server.DEFAULT_STARTER_ENABLE_SEGMENTS_LOADING_CHECK)) {
+      long startTime = System.currentTimeMillis();
+      int serverStarterTimeout = _helixServerConfig.getInt(CommonConstants.Server.CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS, CommonConstants.Server.DEFAULT_STARTER_TIMEOUT_IN_SECONDS);
+      long endTime = TimeUnit.SECONDS.toMillis(startTime + serverStarterTimeout);
+      boolean allSegmentsLoaded = false;
+      while (System.currentTimeMillis() < endTime) {
+        long timeToSleep = Math.min(TimeUnit.MILLISECONDS.toSeconds(endTime - System.currentTimeMillis()), 10 /* Sleep 10 seconds as default*/);
+        if (ServiceStatus.getServiceStatus() == Status.GOOD) {
+          LOGGER.info("All the segments are fully loaded into Pinot server, time taken: {} seconds", TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - startTime));
+          allSegmentsLoaded = true;
+          break;
+        }
+        try {
+          int numSegmentsLoaded = getNumSegmentLoaded();
+          int numSegmentsToLoad = getNumSegmentsToLoad();
+          LOGGER.warn("Waiting for all segments to be loaded, current progress: [ {} / {} ], sleep {} seconds...", numSegmentsLoaded, numSegmentsToLoad, timeToSleep);
+          logSegmentsLoadingInfo();
+          Thread.sleep(TimeUnit.SECONDS.toMillis(timeToSleep));
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return;
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception during waiting for segments loading...", e);
+        }
+      }
+      if (!allSegmentsLoaded) {
+        LOGGER.info("Segments are not fully loaded within {} seconds...", serverStarterTimeout);
+      }
+    }
+  }
+
+  private int getNumSegmentLoaded() {
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      return -1;
+    }
+
+    List<String> tableNames = _helixAdmin.getResourcesInCluster(_helixClusterName);
+    int numSegmentsLoaded = 0;
+    for (String tableName: tableNames) {
+      numSegmentsLoaded += instanceDataManager.getAllSegmentsMetadata(tableName).size();
+    }
+    return numSegmentsLoaded;
+  }
+
+  private int getNumSegmentsToLoad() {
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      return -1;
+    }
+
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    Builder keyBuilder = helixDataAccessor.keyBuilder();
+    int numSegmentsToLoad = 0;
+    List<String> tableNames = _helixAdmin.getResourcesInCluster(_helixClusterName);
+    for (String tableName: tableNames) {
+      LiveInstance liveInstance = helixDataAccessor.getProperty(keyBuilder.liveInstance(_instanceId));
+      String sessionId = liveInstance.getSessionId();
+      PropertyKey currentStateKey = keyBuilder.currentState(_instanceId, sessionId, tableName);
+      CurrentState currentState = helixDataAccessor.getProperty(currentStateKey);
+      if (currentState != null && currentState.isValid()) {
+        numSegmentsToLoad += currentState.getPartitionStateMap().size();
+      }
+    }
+    return numSegmentsToLoad;
+  }
+
+  private void logSegmentsLoadingInfo() {
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      return;
+    }
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    Builder keyBuilder = helixDataAccessor.keyBuilder();
+    LiveInstance liveInstance = helixDataAccessor.getProperty(keyBuilder.liveInstance(_instanceId));
+    String sessionId = liveInstance.getSessionId();
+    List<String> tableNames = _helixAdmin.getResourcesInCluster(_helixClusterName);
+    for (String tableName: tableNames) {
+      PropertyKey currentStateKey = keyBuilder.currentState(_instanceId, sessionId, tableName);
+      CurrentState currentState = helixDataAccessor.getProperty(currentStateKey);
+      int numSegmentsLoaded = instanceDataManager.getAllSegmentsMetadata(tableName).size();
+      if (currentState != null && currentState.isValid()) {
+        int numSegmentsToLoad = currentState.getPartitionStateMap().size();
+        LOGGER.info("Waiting for all segments to be loaded, table: {}, progress [ {} / {} ]", tableName, numSegmentsLoaded, numSegmentsToLoad);
+      }
+    }
+  }
+
+  private void setAdminApiPort(int adminApiPort) {
     Map<String, String> propToUpdate = new HashMap<>();
-    propToUpdate.put(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, String.valueOf(shuttingDown));
     propToUpdate.put(CommonConstants.Helix.Instance.ADMIN_PORT_KEY, String.valueOf(adminApiPort));
     updateInstanceConfigInHelix(propToUpdate);
   }
