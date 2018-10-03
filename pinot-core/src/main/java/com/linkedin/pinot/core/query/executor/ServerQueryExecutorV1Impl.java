@@ -16,16 +16,11 @@
 package com.linkedin.pinot.core.query.executor;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
@@ -40,20 +35,22 @@ import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
-import com.linkedin.pinot.core.query.pruner.SegmentPrunerServiceImpl;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
+import com.linkedin.pinot.core.query.request.context.TimerContext;
 import com.linkedin.pinot.core.util.trace.TraceContext;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+@ThreadSafe
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
   private static final boolean PRINT_QUERY_PLAN = false;
@@ -61,29 +58,35 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private InstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
-  private volatile boolean _isStarted = false;
   private long _defaultTimeOutMs = CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS;
-  private final Map<String, Long> _resourceTimeOutMsMap = new ConcurrentHashMap<>();
+  private final Map<String, Long> _tableTimeoutMs = new ConcurrentHashMap<>();
   private ServerMetrics _serverMetrics;
 
-  public ServerQueryExecutorV1Impl() {
-  }
-
   @Override
-  public void init(Configuration configuration, DataManager dataManager, ServerMetrics serverMetrics)
-      throws ConfigurationException {
+  public synchronized void init(Configuration config, InstanceDataManager instanceDataManager,
+      ServerMetrics serverMetrics) throws ConfigurationException {
+    _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
-    _instanceDataManager = (InstanceDataManager) dataManager;
-    QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(configuration);
+    QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(config);
     if (queryExecutorConfig.getTimeOut() > 0) {
       _defaultTimeOutMs = queryExecutorConfig.getTimeOut();
     }
     LOGGER.info("Default timeout for query executor : {}", _defaultTimeOutMs);
     LOGGER.info("Trying to build SegmentPrunerService");
-    _segmentPrunerService = new SegmentPrunerServiceImpl(queryExecutorConfig.getPrunerConfig());
+    _segmentPrunerService = new SegmentPrunerService(queryExecutorConfig.getPrunerConfig());
     LOGGER.info("Trying to build QueryPlanMaker");
     _planMaker = new InstancePlanMakerImplV2(queryExecutorConfig);
     LOGGER.info("Trying to build QueryExecutorTimer");
+  }
+
+  @Override
+  public synchronized void start() {
+    LOGGER.info("Query executor started");
+  }
+
+  @Override
+  public synchronized void shutDown() {
+    LOGGER.info("Query executor shut down");
   }
 
   @Override
@@ -96,12 +99,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long querySchedulingTimeMs = System.currentTimeMillis() - timerContext.getQueryArrivalTimeMs();
     TimerContext.Timer queryProcessingTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PROCESSING);
 
-    InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
-    long requestId = instanceRequest.getRequestId();
-    BrokerRequest brokerRequest = instanceRequest.getQuery();
+    long requestId = queryRequest.getRequestId();
+    BrokerRequest brokerRequest = queryRequest.getBrokerRequest();
     LOGGER.debug("Incoming request Id: {}, query: {}", requestId, brokerRequest);
-    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
-    long queryTimeoutMs = _resourceTimeOutMsMap.getOrDefault(tableNameWithType, _defaultTimeOutMs);
+    String tableNameWithType = queryRequest.getTableNameWithType();
+    long queryTimeoutMs = _tableTimeoutMs.getOrDefault(tableNameWithType, _defaultTimeOutMs);
     long remainingTimeMs = queryTimeoutMs - querySchedulingTimeMs;
 
     // Query scheduler wait time already exceeds query timeout, directly return
@@ -117,10 +119,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
-    Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: {}", tableNameWithType);
-    List<SegmentDataManager> queryableSegmentDataManagerList =
-        acquireQueryableSegments(tableDataManager, instanceRequest);
-    boolean enableTrace = instanceRequest.isEnableTrace();
+    Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(queryRequest.getSegmentsToQuery());
+    boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
       TraceContext.register(requestId);
     }
@@ -128,10 +129,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     DataTable dataTable = null;
     try {
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      long totalRawDocs = pruneSegments(tableDataManager, queryableSegmentDataManagerList, queryRequest);
+      long totalRawDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
       segmentPruneTimer.stopAndRecord();
 
-      int numSegmentsMatched = queryableSegmentDataManagerList.size();
+      int numSegmentsMatched = segmentDataManagers.size();
       queryRequest.setSegmentCountAfterPruning(numSegmentsMatched);
       LOGGER.debug("Matched {} segments", numSegmentsMatched);
       if (numSegmentsMatched == 0) {
@@ -144,13 +145,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       } else {
         TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
         Plan globalQueryPlan =
-            _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest, executorService,
-                remainingTimeMs);
+            _planMaker.makeInterSegmentPlan(segmentDataManagers, brokerRequest, executorService, remainingTimeMs);
         planBuildTimer.stopAndRecord();
 
         if (PRINT_QUERY_PLAN) {
           LOGGER.debug("***************************** Query Plan for Request {} ***********************************",
-              instanceRequest.getRequestId());
+              queryRequest.getRequestId());
           globalQueryPlan.print();
           LOGGER.debug("*********************************** End Query Plan ***********************************");
         }
@@ -175,7 +175,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       dataTable = new DataTableImplV2();
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     } finally {
-      for (SegmentDataManager segmentDataManager : queryableSegmentDataManagerList) {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
       if (enableTrace) {
@@ -195,74 +195,34 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   /**
-   * Helper method to acquire segments that can be queried for the request.
-   *
-   * @param tableDataManager Table data manager
-   * @param instanceRequest Instance request
-   * @return List of segment data managers that can be queried.
-   */
-  private List<SegmentDataManager> acquireQueryableSegments(TableDataManager tableDataManager,
-      final InstanceRequest instanceRequest) {
-    LOGGER.debug("InstanceRequest contains {} segments", instanceRequest.getSearchSegmentsSize());
-
-    if (tableDataManager == null || instanceRequest.getSearchSegmentsSize() == 0) {
-      return new ArrayList<>();
-    }
-    List<SegmentDataManager> listOfQueryableSegments =
-        tableDataManager.acquireSegments(instanceRequest.getSearchSegments());
-    LOGGER.debug("TableDataManager found {} segments before pruning", listOfQueryableSegments.size());
-    return listOfQueryableSegments;
-  }
-
-  /**
    * Helper method to prune segments.
    *
    * @param tableDataManager Table data manager
-   * @param segments List of segments to prune
+   * @param segmentDataManagers List of segments to prune
    * @param serverQueryRequest Server query request
    * @return Total number of docs across all segments (including the ones that were pruned).
    */
-  private long pruneSegments(TableDataManager tableDataManager, List<SegmentDataManager> segments,
+  private long pruneSegments(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
       ServerQueryRequest serverQueryRequest) {
     long totalRawDocs = 0;
-    Iterator<SegmentDataManager> it = segments.iterator();
 
-    while (it.hasNext()) {
-      SegmentDataManager segmentDataManager = it.next();
-      final IndexSegment indexSegment = segmentDataManager.getSegment();
+    Iterator<SegmentDataManager> iterator = segmentDataManagers.iterator();
+    while (iterator.hasNext()) {
+      SegmentDataManager segmentDataManager = iterator.next();
+      IndexSegment indexSegment = segmentDataManager.getSegment();
       // We need to compute the total raw docs for the table before any pruning.
       totalRawDocs += indexSegment.getSegmentMetadata().getTotalRawDocs();
       if (_segmentPrunerService.prune(indexSegment, serverQueryRequest)) {
-        it.remove();
+        iterator.remove();
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+
     return totalRawDocs;
   }
 
   @Override
-  public synchronized void shutDown() {
-    if (isStarted()) {
-      _isStarted = false;
-      LOGGER.info("QueryExecutor is shutDown!");
-    } else {
-      LOGGER.warn("QueryExecutor is already shutDown, won't do anything!");
-    }
-  }
-
-  @Override
-  public boolean isStarted() {
-    return _isStarted;
-  }
-
-  @Override
-  public synchronized void start() {
-    _isStarted = true;
-    LOGGER.info("QueryExecutor is started!");
-  }
-
-  @Override
-  public void updateResourceTimeOutInMs(String resource, long timeOutMs) {
-    _resourceTimeOutMsMap.put(resource, timeOutMs);
+  public void setTableTimeoutMs(String tableNameWithType, long timeOutMs) {
+    _tableTimeoutMs.put(tableNameWithType, timeOutMs);
   }
 }

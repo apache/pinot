@@ -17,11 +17,13 @@ package com.linkedin.pinot.controller;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.filesystem.LocalPinotFS;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 
@@ -32,11 +34,14 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String DATA_DIR = "controller.data.dir";
+  // Potentially same as data dir if local
+  private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
   private static final String ZK_STR = "controller.zk.str";
   private static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model"; // boolean: Update the statemodel on boot?
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
+  private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
   private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
@@ -57,6 +62,10 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
   private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = "controller.realtime.segment.metadata.commit.numLocks";
 
+  // Defines the kind of storage and the underlying PinotFS implementation
+  private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
+  private static final String PINOT_FS_FACTORY_CLASS_LOCAL = "controller.storage.factory.class.file";
+
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
   private static final int DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
   private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
@@ -74,6 +83,11 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
 
+  private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
+  private static final boolean DEFAULT_STORAGE_QUOTA_CHECK = true;
+
+  private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
+
   public ControllerConf(File file) throws ConfigurationException {
     super(file);
   }
@@ -87,7 +101,23 @@ public class ControllerConf extends PropertiesConfiguration {
       return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
     } catch (UnsupportedEncodingException e) {
       // Shouldn't happen
-      throw new AssertionError("UTF-8 encoding should always be supported", e);
+      throw new AssertionError("Encountered error while encoding in UTF-8 format", e);
+    }
+  }
+
+  public void setLocalTempDir(String localTempDir) {
+    setProperty(LOCAL_TEMP_DIR, localTempDir);
+  }
+
+  public String getLocalTempDir() {
+    return getString(LOCAL_TEMP_DIR, null);
+  }
+
+  public void setPinotFSFactoryClasses(Configuration pinotFSFactoryClasses) {
+    setProperty(PINOT_FS_FACTORY_CLASS_LOCAL, DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL);
+
+    if (pinotFSFactoryClasses != null) {
+      pinotFSFactoryClasses.getKeys().forEachRemaining(key -> setProperty((String) key, pinotFSFactoryClasses.getProperty((String) key)));
     }
   }
 
@@ -99,11 +129,19 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(CONSOLE_WEBAPP_ROOT_PATH, path);
   }
 
-  public String getQueryConsole() {
+  public String getQueryConsoleWebappPath() {
     if (containsKey(CONSOLE_WEBAPP_ROOT_PATH)) {
       return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
     }
     return ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm();
+  }
+
+  public void setQueryConsoleUseHttps(boolean useHttps){
+    setProperty(CONSOLE_WEBAPP_USE_HTTPS, useHttps);
+  }
+
+  public boolean getQueryConsoleUseHttps() {
+    return containsKey(CONSOLE_WEBAPP_USE_HTTPS) && getBoolean(CONSOLE_WEBAPP_USE_HTTPS);
   }
 
   public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
@@ -209,6 +247,10 @@ public class ControllerConf extends PropertiesConfiguration {
   @Override
   public String toString() {
     return super.toString();
+  }
+
+  public Configuration getPinotFSFactoryClasses() {
+    return this.subset(PINOT_FS_FACTORY_CLASS_PREFIX);
   }
 
   public boolean getAcceptSplitCommit() {
@@ -372,5 +414,9 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setRealtimeSegmentMetadataCommitNumLocks(int realtimeSegmentMetadataCommitNumLocks) {
     setProperty(REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS, realtimeSegmentMetadataCommitNumLocks);
+  }
+
+  public boolean getEnableStorageQuotaCheck() {
+    return getBoolean(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_STORAGE_QUOTA_CHECK);
   }
 }

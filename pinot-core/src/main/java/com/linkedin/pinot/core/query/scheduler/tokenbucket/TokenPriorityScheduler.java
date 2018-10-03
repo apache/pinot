@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.query.scheduler.tokenbucket;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.MultiLevelPriorityQueue;
 import com.linkedin.pinot.core.query.scheduler.PriorityScheduler;
 import com.linkedin.pinot.core.query.scheduler.SchedulerGroup;

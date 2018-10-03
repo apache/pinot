@@ -16,6 +16,7 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -136,6 +137,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME,
         TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(),
         getTaskConfig());
+
+    completeTableConfiguration();
   }
 
   protected List<File> getAllAvroFiles() throws Exception {
@@ -247,6 +250,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testInstanceShutdown();
   }
 
+  @Test
+  @Override
+  public void testVirtualColumnQueries() {
+    super.testVirtualColumnQueries();
+  }
+
   @AfterClass
   public void tearDown() throws Exception {
     // Try deleting the tables and check that they have no routing table
@@ -284,5 +293,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    */
   protected void cleanup() throws Exception {
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  @Override
+  protected boolean isUsingNewConfigFormat() {
+    return true;
   }
 }

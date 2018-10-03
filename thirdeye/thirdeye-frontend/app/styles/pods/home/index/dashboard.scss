@@ -1,0 +1,121 @@
+.dashboard-container {
+  header {
+    .range-pill-selectors {
+      display: inline-flex;
+    }
+    .te-button {
+      margin-top: 15px;
+    }
+  }
+
+  &__body {
+    background-color: #FFF;
+    margin-bottom: $te-default-element-spacing;
+    padding: 0 15px 15px 15px;
+    border: 1px solid app-shade(black, 0.1);
+
+    // Hide the empty filtering from the table
+    .table-header-no-filtering {
+      display: none;
+    }
+
+    .table-bordered {
+      thead {
+        tr {
+          th {
+            border-bottom-width: 0;
+          }
+        }
+      }
+    }
+
+    //Show/hide accordian
+    .panel-group {
+      .panel {
+        margin-bottom: 20px;
+      }
+    }
+  }
+
+  &__title {
+
+    span {
+      margin-left: 5px;
+    }
+  }
+
+  &__application-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+
+    &-dropdown {
+      width: 200px;
+    }
+  }
+
+  &__application-filter-by {
+    margin: 20px 0;
+
+    .te-anomaly-table__select {
+      display: inline-flex;
+    }
+  }
+
+  &__alert-selector {
+    margin: 0 0 10px 10px;
+    max-width: 800px;
+  }
+
+  &__icon {
+    font-size: 16px;
+    margin-right: 5px;
+  }
+
+  &__go-link {
+    line-height: 26px;
+    margin: 1px 0 0 10px;
+  }
+
+  &__redirect-link{
+    display: flex;
+    justify-content: center;
+    border: solid 1px $te-light-grey;
+    border-top: none;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  //dashboard table styles
+  .anomalies-table {
+    &__column {
+        &--small-width {
+          width: 60px;
+        }
+        &--med-width {
+          width: 120px;
+        }
+        &--large-width {
+          width: 280px;
+        }
+    }
+
+    &__text {
+      margin-bottom: 0px;
+
+      &--stronger {
+        font-weight: bold;
+      }
+    }
+  }
+
+  .te-anomaly-table {
+    &__list {
+      &-item {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+  }
+}

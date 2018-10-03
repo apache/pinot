@@ -17,12 +17,13 @@
       <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color:white; border:1px solid #E9E9E9; border-radius: 2px; width: 100%;">
         <tr>
           <td style="padding: 32px; background-color: #0073B1; color: #FFF; text-align: center" colspan="2">
-            <p style="font-size: 20px; font-weight: 500; margin-bottom: 12px;">2 anomalies were detected </p>
-            <p style="font-size: 16px; font-weight: 300; line-height:20px; color:#FFF">between Nov 06, 10:00 PDT and Nov 07, 17:00 PDT.</p>
-            <p style="margin-top: 0px; font-size:14px;  margin-bottom: 25px;">Below are the list of all anomalies from alerts subscribed by
-              <strong>Test Config</strong>.</p>
-            <a style="margin-top: 0px; padding: 4px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;"
-               href="http://localhost:8080/dashboard/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=2,3">View all in ThirdEye</a>
+            <h2 style="margin-bottom: 12px;">ACTION REQUIRED</h2>
+            <p style="font-size: 14px; margin-bottom: 12px;">
+              <strong>2 anomalies</strong> were detected between <strong>Nov 06, 10:00 and Nov 07, 17:00 (PDT)</strong> on metric
+              <strong><a style="color: white;" href="http://localhost:8080/dashboard/app/#/rootcause?metricId=4">test</a></strong>
+            </p>
+            <p style="margin-top: 0px; font-size:14px;  margin-bottom: 25px;">
+              <a style="margin-top: 0px; padding: 4px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="http://localhost:8080/dashboard/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=2,3">Investigate all in ThirdEye</a>
             </p>
           </td>
         </tr>
@@ -30,7 +31,6 @@
           <td colspan="2" style="border-bottom: 1px solid #E9E9E9;">
           </td>
         </tr>
-
 
         <tr>
           <td style="border-bottom: 1px solid rgba(0,0,0,0.15); padding: 24px; font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;" colspan="2" align="left">

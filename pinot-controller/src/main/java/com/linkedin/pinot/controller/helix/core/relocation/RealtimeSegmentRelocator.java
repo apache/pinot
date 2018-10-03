@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.relocation;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
@@ -35,7 +36,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
-import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,17 +139,14 @@ public class RealtimeSegmentRelocator {
    */
   protected void relocateSegments(RealtimeTagConfig realtimeTagConfig, IdealState idealState) {
 
-    final HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
-    final String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
+    final HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
 
-    List<String> consumingServers =
-        helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeTagConfig.getConsumingServerTag());
+    List<String> consumingServers = getInstancesWithTag(helixManager, realtimeTagConfig.getConsumingServerTag());
     if (consumingServers.isEmpty()) {
       throw new IllegalStateException(
           "Found no realtime consuming servers with tag " + realtimeTagConfig.getConsumingServerTag());
     }
-    List<String> completedServers =
-        helixAdmin.getInstancesInClusterWithTag(helixClusterName, realtimeTagConfig.getCompletedServerTag());
+    List<String> completedServers = getInstancesWithTag(helixManager, realtimeTagConfig.getCompletedServerTag());
     if (completedServers.isEmpty()) {
       throw new IllegalStateException(
           "Found no realtime completed servers with tag " + realtimeTagConfig.getCompletedServerTag());
@@ -180,6 +178,11 @@ public class RealtimeSegmentRelocator {
 
     // get new mapping for segments that need relocation
     createNewIdealState(realtimeTagConfig, idealState, consumingServers, completedServersQueue);
+  }
+
+  @VisibleForTesting
+  protected List<String> getInstancesWithTag(HelixManager helixManager, String instanceTag) {
+    return HelixHelper.getInstancesWithTag(helixManager, instanceTag);
   }
 
   /**

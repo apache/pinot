@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 
 import com.google.common.base.Preconditions;
@@ -5,6 +21,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.resources.v2.ResourceUtils;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEventEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEventEntity;
@@ -43,6 +60,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
   public static final String ATTR_SCORE = "score";
   public static final String ATTR_METRIC_GRANULARITY = "metricGranularity";
   public static final String ATTR_STATUS_CLASSIFICATION = "statusClassification";
+  public static final String ATTR_AGGREGATE_MULTIPLIER = "aggregateMultiplier";
 
   private final MergedAnomalyResultManager anomalyDAO;
   private final MetricConfigManager metricDAO;
@@ -76,10 +94,13 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     MergedAnomalyResultDTO anomaly = this.anomalyDAO.findById(e.getId());
     Multimap<String, String> attributes = ArrayListMultimap.create();
 
-    MetricConfigDTO metric = null;
+    MetricConfigDTO metric = getMetricByName(anomaly.getMetric(), anomaly.getCollection());
+    Preconditions.checkNotNull(metric);
+
+    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
     String functionName = "unknown";
+
     if (anomaly.getDetectionConfigId() != null){
-      metric = getMetricByName(anomaly.getMetric(), anomaly.getCollection());
       DetectionConfigDTO detectionConfigDTO = detectionDAO.findById(anomaly.getDetectionConfigId());
       if (detectionConfigDTO == null){
         throw new IllegalArgumentException(String.format("could not resolve detection config id %d", anomaly.getDetectionConfigId()));
@@ -91,13 +112,14 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
       AnomalyFunctionDTO function = anomaly.getFunction();
       functionName = function.getFunctionName();
       attributes.put(ATTR_FUNCTION_ID, String.valueOf(function.getId()));
-      metric = this.getMetricFromFunction(function);
+    }
+
+    if (anomaly.getAvgBaselineVal() != 0.0d) {
+      // NOTE: hack for legacy anomaly function results
+      attributes.put(ATTR_AGGREGATE_MULTIPLIER, String.valueOf(getAggregateMultiplier(anomaly, dataset, metric)));
     }
 
     attributes.put(ATTR_FUNCTION, functionName);
-    Preconditions.checkNotNull(metric);
-    DatasetConfigDTO dataset = this.datasetDAO.findByDataset(metric.getDataset());
-
 
     String comment = "";
     AnomalyFeedbackType status = AnomalyFeedbackType.NO_FEEDBACK;
@@ -154,26 +176,29 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     return out;
   }
 
-  private MetricConfigDTO getMetricFromFunction(AnomalyFunctionDTO function) {
-    // NOTE: this should be >= 0 but is a limitation of null field in the DB being converted to 0 by default
-    if (function.getMetricId() > 0) {
-      MetricConfigDTO metric = this.metricDAO.findById(function.getMetricId());
-      if (metric == null) {
-        throw new IllegalArgumentException(String.format("Could not resolve metric id %d", function.getMetricId()));
-      }
-      return metric;
-
-    } else {
-      return getMetricByName(function.getMetric(), function.getCollection());
-
-    }
-  }
-
   private MetricConfigDTO getMetricByName(String metric, String dataset) {
     MetricConfigDTO metricDTO = this.metricDAO.findByMetricAndDataset(metric, dataset);
     if (metricDTO == null) {
       throw new IllegalArgumentException(String.format("Could not resolve metric '%s' in dataset '%s'", metric, dataset));
     }
     return metricDTO;
+  }
+
+  /**
+   * (Business logic) Returns the multiplier for range-aggregates to be used for display on RCA header
+   *
+   * @param anomaly anomaly
+   * @param dataset dataset config
+   * @param metric metric config
+   * @return multiplier between {@code 0.0} and {@code 1.0}
+   */
+  private double getAggregateMultiplier(MergedAnomalyResultDTO anomaly, DatasetConfigDTO dataset, MetricConfigDTO metric) {
+    if (MetricAggFunction.SUM.equals(metric.getDefaultAggFunction())
+        || MetricAggFunction.COUNT.equals(metric.getDefaultAggFunction())) {
+      return dataset.bucketTimeGranularity().toMillis() / (double) (anomaly.getEndTime() - anomaly.getStartTime());
+
+    } else {
+      return 1.0;
+    }
   }
 }

@@ -36,18 +36,18 @@ import static com.linkedin.pinot.common.utils.CommonConstants.SegmentOperations.
 public class HdfsSegmentFetcher implements SegmentFetcher {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HdfsSegmentFetcher.class);
-  private FileSystem hadoopFS = null;
-  private int retryCount = RETRY_DEFAULT;
-  private int retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
+  private FileSystem _hadoopFS = null;
+  private int _retryCount = RETRY_DEFAULT;
+  private int _retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
 
   @Override
   public void init(org.apache.commons.configuration.Configuration configs) {
     try {
-      retryCount = configs.getInt(RETRY, retryCount);
-      retryWaitMs = configs.getInt(RETRY_WAITIME_MS, retryWaitMs);
+      _retryCount = configs.getInt(RETRY, _retryCount);
+      _retryWaitMs = configs.getInt(RETRY_WAITIME_MS, _retryWaitMs);
       Configuration hadoopConf = getConf(configs.getString(HADOOP_CONF_PATH));
       authenticate(hadoopConf, configs);
-      hadoopFS = FileSystem.get(hadoopConf);
+      _hadoopFS = FileSystem.get(hadoopConf);
       LOGGER.info("successfully initialized hdfs segment fetcher");
     } catch (Exception e) {
       LOGGER.error("failed to initialized the hdfs segment fetcher", e);
@@ -88,30 +88,30 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
   @Override
   public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
     LOGGER.debug("starting to fetch segment from hdfs");
-    final String tempFilePath = tempFile.getAbsolutePath();
+    final String dstFilePath = tempFile.getAbsolutePath();
     try {
       final Path remoteFile = new Path(uri);
       final Path localFile = new Path(tempFile.toURI());
 
-      RetryPolicy fixDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(retryCount, retryWaitMs);
-      fixDelayRetryPolicy.attempt(() -> {
+      RetryPolicy fixedDelayRetryPolicy = RetryPolicies.fixedDelayRetryPolicy(_retryCount, _retryWaitMs);
+      fixedDelayRetryPolicy.attempt(() -> {
         try {
-          if (hadoopFS == null) {
-            throw new RuntimeException("hadoopFS client is not initialized when trying to copy files");
+          if (_hadoopFS == null) {
+            throw new RuntimeException("_hadoopFS client is not initialized when trying to copy files");
           }
           long startMs = System.currentTimeMillis();
-          hadoopFS.copyToLocalFile(remoteFile, localFile);
-          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", uri, tempFilePath,
+          _hadoopFS.copyToLocalFile(remoteFile, localFile);
+          LOGGER.debug("copied {} from hdfs to {} in local for size {}, take {} ms", uri, dstFilePath,
               tempFile.length(), System.currentTimeMillis() - startMs);
           return true;
-        } catch (IOException ex) {
-          LOGGER.warn(String.format("failed to fetch segment %s from hdfs, might retry", uri), ex);
+        } catch (IOException e) {
+          LOGGER.warn("failed to fetch segment {} from hdfs, might retry", uri, e);
           return false;
         }
       });
-    } catch (Exception ex) {
-      LOGGER.error(String.format("failed to fetch %s from hdfs to local %s", uri, tempFilePath), ex);
-      throw ex;
+    } catch (Exception e) {
+      LOGGER.error("failed to fetch {} from hdfs to local {}", uri, dstFilePath, e);
+      throw e;
     }
   }
 

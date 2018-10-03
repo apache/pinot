@@ -15,22 +15,28 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
-import javax.annotation.Nonnull;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 
 
-public class SimpleConsumerFactory extends PinotStreamConsumerFactory {
-  public PinotStreamConsumer buildConsumer(String clientId, int partition, StreamMetadata streamMetadata) {
-    KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(),
-        clientId, streamMetadata.getKafkaTopicName(), partition, streamMetadata.getKafkaConnectionTimeoutMillis());
+/**
+ * A {@link StreamConsumerFactory} implementation for consuming a kafka stream using Kafka's Simple Consumer
+ */
+public class SimpleConsumerFactory extends StreamConsumerFactory {
+
+  @Override
+  public StreamConsumer createStreamConsumer(String clientId, int partition) {
+    return new KafkaSimpleStreamConsumer(clientId, _streamMetadata, partition);
   }
 
-  public PinotStreamConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata) {
-    KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(),
-        clientId, streamMetadata.getKafkaConnectionTimeoutMillis());
+  @Override
+  public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+    return new KafkaSimpleStreamMetadataProvider(clientId, _streamMetadata, partition);
+  }
+
+  @Override
+  public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+    return new KafkaSimpleStreamMetadataProvider(clientId, _streamMetadata);
   }
 }

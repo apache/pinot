@@ -18,13 +18,14 @@ package com.linkedin.pinot.core.common.datatable;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -35,7 +36,6 @@ import org.apache.commons.lang3.StringUtils;
 
 public class DataTableImplV2 implements DataTable {
   private static final int VERSION = 2;
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   // VERSION
   // NUM_ROWS
@@ -212,7 +212,7 @@ public class DataTableImplV2 implements DataTable {
       byte[] buffer = new byte[length];
       int numBytesRead = dataInputStream.read(buffer);
       assert numBytesRead == length;
-      return new String(buffer, UTF_8);
+      return StringUtil.decodeUtf8(buffer);
     }
   }
 
@@ -302,14 +302,14 @@ public class DataTableImplV2 implements DataTable {
     for (Entry<String, Map<Integer, String>> dictionaryMapEntry : _dictionaryMap.entrySet()) {
       String columnName = dictionaryMapEntry.getKey();
       Map<Integer, String> dictionary = dictionaryMapEntry.getValue();
-      byte[] bytes = columnName.getBytes(UTF_8);
+      byte[] bytes = StringUtil.encodeUtf8(columnName);
       dataOutputStream.writeInt(bytes.length);
       dataOutputStream.write(bytes);
       dataOutputStream.writeInt(dictionary.size());
 
       for (Entry<Integer, String> dictionaryEntry : dictionary.entrySet()) {
         dataOutputStream.writeInt(dictionaryEntry.getKey());
-        byte[] valueBytes = dictionaryEntry.getValue().getBytes(UTF_8);
+        byte[] valueBytes = StringUtil.encodeUtf8(dictionaryEntry.getValue());
         dataOutputStream.writeInt(valueBytes.length);
         dataOutputStream.write(valueBytes);
       }
@@ -324,11 +324,11 @@ public class DataTableImplV2 implements DataTable {
 
     dataOutputStream.writeInt(_metadata.size());
     for (Entry<String, String> entry : _metadata.entrySet()) {
-      byte[] keyBytes = entry.getKey().getBytes(UTF_8);
+      byte[] keyBytes = StringUtil.encodeUtf8(entry.getKey());
       dataOutputStream.writeInt(keyBytes.length);
       dataOutputStream.write(keyBytes);
 
-      byte[] valueBytes = entry.getValue().getBytes(UTF_8);
+      byte[] valueBytes = StringUtil.encodeUtf8(entry.getValue());
       dataOutputStream.writeInt(valueBytes.length);
       dataOutputStream.write(valueBytes);
     }
@@ -389,14 +389,10 @@ public class DataTableImplV2 implements DataTable {
   @Override
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
-    ObjectType objectType = ObjectType.getObjectType(_variableSizeData.getInt());
+    int objectTypeValue = _variableSizeData.getInt();
     ByteBuffer byteBuffer = _variableSizeData.slice();
     byteBuffer.limit(size);
-    try {
-      return ObjectCustomSerDe.deserialize(byteBuffer, objectType);
-    } catch (IOException e) {
-      throw new RuntimeException("Caught exception while de-serializing object.", e);
-    }
+    return ObjectSerDeUtils.deserialize(byteBuffer, objectTypeValue);
   }
 
   @Nonnull

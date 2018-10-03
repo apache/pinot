@@ -17,11 +17,16 @@ package com.linkedin.pinot.filesystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.util.Collection;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -29,6 +34,8 @@ import org.apache.commons.io.FileUtils;
  * if access to the file is denied.
  */
 public class LocalPinotFS extends PinotFS {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LocalPinotFS.class);
+  private static final String DEFAULT_ENCODING = "UTF-8";
 
   public LocalPinotFS() {
   }
@@ -38,8 +45,14 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
+  public boolean mkdir(URI uri) throws IOException {
+    FileUtils.forceMkdir(new File(decodeURI(uri.getRawPath())));
+    return true;
+  }
+
+  @Override
   public boolean delete(URI segmentUri) throws IOException {
-    File file = new File(segmentUri);
+    File file = new File(decodeURI(segmentUri.getRawPath()));
     if (file.isDirectory()) {
       // Throws an IOException if it is unable to delete
       FileUtils.deleteDirectory(file);
@@ -52,8 +65,8 @@ public class LocalPinotFS extends PinotFS {
 
   @Override
   public boolean move(URI srcUri, URI dstUri) throws IOException {
-    File srcFile = new File(srcUri);
-    File dstFile = new File(dstUri);
+    File srcFile = new File(decodeURI(srcUri.getRawPath()));
+    File dstFile = new File(decodeURI(dstUri.getRawPath()));
     if (dstFile.exists()) {
       FileUtils.deleteQuietly(dstFile);
     }
@@ -69,8 +82,8 @@ public class LocalPinotFS extends PinotFS {
 
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
-    File srcFile = new File(srcUri);
-    File dstFile = new File(dstUri);
+    File srcFile = new File(decodeURI(srcUri.getRawPath()));
+    File dstFile = new File(decodeURI(dstUri.getRawPath()));
     if (dstFile.exists()) {
       FileUtils.deleteQuietly(dstFile);
     }
@@ -86,13 +99,13 @@ public class LocalPinotFS extends PinotFS {
 
   @Override
   public boolean exists(URI fileUri) throws IOException {
-    File file = new File(fileUri);
+    File file = new File(decodeURI(fileUri.getRawPath()));
     return file.exists();
   }
 
   @Override
   public long length(URI fileUri) throws IOException {
-    File file = new File(fileUri);
+    File file = new File(decodeURI(fileUri.getRawPath()));
     if (file.isDirectory()) {
       throw new IllegalArgumentException("File is directory");
     }
@@ -101,18 +114,26 @@ public class LocalPinotFS extends PinotFS {
 
   @Override
   public String[] listFiles(URI fileUri) throws IOException {
-    File file = new File(fileUri);
+    File file = new File(decodeURI(fileUri.getRawPath()));
     Collection<File> files = FileUtils.listFiles(file, null, true);
     return files.stream().map(File::getPath).toArray(String[]::new);
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, URI dstUri) throws IOException {
-    copy(srcUri, dstUri);
+  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
+    copy(srcUri, new URI(encodeURI(dstFile.getAbsolutePath())));
   }
 
   @Override
-  public void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException {
-    copy(srcUri, dstUri);
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
+    copy(new URI(encodeURI(srcFile.getAbsolutePath())), dstUri);
+  }
+
+  private String encodeURI(String uri) throws UnsupportedEncodingException {
+    return URLEncoder.encode(uri, DEFAULT_ENCODING);
+  }
+
+  private String decodeURI(String uri) throws UnsupportedEncodingException {
+    return URLDecoder.decode(uri, DEFAULT_ENCODING);
   }
 }

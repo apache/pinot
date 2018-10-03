@@ -20,12 +20,22 @@ import javax.annotation.Nonnull;
 
 
 public class AggregationFunctionColumnPair {
-  private final AggregationFunctionType _functionType;
-  private final String _columnName;
+  public static final String DELIMITER = "__";
+  public static final String STAR = "*";
+  public static final AggregationFunctionColumnPair COUNT_STAR =
+      new AggregationFunctionColumnPair(AggregationFunctionType.COUNT, STAR);
+  public static final String COUNT_STAR_COLUMN_NAME = COUNT_STAR.toColumnName();
 
-  public AggregationFunctionColumnPair(@Nonnull AggregationFunctionType functionType, @Nonnull String columnName) {
+  private final AggregationFunctionType _functionType;
+  private final String _column;
+
+  public AggregationFunctionColumnPair(@Nonnull AggregationFunctionType functionType, @Nonnull String column) {
     _functionType = functionType;
-    _columnName = columnName;
+    if (functionType == AggregationFunctionType.COUNT) {
+      _column = STAR;
+    } else {
+      _column = column;
+    }
   }
 
   @Nonnull
@@ -34,13 +44,29 @@ public class AggregationFunctionColumnPair {
   }
 
   @Nonnull
-  public String getColumnName() {
-    return _columnName;
+  public String getColumn() {
+    return _column;
+  }
+
+  @Nonnull
+  public String toColumnName() {
+    return _functionType.getName() + DELIMITER + _column;
+  }
+
+  @Nonnull
+  public static AggregationFunctionColumnPair fromColumnName(@Nonnull String columnName) {
+    String[] parts = columnName.split(DELIMITER, 2);
+    AggregationFunctionType functionType = AggregationFunctionType.valueOf(parts[0].toUpperCase());
+    if (functionType == AggregationFunctionType.COUNT) {
+      return COUNT_STAR;
+    } else {
+      return new AggregationFunctionColumnPair(functionType, parts[1]);
+    }
   }
 
   @Override
   public int hashCode() {
-    return 31 * _functionType.hashCode() + _columnName.hashCode();
+    return 31 * _functionType.hashCode() + _column.hashCode();
   }
 
   @Override
@@ -50,7 +76,7 @@ public class AggregationFunctionColumnPair {
     }
     if (obj instanceof AggregationFunctionColumnPair) {
       AggregationFunctionColumnPair anotherPair = (AggregationFunctionColumnPair) obj;
-      return _functionType == anotherPair._functionType && _columnName.equals(anotherPair._columnName);
+      return _functionType == anotherPair._functionType && _column.equals(anotherPair._column);
     }
     return false;
   }

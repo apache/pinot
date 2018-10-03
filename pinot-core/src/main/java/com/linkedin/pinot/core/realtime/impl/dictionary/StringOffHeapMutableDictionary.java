@@ -15,17 +15,15 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.io.writer.impl.MutableOffHeapByteArrayStore;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 
 
 public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
-
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
   private final MutableOffHeapByteArrayStore _byteStore;
   private String _min = null;
   private String _max = null;
@@ -48,21 +46,21 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public Object get(int dictionaryId) {
-    return new String(_byteStore.get(dictionaryId), UTF_8);
+    return StringUtil.decodeUtf8(_byteStore.get(dictionaryId));
   }
 
   @Override
   public void index(@Nonnull Object rawValue) {
     if (rawValue instanceof String) {
       // Single value
-      byte[] serializedValue =  ((String) rawValue).getBytes(UTF_8);
+      byte[] serializedValue =  StringUtil.encodeUtf8((String) rawValue);
       indexValue(rawValue, serializedValue);
       updateMinMax((String) rawValue);
     } else {
       // Multi value
       Object[] values = (Object[]) rawValue;
       for (Object value : values) {
-        byte[] serializedValue =  ((String) value).getBytes(UTF_8);
+        byte[] serializedValue =  StringUtil.encodeUtf8((String) value);
         indexValue(value, serializedValue);
         updateMinMax((String) value);
       }
@@ -70,7 +68,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
   }
 
   private String getInternal(int dictId) {
-    return new String(_byteStore.get(dictId), UTF_8);
+    return StringUtil.decodeUtf8(_byteStore.get(dictId));
   }
 
   @Override
@@ -82,7 +80,7 @@ public class StringOffHeapMutableDictionary extends BaseOffHeapMutableDictionary
 
   @Override
   public int indexOf(Object rawValue) {
-    byte[] serializedValue = ((String) rawValue).getBytes(UTF_8);
+    byte[] serializedValue = StringUtil.encodeUtf8((String) rawValue);
     return getDictId(rawValue, serializedValue);
   }
 

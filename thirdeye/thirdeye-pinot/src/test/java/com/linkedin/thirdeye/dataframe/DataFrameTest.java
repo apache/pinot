@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dataframe;
 
 import java.io.IOException;
@@ -2465,6 +2481,12 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleLog() {
+    DoubleSeries s = DataFrame.toSeries(-1, 0, Math.exp(1), Math.exp(2), Math.exp(3));
+    assertEquals(s.log(), DataFrame.toSeries(DNULL, Double.NEGATIVE_INFINITY, 1.0, 2.0, 3.0));
+  }
+
+  @Test
   public void testDoubleOperationsSeries() {
     DoubleSeries base = DataFrame.toSeries(DNULL, 0, 1, 1.5, 0.003);
     DoubleSeries mod = DataFrame.toSeries(1, 1, 1, 0, DNULL);
@@ -2697,6 +2719,16 @@ public class DataFrameTest {
     assertEquals(base.replace(2, 1), DNULL, 1, 1, 1.5, 0.003);
     assertEquals(base.replace(1.5, DNULL), DNULL, 1, 1, DNULL, 0.003);
     assertEquals(base.replace(DNULL, 1), 1, 1, 1, 1.5, 0.003);
+  }
+
+  @Test
+  public void testDoubleFind() {
+    DoubleSeries base = DataFrame.toSeries(0.5, DNULL, 3.1, 2.5, 1.8, DNULL, 3.2);
+    Assert.assertEquals(base.find(0.4, 0.1), 0);
+    Assert.assertEquals(base.find(DNULL, DNULL), 1);
+    Assert.assertEquals(base.find(3, 0.2), 2);
+    Assert.assertEquals(base.find(DNULL, 10.0, 2), 5);
+    Assert.assertEquals(base.find(3, 0.2, 3), 6);
   }
 
   @Test
@@ -3005,6 +3037,15 @@ public class DataFrameTest {
     assertEquals(base.replace(2, 1), LNULL, 0, 0, 5, 10);
     assertEquals(base.replace(5, LNULL), LNULL, 0, 0, LNULL, 10);
     assertEquals(base.replace(LNULL, 1), 1, 0, 0, 5, 10);
+  }
+
+  @Test
+  public void testLongFind() {
+    LongSeries base = DataFrame.toSeries(0, LNULL, 3, 2, 1, LNULL, 3);
+    Assert.assertEquals(base.find(0), 0);
+    Assert.assertEquals(base.find(LNULL), 1);
+    Assert.assertEquals(base.find(3, 2), 2);
+    Assert.assertEquals(base.find(LNULL, 2), 5);
   }
 
   @Test
@@ -3975,6 +4016,28 @@ public class DataFrameTest {
 
     Assert.assertEquals(df.getSeriesNames(), new HashSet<>(Arrays.asList("a", "b", "c", "d")));
     Assert.assertEquals(dfOut.getSeriesNames(), new HashSet<>(Arrays.asList("a", "c", "d")));
+  }
+
+  @Test
+  public void testDropSeries() {
+    Assert.assertEquals(this.df.dropSeries("long", "boolean").getSeriesNames(),
+        new HashSet<>(Arrays.asList("double", "string", "object", "index")));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testDropSeriesFail() {
+    new DataFrame("a", LongSeries.empty()).dropSeries("b");
+  }
+
+  @Test
+  public void testRetainSeries() {
+    Assert.assertEquals(this.df.retainSeries("long", "boolean").getSeriesNames(),
+        new HashSet<>(Arrays.asList("long", "boolean")));
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testRetainSeriesFail() {
+    new DataFrame("a", LongSeries.empty()).retainSeries("b");
   }
 
   /* **************************************************************************

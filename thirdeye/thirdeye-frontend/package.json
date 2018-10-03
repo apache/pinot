@@ -43,12 +43,12 @@
     "ember-cli-qunit": "^4.1.1",
     "ember-cli-sass": "^6.2.0",
     "ember-cli-shims": "^1.2.0",
+    "ember-cli-showdown": "4.1.0",
     "ember-cli-spinjs": "^1.4.2",
     "ember-cli-sri": "^2.1.0",
     "ember-cli-text-support-mixins": "^1.1.2",
     "ember-cli-textarea-autosize": "^1.1.0",
     "ember-cli-uglify": "^2.0.0",
-    "ember-cli-showdown": "4.1.0",
     "ember-composable-helpers": "^2.0.3",
     "ember-concurrency": "^0.8.6",
     "ember-d3": "^0.2.0",
@@ -70,24 +70,30 @@
     "ember-source": "~2.18.0",
     "ember-symbol-observable": "^1.0.1",
     "ember-tether": "^1.0.0-beta.0",
+    "ember-toastr": "^1.7.2",
     "ember-toggle": "^5.0.2",
     "ember-tooltips": "^2.9.0-beta.0",
     "ember-truth-helpers": "^1.3.0",
     "eslint-plugin-ember": "^5.0.0",
+    "html2canvas": "^1.0.0-alpha.12",
+    "jspdf": "^1.4.1",
     "keyevent": "^1.1.0",
     "liquid-fire": "^0.29.1",
     "liquid-tether": "^2.0.6",
     "liquid-wormhole": "^2.1.1",
     "loader.js": "^4.2.3",
     "redux": "^3.6.0",
-    "redux-thunk": "^2.2.0"
+    "redux-thunk": "^2.2.0",
+    "toastr": "^2.1.4"
   },
   "engines": {
     "node": "^4.5 || 6.* || >= 7.*"
   },
   "dependencies": {
     "bower": "^1.8.0",
+    "ember-cryptojs-shim": "^4.3.0",
     "ember-radio-button": "^1.1.1",
+    "ember-simple-tree": "^0.4.2",
     "ion-rangeslider": "^2.2.0",
     "moment": "^2.18.1"
   }

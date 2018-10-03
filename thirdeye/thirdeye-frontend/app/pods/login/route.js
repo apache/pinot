@@ -1,12 +1,11 @@
 import Route from '@ember/routing/route';
-
-import { get } from '@ember/object';
+import { get, set } from '@ember/object';
 import { inject as service } from '@ember/service';
 import UnauthenticatedRouteMixin from 'ember-simple-auth/mixins/unauthenticated-route-mixin';
 
 export default Route.extend(UnauthenticatedRouteMixin, {
   session: service(),
-  errorMessage: null,
+
 
   /**
    * Used to redirect to the old thirdeye app (search entry point)
@@ -23,6 +22,23 @@ export default Route.extend(UnauthenticatedRouteMixin, {
    * @override UnauthenticatedRouteMixin.routeIfAlreadyAuthenticated
    */
   routeIfAlreadyAuthenticated: 'home',
+
+  /**
+   * Set any needed error message
+   * @return {undefined}
+   */
+  setupController(controller, model) {
+    this._super(...arguments);
+    const errorMsg = get(this, 'session.store.errorMsg');
+
+    if (errorMsg) {
+      controller.set('errorMessage', errorMsg);
+    }
+
+    if (controller.fromUrl) {
+      this.set('session.store.fromUrl', {deeplink: controller.fromUrl});
+    }
+  },
 
   /**
    * @description Resets any query params to allow not to have leak state or sticky query-param
@@ -52,7 +68,7 @@ export default Route.extend(UnauthenticatedRouteMixin, {
         transition.abort();
         // set the fromUrl param to the controller prior to re-route to login
         let loginController = this.controllerFor('login');
-        loginController.set('fromUrl', fromUrl)
+        loginController.set('fromUrl', fromUrl);
         this.transitionTo('login');
       } else {
         return true;

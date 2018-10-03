@@ -43,8 +43,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.PERCENTILE.getName() + _percentile + "_" + column;
   }
 
   @Override
@@ -67,14 +67,10 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
+    DoubleArrayList valueList = getValueList(aggregationResultHolder);
     double[] valueArray = blockValSets[0].getDoubleValuesSV();
-    DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
-    if (doubleArrayList == null) {
-      doubleArrayList = new DoubleArrayList();
-      aggregationResultHolder.setValue(doubleArrayList);
-    }
     for (int i = 0; i < length; i++) {
-      doubleArrayList.add(valueArray[i]);
+      valueList.add(valueArray[i]);
     }
   }
 
@@ -83,13 +79,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
     double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-      if (doubleArrayList == null) {
-        doubleArrayList = new DoubleArrayList();
-        groupByResultHolder.setValueForKey(groupKey, doubleArrayList);
-      }
-      doubleArrayList.add(valueArray[i]);
+      DoubleArrayList valueList = getValueList(groupByResultHolder, groupKeyArray[i]);
+      valueList.add(valueArray[i]);
     }
   }
 
@@ -100,12 +91,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-        if (doubleArrayList == null) {
-          doubleArrayList = new DoubleArrayList();
-          groupByResultHolder.setValueForKey(groupKey, doubleArrayList);
-        }
-        doubleArrayList.add(value);
+        DoubleArrayList valueList = getValueList(groupByResultHolder, groupKey);
+        valueList.add(value);
       }
     }
   }
@@ -159,7 +146,42 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
       return DEFAULT_FINAL_RESULT;
     } else {
       Collections.sort(intermediateResult);
-      return intermediateResult.get((int) ((long) intermediateResult.size() * _percentile / 100));
+      if (_percentile == 100) {
+        return intermediateResult.get(size - 1);
+      } else {
+        return intermediateResult.get((int) ((long) size * _percentile / 100));
+      }
     }
+  }
+
+  /**
+   * Returns the value list from the result holder or creates a new one if it does not exist.
+   *
+   * @param aggregationResultHolder Result holder
+   * @return Value list from the result holder
+   */
+  protected static DoubleArrayList getValueList(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    DoubleArrayList valueList = aggregationResultHolder.getResult();
+    if (valueList == null) {
+      valueList = new DoubleArrayList();
+      aggregationResultHolder.setValue(valueList);
+    }
+    return valueList;
+  }
+
+  /**
+   * Returns the value list for the given group key. If one does not exist, creates a new one and returns that.
+   *
+   * @param groupByResultHolder Result holder
+   * @param groupKey Group key for which to return the value list
+   * @return Value list for the group key
+   */
+  protected static DoubleArrayList getValueList(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    DoubleArrayList valueList = groupByResultHolder.getResult(groupKey);
+    if (valueList == null) {
+      valueList = new DoubleArrayList();
+      groupByResultHolder.setValueForKey(groupKey, valueList);
+    }
+    return valueList;
   }
 }

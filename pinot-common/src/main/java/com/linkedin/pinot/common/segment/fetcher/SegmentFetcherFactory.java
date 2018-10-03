@@ -44,11 +44,12 @@ public class SegmentFetcherFactory {
   public static final String PROTOCOLS_KEY = "protocols";
   public static final List<String> DEFAULT_PROTOCOLS = Collections.unmodifiableList(Arrays.asList("file", "http"));
   public static final Map<String, String> DEFAULT_FETCHER_CLASS_MAP =
-      Collections.unmodifiableMap(new HashMap<String, String>(4) {{
-        put("file", LocalFileSegmentFetcher.class.getName());
+      Collections.unmodifiableMap(new HashMap<String, String>(5) {{
         put("http", HttpSegmentFetcher.class.getName());
         put("https", HttpsSegmentFetcher.class.getName());
-        put("hdfs", HdfsSegmentFetcher.class.getName());
+        put("hdfs", PinotFSSegmentFetcher.class.getName());
+        put("adl", PinotFSSegmentFetcher.class.getName());
+        put("file", PinotFSSegmentFetcher.class.getName());
       }});
   public static final String FETCHER_CLASS_KEY_SUFFIX = ".class";
 
@@ -56,20 +57,20 @@ public class SegmentFetcherFactory {
 
   /**
    * Initiate the segment fetcher factory. This method should only be called once.
+   * @param segmentFetcherClassConfig Segment fetcher factory config
    *
-   * @param config Segment fetcher factory config
    */
-  public void init(Configuration config) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+  public void init(Configuration segmentFetcherClassConfig, Configuration pinotFSConfig) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
     @SuppressWarnings("unchecked")
-    List<String> protocols = config.getList(PROTOCOLS_KEY, DEFAULT_PROTOCOLS);
+    List<String> protocols = segmentFetcherClassConfig.getList(PROTOCOLS_KEY, DEFAULT_PROTOCOLS);
     for (String protocol : protocols) {
       String fetcherClass =
-          config.getString(protocol + FETCHER_CLASS_KEY_SUFFIX, DEFAULT_FETCHER_CLASS_MAP.get(protocol));
+          segmentFetcherClassConfig.getString(protocol + FETCHER_CLASS_KEY_SUFFIX, DEFAULT_FETCHER_CLASS_MAP.get(protocol));
       Preconditions.checkNotNull(fetcherClass, "No fetcher class defined for protocol: " + protocol);
       LOGGER.info("Creating a new segment fetcher for protocol: {} with class: {}", protocol, fetcherClass);
       SegmentFetcher segmentFetcher = (SegmentFetcher) Class.forName(fetcherClass).newInstance();
       LOGGER.info("Initializing segment fetcher for protocol: {}", protocol);
-      Configuration segmentFetcherConfig = config.subset(protocol);
+      Configuration segmentFetcherConfig = segmentFetcherClassConfig.subset(protocol);
       logFetcherInitConfig(segmentFetcher, protocol, segmentFetcherConfig);
       segmentFetcher.init(segmentFetcherConfig);
       _segmentFetcherMap.put(protocol, segmentFetcher);

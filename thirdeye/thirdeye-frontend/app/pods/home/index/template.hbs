@@ -1,0 +1,124 @@
+<div class="container dashboard-container">
+  <header>
+    {{range-pill-selectors
+      title="Showing"
+      uiDateFormat=pill.uiDateFormat
+      activeRangeEnd=pill.activeRangeEnd
+      activeRangeStart=pill.activeRangeStart
+      timeRangeOptions=pill.timeRangeOptions
+      timePickerIncrement=pill.timePickerIncrement
+      predefinedRanges=pill.predefinedRanges
+      selectAction=(action "onRangeSelection")
+    }}
+
+    {{#link-to "home.share-dashboard" (query-params appName=appName duration=duration startDate=startDate endDate=endDate feedbackType=feedbackType shareId=null) tagName="button" type="button" class="pull-right te-button te-button--outline"}}
+      Share
+    {{/link-to}}
+  </header>
+
+  <article class="dashboard-container__body">
+    <section class="dashboard-container__application-header">
+      <h2 class="dashboard-container__title">Application:<span>{{appName}}</span></h2>
+      <div class="dashboard-container__application-header-dropdown">
+        {{#power-select
+          options=model.applications
+          selected=appNameSelected
+          searchField="application"
+          searchEnabled=true
+          placeholder="Please pick an application"
+          onchange=(action "selectApplication")
+          as |app|}}
+          {{app.application}}
+        {{/power-select}}
+      </div>
+    </section>
+
+  {{#if (gt anomaliesCount 0)}}
+    <section>
+      {{stats-cards stats=stats}}
+    </section>
+
+    <section>
+      <div class="dashboard-container__application-filter-by">
+        <strong>Filter by</strong>
+        {{#power-select
+          triggerId="dash-filter-by"
+          triggerClass="te-anomaly-table__select te-anomaly-table__select--margin-left"
+          options=anomalyResponseNames
+          searchEnabled=false
+          placeholder="All Resolutions"
+          selected=feedbackType
+          onchange=(action "onFilterBy" feedbackType)
+          as |feedbackType|
+        }}
+          {{feedbackType}}
+        {{/power-select}}
+
+        <button class="pull-right te-button te-button--outline" {{action 'toggleAllAccordions'}}>{{if toggleCollapsed "Show tables" "Hide tables"}}</button>
+      </div>
+
+      {{#bs-accordion as |accordion|}}
+        {{#each-in filteredAnomalyMapping as |metric humanizedEntityList|}}
+          {{#accordion.item value=metric as |aitem|}}
+            {{#aitem.title}}
+              <section class="dashboard-container__title">Metric:
+                <span>{{metric}} ({{humanizedEntityList.length}} {{if (gt humanizedEntityList.length 1) "anomalies" "anomaly"}})</span>
+                <span class="pull-right"><i class="glyphicon glyphicon-menu-{{if toggleCollapsed "down" "up"}}"></i></span>
+              </section>
+            {{/aitem.title}}
+            {{#aitem.body collapsed=toggleCollapsed}}
+              {{#if isReportAnomalyEnabled}}
+                <div class="pull-left">
+                  <i class="glyphicon glyphicon-edit dashboard-container__icon"></i> Report missing anomaly in <span class="anomalies-table__text anomalies-table__text--stronger">alert page</span> for: </div>
+                <div class="pull-left dashboard-container__alert-selector">
+                  {{#with (get model.alertsByMetric metric) as |alertList|}}
+                    {{#power-select
+                      triggerId=metric
+                      id=metric
+                      triggerClass="te-form__select te-form__select--shortened"
+                      renderInPlace=true
+                      options=alertList.names
+                      selected=alertList.names.firstObject
+                      searchEnabled=false
+                      onchange=(action "onSelectAlert" metric)
+                      as |alertOption|
+                    }}
+                      {{alertOption}}
+                    {{/power-select}}
+                  {{/with}}
+                </div>
+                <div class="te-button te-button--outline pull-left dashboard-container__go-link">
+                  <a class="thirdeye-link thirdeye-link--terciary" href="#" {{action "onClickReport" metric humanizedEntityList}}>GO</a>
+                </div>
+              {{/if}}
+              {{models-table
+                data=humanizedEntityList
+                columns=columns
+                customClasses=classes
+                showColumnsDropdown=false
+                showGlobalFilter=false
+                filteringIgnoreCase=true
+                multipleExpand=true
+                pageSize=5
+                showComponentFooter=true
+              }}
+            {{/aitem.body}}
+          {{/accordion.item}}
+          {{!-- TODO: leave to decide if after poc we need it - lohuynh
+          {{#if (gt humanizedEntityList.length 5)}}
+            <a href="{{get (get model.redirectLink metric) alert}}" class="dashboard-container__redirect-link">
+              See More
+            </a>
+          {{/if}} --}}
+        {{else}}
+          {{partial 'partials/home'}}
+        {{/each-in}}
+      {{/bs-accordion}}
+    </section>
+  {{else}}
+    {{partial 'partials/home'}}
+  {{/if}}
+  </article>
+</div>
+
+{{outlet}}

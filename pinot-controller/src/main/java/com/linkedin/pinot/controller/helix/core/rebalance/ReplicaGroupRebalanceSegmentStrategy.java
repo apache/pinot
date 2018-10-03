@@ -111,7 +111,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
    * @return a rebalanced idealstate
    */
   @Override
-  public IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig,
+  public IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig,
       Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment) throws InvalidConfigException {
     // Currently, only offline table is supported
     if (tableConfig.getTableType() == CommonConstants.Helix.TableType.REALTIME) {
@@ -119,21 +119,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
     }
     ReplicaGroupPartitionAssignment newReplicaGroupPartitionAssignment =
         (ReplicaGroupPartitionAssignment) newPartitionAssignment;
-    String tableNameWithType = tableConfig.getTableName();
-
-    // update if not dryRun
-    boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN,
-        RebalanceUserConfigConstants.DEFAULT_DRY_RUN);
-    IdealState newIdealState;
-    if (!dryRun) {
-      LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      newIdealState = rebalanceSegmentsAndUpdateIdealState(tableConfig, newReplicaGroupPartitionAssignment);
-    } else {
-      newIdealState = rebalanceSegments(idealState, tableConfig, newReplicaGroupPartitionAssignment);
-      LOGGER.info("Dry run. Skip writing ideal state");
-    }
-
-    return newIdealState;
+    return rebalanceSegments(idealState, tableConfig, newReplicaGroupPartitionAssignment);
   }
 
   /**
@@ -162,7 +148,7 @@ public class ReplicaGroupRebalanceSegmentStrategy implements RebalanceSegmentStr
 
     OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
     List<String> serverInstances =
-        _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, offlineTagConfig.getOfflineServerTag());
+        HelixHelper.getInstancesWithTag(_helixManager, offlineTagConfig.getOfflineServerTag());
 
     // Perform the basic validation
     if (targetNumReplicaGroup <= 0 || targetNumInstancesPerPartition <= 0

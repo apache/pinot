@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Locale;
@@ -34,6 +35,36 @@ public class AggregationFunctionUtils {
   private AggregationFunctionUtils() {
   }
 
+  public static final String COLUMN_KEY = "column";
+
+  /**
+   * Extracts the aggregation column (could be column name or UDF expression) from the {@link AggregationInfo}.
+   */
+  @Nonnull
+  public static String getColumn(@Nonnull AggregationInfo aggregationInfo) {
+    return aggregationInfo.getAggregationParams().get(COLUMN_KEY);
+  }
+
+  /**
+   * Creates an {@link AggregationFunctionColumnPair} from the {@link AggregationInfo}.
+   */
+  @Nonnull
+  public static AggregationFunctionColumnPair getFunctionColumnPair(@Nonnull AggregationInfo aggregationInfo) {
+    AggregationFunctionType functionType =
+        AggregationFunctionType.getAggregationFunctionType(aggregationInfo.getAggregationType());
+    return new AggregationFunctionColumnPair(functionType, getColumn(aggregationInfo));
+  }
+
+  /**
+   * Creates an {@link AggregationFunctionContext} from the {@link AggregationInfo}.
+   */
+  @Nonnull
+  public static AggregationFunctionContext getAggregationFunctionContext(@Nonnull AggregationInfo aggregationInfo) {
+    String functionName = aggregationInfo.getAggregationType();
+    AggregationFunction aggregationFunction = AggregationFunctionFactory.getAggregationFunction(functionName);
+    return new AggregationFunctionContext(aggregationFunction, AggregationFunctionUtils.getColumn(aggregationInfo));
+  }
+
   @Nonnull
   public static AggregationFunctionContext[] getAggregationFunctionContexts(
       @Nonnull List<AggregationInfo> aggregationInfos, @Nullable SegmentMetadata segmentMetadata) {
@@ -41,7 +72,7 @@ public class AggregationFunctionUtils {
     AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationInfo aggregationInfo = aggregationInfos.get(i);
-      aggregationFunctionContexts[i] = AggregationFunctionContext.instantiate(aggregationInfo);
+      aggregationFunctionContexts[i] = getAggregationFunctionContext(aggregationInfo);
     }
     if (segmentMetadata != null) {
       AggregationFunctionInitializer aggregationFunctionInitializer =
@@ -91,6 +122,7 @@ public class AggregationFunctionUtils {
     }
   }
 
+  @Nonnull
   public static Serializable getSerializableValue(@Nonnull Object value) {
     if (value instanceof Number) {
       return (Number) value;

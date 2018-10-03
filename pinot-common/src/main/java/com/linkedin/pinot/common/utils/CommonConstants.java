@@ -59,6 +59,10 @@ public class CommonConstants {
       }
     }
 
+    public static class ZkClient {
+      public static final long DEFAULT_CONNECT_TIMEOUT_SEC = 60L;
+    }
+
     public static class DataSource {
       public static final String SCHEMA = "schema";
       public static final String KAFKA = "kafka";
@@ -262,6 +266,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_SPLIT_COMMIT = "pinot.server.instance.enable.split.commit";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
     public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap.direct";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";
@@ -284,7 +290,7 @@ public class CommonConstants {
   }
 
   public static class Controller {
-    public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.controller.segment.fetcher";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.controller.storage.factory";
     public static final String HOST_HTTP_HEADER = "Pinot-Controller-Host";
     public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
@@ -306,6 +312,7 @@ public class CommonConstants {
     public static final String DEFAULT_INSTANCE_BASE_DIR =
         System.getProperty("java.io.tmpdir") + File.separator + "PinotMinion";
     public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "data";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
   }
@@ -336,6 +343,7 @@ public class CommonConstants {
     public static final String SEGMENT_NAME = "segment.name";
     public static final String TABLE_NAME = "segment.table.name";
     public static final String SEGMENT_TYPE = "segment.type";
+    public static final String CRYPTER_NAME = "segment.crypter";
     public static final String INDEX_VERSION = "segment.index.version";
     public static final String START_TIME = "segment.start.time";
     public static final String END_TIME = "segment.end.time";
@@ -358,6 +366,9 @@ public class CommonConstants {
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
 
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
+    public static final String LOCAL_SEGMENT_SCHEME = "file";
+
     public enum SegmentType {
       OFFLINE,
       REALTIME
@@ -369,6 +380,13 @@ public class CommonConstants {
       public static final String PRINCIPAL = "hadoop.kerberos.principle";
       public static final String KEYTAB = "hadoop.kerberos.keytab";
       public static final String HADOOP_CONF_PATH = "hadoop.conf.path";
+    }
+
+    public static class AzureSegmentOperations {
+      public static final String ACCOUNT_ID = "accountId";
+      public static final String AUTH_ENDPOINT = "authEndpoint";
+      public static final String CLIENT_ID = "clientId";
+      public static final String CLIENT_SECRET = "clientSecret";
     }
 
     public static final String RETRY = "retry.count";

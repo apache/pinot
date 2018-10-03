@@ -36,19 +36,15 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + columns[0];
+  public String getColumnName(@Nonnull String column) {
+    return AggregationFunctionType.PERCENTILEEST.getName() + _percentile + "MV_" + column;
   }
 
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
-    QuantileDigest quantileDigest = aggregationResultHolder.getResult();
-    if (quantileDigest == null) {
-      quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
-      aggregationResultHolder.setValue(quantileDigest);
-    }
+    QuantileDigest quantileDigest = getQuantileDigest(aggregationResultHolder);
     for (int i = 0; i < length; i++) {
       for (double value : valuesArray[i]) {
         quantileDigest.add((long) value);
@@ -61,12 +57,7 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
     double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
-      if (quantileDigest == null) {
-        quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
-        groupByResultHolder.setValueForKey(groupKey, quantileDigest);
-      }
+      QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
       for (double value : valuesArray[i]) {
         quantileDigest.add((long) value);
       }
@@ -80,11 +71,7 @@ public class PercentileEstMVAggregationFunction extends PercentileEstAggregation
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
-        if (quantileDigest == null) {
-          quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
-          groupByResultHolder.setValueForKey(groupKey, quantileDigest);
-        }
+        QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
         for (double value : values) {
           quantileDigest.add((long) value);
         }

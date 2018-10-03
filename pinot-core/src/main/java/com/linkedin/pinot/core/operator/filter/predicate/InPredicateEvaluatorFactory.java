@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.filter.predicate;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.HashUtil;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -82,7 +83,7 @@ public class InPredicateEvaluatorFactory {
 
     DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary) {
       String[] values = inPredicate.getValues();
-      _matchingDictIdSet = new IntOpenHashSet();
+      _matchingDictIdSet = new IntOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         int dictId = dictionary.indexOf(value);
         if (dictId >= 0) {
@@ -107,6 +108,11 @@ public class InPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumMatchingDictIds() {
+     return _matchingDictIdSet.size();
+    }
+
+    @Override
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
         _matchingDictIds = _matchingDictIdSet.toIntArray();
@@ -120,7 +126,7 @@ public class InPredicateEvaluatorFactory {
 
     IntRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
       String[] values = inPredicate.getValues();
-      _matchingValues = new IntOpenHashSet(values.length);
+      _matchingValues = new IntOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         _matchingValues.add(Integer.parseInt(value));
       }
@@ -142,7 +148,7 @@ public class InPredicateEvaluatorFactory {
 
     LongRawValueBasedInPredicateEvaluator(InPredicate predicate) {
       String[] values = predicate.getValues();
-      _matchingValues = new LongOpenHashSet(values.length);
+      _matchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         _matchingValues.add(Long.parseLong(value));
       }
@@ -164,7 +170,7 @@ public class InPredicateEvaluatorFactory {
 
     FloatRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
       String[] values = inPredicate.getValues();
-      _matchingValues = new FloatOpenHashSet(values.length);
+      _matchingValues = new FloatOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         _matchingValues.add(Float.parseFloat(value));
       }
@@ -186,7 +192,7 @@ public class InPredicateEvaluatorFactory {
 
     DoubleRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
       String[] values = inPredicate.getValues();
-      _matchingValues = new DoubleOpenHashSet(values.length);
+      _matchingValues = new DoubleOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         _matchingValues.add(Double.parseDouble(value));
       }
@@ -208,7 +214,7 @@ public class InPredicateEvaluatorFactory {
 
     StringRawValueBasedInPredicateEvaluator(InPredicate inPredicate) {
       String[] values = inPredicate.getValues();
-      _matchingValues = new HashSet<>(values.length);
+      _matchingValues = new HashSet<>(HashUtil.getMinHashSetSize(values.length));
       Collections.addAll(_matchingValues, values);
     }
 

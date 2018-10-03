@@ -1,4 +1,23 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.tools.anomaly.report;
+
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+
 
 public class AnomalyReportConfig {
   private String startTimeIso;
@@ -6,7 +25,7 @@ public class AnomalyReportConfig {
   private String thirdEyeConfigDirectoryPath;
   private String datasets;
   private String teBaseUrl;
-  private String emailRecipients;
+  private DetectionAlertFilterRecipients emailRecipients;
   private boolean includeNotifiedOnly = true;
 
   public String getEndTimeIso() {
@@ -49,11 +68,11 @@ public class AnomalyReportConfig {
     this.thirdEyeConfigDirectoryPath = thirdEyeConfigDirectoryPath;
   }
 
-  public String getEmailRecipients() {
+  public DetectionAlertFilterRecipients getEmailRecipients() {
     return emailRecipients;
   }
 
-  public void setEmailRecipients(String emailRecipients) {
+  public void setEmailRecipients(DetectionAlertFilterRecipients emailRecipients) {
     this.emailRecipients = emailRecipients;
   }
 

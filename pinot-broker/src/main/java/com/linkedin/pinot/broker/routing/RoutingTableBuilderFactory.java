@@ -15,25 +15,25 @@
  */
 package com.linkedin.pinot.broker.routing;
 
-import com.linkedin.pinot.broker.routing.builder.PartitionAwareOfflineRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTableBuilder;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import org.apache.commons.configuration.Configuration;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.DefaultOfflineRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.DefaultRealtimeRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.KafkaLowLevelConsumerRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.PartitionAwareOfflineRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class RoutingTableBuilderFactory {
@@ -58,7 +58,7 @@ public class RoutingTableBuilderFactory {
     _propertyStore = propertyStore;
   }
 
-  public RoutingTableBuilder createRoutingTableBuilder(TableConfig tableConfig) {
+  public RoutingTableBuilder createRoutingTableBuilder(TableConfig tableConfig, BrokerMetrics brokerMetrics) {
     String builderName = null;
     if (tableConfig.getRoutingConfig() != null) {
       builderName = tableConfig.getRoutingConfig().getRoutingTableBuilderName();
@@ -135,7 +135,7 @@ public class RoutingTableBuilderFactory {
         }
         break;
     }
-    builder.init(_configuration, tableConfig, _propertyStore);
+    builder.init(_configuration, tableConfig, _propertyStore, brokerMetrics);
     return builder;
   }
 }

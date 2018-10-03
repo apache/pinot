@@ -9,9 +9,14 @@ const Router = EmberRouter.extend({
 Router.map(function() {
   this.route('login');
   this.route('logout');
-  //this.route('error'); disable for now
+  //page not found placeholder - lohuynh
+  //this.route('404', { path: '/*path' });
 
-  this.route('home');
+  this.route('home', function() {
+    this.route('index', { path: '/' });
+    this.route('share-dashboard');
+  });
+
 
   this.route('manage', function() {
     this.route('alert', { path: 'alert/:alert_id' }, function() {
@@ -41,6 +46,7 @@ Router.map(function() {
 
   this.route('screenshot', { path: 'screenshot/:anomaly_id' });
   this.route('rootcause');
+  this.route('rootcause2');
   this.route('preview');
   this.route('auto-onboard');
 });

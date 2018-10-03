@@ -32,6 +32,8 @@ const ROOTCAUSE_ROLE_TAIL = 'tail';
 const ROOTCAUSE_ROLLUP_RANGE = [0, 100];
 const ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION = 0.95;
 
+const ROOTCAUSE_VALUE_OTHER = 'OTHER';
+
 const ROOTCAUSE_MODE_MAPPING = {
   'Percentage Change': ROOTCAUSE_ROLLUP_MODE_CHANGE,
   'Change in Contribution': ROOTCAUSE_ROLLUP_MODE_CONTRIBUTION_DIFF,
@@ -272,7 +274,7 @@ export default Component.extend({
         const cutoff = this._sum(all.map(v => sizeMetricCurrent[n][v])) * ROOTCAUSE_ROLLUP_EXPLAIN_FRACTION;
         let sum = this._sum(head.map(v => sizeMetricCurrent[n][v]));
         let i = range[0];
-        while (i < range[1] && sum < cutoff) {
+        while (i < range[1] && sum < cutoff && all[i] !== ROOTCAUSE_VALUE_OTHER) {
           sum += sizeMetricCurrent[n][all[i]];
           visible.push(all[i]);
           i++;
@@ -322,17 +324,16 @@ export default Component.extend({
           const curr = val.current;
           const base = val.baseline;
           const size = val.size;
-
           const labelChange = transformation(curr, base, currTotal, baseTotal);
-
           const [value, labelValue] = this._makeValueLabel(val, labelChange);
+          const sizeRatioLabel = size/sizeTotal < 0.01 ? '' : labelValue;
 
           cells[n].push({
             index,
             role: val.role,
             dimName: val.dimName,
             dimValue: val.dimValue,
-            label: labelValue,
+            label: sizeRatioLabel,
             value,
             size: size / sizeTotal,
             inverse: isInverse,
@@ -418,7 +419,14 @@ export default Component.extend({
     if (!dimNameObj) {
       return [];
     }
-    return Object.keys(dimNameObj).map(v => [dimNameObj[v], v]).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0])).map(t => t[1]);
+    return Object.keys(dimNameObj)
+      .map(v => [dimNameObj[v], v])
+      .sort((a, b) => {
+        if (a[1] === ROOTCAUSE_VALUE_OTHER) { return parseFloat("inf"); }
+        if (b[1] === ROOTCAUSE_VALUE_OTHER) { return parseFloat("-inf"); }
+        return parseFloat(a[0]) - parseFloat(b[0]);
+      })
+      .map(t => t[1]);
   },
 
   _sum(arr) {

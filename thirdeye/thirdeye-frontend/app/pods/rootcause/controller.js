@@ -42,7 +42,7 @@ const ROOTCAUSE_SERVICE_ANOMALY_FUNCTIONS = 'anomalyFunctions';
 const ROOTCAUSE_SERVICE_ALL = 'all';
 
 const ROOTCAUSE_SESSION_TIMER_INTERVAL = 300000;
-const ROOTCAUSE_SESSION_DEBOUNCE_INTERVAL = 5000;
+const ROOTCAUSE_SESSION_DEBOUNCE_INTERVAL = 2000;
 
 const ROOTCAUSE_SESSION_PERMISSIONS_READ = 'READ';
 const ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE = 'READ_WRITE';
@@ -317,6 +317,7 @@ export default Controller.extend({
       //
       // related metrics
       //
+      const anomalyMetricUrns = new Set();
       const relatedMetricUrns = new Set();
 
       if (activeTab === ROOTCAUSE_TAB_METRICS
@@ -326,7 +327,7 @@ export default Controller.extend({
       }
 
       if (context.anomalyUrns.size > 0) {
-        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
+        filterPrefix(context.anomalyUrns, 'thirdeye:metric:').forEach(urn => anomalyMetricUrns.add(urn));
       }
 
       //
@@ -371,11 +372,17 @@ export default Controller.extend({
       //
       // aggregates
       //
-      const offsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+      const offsets = ['current', 'baseline', 'wo1w', 'wo2w'];
       const offsetUrns = [...relatedMetricUrns]
         .map(urn => [].concat(offsets.map(offset => toOffsetUrn(urn, offset))))
         .reduce((agg, l) => agg.concat(l), []);
-      aggregatesService.request(context, new Set(offsetUrns));
+
+      const anomalyOffsets = ['current', 'baseline', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+      const anomalyOffsetUrns = [...anomalyMetricUrns]
+        .map(urn => [].concat(anomalyOffsets.map(offset => toOffsetUrn(urn, offset))))
+        .reduce((agg, l) => agg.concat(l), []);
+
+      aggregatesService.request(context, new Set([...offsetUrns, ...anomalyOffsetUrns]));
 
     }
   ),
@@ -883,8 +890,6 @@ export default Controller.extend({
         selectedUrns: new Set(selectedUrns),
         sessionModified: true
       });
-
-
     },
 
     /**

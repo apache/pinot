@@ -23,17 +23,15 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.PartitionCountFetcher;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.builder.CustomModeISBuilder;
@@ -100,11 +98,10 @@ public class PinotTableIdealStateBuilder {
   }
 
   public static IdealState buildInitialHighLevelRealtimeIdealStateFor(String realtimeTableName,
-      TableConfig realtimeTableConfig, HelixAdmin helixAdmin, String helixClusterName,
-      ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
+      TableConfig realtimeTableConfig, HelixManager helixManager, ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore) {
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig);
-    final List<String> realtimeInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName,
-        realtimeTagConfig.getConsumingServerTag());
+    final List<String> realtimeInstances =
+        HelixHelper.getInstancesWithTag(helixManager, realtimeTagConfig.getConsumingServerTag());
     IdealState idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, 1);
     if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
       throw new RuntimeException(
@@ -142,14 +139,14 @@ public class PinotTableIdealStateBuilder {
     }
   }
 
-  public static int getPartitionCount(StreamMetadata kafkaMetadata) {
-    KafkaPartitionsCountFetcher fetcher = new KafkaPartitionsCountFetcher(kafkaMetadata);
+  public static int getPartitionCount(StreamMetadata streamMetadata) {
+    PartitionCountFetcher partitionCountFetcher = new PartitionCountFetcher(streamMetadata);
     try {
-      RetryPolicies.noDelayRetryPolicy(3).attempt(fetcher);
-      return fetcher.getPartitionCount();
+      RetryPolicies.noDelayRetryPolicy(3).attempt(partitionCountFetcher);
+      return partitionCountFetcher.getPartitionCount();
     } catch (Exception e) {
-      Exception fetcherException = fetcher.getException();
-      LOGGER.error("Could not get partition count for {}", kafkaMetadata.getKafkaTopicName(), fetcherException);
+      Exception fetcherException = partitionCountFetcher.getException();
+      LOGGER.error("Could not get partition count for {}", streamMetadata.getKafkaTopicName(), fetcherException);
       throw new RuntimeException(fetcherException);
     }
   }
@@ -204,56 +201,5 @@ public class PinotTableIdealStateBuilder {
       groupId = streamProviderConfig.get(keyOfGroupId);
     }
     return groupId;
-  }
-
-  private static class KafkaPartitionsCountFetcher implements Callable<Boolean> {
-    private int _partitionCount = -1;
-    private final StreamMetadata _streamMetadata;
-    private Exception _exception;
-
-    private KafkaPartitionsCountFetcher(StreamMetadata streamMetadata) {
-      _streamMetadata = streamMetadata;
-    }
-
-    private int getPartitionCount() {
-      return _partitionCount;
-    }
-
-    private Exception getException() {
-      return _exception;
-    }
-
-    @Override
-    public Boolean call() throws Exception {
-      final String bootstrapHosts = _streamMetadata.getBootstrapHosts();
-      final String kafkaTopicName = _streamMetadata.getKafkaTopicName();
-      if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
-        LOGGER.warn("Could not get partition count for topic {}. Invalid config for bootstrap hosts:'{}'",
-            kafkaTopicName, bootstrapHosts);
-        throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST + ":'"
-            + bootstrapHosts + "'");
-      }
-      PinotStreamConsumerFactory pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(_streamMetadata);
-      PinotStreamConsumer consumerWrapper = pinotStreamConsumerFactory.buildMetadataFetcher(
-          PinotTableIdealStateBuilder.class.getSimpleName() + "-" + kafkaTopicName, _streamMetadata);
-      try {
-        _partitionCount = consumerWrapper.getPartitionCount(kafkaTopicName, /*maxWaitTimeMs=*/5000L);
-        if (_exception != null) {
-          // We had at least one failure, but succeeded now. Log an info
-          LOGGER.info("Successfully retrieved partition count as {} for topic {}", _partitionCount, kafkaTopicName);
-        }
-        return Boolean.TRUE;
-      } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        LOGGER.warn("Could not get Kafka partition count for topic {}:{}", kafkaTopicName, e);
-        _exception = e;
-        return Boolean.FALSE;
-      } catch (Exception e) {
-        LOGGER.warn("Could not get Kafka partition count for topic {}:{}", kafkaTopicName, e);
-        _exception = e;
-        throw e;
-      } finally {
-        IOUtils.closeQuietly(consumerWrapper);
-      }
-    }
   }
 }

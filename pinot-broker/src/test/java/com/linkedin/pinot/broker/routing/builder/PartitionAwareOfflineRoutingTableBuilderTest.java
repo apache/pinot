@@ -244,7 +244,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
   private RoutingTableBuilder buildPartitionAwareOfflineRoutingTableBuilder(FakePropertyStore propertyStore,
       TableConfig tableConfig, ExternalView externalView, List<InstanceConfig> instanceConfigs) throws Exception {
     PartitionAwareOfflineRoutingTableBuilder routingTableBuilder = new PartitionAwareOfflineRoutingTableBuilder();
-    routingTableBuilder.init(null, tableConfig, propertyStore);
+    routingTableBuilder.init(null, tableConfig, propertyStore, null);
     routingTableBuilder.computeRoutingTableFromExternalView(OFFLINE_TABLE_NAME, externalView, instanceConfigs);
 
     return routingTableBuilder;

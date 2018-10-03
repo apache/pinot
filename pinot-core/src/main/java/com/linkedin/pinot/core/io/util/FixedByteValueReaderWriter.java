@@ -15,57 +15,62 @@
  */
 package com.linkedin.pinot.core.io.util;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
-import java.nio.charset.Charset;
 
 
-public final class FixedByteValueReaderWriter implements Closeable {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
-
+public final class FixedByteValueReaderWriter implements Closeable, ValueReader {
   private final PinotDataBuffer _dataBuffer;
 
   public FixedByteValueReaderWriter(PinotDataBuffer dataBuffer) {
     _dataBuffer = dataBuffer;
   }
 
+  @Override
   public int getInt(int index) {
     return _dataBuffer.getInt(index * Integer.BYTES);
   }
 
+  @Override
   public long getLong(int index) {
     return _dataBuffer.getLong(index * Long.BYTES);
   }
 
+  @Override
   public float getFloat(int index) {
     return _dataBuffer.getFloat(index * Float.BYTES);
   }
 
+  @Override
   public double getDouble(int index) {
     return _dataBuffer.getDouble(index * Double.BYTES);
   }
 
+  @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
     int startOffset = index * numBytesPerValue;
     for (int i = 0; i < numBytesPerValue; i++) {
       byte currentByte = _dataBuffer.getByte(startOffset + i);
       if (currentByte == paddingByte) {
-        return new String(buffer, 0, i, UTF_8);
+        return StringUtil.decodeUtf8(buffer, 0, i);
       }
       buffer[i] = currentByte;
     }
-    return new String(buffer, UTF_8);
+    return StringUtil.decodeUtf8(buffer);
   }
 
+  @Override
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
     int startOffset = index * numBytesPerValue;
     for (int i = 0; i < numBytesPerValue; i++) {
       buffer[i] = _dataBuffer.getByte(startOffset + i);
     }
-    return new String(buffer, UTF_8);
+    return StringUtil.decodeUtf8(buffer);
   }
 
+  @Override
   public byte[] getBytes(int index, int numBytesPerValue, byte[] output) {
     assert output.length == numBytesPerValue;
     int startOffset = index * numBytesPerValue;

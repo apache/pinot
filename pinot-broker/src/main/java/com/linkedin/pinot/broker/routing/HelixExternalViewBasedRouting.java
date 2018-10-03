@@ -61,7 +61,7 @@ import org.slf4j.LoggerFactory;
 public class HelixExternalViewBasedRouting implements RoutingTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
 
-  private final Map<String,RoutingTableBuilder> _routingTableBuilderMap;
+  private final Map<String, RoutingTableBuilder> _routingTableBuilderMap;
 
   private final Map<String, Integer> _lastKnownExternalViewVersionMap = new ConcurrentHashMap<>();
   private final Map<String, Map<String, InstanceConfig>> _lastKnownInstanceConfigsForTable = new ConcurrentHashMap<>();
@@ -102,7 +102,6 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     return _routingTableBuilderMap.containsKey(tableName);
   }
 
-
   public void setBrokerMetrics(BrokerMetrics brokerMetrics) {
     _brokerMetrics = brokerMetrics;
   }
@@ -111,9 +110,10 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       List<InstanceConfig> instanceConfigList) {
     String tableName = tableConfig.getTableName();
 
-    RoutingTableBuilder routingTableBuilder = _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig);
-    routingTableBuilder.init(_configuration, tableConfig, _propertyStore);
-    LOGGER.info("Initialized routingTableBuilder: {} for table {}", routingTableBuilder.getClass().getName(), tableName);
+    RoutingTableBuilder routingTableBuilder =
+        _routingTableBuilderFactory.createRoutingTableBuilder(tableConfig, _brokerMetrics);
+    LOGGER.info("Initialized routingTableBuilder: {} for table {}", routingTableBuilder.getClass().getName(),
+        tableName);
     _routingTableBuilderMap.put(tableName, routingTableBuilder);
 
     // Build the routing table
@@ -143,7 +143,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     int externalViewRecordVersion = externalView.getRecord().getVersion();
     int lastKnownExternalViewVersion = _lastKnownExternalViewVersionMap.get(tableName);
 
-    if (externalViewRecordVersion != lastKnownExternalViewVersion || lastKnownExternalViewVersion == INVALID_EXTERNAL_VIEW_VERSION) {
+    if (externalViewRecordVersion != lastKnownExternalViewVersion
+        || lastKnownExternalViewVersion == INVALID_EXTERNAL_VIEW_VERSION) {
       LOGGER.info(
           "Routing table for table {} requires rebuild due to external view change (current version {}, last known version {})",
           tableName, externalViewRecordVersion, lastKnownExternalViewVersion);
@@ -223,7 +224,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _lastKnownExternalViewVersionMap.put(tableNameWithType, externalViewRecordVersion);
 
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableNameWithType);
-    if(routingTableBuilder == null) {
+    if (routingTableBuilder == null) {
       //TODO: warn
       return;
     }
@@ -372,7 +373,6 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
           iterator.remove();
         }
       }
-
     }
   }
 
@@ -549,8 +549,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   }
 
   @Override
-  public String dumpSnapshot(String tableName)
-      throws Exception {
+  public String dumpSnapshot(String tableName) throws Exception {
     JSONObject ret = new JSONObject();
     JSONArray routingTableSnapshot = new JSONArray();
 
@@ -563,7 +562,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(currentTable);
         List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
         for (Map<String, List<String>> routingTable : routingTables) {
-          entries.put(new JSONObject(routingTable.toString()));
+          entries.put(new JSONObject(routingTable));
         }
         tableEntry.put("routingTableEntries", entries);
         routingTableSnapshot.put(tableEntry);

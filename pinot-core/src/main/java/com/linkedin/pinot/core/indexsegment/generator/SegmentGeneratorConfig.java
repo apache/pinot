@@ -148,6 +148,12 @@ public class SegmentGeneratorConfig {
     _onHeap = config._onHeap;
   }
 
+  /**
+   * This constructor is used during offline data generation. Note that it has an option that will generate inverted
+   * index.
+   * @param tableConfig
+   * @param schema
+   */
   public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(schema);
     _schema = schema;
@@ -176,7 +182,9 @@ public class SegmentGeneratorConfig {
     if (starTreeIndexSpec != null) {
       enableStarTreeIndex(starTreeIndexSpec);
     }
-    _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+    if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+      _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+    }
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
@@ -358,7 +366,7 @@ public class SegmentGeneratorConfig {
       return _segmentTimeColumnName;
     }
     // TODO: if segmentTimeColumnName is null, getQualifyingFields DATETIME. If multiple found, throw exception "must specify primary timeColumnName"
-    return getQualifyingFields(FieldType.TIME);
+    return getQualifyingFields(FieldType.TIME, true);
   }
 
   public void setTimeColumnName(String timeColumnName) {
@@ -537,7 +545,7 @@ public class SegmentGeneratorConfig {
 
   @JsonIgnore
   public String getMetrics() {
-    return getQualifyingFields(FieldType.METRIC);
+    return getQualifyingFields(FieldType.METRIC, true);
   }
 
   /**
@@ -573,12 +581,12 @@ public class SegmentGeneratorConfig {
 
   @JsonIgnore
   public String getDimensions() {
-    return getQualifyingFields(FieldType.DIMENSION);
+    return getQualifyingFields(FieldType.DIMENSION, true);
   }
 
   @JsonIgnore
   public String getDateTimeColumnNames() {
-    return getQualifyingFields(FieldType.DATE_TIME);
+    return getQualifyingFields(FieldType.DATE_TIME, true);
   }
 
   public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
@@ -595,14 +603,19 @@ public class SegmentGeneratorConfig {
    * @return Comma separate qualifying fields names.
    */
   @JsonIgnore
-  private String getQualifyingFields(FieldType type) {
+  private String getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 
     for (final FieldSpec spec : getSchema().getAllFieldSpecs()) {
+      if (excludeVirtualColumns && getSchema().isVirtualColumn(spec.getName())) {
+        continue;
+      }
+
       if (spec.getFieldType() == type) {
         fields.add(spec.getName());
       }
     }
+
     Collections.sort(fields);
     return StringUtils.join(fields, ",");
   }

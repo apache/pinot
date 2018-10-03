@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegmentUtils;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
@@ -34,7 +35,9 @@ import com.linkedin.pinot.core.realtime.impl.invertedindex.RealtimeInvertedIndex
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
-import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnContext;
+import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
+import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import com.linkedin.pinot.core.util.FixedIntArray;
 import com.linkedin.pinot.core.util.FixedIntArrayOffHeapIdMap;
@@ -42,6 +45,7 @@ import com.linkedin.pinot.core.util.IdMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -363,14 +367,33 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public ColumnDataSource getDataSource(String columnName) {
-    return new ColumnDataSource(_schema.getFieldSpecFor(columnName), _numDocsIndexed, _maxNumValuesMap.get(columnName),
-        _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName));
+  public Set<String> getPhysicalColumnNames() {
+    HashSet<String> physicalColumnNames = new HashSet<>();
+
+    for (String columnName : getColumnNames()) {
+      if (!_segmentMetadata.getSchema().isVirtualColumn(columnName)) {
+        physicalColumnNames.add(columnName);
+      }
+    }
+
+    return physicalColumnNames;
   }
 
   @Override
-  public StarTree getStarTree() {
-    return null;
+  public ColumnDataSource getDataSource(String columnName) {
+    if (!_schema.isVirtualColumn(columnName)) {
+      return new ColumnDataSource(_schema.getFieldSpecFor(columnName), _numDocsIndexed, _maxNumValuesMap.get(columnName),
+          _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName));
+    } else {
+      return getVirtualDataSource(columnName);
+    }
+  }
+
+  private ColumnDataSource getVirtualDataSource(String column) {
+    VirtualColumnContext virtualColumnContext = new VirtualColumnContext(NetUtil.getHostnameOrAddress(), _segmentMetadata.getTableName(), getSegmentName(),
+        column, _numDocsIndexed + 1);
+    VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(_schema.getFieldSpecFor(column).getVirtualColumnProvider());
+    return new ColumnDataSource(provider.buildColumnIndexContainer(virtualColumnContext), provider.buildMetadata(virtualColumnContext));
   }
 
   @Override

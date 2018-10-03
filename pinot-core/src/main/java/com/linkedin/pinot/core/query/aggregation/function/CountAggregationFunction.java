@@ -36,7 +36,7 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
 
   @Nonnull
   @Override
-  public String getColumnName(@Nonnull String[] columns) {
+  public String getColumnName(@Nonnull String column) {
     return COLUMN_NAME;
   }
 
@@ -60,24 +60,54 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull BlockValSet... blockValSets) {
-    aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
+    if (blockValSets.length == 0) {
+      aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
+    } else {
+      // Star-tree pre-aggregated values
+      long[] valueArray = blockValSets[0].getLongValuesSV();
+      long count = 0;
+      for (int i = 0; i < length; i++) {
+        count += valueArray[i];
+      }
+      aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + count);
+    }
   }
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeyArray[i];
-      groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
+    if (blockValSets.length == 0) {
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
+      }
+    } else {
+      // Star-tree pre-aggregated values
+      long[] valueArray = blockValSets[0].getLongValuesSV();
+      for (int i = 0; i < length; i++) {
+        int groupKey = groupKeyArray[i];
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
+      }
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
+    if (blockValSets.length == 0) {
+      for (int i = 0; i < length; i++) {
+        for (int groupKey : groupKeysArray[i]) {
+          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
+        }
+      }
+    } else {
+      // Star-tree pre-aggregated values
+      long[] valueArray = blockValSets[0].getLongValuesSV();
+      for (int i = 0; i < length; i++) {
+        long value = valueArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + value);
+        }
       }
     }
   }

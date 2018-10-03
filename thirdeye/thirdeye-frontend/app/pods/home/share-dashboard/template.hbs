@@ -1,0 +1,180 @@
+<div class="container share-dashboard-container">
+  <header>
+    {{#link-to "home" (query-params appName=model.appName feedbackType=model.feedbackType duration=model.duration startDate=model.startDate endDate=model.endDate) class="te-anomaly-table__link"}}
+      Back to Dashboard
+    {{/link-to}}
+  </header>
+  <section class="share-dashboard-container__body">
+    <article class="share-dashboard-container__share-header">
+      <h2 style="color: rgba(0,0,0,0.9);font-size: 24px;">Share dashboard summary</h2>
+    </article>
+    <article class="share-dashboard-container__share-configure">
+      <h4 style="color: rgba(0,0,0,0.9);font-size: 18px;font-weight: bold;">Configure summary</h4>
+      <section>
+        <div style="margin-left: 15px;margin-bottom: 15px;display: inline-block;">
+          <p><input type="checkbox" {{action 'toggleSelection' "dashboard_summary" on="change"}} checked> Add dashboard-level comments</p>
+          <p>
+            <textarea {{action 'updateComment' "dashboard_summary" on="change"}} value="{{dashboard_summary_comment}}" placeholder="Comment for dashboard summary" name="dashboard_summary" id="dashboard_summary" style="border: none;border-bottom: 1px solid grey;margin-left: 15px;width: 800px;">
+            </textarea>
+          </p>
+        </div>
+        {{#x-tree
+          chosenId=selectedNode
+          checkable=true
+          expandDepth=0
+          model=tree as |node|}}
+            {{node.name}}
+            {{#if node.isComment}}
+              <input type="text" {{action 'updateComment' node.id on="change"}} value="{{node.comment}}" placeholder="Add comments for metrics/alerts" name="{{node.name}}" id="{{node.id}}" style="border: none;border-bottom: 1px solid grey;margin-left: 30px;width: 800px;">
+            {{/if}}
+        {{/x-tree}}
+    </section>
+    </article>
+    <article class="share-dashboard-container__share-body">
+      <h4 style="color: rgba(0,0,0,0.9);font-size: 18px;">Preview dashboard summary</h4>
+      <section style="color: rgba(0,0,0,0.6);font-size: 14px; display: flex;justify-content: space-between;">
+        <span>Click the copy button to copy to clipboard to paste in email or any word processor.</span>
+        <span>
+          <a href="" style="margin-right: 15px;font-weight: normal;font-size: 16px;line-height: 20px;">
+            <span style="color: #0073B1;" {{action 'createPDF'}}>Download PDF</span>
+          </a>
+          <a href="" style="display: inline-block;padding: 5px;border-radius: 2px;text-decoration: none;border: 1px solid #0073B1;font-weight: normal;margin: 0 1px;font-size: 17px;line-height: 20px;">
+            <span style="color: #0073B1;" {{action "copy"}}>Copy</span>
+            {{#if showCopyTooltip}}
+              {{#tooltip-on-element isShown=showCopyTooltip}}
+                  Shared summary copied!
+              {{/tooltip-on-element}}
+            {{/if}}
+          </a>
+          <a href="" style="display: inline-block;padding: 5px;border-radius: 2px;text-decoration: none;border: 1px solid #0073B1;font-weight: normal;margin: 0 1px;font-size: 17px;line-height: 20px;">
+            <span style="color: #0073B1;" {{action "getShareLink"}}>Get share link</span>
+            {{#if showSharedTooltip}}
+              {{#tooltip-on-element isShown=showSharedTooltip}}
+                  Your share link copied!
+              {{/tooltip-on-element}}
+            {{/if}}
+          </a>
+        </span>
+      </section>
+    </article>
+    <article class="share-dashboard-container__preview-container">
+      <section class="share-dashboard-container__preview-container-body">
+        <!-- EMAIL TEMPLATE -->
+        <div style="background-color: #FFF;width: 700px;font-family: 'Source Sans Pro', sans-serif;">
+          <div>
+            <h2 style="margin: 0;padding: 15px;background-color: #F6F8FA;letter-spacing: 5px;font-size: 19px;">
+              <img src="/assets/images/in-logo/in-logo-58_58.png" alt="share logo" class="share-dashboard-container__logo" style="margin-right: 10px;width: 34px;height: 34px;">THIRDEYE
+            </h2>
+          </div>
+          <div style="color: #FFF;">
+            <div style="padding: 20px; background-color: #0073b1;text-align: left;">
+              <h3 style="line-height: 20px;margin-bottom: 25x;">Application:<span  style="padding-left:10px;">{{appNameDisplay}}</span></h3>
+              <h4 style="line-height: 20px;">{{anomaliesFilteredCount}} anomalies were detected from {{startDateDisplay}} to {{endDateDisplay}}</h4>
+              {{#if dashboard_summary_comment}}
+                <div id="section_dashboard_summary">
+                  <h5>Summary</h5>
+                  <p id="dashboardId_dashboard_summary">{{markdown-to-html dashboard_summary_comment}}</p>
+                </div>
+              {{/if}}
+              {{#if shareUrl}}
+                <p>
+                  <a href="{{shareUrl}}" target="_blank" style="display: inline-block;padding: 5px;border-radius: 2px;color: #FFF;text-decoration: none;border: 1px solid #FFF;font-weight: normal;margin: 0 1px;font-size: 17px;line-height: 20px;">
+                    <span style="color: #FFF;">View all in ThirdEye</span>
+                  </a>
+                </p>
+              {{/if}}
+            </div>
+            <div class="email-preview__body" style="color: #262626;">
+              <!-- Metric level -->
+              {{#each-in filteredAnomalyMapping as |metric metricList|}}
+                <!-- html email tables -->
+                {{#if metricList.viewTreeNode.isChecked}}
+                  <h4 style="margin-left: 20px;word-wrap: break-word;"><span style="color: #737373;margin-right:10px;">Metric</span>{{metric}}</h4>
+                  {{#if metricList.viewTreeNode.comment}}
+                    <div id="section_{metricList.metricId}">
+                      <h5 style="margin-left: 20px;font-weight: bold;">Metric summary</h5>
+                      <p style="margin-left: 20px;" id="metricId_{{metricList.metricId}}">{{markdown-to-html metricList.viewTreeNode.comment}}</p>
+                    </div>
+                  {{/if}}
+
+                  <!-- Alert level -->
+                    {{#each-in metricList.items as |alert alertList|}}
+                    {{#if alertList.viewTreeNode.isChecked}}
+                      <h4 style="margin-left: 20px;word-wrap: break-word;">
+                        <span style="height: 20px; width: 33px;font-size: 14px; color: #737373;color: #737373;margin-right:10px;">Alert</span>
+                        <a style="font-size: 14px; color: #0073B1;font-weight: bold;" href="https://thirdeye.corp.linkedin.com/app/#/manage/alert/{{alertList.functionId}}/explore?duration={{duration}}&amp;endDate={{endDate}}&amp;startDate={{startDate}}">
+                          {{alert}}
+                        </a>
+                      </h4>
+                      <table width="660" style="margin: 20px;{{unless (mod-check metricList.count) 'background-color: #F6F8FA;'}}">
+                        <tr style="border-top: 1px solid #C7D1D8; border-bottom: 1px solid #C7D1D8; background-color: #F6F8FA; color: #383838; font-size: 12px;">
+                          <th style="padding: 10px;">Start/Duration</th>
+                          <th style="padding: 10px;">Dimensions</th>
+                          <th style="padding: 10px;">Current/Predicted</th>
+                          <th style="padding: 10px;">Resolution</th>
+                        </tr>
+                        <!-- Anomaly level -->
+                        {{#each alertList.items as |record index|}}
+                          <tr style="border-bottom: 1px solid #C7D1D8;{{if record.anomaly.comment 'border-bottom: none;'}}">
+                            <td style="padding: 0 3px 3px 10px;">
+                              <p style="margin: 0;">
+                                <label style="margin: 0;">
+                                  <span style="color: #0073B1; font-size: 14px; line-height: 20px;">
+                                    <a href="https://thirdeye.corp.linkedin.com/app/#/rootcause?anomalyId={{record.anomaly.id}}">
+                                      {{moment-format record.anomaly.start 'MMM D, hh:mm A'}}
+                                    </a>
+                                  </span>
+                                </label>
+                              </p>
+                              <p style="margin: 0;color: rgba(0,0,0,0.6);font-size: 12px;">
+                                {{record.duration}}
+                              </p>
+                            </td>
+                            <td style="padding: 0 3px 3px 10px;">
+                              <ul style="list-style: none;padding: 0px;margin-bottom: 0;max-width: 180px;">
+                                {{#each-in record.anomaly.dimensions as |dimName dimList|}}
+                                  <li style="color: rgba(0,0,0,0.6);font-size: 12px;">
+                                     {{dimName}}:<span style="margin-left: 5px;">{{dimList}}</span>
+                                  </li>
+                                {{else}}
+                                    -
+                                {{/each-in}}
+                              </ul>
+                            </td>
+                            <td style="padding: 0 3px 3px 10px;">
+                              <p style="margin: 0;">{{record.current}}/{{record.baseline}}</p>
+                              <p  style="margin: 0;" class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calculate-direction record.change}}">
+                                ({{record.humanizedChangeDisplay}})
+                              </p>
+                            </td>
+                            {{#if (eq record.anomalyFeedback "True anomaly")}}
+                              <td style="padding: 0 3px 3px 10px;color: #FF2C33;">{{record.anomalyFeedback}}</td>
+                            {{else}}
+                              <td style="padding: 0 3px 3px 10px;">{{record.anomalyFeedback}}</td>
+                            {{/if}}
+                          </tr>
+                          {{#if record.anomaly.comment}}
+                            <tr style="border-bottom: 1px solid #C7D1D8;{{unless (mod-check index) 'background-color: #F6F8FA;'}}">
+                              <td colspan="4" style="padding: 3px;padding-top: 0;">
+                                <strong>Comment:</strong> {{record.anomaly.comment}}
+                              </td>
+                            </tr>
+                          {{/if}}
+                        {{/each}}
+                      </table>
+                      <hr/>
+                      <!-- html email tables -->
+                    {{/if}}
+                  {{/each-in}}
+                {{/if}}
+
+              {{else}}
+                {{partial 'partials/home'}}
+              {{/each-in}}
+            </div>
+          </div>
+        </div>
+      </section>
+    </article>
+  </section>
+</div>

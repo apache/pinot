@@ -202,10 +202,28 @@ export default Component.extend({
   groupNameMessage: null,
 
   /**
-   * Temp storage for group recipients from text input
+   * Error message container for to-recipients
+   * @type {string}
+   */
+  toAddrWarning: null,
+
+  /**
+   * Temp storage for recipients(to) from text input
    * @type {String}
    */
-  groupRecipients: null,
+  toAddresses: null,
+
+  /**
+   * Temp storage for recipients(cc) from text input
+   * @type {String}
+   */
+  ccAddresses: null,
+
+  /**
+   * Temp storage for recipients(bcc) from text input
+   * @type {String}
+   */
+  BccAddresses: null,
 
   /**
    * Group options available in database
@@ -219,7 +237,7 @@ export default Component.extend({
    */
   groupOptions: computed('application', 'groupOptionsRaw', function () {
     const { application, groupOptionsRaw } = getProperties(this, 'application', 'groupOptionsRaw');
-    const options = groupOptionsRaw.filter(opt => opt.application === null || opt.application === application);
+    const options = groupOptionsRaw.filter(opt => opt.application === null || opt.application === application || opt.id === null);
     options[0].application = application; // set application for "new" template
     return options;
   }),
@@ -257,16 +275,11 @@ export default Component.extend({
    * Currently selected application option
    * @type {object}
    */
-  applicationOptionSelected: computed('application', {
-    get () {
-      const { applicationOptions, application } = getProperties(this, 'applicationOptions', 'application');
-      if (_.isEmpty(application)) { return; }
-      return applicationOptions.find(opt => opt.application === application);
-    },
-    set () {
-      // left blank to prevent property override
-    }
-  }),
+  applicationOptionSelected: computed('application', function () {
+    const { applicationOptions, application } = getProperties(this, 'applicationOptions', 'application');
+    if (_.isEmpty(application)) { return; }
+    return applicationOptions.find(opt => opt.application === application);
+  }).readOnly(),
 
   /**
    * Cron options available for selection
@@ -302,16 +315,31 @@ export default Component.extend({
    * Currently selected cron option
    * @type {object}
    */
-  cronOptionSelected: computed('group.cronExpression', {
-    get () {
-      const { cronOptions, group } = getProperties(this, 'cronOptions', 'group');
-      if (_.isEmpty(group)) { return; }
-      return cronOptions.find(opt => opt.cron === group.cronExpression);
-    },
-    set () {
-      // left blank to prevent property override
-    }
-  }),
+  cronOptionSelected: computed('group.cronExpression', function () {
+    const { cronOptions, group } = getProperties(this, 'cronOptions', 'group');
+    if (_.isEmpty(group)) { return; }
+    return cronOptions.find(opt => opt.cron === group.cronExpression);
+  }).readOnly(),
+
+  /**
+   * SubjectType options available for selection
+   * @type {Array}
+   */
+  subjectTypeOptions: [
+    { name: 'group name only', subjectType: 'ALERT' },
+    { name: 'with metric name', subjectType: 'METRICS' },
+    { name: 'with dataset name', subjectType: 'DATASETS' }
+  ],
+
+  /**
+   * Currently selected subjectType option
+   * @type {object}
+   */
+  subjectTypeOptionSelected: computed('group.subjectType', function () {
+    const { subjectTypeOptions, group } = getProperties(this, 'subjectTypeOptions', 'group');
+    if (_.isEmpty(group)) { return; }
+    return subjectTypeOptions.find(opt => opt.subjectType === group.subjectType);
+  }).readOnly(),
 
   /**
    * Function options available for selection (and search)
@@ -333,16 +361,11 @@ export default Component.extend({
    * Currently selected function ids
    * @type {Array}
    */
-  functionOptionsSelected: computed('functionOptionsSelectedIds', {
-    get () {
-      const { functionOptions, functionOptionsSelectedIds } = getProperties(this, 'functionOptions', 'functionOptionsSelectedIds');
-      if (_.isEmpty(functionOptionsSelectedIds)) { return []; }
-      return functionOptions.filter(opt => functionOptionsSelectedIds.has(opt.id));
-    },
-    set () {
-      // left blank to prevent property override
-    }
-  }),
+  functionOptionsSelected: computed('functionOptionsSelectedIds', function () {
+    const { functionOptions, functionOptionsSelectedIds } = getProperties(this, 'functionOptions', 'functionOptionsSelectedIds');
+    if (_.isEmpty(functionOptionsSelectedIds)) { return []; }
+    return functionOptions.filter(opt => functionOptionsSelectedIds.has(opt.id));
+  }).readOnly(),
 
   /**
    * Parses application entities into power-select options
@@ -369,6 +392,7 @@ export default Component.extend({
       active: true,
       application: null,
       cronExpression: get(this, 'cronOptions')[0].cron,
+      subjectType: get(this, 'subjectTypeOptions')[0].subjectType,
       emailConfig: {
         functionIds: []
       }
@@ -464,13 +488,54 @@ export default Component.extend({
     }
   },
 
+  /**
+   * Check for at least one recipient
+   *
+   * @param toAddr {String} comma separated email addresses
+   * @private
+   */
+  _validateRecipient(toAddr) {
+    if (!_.isEmpty(toAddr)) {
+      var emailArray = toAddr.split(',');
+      for (var index = 0; index < emailArray.length; index++) {
+        if (this._validateEmail(emailArray[index].trim())) {
+          set(this, 'toAddrWarning', null);
+          return;
+        }
+      }
+    }
+
+    set(this, 'toAddrWarning', 'Please enter at least one valid recipient');
+  },
+
+  /**
+   * Verify if string is a valid email address
+   *
+   * @param email {String} email address
+   * @private
+   */
+  _validateEmail(email) {
+    var re = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    return re.test(String(email).toLowerCase());
+  },
+
   actions: {
     /**
      * Handles recipient updates
      */
-    onRecipients () {
-      const recipients = get(this, 'groupRecipients');
-      set(this, 'group.recipients', recipients.replace(' ', ''));
+    onToAddresses () {
+      const toAddresses = get(this, 'toAddresses');
+      this._validateRecipient(toAddresses);
+
+      set(this, 'group.receiverAddresses.to', toAddresses.replace(/[^!-~]+/g, '').replace(/,+/g, ',').split(','));
+    },
+    onCcAddresses () {
+      const ccAddresses = get(this, 'ccAddresses');
+      set(this, 'group.receiverAddresses.cc', ccAddresses.replace(/[^!-~]+/g, '').replace(/,+/g, ',').split(','));
+    },
+    onBccAddresses () {
+      const bccAddresses = get(this, 'bccAddresses');
+      set(this, 'group.receiverAddresses.bcc', bccAddresses.replace(/[^!-~]+/g, '').replace(/,+/g, ',').split(','));
     },
 
     /**
@@ -518,10 +583,13 @@ export default Component.extend({
       setProperties(this, {
         application: null,
         group: null,
-        groupRecipients: null,
+        toAddresses: null,
+        ccAddresses: null,
+        bccAddresses: null,
         showManageGroupsModal: false,
         changeCache: new Set(),
-        groupNameMessage: null
+        groupNameMessage: null,
+        toAddrWarning: null
       });
 
       if (onExit) { onExit(); }
@@ -545,16 +613,19 @@ export default Component.extend({
         .then(res => setProperties(this, {
           application: null,
           group: null,
-          groupRecipients: null,
+          toAddresses: null,
+          ccAddresses: null,
+          bccAddresses: null,
           showManageGroupsModal: false,
           changeCache: new Set(),
-          groupNameMessage: null
+          groupNameMessage: null,
+          toAddrWarning: null
         }))
         .then(res => {
           if (onSave) { onSave(group); }
         })
         .catch(err => set(this, 'message', err));
-     },
+    },
 
     /**
      * Handles group selection
@@ -568,7 +639,9 @@ export default Component.extend({
         application: group.application, // in case not set
         group,
         groupFunctionIds: (group.emailConfig.functionIds || []).join(', '),
-        groupRecipients: (group.recipients || '').split(',').join(', ')
+        toAddresses: (group.receiverAddresses.to || []).join(', '),
+        ccAddresses: (group.receiverAddresses.cc || []).join(', '),
+        bccAddresses: (group.receiverAddresses.bcc || []).join(', ')
       });
 
       this._validateGroupName(group);
@@ -604,12 +677,28 @@ export default Component.extend({
     },
 
     /**
+     * Handles subjectType selection
+     * @param subjectOption {object} subjectType option
+     */
+    onSubjectType (subjectOption) {
+      set(this, 'group.subjectType', subjectOption.subjectType);
+    },
+
+    /**
      * Handles application selection
      * @param applicationOption {object} application option
      */
     onApplication (applicationOption) {
       this._updateChangeCache();
-      setProperties(this, { application: applicationOption.application, group: null, groupRecipients: null, groupNameMessage: null });
+      setProperties(this, {
+        application: applicationOption.application,
+        group: null,
+        toAddresses: null,
+        ccAddresses: null,
+        bccAddresses: null,
+        groupNameMessage: null,
+        toAddrWarning: null
+      });
     },
 
     /**

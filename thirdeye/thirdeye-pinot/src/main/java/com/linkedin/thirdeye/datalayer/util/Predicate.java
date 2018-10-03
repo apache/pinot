@@ -1,15 +1,27 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.util;
 
-import java.util.List;
-
 import org.apache.commons.lang3.tuple.ImmutablePair;
-
-import com.google.common.collect.Range;
 
 public class Predicate {
   enum OPER {
     AND("AND"), OR("OR"), EQ("="), GT(">"), GE(">="), LT("<"), LE("<="), NEQ("!="), IN(
-        "IN"), BETWEEN("BETWEEN");
+        "IN"), BETWEEN("BETWEEN"), LIKE("LIKE");
     private String sign;
 
     OPER(String sign) {
@@ -93,6 +105,10 @@ public class Predicate {
   public static Predicate BETWEEN(String columnName, Object startValue, Object endValue) {
     return new Predicate(columnName, OPER.BETWEEN,
         new ImmutablePair<Object, Object>(startValue, endValue));
+  }
+
+  public static Predicate LIKE(String columnName, Object value) {
+    return new Predicate(columnName, OPER.LIKE, value);
   }
 
 }

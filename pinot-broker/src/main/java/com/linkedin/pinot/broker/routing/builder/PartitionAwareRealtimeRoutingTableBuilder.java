@@ -18,6 +18,7 @@ package com.linkedin.pinot.broker.routing.builder;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCUtils;
@@ -47,8 +48,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwareRoutingTableBuilder {
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    super.init(configuration, tableConfig, propertyStore);
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+    super.init(configuration, tableConfig, propertyStore, brokerMetrics);
     _numReplicas = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
   }
 

@@ -17,6 +17,7 @@ package com.linkedin.pinot.broker.broker;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
+import com.linkedin.pinot.broker.routing.RoutingTable;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import io.swagger.jaxrs.config.BeanConfig;
@@ -37,16 +38,16 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   private URI _baseUri;
   private HttpServer _httpServer;
 
-  public BrokerAdminApiApplication(final BrokerServerBuilder brokerServerBuilder, final BrokerMetrics brokerMetrics,
-      final BrokerRequestHandler brokerRequestHandler, final TimeBoundaryService timeBoundaryService) {
+  public BrokerAdminApiApplication(BrokerServerBuilder brokerServerBuilder) {
     packages(RESOURCE_PACKAGE);
     register(new AbstractBinder() {
       @Override
       protected void configure() {
         bind(brokerServerBuilder).to(BrokerServerBuilder.class);
-        bind(brokerMetrics).to(BrokerMetrics.class);
-        bind(brokerRequestHandler).to(BrokerRequestHandler.class);
-        bind(timeBoundaryService).to(TimeBoundaryService.class);
+        bind(brokerServerBuilder.getRoutingTable()).to(RoutingTable.class);
+        bind(brokerServerBuilder.getTimeBoundaryService()).to(TimeBoundaryService.class);
+        bind(brokerServerBuilder.getBrokerMetrics()).to(BrokerMetrics.class);
+        bind(brokerServerBuilder.getBrokerRequestHandler()).to(BrokerRequestHandler.class);
       }
     });
     registerClasses(io.swagger.jaxrs.listing.ApiListingResource.class);

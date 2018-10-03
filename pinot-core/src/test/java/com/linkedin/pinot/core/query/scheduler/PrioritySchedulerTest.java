@@ -17,14 +17,14 @@ package com.linkedin.pinot.core.query.scheduler;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceLimitPolicy;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
@@ -43,7 +43,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
@@ -264,19 +263,21 @@ public class PrioritySchedulerTest {
   static class TestQueryExecutor implements QueryExecutor {
 
     @Override
-    public void init(Configuration queryExecutorConfig, DataManager dataManager, ServerMetrics serverMetrics)
-        throws ConfigurationException {
-
+    public void init(@Nonnull Configuration config, @Nonnull InstanceDataManager instanceDataManager,
+        @Nonnull ServerMetrics serverMetrics) {
     }
 
     @Override
     public void start() {
-
     }
 
     @Override
-    public DataTable processQuery(ServerQueryRequest queryRequest,
-        ExecutorService executorService) {
+    public void shutDown() {
+    }
+
+    @Nonnull
+    @Override
+    public DataTable processQuery(@Nonnull ServerQueryRequest queryRequest, @Nonnull ExecutorService executorService) {
       if (useBarrier) {
         try {
           startupBarrier.await();
@@ -285,7 +286,7 @@ public class PrioritySchedulerTest {
         }
       }
       DataTableImplV2 result = new DataTableImplV2();
-      result.getMetadata().put("table", queryRequest.getTableName());
+      result.getMetadata().put("table", queryRequest.getTableNameWithType());
       if (useBarrier) {
         try {
           validationBarrier.await();
@@ -298,18 +299,7 @@ public class PrioritySchedulerTest {
     }
 
     @Override
-    public void shutDown() {
-
-    }
-
-    @Override
-    public boolean isStarted() {
-      return true;
-    }
-
-    @Override
-    public void updateResourceTimeOutInMs(String resource, long timeOutMs) {
-
+    public void setTableTimeoutMs(@Nonnull String tableNameWithType, long timeOutMs) {
     }
   }
 }

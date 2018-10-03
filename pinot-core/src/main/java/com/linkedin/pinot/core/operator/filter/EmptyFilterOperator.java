@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.EmptyFilterBlock;
+import com.linkedin.pinot.core.operator.blocks.FilterBlock;
 
 
 /**
@@ -34,7 +34,7 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected BaseFilterBlock getNextBlock() {
+  protected FilterBlock getNextBlock() {
     return EmptyFilterBlock.getInstance();
   }
 

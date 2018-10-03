@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.algorithm;
 
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
@@ -8,8 +24,8 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineData;
-import com.linkedin.thirdeye.detection.StaticDetectionPipelineModel;
+import com.linkedin.thirdeye.detection.InputData;
+import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.List;
@@ -36,18 +52,18 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
     this.max = MapUtils.getDoubleValue(config.getProperties(), "max", Double.NaN);
 
     String metricUrn = MapUtils.getString(config.getProperties(), "metricUrn");
-    MetricEntity me = MetricEntity.fromURN(metricUrn, 1.0);
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
     this.slice = MetricSlice.from(me.getId(), this.startTime, this.endTime, me.getFilters());
   }
 
   @Override
-  public StaticDetectionPipelineModel getModel() {
-    return new StaticDetectionPipelineModel()
+  public InputDataSpec getInputDataSpec() {
+    return new InputDataSpec()
         .withTimeseriesSlices(Collections.singletonList(this.slice));
   }
 
   @Override
-  public DetectionPipelineResult run(StaticDetectionPipelineData data) {
+  public DetectionPipelineResult run(InputData data) {
     DataFrame df = data.getTimeseries().get(this.slice);
 
     // defaults
@@ -68,6 +84,7 @@ public class ThresholdAlgorithm extends StaticDetectionPipeline {
 
     List<MergedAnomalyResultDTO> anomalies = this.makeAnomalies(this.slice, df, COL_ANOMALY);
 
-    return new DetectionPipelineResult(anomalies);
+    return new DetectionPipelineResult(anomalies)
+        .setDiagnostics(Collections.singletonMap(DetectionPipelineResult.DIAGNOSTICS_DATA, (Object) df.dropAllNullColumns()));
   }
 }

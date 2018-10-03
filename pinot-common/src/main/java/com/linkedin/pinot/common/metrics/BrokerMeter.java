@@ -38,6 +38,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
   // Scatter phase.
   NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
+  REQUEST_SEND_EXCEPTIONS("exceptions", false),
   // Gather phase.
   RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
   // Response deserialize phase.
@@ -83,7 +84,11 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   GROUP_BY_SIZE("queries", false),
   TOTAL_SERVER_RESPONSE_SIZE("queries", false),
 
-  QUERY_QUOTA_EXCEEDED("exceptions", false);
+  QUERY_QUOTA_EXCEEDED("exceptions", false),
+
+  // tracks a case a segment is not hosted by any server
+  // this is different from NO_SERVER_FOUND_EXCEPTIONS which tracks unavailability across all segments
+  NO_SERVING_HOST_FOR_SEGMENT("badResponses", false);
 
 
   private final String brokerMeterName;

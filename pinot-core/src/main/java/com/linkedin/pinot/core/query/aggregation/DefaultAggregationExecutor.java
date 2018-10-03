@@ -29,10 +29,10 @@ import javax.annotation.Nonnull;
  * aggregations.
  */
 public class DefaultAggregationExecutor implements AggregationExecutor {
-  private final int _numFunctions;
-  private final AggregationFunction[] _functions;
-  private final AggregationResultHolder[] _resultHolders;
-  private final TransformExpressionTree[] _expressions;
+  protected final int _numFunctions;
+  protected final AggregationFunction[] _functions;
+  protected final AggregationResultHolder[] _resultHolders;
+  protected final TransformExpressionTree[] _expressions;
 
   public DefaultAggregationExecutor(@Nonnull AggregationFunctionContext[] functionContexts) {
     _numFunctions = functionContexts.length;
@@ -43,10 +43,8 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       AggregationFunction function = functionContexts[i].getAggregationFunction();
       _functions[i] = function;
       _resultHolders[i] = _functions[i].createAggregationResultHolder();
-      // TODO: currently only support single argument aggregation
       if (function.getType() != AggregationFunctionType.COUNT) {
-        _expressions[i] =
-            TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
+        _expressions[i] = TransformExpressionTree.compileToExpressionTree(functionContexts[i].getColumn());
       }
     }
   }

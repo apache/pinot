@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.alert.content;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -20,13 +36,17 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -46,12 +66,16 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -97,7 +121,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   protected Period postEventCrawlOffset;
   protected String imgPath = null;
   protected EmailContentFormatterConfiguration emailContentFormatterConfiguration;
-
+  protected MetricConfigManager metricDAO;
 
   @Override
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
@@ -116,18 +140,47 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       this.postEventCrawlOffset = Period.parse(properties.getProperty(POST_EVENT_CRAWL_OFFSET));
     }
     this.emailContentFormatterConfiguration = configuration;
+
+    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
   }
 
   @Override
-  public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, String recipients, String subject,
+  public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, DetectionAlertFilterRecipients recipients, String subject,
       Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
-    Map<String, Object> templateData =
-        getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
+    Map<String, Object> templateData = getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
+
     updateTemplateDataByAnomalyResults(templateData, anomalies, context);
-    if (org.apache.commons.lang3.StringUtils.isNotBlank(groupName)) {
-      subject = subject + " - " + groupName;
+
+    String outputSubject = makeSubject(subject, groupName, alertConfigDTO.getSubjectType(), templateData);
+
+    return buildEmailEntity(templateData, outputSubject, recipients, alertConfigDTO.getFromAddress(), emailTemplate);
+  }
+
+  /**
+   * Generate subject based on configuration.
+   * @param baseSubject
+   * @param groupName
+   * @param type
+   * @param templateData
+   * @return
+   */
+  private static String makeSubject(String baseSubject, String groupName, AlertConfigBean.SubjectType type, Map<String, Object> templateData) {
+    switch (type) {
+      case ALERT:
+        if (StringUtils.isNotBlank(groupName)) {
+          return baseSubject + " - " + groupName;
+        }
+        return baseSubject;
+
+      case METRICS:
+        return baseSubject + " - " + templateData.get("metrics");
+
+      case DATASETS:
+        return baseSubject + " - " + templateData.get("datasets");
+
+      default:
+        throw new IllegalArgumentException(String.format("Unknown type '%s'", type));
     }
-    return buildEmailEntity(templateData, subject, recipients, alertConfigDTO.getFromAddress(), emailTemplate);
   }
 
   /**
@@ -151,10 +204,12 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
     Map<String, Object> templateData = new HashMap<>();
 
     DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
-    Set<String> metrics = new HashSet<>();
 
-    Set<String> datasets = new HashSet<>();
+    Set<String> metrics = new TreeSet<>();
+    Set<String> datasets = new TreeSet<>();
     List<MergedAnomalyResultDTO> mergedAnomalyResults = new ArrayList<>();
+
+    Map<String, MetricConfigDTO> metricsMap = new TreeMap<>();
 
     // Calculate start and end time of the anomalies
     DateTime startTime = DateTime.now();
@@ -165,6 +220,12 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
         mergedAnomalyResults.add(mergedAnomaly);
         datasets.add(mergedAnomaly.getCollection());
         metrics.add(mergedAnomaly.getMetric());
+
+        MetricConfigDTO metric = this.metricDAO.findByMetricAndDataset(mergedAnomaly.getMetric(), mergedAnomaly.getCollection());
+        if (metric != null) {
+          // NOTE: our stale freemarker version doesn't play nice with non-string keys
+          metricsMap.put(metric.getId().toString(), metric);
+        }
       }
       if (anomalyResult.getStartTime() < startTime.getMillis()) {
         startTime = new DateTime(anomalyResult.getStartTime(), dateTimeZone);
@@ -174,16 +235,18 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       }
     }
 
-    PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(new DummyAlertFilter(),
-        mergedAnomalyResults);
+    PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(new DummyAlertFilter(), mergedAnomalyResults);
 
-    templateData.put("datasets", Joiner.on(", ").join(datasets));
-    templateData.put("timeZone", getTimezoneString(dateTimeZone));
-    templateData.put("dateFormat", new DataReportHelper.DateFormatMethod(timeZone));
+    templateData.put("datasetsCount", datasets.size());
+    templateData.put("datasets", StringUtils.join(datasets, ", "));
+    templateData.put("metricsCount", metrics.size());
+    templateData.put("metrics", StringUtils.join(metrics, ", "));
+    templateData.put("metricsMap", metricsMap);
+    templateData.put("anomalyCount", anomalies.size());
     templateData.put("startTime", getDateString(startTime));
     templateData.put("endTime", getDateString(endTime));
-    templateData.put("anomalyCount", anomalies.size());
-    templateData.put("metricsCount", metrics.size());
+    templateData.put("timeZone", getTimezoneString(dateTimeZone));
+    templateData.put("dateFormat", new DataReportHelper.DateFormatMethod(timeZone));
     templateData.put("notifiedCount", precisionRecallEvaluator.getTotalAlerts());
     templateData.put("feedbackCount", precisionRecallEvaluator.getTotalResponses());
     templateData.put("trueAlertCount", precisionRecallEvaluator.getTrueAnomalies());
@@ -216,13 +279,13 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    * Apply the parameter map to given email template, and format it as EmailEntity
    * @param paramMap
    * @param subject
-   * @param emailRecipients
+   * @param recipients
    * @param fromEmail
    * @param emailTemplate
    * @return
    */
-  public EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject, String emailRecipients,
-      String fromEmail, String emailTemplate) {
+  public EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject,
+      DetectionAlertFilterRecipients recipients, String fromEmail, String emailTemplate) {
     if (Strings.isNullOrEmpty(fromEmail)) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
@@ -252,7 +315,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
 
       emailEntity.setFrom(fromEmail);
-      emailEntity.setTo(EmailUtils.getValidEmailAddresses(emailRecipients));
+      emailEntity.setTo(recipients);
       emailEntity.setSubject(subject);
       email.setHtmlMsg(alertEmailHtml);
       emailEntity.setContent(email);

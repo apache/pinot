@@ -115,6 +115,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numServersQueried")
+  @Override
   public int getNumServersQueried() {
     return _numServersQueried;
   }
@@ -126,6 +127,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numServersResponded")
+  @Override
   public int getNumServersResponded() {
     return _numServersResponded;
   }

@@ -40,6 +40,7 @@ import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -58,7 +59,7 @@ public abstract class ControllerTest {
 
   private static final int DEFAULT_CONTROLLER_PORT = 8998;
   private static final String DEFAULT_DATA_DIR =
-      FileUtils.getTempDirectoryPath() + File.separator + "test-controller-" + System.currentTimeMillis();
+      new File(FileUtils.getTempDirectoryPath(), "test-controller-" + System.currentTimeMillis()).getAbsolutePath();
 
   protected int _controllerPort;
   protected String _controllerBaseApiUrl;
@@ -100,6 +101,7 @@ public abstract class ControllerTest {
     config.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT));
     config.setDataDir(DEFAULT_DATA_DIR);
     config.setZkStr(ZkStarter.DEFAULT_ZK_STR);
+
     return config;
   }
 
@@ -171,6 +173,10 @@ public abstract class ControllerTest {
 
   public static String sendGetRequest(String urlString) throws IOException {
     return constructResponse(new URL(urlString).openStream());
+  }
+
+  public static String sendGetRequestRaw(String urlString) throws IOException {
+    return IOUtils.toString(new URL(urlString).openStream());
   }
 
   public static String sendPostRequest(String urlString, String payload) throws IOException {

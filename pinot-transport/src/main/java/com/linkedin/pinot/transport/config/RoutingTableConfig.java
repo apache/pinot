@@ -18,9 +18,7 @@ package com.linkedin.pinot.transport.config;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
 
 
 /**
@@ -44,10 +42,10 @@ public class RoutingTableConfig {
   private static final String TABLE_NAME = "tableName";
 
   public RoutingTableConfig() {
-    _tableRoutingCfg = new HashMap<String, PerTableRoutingConfig>();
+    _tableRoutingCfg = new HashMap<>();
   }
 
-  public void init(Configuration brokerRoutingConfig) throws ConfigurationException {
+  public void init(Configuration brokerRoutingConfig) {
     _brokerRoutingConfig = brokerRoutingConfig;
     loadConfigs();
   }

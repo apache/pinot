@@ -18,6 +18,7 @@ import DIMENSIONS_TABLE_COLUMNS from 'thirdeye-frontend/shared/dimensionsTableCo
 import _ from 'lodash';
 
 const ROOTCAUSE_TRUNCATION_FRACTION = 0.0001;
+const ROOTCAUSE_VALUE_OTHER = 'OTHER';
 
 export default Component.extend({
   classNames: ['rootcause-metrics'],
@@ -122,6 +123,8 @@ export default Component.extend({
         const baseTotal = this._sum(baseline, name);
 
         Object.keys(current[name]).forEach(value => {
+          if (value === ROOTCAUSE_VALUE_OTHER) { return; }
+
           const urn = appendFilters(metricUrn, [[name, value]]);
           const curr = (current[name] || {})[value] || 0;
           const base = (baseline[name] || {})[value] || 0;

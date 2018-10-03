@@ -497,6 +497,7 @@ public class PinotDataBufferTest {
     }
   }
 
+  @SuppressWarnings("RedundantExplicitClose")
   @Test
   public void testMultipleClose() throws Exception {
     try (PinotDataBuffer buffer = PinotByteBuffer.allocateDirect(BUFFER_SIZE, PinotDataBuffer.NATIVE_ORDER)) {

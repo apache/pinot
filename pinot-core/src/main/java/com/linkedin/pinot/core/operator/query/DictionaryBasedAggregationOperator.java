@@ -70,7 +70,7 @@ public class DictionaryBasedAggregationOperator extends BaseOperator<Intermediat
     for (AggregationFunctionContext aggregationFunctionContext : _aggregationFunctionContexts) {
       AggregationFunction function = aggregationFunctionContext.getAggregationFunction();
       AggregationFunctionType functionType = function.getType();
-      String column = aggregationFunctionContext.getAggregationColumns()[0];
+      String column = aggregationFunctionContext.getColumn();
       Dictionary dictionary = _dictionaryMap.get(column);
       AggregationResultHolder resultHolder;
       switch (functionType) {

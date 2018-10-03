@@ -15,9 +15,18 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+
+
 //This class will be inherited by different classes that compare (e.g., for equality) the input value by the base value
 public abstract class ComparisonFunction {
-  protected String _functionExpression;
+  private final String _functionExpression;
+
+  protected ComparisonFunction(AggregationInfo aggregationInfo) {
+    _functionExpression =
+        AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo).getAggregationColumnName();
+  }
 
   public abstract boolean isComparisonValid(String aggResult);
 

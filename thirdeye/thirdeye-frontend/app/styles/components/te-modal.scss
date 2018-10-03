@@ -60,7 +60,7 @@
     // needed to avoid unscrollable overflow
     max-height: 80vh;
     overflow-x: hidden;
-    overflow-y: scroll;
+    overflow-y: auto;
   }
 
   &__footer {
@@ -99,6 +99,11 @@
   &__tooltip {
     // necessary so that the tooltip is deployed above the modal
     z-index: 10000;
+  }
+
+  &__tooltip-icon {
+    margin-left: 3px;
+    opacity: 0.6;
   }
 
   &__table-header {
@@ -159,4 +164,8 @@
   &__settings {
     margin: $te-spacing--lg;
   }
+}
+
+.te-modal-micro {
+  width: 560px;
 }

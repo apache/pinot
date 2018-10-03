@@ -17,6 +17,7 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.SegmentName;
 import java.util.Collections;
 import java.util.List;
@@ -39,11 +40,11 @@ public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder 
   private boolean _hasLLC;
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
     _realtimeHLCRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
     _realtimeLLCRoutingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
-    _realtimeHLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
-    _realtimeLLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore);
+    _realtimeHLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore, brokerMetrics);
+    _realtimeLLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore, brokerMetrics);
   }
 
   @Override

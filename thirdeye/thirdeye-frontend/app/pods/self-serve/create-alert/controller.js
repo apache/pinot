@@ -281,7 +281,7 @@ export default Controller.extend({
     } = this.getProperties('maxTime', 'selectedFilters', 'selectedDimension', 'selectedGranularity', 'selectedMetricOption');
 
     // Use key properties to derive the metric data url
-    const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension, granularity, id: metric.id });
+    const metricUrl = buildMetricDataUrl({ maxTime, filters, dimension: 'All', granularity, id: metric.id }); // NOTE: avoid dimension explosion - dimension
 
     // Fetch new graph metric data
     // TODO: const metricData = await fetch(metricUrl).then(checkStatus)
@@ -444,7 +444,7 @@ export default Controller.extend({
         'alertGroupNewRecipient',
         'selectedConfigGroup'
       );
-      const hasRecipients = _.has(groupRecipients, 'recipients');
+      const existingRecipients = groupRecipients ? getWithDefault(groupRecipients, 'receiverAddresses.to', []) : [];
       // Any missing required field values?
       for (var field of requiredFields) {
         if (isBlank(this.get(field))) {
@@ -460,7 +460,7 @@ export default Controller.extend({
         isDisabled = true;
       }
       // For alert group email recipients, require presence only if group recipients is empty
-      if (isBlank(alertGroupNewRecipient) && !hasRecipients) {
+      if (isBlank(alertGroupNewRecipient) && !existingRecipients.length) {
         isDisabled = true;
       }
       // Disable after submit clicked
@@ -500,7 +500,7 @@ export default Controller.extend({
     let isEmailPresent = true;
 
     if (this.get('selectedConfigGroup') || this.get('newConfigGroupName')) {
-      isEmailPresent = isPresent(this.get('selectedGroupRecipients')) || isPresent(emailArr);
+      isEmailPresent = isPresent(this.get('selectedGroupToRecipients')) || isPresent(emailArr);
     }
 
     return isEmailPresent;
@@ -736,7 +736,9 @@ export default Controller.extend({
       selectedConfigGroup: null,
       newConfigGroupName: null,
       alertGroupNewRecipient: null,
-      selectedGroupRecipients: null,
+      selectedGroupToRecipients: null,
+      selectedGroupBccRecipients: null,
+      selectedGroupCcRecipients: null,
       isProcessingForm: false,
       isCreateGroupSuccess: false,
       isGroupNameDuplicate: false,
@@ -903,12 +905,16 @@ export default Controller.extend({
      * @return {undefined}
      */
     onSelectConfigGroup(selectedObj) {
-      const emails = selectedObj.recipients || '';
+      const toAddr = ((selectedObj.receiverAddresses || []).to || []).join(", ");
+      const ccAddr = ((selectedObj.receiverAddresses || []).cc || []).join(", ");
+      const bccAddr = ((selectedObj.receiverAddresses || []).bcc || []).join(", ");
       this.setProperties({
         selectedConfigGroup: selectedObj,
         newConfigGroupName: null,
-        isEmptyEmail: isEmpty(emails),
-        selectedGroupRecipients: emails.split(',').filter(e => String(e).trim()).join(', ')
+        isEmptyEmail: isEmpty(toAddr),
+        selectedGroupToRecipients: toAddr,
+        selectedGroupCcRecipients: ccAddr,
+        selectedGroupBccRecipients: bccAddr
       });
       this.prepareFunctions(selectedObj).then(functionData => {
         this.set('selectedGroupFunctions', functionData);
@@ -958,7 +964,9 @@ export default Controller.extend({
       this.setProperties({
         newConfigGroupName: name,
         selectedConfigGroup: null,
-        selectedGroupRecipients: null,
+        selectedGroupToRecipients: null,
+        selectedGroupCcRecipients: null,
+        selectedGroupBccRecipients: null,
         isEmptyEmail: isEmpty(this.get('alertGroupNewRecipient'))
       });
     },
@@ -971,7 +979,7 @@ export default Controller.extend({
      */
     validateAlertEmail(emailInput) {
       const newEmailArr = emailInput.replace(/\s+/g, '').split(',');
-      let existingEmailArr = this.get('selectedGroupRecipients');
+      let existingEmailArr = this.get('selectedGroupToRecipients');
       let cleanEmailArr = [];
       let badEmailArr = [];
       let isDuplicateEmail = false;
@@ -997,7 +1005,7 @@ export default Controller.extend({
         }
         this.setProperties({
           isDuplicateEmail,
-          duplicateEmails: badEmailArr.join()
+          duplicateEmails: badEmailArr.join(", ")
         });
       }
     },

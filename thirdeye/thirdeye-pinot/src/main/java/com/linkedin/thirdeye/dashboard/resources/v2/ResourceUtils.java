@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.google.common.collect.SetMultimap;
@@ -16,6 +32,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -47,14 +64,39 @@ public class ResourceUtils {
    * @param params input of params
    * @return list of params
    */
-
   public static List<String> parseListParams(List<String> params) {
     if (params == null){
       return Collections.emptyList();
     }
-    if(params.size() != 1)
+    if (params.size() != 1)
       return params;
     return Arrays.asList(params.get(0).split(","));
+  }
+
+  /**
+   * Return a list of numeric parameters.
+   * Support both multi-entity notations:
+   * <br/><b>(1) comma-delimited:</b> {@code "ids=1,2"}
+   * <br/><b>(2) multi-param</b> {@code "ids=1&ids=2"}
+   *
+   * @param params input of params
+   * @return list of params
+   */
+  public static List<Long> parseListParamsLong(List<String> params) {
+    if (params == null){
+      return Collections.emptyList();
+    }
+
+    if (params.size() == 1) {
+      params = Arrays.asList(params.get(0).split(","));
+    }
+
+    List<Long> numbers = new ArrayList<>(params.size());
+    for (String p : params) {
+      numbers.add(Long.parseLong(p));
+    }
+
+    return numbers;
   }
 
   /**
@@ -319,7 +361,7 @@ public class ResourceUtils {
       case ANOMALY_NEW_TREND:
         return AnomalyClassificationType.TRUE_POSITIVE;
       case NOT_ANOMALY:
-        return AnomalyClassificationType.TRUE_NEGATIVE;
+        return AnomalyClassificationType.FALSE_POSITIVE;
     }
 
     throw new IllegalStateException(String.format("Could not classify feedback status of anomaly id %d", anomaly.getId()));

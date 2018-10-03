@@ -22,6 +22,15 @@ export default DS.JSONAPISerializer.extend({
     return {
       data
     };
+  },
+
+  /*
+   * serializing the data to send to the api server
+   * https://www.emberjs.com/api/ember-data/3.3/classes/DS.JSONAPISerializer/methods/serialize?anchor=serialize
+   */
+  serialize(snapshot, options) {
+    let json = this._super(...arguments);
+    return json;
   }
 
   /*

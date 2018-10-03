@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.util.TableSizeReader;
@@ -51,6 +52,8 @@ public class TableSize {
   @Inject
   HttpConnectionManager _connectionManager;
 
+  @Inject ControllerMetrics _controllerMetrics;
+
   @GET
   @Path("/tables/{tableName}/size")
   @Produces(MediaType.APPLICATION_JSON)
@@ -66,7 +69,8 @@ public class TableSize {
           @QueryParam("detailed") boolean detailed
   ) {
     TableSizeReader
-        tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
+        tableSizeReader = new TableSizeReader(_executor, _connectionManager,
+        _controllerMetrics, _pinotHelixResourceManager);
     TableSizeReader.TableSizeDetails tableSizeDetails = null;
     try {
       tableSizeDetails = tableSizeReader.getTableSizeDetails(tableName,

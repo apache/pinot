@@ -104,9 +104,13 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     addPhaseTiming(request, phase, nanos, TimeUnit.NANOSECONDS);
   }
 
-  public void addPhaseTiming(String tableName, QP phase, long nanos) {
+  public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {
     String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
-    addValueToTimer(fullTimerName, nanos, TimeUnit.NANOSECONDS);
+    addValueToTimer(fullTimerName, duration, timeUnit);
+  }
+
+  public void addPhaseTiming(String tableName, QP phase, long nanos) {
+    addPhaseTiming(tableName, phase, nanos, TimeUnit.NANOSECONDS);
   }
 
   /**

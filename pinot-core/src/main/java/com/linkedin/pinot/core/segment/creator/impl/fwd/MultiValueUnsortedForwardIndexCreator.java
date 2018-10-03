@@ -15,42 +15,32 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
 import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
-import org.apache.commons.io.FileUtils;
 
 
 public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardIndexCreator {
-  private final File forwardIndexFile;
-  private final FieldSpec spec;
-  private int maxNumberOfBits = 0;
-  private SingleColumnMultiValueWriter mVWriter;
+  private final SingleColumnMultiValueWriter _writer;
 
-  public MultiValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs,
-      int totalNumberOfValues, boolean hasNulls) throws Exception {
-    forwardIndexFile =
-        new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
-    this.spec = spec;
-    FileUtils.touch(forwardIndexFile);
-    maxNumberOfBits = SingleValueUnsortedForwardIndexCreator.getNumOfBits(cardinality);
-    mVWriter = new FixedBitMultiValueWriter(forwardIndexFile, numDocs, totalNumberOfValues, maxNumberOfBits);
+  public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs,
+      int totalNumValues) throws Exception {
+    File indexFile = new File(outputDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+    _writer = new FixedBitMultiValueWriter(indexFile, numDocs, totalNumValues,
+        PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
   }
 
   @Override
-  public void index(int docId, int[] dictionaryIndices) {
-    final int[] entries = Arrays.copyOf(dictionaryIndices, dictionaryIndices.length);
-    Arrays.sort(entries);
-    mVWriter.setIntArray(docId, entries);
+  public void index(int docId, int[] dictIds) {
+    _writer.setIntArray(docId, dictIds);
   }
 
   @Override
   public void close() throws IOException {
-    mVWriter.close();
+    _writer.close();
   }
 }

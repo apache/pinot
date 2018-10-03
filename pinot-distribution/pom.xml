@@ -75,6 +75,10 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-azure-filesystem</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-transport</artifactId>
     </dependency>
     <dependency>

@@ -14,7 +14,7 @@
   }
 
   &--cancel {
-    background-color: white;
+    background-color: #FFF;
     color: #339BC7;
     a {
       color: #339BC7;
@@ -29,7 +29,7 @@
   }
 
   &--muted {
-    background-color: white;
+    background-color: #FFF;
     border-color: app-shade(black, 0.55);
     color: app-shade(black, 0.55);
     a {
@@ -49,20 +49,20 @@
   &--submit {
     margin-left: 4px;
     background-color: $te-blue-7;
-    color: white;
+    color: #FFF;
 
     &:hover,
     &:focus,
     &:active,
     a:hover {
-      color: white;
+      color: #FFF;
       text-decoration: none;
       background-color: $te-blue-8;
     }
   }
 
   &--link {
-    border-color: white;
+    border-color: #FFF;
     color: $te-blue;
     cursor: pointer;
     text-decoration: none;
@@ -71,6 +71,13 @@
       color: $te-blue;
       text-decoration: none;
     }
+  }
+
+  &--link-white {
+    border-color: #FFF;
+    color: #FFF;
+    background-color: inherit;
+    text-decoration: none;
   }
 
   &--outline {

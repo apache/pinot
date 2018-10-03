@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer;
 
 import com.google.common.collect.HashMultimap;
@@ -10,6 +26,7 @@ import com.linkedin.thirdeye.alert.commons.AnomalySource;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.anomalydetection.context.RawAnomalyResult;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
@@ -31,10 +48,10 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RootcauseSessionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -87,7 +104,12 @@ public class DaoTestUtils {
     alertConfigDTO.setActive(true);
     alertConfigDTO.setApplication("test");
     alertConfigDTO.setFromAddress("te@linkedin.com");
-    alertConfigDTO.setRecipients("anomaly@linedin.com");
+
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses("anomaly-to@linedin.com"),
+        EmailUtils.getValidEmailAddresses("anomaly-cc@linedin.com"),
+        EmailUtils.getValidEmailAddresses("anomaly-bcc@linedin.com"));
+    alertConfigDTO.setReceiverAddresses(recipients);
     alertConfigDTO.setCronExpression("0/10 * * * * ?");
     AlertConfigBean.EmailConfig emailConfig = new AlertConfigBean.EmailConfig();
     emailConfig.setAnomalyWatermark(0l);

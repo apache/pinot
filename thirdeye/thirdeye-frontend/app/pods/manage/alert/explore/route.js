@@ -18,11 +18,12 @@ import {
   getWithDefault
 } from '@ember/object';
 import { isPresent, isNone, isBlank } from '@ember/utils';
-import { checkStatus, buildDateEod, toIso } from 'thirdeye-frontend/utils/utils';
 import {
-  splitFilterFragment,
-  toFilterMap
-} from 'thirdeye-frontend/utils/rca-utils';
+  checkStatus,
+  buildDateEod,
+  makeFilterString,
+  toIso
+} from 'thirdeye-frontend/utils/utils';
 import {
   enhanceAnomalies,
   toIdGroups,
@@ -120,6 +121,7 @@ export default Route.extend({
     duration: queryParamsConfig,
     startDate: queryParamsConfig,
     endDate: queryParamsConfig,
+    openReport: queryParamsConfig,
     repRunStatus: queryParamsConfig
   },
 
@@ -127,6 +129,7 @@ export default Route.extend({
    * Make duration service accessible
    */
   durationCache: service('services/duration'),
+  session: service(),
 
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
@@ -178,6 +181,7 @@ export default Route.extend({
           startDate,
           evalUrl,
           endDate,
+          dateParams,
           alertEvalMetrics,
           isReplayDone
         };
@@ -198,6 +202,7 @@ export default Route.extend({
       startDate,
       endDate,
       duration,
+      dateParams,
       alertEvalMetrics
     } = model;
 
@@ -211,8 +216,6 @@ export default Route.extend({
       bucketUnit
     } = alertData;
 
-    const filters = this._makeFilterString(filtersRaw);
-
     // Derive start/end time ranges based on querystring input with fallback on default '1 month'
     const {
       startStamp,
@@ -223,21 +226,20 @@ export default Route.extend({
 
     // Set initial value for metricId for early transition cases
     const config = {
-      filters,
       startStamp,
       endStamp,
       bucketSize,
       bucketUnit,
       baseEnd,
       baseStart,
-      exploreDimensions
+      exploreDimensions,
+      filters: filtersRaw ? makeFilterString(filtersRaw) : ''
     };
 
     // Load endpoints for projected metrics. TODO: consolidate into CP if duplicating this logic
-    const qsParams = `start=${baseStart.utc().format(dateFormat)}&end=${baseEnd.utc().format(dateFormat)}&useNotified=true`;
     const anomalyDataUrl = getAnomalyDataUrl(startStamp, endStamp);
     const metricsUrl = selfServeApiCommon.metricAutoComplete(metricName);
-    const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${qsParams}`;
+    const anomaliesUrl = `/dashboard/anomaly-function/${alertId}/anomalies?${dateParams}&useNotified=true`;
     let anomalyPromiseHash = {
       projectedMttd: 0,
       metricsByName: [],
@@ -274,7 +276,7 @@ export default Route.extend({
           id: metricId,
           filters: config.filters,
           granularity: config.bucketUnit,
-          dimension: config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
+          dimension: 'All' // NOTE: avoid dimension explosion - config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
         })});
       })
       // Catch is not mandatory here due to our error action, but left it to add more context
@@ -395,14 +397,6 @@ export default Route.extend({
       return (metric.name === alertData.metric) && (metric.dataset === alertData.collection);
     }) || { id: 0 };
     return isBlank(metricList) ? 0 : metricId.id;
-  },
-
-  _makeFilterString(filtersRaw) {
-    try {
-      return JSON.stringify(toFilterMap(filtersRaw.split(';').map(splitFilterFragment)));
-    } catch (ignore) {
-      return '';
-    }
   },
 
   /**
@@ -544,10 +538,21 @@ export default Route.extend({
 
   actions: {
     /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+
+    /**
     * Refresh route's model.
     */
     refreshModel() {
-      this.refresh();
+      this.replaceWith({ queryParams: { openReport: false } });
     },
 
     /**

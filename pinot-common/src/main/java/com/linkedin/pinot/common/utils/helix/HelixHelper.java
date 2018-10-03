@@ -47,14 +47,20 @@ import org.slf4j.LoggerFactory;
 
 
 public class HelixHelper {
+  public static final int MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE = 1000;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixHelper.class);
-  private static final int MAX_PARTITION_COUNT_IN_UNCOMPRESSED_IDEAL_STATE = 1000;
+  private static final ZNRecordSerializer ZN_RECORD_SERIALIZER = new ZNRecordSerializer();
 
   private static final String ONLINE = "ONLINE";
   private static final String OFFLINE = "OFFLINE";
 
   public static final String BROKER_RESOURCE = CommonConstants.Helix.BROKER_RESOURCE_INSTANCE;
+
+  public static IdealState cloneIdealState(IdealState idealState) {
+    return new IdealState(
+        (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
+  }
 
   /**
    * Updates the ideal state, retrying if necessary in case of concurrent updates to the ideal state.
@@ -77,9 +83,7 @@ public class HelixHelper {
           // Make a copy of the the idealState above to pass it to the updater
           // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
           // list fields
-          ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
-          IdealState idealStateCopy = new IdealState(
-              (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+          IdealState idealStateCopy = cloneIdealState(idealState);
 
           IdealState updatedIdealState;
           try {
@@ -394,20 +398,46 @@ public class HelixHelper {
     updateIdealState(helixManager, tableNameWithType, updater, DEFAULT_RETRY_POLICY);
   }
 
-  public static List<String> getEnabledInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName,
-      String instanceTag) {
-    List<String> instances = helixAdmin.getInstancesInCluster(helixClusterName);
-    List<String> enabledInstances = new ArrayList<>();
-    for (String instance : instances) {
-      try {
-        InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instance);
-        if (instanceConfig.containsTag(instanceTag) && instanceConfig.getInstanceEnabled()) {
-          enabledInstances.add(instance);
+  /**
+   * Helper method which gets all instances which are enabled and contains the instanceTag
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  public static List<String> getEnabledInstancesWithTag(final HelixManager helixManager, String instanceTag) {
+    return getInstancesWithTag(helixManager, instanceTag, true);
+  }
+
+  /**
+   * Helper method which gets all instances which contain the instanceTag
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  public static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag) {
+    return getInstancesWithTag(helixManager, instanceTag, false);
+  }
+
+  /**
+   * Helper method which fetches all instance configs and applies instanceTag and enabled filtering
+   * @param helixManager
+   * @param instanceTag
+   * @return
+   */
+  private static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag, boolean isEnabled) {
+    HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
+    List<InstanceConfig> instanceConfigs =
+        helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
+
+    List<String> instancesWithTag = new ArrayList<>();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      if (instanceConfig.containsTag(instanceTag)) {
+        if (!isEnabled || (isEnabled && instanceConfig.getInstanceEnabled())) {
+          instancesWithTag.add(instanceConfig.getInstanceName());
         }
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while fetching instance config for instance: {}", instance, e);
       }
     }
-    return enabledInstances;
+    return instancesWithTag;
   }
+
 }

@@ -24,16 +24,11 @@ public class LessEqualComparison extends ComparisonFunction {
   private double _rightValue;
 
   public LessEqualComparison(String rightValue, AggregationInfo aggregationInfo) {
+    super(aggregationInfo);
     try {
       this._rightValue = Double.parseDouble(rightValue);
     } catch (Exception e) {
       LOGGER.info("Exception in creating HAVING clause LESS EQUAL predicate", e);
-    }
-    if (!aggregationInfo.getAggregationParams().get("column").equals("*")) {
-      this._functionExpression =
-          aggregationInfo.getAggregationType() + "_" + aggregationInfo.getAggregationParams().get("column");
-    } else {
-      this._functionExpression = aggregationInfo.getAggregationType() + "_star";
     }
   }
 

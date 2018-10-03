@@ -179,6 +179,7 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
     }
 
     conf = new ControllerConf(configFile);
+    conf.setPinotFSFactoryClasses(null);
     return (validateConfig(conf)) ? conf : null;
   }
 

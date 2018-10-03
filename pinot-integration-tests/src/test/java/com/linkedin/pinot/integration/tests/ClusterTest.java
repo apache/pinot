@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -46,6 +47,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,6 +74,7 @@ import org.testng.Assert;
  * Base class for integration tests that involve a complete Pinot cluster.
  */
 public abstract class ClusterTest extends ControllerTest {
+  private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
   protected final String _clusterName = getHelixClusterName();
@@ -80,6 +83,10 @@ public abstract class ClusterTest extends ControllerTest {
   private List<HelixBrokerStarter> _brokerStarters = new ArrayList<>();
   private List<HelixServerStarter> _serverStarters = new ArrayList<>();
   private List<MinionStarter> _minionStarters = new ArrayList<>();
+
+  protected Schema _schema;
+  protected TableConfig _offlineTableConfig;
+  protected TableConfig _realtimeTableConfig;
 
   protected void startBroker() {
     startBrokers(1);
@@ -100,7 +107,12 @@ public abstract class ClusterTest extends ControllerTest {
       configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
       configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(basePort + i));
       configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
-      configuration.setProperty("pinot.broker.delayShutdownTimeMs", 0);
+      configuration.setProperty(BrokerServerBuilder.DELAY_SHUTDOWN_TIME_MS_CONFIG, 0);
+      // Randomly choose to use connection-pool or single-connection request handler
+      if (RANDOM.nextBoolean()) {
+        configuration.setProperty(BrokerServerBuilder.REQUEST_HANDLER_TYPE_CONFIG,
+            BrokerServerBuilder.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
+      }
       overrideBrokerConf(configuration);
       _brokerStarters.add(BrokerTestUtils.startBroker(_clusterName, zkStr, configuration));
     }
@@ -216,9 +228,14 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void addSchema(File schemaFile, String schemaName) throws Exception {
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort),
-          schemaName, schemaFile);
+    if (!isUsingNewConfigFormat()) {
+      try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+        fileUploadDownloadClient
+            .addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort), schemaName,
+                schemaFile);
+      }
+    } else {
+      _schema = Schema.fromFile(schemaFile);
     }
   }
 
@@ -268,7 +285,12 @@ public abstract class ClusterTest extends ControllerTest {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, taskConfig);
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+
+    if (!isUsingNewConfigFormat()) {
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+    } else {
+      _offlineTableConfig = tableConfig;
+    }
   }
 
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
@@ -277,7 +299,12 @@ public abstract class ClusterTest extends ControllerTest {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, taskConfig);
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
+
+    if (!isUsingNewConfigFormat()) {
+      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
+    } else {
+      _offlineTableConfig = tableConfig;
+    }
   }
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
@@ -299,6 +326,10 @@ public abstract class ClusterTest extends ControllerTest {
   protected void dropOfflineTable(String tableName) throws Exception {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
+  }
+
+  protected boolean isUsingNewConfigFormat() {
+    return false;
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
@@ -377,7 +408,12 @@ public abstract class ClusterTest extends ControllerTest {
         .setStreamConfigs(streamConfigs)
         .setTaskConfig(taskConfig)
         .build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+
+    if (!isUsingNewConfigFormat()) {
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+    } else {
+      _realtimeTableConfig = tableConfig;
+    }
   }
 
   protected void dropRealtimeTable(String tableName) throws Exception {

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  */
 public class TarGzCompressionUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TarGzCompressionUtils.class);
-  public static final String TAR_GZ_FILE_EXTENTION = ".tar.gz";
+  public static final String TAR_GZ_FILE_EXTENSION = ".tar.gz";
 
   /**
    * Creates a tar.gz file at the specified path with the contents of the
@@ -70,8 +70,8 @@ public class TarGzCompressionUtils {
 
   public static String createTarGzOfDirectory(String directoryPath, String tarGzPath, String entryPrefix)
       throws IOException {
-    if (!tarGzPath.endsWith(TAR_GZ_FILE_EXTENTION)) {
-      tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENTION;
+    if (!tarGzPath.endsWith(TAR_GZ_FILE_EXTENSION)) {
+      tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENSION;
     }
     try (
         FileOutputStream fOut = new FileOutputStream(new File(tarGzPath));
@@ -93,7 +93,7 @@ public class TarGzCompressionUtils {
     while (tarGzPath.endsWith("/")) {
       tarGzPath = tarGzPath.substring(0, tarGzPath.length() - 1);
     }
-    tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENTION;
+    tarGzPath = tarGzPath + TAR_GZ_FILE_EXTENSION;
     return createTarGzOfDirectory(directoryPath, tarGzPath);
   }
 

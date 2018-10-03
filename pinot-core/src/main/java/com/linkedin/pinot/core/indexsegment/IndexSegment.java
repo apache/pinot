@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.indexsegment;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import java.util.List;
 import java.util.Set;
@@ -48,19 +47,19 @@ public interface IndexSegment {
   Set<String> getColumnNames();
 
   /**
+   * Returns all of the columns in the segment that are not provided by a virtual column provider.
+   *
+   * @return Set of column names
+   */
+  Set<String> getPhysicalColumnNames();
+
+  /**
    * Returns the {@link DataSource} for the given column.
    *
    * @param columnName Column name
    * @return Data source for the given column
    */
   DataSource getDataSource(String columnName);
-
-  /**
-   * Returns the Star-tree index if it exists, or null if it does not exist.
-   *
-   * @return Star-tree index
-   */
-  StarTree getStarTree();
 
   /**
    * Returns a list of star-trees (V2), or null if there is no star-tree (V2) in the segment.

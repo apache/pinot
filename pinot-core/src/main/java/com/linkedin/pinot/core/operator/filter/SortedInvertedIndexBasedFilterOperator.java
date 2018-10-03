@@ -16,13 +16,9 @@
 package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
-import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import com.linkedin.pinot.core.operator.blocks.FilterBlock;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import java.util.ArrayList;
@@ -49,7 +45,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected BaseFilterBlock getNextBlock() {
+  protected FilterBlock getNextBlock() {
     SortedIndexReader invertedIndex = (SortedIndexReader) _dataSource.getInvertedIndex();
     List<IntPair> pairs = new ArrayList<>();
 
@@ -147,7 +143,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
       pairs = newPairs;
     }
 
-    return new SortedBlock(_dataSource.getOperatorName(), pairs);
+    return new FilterBlock(new SortedDocIdSet(_dataSource.getOperatorName(), pairs));
   }
 
   @Override
@@ -158,38 +154,5 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  public static class SortedBlock extends BaseFilterBlock {
-
-    private List<IntPair> pairs;
-    private SortedDocIdSet sortedDocIdSet;
-    private String datasourceName;
-
-    public SortedBlock(String datasourceName, List<IntPair> pairs) {
-      this.datasourceName = datasourceName;
-      this.pairs = pairs;
-    }
-
-    @Override
-    public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-      sortedDocIdSet = new SortedDocIdSet(datasourceName, pairs);
-      return sortedDocIdSet;
-    }
-
-    @Override
-    public BlockValSet getBlockValueSet() {
-      throw new UnsupportedOperationException("getBlockValueSet not supported in " + this.getClass());
-    }
-
-    @Override
-    public BlockDocIdValueSet getBlockDocIdValueSet() {
-      throw new UnsupportedOperationException("getBlockDocIdValueSet not supported in " + this.getClass());
-    }
-
-    @Override
-    public BlockMetadata getMetadata() {
-      throw new UnsupportedOperationException("getMetadata not supported in " + this.getClass());
-    }
   }
 }

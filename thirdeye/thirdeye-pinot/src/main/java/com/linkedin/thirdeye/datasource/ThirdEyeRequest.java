@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datasource;
 
 import com.google.common.collect.ArrayListMultimap;
@@ -39,6 +55,7 @@ public class ThirdEyeRequest {
   private final List<String> metricNames;
   private final String dataSource;
   private final String requestReference;
+  private final int limit;
 
   private ThirdEyeRequest(String requestReference, ThirdEyeRequestBuilder builder) {
     this.requestReference = requestReference;
@@ -54,6 +71,7 @@ public class ThirdEyeRequest {
     for (MetricFunction metric : metricFunctions) {
       metricNames.add(metric.toString());
     }
+    this.limit = builder.limit;
   }
 
   public static ThirdEyeRequestBuilder newBuilder() {
@@ -102,6 +120,10 @@ public class ThirdEyeRequest {
     return dataSource;
   }
 
+  public int getLimit() {
+    return limit;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -115,13 +137,14 @@ public class ThirdEyeRequest {
         .equals(endTime, that.endTime) && Objects.equals(filterSet, that.filterSet) && Objects.equals(filterClause,
         that.filterClause) && Objects.equals(groupByDimensions, that.groupByDimensions) && Objects.equals(
         groupByTimeGranularity, that.groupByTimeGranularity) && Objects.equals(metricNames, that.metricNames) && Objects
-        .equals(dataSource, that.dataSource) && Objects.equals(requestReference, that.requestReference);
+        .equals(dataSource, that.dataSource) && Objects.equals(requestReference, that.requestReference) &&
+        Objects.equals(requestReference, that.requestReference);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(metricFunctions, startTime, endTime, filterSet, filterClause, groupByDimensions,
-        groupByTimeGranularity, metricNames, dataSource, requestReference);
+        groupByTimeGranularity, metricNames, dataSource, requestReference, limit);
   }
 
   @Override
@@ -129,7 +152,8 @@ public class ThirdEyeRequest {
     return "ThirdEyeRequest{" + "metricFunctions=" + metricFunctions + ", startTime=" + startTime + ", endTime="
         + endTime + ", filterSet=" + filterSet + ", filterClause='" + filterClause + '\'' + ", groupByDimensions="
         + groupByDimensions + ", groupByTimeGranularity=" + groupByTimeGranularity + ", metricNames=" + metricNames
-        + ", dataSource='" + dataSource + '\'' + ", requestReference='" + requestReference + '\'' + '}';
+        + ", dataSource='" + dataSource + '\'' + ", requestReference='" + requestReference + '\'' +
+        ", limit='" + limit + '\'' + '}';
   }
 
   public static class ThirdEyeRequestBuilder {
@@ -143,6 +167,7 @@ public class ThirdEyeRequest {
     private final List<String> groupBy;
     private TimeGranularity groupByTimeGranularity;
     private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;
+    private int limit;
 
     public ThirdEyeRequestBuilder() {
       this.filterSet = LinkedListMultimap.create();
@@ -241,6 +266,11 @@ public class ThirdEyeRequest {
 
     public ThirdEyeRequestBuilder setDataSource(String dataSource) {
       this.dataSource = dataSource;
+      return this;
+    }
+
+    public ThirdEyeRequestBuilder setLimit(int limit) {
+      this.limit = limit;
       return this;
     }
 

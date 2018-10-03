@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.startree.StarTreeBuilderUtils.TreeNode;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import java.io.BufferedOutputStream;
@@ -33,18 +34,14 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -95,7 +92,6 @@ import org.slf4j.LoggerFactory;
  */
 public class OffHeapStarTreeBuilder implements StarTreeBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(OffHeapStarTreeBuilder.class);
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   // If the temporary buffer needed is larger than 500M, use MMAP, otherwise use DIRECT
   private static final long MMAP_SIZE_THRESHOLD = 500_000_000;
@@ -134,19 +130,6 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
 
   // Store data tables that need to be closed in close()
   private final Set<StarTreeDataTable> _dataTablesToClose = new HashSet<>();
-
-  /**
-   * Helper class to represent a tree node.
-   */
-  private static class TreeNode {
-    int _dimensionId = -1;
-    int _dimensionValue = -1;
-    int _childDimensionId = -1;
-    Map<Integer, TreeNode> _children;
-    int _startDocId;
-    int _endDocId;
-    int _aggregatedDocId;
-  }
 
   @Override
   public void init(StarTreeBuilderConfig builderConfig) throws IOException {
@@ -760,7 +743,8 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     updateTree(_rootNode, indexCreationInfoMap);
 
     // Serialize the star tree into a file
-    serializeTree(starTreeFile);
+    StarTreeBuilderUtils.serializeTree(starTreeFile, _rootNode, _dimensionNames.toArray(new String[_numDimensions]),
+        _numNodes);
 
     LOGGER.info("Finish serializing star tree into file: {}", starTreeFile);
   }
@@ -807,151 +791,6 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
     } else {
       throw new IllegalStateException();
     }
-  }
-
-  /**
-   * Helper method to serialize the updated tree into a file.
-   */
-  private void serializeTree(File starTreeFile) throws IOException {
-    int headerSizeInBytes = computeHeaderSizeInBytes();
-    long totalSizeInBytes = headerSizeInBytes + (long) _numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES;
-
-    // Backward-compatible: star-tree file is always little-endian
-    try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(starTreeFile, false, 0, totalSizeInBytes,
-        ByteOrder.LITTLE_ENDIAN, "OffHeapStarTreeBuilder#serializeTree: star-tree buffer")) {
-      long offset = writeHeader(buffer, headerSizeInBytes);
-      Preconditions.checkState(offset == headerSizeInBytes, "Error writing Star Tree file, header size mis-match");
-      writeNodes(buffer, offset);
-    }
-  }
-
-  /**
-   * Helper method to compute size of the header of the star tree in bytes.
-   * <p>The header contains the following fields:
-   * <ul>
-   *   <li>Magic marker (long)</li>
-   *   <li>Size of the header (int)</li>
-   *   <li>Version (int)</li>
-   *   <li>Number of dimensions (int)</li>
-   *   <li>For each dimension, index of the dimension (int), number of bytes in the dimension string (int), and the byte
-   *   array for the string</li>
-   *   <li>Number of nodes in the tree (int)</li>
-   * </ul>
-   */
-  private int computeHeaderSizeInBytes() {
-    // Magic marker (8), version (4), size of header (4) and number of dimensions (4)
-    int headerSizeInBytes = 20;
-
-    for (String dimension : _dimensionNames) {
-      headerSizeInBytes += Integer.BYTES; // For dimension index
-      headerSizeInBytes += Integer.BYTES; // For length of dimension name
-      headerSizeInBytes += dimension.getBytes(UTF_8).length; // For dimension name
-    }
-
-    headerSizeInBytes += Integer.BYTES; // For number of nodes.
-    return headerSizeInBytes;
-  }
-
-  /**
-   * Helper method to write the header into the data buffer.
-   */
-  private long writeHeader(PinotDataBuffer dataBuffer, int headerSizeInBytes) {
-    long offset = 0L;
-
-    dataBuffer.putLong(offset, OffHeapStarTree.MAGIC_MARKER);
-    offset += Long.BYTES;
-
-    dataBuffer.putInt(offset, OffHeapStarTree.VERSION);
-    offset += Integer.BYTES;
-
-    dataBuffer.putInt(offset, headerSizeInBytes);
-    offset += Integer.BYTES;
-
-    dataBuffer.putInt(offset, _numDimensions);
-    offset += Integer.BYTES;
-
-    for (int i = 0; i < _numDimensions; i++) {
-      String dimensionName = _dimensionNames.get(i);
-
-      dataBuffer.putInt(offset, i);
-      offset += Integer.BYTES;
-
-      byte[] dimensionBytes = dimensionName.getBytes(UTF_8);
-      int dimensionLength = dimensionBytes.length;
-      dataBuffer.putInt(offset, dimensionLength);
-      offset += Integer.BYTES;
-
-      dataBuffer.readFrom(offset, dimensionBytes, 0, dimensionLength);
-      offset += dimensionLength;
-    }
-
-    dataBuffer.putInt(offset, _numNodes);
-    offset += Integer.BYTES;
-
-    return offset;
-  }
-
-  /**
-   * Helper method to write the star tree nodes into the data buffer.
-   */
-  private void writeNodes(PinotDataBuffer dataBuffer, long offset) {
-    int index = 0;
-    Queue<TreeNode> queue = new LinkedList<>();
-    queue.add(_rootNode);
-
-    while (!queue.isEmpty()) {
-      TreeNode node = queue.remove();
-
-      if (node._children == null) {
-        // Leaf node
-
-        offset =
-            writeNode(dataBuffer, node, offset, OffHeapStarTreeNode.INVALID_INDEX, OffHeapStarTreeNode.INVALID_INDEX);
-      } else {
-        // Non-leaf node
-
-        // Get a list of children nodes sorted on the dimension value
-        List<TreeNode> sortedChildren = new ArrayList<>(node._children.values());
-        sortedChildren.sort((o1, o2) -> Integer.compare(o1._dimensionValue, o2._dimensionValue));
-
-        int startChildrenIndex = index + queue.size() + 1;
-        int endChildrenIndex = startChildrenIndex + sortedChildren.size() - 1;
-        offset = writeNode(dataBuffer, node, offset, startChildrenIndex, endChildrenIndex);
-
-        queue.addAll(sortedChildren);
-      }
-
-      index++;
-    }
-  }
-
-  /**
-   * Helper method to write one node into the data buffer.
-   */
-  private static long writeNode(PinotDataBuffer dataBuffer, TreeNode node, long offset, int startChildrenIndex,
-      int endChildrenIndex) {
-    dataBuffer.putInt(offset, node._dimensionId);
-    offset += Integer.BYTES;
-
-    dataBuffer.putInt(offset, node._dimensionValue);
-    offset += Integer.BYTES;
-
-    dataBuffer.putInt(offset, node._startDocId);
-    offset += Integer.BYTES;
-
-    dataBuffer.putInt(offset, node._endDocId);
-    offset += Integer.BYTES;
-
-    dataBuffer.putInt(offset, node._aggregatedDocId);
-    offset += Integer.BYTES;
-
-    dataBuffer.putInt(offset, startChildrenIndex);
-    offset += Integer.BYTES;
-
-    dataBuffer.putInt(offset, endChildrenIndex);
-    offset += Integer.BYTES;
-
-    return offset;
   }
 
   @Override

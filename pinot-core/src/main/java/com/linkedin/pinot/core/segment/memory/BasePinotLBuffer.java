@@ -19,10 +19,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import javax.annotation.concurrent.ThreadSafe;
 import xerial.larray.buffer.LBuffer;
 import xerial.larray.buffer.LBufferAPI;
+import xerial.larray.buffer.WrappedLBuffer;
 import xerial.larray.mmap.MMapBuffer;
 
 
@@ -121,6 +123,24 @@ public abstract class BasePinotLBuffer extends PinotDataBuffer {
     } else {
       return _buffer.size();
     }
+  }
+
+  @Override
+  public PinotDataBuffer view(long start, long end, ByteOrder byteOrder) {
+    if (byteOrder == NATIVE_ORDER) {
+      // Workaround to handle cases where offset is not page-aligned or view of view
+      return new PinotNativeOrderLBuffer(
+          new WrappedLBuffer(_buffer.m, start + _buffer.address() - _buffer.m.address(), end - start), false, false);
+    } else {
+      // Workaround to handle cases where offset is not page-aligned or view of view
+      return new PinotNonNativeOrderLBuffer(
+          new WrappedLBuffer(_buffer.m, start + _buffer.address() - _buffer.m.address(), end - start), false, false);
+    }
+  }
+
+  @Override
+  public ByteBuffer toDirectByteBuffer(long offset, int size, ByteOrder byteOrder) {
+    return _buffer.toDirectByteBuffer(offset, size).order(byteOrder);
   }
 
   @Override

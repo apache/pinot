@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.filter.predicate;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.HashUtil;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -84,7 +85,7 @@ public class NotInPredicateEvaluatorFactory {
 
     DictionaryBasedNotInPredicateEvaluator(NotInPredicate notInPredicate, Dictionary dictionary) {
       String[] values = notInPredicate.getValues();
-      _nonMatchingDictIdSet = new IntOpenHashSet(values.length);
+      _nonMatchingDictIdSet = new IntOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         int dictId = dictionary.indexOf(value);
         if (dictId >= 0) {
@@ -125,6 +126,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumNonMatchingDictIds() {
+      return _nonMatchingDictIdSet.size();
+    }
+
+    @Override
     public int[] getNonMatchingDictIds() {
       if (_nonMatchingDictIds == null) {
         _nonMatchingDictIds = _nonMatchingDictIdSet.toIntArray();
@@ -138,7 +144,7 @@ public class NotInPredicateEvaluatorFactory {
 
     IntRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
       String[] values = notInPredicate.getValues();
-      _nonMatchingValues = new IntOpenHashSet(values.length);
+      _nonMatchingValues = new IntOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         _nonMatchingValues.add(Integer.parseInt(value));
       }
@@ -182,7 +188,7 @@ public class NotInPredicateEvaluatorFactory {
 
     FloatRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
       String[] values = notInPredicate.getValues();
-      _nonMatchingValues = new FloatOpenHashSet(values.length);
+      _nonMatchingValues = new FloatOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         _nonMatchingValues.add(Float.parseFloat(value));
       }
@@ -204,7 +210,7 @@ public class NotInPredicateEvaluatorFactory {
 
     DoubleRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
       String[] values = notInPredicate.getValues();
-      _nonMatchingValues = new DoubleOpenHashSet(values.length);
+      _nonMatchingValues = new DoubleOpenHashSet(HashUtil.getMinHashSetSize(values.length));
       for (String value : values) {
         _nonMatchingValues.add(Double.parseDouble(value));
       }
@@ -226,7 +232,7 @@ public class NotInPredicateEvaluatorFactory {
 
     StringRawValueBasedNotInPredicateEvaluator(NotInPredicate notInPredicate) {
       String[] values = notInPredicate.getValues();
-      _nonMatchingValues = new HashSet<>(values.length);
+      _nonMatchingValues = new HashSet<>(HashUtil.getMinHashSetSize(values.length));
       Collections.addAll(_nonMatchingValues, values);
     }
 

@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Preconditions;
@@ -5,8 +21,8 @@ import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
+import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
+import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalySummary;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -236,13 +252,14 @@ public class UserDashboardResource {
     //
     List<AnomalySummary> output = new ArrayList<>();
     for (MergedAnomalyResultDTO anomaly : anomalies) {
+      long metricId = this.getMetricId(anomaly);
+
       AnomalySummary summary = new AnomalySummary();
       summary.setId(anomaly.getId());
       summary.setStart(anomaly.getStartTime());
       summary.setEnd(anomaly.getEndTime());
       summary.setCurrent(anomaly.getAvgCurrentVal());
       summary.setBaseline(anomaly.getAvgBaselineVal());
-      summary.setMetricId(getMetricId(anomaly));
 
       summary.setFunctionId(-1);
       if (anomaly.getFunctionId() != null) {
@@ -263,7 +280,11 @@ public class UserDashboardResource {
       summary.setMetricName(anomaly.getMetric());
       summary.setDimensions(anomaly.getDimensions());
       summary.setDataset(anomaly.getCollection());
-//      summary.setMetricUrn(this.getMetricUrn(anomaly));
+      summary.setMetricId(metricId);
+
+      if (metricId > 0) {
+        summary.setMetricUrn(this.getMetricUrn(anomaly));
+      }
 
       // TODO use alert filter if necessary
       summary.setSeverity(Math.abs(anomaly.getWeight()));
@@ -277,6 +298,7 @@ public class UserDashboardResource {
       }
 
       summary.setClassification(ResourceUtils.getStatusClassification(anomaly));
+      summary.setSource(anomaly.getAnomalyResultSource());
 
       output.add(summary);
     }

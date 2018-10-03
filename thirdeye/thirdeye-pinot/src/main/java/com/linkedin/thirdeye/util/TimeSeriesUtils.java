@@ -1,9 +1,28 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.util;
 
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.TreeMap;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,9 +67,22 @@ public class TimeSeriesUtils {
     List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();
     List<Double> observedValues = anomalyTimelinesView.getCurrentValues();
     List<Double> expectedValues = anomalyTimelinesView.getBaselineValues();
+    TreeMap<TimeBucket, Tuple2<Double, Double>> sortedView = new TreeMap<>(new Comparator<TimeBucket>() {
+      @Override
+      public int compare(TimeBucket o1, TimeBucket o2) {
+        return Long.compare(o1.getCurrentStart(), o2.getCurrentStart());
+      }
+    });
     for (int i = 0; i < timeBuckets.size(); i++) {
-      observed.set(timeBuckets.get(i).getCurrentStart(), observedValues.get(i));
-      expected.set(timeBuckets.get(i).getCurrentStart(), expectedValues.get(i));
+      sortedView.put(timeBuckets.get(i), new Tuple2<>(observedValues.get(i), expectedValues.get(i)));
+    }
+
+    timeBuckets = new ArrayList<>(sortedView.navigableKeySet());
+
+    for (TimeBucket timeBucket : timeBuckets) {
+      Tuple2<Double, Double> values = sortedView.get(timeBucket);
+      observed.set(timeBucket.getCurrentStart(), values._1);
+      expected.set(timeBucket.getCurrentStart(), values._2);
     }
     observed.setTimeSeriesInterval(
         new Interval(timeBuckets.get(0).getCurrentStart(), timeBuckets.get(timeBuckets.size()- 1).getCurrentEnd()));

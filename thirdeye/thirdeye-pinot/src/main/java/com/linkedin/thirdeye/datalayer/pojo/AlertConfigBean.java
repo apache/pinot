@@ -1,7 +1,24 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.alert.commons.AnomalyFeedConfig;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -13,6 +30,12 @@ import org.eclipse.jetty.util.StringUtil;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertConfigBean extends AbstractBean {
+  public enum SubjectType {
+    ALERT,
+    METRICS,
+    DATASETS
+  }
+
   String name;
   String application;
   String cronExpression;
@@ -23,8 +46,9 @@ public class AlertConfigBean extends AbstractBean {
   ReportConfigCollection reportConfigCollection;
   AlertGroupConfig alertGroupConfig;
   EmailFormatterConfig emailFormatterConfig;
-  String recipients;
+  DetectionAlertFilterRecipients receiverAddresses;
   String fromAddress;
+  SubjectType subjectType = SubjectType.ALERT;
 
   public String getApplication() {
     return application;
@@ -46,12 +70,12 @@ public class AlertConfigBean extends AbstractBean {
     this.fromAddress = fromAddress;
   }
 
-  public String getRecipients() {
-    return recipients;
+  public DetectionAlertFilterRecipients getReceiverAddresses() {
+    return receiverAddresses;
   }
 
-  public void setRecipients(String recipients) {
-    this.recipients = recipients;
+  public void setReceiverAddresses(DetectionAlertFilterRecipients receiverAddresses) {
+    this.receiverAddresses = receiverAddresses;
   }
 
   public void setCronExpression(String cronExpression) {
@@ -122,6 +146,13 @@ public class AlertConfigBean extends AbstractBean {
     this.emailFormatterConfig = emailFormatterConfig;
   }
 
+  public SubjectType getSubjectType() {
+    return subjectType;
+  }
+
+  public void setSubjectType(SubjectType subjectType) {
+    this.subjectType = subjectType;
+  }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class EmailConfig {
@@ -349,13 +380,13 @@ public class AlertConfigBean extends AbstractBean {
         .equals(getReportConfigCollection(), that.getReportConfigCollection()) && Objects
         .equals(getAlertGroupConfig(), that.getAlertGroupConfig()) && Objects
         .equals(getEmailFormatterConfig(), that.getEmailFormatterConfig()) && Objects
-        .equals(getRecipients(), that.getRecipients()) && Objects.equals(getFromAddress(), that.getFromAddress());
+        .equals(getReceiverAddresses(), that.getReceiverAddresses()) && Objects.equals(getFromAddress(), that.getFromAddress());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getName(), getApplication(), getCronExpression(), getHolidayCronExpression(), isActive(),
         getAnomalyFeedConfig(), getEmailConfig(), getReportConfigCollection(), getAlertGroupConfig(),
-        getEmailFormatterConfig(), getRecipients(), getFromAddress());
+        getEmailFormatterConfig(), getReceiverAddresses(), getFromAddress());
   }
 }

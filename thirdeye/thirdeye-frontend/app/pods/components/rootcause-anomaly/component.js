@@ -18,7 +18,7 @@ import { equal, reads } from '@ember/object/computed';
 
 const ROOTCAUSE_HIDDEN_DEFAULT = 'default';
 
-const OFFSETS = ['current', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
+const OFFSETS = ['current', 'predicted', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
 
 /**
  * Maps the status from the db to something human readable to display on the form
@@ -144,9 +144,15 @@ export default Component.extend({
 
   /**
    * Anomaly baseline as computed by anomaly function
-   * @type {Float}
+   * @type {float}
    */
   predicted: reads('anomaly.attributes.baseline.firstObject'),
+
+  /**
+   * Anomaly aggregate multiplier
+   * @type {float}
+   */
+  aggregateMultiplier: reads('anomaly.attributes.aggregateMultiplier.firstObject'),
 
   /**
    * Anomaly unique identifier
@@ -280,16 +286,27 @@ export default Component.extend({
         const value = this._getAggregate(offset);
         const change = curr / value - 1;
 
-        anomalyInfo[offset] = {
-          value: humanizeFloat(value), // numerical value to display
-          change: humanizeChange(change), // text of % change with + or - sign
-          direction: toColorDirection(change, isInverse(metricUrn, entities))
-        };
+        if (!Number.isNaN(value)) {
+          anomalyInfo[offset] = {
+            value: humanizeFloat(value), // numerical value to display
+            change: humanizeChange(change), // text of % change with + or - sign
+            direction: toColorDirection(change, isInverse(metricUrn, entities))
+          };
+        }
       });
 
       return anomalyInfo;
     }
   ),
+
+  /**
+   * Returns any offset that has associated current and change values
+   * @type {Array}
+   */
+  availableOffsets: computed('offsets', 'anomalyInfo', function () {
+    const { offsets, anomalyInfo } = getProperties(this, 'offsets', 'anomalyInfo');
+    return offsets.filter(offset => offset in anomalyInfo);
+  }),
 
   /**
    * Returns the aggregate value for a given offset. Handles computed baseline special case.
@@ -299,13 +316,16 @@ export default Component.extend({
    * @private
    */
   _getAggregate(offset) {
-    const { metricUrn, aggregates, predicted } = getProperties(this, 'metricUrn', 'aggregates', 'predicted');
+    const { metricUrn, aggregates, predicted, aggregateMultiplier } =
+      getProperties(this, 'metricUrn', 'aggregates', 'predicted', 'aggregateMultiplier');
 
     if (offset === 'predicted') {
-      return parseFloat(predicted);
+      const value = parseFloat(predicted);
+      if (value === 0.0) { return Number.NaN; }
+      return value;
     }
 
-    return aggregates[toOffsetUrn(metricUrn, offset)];
+    return aggregates[toOffsetUrn(metricUrn, offset)] * (aggregateMultiplier || 1.0);
   },
 
   actions: {

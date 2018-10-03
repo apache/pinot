@@ -62,6 +62,16 @@ public interface BrokerResponse {
       throws Exception;
 
   /**
+   * Returns the number of servers queried.
+   */
+  int getNumServersQueried();
+
+  /**
+   * Returns the number of servers responded.
+   */
+  int getNumServersResponded();
+
+  /**
    * Get number of documents scanned while processing the query.
    */
   long getNumDocsScanned();

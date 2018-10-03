@@ -1,12 +1,28 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.alert.filter;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilter;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,11 +41,18 @@ import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
 
 public class ToAllRecipientsDetectionAlertFilterTest {
 
-  private static final String PROP_RECIPIENTS = "recipients";
-  private static final Set<String> PROP_RECIPIENTS_VALUE = new HashSet<>(Arrays.asList("test@test.com", "test@test.org"));
+  private static final String PROP_TO = "to";
+  private static final String PROP_CC = "cc";
+  private static final String PROP_BCC = "bcc";
+  private static final Set<String> PROP_TO_VALUE = new HashSet<>(Arrays.asList("test@test.com", "test@test.org"));
+  private static final Set<String> PROP_CC_VALUE = new HashSet<>(Arrays.asList("cctest@test.com", "cctest@test.org"));
+  private static final Set<String> PROP_BCC_VALUE = new HashSet<>(Arrays.asList("bcctest@test.com", "bcctest@test.org"));
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final List<Long> PROP_ID_VALUE = Arrays.asList(1001L, 1002L);
   private static final String PROP_SEND_ONCE = "sendOnce";
+
+  private static final DetectionAlertFilterRecipients RECIPIENTS = new DetectionAlertFilterRecipients(
+      new HashSet<>(PROP_TO_VALUE), new HashSet<>(PROP_CC_VALUE), new HashSet<>(PROP_BCC_VALUE));
 
   private DetectionAlertFilter alertFilter;
   private List<MergedAnomalyResultDTO> detectedAnomalies;
@@ -53,7 +76,9 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     this.alertConfig = new DetectionAlertConfigDTO();
 
     this.properties = new HashMap<>();
-    this.properties.put(PROP_RECIPIENTS, PROP_RECIPIENTS_VALUE);
+    this.properties.put(PROP_TO, PROP_TO_VALUE);
+    this.properties.put(PROP_CC, PROP_CC_VALUE);
+    this.properties.put(PROP_BCC, PROP_BCC_VALUE);
     this.properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
 
     this.alertConfig.setProperties(properties);
@@ -68,7 +93,7 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getResult().get(PROP_RECIPIENTS_VALUE), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
+    Assert.assertEquals(result.getResult().get(RECIPIENTS), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
   }
 
   @Test
@@ -97,11 +122,11 @@ public class ToAllRecipientsDetectionAlertFilterTest {
 
     DetectionAlertFilterResult result = this.alertFilter.run();
     Assert.assertEquals(result.getResult().size(), 1);
-    Assert.assertTrue(result.getResult().containsKey(PROP_RECIPIENTS_VALUE));
-    Assert.assertEquals(result.getResult().get(PROP_RECIPIENTS_VALUE).size(), 3);
-    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(this.detectedAnomalies.get(5)));
-    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(anomalyWithoutFeedback));
-    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(anomalyWithNull));
+    Assert.assertTrue(result.getResult().containsKey(RECIPIENTS));
+    Assert.assertEquals(result.getResult().get(RECIPIENTS).size(), 3);
+    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(this.detectedAnomalies.get(5)));
+    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(anomalyWithoutFeedback));
+    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(anomalyWithNull));
   }
 
   @Test
@@ -126,8 +151,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getResult().get(PROP_RECIPIENTS_VALUE).size(), 1);
-    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(existingFuture));
+    Assert.assertEquals(result.getResult().get(RECIPIENTS).size(), 1);
+    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(existingFuture));
   }
 
   @Test
@@ -153,9 +178,8 @@ public class ToAllRecipientsDetectionAlertFilterTest {
     this.alertFilter = new ToAllRecipientsDetectionAlertFilter(this.provider, this.alertConfig,2500L);
 
     DetectionAlertFilterResult result = this.alertFilter.run();
-    Assert.assertEquals(result.getResult().get(PROP_RECIPIENTS_VALUE).size(), 2);
-    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(existingNew));
-    Assert.assertTrue(result.getResult().get(PROP_RECIPIENTS_VALUE).contains(existingFuture));
+    Assert.assertEquals(result.getResult().get(RECIPIENTS).size(), 2);
+    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(existingNew));
+    Assert.assertTrue(result.getResult().get(RECIPIENTS).contains(existingFuture));
   }
-
 }

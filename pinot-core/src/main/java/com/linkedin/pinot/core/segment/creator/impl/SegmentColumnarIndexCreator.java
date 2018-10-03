@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexCreator;
@@ -120,14 +121,17 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     // Initialize creators for dictionary, forward index and inverted index
     for (FieldSpec fieldSpec : fieldSpecs) {
       String columnName = fieldSpec.getName();
+
+      // Ignore virtual columns
+      if (schema.isVirtualColumn(columnName)) {
+        continue;
+      }
+
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(columnName);
       Preconditions.checkNotNull(indexCreationInfo, "Missing index creation info for column: %s", columnName);
 
       if (createDictionaryForColumn(indexCreationInfo, segmentCreationSpec, fieldSpec)) {
         // Create dictionary-encoded index
-
-        // TODO: hasNulls is always false, for null value we replace it with default null value
-        boolean hasNulls = indexCreationInfo.hasNulls();
 
         // Initialize dictionary creator
         SegmentDictionaryCreator dictionaryCreator =
@@ -148,16 +152,15 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         if (fieldSpec.isSingleValueField()) {
           if (indexCreationInfo.isSorted()) {
             _forwardIndexCreatorMap.put(columnName,
-                new SingleValueSortedForwardIndexCreator(_indexDir, cardinality, fieldSpec));
+                new SingleValueSortedForwardIndexCreator(_indexDir, columnName, cardinality));
           } else {
             _forwardIndexCreatorMap.put(columnName,
-                new SingleValueUnsortedForwardIndexCreator(fieldSpec, _indexDir, cardinality, totalDocs, totalDocs,
-                    hasNulls));
+                new SingleValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, totalDocs));
           }
         } else {
           _forwardIndexCreatorMap.put(columnName,
-              new MultiValueUnsortedForwardIndexCreator(fieldSpec, _indexDir, cardinality, totalDocs,
-                  indexCreationInfo.getTotalNumberOfEntries(), hasNulls));
+              new MultiValueUnsortedForwardIndexCreator(_indexDir, columnName, cardinality, totalDocs,
+                  indexCreationInfo.getTotalNumberOfEntries()));
         }
 
         // Initialize inverted index creator
@@ -398,14 +401,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo, int totalDocs, int totalRawDocs, int totalAggDocs,
       FieldSpec fieldSpec, boolean hasDictionary, int dictionaryElementSize, boolean hasInvertedIndex,
       String hllOriginColumn) {
-    int distinctValueCount = columnIndexCreationInfo.getDistinctValueCount();
-    properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(distinctValueCount));
+    int cardinality = columnIndexCreationInfo.getDistinctValueCount();
+    properties.setProperty(getKeyFor(column, CARDINALITY), String.valueOf(cardinality));
     properties.setProperty(getKeyFor(column, TOTAL_DOCS), String.valueOf(totalDocs));
     properties.setProperty(getKeyFor(column, TOTAL_RAW_DOCS), String.valueOf(totalRawDocs));
     properties.setProperty(getKeyFor(column, TOTAL_AGG_DOCS), String.valueOf(totalAggDocs));
     properties.setProperty(getKeyFor(column, DATA_TYPE), String.valueOf(fieldSpec.getDataType()));
     properties.setProperty(getKeyFor(column, BITS_PER_ELEMENT),
-        String.valueOf(SingleValueUnsortedForwardIndexCreator.getNumOfBits(distinctValueCount)));
+        String.valueOf(PinotDataBitSet.getNumBitsPerValue(cardinality - 1)));
     properties.setProperty(getKeyFor(column, DICTIONARY_ELEMENT_SIZE), String.valueOf(dictionaryElementSize));
     properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldSpec.getFieldType()));
     properties.setProperty(getKeyFor(column, IS_SORTED), String.valueOf(columnIndexCreationInfo.isSorted()));

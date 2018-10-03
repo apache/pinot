@@ -1,26 +1,29 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datasource.pinot;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ExecutionException;
-
-import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.joda.time.Period;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.base.Joiner;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -29,18 +32,47 @@ import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean.DimensionAsMetricPr
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Util class for generated PQL queries (pinot).
  */
 public class PqlUtils {
   private static final Joiner AND = Joiner.on(" AND ");
-  private static final Joiner COMMA = Joiner.on(",");
+  private static final Joiner COMMA = Joiner.on(", ");
 
-  private static final String PREFIX_EXCLUDE = "!";
+  private static final String PREFIX_NOT_EQUALS = "!";
+  private static final String PREFIX_LESS_THAN = "<";
+  private static final String PREFIX_LESS_THAN_EQUALS = "<=";
+  private static final String PREFIX_GREATER_THAN = ">";
+  private static final String PREFIX_GREATER_THAN_EQUALS = ">=";
+
+  private static final String OPERATOR_EQUALS = "IN";
+  private static final String OPERATOR_NOT_EQUALS = "NOT IN";
+  private static final String OPERATOR_LESS_THAN = "<";
+  private static final String OPERATOR_LESS_THAN_EQUALS = "<=";
+  private static final String OPERATOR_GREATER_THAN = ">";
+  private static final String OPERATOR_GREATER_THAN_EQUALS = ">=";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
   private static final int DEFAULT_TOP = 100000;
+  private static final String PERCENTILE_TDIGEST_PREFIX = "percentileTDigest";
 
 
   /**
@@ -54,13 +86,13 @@ public class PqlUtils {
     // TODO handle request.getFilterClause()
 
     return getPql(metricFunction, request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
-        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec);
+        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec, request.getLimit());
   }
 
 
   private static String getPql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec) throws ExecutionException {
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, int limit) throws ExecutionException {
 
     MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricFunction.getMetricId());
     String dataset = metricFunction.getDataset();
@@ -79,10 +111,14 @@ public class PqlUtils {
       sb.append(" AND ").append(dimensionWhereClause);
     }
 
+    if (limit <= 0) {
+      limit = DEFAULT_TOP;
+    }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      sb.append(" TOP ").append(DEFAULT_TOP);
+      sb.append(" TOP ").append(limit);
     }
 
     return sb.toString();
@@ -96,7 +132,7 @@ public class PqlUtils {
     } else {
       metricName = metricConfig.getName();
     }
-    builder.append(metricFunction.getFunctionName()).append("(").append(metricName).append(")");
+    builder.append(convertAggFunction(metricFunction.getFunctionName())).append("(").append(metricName).append(")");
     return builder.toString();
   }
 
@@ -140,7 +176,7 @@ public class PqlUtils {
     String dimensionAsMetricPql = getDimensionAsMetricPql(metricFunction,
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), filterSet,
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
-        metricNamesList, metricNamesColumnsList, metricValuesColumn);
+        metricNamesList, metricNamesColumnsList, metricValuesColumn, request.getLimit());
 
     return dimensionAsMetricPql;
   }
@@ -148,8 +184,8 @@ public class PqlUtils {
 
   private static String getDimensionAsMetricPql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec,
-      List<String> metricNames, List<String> metricNamesColumns, String metricValuesColumn)
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, List<String> metricNames, List<String> metricNamesColumns,
+      String metricValuesColumn, int limit)
           throws ExecutionException {
 
     MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
@@ -172,10 +208,14 @@ public class PqlUtils {
       sb.append(" AND ").append(dimensionWhereClause);
     }
 
+    if (limit <= 0) {
+      limit = DEFAULT_TOP;
+    }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
-      sb.append(" TOP ").append(DEFAULT_TOP);
+      sb.append(" TOP ").append(limit);
     }
 
     return sb.toString();
@@ -244,7 +284,21 @@ public class PqlUtils {
     return String.format(" %s >= %s AND %s < %s", timeField, startUnits, timeField, endUnits);
   }
 
-  private static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
+  /**
+   * Generates PQL WHERE clause for a given filter map. The supported operation are:
+   * <pre>
+   *   key, value (equals, <b>OR</b> semantics)
+   *   key, !value (not equals, AND semantics)
+   *   key, &gt;value (greater than, AND semantics)
+   *   key, &gt;=value (greater than or equal, AND semantics)
+   *   key, &lt;value (less than, AND semantics)
+   *   key, &lt;=value (less than or equal, AND semantics)
+   * </pre>
+   *
+   * @param dimensionValues multimap of filters
+   * @return where-clause string
+   */
+  static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
     List<String> components = new ArrayList<>();
     for (Map.Entry<String, Collection<String>> entry : dimensionValues.asMap().entrySet()) {
       String key = entry.getKey();
@@ -253,28 +307,43 @@ public class PqlUtils {
         continue;
       }
 
-      List<String> include = new ArrayList<>();
-      List<String> exclude = new ArrayList<>();
+      // tokenize
+      Set<String> greaterThanEquals = filter(values, PREFIX_GREATER_THAN_EQUALS);
+      Set<String> greaterThan = filter(values, PREFIX_GREATER_THAN);
+      Set<String> lessThanEquals = filter(values, PREFIX_LESS_THAN_EQUALS);
+      Set<String> lessThen = filter(values, PREFIX_LESS_THAN);
+      Set<String> notEquals = filter(values, PREFIX_NOT_EQUALS);
+      Set<String> equals = new HashSet<>(values);
 
-      for (String value : values) {
-        if (value.startsWith(PREFIX_EXCLUDE)) {
-          exclude.add(quote(value.substring(PREFIX_EXCLUDE.length())));
-        } else {
-          include.add(quote(value));
-        }
-      }
+      // resolve ambiguity
+      greaterThan.removeAll(greaterThanEquals);
+      lessThen.removeAll(lessThanEquals);
+      equals.removeAll(greaterThanEquals);
+      equals.removeAll(greaterThan);
+      equals.removeAll(lessThanEquals);
+      equals.removeAll(lessThen);
+      equals.removeAll(notEquals);
 
-      if (!include.isEmpty()) {
-        components.add(String.format("%s IN (%s)", key, COMMA.join(include)));
+      // create components
+      if (!equals.isEmpty()) {
+        components.add(makeComponentGrouped(key, OPERATOR_EQUALS, equals));
       }
+      if (!notEquals.isEmpty()) {
+        components.add(makeComponentGrouped(key, OPERATOR_NOT_EQUALS, tokenize(PREFIX_NOT_EQUALS, notEquals)));
+      }
+      components.addAll(makeComponents(key, OPERATOR_GREATER_THAN, tokenize(PREFIX_GREATER_THAN, greaterThan)));
+      components.addAll(makeComponents(key, OPERATOR_GREATER_THAN_EQUALS, tokenize(PREFIX_GREATER_THAN_EQUALS, greaterThanEquals)));
+      components.addAll(makeComponents(key, OPERATOR_LESS_THAN, tokenize(PREFIX_LESS_THAN, lessThen)));
+      components.addAll(makeComponents(key, OPERATOR_LESS_THAN_EQUALS, tokenize(PREFIX_LESS_THAN_EQUALS, lessThanEquals)));
 
-      if (!exclude.isEmpty()) {
-        components.add(String.format("%s NOT IN (%s)", key, COMMA.join(exclude)));
-      }
     }
+
     if (components.isEmpty()) {
       return null;
     }
+
+    Collections.sort(components);
+
     return AND.join(components);
   }
 
@@ -300,20 +369,126 @@ public class PqlUtils {
   }
 
   /**
-   * Surrounds a value with quote characters that are not contained in the value itself.
+   * Surrounds a value with appropriate quote characters.
    *
    * @param value value to be quoted
    * @return quoted value
    * @throws IllegalArgumentException if no unused quote char can be found
    */
-  private static String quote(String value) {
-    String quoteChar = "\"";
-    if (value.contains(quoteChar)) {
-      quoteChar = "\'";
-    }
-    if (value.contains(quoteChar)) {
-      throw new IllegalArgumentException(String.format("Could not find quote char for expression: %s", value));
+  static String quote(String value) {
+    String quoteChar = "";
+    if (!StringUtils.isNumeric(value)) {
+      quoteChar = "\"";
+      if (value.contains(quoteChar)) {
+        quoteChar = "\'";
+      }
+      if (value.contains(quoteChar)) {
+        throw new IllegalArgumentException(String.format("Could not find quote char for expression: %s", value));
+      }
     }
     return String.format("%s%s%s", quoteChar, value, quoteChar);
+  }
+
+  /**
+   * Convert the name of the MetricAggFunction to the name expected by Pinot. See PQL Documentation for details.
+   *
+   * @param aggFunction function enum to convert
+   * @return a valid pinot function name
+   */
+  private static String convertAggFunction(MetricAggFunction aggFunction) {
+    if (aggFunction.isPercentile()) {
+      return aggFunction.name().replaceFirst(MetricAggFunction.PERCENTILE_PREFIX, PERCENTILE_TDIGEST_PREFIX);
+    }
+    return aggFunction.name();
+  }
+
+  /**
+   * Returns a component with grouped values for a given key, operator, and values
+   *
+   * @param key key
+   * @param operator operator
+   * @param values values
+   * @return grouped component
+   */
+  private static String makeComponentGrouped(String key, String operator, Collection<String> values) {
+    List<String> quoted = new ArrayList<>();
+    for (String value : values) {
+      quoted.add(quote(value));
+    }
+    Collections.sort(quoted);
+    return String.format("%s %s (%s)", key, operator, COMMA.join(quoted));
+  }
+
+  /**
+   * Returns a set of components for a key, operator, and a collection of values.
+   *
+   * @param key key
+   * @param operator operator
+   * @param values collection of values
+   * @return set of components
+   */
+  private static Set<String> makeComponents(String key, String operator, Collection<String> values) {
+    Set<String> output = new HashSet<>();
+    for (String value : values) {
+      output.add(makeComponent(key, operator, value));
+    }
+    return output;
+  }
+
+  /**
+   * Component for a key, operator and a value.
+   *
+   * @param key key
+   * @param value raw value
+   * @param operator  operator
+   * @return pair of prefix, value
+   */
+  private static String makeComponent(String key, String operator, String value) {
+    return String.format("%s %s %s", key, operator, quote(value));
+  }
+
+  /**
+   * Tokenize a collection of values for a given prefix
+   *
+   * @param prefix prefix
+   * @param values string values
+   * @return set of tokenized values
+   */
+  private static Set<String> tokenize(String prefix, Collection<String> values) {
+    Set<String> output = new HashSet<>();
+    for (String value : values) {
+      output.add(tokenize(prefix, value));
+    }
+    return output;
+  }
+
+  /**
+   * Tokenize value for given prefix
+   *
+   * @param prefix prefix
+   * @param value string value
+   * @return tokenized value
+   */
+  private static String tokenize(String prefix, String value) {
+    if (!value.startsWith(prefix)) {
+      throw new IllegalArgumentException(String.format("Expected value with prefix '%s' but got '%s", prefix, value));
+    }
+    return value.substring(prefix.length());
+  }
+
+  /**
+   * Filters a collection of strings for a given prefix
+   *
+   * @param values string values
+   * @param prefix prefix
+   * @return set of string with prefix
+   */
+  private static Set<String> filter(Collection<String> values, final String prefix) {
+    return new HashSet<>(Collections2.filter(values, new Predicate<String>() {
+      @Override
+      public boolean apply(@Nullable String s) {
+        return (s != null) && s.startsWith(prefix);
+      }
+    }));
   }
 }

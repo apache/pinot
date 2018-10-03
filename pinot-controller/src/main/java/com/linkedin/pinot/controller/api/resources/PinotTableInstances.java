@@ -56,7 +56,7 @@ public class PinotTableInstances {
       @ApiResponse(code = 500, message = "Internal server error")})
   public String getTableInstances(
       @ApiParam(value = "Table name without type", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Instance type", required = false, example = "broker", allowableValues = "[broker, server]")
+      @ApiParam(value = "Instance type", required = false, example = "broker", allowableValues = "BROKER, SERVER")
           @DefaultValue("") @QueryParam("type") String type
   ) {
     try {

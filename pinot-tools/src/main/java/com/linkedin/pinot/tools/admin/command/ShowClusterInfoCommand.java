@@ -16,6 +16,7 @@
 package com.linkedin.pinot.tools.admin.command;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.tools.Command;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -25,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
@@ -94,7 +96,7 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
     ZkClient zkClient = new ZkClient(_zkAddress);
     zkClient.setZkSerializer(new ZNRecordStreamingSerializer());
     LOGGER.info("Connecting to Zookeeper at: {}", _zkAddress);
-    zkClient.waitUntilConnected();
+    zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS);
     ZkBaseDataAccessor<ZNRecord> baseDataAccessor = new ZkBaseDataAccessor<>(zkClient);
     ZKHelixDataAccessor zkHelixDataAccessor = new ZKHelixDataAccessor(_clusterName, baseDataAccessor);
     PropertyKey property = zkHelixDataAccessor.keyBuilder().liveInstances();

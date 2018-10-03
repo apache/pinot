@@ -21,8 +21,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataSchema;
@@ -30,9 +28,12 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManager;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.serde.SerDe;
 import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.buffer.ByteBuf;
@@ -56,6 +57,9 @@ import static org.mockito.Mockito.*;
 
 
 public class ScheduledRequestHandlerTest {
+  private static final BrokerRequest DUMMY_BROKER_REQUEST =
+      new Pql2Compiler().compileToBrokerRequest("SELECT * FROM myTable_OFFLINE");
+
   private ServerMetrics serverMetrics;
   private ChannelHandlerContext channelHandlerContext;
   private QueryScheduler queryScheduler;
@@ -89,11 +93,11 @@ public class ScheduledRequestHandlerTest {
 
   private InstanceRequest getInstanceRequest() {
     InstanceRequest request = new InstanceRequest();
-    request.setBrokerId("broker");
-    request.setEnableTrace(false);
     request.setRequestId(1);
+    request.setQuery(DUMMY_BROKER_REQUEST);
     request.setSearchSegments(Arrays.asList("segment1", "segment2"));
-    request.setQuery(new BrokerRequest());
+    request.setEnableTrace(false);
+    request.setBrokerId("broker");
     return request;
   }
 
@@ -109,7 +113,7 @@ public class ScheduledRequestHandlerTest {
         new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
           @Nonnull
           @Override
-          public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+          public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
             ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(() -> {
               throw new RuntimeException("query processing error");
             });
@@ -148,7 +152,7 @@ public class ScheduledRequestHandlerTest {
         new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
           @Nonnull
           @Override
-          public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+          public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
             ListenableFuture<DataTable> response = resourceManager.getQueryRunners().submit(() -> {
               String[] columnNames = new String[]{"foo", "bar"};
               DataSchema.ColumnDataType[] columnDataTypes =

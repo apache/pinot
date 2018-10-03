@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
+import com.linkedin.pinot.common.restlet.resources.ResourceUtils;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
@@ -60,7 +61,7 @@ public class TableSizeResource {
       @ApiResponse(code = 500, message = "Internal server error"),
       @ApiResponse(code = 404, message = "Table not found")
   })
-  public TableSizeInfo getTableSize(
+  public String getTableSize(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed)
       throws WebApplicationException {
@@ -102,7 +103,7 @@ public class TableSizeResource {
       }
     }
     //invalid to use the segmentDataManagers below
-    return tableSizeInfo;
+    return ResourceUtils.convertToJsonString(tableSizeInfo);
   }
 
   // same as above but with /tables (plural) path for consistency.
@@ -117,7 +118,7 @@ public class TableSizeResource {
       @ApiResponse(code = 404, message = "Table not found")
   })
   @Deprecated
-  public TableSizeInfo getTableSizeOld(
+  public String getTableSizeOld(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Provide detailed information") @DefaultValue("true") @QueryParam("detailed") boolean detailed)
       throws WebApplicationException {

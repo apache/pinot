@@ -21,21 +21,21 @@ import javax.ws.rs.core.Response;
 import org.slf4j.Logger;
 
 
-class ControllerApplicationException extends WebApplicationException {
+public class ControllerApplicationException extends WebApplicationException {
 
-  ControllerApplicationException(Logger logger, String message, Response.Status status) {
+  public ControllerApplicationException(Logger logger, String message, Response.Status status) {
     this(logger, message, status.getStatusCode(), null);
   }
 
-  ControllerApplicationException(Logger logger, String message, int status) {
+  public ControllerApplicationException(Logger logger, String message, int status) {
     this(logger, message, status, null);
   }
 
-  ControllerApplicationException(Logger logger, String message, Response.Status status, @Nullable Throwable e) {
+  public ControllerApplicationException(Logger logger, String message, Response.Status status, @Nullable Throwable e) {
     this(logger, message, status.getStatusCode(), e);
   }
 
-  ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e) {
+  public ControllerApplicationException(Logger logger, String message, int status, @Nullable Throwable e) {
     super(message, status);
     if (status >= 300 && status < 500) {
       if (e == null) {

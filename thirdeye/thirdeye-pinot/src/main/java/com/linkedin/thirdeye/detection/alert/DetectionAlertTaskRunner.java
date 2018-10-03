@@ -1,7 +1,22 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.alert;
 
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -10,17 +25,14 @@ import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
@@ -31,6 +43,10 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
+import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
+import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detection.CurrentAndBaselineLoader;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultDataProvider;
@@ -46,7 +62,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.HtmlEmail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,44 +123,62 @@ public class DetectionAlertTaskRunner implements TaskRunner {
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-    List<TaskResult> taskResult = new ArrayList<>();
-    DetectionAlertTaskInfo alertTaskInfo = (DetectionAlertTaskInfo) taskInfo;
-    this.thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
+    ThirdeyeMetricsUtil.alertTaskCounter.inc();
 
-    long detectionAlertConfigId = alertTaskInfo.getDetectionAlertConfigId();
-    this.detectionAlertConfig = this.alertConfigDAO.findById(detectionAlertConfigId);
-    if (this.detectionAlertConfig.getProperties() == null) {
-      LOG.warn(String.format("Detection alert %d contains no properties", detectionAlertConfigId));
+    try {
+      List<TaskResult> taskResult = new ArrayList<>();
+      DetectionAlertTaskInfo alertTaskInfo = (DetectionAlertTaskInfo) taskInfo;
+      this.thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
+
+      long detectionAlertConfigId = alertTaskInfo.getDetectionAlertConfigId();
+      this.detectionAlertConfig = this.alertConfigDAO.findById(detectionAlertConfigId);
+      if (this.detectionAlertConfig.getProperties() == null) {
+        LOG.warn(String.format("Detection alert %d contains no properties", detectionAlertConfigId));
+      }
+
+      DetectionAlertFilter alertFilter = this.alertFilterLoader.from(this.provider, this.detectionAlertConfig, System.currentTimeMillis());
+
+      DetectionAlertFilterResult result = alertFilter.run();
+
+      if (result.getResult().isEmpty()) {
+        LOG.info("Zero anomalies found, skipping sending email");
+      } else {
+        this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(result.getAllAnomalies());
+        sendEmail(result);
+
+        this.detectionAlertConfig.setVectorClocks(mergeVectorClock(
+            this.detectionAlertConfig.getVectorClocks(),
+            makeVectorClock(result.getAllAnomalies())));
+
+        long highWaterMark = getHighWaterMark(result.getAllAnomalies());
+        if (this.detectionAlertConfig.getHighWaterMark() != null) {
+          highWaterMark = Math.max(this.detectionAlertConfig.getHighWaterMark(), highWaterMark);
+        }
+        this.detectionAlertConfig.setHighWaterMark(highWaterMark);
+
+        this.alertConfigDAO.save(this.detectionAlertConfig);
+      }
+      return taskResult;
+
+    } finally {
+      ThirdeyeMetricsUtil.alertTaskSuccessCounter.inc();
     }
-
-    DetectionAlertFilter alertFilter = this.alertFilterLoader.from(this.provider, this.detectionAlertConfig, System.currentTimeMillis());
-
-    DetectionAlertFilterResult result = alertFilter.run();
-
-    if (result.getResult().isEmpty()) {
-      LOG.info("Zero anomalies found, skipping sending email");
-    } else {
-      this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(result.getAllAnomalies());
-      sendEmail(result);
-
-      this.detectionAlertConfig.setVectorClocks(mergeVectorClock(
-          this.detectionAlertConfig.getVectorClocks(),
-          makeVectorClock(result.getAllAnomalies())));
-
-      this.detectionAlertConfig.setHighWaterMark(getHighWaterMark(result.getAllAnomalies()));
-
-      this.alertConfigDAO.save(this.detectionAlertConfig);
-    }
-    return taskResult;
   }
 
   private void sendEmail(DetectionAlertFilterResult detectionResult) throws Exception {
-    for (Map.Entry<Set<String>, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
-      Set<String> recipients = entry.getKey();
+    for (Map.Entry<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
+      DetectionAlertFilterRecipients recipients = entry.getKey();
       Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
 
       if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
-        recipients.retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.getTo().retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.getCc().retainAll(this.thirdeyeConfig.getEmailWhitelist());
+        recipients.getBcc().retainAll(this.thirdeyeConfig.getEmailWhitelist());
+      }
+
+      if (recipients.to.isEmpty()) {
+        LOG.warn("Email doesn't have any valid (whitelisted) recipients. Skipping.");
+        continue;
       }
 
       EmailContentFormatter emailContentFormatter =
@@ -149,20 +187,30 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       emailContentFormatter.init(new Properties(),
           EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.thirdeyeConfig));
 
-      Joiner joiner = Joiner.on(",").skipNulls();
-
       List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
       anomalyResultListOfGroup.addAll(anomalies);
       Collections.sort(anomalyResultListOfGroup, COMPARATOR_DESC);
 
       AlertConfigDTO alertConfig = new AlertConfigDTO();
       alertConfig.setName(this.detectionAlertConfig.getName());
-      alertConfig.setFromAddress(this.detectionAlertConfig.getFromAddress());
+      alertConfig.setFromAddress(this.detectionAlertConfig.getFrom());
+      alertConfig.setSubjectType(this.detectionAlertConfig.getSubjectType());
 
-      EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, joiner.join(recipients),
+      EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
           "Thirdeye Alert : " + this.detectionAlertConfig.getName(), null, null, anomalyResultListOfGroup,
           new EmailContentFormatterContext());
-      EmailHelper.sendEmailWithEmailEntity(emailEntity, thirdeyeConfig.getSmtpConfiguration());
+
+      HtmlEmail email = emailEntity.getContent();
+      email.setFrom(this.detectionAlertConfig.getFrom());
+      email.setTo(AlertUtils.toAddress(recipients.getTo()));
+      if (CollectionUtils.isNotEmpty(recipients.getCc())) {
+        email.setCc(AlertUtils.toAddress(recipients.getCc()));
+      }
+      if (CollectionUtils.isNotEmpty(recipients.getBcc())) {
+        email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
+      }
+
+      this.sendEmail(emailEntity);
     }
   }
 
@@ -214,5 +262,27 @@ public class DetectionAlertTaskRunner implements TaskRunner {
     }
 
     return result;
+  }
+
+  /** Sends email according to the provided config. */
+  private void sendEmail(EmailEntity entity) throws EmailException {
+    HtmlEmail email = entity.getContent();
+    SmtpConfiguration config = this.thirdeyeConfig.getSmtpConfiguration();
+
+    if (config == null) {
+      LOG.error("No email configuration available. Skipping.");
+      return;
+    }
+
+    email.setHostName(config.getSmtpHost());
+    email.setSmtpPort(config.getSmtpPort());
+    if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
+      email.setAuthenticator(new DefaultAuthenticator(config.getSmtpUser(), config.getSmtpPassword()));
+      email.setSSLOnConnect(true);
+    }
+    email.send();
+
+    int recipientCount = email.getToAddresses().size() + email.getCcAddresses().size() + email.getBccAddresses().size();
+    LOG.info("Sent email sent with subject '{}' to {} recipients", email.getSubject(), recipientCount);
   }
 }

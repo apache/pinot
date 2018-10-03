@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.anomaly.onboard.framework;
 
 import com.google.common.base.Preconditions;
@@ -6,8 +22,11 @@ import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -36,7 +55,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
   private final TimeUnit taskTimeOutUnit;
   private final SmtpConfiguration smtpConfiguration;
   private final String failureNotificationSender;
-  private final String failureNotificationReceiver;
+  private final DetectionAlertFilterRecipients failureNotificationReceiver;
   private final boolean notifyIfFails;
 
   public DetectionOnBoardJobRunner(DetectionOnboardJobContext jobContext, List<DetectionOnboardTask> tasks,
@@ -65,7 +84,8 @@ public class DetectionOnBoardJobRunner implements Runnable {
       smtpConfiguration = null;
     }
     failureNotificationSender = configuration.getString(DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER_ADDRESS);
-    failureNotificationReceiver = configuration.getString(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS);
+    Set<String> toAddresses = EmailUtils.getValidEmailAddresses(configuration.getString(DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS));
+    failureNotificationReceiver = new DetectionAlertFilterRecipients(toAddresses);
     notifyIfFails = configuration.getBoolean(DefaultDetectionOnboardJob.NOTIFY_IF_FAILS,
         DefaultDetectionOnboardJob.DEFAULT_NOTIFY_IF_FAILS);
   }
@@ -116,7 +136,7 @@ public class DetectionOnBoardJobRunner implements Runnable {
       // Notify upon exception
       if (notifyIfFails && !TaskConstants.TaskStatus.COMPLETED.equals(taskStatus.getTaskStatus())) {
         if (smtpConfiguration == null || StringUtils.isBlank(failureNotificationSender)
-            || StringUtils.isBlank(failureNotificationReceiver)) {
+            || failureNotificationReceiver.getTo().isEmpty()) {
           LOG.warn("SmtpConfiguration, and email sender/recipients cannot be null or empty");
         } else {
           try {

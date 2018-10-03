@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -14,12 +30,12 @@ import java.util.Objects;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DetectionAlertConfigBean extends AbstractBean {
-
   boolean active;
   String name;
-  String fromAddress;
+  String from;
   String cronExpression;
   String application;
+  AlertConfigBean.SubjectType subjectType = AlertConfigBean.SubjectType.ALERT;
 
   Map<Long, Long> vectorClocks;
   Long highWaterMark;
@@ -50,12 +66,12 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.cronExpression = cronExpression;
   }
 
-  public String getFromAddress() {
-    return fromAddress;
+  public String getFrom() {
+    return from;
   }
 
-  public void setFromAddress(String fromAddress) {
-    this.fromAddress = fromAddress;
+  public void setFrom(String fromAddress) {
+    this.from = fromAddress;
   }
 
   public Map<String, Object> getProperties() {
@@ -90,6 +106,14 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.highWaterMark = highWaterMark;
   }
 
+  public AlertConfigBean.SubjectType getSubjectType() {
+    return subjectType;
+  }
+
+  public void setSubjectType(AlertConfigBean.SubjectType subjectType) {
+    this.subjectType = subjectType;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -99,16 +123,15 @@ public class DetectionAlertConfigBean extends AbstractBean {
       return false;
     }
     DetectionAlertConfigBean that = (DetectionAlertConfigBean) o;
-    return active == that.active && Objects.equals(name, that.name) && Objects.equals(fromAddress, that.fromAddress)
+    return active == that.active && Objects.equals(name, that.name) && Objects.equals(from, that.from)
         && Objects.equals(cronExpression, that.cronExpression) && Objects.equals(application, that.application)
-        && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(highWaterMark, that.highWaterMark)
-        && Objects.equals(properties, that.properties);
+        && subjectType == that.subjectType && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(
+        highWaterMark, that.highWaterMark) && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
-
-    return Objects.hash(active, name, fromAddress, cronExpression, application, vectorClocks, highWaterMark,
-        properties);
+    return Objects.hash(active, name, from, cronExpression, application, subjectType, vectorClocks,
+        highWaterMark, properties);
   }
 }

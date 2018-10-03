@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.broker.api.resources;
 
-import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
+import com.linkedin.pinot.broker.routing.RoutingTable;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -44,13 +44,13 @@ public class PinotBrokerDebug {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerDebug.class);
 
   @Inject
-  private BrokerRequestHandler requestHandler;
+  private RoutingTable _routingTable;
 
   @Inject
-  private BrokerMetrics brokerMetrics;
+  private BrokerMetrics _brokerMetrics;
 
   @Inject
-  private TimeBoundaryService timeBoundaryService;
+  private TimeBoundaryService _timeBoundaryService;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -61,13 +61,13 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public String debugRoutingTable(
-      @ApiParam(value = "Name of the table", required = false) @PathParam("tableName") String tableName
+      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName
   ) {
     try {
-      return requestHandler.getRoutingTableSnapshot(tableName);
+      return _routingTable.dumpSnapshot(tableName);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
@@ -81,7 +81,7 @@ public class PinotBrokerDebug {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public String debugTimeBoundaryService(
-      @ApiParam(value = "Name of the table", required = false) @PathParam("tableName") String tableName
+      @ApiParam(value = "Name of the table") @PathParam("tableName") String tableName
   ) {
     try {
       String response = "{}";
@@ -90,7 +90,7 @@ public class PinotBrokerDebug {
         if (tableType == null) {
           tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
         }
-        TimeBoundaryService.TimeBoundaryInfo tbInfo = timeBoundaryService.getTimeBoundaryInfoFor(tableName);
+        TimeBoundaryService.TimeBoundaryInfo tbInfo = _timeBoundaryService.getTimeBoundaryInfoFor(tableName);
         if (tbInfo != null) {
           response = tbInfo.toJsonString();
         }
@@ -98,7 +98,7 @@ public class PinotBrokerDebug {
       return response;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
-      brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1);
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
   }

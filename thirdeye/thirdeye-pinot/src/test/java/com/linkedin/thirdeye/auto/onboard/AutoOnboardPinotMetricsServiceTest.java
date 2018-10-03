@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.auto.onboard;
 
 import com.google.common.collect.Sets;
@@ -6,11 +22,13 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,7 +43,7 @@ import org.testng.annotations.Test;
 
 public class AutoOnboardPinotMetricsServiceTest {
 
-  private AutoOnboardPinotDataSource testAutoLoadPinotMetricsService;
+  private AutoOnboardPinotMetadataSource testAutoLoadPinotMetricsService;
   private String dataset = "test-collection";
   private Schema schema;
 
@@ -39,7 +57,7 @@ public class AutoOnboardPinotMetricsServiceTest {
     DAORegistry daoRegistry = DAORegistry.getInstance();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
-    testAutoLoadPinotMetricsService = new AutoOnboardPinotDataSource(null, null);
+    testAutoLoadPinotMetricsService = new AutoOnboardPinotMetadataSource(null, null);
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
     Map<String, String> pinotCustomConfigs = new HashMap<>();
     pinotCustomConfigs.put("configKey1", "configValue1");
@@ -73,6 +91,12 @@ public class AutoOnboardPinotMetricsServiceTest {
     for (MetricConfigDTO metricConfig : metricConfigs) {
       Assert.assertTrue(schemaMetricNames.contains(metricConfig.getName()));
       metricIds.add(metricConfig.getId());
+      if (metricConfig.getName().equals("latency_tdigest")) {
+        Assert.assertEquals(metricConfig.getDefaultAggFunction(), MetricConfigBean.DEFAULT_TDIGEST_AGG_FUNCTION);
+        Assert.assertEquals(metricConfig.getDatatype(), MetricType.DOUBLE);
+      } else {
+        Assert.assertEquals(metricConfig.getDefaultAggFunction(), MetricConfigBean.DEFAULT_AGG_FUNCTION);
+      }
     }
   }
 

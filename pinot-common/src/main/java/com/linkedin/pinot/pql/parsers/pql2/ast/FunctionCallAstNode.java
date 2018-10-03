@@ -16,8 +16,10 @@
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
+import java.util.List;
 
 
 /**
@@ -71,37 +73,21 @@ public class FunctionCallAstNode extends BaseAstNode {
   }
 
   public AggregationInfo buildAggregationInfo() {
-    String identifier = null;
-    for (AstNode astNode : getChildren()) {
-      if (astNode instanceof IdentifierAstNode) {
-        IdentifierAstNode node = (IdentifierAstNode) astNode;
-        if (identifier == null) {
-          identifier = node.getName();
-        } else {
-          throw new Pql2CompilationException("More than one identifier specified to an aggregation function");
-        }
-      } else if (astNode instanceof StarExpressionAstNode) {
-        identifier = "*";
-      } else if (astNode instanceof StringLiteralAstNode) {
-        // Pinot quirk: Passing a string as an aggregation function is probably a column name
-        StringLiteralAstNode node = (StringLiteralAstNode) astNode;
-        identifier = node.getText();
-      } else {
-        throw new Pql2CompilationException("Child node of aggregation function is not an identifier, star or string literal.");
+    String expression;
+    // COUNT aggregation function always works on '*'
+    if (_name.equalsIgnoreCase("count")) {
+      expression = "*";
+    } else {
+      List<? extends AstNode> children = getChildren();
+      if (children == null || children.size() != 1) {
+        throw new Pql2CompilationException("Aggregation function expects exact 1 argument");
       }
-    }
-
-    String function = _name;
-
-    // Pinot quirk: count is always count(*) no matter what
-    if ("count".equalsIgnoreCase(function)) {
-      function = "count";
-      identifier = "*";
+      expression = TransformExpressionTree.getStandardExpression(children.get(0));
     }
 
     AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(function);
-    aggregationInfo.putToAggregationParams("column", identifier);
+    aggregationInfo.setAggregationType(_name);
+    aggregationInfo.putToAggregationParams("column", expression);
     aggregationInfo.setIsInSelectList(_isInSelectList);
 
     return aggregationInfo;

@@ -16,21 +16,34 @@
 package com.linkedin.pinot.core.indexsegment.immutable;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegmentUtils;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionType;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2Metadata;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,18 +54,81 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private final SegmentDirectory _segmentDirectory;
   private final SegmentMetadataImpl _segmentMetadata;
   private final Map<String, ColumnIndexContainer> _indexContainerMap;
-  private final StarTree _starTree;
+  private final List<StarTreeV2> _starTrees;
 
-  public ImmutableSegmentImpl(SegmentDirectory segmentDirectory, SegmentMetadataImpl segmentMetadata,
-      Map<String, ColumnIndexContainer> columnIndexContainerMap, StarTree starTree) {
+  public ImmutableSegmentImpl(@Nonnull SegmentDirectory segmentDirectory, @Nonnull SegmentMetadataImpl segmentMetadata,
+      @Nonnull Map<String, ColumnIndexContainer> columnIndexContainerMap, @Nullable StarTree starTree) {
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentMetadata;
     _indexContainerMap = columnIndexContainerMap;
-    _starTree = starTree;
+    if (starTree != null) {
+      _starTrees = convertToStarTrees(starTree);
+    } else {
+      _starTrees = null;
+    }
+  }
+
+  /**
+   * Helper method to convert {@link StarTree} into a singleton list of {@link StarTreeV2}.
+   *
+   * TODO: this is for backward-compatibility. When StarTreeV2 builder part is done, directly load StarTreeV2.
+   */
+  private List<StarTreeV2> convertToStarTrees(StarTree starTree) {
+    Schema schema = _segmentMetadata.getSchema();
+    StarTreeMetadata starTreeMetadata = _segmentMetadata.getStarTreeMetadata();
+    assert starTreeMetadata != null;
+
+    // Add all dimensions that are not skipped for materialization into dimensions split order
+    ArrayList<String> dimensionsSplitOrder = new ArrayList<>(schema.getDimensionNames());
+    dimensionsSplitOrder.removeAll(starTreeMetadata.getSkipMaterializationForDimensions());
+
+    // Add all metrics to function-column pairs
+    Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs = new HashSet<>();
+    for (MetricFieldSpec metricFieldSpec : schema.getMetricFieldSpecs()) {
+      String column = metricFieldSpec.getName();
+      if (metricFieldSpec.isDerivedMetric()) {
+        assert metricFieldSpec.getDerivedMetricType() == MetricFieldSpec.DerivedMetricType.HLL;
+        aggregationFunctionColumnPairs.add(new AggregationFunctionColumnPair(AggregationFunctionType.FASTHLL, column));
+      } else {
+        aggregationFunctionColumnPairs.add(new AggregationFunctionColumnPair(AggregationFunctionType.SUM, column));
+      }
+    }
+
+    StarTreeV2Metadata starTreeV2Metadata =
+        new StarTreeV2Metadata(_segmentMetadata.getTotalDocs(), dimensionsSplitOrder, aggregationFunctionColumnPairs,
+            starTreeMetadata.getMaxLeafRecords(),
+            new HashSet<>(starTreeMetadata.getSkipStarNodeCreationForDimensions()));
+
+    return Collections.singletonList(new StarTreeV2() {
+      @Override
+      public StarTree getStarTree() {
+        return starTree;
+      }
+
+      @Override
+      public StarTreeV2Metadata getMetadata() {
+        return starTreeV2Metadata;
+      }
+
+      @Override
+      public DataSource getDataSource(String columnName) {
+        if (columnName.contains(AggregationFunctionColumnPair.DELIMITER)) {
+          return ImmutableSegmentImpl.this.getDataSource(
+              AggregationFunctionColumnPair.fromColumnName(columnName).getColumn());
+        } else {
+          return ImmutableSegmentImpl.this.getDataSource(columnName);
+        }
+      }
+
+      @Override
+      public void close() throws IOException {
+        starTree.close();
+      }
+    });
   }
 
   @Override
-  public ImmutableDictionaryReader getDictionary(String column) {
+  public Dictionary getDictionary(String column) {
     return _indexContainerMap.get(column).getDictionary();
   }
 
@@ -92,13 +168,26 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Override
+  public Set<String> getPhysicalColumnNames() {
+    HashSet<String> physicalColumnNames = new HashSet<>();
+
+    for (String columnName : getColumnNames()) {
+      if (!_segmentMetadata.getSchema().isVirtualColumn(columnName)) {
+        physicalColumnNames.add(columnName);
+      }
+    }
+
+    return physicalColumnNames;
+  }
+
+  @Override
   public void destroy() {
     LOGGER.info("Trying to destroy segment : {}", this.getSegmentName());
     for (String column : _indexContainerMap.keySet()) {
       ColumnIndexContainer columnIndexContainer = _indexContainerMap.get(column);
 
       try {
-        ImmutableDictionaryReader dictionary = columnIndexContainer.getDictionary();
+        Dictionary dictionary = columnIndexContainer.getDictionary();
         if (dictionary != null) {
           dictionary.close();
         }
@@ -125,24 +214,20 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
       LOGGER.error("Failed to close segment directory: {}. Continuing with error.", _segmentDirectory, e);
     }
     _indexContainerMap.clear();
-    if (_starTree != null) {
-      try {
-        _starTree.close();
-      } catch (IOException e) {
-        LOGGER.error("Failed to close star-tree. Continuing with error.", e);
+    if (_starTrees != null) {
+      for (StarTreeV2 starTree : _starTrees) {
+        try {
+          starTree.close();
+        } catch (IOException e) {
+          LOGGER.error("Failed to close star-tree. Continuing with error.", e);
+        }
       }
     }
   }
 
   @Override
-  public StarTree getStarTree() {
-    return _starTree;
-  }
-
-  @Override
   public List<StarTreeV2> getStarTrees() {
-    // TODO: to be added
-    return null;
+    return _starTrees;
   }
 
   @Override

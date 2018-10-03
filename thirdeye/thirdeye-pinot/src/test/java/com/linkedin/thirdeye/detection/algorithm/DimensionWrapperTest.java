@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.algorithm;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -13,11 +29,11 @@ import com.linkedin.thirdeye.detection.MockPipelineLoader;
 import com.linkedin.thirdeye.detection.MockPipelineOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -35,7 +51,7 @@ public class DimensionWrapperTest {
 
   // prototyping
   private static final String PROP_NESTED = "nested";
-  private static final String PROP_NESTED_METRIC_URN = "nestedMetricUrn";
+  private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
   private static final String PROP_NESTED_METRIC_URN_KEY = "nestedMetricUrnKey";
   private static final String PROP_CLASS_NAME = "className";
 
@@ -43,7 +59,7 @@ public class DimensionWrapperTest {
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
   private static final String PROP_CLASS_NAME_VALUE = "MyClassName";
-  private static final String PROP_NESTED_METRIC_URN_VALUE = "thirdeye:metric:2";
+  private static final Collection<String> PROP_NESTED_METRIC_URN_VALUES = Collections.singleton("thirdeye:metric:2");
   private static final String PROP_NESTED_METRIC_URN_KEY_VALUE = "myMetricUrn";
 
   private DataProvider provider;
@@ -82,7 +98,7 @@ public class DimensionWrapperTest {
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put(PROP_DIMENSIONS, Arrays.asList("a", "b"));
     this.properties.put(PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_VALUE);
-    this.properties.put(PROP_NESTED_METRIC_URN, PROP_NESTED_METRIC_URN_VALUE);
+    this.properties.put(PROP_NESTED_METRIC_URNS, PROP_NESTED_METRIC_URN_VALUES);
     this.properties.put(PROP_NESTED, Collections.singletonList(this.nestedProperties));
     this.properties.put(PROP_LOOKBACK, 0);
 
@@ -94,7 +110,7 @@ public class DimensionWrapperTest {
 
   @Test
   public void testLookBack() throws Exception {
-    this.properties.put(PROP_LOOKBACK, 5);
+    this.properties.put(PROP_LOOKBACK, "5");
     this.properties.put(PROP_DIMENSIONS, Collections.singleton("b"));
 
     this.wrapper = new DimensionWrapper(this.provider, this.config, 14, 15);
@@ -173,6 +189,37 @@ public class DimensionWrapperTest {
     assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:2:a%3D2:b%3D1"));
     assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:2:a%3D2:b%3D3"));
     assertEquals(this.runs.get(3), makePipeline("thirdeye:metric:2:a%3D1:b%3D2"));
+  }
+
+  @Test
+  public void testNestedMetricsOnly() throws Exception {
+    this.properties.remove(PROP_METRIC_URN);
+    this.properties.remove(PROP_DIMENSIONS);
+    this.properties.put(PROP_NESTED_METRIC_URNS, Arrays.asList("thirdeye:metric:10", "thirdeye:metric:11", "thirdeye:metric:12"));
+
+    this.wrapper = new DimensionWrapper(this.provider, this.config, 10, 15);
+    this.wrapper.run();
+
+    Assert.assertEquals(this.runs.size(), 3);
+    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:10"));
+    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:11"));
+    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:12"));
+  }
+
+  @Test
+  public void testNestedMetricsAndDimensions() throws Exception {
+    this.properties.put(PROP_DIMENSIONS, Collections.singleton("b"));
+    this.properties.put(PROP_MIN_VALUE, 16.0d);
+    this.properties.put(PROP_NESTED_METRIC_URNS, Arrays.asList("thirdeye:metric:10", "thirdeye:metric:11"));
+
+    this.wrapper = new DimensionWrapper(this.provider, this.config, 10, 15);
+    this.wrapper.run();
+
+    Assert.assertEquals(this.runs.size(), 4);
+    assertEquals(this.runs.get(0), makePipeline("thirdeye:metric:10:b%3D1"));
+    assertEquals(this.runs.get(1), makePipeline("thirdeye:metric:10:b%3D2"));
+    assertEquals(this.runs.get(2), makePipeline("thirdeye:metric:11:b%3D1"));
+    assertEquals(this.runs.get(3), makePipeline("thirdeye:metric:11:b%3D2"));
   }
 
   private DetectionConfigDTO makeConfig(String metricUrn) {

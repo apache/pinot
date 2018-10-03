@@ -41,9 +41,12 @@
     {{rootcause-dimensions-algorithm
       entities=entities
       metricUrn=metricUrn
+      metricId=metricId
+      filters=filteredUrns
       range=context.anomalyRange
       mode=context.compareMode
       selectedUrns=selectedUrns
+      enableSubTotals=false
       onSelection=(action "onSelection")
     }}
   {{/subtab.tabpanel}}

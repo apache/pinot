@@ -6,4 +6,3 @@ export function setHas([set, value]) {
 }
 
 export default helper(setHas);
-

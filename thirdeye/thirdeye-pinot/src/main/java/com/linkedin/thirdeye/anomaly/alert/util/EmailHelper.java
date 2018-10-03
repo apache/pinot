@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.google.common.cache.LoadingCache;
@@ -5,10 +21,10 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
-import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -17,9 +33,12 @@ import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 
+import com.linkedin.thirdeye.detection.alert.AlertUtils;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
@@ -51,8 +70,6 @@ public abstract class EmailHelper {
   private static final long DAY_MILLIS = TimeUnit.DAYS.toMillis(1);
   private static final long WEEK_MILLIS = TimeUnit.DAYS.toMillis(7);
 
-  public static final String EMAIL_ADDRESS_SEPARATOR = ",";
-
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -66,15 +83,15 @@ public abstract class EmailHelper {
   }
 
   public static void sendEmailWithTextBody(HtmlEmail email, SmtpConfiguration smtpConfigutation, String subject,
-      String textBody, String fromAddress, String toAddress) throws EmailException {
+      String textBody, String fromAddress, DetectionAlertFilterRecipients recipients) throws EmailException {
     email.setTextMsg(textBody);
-    sendEmail(smtpConfigutation, email, subject, fromAddress, toAddress);
+    sendEmail(smtpConfigutation, email, subject, fromAddress, recipients);
   }
 
   public static void sendEmailWithHtml(HtmlEmail email, SmtpConfiguration smtpConfiguration, String subject,
-      String htmlBody, String fromAddress, String toAddress) throws EmailException {
+      String htmlBody, String fromAddress, DetectionAlertFilterRecipients recipients) throws EmailException {
     email.setHtmlMsg(htmlBody);
-    sendEmail(smtpConfiguration, email, subject, fromAddress, toAddress);
+    sendEmail(smtpConfiguration, email, subject, fromAddress, recipients);
   }
 
   public static void sendEmailWithEmailEntity(EmailEntity emailEntity, SmtpConfiguration smtpConfiguration)
@@ -84,10 +101,10 @@ public abstract class EmailHelper {
 
   /** Sends email according to the provided config. */
   private static void sendEmail(SmtpConfiguration config, HtmlEmail email, String subject,
-      String fromAddress, String toAddress) throws EmailException {
+      String fromAddress, DetectionAlertFilterRecipients recipients) throws EmailException {
     if (config != null) {
       email.setSubject(subject);
-      LOG.info("Sending email to {}", toAddress);
+      LOG.info("Sending email to {}", recipients.toString());
       email.setHostName(config.getSmtpHost());
       email.setSmtpPort(config.getSmtpPort());
       if (config.getSmtpUser() != null && config.getSmtpPassword() != null) {
@@ -96,11 +113,15 @@ public abstract class EmailHelper {
         email.setSSLOnConnect(true);
       }
       email.setFrom(fromAddress);
-      for (String address : toAddress.split(EMAIL_ADDRESS_SEPARATOR)) {
-        email.addTo(address);
+      email.setTo(AlertUtils.toAddress(recipients.getTo()));
+      if (CollectionUtils.isNotEmpty(recipients.getCc())) {
+        email.setCc(AlertUtils.toAddress(recipients.getCc()));
+      }
+      if (CollectionUtils.isNotEmpty(recipients.getBcc())) {
+        email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
       }
       email.send();
-      LOG.info("Email sent with subject [{}] to address [{}]!", subject, toAddress);
+      LOG.info("Email sent with subject [{}] to address [{}]!", subject, recipients.toString());
     } else {
       LOG.error("No email config provided for email with subject [{}]!", subject);
     }
@@ -208,12 +229,13 @@ public abstract class EmailHelper {
 
   public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, ThirdEyeConfiguration thirdeyeConfig)
       throws JobExecutionException {
-    sendFailureEmailForScreenshot(anomalyId, t, thirdeyeConfig.getSmtpConfiguration(), thirdeyeConfig.getFailureFromAddress(),
-        thirdeyeConfig.getFailureToAddress());
+    sendFailureEmailForScreenshot(anomalyId, t, thirdeyeConfig.getSmtpConfiguration(),
+        thirdeyeConfig.getFailureFromAddress(),
+        new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress())));
   }
 
   public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, SmtpConfiguration smtpConfiguration,
-    String failureFromAddress, String failureToAddress) throws JobExecutionException {
+    String failureFromAddress, DetectionAlertFilterRecipients failureToAddress) throws JobExecutionException {
     HtmlEmail email = new HtmlEmail();
     String subject = String
         .format("[ThirdEye Anomaly Detector] FAILED SCREENSHOT FOR ANOMALY ID=%s", anomalyId);
@@ -245,7 +267,8 @@ public abstract class EmailHelper {
 
     try {
       EmailHelper.sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody.toString(),
-              thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
+          thirdeyeConfig.getFailureFromAddress(),
+          new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress())));
     } catch (EmailException e) {
       LOG.error("Exception in sending email notification for incomplete datasets", e);
     }

@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.creator;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.google.common.primitives.Ints;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -37,6 +36,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.util.AvroUtils;
+import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -144,7 +144,7 @@ public class SegmentGenerationWithBytesTypeTest {
 
   @Test
   public void testDictionary() {
-    ImmutableDictionaryReader dictionary = _segment.getDictionary(FIXED_BYTE_SORTED_COLUMN);
+    ImmutableDictionaryReader dictionary = (ImmutableDictionaryReader) _segment.getDictionary(FIXED_BYTE_SORTED_COLUMN);
     Assert.assertEquals(dictionary.length(), NUM_SORTED_VALUES);
 
     // Test dictionary indexing.
@@ -276,7 +276,7 @@ public class SegmentGenerationWithBytesTypeTest {
       for (int i = 0; i < NUM_ROWS; i++) {
         GenericData.Record record = new GenericData.Record(avroSchema);
 
-        TDigest tDigest = new TDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+        TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
         tDigest.add(_random.nextDouble());
 
         ByteBuffer buffer = ByteBuffer.allocate(tDigest.byteSize());

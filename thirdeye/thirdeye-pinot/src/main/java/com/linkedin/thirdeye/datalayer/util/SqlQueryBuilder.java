@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.util;
 
 import com.google.common.base.Preconditions;
@@ -304,7 +320,7 @@ public class SqlQueryBuilder {
     List<Pair<String, Object>> parametersList = new ArrayList<>();
     generateWhereClause(entityNameToDBNameMapping, predicate, parametersList, whereClause);
     sqlBuilder.append(whereClause.toString());
-    LOG.debug("createFindByParamsStatement Query:{} " + sqlBuilder);
+    LOG.debug("createFindByParamsStatement Query: {}", sqlBuilder);
     PreparedStatement prepareStatement = connection.prepareStatement(sqlBuilder.toString());
     int parameterIndex = 1;
     LinkedHashMap<String, ColumnInfo> columnInfoMap =
@@ -342,12 +358,13 @@ public class SqlQueryBuilder {
         whereClause.append(")");
         break;
       case EQ:
+      case LIKE:
       case GT:
       case LT:
       case NEQ:
       case LE:
       case GE:
-        whereClause.append(columnName).append(predicate.getOper().toString()).append("?");
+        whereClause.append(columnName).append(" ").append(predicate.getOper().toString()).append(" ?");
         parametersList.add(ImmutablePair.of(columnName, predicate.getRhs()));
         break;
       case IN:

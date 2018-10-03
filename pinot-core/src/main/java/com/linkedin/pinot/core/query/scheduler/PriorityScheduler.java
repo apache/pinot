@@ -24,8 +24,8 @@ import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.List;
@@ -59,10 +59,10 @@ public abstract class PriorityScheduler extends QueryScheduler {
     runningQueriesSemaphore = new Semaphore(numRunners);
   }
 
+  @Nonnull
   @Override
-  public ListenableFuture<byte[]> submit(@Nullable final ServerQueryRequest queryRequest) {
-    Preconditions.checkNotNull(queryRequest);
-    if (! isRunning) {
+  public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
+    if (!isRunning) {
       return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
@@ -70,13 +70,12 @@ public abstract class PriorityScheduler extends QueryScheduler {
     try {
       queryQueue.put(schedQueryContext);
     } catch (OutOfCapacityException e) {
-      LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableName(), e.getMessage());
+      LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableNameWithType(), e.getMessage());
       return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
     }
-    serverMetrics.addMeteredTableValue(queryRequest.getTableName(), ServerMeter.QUERIES, 1);
+    serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES, 1);
     return schedQueryContext.getResultFuture();
   }
-
 
   @Override
   public void start() {

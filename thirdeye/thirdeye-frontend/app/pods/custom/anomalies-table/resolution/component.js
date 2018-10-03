@@ -13,19 +13,35 @@
  *   },
  */
 import Component from "@ember/component";
-import { getWithDefault } from '@ember/object';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
-import { set, setProperties } from '@ember/object';
 import { getAnomalyDataUrl } from 'thirdeye-frontend/utils/api/anomaly';
 import { inject as service } from '@ember/service';
+import {
+  set,
+  get,
+  computed,
+  setProperties,
+  getWithDefault
+} from '@ember/object';
 
 export default Component.extend({
-  //store: service('store'),
-
   tagName: '',//using tagless so i can add my own in hbs
   anomalyResponseNames: anomalyUtil.anomalyResponseObj.mapBy('name'),
   anomalyDataUrl: getAnomalyDataUrl(),
   showResponseSaved: false,
+  isUserReported: false,
+  hasComment: false,
+
+  didReceiveAttrs() {
+    this._super(...arguments);
+    const anomalyComment = get(this.record.anomaly, 'comment');
+    const hasComment = (anomalyComment && anomalyComment.replace(/ /g, '') !== 'null');
+    const isUserReported = get(this.record.anomaly, 'source') === 'USER_LABELED_ANOMALY';
+    setProperties(this, {
+      hasComment,
+      isUserReported
+    });
+  },
 
   actions: {
     /**
@@ -52,12 +68,12 @@ export default Component.extend({
         const filterMap = getWithDefault(res, 'searchFilters.statusFilterMap', null);
         if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
           humanizedAnomaly.set('anomalyFeedback', selectedResponse);
-          this.set('showResponseSaved', true);
+          set(this, 'showResponseSaved', true);
         } else {
           return Promise.reject(new Error('Response not saved'));
         }
       } catch (err) {
-        this.setProperties({
+        setProperties(this, {
           showResponseFailed: true,
           showResponseSaved: false
         });

@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.indexsegment.immutable;
 
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 
@@ -29,7 +30,7 @@ public interface ImmutableSegment extends IndexSegment {
    * @param column Column name
    * @return Dictionary for the given column, or null if the given column does not have one
    */
-  ImmutableDictionaryReader getDictionary(String column);
+  Dictionary getDictionary(String column);
 
   /**
    * Returns the forward index for the given column.

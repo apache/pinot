@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexType;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexType;
@@ -30,6 +31,7 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +56,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     // Present in segment but not in schema, auto-generated.
     REMOVE_DIMENSION,
     REMOVE_METRIC;
+
+    boolean isAddAction() {
+      return this == ADD_DIMENSION || this == ADD_METRIC;
+    }
+
+    boolean isUpdateAction() {
+      return this == UPDATE_DIMENSION || this == UPDATE_METRIC;
+    }
 
     boolean isRemoveAction() {
       return this == REMOVE_DIMENSION || this == REMOVE_METRIC;
@@ -235,13 +245,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *
    * @param column column name.
    */
-  protected void removeColumnV1Indices(String column) {
-    // Delete existing dictionary and forward index for the column.
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION));
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION));
-    FileUtils.deleteQuietly(new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
+  protected void removeColumnV1Indices(String column) throws IOException {
+    // Delete existing dictionary and forward index
+    FileUtils.forceDelete(new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION));
+    File svFwdIndex = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+    if (svFwdIndex.exists()) {
+      FileUtils.forceDelete(svFwdIndex);
+    } else {
+      FileUtils.forceDelete(new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION));
+    }
 
-    // Remove the column metadata information if exists.
+    // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
   }
 
@@ -252,17 +266,17 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    */
   protected void createColumnV1Indices(String column)
       throws Exception {
-    FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+    final FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     Preconditions.checkNotNull(fieldSpec);
 
     // Generate column index creation information.
-    int totalDocs = _segmentMetadata.getTotalDocs();
-    int totalRawDocs = _segmentMetadata.getTotalRawDocs();
-    int totalAggDocs = totalDocs - totalRawDocs;
-    FieldSpec.DataType dataType = fieldSpec.getDataType();
-    Object defaultValue = fieldSpec.getDefaultNullValue();
-    boolean isSingleValue = fieldSpec.isSingleValueField();
-    int maxNumberOfMultiValueElements = isSingleValue ? 0 : 1;
+    final int totalDocs = _segmentMetadata.getTotalDocs();
+    final int totalRawDocs = _segmentMetadata.getTotalRawDocs();
+    final int totalAggDocs = totalDocs - totalRawDocs;
+    final FieldSpec.DataType dataType = fieldSpec.getDataType();
+    final Object defaultValue = fieldSpec.getDefaultNullValue();
+    final boolean isSingleValue = fieldSpec.isSingleValueField();
+    final int maxNumberOfMultiValueElements = isSingleValue ? 0 : 1;
     int dictionaryElementSize = 0;
 
     Object sortedArray;
@@ -287,18 +301,24 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         Preconditions.checkState(defaultValue instanceof String);
         String stringDefaultValue = (String) defaultValue;
         // Length of the UTF-8 encoded byte array.
-        dictionaryElementSize = stringDefaultValue.getBytes("UTF8").length;
+        dictionaryElementSize = StringUtil.encodeUtf8(stringDefaultValue).length;
         sortedArray = new String[]{stringDefaultValue};
         break;
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + dataType + " for column: " + column);
     }
+    DefaultColumnStatistics columnStatistics = new DefaultColumnStatistics(
+        defaultValue  /* min */,
+        defaultValue  /* max */,
+        sortedArray,
+        isSingleValue,
+        totalDocs,
+        maxNumberOfMultiValueElements
+    );
 
     ColumnIndexCreationInfo columnIndexCreationInfo =
-        new ColumnIndexCreationInfo(true/*createDictionary*/, defaultValue/*min*/, defaultValue/*max*/, sortedArray,
-            ForwardIndexType.FIXED_BIT_COMPRESSED, InvertedIndexType.SORTED_INDEX, isSingleValue/*isSortedColumn*/,
-            false/*hasNulls*/, totalDocs/*totalNumberOfEntries*/, maxNumberOfMultiValueElements, -1, -1 /* Unused min/max length*/,
-            true/*isAutoGenerated*/, null/*partitionFunction*/, -1/*numPartitions*/, null/*partitionValue*/,
+        new ColumnIndexCreationInfo(columnStatistics, true/*createDictionary*/,
+            ForwardIndexType.FIXED_BIT_COMPRESSED, InvertedIndexType.SORTED_INDEX, true/*isAutoGenerated*/,
             defaultValue/*defaultNullValue*/);
 
     // Create dictionary.
@@ -312,20 +332,20 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       // Single-value column.
 
       SingleValueSortedForwardIndexCreator svFwdIndexCreator =
-          new SingleValueSortedForwardIndexCreator(_indexDir, 1/*cardinality*/, fieldSpec);
+          new SingleValueSortedForwardIndexCreator(_indexDir, fieldSpec.getName(), 1/*cardinality*/);
       for (int docId = 0; docId < totalDocs; docId++) {
-        svFwdIndexCreator.add(0/*dictionaryId*/, docId);
+        svFwdIndexCreator.index(docId, 0/*dictionaryId*/);
       }
       svFwdIndexCreator.close();
     } else {
       // Multi-value column.
 
       MultiValueUnsortedForwardIndexCreator mvFwdIndexCreator =
-          new MultiValueUnsortedForwardIndexCreator(fieldSpec, _indexDir, 1/*cardinality*/, totalDocs/*numDocs*/,
-              totalDocs/*totalNumberOfValues*/, false/*hasNulls*/);
-      int[] dictionaryIds = {0};
+          new MultiValueUnsortedForwardIndexCreator(_indexDir, fieldSpec.getName(), 1/*cardinality*/,
+              totalDocs/*numDocs*/, totalDocs/*totalNumberOfValues*/);
+      int[] dictIds = {0};
       for (int docId = 0; docId < totalDocs; docId++) {
-        mvFwdIndexCreator.index(docId, dictionaryIds);
+        mvFwdIndexCreator.index(docId, dictIds);
       }
       mvFwdIndexCreator.close();
     }

@@ -96,6 +96,8 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, null, null,
         getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(), getTaskConfig(), null);
+
+    completeTableConfiguration();
   }
 
   @Test
@@ -182,5 +184,10 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSe
     pqlQuery = "SELECT MINMAXRANGE(" + column + ") FROM " + getTableName();
     sqlQuery = "SELECT MAX(" + column + ")-MIN(" + column + ") FROM " + getTableName();
     testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+  }
+
+  @Override
+  protected boolean isUsingNewConfigFormat() {
+    return true;
   }
 }

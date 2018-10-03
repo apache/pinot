@@ -139,14 +139,10 @@ export default Component.extend({
             baseline: this._makeRecord(urn, 'baseline', entities, aggregates),
             wo1w: this._makeRecord(urn, 'wo1w', entities, aggregates),
             wo2w: this._makeRecord(urn, 'wo2w', entities, aggregates),
-            wo3w: this._makeRecord(urn, 'wo3w', entities, aggregates),
-            wo4w: this._makeRecord(urn, 'wo4w', entities, aggregates),
             sortable_current: this._makeChange(urn, 'current', aggregates),
             sortable_baseline: this._makeChange(urn, 'baseline', aggregates),
             sortable_wo1w: this._makeChange(urn, 'wo1w', aggregates),
-            sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates),
-            sortable_wo3w: this._makeChange(urn, 'wo3w', aggregates),
-            sortable_wo4w: this._makeChange(urn, 'wo4w', aggregates)
+            sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates)
           };
         });
 

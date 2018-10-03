@@ -21,25 +21,24 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.docvalsets.SingleValueSet;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public final class SingleValueBlock implements Block {
-  private final SingleColumnSingleValueReader<? super ReaderContext> _reader;
+  private final SingleColumnSingleValueReader _reader;
   private final BlockValSet _blockValSet;
   private final BlockMetadata _blockMetadata;
 
-  public SingleValueBlock(SingleColumnSingleValueReader<? super ReaderContext> reader, int numDocs,
-      FieldSpec.DataType dataType, Dictionary dictionary) {
+  public SingleValueBlock(SingleColumnSingleValueReader reader, int numDocs, FieldSpec.DataType dataType,
+      Dictionary dictionary) {
     _reader = reader;
     _blockValSet = new SingleValueSet(reader, numDocs, dataType);
     _blockMetadata = new BlockMetadataImpl(numDocs, true, 0, dataType, dictionary);
   }
 
-  public SingleColumnSingleValueReader<? extends ReaderContext> getReader() {
+  public SingleColumnSingleValueReader getReader() {
     return _reader;
   }
 

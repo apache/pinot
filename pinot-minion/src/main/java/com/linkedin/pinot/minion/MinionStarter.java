@@ -19,12 +19,13 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.linkedin.pinot.minion.events.EventObserverFactoryRegistry;
 import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
-import com.linkedin.pinot.minion.executor.BaseSegmentConversionExecutor;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutorFactory;
 import com.linkedin.pinot.minion.executor.TaskExecutorFactoryRegistry;
 import com.linkedin.pinot.minion.metrics.MinionMeter;
@@ -33,6 +34,7 @@ import com.linkedin.pinot.minion.taskfactory.TaskFactoryRegistry;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import javax.annotation.Nonnull;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -50,6 +52,9 @@ import org.slf4j.LoggerFactory;
  */
 public class MinionStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionStarter.class);
+
+  private static final String HTTPS_PROTOCOL = "https";
+  private static final String HTTPS_ENABLED = "enabled";
 
   private final String _helixClusterName;
   private final Configuration _config;
@@ -125,13 +130,26 @@ public class MinionStarter {
     // TODO: set the correct minion version
     minionContext.setMinionVersion("1.0");
 
-    LOGGER.info("initializing segment fetchers for all protocols");
-    SegmentFetcherFactory.getInstance()
-        .init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
+    // Start all components
+    LOGGER.info("Initializing PinotFSFactory");
+    Configuration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    PinotFSFactory.init(pinotFSConfig);
+
+    LOGGER.info("Initializing segment fetchers for all protocols");
+    Configuration segmentFetcherFactoryConfig =
+        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
 
     // Need to do this before we start receiving state transitions.
-    LOGGER.info("Initializing segment conversion executor");
-    BaseSegmentConversionExecutor.init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    LOGGER.info("Initializing ssl context for segment uploader");
+    Configuration httpsConfig =
+        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER).subset(HTTPS_PROTOCOL);
+    if (httpsConfig.getBoolean(HTTPS_ENABLED, false)) {
+      SSLContext sslContext =
+          new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
+      minionContext.setSSLContext(sslContext);
+    }
+
     // Join the Helix cluster
     LOGGER.info("Joining the Helix cluster");
     _helixManager.getStateMachineEngine()

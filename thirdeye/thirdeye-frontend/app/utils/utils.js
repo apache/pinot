@@ -1,6 +1,7 @@
+import d3 from 'd3';
 import { isNone } from '@ember/utils';
 import moment from 'moment';
-import d3 from 'd3';
+import { splitFilterFragment, toFilterMap } from 'thirdeye-frontend/utils/rca-utils';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -11,7 +12,10 @@ import d3 from 'd3';
  * @return {Object} either json-formatted payload or error object
  */
 export function checkStatus(response, mode = 'get', recoverBlank = false) {
-  if (response.status >= 200 && response.status < 300) {
+  if (response.status === 401) {
+    // We want to throw a 401 error up the error substate(s) to handle it
+    throw new Error('401');
+  } else if (response.status >= 200 && response.status < 300) {
     // Prevent parsing of null response
     if (response.status === 204) {
       return '';
@@ -49,7 +53,10 @@ function isValidForDisplay(f) {
  */
 export function humanizeFloat(f) {
   if (!isValidForDisplay(f)) { return '-'; }
-  return d3.format('.3s')(f);
+  const formattedNum = d3.format('.3s')(f);
+  // Catch/replace meaningless micro value
+  const isMicroNum = (new RegExp(/0\.0+y$/)).test(formattedNum)
+  return isMicroNum ? 0 : formattedNum;
 }
 
 /**
@@ -109,6 +116,21 @@ export function parseProps(filters) {
 }
 
 /**
+ * Takes a raw filter string and processes it via 'splitFilterFragment' into a API-compatible JSON-formatted string.
+ * "filter1=value;filter2=value"
+ * @method makeFilterString
+ * @param {Array} filtersRaw - single current record
+ * @private
+ */
+export function makeFilterString(filtersRaw) {
+  try {
+    return JSON.stringify(toFilterMap(filtersRaw.split(';').map(splitFilterFragment)));
+  } catch (ignore) {
+    return '';
+  }
+}
+
+/**
  * Preps post object and stringifies post data
  * @param {Object} data to post
  * @returns {Object}
@@ -134,6 +156,7 @@ export default {
   humanizeFloat,
   humanizeChange,
   humanizeScore,
+  makeFilterString,
   parseProps,
   postProps,
   toIso

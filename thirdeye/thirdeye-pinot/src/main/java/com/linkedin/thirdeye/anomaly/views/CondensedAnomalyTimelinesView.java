@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.anomaly.views;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -120,8 +136,16 @@ public class CondensedAnomalyTimelinesView {
           startTime * minBucketUnit + timestampOffset,
           (startTime + bucketMillis) * minBucketUnit + timestampOffset);
       anomalyTimelinesView.addTimeBuckets(timeBucket);
-      anomalyTimelinesView.addBaselineValues(baselineValues.get(i));
-      anomalyTimelinesView.addCurrentValues(currentValues.get(i));
+      if (i < baselineValues.size()) {
+        anomalyTimelinesView.addBaselineValues(baselineValues.get(i));
+      } else {
+        anomalyTimelinesView.addCurrentValues(Double.NaN);
+      }
+      if (i < currentValues.size()) { // In case there is no current value in view
+        anomalyTimelinesView.addCurrentValues(currentValues.get(i));
+      } else {
+        anomalyTimelinesView.addCurrentValues(Double.NaN);
+      }
     }
     for (Map.Entry<String, String> entry : summary.entrySet()) {
       anomalyTimelinesView.addSummary(entry.getKey(), entry.getValue());

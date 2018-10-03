@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
@@ -19,6 +35,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -28,6 +45,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.lang.StringUtils;
@@ -75,7 +93,10 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   public static final String ALERT_CRON = DefaultDetectionOnboardJob.ALERT_CRON;
   public static final String ALERT_FROM = DefaultDetectionOnboardJob.ALERT_FROM;
   public static final String ALERT_TO = DefaultDetectionOnboardJob.ALERT_TO;
+  public static final String ALERT_CC = DefaultDetectionOnboardJob.ALERT_CC;
+  public static final String ALERT_BCC = DefaultDetectionOnboardJob.ALERT_BCC;
   public static final String ALERT_APPLICATION = DefaultDetectionOnboardJob.ALERT_APPLICATION;
+  public static final String DEFAULT_ALERT_SENDER = DefaultDetectionOnboardJob.DEFAULT_ALERT_SENDER_ADDRESS;
   public static final String DEFAULT_ALERT_RECEIVER = DefaultDetectionOnboardJob.DEFAULT_ALERT_RECEIVER_ADDRESS;
 
   public static final Boolean DEFAULT_IS_ACTIVE = true;
@@ -246,14 +267,10 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       emailConfig.getFunctionIds().add(anomalyFunction.getId());
 
       // Add recipients to existing alert group
-      String recipients = configuration.getString(ALERT_TO);
-      if (StringUtils.isNotBlank(recipients)) {
-        if (StringUtils.isNotBlank(alertConfig.getRecipients())) {
-          recipients = recipients + "," + alertConfig.getRecipients();
-        }
-        recipients = EmailUtils.getValidEmailAddresses(recipients);
-        alertConfig.setRecipients(recipients);
-      }
+      alertConfig.getReceiverAddresses().getTo().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_TO)));
+      alertConfig.getReceiverAddresses().getCc().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_CC)));
+      alertConfig.getReceiverAddresses().getBcc().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_BCC)));
+
       alertConfigDAO.update(alertConfig);
     } else {
       alertConfig = new AlertConfigDTO();
@@ -261,15 +278,20 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
       emailConfig.setFunctionIds(Arrays.asList(anomalyFunction.getId()));
       alertConfig.setEmailConfig(emailConfig);
       alertConfig.setName(configuration.getString(ALERT_NAME));
-      String thirdeyeDefaultEmail = configuration.getString(DEFAULT_ALERT_RECEIVER);
-      alertConfig.setFromAddress(configuration.getString(ALERT_FROM, thirdeyeDefaultEmail));
-      String alertRecipients = thirdeyeDefaultEmail;
-      if (configuration.containsKey(ALERT_TO)) {
-        alertRecipients = alertRecipients + "," + configuration.getString(ALERT_TO);
+
+      Set<String> toAddresses = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_TO));
+      Set<String> ccAddresses = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_CC));
+      ccAddresses.addAll(EmailUtils.getValidEmailAddresses(configuration.getString(DEFAULT_ALERT_RECEIVER)));
+      Set<String> bccAddresses = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_BCC));
+
+      Set<String> defaultSender = EmailUtils.getValidEmailAddresses(configuration.getString(DEFAULT_ALERT_SENDER));
+      if (defaultSender.isEmpty()) {
+        throw new IllegalArgumentException("No sender configured for the emails. Please set " + DEFAULT_ALERT_SENDER);
       }
-      alertRecipients = EmailUtils.getValidEmailAddresses(alertRecipients);
+      alertConfig.setFromAddress(configuration.getString(ALERT_FROM, defaultSender.iterator().next()));
+
+      alertConfig.setReceiverAddresses(new DetectionAlertFilterRecipients(toAddresses, ccAddresses, bccAddresses));
       alertConfig.setApplication(configuration.getString(ALERT_APPLICATION));
-      alertConfig.setRecipients(alertRecipients);
       alertConfig.setCronExpression(configuration.getString(ALERT_CRON, DEFAULT_ALERT_CRON));
       alertConfigDAO.save(alertConfig);
     }
@@ -285,7 +307,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setWindowSize(6);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
         anomalyFunctionSpec.setFrequency(new TimeGranularity(15, TimeUnit.MINUTES));
-        anomalyFunctionSpec.setProperties("");
+        anomalyFunctionSpec.setProperties("signTestWindowSize=24");
         anomalyFunctionSpec.setRequiresCompletenessCheck(false);
         break;
       case HOURS:

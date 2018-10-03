@@ -1,7 +1,24 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
+import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
@@ -74,5 +91,13 @@ public class MetricEntity extends Entity {
     ParsedUrn parsedUrn = EntityUtils.parseUrnString(urn, TYPE, 3);
     long id = Long.parseLong(parsedUrn.getPrefixes().get(2));
     return new MetricEntity(urn, score, Collections.<Entity>emptyList(), id, parsedUrn.toFilters());
+  }
+
+  public static MetricEntity fromURN(String urn) {
+    return fromURN(urn, 1.0);
+  }
+
+  public static MetricEntity fromSlice(MetricSlice slice, double score) {
+    return fromMetric(score, slice.getMetricId(), slice.getFilters());
   }
 }

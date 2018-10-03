@@ -30,13 +30,14 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.operator.DocIdSetOperator;
 import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
+import com.linkedin.pinot.core.operator.filter.MatchAllFilterOperator;
 import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationExecutor;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.DefaultAggregationExecutor;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
 import java.util.ArrayList;
@@ -130,9 +131,8 @@ public class DefaultAggregationExecutorTest {
       expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
     }
     int totalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
-    MatchEntireSegmentOperator matchEntireSegmentOperator = new MatchEntireSegmentOperator(totalRawDocs);
-    DocIdSetOperator docIdSetOperator =
-        new DocIdSetOperator(matchEntireSegmentOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    MatchAllFilterOperator matchAllFilterOperator = new MatchAllFilterOperator(totalRawDocs);
+    DocIdSetOperator docIdSetOperator = new DocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator = new ProjectionOperator(dataSourceMap, docIdSetOperator);
     TransformOperator transformOperator = new TransformOperator(projectionOperator, expressionTrees);
     TransformBlock transformBlock = transformOperator.nextBlock();
@@ -142,7 +142,7 @@ public class DefaultAggregationExecutorTest {
         new AggregationFunctionInitializer(_indexSegment.getSegmentMetadata());
     for (int i = 0; i < numAggFuncs; i++) {
       AggregationInfo aggregationInfo = _aggregationInfoList.get(i);
-      aggrFuncContextArray[i] = AggregationFunctionContext.instantiate(aggregationInfo);
+      aggrFuncContextArray[i] = AggregationFunctionUtils.getAggregationFunctionContext(aggregationInfo);
       aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
     }
     AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(aggrFuncContextArray);

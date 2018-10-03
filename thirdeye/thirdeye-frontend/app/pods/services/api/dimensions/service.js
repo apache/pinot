@@ -7,7 +7,7 @@ import EmberObject, { computed, get } from '@ember/object';
  * @type {Ember.Service}
  * @summary This service provides all the api calls for dimensions analysis data. An `Ember.Service`
    is a long-lived Ember object that can be made available in different parts of your application.
- * @example anomaliesApiService: service('services/api/dimensions');
+ * @example dimensionsApiService: service('services/api/dimensions');
  */
 export default Service.extend({
   queryCache: service('services/query-cache'),
@@ -35,7 +35,8 @@ export default Service.extend({
       'baselineStart',  // number: baseline start ISO
       'baselineEnd',    // number: baseline end ISO
       'summarySize',    // number: number of results requested
-      'depth'           // number: nesting levels 1 - 3
+      'depth',          // number: nesting levels 1 - 3
+      'orderType'       // string: manual or auto
     ];
 
     requiredKeys.forEach((key) => {
