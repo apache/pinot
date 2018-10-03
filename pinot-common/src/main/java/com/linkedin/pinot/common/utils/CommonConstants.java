@@ -268,7 +268,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
-    public static final String CONFIG_OF_INSTANCE_WAIT_TIME = "pinot.server.instance.starter.waitTime";
+    public static final String CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME = "pinot.server.instance.starter.maxShutdownWaitTime";
+    public static final String CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME = "pinot.server.instance.starter.checkIntervalTime";
 
     public static final int DEFAULT_ADMIN_API_PORT = 8097;
     public static final String DEFAULT_READ_MODE = "heap";
@@ -288,7 +289,8 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
-    public static final long DEFAULT_MAX_WAIT_TIME_MS = 60_000L;
+    public static final long DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS = 600_000L;
+    public static final long DEFAULT_CHECK_INTERVAL_TIME_MS = 10_000L;
   }
 
   public static class Controller {

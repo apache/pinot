@@ -69,7 +69,7 @@ public class HelixServerStarter {
   private final Configuration _helixServerConfig;
   private final String _instanceId;
   private final long _maxQueryTimeMs;
-  private final long _maxWaitTimeMs;
+  private final long _maxShutdownWaitTimeMs;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final ServerInstance _serverInstance;
@@ -96,8 +96,8 @@ public class HelixServerStarter {
 
     _maxQueryTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    _maxWaitTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_WAIT_TIME,
-        CommonConstants.Server.DEFAULT_MAX_WAIT_TIME_MS);
+    _maxShutdownWaitTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME,
+        CommonConstants.Server.DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS);
 
     LOGGER.info("Connecting Helix components");
     setupHelixSystemProperties(_helixServerConfig);
@@ -135,6 +135,7 @@ public class HelixServerStarter {
         CommonConstants.Server.DEFAULT_ADMIN_API_PORT);
     _adminApiApplication = new AdminApiApplication(_serverInstance);
     _adminApiApplication.start(adminApiPort);
+    updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
 
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
@@ -156,9 +157,6 @@ public class HelixServerStarter {
 
     ControllerLeaderLocator.create(_helixManager);
 
-
-    waitForServiceStatusChange(false /*shutDownStatus*/);
-    updateInstanceConfigInHelix(adminApiPort, false/*shutDownStatus*/);
     LOGGER.info("Pinot server ready");
 
     // Create metrics for mmap stuff
@@ -225,30 +223,36 @@ public class HelixServerStarter {
     if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, true)) {
       Uninterruptibles.sleepUninterruptibly(_maxQueryTimeMs, TimeUnit.MILLISECONDS);
     }
-    waitForServiceStatusChange(true /*shutDownStatus*/);
+    waitUntilNoIncomingQueries();
     _helixManager.disconnect();
     _serverInstance.shutDown();
   }
 
-  private void waitForServiceStatusChange(boolean shuttingDownStatus) {
-    LOGGER.info("Waiting upto {}ms to have services complete their status change...", _maxWaitTimeMs);
+  private void waitUntilNoIncomingQueries() {
+    LOGGER.info("Waiting upto {}ms until Pinot server doesn't receive any incoming queries...", _maxShutdownWaitTimeMs);
     long startTime = System.currentTimeMillis();
+    long currentTime = startTime;
+    long endTime = _maxShutdownWaitTimeMs + System.currentTimeMillis();
 
-    while (!ServiceStatus.checkServiceStatus(shuttingDownStatus)) {
-      if (System.currentTimeMillis() - startTime > _maxWaitTimeMs) {
-        LOGGER.error("Timeout waiting for all service status to change when {} Pinot server {}! Max waiting time: {}",
-            shuttingDownStatus ? "shutting down" : "starting up", _instanceId, _maxWaitTimeMs);
+    while (currentTime < endTime) {
+      if (currentTime > _serverInstance.getLatestQueryTime() + CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS) {
+        LOGGER.info("No incoming query within {}ms, safely shutdown Pinot server. Total waiting Time: {}ms", CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS,
+            (currentTime - startTime));
         return;
       }
 
       try {
-        // Sleep for 1 second.
-        Thread.sleep(1_000L);
+        // Sleep for 10 second.
+        Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        LOGGER.error("Interrupted when waiting for Pinot server not to receive any queries.", e);
+        Thread.currentThread().interrupt();
+        return;
       }
+      currentTime = System.currentTimeMillis();
     }
-    LOGGER.info("Service status change completed. Time to take: {}ms", (System.currentTimeMillis() - startTime));
+    LOGGER.error("Reach timeout since Pinot server {} keeps receiving queries! Forcing Pinot server to shutdown. Max waiting time: {}",
+        _instanceId, _maxShutdownWaitTimeMs);
   }
 
   /**
