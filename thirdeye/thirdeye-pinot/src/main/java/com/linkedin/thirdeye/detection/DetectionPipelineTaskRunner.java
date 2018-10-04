@@ -114,7 +114,7 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       config.setLastTimestamp(result.getLastTimestamp());
       this.detectionDAO.update(config);
 
-      for (MergedAnomalyResultDTO mergedAnomalyResultDTO: result.getAnomalies()) {
+      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : result.getAnomalies()) {
         this.anomalyDAO.save(mergedAnomalyResultDTO);
         if (mergedAnomalyResultDTO.getId() == null) {
           LOG.warn("Could not store anomaly:\n{}", mergedAnomalyResultDTO);
@@ -122,6 +122,10 @@ public class DetectionPipelineTaskRunner implements TaskRunner {
       }
 
       return Collections.emptyList();
+
+    } catch(Exception e) {
+      ThirdeyeMetricsUtil.detectionTaskExceptionCounter.inc();
+      throw e;
 
     } finally {
       ThirdeyeMetricsUtil.detectionTaskSuccessCounter.inc();

@@ -40,14 +40,23 @@ public class ThirdeyeMetricsUtil {
   public static final Counter detectionTaskSuccessCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionTaskSuccessCounter");
 
+  public static final Counter detectionTaskExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionTaskExceptionCounter");
+
   public static final Counter alertTaskCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "alertTaskCounter");
 
   public static final Counter alertTaskSuccessCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "alertTaskSuccessCounter");
 
+  public static final Counter alertTaskExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "alertTaskExceptionCounter");
+
   public static final Counter dbCallCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbCallCounter");
+
+  public static final Counter dbExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbExceptionCounter");
 
   public static final Counter dbReadCallCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbReadCallCounter");
@@ -73,11 +82,17 @@ public class ThirdeyeMetricsUtil {
   public static final Counter datasourceDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "datasourceDurationCounter");
 
+  public static final Counter datasourceExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "datasourceExceptionCounter");
+
   public static final Counter pinotCallCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "pinotCallCounter");
 
   public static final Counter pinotDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "pinotDurationCounter");
+
+  public static final Counter pinotExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "pinotExceptionCounter");
 
   public static final Counter rcaPipelineCallCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaPipelineCallCounter");
@@ -85,17 +100,26 @@ public class ThirdeyeMetricsUtil {
   public static final Counter rcaPipelineDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaPipelineDurationCounter");
 
+  public static final Counter rcaPipelineExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaPipelineExceptionCounter");
+
   public static final Counter rcaFrameworkCallCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaFrameworkCallCounter");
 
   public static final Counter rcaFrameworkDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaFrameworkDurationCounter");
 
+  public static final Counter rcaFrameworkExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "rcaFrameworkExceptionCounter");
+
   public static final Counter cubeCallCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "cubeCallCounter");
 
   public static final Counter cubeDurationCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "cubeDurationCounter");
+
+  public static final Counter cubeExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "cubeExceptionCounter");
 
   public static MetricsRegistry getMetricsRegistry() {
     return metricsRegistry;

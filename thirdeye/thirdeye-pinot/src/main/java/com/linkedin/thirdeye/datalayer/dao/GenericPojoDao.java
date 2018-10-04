@@ -193,7 +193,6 @@ public class GenericPojoDao {
    * @throws SQLException
    */
   public Connection getConnection() throws SQLException {
-    ThirdeyeMetricsUtil.dbCallCounter.inc();
     // ensure to close the connection
     return dataSource.getConnection();
   }
@@ -778,6 +777,8 @@ public class GenericPojoDao {
   }
 
   <T> T runTask(QueryTask<T> task, T defaultReturnValue) {
+    ThirdeyeMetricsUtil.dbCallCounter.inc();
+
     Connection connection = null;
     try {
       connection = getConnection();
@@ -787,8 +788,11 @@ public class GenericPojoDao {
       // Commit this transaction
       connection.commit();
       return t;
+
     } catch (Exception e) {
       LOG.error("Exception while executing query task", e);
+      ThirdeyeMetricsUtil.dbExceptionCounter.inc();
+
       // Rollback transaction in case json table is updated but index table isn't due to any errors (duplicate key, etc.)
       if (connection != null) {
         try {
@@ -798,6 +802,7 @@ public class GenericPojoDao {
         }
       }
       return defaultReturnValue;
+
     } finally {
       // Always close connection before leaving
       if (connection != null) {

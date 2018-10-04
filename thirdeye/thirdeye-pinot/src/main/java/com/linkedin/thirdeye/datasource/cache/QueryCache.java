@@ -45,16 +45,19 @@ public class QueryCache {
     long tStart = System.nanoTime();
     try {
       String dataSource = request.getDataSource();
-      ThirdEyeResponse response = getDataSource(dataSource).execute(request);
-      return response;
+      return getDataSource(dataSource).execute(request);
+
+    } catch (Exception e) {
+      ThirdeyeMetricsUtil.datasourceExceptionCounter.inc();
+      throw e;
+
     } finally {
       ThirdeyeMetricsUtil.datasourceCallCounter.inc();
       ThirdeyeMetricsUtil.datasourceDurationCounter.inc(System.nanoTime() - tStart);
     }
   }
 
-  public Future<ThirdEyeResponse> getQueryResultAsync(final ThirdEyeRequest request)
-      throws Exception {
+  public Future<ThirdEyeResponse> getQueryResultAsync(final ThirdEyeRequest request) throws Exception {
     return executorService.submit(new Callable<ThirdEyeResponse>() {
       @Override
       public ThirdEyeResponse call() throws Exception {
