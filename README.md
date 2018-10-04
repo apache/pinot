@@ -11,6 +11,8 @@ These presentations on Pinot give an overview of Pinot and how it is used at Lin
 * [Open Source Analytics Pipeline at LinkedIn (Sep 2016, covers Gobblin and Pinot)](http://www.slideshare.net/IssacBuenrostro/open-source-linkedin-analytics-pipeline-vldb-2016)
 * [Pinot: Realtime OLAP for 530 Million Users - Sigmod 2018 (June 2018)](http://www.slideshare.net/seunghyunlee1460/pinot-realtime-olap-for-530-million-users-sigmod-2018-107394584)
 
+Looking for the ThirdEye anomaly detection and root-cause analysis platform? Check out the [Pinot/ThirdEye project](https://github.com/linkedin/pinot/tree/master/thirdeye)
+
 ## What is it for (and not)?
 
 Pinot is well suited for analytical use cases on immutable append-only data that require low latency between an event being ingested and it being available to be queried. 
