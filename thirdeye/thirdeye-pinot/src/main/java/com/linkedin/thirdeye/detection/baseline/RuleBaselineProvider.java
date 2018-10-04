@@ -18,12 +18,14 @@ package com.linkedin.thirdeye.detection.baseline;
 
 import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,10 +84,11 @@ public class RuleBaselineProvider extends StaticBaselineProvider {
   public Map<MetricSlice, Double> fetchBaselineAggregates(Collection<MetricSlice> slices, InputData data) {
     Map<MetricSlice, Double> result = new HashMap<>();
     for (MetricSlice slice : slices) {
-      double value = Double.NaN;
-      DataFrame aggregate = this.baseline.gather(slice, data.getAggregates());
-      if (!aggregate.isEmpty()) {
-        value = aggregate.getDouble(COL_VALUE, 0);
+      double value;
+      try {
+        value = data.getAggregates().get(this.baseline.scatter(slice).get(0)).getDouble(COL_VALUE, 0);
+      } catch (Exception e) {
+        value = Double.NaN;
       }
       result.put(slice, value);
     }
