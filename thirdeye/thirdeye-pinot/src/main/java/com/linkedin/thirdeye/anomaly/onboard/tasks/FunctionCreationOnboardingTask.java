@@ -323,21 +323,33 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
   }
 
   private AnomalyFunctionDTO getDefaultFunctionSpec(boolean isLegacy, TimeGranularity dataGranularity) {
-    AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
+    AnomalyFunctionDTO anomalyFunctionSpec;
     if (isLegacy) {
-      anomalyFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
+      anomalyFunctionSpec = getDefaultFunctionSpecByTimeGranularityLegacy(dataGranularity);
     } else {
-      anomalyFunctionSpec.setType("SPLINE_REGRESSION_WRAPPER");
-      anomalyFunctionSpec.setCron("0 0 14 * * ? *");
-      anomalyFunctionSpec.setWindowSize(1);
-      anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
-      anomalyFunctionSpec.setProperties("variables.continuumOffset=P90D;module.training=parametric.GenericSplineTrainingModule;variables.numberOfKnots=0;variables.degree=3;variables.predictionMode=TRENDING;variables.anomalyRemovalThreshold=0.6,-0.6;module.data=ContinuumDataModule;variables.pValueThreshold=0.025;function=ConfigurableAnomalyDetectionFunction;variables.seasonalities=DAILY_SEASONALITY;module.detection=ConfidenceIntervalDetectionModule;module.testingPreprocessors=DummyPreprocessModule;variables.recentPeriod=P14D;module.trainingPreprocessors=AnomalyRemovalByWeight;variables.r2Cutoff=0.9");
-      anomalyFunctionSpec.setRequiresCompletenessCheck(true);
+      anomalyFunctionSpec = getDefaultFunctionSpecByTimeGranularity(dataGranularity);
     }
     return anomalyFunctionSpec;
   }
 
   protected AnomalyFunctionDTO getDefaultFunctionSpecByTimeGranularity(TimeGranularity timeGranularity) {
+    AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
+    switch (timeGranularity.getUnit()) {
+      case DAYS:
+        anomalyFunctionSpec.setType("SPLINE_REGRESSION_WRAPPER");
+        anomalyFunctionSpec.setCron("0 0 14 * * ? *");
+        anomalyFunctionSpec.setWindowSize(1);
+        anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
+        anomalyFunctionSpec.setProperties("variables.continuumOffset=P90D;module.training=parametric.GenericSplineTrainingModule;variables.numberOfKnots=0;variables.degree=3;variables.predictionMode=TRENDING;variables.anomalyRemovalThreshold=0.6,-0.6;module.data=ContinuumDataModule;variables.pValueThreshold=0.025;function=ConfigurableAnomalyDetectionFunction;variables.seasonalities=DAILY_SEASONALITY;module.detection=ConfidenceIntervalDetectionModule;module.testingPreprocessors=DummyPreprocessModule;variables.recentPeriod=P14D;module.trainingPreprocessors=AnomalyRemovalByWeight;variables.r2Cutoff=0.9");
+        anomalyFunctionSpec.setRequiresCompletenessCheck(true);
+        break;
+      default:
+        throw new IllegalArgumentException("Metric data granularity other than DAILY is not yet supported.");
+    }
+    return anomalyFunctionSpec;
+  }
+
+  protected AnomalyFunctionDTO getDefaultFunctionSpecByTimeGranularityLegacy(TimeGranularity timeGranularity) {
     AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
     switch (timeGranularity.getUnit()) {
       case MINUTES:

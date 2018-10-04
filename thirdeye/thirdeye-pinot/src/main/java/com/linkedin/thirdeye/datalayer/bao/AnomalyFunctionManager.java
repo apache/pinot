@@ -25,8 +25,6 @@ public interface AnomalyFunctionManager extends AbstractManager<AnomalyFunctionD
 
   List<AnomalyFunctionDTO> findAllByCollection(String collection);
 
-  List<AnomalyFunctionDTO> findAllByMetricAndCollection(String metric, String collection);
-
   /**
    * Get the list of anomaly functions under the given application
    * @param application name of the application

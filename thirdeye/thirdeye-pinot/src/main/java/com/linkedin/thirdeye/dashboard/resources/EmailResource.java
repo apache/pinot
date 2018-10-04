@@ -32,6 +32,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -197,8 +198,8 @@ public class EmailResource {
       @QueryParam("metric") String metric,
       @QueryParam("dataset") String dataset,
       @DefaultValue("") @QueryParam("functionPrefix") String functionPrefix) throws Exception {
-    if (org.apache.commons.lang3.StringUtils.isBlank(functionIds) && org.apache.commons.lang3.StringUtils.isBlank(functionName)
-        && (org.apache.commons.lang3.StringUtils.isBlank(metric) || org.apache.commons.lang3.StringUtils.isBlank(dataset))) {
+    if (StringUtils.isBlank(functionIds) && StringUtils.isBlank(functionName)
+        && (StringUtils.isBlank(metric) || StringUtils.isBlank(dataset))) {
       throw new IllegalArgumentException(String.format("Received null or emtpy String for the mandatory params. Please"
           + " specify either functionIds or functionName or (metric & dataset). dataset: %s, metric: %s,"
           + " functionName %s, functionIds: %s", dataset, metric, functionName, functionIds));
@@ -213,7 +214,7 @@ public class EmailResource {
     }
 
     final List<Long> functionIdList = new ArrayList<>();
-    if (org.apache.commons.lang3.StringUtils.isNotBlank(functionIds)) {
+    if (StringUtils.isNotBlank(functionIds)) {
       for (String functionId : functionIds.split(",")) {
         AnomalyFunctionDTO anomalyFunction = anomalyDAO.findById(Long.valueOf(functionId));
         if (anomalyFunction != null) {
@@ -222,14 +223,17 @@ public class EmailResource {
           responseMessage.put("skipped function " + functionId, "Cannot be found!");
         }
       }
-    } else if (org.apache.commons.lang3.StringUtils.isNotBlank(functionName)) {
+    } else if (StringUtils.isNotBlank(functionName)) {
       AnomalyFunctionDTO anomalyFunctionDTO = anomalyDAO.findWhereNameEquals(functionName);
       if (anomalyFunctionDTO == null) {
         responseMessage.put("message", "function " + functionName + " cannot be found.");
         return Response.ok(responseMessage).build();
       }
     } else {
-      List<AnomalyFunctionDTO> anomalyFunctionDTOS = anomalyDAO.findAllByMetricAndCollection(metric, dataset);
+      Predicate predicate = Predicate.AND(
+          Predicate.EQ("metric", metric),
+          Predicate.EQ("collection", dataset));
+      List<AnomalyFunctionDTO> anomalyFunctionDTOS = anomalyDAO.findByPredicate(predicate);
       if (anomalyFunctionDTOS == null) {
         responseMessage.put("message", "no function found on metric " + metric + " & dataset " + dataset);
         return Response.ok(responseMessage).build();
