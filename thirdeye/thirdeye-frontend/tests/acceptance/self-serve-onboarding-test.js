@@ -173,7 +173,7 @@ module('Acceptance | create alert', function(hooks) {
 
     assert.equal(
       $(selfServeConst.ALERT_ACTIVE_LABEL).get(0).innerText,
-      'Active',
+      'ACTIVE',
       'Alert status label is set to active.'
     );
 
