@@ -583,7 +583,7 @@ export default Route.extend({
      * https://www.emberjs.com/api/ember/2.16/classes/Route/events/error?anchor=error
      * https://guides.emberjs.com/v2.18.0/routing/loading-and-error-substates/#toc_the-code-error-code-event
      */
-    error() {
+    error(error) {
       return true;
     }
   }

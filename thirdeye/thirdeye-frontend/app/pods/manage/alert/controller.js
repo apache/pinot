@@ -4,6 +4,7 @@
  * @exports manage/alert
  */
 import Controller from '@ember/controller';
+import { setProperties } from '@ember/object';
 
 export default Controller.extend({
   /**
@@ -29,31 +30,23 @@ export default Controller.extend({
      * Handle conditions for display of appropriate alert nav link (overview or edit)
      */
     setEditModeActive() {
-      this.setProperties({
-        isOverViewModeActive: false,
-        isEditModeActive: true
-      });
+      this.set('isEditModeActive', true);
     },
 
     /**
      * Handle navigation to edit route
      */
     onClickEdit() {
-      this.send('transitionToEditPage', this.get('id'));
-    },
-
-    /**
-     * Navigate to Tune Page
-     */
-    onClickNavToTune() {
-      this.send('transitionToTunePage', this.get('id'));
+      this.set('isEditModeActive', true);
+      this.transitionToRoute('manage.alert.edit', this.get('id'), { queryParams: { refresh: true }});
     },
 
     /**
      * Navigate to Alert Page
      */
     onClickNavToOverview() {
-      this.send('transitionToAlertPage', this.get('id'));
+      this.set('isEditModeActive', false);
+      this.transitionToRoute('manage.alert.explore', this.get('id'));
     }
   }
 });

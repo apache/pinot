@@ -19,6 +19,6 @@ export default Route.extend({
       // `transition`, which can be stored and later
       // `.retry()`d if desired.
       return true;
-    },
+    }
   }
 });

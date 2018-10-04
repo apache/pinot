@@ -124,6 +124,11 @@ const metricsByDataset = dataSet => `/thirdeye-admin/metric-config/metrics?datas
 const triggerInstantOnboard = '/autoOnboard/runAdhoc/AutometricsThirdeyeDataSource';
 
 /**
+ * POST request to edit an existing alert function with properties payload
+ */
+const editAlert = '/thirdeye/entity?entityType=ANOMALY_FUNCTION';
+
+/**
  * POST | Add metric & dataset to thirdEye DB
  * Requires payload containing: 'datasetName', 'metricName', 'dataSource', 'properties'
  * @see {@link https://tinyurl.com/y9g77y87|class OnboardDatasetMetricResource}
@@ -163,6 +168,7 @@ export const selfServeApiOnboard = {
   createAlert,
   updateAlert,
   deleteAlert,
+  editAlert,
   dashboardByName,
   metricsByDataset,
   createNewDataset,

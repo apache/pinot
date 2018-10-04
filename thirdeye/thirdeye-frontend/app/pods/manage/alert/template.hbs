@@ -17,10 +17,10 @@
       </div>
       {{#if (not isReplayPending)}}
         <div class="te-search-results__cta">
-          {{#if isOverViewModeActive}}
-            <button class="te-button te-button--outline" {{action "onClickEdit"}}>Edit</button>
-          {{else}}
+          {{#if isEditModeActive}}
             <button {{action "onClickNavToOverview"}} class="te-button te-button--outline">Back to overview</button>
+          {{else}}
+            <button class="te-button te-button--outline" {{action "onClickEdit"}}>Edit</button>
           {{/if}}
         </div>
       {{/if}}
