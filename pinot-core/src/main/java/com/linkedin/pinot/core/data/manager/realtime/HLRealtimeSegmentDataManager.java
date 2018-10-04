@@ -71,7 +71,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
   private final StreamConsumerFactory _streamConsumerFactory;
   private final StreamProviderConfig kafkaStreamProviderConfig;
-  private final StreamLevelConsumer _kafkaStreamLevelConsumer;
+  private final StreamLevelConsumer _streamLevelConsumer;
   private final File resourceDir;
   private final File resourceTmpDir;
   private final MutableSegmentImpl realtimeSegment;
@@ -167,10 +167,12 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // create and init stream level consumer
     _streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
-    _kafkaStreamLevelConsumer = _streamConsumerFactory.createStreamLevelConsumer(
+    _streamLevelConsumer = _streamConsumerFactory.createStreamLevelConsumer(
         HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamMetadata.getKafkaTopicName());
-    _kafkaStreamLevelConsumer.init(kafkaStreamProviderConfig, tableName, serverMetrics);
-    _kafkaStreamLevelConsumer.start();
+    // TODO: define a contract for StreamLevelConsumer.init() or get rid of it completely
+    // A future refactoring work of unifying StreamMetadata and StreamProviderConfig into StreamConfigs should give some clarity into this
+    _streamLevelConsumer.init(kafkaStreamProviderConfig, tableName, serverMetrics);
+    _streamLevelConsumer.start();
 
     tableStreamName = tableName + "_" + kafkaStreamProviderConfig.getStreamName();
 
@@ -224,7 +226,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           GenericRow row = null;
           try {
             readRow = GenericRow.createOrReuseRow(readRow);
-            readRow = _kafkaStreamLevelConsumer.next(readRow);
+            readRow = _streamLevelConsumer.next(readRow);
             row = readRow;
 
             if (readRow != null) {
@@ -313,9 +315,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           segmentLogger.info("Committing Kafka offsets");
           boolean commitSuccessful = false;
           try {
-            _kafkaStreamLevelConsumer.commit();
+            _streamLevelConsumer.commit();
             commitSuccessful = true;
-            _kafkaStreamLevelConsumer.shutdown();
+            _streamLevelConsumer.shutdown();
             segmentLogger.info("Successfully committed Kafka offsets, consumer release requested.");
           } catch (Throwable e) {
             // If we got here, it means that either the commit or the shutdown failed. Considering that the
@@ -369,7 +371,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 commitSuccessful, e);
             serverMetrics.addMeteredTableValue(tableName, ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS, 1L);
             if (!commitSuccessful) {
-              _kafkaStreamLevelConsumer.shutdown();
+              _streamLevelConsumer.shutdown();
             }
           }
 
@@ -448,7 +450,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     LOGGER.info("Trying to shutdown RealtimeSegmentDataManager : {}!", this.segmentName);
     isShuttingDown = true;
     try {
-      _kafkaStreamLevelConsumer.shutdown();
+      _streamLevelConsumer.shutdown();
     } catch (Exception e) {
       LOGGER.error("Failed to shutdown kafka stream provider!", e);
     }
