@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "*******************************************************"
-echo "Attempting to run ThirdEye Dashboard in demo mode"
+echo "Launching ThirdEye Dashboard in demo mode"
 echo "*******************************************************"
 
 cd thirdeye-pinot

@@ -1,5 +1,5 @@
 # Introduction to ThirdEye
-[![Build Status](https://travis-ci.org/linkedin/pinot.svg?branch=master)](https://travis-ci.org/linkedin/pinot)
+[![Build Status](https://travis-ci.org/linkedin/pinot.svg?branch=master)](https://travis-ci.org/linkedin/pinot) [![license](https://img.shields.io/github/license/linkedin/pinot.svg)](LICENSE)
 
 ThirdEye is an integrated tool for realtime monitoring of time series and interactive root-cause analysis. It enables anyone inside an organization to collaborate on effective identification and analysis of deviations in business and system metrics. ThirdEye supports the entire workflow from anomaly detection, over root-cause analysis, to issue resolution and post-mortem reporting.
 
@@ -40,21 +40,26 @@ ThirdEye supports an interactive demo mode for the analysis dashboard. These ste
 
 You'll need Java 8+, Maven 3+, and NPM 3.10+
 
+
 ### 2: Build ThirdEye
 
 ```
 git clone https://github.com/linkedin/pinot.git
 cd pinot/thirdeye
+chmod +x ./install.sh
 ./install.sh
 ```
 
 Note: The build of thirdeye-frontend may take several minutes
 
+
 ### 3: Run ThirdEye
 
 ```
+chmod +x ./run.sh
 ./run.sh
 ```
+
 
 ### 4: Start an analysis
 
@@ -66,6 +71,7 @@ http://localhost:1426/app/#/rootcause?metricId=1
 
 Note: ThirdEye in demo mode will accept any credentials
 
+
 ### 5: Have fun
 
 Available metrics in demo mode are:
@@ -75,6 +81,12 @@ Available metrics in demo mode are:
 * tracking::pageViews
 
 Note: These metrics are regenerated randomly every time you launch ThirdEye in demo mode
+
+
+### 6: Shutdown
+
+You can stop the ThirdEye dashboard server anytime by pressing **Ctrl + C** in the terminal
+
 
 ## More information
 
