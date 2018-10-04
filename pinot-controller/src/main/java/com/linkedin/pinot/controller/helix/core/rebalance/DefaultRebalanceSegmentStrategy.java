@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Basic rebalance segments strategy, which rebalances offline segments using autorebalance strategy,
+ * Basic rebalance segments strategy, which rebalances offline segments using auto-rebalance strategy,
  * and consuming segments using the partition assignment strategy for the table
  */
 public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy {
