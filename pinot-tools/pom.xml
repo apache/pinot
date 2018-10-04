@@ -116,7 +116,7 @@
               <mainClass>com.linkedin.pinot.tools.admin.PinotAdministrator</mainClass>
               <name>pinot-admin</name>
               <jvmSettings>
-                <initialMemorySize>4G</initialMemorySize>
+                <initialMemorySize>2G</initialMemorySize>
                 <maxMemorySize>4G</maxMemorySize>
                 <extraArguments>
                   <extraArgument>-XX:MaxDirectMemorySize=30g</extraArgument>

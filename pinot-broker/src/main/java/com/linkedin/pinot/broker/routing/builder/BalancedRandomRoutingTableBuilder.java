@@ -21,30 +21,52 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Assign balanced number of segments to each server.
  */
 public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BalancedRandomRoutingTableBuilder.class);
   private static final int DEFAULT_NUM_ROUTING_TABLES = 10;
   private static final String NUM_ROUTING_TABLES_KEY = "numOfRoutingTables";
 
   private int _numRoutingTables = DEFAULT_NUM_ROUTING_TABLES;
+  private IAwareLBControllerDaemon iAwareLBControllerDaemon;
+
+  //private boolean isIAwareLBDaemonStarted = false;
+
+  //use last routing table only
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _numRoutingTables = configuration.getInt(NUM_ROUTING_TABLES_KEY, DEFAULT_NUM_ROUTING_TABLES);
+    //_lastRoutingTables = new ArrayList<>();
+    //_lastSegment2ServerMap = new HashMap<String, List<String>>();
+
+      iAwareLBControllerDaemon = new IAwareLBControllerDaemon(this);
+      ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+      ScheduledFuture future = executor.scheduleWithFixedDelay(iAwareLBControllerDaemon, 0, 1000, TimeUnit.MILLISECONDS);
   }
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigs) {
+  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView, List<InstanceConfig> instanceConfigs) {
+
+    //_lastSegment2ServerMap.clear();
+    Map<String, List<String>> lastSegment2ServerMap = new HashMap<String, List<String>>();
+
     List<Map<String, List<String>>> routingTables = new ArrayList<>(_numRoutingTables);
     for (int i = 0; i < _numRoutingTables; i++) {
       routingTables.add(new HashMap<String, List<String>>());
@@ -55,21 +77,68 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
       // List of servers that are active and are serving the segment
       List<String> servers = new ArrayList<>();
       for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
-        String serverName = entry.getKey();
-        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
+        String serverName = entry.getKey();        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
             && !instancePruner.isInactive(serverName)) {
           servers.add(serverName);
         }
       }
+
       int numServers = servers.size();
       if (numServers != 0) {
         for (Map<String, List<String>> routingTable : routingTables) {
           // Assign the segment to the server with least segments assigned
           routingTable.get(getServerWithLeastSegmentsAssigned(servers, routingTable)).add(segmentName);
         }
+        lastSegment2ServerMap.put(segmentName,servers);
       }
     }
 
+    setLastSegment2ServerMap(lastSegment2ServerMap);
+
+    //iAwareLBControllerDaemon.setRoutingTables(routingTables);
+    //_lastRoutingTables.clear();
+    List<Map<String, List<String>>> lastRoutingTables = new ArrayList<>();
+
+    for(int i=0;i<routingTables.size();i++)
+    {
+      lastRoutingTables.add(new HashMap<String, List<String>>());
+      for(String key:routingTables.get(i).keySet())
+      {
+        List<String> segList = new ArrayList <>();
+        for(String segName:routingTables.get(i).get(key))
+        {
+          segList.add(segName);
+        }
+        lastRoutingTables.get(i).put(key,segList);
+      }
+
+    }
+
+    setLastRoutingTable(lastRoutingTables);
+
+    iAwareLBControllerDaemon.setRoutingTableBuilder(this);
+
+    routingTables = WorkerWeightDeployer.applyWorkerWeights(routingTables, getLastSegment2ServerMap());
+    setRoutingTables(routingTables);
+
+  }
+
+  public void computeRoutingTableFromLastUpdate()
+  {
+
+    LOGGER.info("Within function to apply new interference status! lastRoutingTablesize: {}, lastSegment2ServerMapSize: {}",getLastRoutingTable().size(), getLastSegment2ServerMap().size());
+
+    List<Map<String, List<String>>> routingTables = new ArrayList<>(_numRoutingTables);
+    for (int i = 0; i < _numRoutingTables; i++) {
+      routingTables.add(new HashMap<String, List<String>>());
+    }
+    routingTables = WorkerWeightDeployer.applyWorkerWeights(getLastRoutingTable(), getLastSegment2ServerMap());
     setRoutingTables(routingTables);
   }
+
+  public  static int getDefaultNumRoutingTables()
+  {
+    return DEFAULT_NUM_ROUTING_TABLES;
+  }
+
 }

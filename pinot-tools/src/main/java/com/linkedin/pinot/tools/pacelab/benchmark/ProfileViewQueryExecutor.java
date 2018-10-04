@@ -23,16 +23,49 @@ public class ProfileViewQueryExecutor extends QueryExecutor{
     private static final String[] QUERIES = getQueries();
 
     private static String[] getQueries() {
-        String[] queries = {
+        String[] queries = {/*
                 "SELECT COUNT(*) FROM ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d",
-                "SELECT ViewedProfileId FROM ProfileView" +
-                    " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s' LIMIT %d",
-                "SELECT count(*) FROM ProfileView" +
-                        " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'",
-                "SELECT ViewerPosition, COUNT(*) FROM ProfileView" +
-                        " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'"+
-                        " GROUP BY ViewerPosition TOP %d"//,
+                "SELECT * FROM ProfileView" +
+                    " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s' LIMIT %d",*/
+        "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView" +
+        //                " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'",
+      			  " WHERE ViewedProfileId = '%s'",
+	"SELECT ViewerPosition, COUNT(*) FROM ProfileView" +
+                        //" WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'"+
+                        " WHERE ViewedProfileId = '%s'"+
+			" GROUP BY ViewerPosition TOP %d",
+	"SELECT ViewerWorkPlace, COUNT(*) FROM ProfileView" +
+                       // " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'"+
+                        " WHERE ViewedProfileId = '%s'"+
+			" GROUP BY ViewerWorkPlace TOP %d",
+        "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView" +
+                        " WHERE ViewedProfilePosition = '%s'",
+        "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView " +
+                        " WHERE ViewedProfileWorkPlace = '%s'"
+        /*
+	"SELECT ViewedProfilePosition, COUNT(*), AVG(ReviewTime) FROM ProfileView" +
+        //		" WHERE ViewStartTime > %d AND ViewStartTime < %d" +
+	                " WHERE ViewerWorkPlace = '%s'"+
+                        " GROUP BY ViewedProfilePosition TOP %d",
+        "SELECT ViewedProfileWorkPlace, COUNT(*), AVG(ReviewTime) FROM ProfileView " +
+			" WHERE ViewStartTime > %d AND ViewStartTime < %d" +
+        //                " WHERE ViewerWorkPlace = '%s'"+
+                        " GROUP BY ViewedProfileWorkPlace TOP %d"
+        */
+	
+	/*
+		"SELECT ViewedProfilePosition, COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView" +
+                        " WHERE ViewStartTime > %d AND ViewStartTime < %d"+
+                        " GROUP BY ViewedProfilePosition TOP %d", 
+		"SELECT ViewedProfileWorkPlace, COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView" +
+                        " WHERE ViewStartTime > %d AND ViewStartTime < %d"+
+                        " GROUP BY ViewedProfileWorkPlace TOP %d"*/
+		//"SELECT ViewerWorkPlace, ViewerPosition, COUNT(*), AVG(ReviewTime) FROM ProfileView" +
+                 //   " WHERE ViewStartTime > %d AND ViewStartTime < %d" +
+                 //   " GROUP BY ViewerWorkPlace, ViewerPosition TOP %d"
+
+		//,
                 //"SELECT ViewerPosition, COUNT(*), AVG(ReviewTime), AVG(ViewedProfileStrength) FROM ProfileView " +
                 //    " WHERE ViewStartTime > %d AND ViewStartTime < %d " +
                 //    " GROUP BY ViewerPosition TOP %d",

@@ -17,11 +17,12 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.*;
 
 
 /**
@@ -29,9 +30,15 @@ import java.util.Random;
  */
 public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   protected final Random _random = new Random();
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseRoutingTableBuilder.class);
 
   // Set variable as volatile so all threads can get the up-to-date routing tables
   private volatile List<Map<String, List<String>>> _routingTables;
+
+
+  private volatile List<Map<String, List<String>>> _lastRoutingTables;
+  private volatile Map<String, List<String>> _lastSegment2ServerMap;
+
 
   protected static String getServerWithLeastSegmentsAssigned(List<String> servers,
       Map<String, List<String>> routingTable) {
@@ -61,11 +68,36 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
 
   @Override
   public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
-    return _routingTables.get(_random.nextInt(_routingTables.size()));
+    //LOGGER.info("routing table size: {}",_routingTables.size());
+    int randIndex = _random.nextInt(_routingTables.size());
+    //LOGGER.info("routing table {} key set: {}",randIndex,_routingTables.get(randIndex).keySet().toString());
+    //LOGGER.info("routing table {} value set: {}",randIndex,_routingTables.get(randIndex).values().toString());
+    return _routingTables.get(randIndex);
   }
 
   @Override
   public List<Map<String, List<String>>> getRoutingTables() {
     return _routingTables;
+  }
+
+
+  protected void setLastRoutingTable(List<Map<String, List<String>>> lastRoutingTables)
+  {
+    _lastRoutingTables = lastRoutingTables;
+  }
+
+  protected List<Map<String, List<String>>> getLastRoutingTable()
+  {
+    return _lastRoutingTables;
+  }
+
+  protected void setLastSegment2ServerMap(Map<String, List<String>> lastSegment2ServerMap)
+  {
+    _lastSegment2ServerMap = lastSegment2ServerMap;
+  }
+
+  protected Map<String, List<String>> getLastSegment2ServerMap()
+  {
+    return _lastSegment2ServerMap;
   }
 }
