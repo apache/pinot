@@ -34,18 +34,18 @@ public interface BaselineProvider {
   void init(Map<String, Object> properties);
 
   /**
-   * Fetch the baseline time series for the collection of metric slices.
+   * Compute the baseline time series for the collection of metric slices.
    * @param slices the metric slices
    * @param provider the data source for time series, aggregates, anomalies, etc.
    * @return the mapping of the metric slice to its time series data frame.
    */
-  Map<MetricSlice, DataFrame> fetchBaselineTimeSeries(Collection<MetricSlice> slices, DataProvider provider);
+  Map<MetricSlice, DataFrame> computeBaselineTimeSeries(Collection<MetricSlice> slices, DataProvider provider);
 
   /**
-   * Fetch the baseline time series for the collection of metric slices.
+   * Compute the baseline time series for the collection of metric slices.
    * @param slices the metric slices
    * @param provider the data source for time series, aggregates, anomalies, etc.
    * @return the mapping of the metric slice to its aggregate value.
    */
-  Map<MetricSlice, Double> fetchBaselineAggregates(Collection<MetricSlice> slices, DataProvider provider);
+  Map<MetricSlice, Double> computeBaselineAggregates(Collection<MetricSlice> slices, DataProvider provider);
 }

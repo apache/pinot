@@ -63,7 +63,7 @@ public class RuleBaselineProvider extends StaticBaselineProvider {
   }
 
   @Override
-  public Map<MetricSlice, DataFrame> fetchBaselineTimeSeries(Collection<MetricSlice> slices, InputData data) {
+  public Map<MetricSlice, DataFrame> computeBaselineTimeSeries(Collection<MetricSlice> slices, InputData data) {
     Map<MetricSlice, DataFrame> result = new HashMap<>();
     for (MetricSlice slice : slices) {
       result.put(slice, this.baseline.gather(slice, data.getTimeseries()));
@@ -81,7 +81,7 @@ public class RuleBaselineProvider extends StaticBaselineProvider {
   }
 
   @Override
-  public Map<MetricSlice, Double> fetchBaselineAggregates(Collection<MetricSlice> slices, InputData data) {
+  public Map<MetricSlice, Double> computeBaselineAggregates(Collection<MetricSlice> slices, InputData data) {
     Map<MetricSlice, Double> result = new HashMap<>();
     for (MetricSlice slice : slices) {
       double value;

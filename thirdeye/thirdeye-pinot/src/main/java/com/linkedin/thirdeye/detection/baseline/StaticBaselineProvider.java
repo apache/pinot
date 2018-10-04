@@ -45,24 +45,25 @@ public abstract class StaticBaselineProvider implements BaselineProvider {
   }
 
   /**
-   * Fetch baseline times eries for the metric slices.
-   * @param slices slices to fetch the baseline time series for.
+   * compute baseline times eries for the metric slices.
+   * The DataFrame should includes one Long series called COL_TIME = "timestamp" and a double series called COL_VALUE = "value"
+   * @param slices slices to compute the baseline time series for.
    * @param data input data as defined by getInputDataSpec method.
    * @return the mapping of the metric slice to its time series data frame.
    */
-  public abstract Map<MetricSlice, DataFrame> fetchBaselineTimeSeries(Collection<MetricSlice> slices, InputData data);
+  public abstract Map<MetricSlice, DataFrame> computeBaselineTimeSeries(Collection<MetricSlice> slices, InputData data);
 
   /**
    * The input data spec to describe what data fetch. The data will be feed in to the
-   * @see StaticBaselineProvider#fetchBaselineTimeSeries method
-   * @param slices slices to fetch the baseline time series for.
+   * @see StaticBaselineProvider#computeBaselineTimeSeries method
+   * @param slices slices to compute the baseline time series for.
    * @return the input data spec to describe what time series, anomalies, etc. to fetch.
    */
   abstract InputDataSpec getInputDataSpec(Collection<MetricSlice> slices);
 
   /**
-   * To fetch the baseline aggregate values for each metric slice. Optionally override this method.
-   * By default calls fetch baseline time series then aggregate to one value based on the aggregation function.
+   * To compute the baseline aggregate values for each metric slice. Optionally override this method.
+   * By default calls compute baseline time series then aggregate to one value based on the aggregation function.
    * The input data are defined by
    * @see StaticBaselineProvider#getAggregateInputDataSpec(Collection<MetricSlice>) method.
    *
@@ -70,8 +71,8 @@ public abstract class StaticBaselineProvider implements BaselineProvider {
    * @param data input data as defined by getAggregateInputDataSpec method.
    * @return the mapping of metric slice to its aggregate values
    */
-  public Map<MetricSlice, Double> fetchBaselineAggregates(Collection<MetricSlice> slices, InputData data) {
-    Map<MetricSlice, DataFrame> baselineTimeSeries = this.fetchBaselineTimeSeries(slices, data);
+  public Map<MetricSlice, Double> computeBaselineAggregates(Collection<MetricSlice> slices, InputData data) {
+    Map<MetricSlice, DataFrame> baselineTimeSeries = this.computeBaselineTimeSeries(slices, data);
     Map<MetricSlice, Double> baselineAggregates = new HashMap<>();
     for (MetricSlice slice : slices) {
       DataFrame ts = baselineTimeSeries.get(slice);
@@ -82,23 +83,23 @@ public abstract class StaticBaselineProvider implements BaselineProvider {
 
   /**
    * The input data spec to describe what data fetch. The data will be feed in to the
-   * @see StaticBaselineProvider#fetchBaselineAggregates method.
+   * @see StaticBaselineProvider#computeBaselineAggregates method.
    * Optionally override this method. By default calls the
    * @see StaticBaselineProvider#getInputDataSpec method to get a data spec.
-   * @param slices slices to fetch the baseline time series for.
-   * @return the input data spec to describe what time series, anomalies, etc. to fetch.
+   * @param slices slices to compute the baseline time series for.
+   * @return the input data spec to describe what time series, anomalies, etc. for the framework to fetch.
    */
   InputDataSpec getAggregateInputDataSpec(Collection<MetricSlice> slices) {
     return this.getInputDataSpec(slices);
   }
 
   @Override
-  public final Map<MetricSlice, DataFrame> fetchBaselineTimeSeries(Collection<MetricSlice> slices, DataProvider provider) {
-    return this.fetchBaselineTimeSeries(slices, StageUtils.getDataForSpec(provider, this.getInputDataSpec(slices)));
+  public final Map<MetricSlice, DataFrame> computeBaselineTimeSeries(Collection<MetricSlice> slices, DataProvider provider) {
+    return this.computeBaselineTimeSeries(slices, StageUtils.getDataForSpec(provider, this.getInputDataSpec(slices)));
   }
 
   @Override
-  public final Map<MetricSlice, Double> fetchBaselineAggregates(Collection<MetricSlice> slices, DataProvider provider) {
-    return this.fetchBaselineAggregates(slices, StageUtils.getDataForSpec(provider, this.getAggregateInputDataSpec(slices)));
+  public final Map<MetricSlice, Double> computeBaselineAggregates(Collection<MetricSlice> slices, DataProvider provider) {
+    return this.computeBaselineAggregates(slices, StageUtils.getDataForSpec(provider, this.getAggregateInputDataSpec(slices)));
   }
 }
