@@ -15,28 +15,47 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.Nonnull;
+import org.apache.commons.configuration.Configuration;
+
+import static com.linkedin.pinot.core.startree.v2.StarTreeV2Constants.MetadataKey.*;
 
 
+/**
+ * The {@code StarTreeV2Metadata} contains the metadata for a single star-tree.
+ */
 public class StarTreeV2Metadata {
   private final int _numDocs;
   private final List<String> _dimensionsSplitOrder;
-  private final Set<AggregationFunctionColumnPair> _aggregationFunctionColumnPairs;
+  private final Set<AggregationFunctionColumnPair> _functionColumnPairs;
 
   // The following properties are useful for generating the builder config
-  private final int _maxNumLeafRecords;
+  private final int _maxLeafRecords;
   private final Set<String> _skipStarNodeCreationForDimensions;
 
-  public StarTreeV2Metadata(int numDocs, @Nonnull List<String> dimensionsSplitOrder,
-      @Nonnull Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs, int maxNumLeafRecords,
-      @Nonnull Set<String> skipStarNodeCreationForDimensions) {
+  public StarTreeV2Metadata(int numDocs, List<String> dimensionsSplitOrder,
+      Set<AggregationFunctionColumnPair> functionColumnPairs, int maxLeafRecords,
+      Set<String> skipStarNodeCreationForDimensions) {
     _numDocs = numDocs;
     _dimensionsSplitOrder = dimensionsSplitOrder;
-    _aggregationFunctionColumnPairs = aggregationFunctionColumnPairs;
-    _maxNumLeafRecords = maxNumLeafRecords;
+    _functionColumnPairs = functionColumnPairs;
+    _maxLeafRecords = maxLeafRecords;
     _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
+  }
+
+  @SuppressWarnings("unchecked")
+  public StarTreeV2Metadata(Configuration metadataProperties) {
+    _numDocs = metadataProperties.getInt(TOTAL_DOCS);
+    _dimensionsSplitOrder = metadataProperties.getList(DIMENSIONS_SPLIT_ORDER);
+    _functionColumnPairs = new HashSet<>();
+    for (Object functionColumnPair : metadataProperties.getList(FUNCTION_COLUMN_PAIRS)) {
+      _functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName((String) functionColumnPair));
+    }
+    _maxLeafRecords = metadataProperties.getInt(MAX_LEAF_RECORDS);
+    _skipStarNodeCreationForDimensions =
+        new HashSet<>(metadataProperties.getList(SKIP_STAR_NODE_CREATION_FOR_DIMENSIONS));
   }
 
   public int getNumDocs() {
@@ -47,16 +66,16 @@ public class StarTreeV2Metadata {
     return _dimensionsSplitOrder;
   }
 
-  public Set<AggregationFunctionColumnPair> getAggregationFunctionColumnPairs() {
-    return _aggregationFunctionColumnPairs;
+  public Set<AggregationFunctionColumnPair> getFunctionColumnPairs() {
+    return _functionColumnPairs;
   }
 
-  public boolean containsAggregationFunctionColumnPair(AggregationFunctionColumnPair pair) {
-    return _aggregationFunctionColumnPairs.contains(pair);
+  public boolean containsFunctionColumnPair(AggregationFunctionColumnPair functionColumnPair) {
+    return _functionColumnPairs.contains(functionColumnPair);
   }
 
-  public int getMaxNumLeafRecords() {
-    return _maxNumLeafRecords;
+  public int getMaxLeafRecords() {
+    return _maxLeafRecords;
   }
 
   public Set<String> getSkipStarNodeCreationForDimensions() {

@@ -17,13 +17,9 @@ package com.linkedin.pinot.core.startree;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -37,64 +33,47 @@ public class OffHeapStarTree implements StarTree {
   public static final long MAGIC_MARKER = 0xBADDA55B00DAD00DL;
   public static final int VERSION = 1;
 
-  private final PinotDataBuffer _dataBuffer;
   private final OffHeapStarTreeNode _root;
   private final List<String> _dimensionNames;
 
   public OffHeapStarTree(PinotDataBuffer dataBuffer) {
-    _dataBuffer = dataBuffer;
-
     long offset = 0L;
-    Preconditions.checkState(MAGIC_MARKER == _dataBuffer.getLong(offset), "Invalid magic marker in Star Tree file");
+    Preconditions.checkState(MAGIC_MARKER == dataBuffer.getLong(offset),
+        "Invalid magic marker in star-tree data buffer");
     offset += Long.BYTES;
 
-    Preconditions.checkState(VERSION == _dataBuffer.getInt(offset), "Invalid version in Star Tree file");
+    Preconditions.checkState(VERSION == dataBuffer.getInt(offset), "Invalid version in star-tree data buffer");
     offset += Integer.BYTES;
 
-    int rootNodeOffset = _dataBuffer.getInt(offset);
+    int rootNodeOffset = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
 
-    int numDimensions = _dataBuffer.getInt(offset);
+    int numDimensions = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
 
     String[] dimensionNames = new String[numDimensions];
     for (int i = 0; i < numDimensions; i++) {
       // NOTE: this is for backward-compatibility. In old version, index might not be stored in order
-      int dimensionId = _dataBuffer.getInt(offset);
+      int dimensionId = dataBuffer.getInt(offset);
       offset += Integer.BYTES;
 
-      int numBytes = _dataBuffer.getInt(offset);
+      int numBytes = dataBuffer.getInt(offset);
       offset += Integer.BYTES;
       byte[] bytes = new byte[numBytes];
-      _dataBuffer.copyTo(offset, bytes);
+      dataBuffer.copyTo(offset, bytes);
       offset += numBytes;
       dimensionNames[dimensionId] = StringUtil.decodeUtf8(bytes);
     }
     _dimensionNames = Arrays.asList(dimensionNames);
 
-    int numNodes = _dataBuffer.getInt(offset);
+    int numNodes = dataBuffer.getInt(offset);
     offset += Integer.BYTES;
-    Preconditions.checkState(offset == rootNodeOffset, "Error reading Star Tree file, header length mis-match");
-    long bufferSize = _dataBuffer.size();
+    Preconditions.checkState(offset == rootNodeOffset, "Error loading star-tree, header length mis-match");
+    long bufferSize = dataBuffer.size();
     Preconditions.checkState(offset + numNodes * OffHeapStarTreeNode.SERIALIZABLE_SIZE_IN_BYTES == bufferSize,
-        "Error reading Star Tree file, buffer size mis-match");
+        "Error loading star-tree, buffer size mis-match");
 
-    _root = new OffHeapStarTreeNode(_dataBuffer.view(rootNodeOffset, bufferSize), 0);
-  }
-
-  public OffHeapStarTree(File starTreeFile, ReadMode readMode) throws IOException {
-    this(getDataBuffer(starTreeFile, readMode));
-  }
-
-  private static PinotDataBuffer getDataBuffer(File starTreeFile, ReadMode readMode) throws IOException {
-    // Backward-compatible: star-tree file is always little-endian
-    if (readMode == ReadMode.mmap) {
-      return PinotDataBuffer.mapFile(starTreeFile, true, 0, starTreeFile.length(), ByteOrder.LITTLE_ENDIAN,
-          "OffHeapStarTree");
-    } else {
-      return PinotDataBuffer.loadFile(starTreeFile, 0, starTreeFile.length(), ByteOrder.LITTLE_ENDIAN,
-          "OffHeapStarTree");
-    }
+    _root = new OffHeapStarTreeNode(dataBuffer.view(rootNodeOffset, bufferSize), 0);
   }
 
   @Override
@@ -157,10 +136,5 @@ public class OffHeapStarTree implements StarTree {
         printTreeHelper(dictionaryMap, childrenIterator.next(), level + 1);
       }
     }
-  }
-
-  @Override
-  public void close() throws IOException {
-    _dataBuffer.close();
   }
 }

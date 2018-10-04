@@ -25,6 +25,8 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2Constants;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2Metadata;
 import com.linkedin.pinot.startree.hll.HllConstants;
 import java.io.DataInputStream;
 import java.io.File;
@@ -80,7 +82,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _refreshTime = Long.MIN_VALUE;
   private SegmentVersion _segmentVersion;
   private boolean _hasStarTree;
-  private StarTreeMetadata _starTreeMetadata = null;
+  private StarTreeMetadata _starTreeMetadata;
+  private List<StarTreeV2Metadata> _starTreeV2MetadataList;
   private String _creatorName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
@@ -89,7 +92,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private int _totalRawDocs;
   private long _segmentStartTime;
   private long _segmentEndTime;
-
 
   /**
    * For segments on disk.
@@ -297,6 +299,17 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     if (_hasStarTree) {
       initStarTreeMetadata(segmentMetadataPropertiesConfiguration);
     }
+
+    // Build star-tree v2 metadata
+    int starTreeV2Count =
+        segmentMetadataPropertiesConfiguration.getInt(StarTreeV2Constants.MetadataKey.STAR_TREE_COUNT, 0);
+    if (starTreeV2Count > 0) {
+      _starTreeV2MetadataList = new ArrayList<>(starTreeV2Count);
+      for (int i = 0; i < starTreeV2Count; i++) {
+        _starTreeV2MetadataList.add(new StarTreeV2Metadata(
+            segmentMetadataPropertiesConfiguration.subset(StarTreeV2Constants.MetadataKey.getStarTreePrefix(i))));
+      }
+    }
   }
 
   /**
@@ -501,10 +514,13 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _hasStarTree;
   }
 
-  @Nullable
   @Override
   public StarTreeMetadata getStarTreeMetadata() {
     return _starTreeMetadata;
+  }
+
+  public List<StarTreeV2Metadata> getStarTreeV2MetadataList() {
+    return _starTreeV2MetadataList;
   }
 
   @Override

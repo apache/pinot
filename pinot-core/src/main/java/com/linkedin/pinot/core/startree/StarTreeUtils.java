@@ -58,7 +58,7 @@ public class StarTreeUtils {
       @Nullable Set<TransformExpressionTree> groupByExpressions, @Nullable FilterQueryTree rootFilterNode) {
     // Check aggregations
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-      if (!starTreeV2Metadata.containsAggregationFunctionColumnPair(aggregationFunctionColumnPair)) {
+      if (!starTreeV2Metadata.containsFunctionColumnPair(aggregationFunctionColumnPair)) {
         return false;
       }
     }
