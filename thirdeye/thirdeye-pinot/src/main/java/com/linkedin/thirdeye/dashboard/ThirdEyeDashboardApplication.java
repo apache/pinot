@@ -151,11 +151,12 @@ public class ThirdEyeDashboardApplication
 
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+    AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
 
     env.jersey().register(new DatasetAutoOnboardResource());
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
-    env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
+    env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory, alertFilterAutotuneFactory));
     env.jersey().register(new EmailResource(config));
     env.jersey().register(new EntityManagerResource(config));
     env.jersey().register(new MetricConfigResource());
@@ -207,7 +208,6 @@ public class ThirdEyeDashboardApplication
       Do not call start() as this instance is only meant to run replay/autotune
      */
     DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
-    AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
     env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
 
     try {

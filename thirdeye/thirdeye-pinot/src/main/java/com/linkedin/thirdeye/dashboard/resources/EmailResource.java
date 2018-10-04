@@ -25,13 +25,18 @@ import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.wordnik.swagger.annotations.ApiOperation;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -52,6 +57,7 @@ public class EmailResource {
   private static final Logger LOG = LoggerFactory.getLogger(EmailResource.class);
 
   private final AlertConfigManager alertDAO;
+  private final AnomalyFunctionManager anomalyDAO;
   private final ApplicationManager appDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private AlertFilterFactory alertFilterFactory;
@@ -73,6 +79,7 @@ public class EmailResource {
       String dashboardHost, String phantonJsPath, String rootDir) {
     this.smtpConfiguration = smtpConfiguration;
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.anomalyDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.appDAO = DAO_REGISTRY.getApplicationDAO();
     this.alertFilterFactory = alertFilterFactory;
     this.failureFromAddress = failureFromAddress;
@@ -179,6 +186,84 @@ public class EmailResource {
   @Path("function/{id}")
   public List<AlertConfigDTO> getSubscriberList(@PathParam("id") Long alertFunctionId) {
     return getAlertToSubscriberMapping().get(alertFunctionId);
+  }
+
+  @POST
+  @Path("{id}/subscribe")
+  @ApiOperation("Endpoint for subscribing to an alert/alerts")
+  public Response subscribeAlert(
+      @PathParam("id") Long id,
+      @QueryParam("functionId") String functionIds,
+      @QueryParam("functionName") String functionName,
+      @QueryParam("metric") String metric,
+      @QueryParam("dataset") String dataset,
+      @DefaultValue("") @QueryParam("functionPrefix") String functionPrefix) throws Exception {
+    if (StringUtils.isBlank(functionIds) && StringUtils.isBlank(functionName)
+        && (StringUtils.isBlank(metric) || StringUtils.isBlank(dataset))) {
+      throw new IllegalArgumentException(String.format("Received null or emtpy String for the mandatory params. Please"
+          + " specify either functionIds or functionName or (metric & dataset). dataset: %s, metric: %s,"
+          + " functionName %s, functionIds: %s", dataset, metric, functionName, functionIds));
+    }
+
+    Map<String, String> responseMessage = new HashMap<>();
+
+    AlertConfigDTO alertConfigDTO = alertDAO.findById(id);
+    if (alertConfigDTO == null) {
+      responseMessage.put("message", "cannot find the alert group configuration entry " + id + ".");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
+
+    final List<Long> functionIdList = new ArrayList<>();
+    if (StringUtils.isNotBlank(functionIds)) {
+      for (String functionId : functionIds.split(",")) {
+        AnomalyFunctionDTO anomalyFunction = anomalyDAO.findById(Long.valueOf(functionId));
+        if (anomalyFunction != null) {
+          functionIdList.add(Long.valueOf(functionId));
+        } else {
+          responseMessage.put("skipped function " + functionId, "Cannot be found!");
+        }
+      }
+    } else if (StringUtils.isNotBlank(functionName)) {
+      AnomalyFunctionDTO anomalyFunctionDTO = anomalyDAO.findWhereNameEquals(functionName);
+      if (anomalyFunctionDTO == null) {
+        responseMessage.put("message", "function " + functionName + " cannot be found.");
+        return Response.ok(responseMessage).build();
+      }
+    } else {
+      Predicate predicate = Predicate.AND(
+          Predicate.EQ("metric", metric),
+          Predicate.EQ("collection", dataset));
+      List<AnomalyFunctionDTO> anomalyFunctionDTOS = anomalyDAO.findByPredicate(predicate);
+      if (anomalyFunctionDTOS == null) {
+        responseMessage.put("message", "no function found on metric " + metric + " & dataset " + dataset);
+        return Response.ok(responseMessage).build();
+      }
+
+      for (AnomalyFunctionDTO anomalyDTO : anomalyFunctionDTOS) {
+        if (anomalyDTO.getFunctionName().startsWith(functionPrefix)) {
+          functionIdList.add(anomalyDTO.getId());
+        } else {
+          responseMessage.put("skipped function " + anomalyDTO.getFunctionName(), "Doesn't match prefix."
+              + functionPrefix);
+        }
+      }
+    }
+
+    AlertConfigBean.EmailConfig emailConfig = alertConfigDTO.getEmailConfig();
+    if (emailConfig == null) {
+      AlertConfigBean.EmailConfig emailConf = new AlertConfigBean.EmailConfig();
+      emailConf.setFunctionIds(functionIdList);
+      alertConfigDTO.setEmailConfig(emailConf);
+    } else if (emailConfig.getFunctionIds() != null) {
+      emailConfig.getFunctionIds().addAll(functionIdList);
+    } else {
+      emailConfig.setFunctionIds(functionIdList);
+    }
+    alertDAO.update(alertConfigDTO);
+
+    responseMessage.put("message", "Alert group " + id + " successfully subscribed to following functions: "
+        + functionIdList);
+    return Response.ok(responseMessage).build();
   }
 
   /**

@@ -16,6 +16,14 @@
 
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.google.common.base.CaseFormat;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
+import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import javax.ws.rs.core.Response;
@@ -41,25 +49,99 @@ import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.validation.constraints.NotNull;
 
+import static com.linkedin.thirdeye.dashboard.resources.EntityManagerResource.*;
+
+
 @Path("/onboard")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class OnboardResource {
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private MetricConfigManager metricConfigDAO;
+  private AlertConfigManager emailConfigurationDAO;
+  private TaskManager taskDAO;
 
+  private static final String DEFAULT_FUNCTION_PREFIX = "thirdEyeAutoOnboard_";
+  private static final String DEFAULT_ALERT_GROUP = "te_bulk_onboard_alerts";
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(OnboardResource.class);
 
   public OnboardResource() {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+    this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.taskDAO = DAO_REGISTRY.getTaskDAO();
   }
 
   public OnboardResource(AnomalyFunctionManager anomalyFunctionManager,
                          MergedAnomalyResultManager mergedAnomalyResultManager) {
     this.anomalyFunctionDAO = anomalyFunctionManager;
     this.mergedAnomalyResultDAO = mergedAnomalyResultManager;
+  }
+
+  @POST
+  @Path("/bulk-onboard")
+  @ApiOperation("Endpoint used for bulk on-boarding alerts leveraging the create-job endpoint.")
+  public Response bulkOnboardAlert(
+      @NotNull @QueryParam("tag") String tag,
+      @DefaultValue(DEFAULT_FUNCTION_PREFIX) @QueryParam("functionPrefix") String functionPrefix,
+      @DefaultValue(DEFAULT_ALERT_GROUP) @QueryParam("alertGroupName") String alertGroupName) throws Exception {
+    Map<String, String> responseMessage = new HashMap<>();
+    AlertConfigDTO alertConfigDTO = emailConfigurationDAO.findWhereNameEquals(alertGroupName);
+    if (alertConfigDTO == null) {
+      responseMessage.put("message", "cannot find the alert group with name " + alertGroupName + ".");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
+
+    List<MetricConfigDTO> metrics = fetchMetrics(tag);
+    LOG.info("Number of metrics with tag {} fetched is {}.", tag, metrics.size());
+
+    // For each metric create a new anomaly function & replay it
+    List<Long> ids = new ArrayList<>();
+    for (MetricConfigDTO metric : metrics) {
+      String functionName = functionPrefix + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getName());
+
+      AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findWhereNameEquals(functionName);
+      if (anomalyFunctionDTO != null) {
+        LOG.error("[bulk-onboard] Anomaly function {} already exists.", anomalyFunctionDTO.getFunctionName());
+        responseMessage.put("skipped " + metric.getName(), "Anomaly function already exists.");
+        continue;
+      }
+
+      try {
+        Map<String, String> properties = new HashMap<>();
+        properties.put(DefaultDetectionOnboardJob.FUNCTION_NAME, functionName);
+        properties.put(DefaultDetectionOnboardJob.METRIC_NAME, metric.getName());
+        properties.put(DefaultDetectionOnboardJob.COLLECTION_NAME, metric.getDataset());
+        properties.put(DefaultDetectionOnboardJob.IS_LEGACY, "false");
+        properties.put("alertId", alertConfigDTO.getId().toString());
+        String propertiesJson = OBJECT_MAPPER.writeValueAsString(properties);
+        DetectionOnboardResource detectionOnboardResource = new DetectionOnboardResource(taskDAO, anomalyFunctionDAO);
+        detectionOnboardResource.createDetectionOnboardingJob(functionName, propertiesJson);
+        anomalyFunctionDTO = anomalyFunctionDAO.findWhereNameEquals(functionName);
+        ids.add(anomalyFunctionDTO.getId());
+      } catch (Exception e) {
+        LOG.error("[bulk-onboard] There was an exception onboarding metric {} function {}.", metric, functionName, e);
+        responseMessage.put("skipped " + metric.getName(), "Exception onboarding metric : " + e);
+      }
+    }
+
+    responseMessage.put("message", "successfully on-boarded the following function ids: " + ids);
+    return Response.ok(responseMessage).build();
+  }
+
+  private List<MetricConfigDTO> fetchMetrics(String tag) {
+    List<MetricConfigDTO> results = new ArrayList<>();
+    for (MetricConfigDTO metricConfigDTO : this.metricConfigDAO.findAll()) {
+      if (metricConfigDTO.getTags() != null) {
+        if (metricConfigDTO.getTags().contains(tag)) {
+          results.add(metricConfigDTO);
+        }
+      }
+    }
+    return results;
   }
 
   // endpoint clone function Ids to append a name defined in nameTags
