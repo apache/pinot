@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.PeriodicTask;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -48,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
  */
-public class ValidationManager {
+public class ValidationManager extends PeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ValidationManager.class);
 
   private final long _validationIntervalSeconds;
@@ -60,6 +61,7 @@ public class ValidationManager {
 
   public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
+    super("ValidationManager", config.getValidationControllerFrequencyInSeconds());
     _validationIntervalSeconds = config.getValidationControllerFrequencyInSeconds();
     _enableSegmentLevelValidation = config.getEnableSegmentLevelValidation();
     _pinotHelixResourceManager = pinotHelixResourceManager;

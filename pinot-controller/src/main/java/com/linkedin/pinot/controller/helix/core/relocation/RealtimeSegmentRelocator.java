@@ -20,6 +20,7 @@ import com.google.common.base.Function;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.PeriodicTask;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
@@ -31,9 +32,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 import org.apache.helix.HelixManager;
@@ -50,38 +48,20 @@ import org.slf4j.LoggerFactory;
  * We only relocate segments for realtime tables, and only if tenant config indicates that relocation is required
  * A segment will be relocated, one replica at a time, once all of its replicas are in ONLINE state and on consuming servers
  */
-public class RealtimeSegmentRelocator {
+public class RealtimeSegmentRelocator extends PeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocator.class);
 
-  private final ScheduledExecutorService _executorService;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private final long _runFrequencySeconds;
 
   public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+    super("RealtimeSegmentRelocator");
+    setIntervalSeconds(getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency()));
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _runFrequencySeconds = getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency());
-
-    _executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
-      Thread thread = new Thread(runnable);
-      thread.setName("RealtimeSegmentRelocatorExecutorService");
-      return thread;
-    });
   }
 
-  public void start() {
-    LOGGER.info("Starting realtime segment relocator");
-
-    _executorService.scheduleWithFixedDelay(() -> {
-      try {
-        runRelocation();
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while running realtime segment relocator", e);
-      }
-    }, 120, _runFrequencySeconds, TimeUnit.SECONDS);
-  }
-
-  public void stop() {
-    _executorService.shutdown();
+  @Override
+  public void runTask() {
+    runRelocation();
   }
 
   /**

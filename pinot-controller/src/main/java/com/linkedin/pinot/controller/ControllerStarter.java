@@ -151,11 +151,7 @@ public class ControllerStarter {
 
     LOGGER.info("Starting task manager");
     _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
-    int taskManagerFrequencyInSeconds = _config.getTaskManagerFrequencyInSeconds();
-    if (taskManagerFrequencyInSeconds > 0) {
-      LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);
-      _taskManager.startScheduler(taskManagerFrequencyInSeconds);
-    }
+    _taskManager.start();
 
     LOGGER.info("Starting retention manager");
     _retentionManager.start();
@@ -307,7 +303,7 @@ public class ControllerStarter {
       _segmentStatusChecker.stop();
 
       LOGGER.info("Stopping task manager");
-      _taskManager.stopScheduler();
+      _taskManager.stop();
 
       _executorService.shutdownNow();
     } catch (final Exception e) {

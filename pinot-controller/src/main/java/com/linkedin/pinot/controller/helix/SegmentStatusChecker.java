@@ -21,13 +21,11 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.PeriodicTask;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
@@ -47,19 +45,16 @@ import org.slf4j.LoggerFactory;
  * May 15, 2016
 */
 
-public class SegmentStatusChecker {
+public class SegmentStatusChecker extends PeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
-  private static final int SegmentCheckerDefaultIntervalSeconds = 120;
   private static final int MaxOfflineSegmentsToLog = 5;
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
   public static final String CONSUMING = "CONSUMING";
-  private ScheduledExecutorService _executorService;
   private final ControllerMetrics _metricsRegistry;
   private final ControllerConf _config;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final HelixAdmin _helixAdmin;
-  private final long _segmentStatusIntervalSeconds;
   private final int _waitForPushTimeSeconds;
 
   // log messages about disabled tables atmost once a day
@@ -72,68 +67,30 @@ public class SegmentStatusChecker {
    * @param config The controller configuration object
    */
   public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config, ControllerMetrics metricsRegistry) {
+    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
     _config = config;
-    _segmentStatusIntervalSeconds = config.getStatusCheckerFrequencyInSeconds();
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _metricsRegistry = metricsRegistry;
     HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
+  }
 
-    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable runnable) {
-        Thread thread = new Thread(runnable);
-        thread.setName("Segment status checker");
-        return thread;
-      }
-    });
+  @Override
+  public void runTask() {
+    updateSegmentMetrics();
   }
 
   /**
    * Starts the segment status checker.
    */
   public void start() {
-    if (_segmentStatusIntervalSeconds == -1) {
+    if (getIntervalSeconds() == -1) {
       LOGGER.warn("Segment status check interval is -1, status checks disabled.");
       return;
     }
-
     setStatusToDefault();
-
-    _executorService.scheduleWithFixedDelay(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          updateSegmentMetrics();
-        } catch (Throwable e) {
-          // catch all errors to prevent subsequent exeuctions from being silently suppressed
-          // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
-          LOGGER.warn("Caught exception while running segment status checker", e);
-        }
-      }
-    }, SegmentCheckerDefaultIntervalSeconds, _segmentStatusIntervalSeconds, TimeUnit.SECONDS);
-  }
-
-
-  /**
-   * Stops the segment status checker.
-   */
-  public void stop() {
-    if (_executorService == null) {
-      return;
-    }
-
-    // Shut down the executor
-    _executorService.shutdown();
-
-    try {
-      _executorService.awaitTermination(SegmentCheckerDefaultIntervalSeconds, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      // Ignored
-    }
-
-    _executorService = null;
+    super.start();
   }
 
   /**

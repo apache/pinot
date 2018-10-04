@@ -22,6 +22,7 @@ import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.common.utils.PeriodicTask;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
@@ -31,8 +32,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
@@ -43,31 +42,30 @@ import org.slf4j.LoggerFactory;
  * The <code>RetentionManager</code> class manages retention for all segments and delete expired segments.
  * <p>It is scheduled to run only on leader controller.
  */
-public class RetentionManager {
+public class RetentionManager extends PeriodicTask {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private final ScheduledExecutorService _executorService;
-  private final int _runFrequencyInSeconds;
   private final int _deletedSegmentsRetentionInDays;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
       int deletedSegmentsRetentionInDays) {
+    super("PinotRetentionManager", runFrequencyInSeconds, Math.min(60, runFrequencyInSeconds));
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _runFrequencyInSeconds = runFrequencyInSeconds;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
-    _executorService =
-        Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "PinotRetentionManagerExecutorService"));
+  }
+
+  @Override
+  public void runTask() {
+    execute();
   }
 
   public void start() {
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        _runFrequencyInSeconds, _deletedSegmentsRetentionInDays);
-    _executorService.scheduleWithFixedDelay(this::execute, Math.min(60, _runFrequencyInSeconds), _runFrequencyInSeconds,
-        TimeUnit.SECONDS);
-    LOGGER.info("RetentionManager started");
+        getIntervalSeconds(), _deletedSegmentsRetentionInDays);
+    super.start();
   }
 
   public void execute() {

@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.PeriodicTask;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
@@ -29,9 +30,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * <p><code>PinotTaskManager</code> is also responsible for checking the health status on each type of tasks, detect and
  * fix issues accordingly.
  */
-public class PinotTaskManager {
+public class PinotTaskManager extends PeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManager.class);
 
   private final PinotHelixResourceManager _helixResourceManager;
@@ -52,11 +50,11 @@ public class PinotTaskManager {
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
   private final ControllerMetrics _controllerMetrics;
 
-  private ScheduledExecutorService _executorService;
-
   public PinotTaskManager(@Nonnull PinotHelixTaskResourceManager helixTaskResourceManager,
       @Nonnull PinotHelixResourceManager helixResourceManager, @Nonnull ControllerConf controllerConf,
       @Nonnull ControllerMetrics controllerMetrics) {
+    super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
+        Math.min(60, controllerConf.getTaskManagerFrequencyInSeconds()));
     _helixResourceManager = helixResourceManager;
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
@@ -88,27 +86,11 @@ public class PinotTaskManager {
   /**
    * Start the task scheduler with the given running frequency.
    *
-   * @param runFrequencyInSeconds Scheduler running frequency in seconds
    */
-  public void startScheduler(int runFrequencyInSeconds) {
-    _executorService = Executors.newSingleThreadScheduledExecutor();
-    _executorService.scheduleWithFixedDelay(() -> {
-      // Only schedule new tasks from leader controller
-      if (!_helixResourceManager.isLeader()) {
-        LOGGER.info("Skip scheduling new tasks on non-leader controller");
-        nonLeaderCleanUp();
-        return;
-      }
-      scheduleTasks();
-    }, Math.min(60, runFrequencyInSeconds), runFrequencyInSeconds, TimeUnit.SECONDS);
-  }
-
-  /**
-   * Stop the task scheduler.
-   */
-  public void stopScheduler() {
-    if (_executorService != null) {
-      _executorService.shutdown();
+  public void start() {
+    if (getIntervalSeconds() > 0) {
+      LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalSeconds());
+      super.start();
     }
   }
 
@@ -119,6 +101,13 @@ public class PinotTaskManager {
    */
   @Nonnull
   public Map<String, String> scheduleTasks() {
+    // Only schedule new tasks from leader controller
+    if (!_helixResourceManager.isLeader()) {
+      LOGGER.info("Skip scheduling new tasks on non-leader controller");
+      nonLeaderCleanUp();
+      return new HashMap<>();
+    }
+
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -173,5 +162,10 @@ public class PinotTaskManager {
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
       _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
     }
+  }
+
+  @Override
+  public void runTask() {
+    scheduleTasks();
   }
 }
