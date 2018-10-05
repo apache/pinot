@@ -118,6 +118,7 @@ public class SegmentGeneratorConfig {
     _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
     _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
+    _columnSortOrder.addAll(config._columnSortOrder);
     _dataDir = config._dataDir;
     _inputFilePath = config._inputFilePath;
     _format = config._format;
@@ -171,9 +172,11 @@ public class SegmentGeneratorConfig {
 
       if (noDictionaryColumnMap != null) {
         Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
-            noDictionaryColumnMap.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey,
-                e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
+            noDictionaryColumnMap.entrySet()
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                    e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(
+                        e.getValue())));
         this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
       }
     }
@@ -189,7 +192,6 @@ public class SegmentGeneratorConfig {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
   }
-
 
   public SegmentGeneratorConfig(Schema schema) {
     _schema = schema;
