@@ -52,7 +52,7 @@ public class StarTreeQueryGenerator {
   private static final int SHUFFLE_THRESHOLD = 5 * MAX_NUM_IN_VALUES;
   private static final Random RANDOM = new Random();
   // Add more functions here to generate them in the queries.
-  private static final List<String> AGGREGATION_FUNCTIONS = Collections.singletonList("SUM");
+  private static final List<String> DEFAULT_AGGREGATION_FUNCTIONS = Collections.singletonList("SUM");
   // Add more comparators here to generate them in the 'WHERE' clause.
   private static final List<String> COMPARATORS = Arrays.asList("=", "<>", "<", ">", "<=", ">=");
 
@@ -60,14 +60,21 @@ public class StarTreeQueryGenerator {
   private final List<String> _singleValueDimensionColumns;
   private final List<String> _metricColumns;
   private final Map<String, List<Object>> _singleValueDimensionValuesMap;
-
+  private final List<String> _aggregationFunctions;
 
   public StarTreeQueryGenerator(String tableName, List<String> singleValueDimensionColumns, List<String> metricColumns,
-      Map<String, List<Object>> singleValueDimensionValuesMap) {
+      Map<String, List<Object>> singleValueDimensionValuesMap, List<String> aggregationFunctions) {
     _tableName = tableName;
     _singleValueDimensionColumns = singleValueDimensionColumns;
     _metricColumns = metricColumns;
     _singleValueDimensionValuesMap = singleValueDimensionValuesMap;
+    _aggregationFunctions = aggregationFunctions;
+  }
+
+  public StarTreeQueryGenerator(String tableName, List<String> singleValueDimensionColumns, List<String> metricColumns,
+      Map<String, List<Object>> singleValueDimensionValuesMap) {
+    this(tableName, singleValueDimensionColumns, metricColumns, singleValueDimensionValuesMap,
+        DEFAULT_AGGREGATION_FUNCTIONS);
   }
 
   /**
@@ -78,7 +85,7 @@ public class StarTreeQueryGenerator {
    */
   private StringBuilder generateAggregation(String metricColumn) {
     StringBuilder stringBuilder =
-        new StringBuilder(AGGREGATION_FUNCTIONS.get(RANDOM.nextInt(AGGREGATION_FUNCTIONS.size())));
+        new StringBuilder(_aggregationFunctions.get(RANDOM.nextInt(_aggregationFunctions.size())));
     return stringBuilder.append('(').append(metricColumn).append(')');
   }
 
@@ -90,13 +97,13 @@ public class StarTreeQueryGenerator {
   private StringBuilder generateAggregations() {
     StringBuilder stringBuilder = new StringBuilder();
 
-    int numAggregations = Math.min(RANDOM.nextInt(MAX_NUM_AGGREGATIONS) + 1, _metricColumns.size());
-    Collections.shuffle(_metricColumns);
+    int numAggregations = RANDOM.nextInt(MAX_NUM_AGGREGATIONS) + 1;
+    int numMetrics = _metricColumns.size();
     for (int i = 0; i < numAggregations; i++) {
       if (i != 0) {
         stringBuilder.append(',').append(' ');
       }
-      stringBuilder.append(generateAggregation(_metricColumns.get(i)));
+      stringBuilder.append(generateAggregation(_metricColumns.get(RANDOM.nextInt(numMetrics))));
     }
 
     return stringBuilder;
@@ -137,8 +144,8 @@ public class StarTreeQueryGenerator {
     Object value1 = valueArray.get(RANDOM.nextInt(valueArray.size()));
     Object value2 = valueArray.get(RANDOM.nextInt(valueArray.size()));
 
-    Preconditions.checkState((value1 instanceof String && value2 instanceof String)
-        || (value1 instanceof Number && value2 instanceof Number));
+    Preconditions.checkState((value1 instanceof String && value2 instanceof String) || (value1 instanceof Number
+        && value2 instanceof Number));
 
     if (value1 instanceof String) {
       if (((String) value1).compareTo((String) value2) < 0) {
@@ -229,12 +236,13 @@ public class StarTreeQueryGenerator {
     }
 
     StringBuilder stringBuilder = new StringBuilder(WHERE);
-    Collections.shuffle(_singleValueDimensionColumns);
+
+    int numDimensions = _singleValueDimensionColumns.size();
     for (int i = 0; i < numPredicates; i++) {
       if (i != 0) {
         stringBuilder.append(AND);
       }
-      String dimensionName = _singleValueDimensionColumns.get(RANDOM.nextInt(numPredicates));
+      String dimensionName = _singleValueDimensionColumns.get(RANDOM.nextInt(numDimensions));
       switch (RANDOM.nextInt(3)) {
         case 0:
           stringBuilder.append(generateComparisonPredicate(dimensionName));
@@ -257,18 +265,19 @@ public class StarTreeQueryGenerator {
    * @return group by section.
    */
   private StringBuilder generateGroupBys() {
-    int numGroupBys = Math.min(RANDOM.nextInt(MAX_NUM_GROUP_BYS + 1), _singleValueDimensionColumns.size());
+    int numGroupBys = RANDOM.nextInt(MAX_NUM_GROUP_BYS + 1);
     if (numGroupBys == 0) {
       return null;
     }
 
     StringBuilder stringBuilder = new StringBuilder(GROUP_BY);
-    Collections.shuffle(_singleValueDimensionColumns);
+
+    int numDimensions = _singleValueDimensionColumns.size();
     for (int i = 0; i < numGroupBys; i++) {
       if (i != 0) {
         stringBuilder.append(',').append(' ');
       }
-      stringBuilder.append(_singleValueDimensionColumns.get(i));
+      stringBuilder.append(_singleValueDimensionColumns.get(RANDOM.nextInt(numDimensions)));
     }
 
     return stringBuilder;
@@ -309,8 +318,7 @@ public class StarTreeQueryGenerator {
    *
    * @param args arguments.
    */
-  public static void main(String[] args)
-      throws Exception {
+  public static void main(String[] args) throws Exception {
     if (args.length != 2) {
       System.err.println("Usage: StarTreeQueryGenerator starTreeSegmentsDirectory numQueries");
       return;
