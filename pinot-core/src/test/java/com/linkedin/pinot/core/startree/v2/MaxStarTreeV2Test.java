@@ -16,28 +16,28 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
+import com.linkedin.pinot.core.data.aggregator.MaxValueAggregator;
 import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
 import java.util.Random;
 
 import static org.testng.Assert.*;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
 
   @Override
   ValueAggregator<Number, Double> getValueAggregator() {
-    return new SumValueAggregator();
+    return new MaxValueAggregator();
   }
 
   @Override
   DataType getRawValueType() {
-    return DataType.INT;
+    return DataType.DOUBLE;
   }
 
   @Override
   Number getRandomRawValue(Random random) {
-    return random.nextInt();
+    return random.nextDouble();
   }
 
   @Override

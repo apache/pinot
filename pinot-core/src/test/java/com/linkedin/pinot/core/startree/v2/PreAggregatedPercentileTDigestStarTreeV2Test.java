@@ -16,32 +16,41 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
+import com.linkedin.pinot.core.data.aggregator.PercentileTDigestValueAggregator;
 import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
+import com.tdunning.math.stats.TDigest;
 import java.util.Random;
 
 import static org.testng.Assert.*;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class PreAggregatedPercentileTDigestStarTreeV2Test extends BaseStarTreeV2Test<Object, TDigest> {
+  // Use non-default compression
+  private static final double COMPRESSION = 50;
 
   @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
-    return new SumValueAggregator();
+  ValueAggregator<Object, TDigest> getValueAggregator() {
+    return new PercentileTDigestValueAggregator();
   }
 
   @Override
   DataType getRawValueType() {
-    return DataType.INT;
+    return DataType.BYTES;
   }
 
   @Override
-  Number getRandomRawValue(Random random) {
-    return random.nextInt();
+  Object getRandomRawValue(Random random) {
+    TDigest tDigest = TDigest.createMergingDigest(COMPRESSION);
+    tDigest.add(random.nextLong());
+    tDigest.add(random.nextLong());
+    return ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest);
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  void assertAggregatedValue(TDigest starTreeResult, TDigest nonStarTreeResult) {
+    for (int i = 0; i <= 100; i++) {
+      assertEquals(starTreeResult.quantile(i / 100), nonStarTreeResult.quantile(i / 100));
+    }
   }
 }

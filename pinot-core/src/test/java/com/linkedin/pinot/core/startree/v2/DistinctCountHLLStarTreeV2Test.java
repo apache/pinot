@@ -15,19 +15,20 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
+import com.linkedin.pinot.core.data.aggregator.DistinctCountHLLValueAggregator;
 import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
 import java.util.Random;
 
 import static org.testng.Assert.*;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class DistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, HyperLogLog> {
 
   @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
-    return new SumValueAggregator();
+  ValueAggregator<Object, HyperLogLog> getValueAggregator() {
+    return new DistinctCountHLLValueAggregator();
   }
 
   @Override
@@ -36,12 +37,12 @@ public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
   }
 
   @Override
-  Number getRandomRawValue(Random random) {
-    return random.nextInt();
+  Object getRandomRawValue(Random random) {
+    return random.nextInt(100);
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
+    assertEquals(starTreeResult.cardinality(), nonStarTreeResult.cardinality());
   }
 }
