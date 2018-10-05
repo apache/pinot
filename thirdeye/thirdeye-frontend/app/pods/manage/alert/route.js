@@ -150,7 +150,8 @@ export default Route.extend({
      */
     didTransition() {
       this.controller.set('isTransitionDone', true);
-      // This is needed in order to update the links in this parent route
+      // This is needed in order to update the links in this parent route,
+      // giving the "currentRouteName" time to resolve
       later(this, () => {
         if (this.router.currentRouteName.includes('explore')) {
           this.controller.set('isEditModeActive', false);

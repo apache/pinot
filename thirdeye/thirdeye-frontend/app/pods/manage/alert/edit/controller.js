@@ -32,7 +32,6 @@ export default Controller.extend({
   /**
    * Important initializations
    */
-  //isEditAlertError: false, // alert save failure
   isEditAlertSuccess: false, // alert save success
   isProcessingForm: false, // to trigger submit disable
   isExiting: false, // exit detection
