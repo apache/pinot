@@ -5,13 +5,15 @@ import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import { get, computed } from '@ember/object';
+import { get, set, computed, getProperties } from '@ember/object';
 export default Component.extend({
   classNames: ['rootcause-select-metric-dimension'],
 
   selectedUrn: null, // ""
 
   onSelection: null, // function (metricUrn)
+
+  onFocus: null,
 
   placeholder: 'Search for a Metric',
 
@@ -23,6 +25,8 @@ export default Component.extend({
   selectedUrnCache: null, // ""
 
   selectedMetric: null, // {}
+
+  searchInputSelector: '#ember-basic-dropdown-wormhole input',
 
   /**
    * @summary Concurrency task that triggers returning the selected metrics as recommended list
@@ -105,6 +109,22 @@ export default Component.extend({
       const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
 
       onSelection(updates);
+    },
+
+    /**
+     * Inserts the selected metric alias into the power-select search field for easy modification
+     * @param {Object} selectObj - metric selected
+     */
+    onFocus(selectObj) {
+      const {
+        onFocus,
+        selectionEditable,
+        searchInputSelector
+      } = getProperties(this, 'onFocus', 'selectionEditable', 'searchInputSelector');
+      if (selectionEditable && selectObj.isActive) {
+        const selectInputEl = document.querySelector(searchInputSelector);
+        selectInputEl.value = selectObj.selected.alias;
+      }
     },
 
     /**
