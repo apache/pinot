@@ -37,7 +37,15 @@ export const eventColorMapping = {
   custom: 'pink'
 };
 
-export const dateFormatFull = 'ddd, MMM D YYYY, h:mm a';
+export const dateFormatFull = 'ddd, MMM D YYYY, h:mm a z';
+
+/**
+ * Returns a timestamp pinned to the default RCA time zone
+ */
+export function makeTime(t, args) {
+  if (typeof t === 'undefined') { t = moment().valueOf(); }
+  return moment(t, args).tz('America/Los_Angeles');
+}
 
 /**
  * Parses the input as float and returns it, unless it is NaN where it returns Number.NEGATIVE_INFINITY instead
@@ -374,7 +382,7 @@ export function toBaselineRange(range, offset) {
     return range;
   }
 
-  const start = moment(range[0]).subtract(offsetWeeks, 'weeks').valueOf();
+  const start = makeTime(range[0]).subtract(offsetWeeks, 'weeks').valueOf();
   const end = start + (range[1] - range[0]);
 
   return [start, end];
@@ -620,5 +628,6 @@ export default {
   eventColorMapping,
   dateFormatFull,
   trimTimeRanges,
-  splitFilterFragment
+  splitFilterFragment,
+  makeTime
 };
