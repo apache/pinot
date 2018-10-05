@@ -146,9 +146,8 @@ public class DetectionAlertTaskRunner implements TaskRunner {
         this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(result.getAllAnomalies());
         sendEmail(result);
 
-        this.detectionAlertConfig.setVectorClocks(mergeVectorClock(
-            this.detectionAlertConfig.getVectorClocks(),
-            makeVectorClock(result.getAllAnomalies())));
+        this.detectionAlertConfig.setVectorClocks(
+            mergeVectorClock(this.detectionAlertConfig.getVectorClocks(), makeVectorClock(result.getAllAnomalies())));
 
         long highWaterMark = getHighWaterMark(result.getAllAnomalies());
         if (this.detectionAlertConfig.getHighWaterMark() != null) {
@@ -159,6 +158,10 @@ public class DetectionAlertTaskRunner implements TaskRunner {
         this.alertConfigDAO.save(this.detectionAlertConfig);
       }
       return taskResult;
+
+    } catch (Exception e) {
+      ThirdeyeMetricsUtil.alertTaskExceptionCounter.inc();
+      throw e;
 
     } finally {
       ThirdeyeMetricsUtil.alertTaskSuccessCounter.inc();

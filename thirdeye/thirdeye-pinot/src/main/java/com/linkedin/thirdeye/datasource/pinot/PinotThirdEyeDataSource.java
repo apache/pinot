@@ -185,7 +185,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         String pql = null;
         MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
         if (metricConfig != null && metricConfig.isDimensionAsMetric()) {
-          pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, dataTimeSpec, datasetConfig);
+          pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, dataTimeSpec,
+              datasetConfig);
         } else {
           pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
         }
@@ -195,22 +196,27 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         try {
           resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
           if (metricConfig != null) {
-            ThirdeyeMetricsUtil.getRequestLog().success(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime());
+            ThirdeyeMetricsUtil.getRequestLog()
+                .success(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime());
           }
         } catch (Exception e) {
           if (metricConfig != null) {
-            ThirdeyeMetricsUtil.getRequestLog().failure(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime(), e);
+            ThirdeyeMetricsUtil.getRequestLog()
+                .failure(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime(), e);
           }
           throw e;
         }
 
         metricFunctionToResultSetList.put(metricFunction, resultSetGroup.getResultSets());
-
       }
 
       List<String[]> resultRows = parseResultSets(request, metricFunctionToResultSetList);
-      PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, timeSpec);
-      return resp;
+      return new PinotThirdEyeResponse(request, resultRows, timeSpec);
+
+    } catch (Exception e) {
+      ThirdeyeMetricsUtil.pinotExceptionCounter.inc();
+      throw e;
+
     } finally {
       ThirdeyeMetricsUtil.pinotCallCounter.inc();
       ThirdeyeMetricsUtil.pinotDurationCounter.inc(System.nanoTime() - tStart);

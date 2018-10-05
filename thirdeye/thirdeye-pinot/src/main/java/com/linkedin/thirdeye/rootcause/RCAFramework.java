@@ -98,9 +98,9 @@ public class RCAFramework {
       Map<String, Future<PipelineResult>> flow = constructDAG(pipelines);
 
       Map<String, PipelineResult> results = new HashMap<>();
-      for(Map.Entry<String, Future<PipelineResult>> e : flow.entrySet()) {
+      for (Map.Entry<String, Future<PipelineResult>> e : flow.entrySet()) {
         PipelineResult r = e.getValue().get(TIMEOUT, TimeUnit.MILLISECONDS);
-        if(LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
           LOG.debug("Results for pipeline '{}':", e.getKey());
           logResultDetails(r);
         }
@@ -108,6 +108,11 @@ public class RCAFramework {
       }
 
       return new RCAFrameworkExecutionResult(results.get(OUTPUT).getEntities(), results);
+
+    } catch (Exception e) {
+      ThirdeyeMetricsUtil.rcaFrameworkExceptionCounter.inc();
+      throw e;
+
     } finally {
       ThirdeyeMetricsUtil.rcaFrameworkCallCounter.inc();
       ThirdeyeMetricsUtil.rcaFrameworkDurationCounter.inc(System.nanoTime() - tStart);

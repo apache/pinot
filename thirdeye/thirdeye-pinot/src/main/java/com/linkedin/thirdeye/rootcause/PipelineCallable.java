@@ -67,6 +67,7 @@ class PipelineCallable implements Callable<PipelineResult> {
     } catch(Exception e) {
       long runtime = (System.nanoTime() - tStart) / 1000000;
       LOG.error("Error while executing pipeline '{}' after {}ms. Returning empty result.", this.pipeline.getOutputName(), runtime, e);
+      ThirdeyeMetricsUtil.rcaPipelineExceptionCounter.inc();
       return new PipelineResult(context, Collections.<Entity>emptySet());
 
     } finally {
