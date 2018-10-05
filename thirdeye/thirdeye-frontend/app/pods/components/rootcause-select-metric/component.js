@@ -1,11 +1,11 @@
 import Component from '@ember/component';
 import fetch from 'fetch';
-import { toBaselineUrn, toCurrentUrn } from 'thirdeye-frontend/utils/rca-utils';
+import { toBaselineUrn, toCurrentUrn, filterPrefix } from 'thirdeye-frontend/utils/rca-utils';
 import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-
+import { get, computed } from '@ember/object';
 export default Component.extend({
   classNames: ['rootcause-select-metric-dimension'],
 
@@ -25,6 +25,31 @@ export default Component.extend({
   selectedMetric: null, // {}
 
   /**
+   * @summary Concurrency task that triggers returning the selected metrics as recommended list
+   * @return {Array} array of groupName and options list
+   * @example
+     [
+       { groupName: 'Selected Metrics', options: [{alias:'one', id: '1'}, {alias:'two', id: '2'}, {alias:'three', id: '3'}] }
+     ]
+   */
+  recommendedMetrics: computed(
+    'entities', 'selectedUrns',
+    function() {
+      const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
+      const result = filterPrefix(selectedUrns, 'thirdeye:metric:')
+        .map((urn) => {
+          const entity = entities[urn];
+          const agg = entity ? { alias: entity.label, id: entity.urn.split(':')[2] } : {};
+          return agg;
+        });
+
+      return [
+        { groupName: 'Selected Metrics', options: _.sortBy(result, (row) => row.alias) || [] }
+      ];
+    }
+  ),
+
+  /**
    * Ember concurrency task that triggers the metric autocomplete
    */
   searchMetrics: task(function* (metric) {
@@ -36,7 +61,10 @@ export default Component.extend({
   didReceiveAttrs() {
     this._super(...arguments);
 
-    const { selectedUrn, selectedUrnCache } = this.getProperties('selectedUrn', 'selectedUrnCache');
+    const {
+      selectedUrn,
+      selectedUrnCache
+    } = this.getProperties('selectedUrn', 'selectedUrnCache');
 
     if (!_.isEqual(selectedUrn, selectedUrnCache)) {
       this.set('selectedUrnCache', selectedUrn);
@@ -45,7 +73,9 @@ export default Component.extend({
         const url = `/data/metric/${selectedUrn.split(':')[2]}`;
         fetch(url)
           .then(checkStatus)
-          .then(res => this.set('selectedMetric', res));
+          .then((res) => {
+            this.set('selectedMetric', res);
+          });
       } else {
         this.set('selectedMetric', null);
       }
@@ -53,6 +83,13 @@ export default Component.extend({
   },
 
   actions: {
+    /**
+     * Action handler for metric recomendations on currently selected metrics
+     * @param {Object} metric
+     */
+    recommendedMetricsAction(metric) {
+      this.send('onChange', metric);
+    },
     /**
      * Action handler for metric search changes
      * @param {Object} metric

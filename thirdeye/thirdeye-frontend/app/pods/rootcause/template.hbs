@@ -133,10 +133,14 @@
     <div class="card-container card-container--md card-container--space-around card-container--flush-top">
       <div class="card-container__row card-container__row--flex row">
         <div class="col-xs-10">
-          {{rootcause-select-metric-dimension
-            selectedUrn=metricUrn
-            onSelection=(action "onPrimaryChange")
-          }}
+          {{#if selectedUrns.size}}
+            {{rootcause-select-metric-dimension
+              selectedUrn=metricUrn
+              selectedUrns=selectedUrns
+              entities=entities
+              onSelection=(action "onPrimaryChange")
+            }}
+          {{/if}}
         </div>
         <div class="col-xs-2">
           {{#if context.urns.size}}

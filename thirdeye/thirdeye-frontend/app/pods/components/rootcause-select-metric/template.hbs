@@ -1,4 +1,5 @@
 {{#power-select
+  options=recommendedMetrics
   selected=selectedMetric
   triggerId="select-metric"
   onchange=(action "onChange")
@@ -8,5 +9,9 @@
   matchTriggerWidth=false
 as |metric|
 }}
+{{#if (eq selectedMetric.alias metric.alias)}}
+  <span class="bluelink">{{metric.alias}}</span>
+{{else}}
   {{metric.alias}}
+{{/if}}
 {{/power-select}}
