@@ -520,7 +520,7 @@ body {
 .te-search-results {
   border-bottom: 1px app-shade(black, 1) solid;
   color: app-shade(black, 0.7);
-  padding: 24px 0;
+  padding: 20px 0;
 
   &--slim {
     padding: 24px 0 0 0;
@@ -544,7 +544,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: $te-spacing;
+    margin-bottom: 14px;
   }
 
   &__row {
@@ -557,8 +557,8 @@ body {
 
     &--list {
       display: inline-block;
-      width: 100px;
-      min-width: 100px;
+      width: 137px;
+      min-width: 137px;
       font-size: 15px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -569,7 +569,13 @@ body {
 
     &--solo {
       color: app-shade(black, 9);
-      width: 117px;
+      width: 140px;
+      margin-right: 20px;
+      text-align: right;
+    }
+
+    &--left {
+      width: 100px;
     }
   }
 
@@ -606,7 +612,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 660px;
-    margin: -30px 0 0 74px;
+    display: inline-block;
   }
 
   &__edit-button {
@@ -638,9 +644,10 @@ body {
 
   &__tag {
     background-color: app-shade(black, 3);
-    font-size: $te-font-size-small;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
     line-height: 20px;
-    letter-spacing: .05em;
     border-radius: 3px;
     padding: 4px 8px;
     margin: 0 20px;
@@ -649,7 +656,9 @@ body {
     width: auto;
 
     &--list {
-      margin: 0 10px 0 0;
+      margin: 3px 10px 0 0;
+      display: block;
+      float: left;
     }
 
     &--active {

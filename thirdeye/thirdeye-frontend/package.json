@@ -44,7 +44,7 @@
     "ember-cli-sass": "^6.2.0",
     "ember-cli-shims": "^1.2.0",
     "ember-cli-showdown": "4.1.0",
-    "ember-cli-spinjs": "^1.4.2",
+    "ember-cli-spinjs": "2.0.0",
     "ember-cli-sri": "^2.1.0",
     "ember-cli-text-support-mixins": "^1.1.2",
     "ember-cli-textarea-autosize": "^1.1.0",

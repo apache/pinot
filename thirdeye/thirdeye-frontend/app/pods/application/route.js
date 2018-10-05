@@ -72,20 +72,19 @@ export default Route.extend(ApplicationRouteMixin, {
      */
     error: function(error, transition) {
       const notifications = this.get('notifications');
+      const toastOptions = {
+        timeOut: '4000',
+        positionClass: 'toast-bottom-right'
+      };
+      const toastMsg = 'Something went wrong with a request. Please try again or come back later.';
       if (error.message === '401' || (error.response && error.response.status === '401')) {
         this.set('session.store.errorMsg', 'Your session expired. Please login again.');
         this.transitionTo('logout');
       } else if (error.message === '500' || (error.response && error.response.status === '500')) {
-        notifications.error('Something went wrong with a request. Please try again or come back later.', '500 error detected', {
-          timeOut: '4000',
-          positionClass: 'toast-bottom-right'
-        });
+        notifications.error(toastMsg, '500 error detected', toastOptions);
       } else {
-        const errorStatus = error.response && error.response.status || 'Unknown';
-        notifications.error('Something went wrong with a request. Please try again or come back later.', `${errorStatus} error detected`, {
-          timeOut: '4000',
-          positionClass: 'toast-bottom-right'
-        });
+        const errorStatus = error.response ? error.response.status : 'Unknown';
+        notifications.error(toastMsg, `${errorStatus} error detected`, toastOptions);
       }
     }
   }

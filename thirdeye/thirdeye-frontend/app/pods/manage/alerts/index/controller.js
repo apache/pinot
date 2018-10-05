@@ -141,6 +141,9 @@ export default Controller.extend({
       const sortOrder = this.get('selectedSortMode');
       const allGroups = this.get('model.subscriberGroups');
       let alerts = this.get('selectedAlerts');
+      let alphaSortedAlerts = alerts.sort((a, b) => {
+        return a.functionName.trim().localeCompare(b.functionName.trim());
+      });
       let groupFunctionIds = [];
       let foundAlert = {};
 
@@ -155,11 +158,11 @@ export default Controller.extend({
           break;
         }
         case 'A to Z': {
-          alerts = alerts.sortBy('functionName');
+          alerts = alphaSortedAlerts;
           break;
         }
         case 'Z to A': {
-          alerts = alerts.sortBy('functionName').reverse();
+          alerts = alphaSortedAlerts.reverse();
           break;
         }
       }
@@ -251,8 +254,6 @@ export default Controller.extend({
 
     // Handles filtering of alerts in response to filter selection
     userDidSelectFilter(filterArr) {
-      let task = {};
-
       // Reset results
       this.send('onSearchModeChange', 'All Alerts');
 
