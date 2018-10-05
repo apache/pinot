@@ -34,7 +34,7 @@ if [ $noThirdEyeChange -eq 0 ]; then
   fi
 fi
 
-mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true -Pbuild-shaded-jar
+mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true
 if [ $? -ne 0 ]; then
   exit 1
 fi
