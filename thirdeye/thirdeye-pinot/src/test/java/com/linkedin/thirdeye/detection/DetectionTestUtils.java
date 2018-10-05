@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 
 public class DetectionTestUtils {
@@ -54,5 +55,25 @@ public class DetectionTestUtils {
 
   public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end, Map<String, String> dimensions) {
     return DetectionTestUtils.makeAnomaly(configId, start, end, null, null, dimensions);
+  }
+
+  public static MergedAnomalyResultDTO makeAnomaly(long start, long end, Set<MergedAnomalyResultDTO> children) {
+    MergedAnomalyResultDTO result = makeAnomaly(start, end);
+    result.setChildren(children);
+    return result;
+  }
+
+  public static MergedAnomalyResultDTO makeAnomaly(long start, long end, Map<String, String> dimensions, Set<MergedAnomalyResultDTO> children) {
+    MergedAnomalyResultDTO result = makeAnomaly(start, end, dimensions);
+    result.setChildren(children);
+    return result;
+  }
+
+  public static MergedAnomalyResultDTO makeAnomaly(long start, long end, String metricUrn, long currentValue, long baselineValue) {
+    MergedAnomalyResultDTO result = makeAnomaly(start, end);
+    result.setMetricUrn(metricUrn);
+    result.setAvgCurrentVal(currentValue);
+    result.setAvgBaselineVal(baselineValue);
+    return result;
   }
 }
