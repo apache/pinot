@@ -25,12 +25,12 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2Constants;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
@@ -146,6 +146,17 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         copyStarTree(v2DataReader, v3DataWriter);
         v3DataWriter.saveAndClose();
       }
+    }
+
+    copyStarTreeV2(v2Directory, v3Directory);
+  }
+
+  private void copyStarTreeV2(File src, File dest) throws IOException {
+    File indexFile = new File(src, StarTreeV2Constants.INDEX_FILE_NAME);
+    if (indexFile.exists()) {
+      FileUtils.copyFile(indexFile, new File(dest, StarTreeV2Constants.INDEX_FILE_NAME));
+      FileUtils.copyFile(new File(src, StarTreeV2Constants.INDEX_MAP_FILE_NAME),
+          new File(dest, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
     }
   }
 
