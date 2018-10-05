@@ -16,9 +16,9 @@
 package com.linkedin.pinot.core.realtime.kafka;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaPartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleStreamConsumer;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleStreamMetadataProvider;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamMetadataProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,9 +48,9 @@ import scala.collection.immutable.List;
 
 
 /**
- * Tests for the KafkaSimpleStreamConsumer.
+ * Tests for the KafkaPartitionLevelConsumer.
  */
-public class KafkaSimpleStreamConsumerTest {
+public class KafkaPartitionLevelConsumerTest {
   public class MockKafkaSimpleConsumerFactory implements KafkaSimpleConsumerFactory {
 
     private String[] hosts;
@@ -231,8 +231,8 @@ public class KafkaSimpleStreamConsumerTest {
         streamKafkaTopicName
     );
 
-    KafkaSimpleStreamMetadataProvider streamMetadataProvider =
-        new KafkaSimpleStreamMetadataProvider(clientId, streamMetadata, mockKafkaSimpleConsumerFactory);
+    KafkaStreamMetadataProvider streamMetadataProvider =
+        new KafkaStreamMetadataProvider(clientId, streamMetadata, mockKafkaSimpleConsumerFactory);
     Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
   }
 
@@ -261,8 +261,8 @@ public class KafkaSimpleStreamConsumerTest {
     );
 
     int partition = 0;
-    KafkaSimpleStreamConsumer kafkaSimpleStreamConsumer =
-        new KafkaSimpleStreamConsumer(clientId, streamMetadata, partition, mockKafkaSimpleConsumerFactory);
+    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
+        new KafkaPartitionLevelConsumer(clientId, streamMetadata, partition, mockKafkaSimpleConsumerFactory);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
   }
 
@@ -290,8 +290,8 @@ public class KafkaSimpleStreamConsumerTest {
         streamKafkaTopicName);
 
     int partition = 0;
-    KafkaSimpleStreamMetadataProvider kafkaSimpleStreamMetadataProvider =
-        new KafkaSimpleStreamMetadataProvider(clientId, streamMetadata, partition, mockKafkaSimpleConsumerFactory);
-    kafkaSimpleStreamMetadataProvider.fetchPartitionOffset("smallest", 10000);
+    KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
+        new KafkaStreamMetadataProvider(clientId, streamMetadata, partition, mockKafkaSimpleConsumerFactory);
+    kafkaStreamMetadataProvider.fetchPartitionOffset("smallest", 10000);
   }
 }

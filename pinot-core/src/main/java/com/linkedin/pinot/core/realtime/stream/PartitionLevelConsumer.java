@@ -21,7 +21,7 @@ import java.io.Closeable;
 /**
  * Interface for a Stream Consumer which fetches messages from the stream for given offsets
  */
-public interface StreamConsumer extends Closeable {
+public interface PartitionLevelConsumer extends Closeable {
 
   /**
    * Fetch messages from the stream between the specified offsets

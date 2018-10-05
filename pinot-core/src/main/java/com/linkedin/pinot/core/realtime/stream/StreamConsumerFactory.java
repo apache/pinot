@@ -33,11 +33,19 @@ public abstract class StreamConsumerFactory {
   }
 
   /**
-   * Creates a stream consumer which can fetch stream messages
+   * Creates a partition level consumer which can fetch messages from a partitioned stream
+   * @param clientId
    * @param partition
    * @return
    */
-  public abstract StreamConsumer createStreamConsumer(String clientId, int partition);
+  public abstract PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition);
+
+  /**
+   * Creates a stream level consumer (high level) which can fetch messages from the stream
+   * @param clientId
+   * @return
+   */
+  public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId);
 
   /**
    * Creates a metadata provider which provides partition specific metadata
