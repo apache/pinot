@@ -59,10 +59,14 @@ const severityMap = {
  * If no filter data is set for sensitivity, use this
  */
 const sensitivityDefaults = {
+  defaultMttdVal: '5',
   selectedSeverityOption: 'Percentage of Change',
   selectedTunePattern: 'Up and Down',
   defaultPercentChange: '0.3',
-  defaultMttdChange: '5'
+  mttdGranularityMinimums: {
+    days: 24,
+    hours: 1
+  }
 };
 
 /**
@@ -106,11 +110,14 @@ const anomalyTableStats = (anomalies) => {
  */
 const processDefaultTuningParams = (alertData) => {
   let {
+    defaultMttdVal,
     selectedSeverityOption,
     selectedTunePattern,
     defaultPercentChange,
-    defaultMttdChange
+    mttdGranularityMinimums
   } = sensitivityDefaults;
+
+  console.log('alertData : ', alertData);
 
   // Cautiously derive tuning data from alert filter properties
   const featureString = 'window_size_in_hour';
@@ -120,6 +127,13 @@ const processDefaultTuningParams = (alertData) => {
   const isMttdPropFormatted =  _.has(alertFilterObj, 'mttd') && alertFilterObj.mttd.includes(`${featureString}=`);
   const alertFeatures = isFeaturesPropFormatted ? alertFilterObj.features.split(',')[1] : null;
   const alertMttd = isMttdPropFormatted ? alertFilterObj.mttd.split(';') : null;
+  const granularityBucket = alertData.bucketUnit ? alertData.bucketUnit.toLowerCase() : null;
+  const isBucketDefaultPresent = granularityBucket && mttdGranularityMinimums.hasOwnProperty(granularityBucket);
+  const defaultMttdChange = isBucketDefaultPresent ? mttdGranularityMinimums[granularityBucket] : defaultMttdVal;
+
+  console.log('bucket: ', granularityBucket, ' isBucketDefaultPresent: ', isBucketDefaultPresent, ' defaultMttdChange: ', defaultMttdChange);
+
+
 
   // Load saved pattern into pattern options
   const savedTunePattern = alertPattern ? alertPattern : 'UP,DOWN';
@@ -140,7 +154,9 @@ const processDefaultTuningParams = (alertData) => {
 
   // Load saved mttd
   const mttdValue = alertMttd ? alertMttd[0].split('=')[1] : 'N/A';
-  const customMttdChange = !isNaN(mttdValue) ? Number(mttdValue).toFixed(2) : defaultMttdChange;
+  console.log('num mttd val : ', alertMttd);
+  //const customMttdChange = !isNaN(mttdValue) ? Number(mttdValue).toFixed(2) : defaultMttdChange;
+  const customMttdChange = !isNaN(mttdValue) ? Math.round(Number(mttdValue)) : defaultMttdChange;
 
   // Load saved severity value
   const severityValue = alertMttd ? alertMttd[1].split('=')[1] : 'N/A';
@@ -338,6 +354,7 @@ export default Route.extend({
       alertEvalMetrics,
       selectedTunePattern,
       selectedSeverityOption,
+      mttdMinimums: sensitivityDefaults.mttdGranularityMinimums,
       alertHasDimensions: isPresent(alertData.exploreDimensions),
       timeRangeOptions: setUpTimeRangeOptions([durationDefault], duration)
     });

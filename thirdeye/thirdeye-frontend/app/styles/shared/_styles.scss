@@ -242,6 +242,10 @@ body {
   &--number {
     width: 50px;
   }
+
+  &--error {
+    border-color: red;
+  }
 }
 
 .te-page {
