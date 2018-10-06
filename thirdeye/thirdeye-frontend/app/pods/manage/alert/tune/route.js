@@ -148,7 +148,6 @@ const processDefaultTuningParams = (alertData) => {
 
   // Load saved mttd
   const mttdValue = alertMttd ? alertMttd[0].split('=')[1] : 'N/A';
-  //const customMttdChange = !isNaN(mttdValue) ? Number(mttdValue).toFixed(2) : defaultMttdChange;
   const customMttdChange = !isNaN(mttdValue) ? Math.round(Number(mttdValue)) : defaultMttdChange;
 
   // Load saved severity value
