@@ -117,8 +117,6 @@ const processDefaultTuningParams = (alertData) => {
     mttdGranularityMinimums
   } = sensitivityDefaults;
 
-  console.log('alertData : ', alertData);
-
   // Cautiously derive tuning data from alert filter properties
   const featureString = 'window_size_in_hour';
   const alertFilterObj = alertData.alertFilter || null;
@@ -130,10 +128,6 @@ const processDefaultTuningParams = (alertData) => {
   const granularityBucket = alertData.bucketUnit ? alertData.bucketUnit.toLowerCase() : null;
   const isBucketDefaultPresent = granularityBucket && mttdGranularityMinimums.hasOwnProperty(granularityBucket);
   const defaultMttdChange = isBucketDefaultPresent ? mttdGranularityMinimums[granularityBucket] : defaultMttdVal;
-
-  console.log('bucket: ', granularityBucket, ' isBucketDefaultPresent: ', isBucketDefaultPresent, ' defaultMttdChange: ', defaultMttdChange);
-
-
 
   // Load saved pattern into pattern options
   const savedTunePattern = alertPattern ? alertPattern : 'UP,DOWN';
@@ -154,7 +148,6 @@ const processDefaultTuningParams = (alertData) => {
 
   // Load saved mttd
   const mttdValue = alertMttd ? alertMttd[0].split('=')[1] : 'N/A';
-  console.log('num mttd val : ', alertMttd);
   //const customMttdChange = !isNaN(mttdValue) ? Number(mttdValue).toFixed(2) : defaultMttdChange;
   const customMttdChange = !isNaN(mttdValue) ? Math.round(Number(mttdValue)) : defaultMttdChange;
 

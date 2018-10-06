@@ -216,9 +216,6 @@ export default Controller.extend({
         }
       ];
 
-      const x = isPerfDataReady ? buildAnomalyStats(metrics, statsCards, false) : [];
-      console.log('x : ', metrics);
-
       return isPerfDataReady ? buildAnomalyStats(metrics, statsCards, false) : [];
     }
   ),
