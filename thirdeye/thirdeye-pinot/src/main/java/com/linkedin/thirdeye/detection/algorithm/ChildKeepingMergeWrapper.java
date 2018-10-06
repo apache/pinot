@@ -62,7 +62,8 @@ public class ChildKeepingMergeWrapper extends MergeWrapper {
           || anomaly.getEndTime() - parent.getStartTime() <= this.maxDuration) {
         // fully merge into existing
         if (parent.getChildren().isEmpty()){
-          parent.getChildren().add(copyAnomaly(parent));
+          MergedAnomalyResultDTO newAnomaly = new MergedAnomalyResultDTO();
+          parent.getChildren().add(copyAnomalyInfo(parent, newAnomaly));
         }
         parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
 
@@ -81,8 +82,7 @@ public class ChildKeepingMergeWrapper extends MergeWrapper {
     return output;
   }
 
-  MergedAnomalyResultDTO copyAnomaly(MergedAnomalyResultDTO anomaly) {
-    MergedAnomalyResultDTO newAnomaly = new MergedAnomalyResultDTO();
+  MergedAnomalyResultDTO copyAnomalyInfo(MergedAnomalyResultDTO anomaly, MergedAnomalyResultDTO newAnomaly) {
     newAnomaly.setStartTime(anomaly.getStartTime());
     newAnomaly.setEndTime(anomaly.getEndTime());
     newAnomaly.setMetric(anomaly.getMetric());
@@ -91,6 +91,12 @@ public class ChildKeepingMergeWrapper extends MergeWrapper {
     newAnomaly.setDimensions(anomaly.getDimensions());
     newAnomaly.setDetectionConfigId(anomaly.getDetectionConfigId());
     newAnomaly.setAnomalyResultSource(anomaly.getAnomalyResultSource());
+    newAnomaly.setAvgBaselineVal(anomaly.getAvgBaselineVal());
+    newAnomaly.setAvgCurrentVal(anomaly.getAvgCurrentVal());
+    newAnomaly.setFeedback(anomaly.getFeedback());
+    newAnomaly.setAnomalyFeedbackId(anomaly.getAnomalyFeedbackId());
+    newAnomaly.setScore(anomaly.getScore());
+    newAnomaly.setWeight(anomaly.getWeight());
     return newAnomaly;
   }
 }
