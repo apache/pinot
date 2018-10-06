@@ -96,7 +96,6 @@ public class ChildKeepingMergeWrapper extends MergeWrapper {
     newAnomaly.setFeedback(anomaly.getFeedback());
     newAnomaly.setAnomalyFeedbackId(anomaly.getAnomalyFeedbackId());
     newAnomaly.setScore(anomaly.getScore());
-    newAnomaly.setWeight(anomaly.getWeight());
     return newAnomaly;
   }
 }
