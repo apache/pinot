@@ -31,7 +31,6 @@ export default Component.extend({
   compareMode: null, // ""
   onChange: null, // func (start, end, compareMode)
   slider: null,
-  timeseries: null,
   originalMinInvestigatePeriod: null,
   originalMaxInvestigatePeriod: null,
 
@@ -74,7 +73,6 @@ export default Component.extend({
   granularityOneWay: computed('granularity', function() {
     return namedToEpocMapping[this.get('granularity')];
   }),
-
 
   startFormatted: computed('anomalyRange.[]', function() {//investigation start
     return moment(this.get('anomalyRange')[0]).format(serverDateFormat);
