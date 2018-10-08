@@ -157,4 +157,9 @@ public class PinotTaskManager extends PeriodicTask {
   public void runTask() {
     scheduleTasks();
   }
+
+  @Override
+  public void initTask() {
+    LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalSeconds());
+  }
 }

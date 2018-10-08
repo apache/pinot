@@ -20,24 +20,24 @@ public abstract class PeriodicTask {
   private final String _taskName;
   private long _executionTime;
   private long _intervalSeconds;
-  private long _initialDelay;
+  private long _initialDelaySeconds;
 
   public static final long DEFAULT_RUN_FREQUENCY_IN_SECOND = 3600L;
-  public static final long DEFAULT_INITIAL_DELAY = 120L;
+  public static final long DEFAULT_INITIAL_DELAY_IN_SECOND = 120L;
 
   public PeriodicTask(String taskName) {
     this(taskName, DEFAULT_RUN_FREQUENCY_IN_SECOND);
   }
 
   public PeriodicTask(String taskName, long runFrequencyInSeconds) {
-    this(taskName, runFrequencyInSeconds, DEFAULT_INITIAL_DELAY);
+    this(taskName, runFrequencyInSeconds, DEFAULT_INITIAL_DELAY_IN_SECOND);
   }
 
-  public PeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelay) {
+  public PeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelaySeconds) {
     _taskName = taskName;
     _intervalSeconds = runFrequencyInSeconds;
-    _initialDelay = initialDelay;
-    _executionTime = System.currentTimeMillis() + initialDelay;
+    _initialDelaySeconds = initialDelaySeconds;
+    _executionTime = System.currentTimeMillis() + initialDelaySeconds;
   }
 
   public abstract void runTask();
@@ -53,8 +53,8 @@ public abstract class PeriodicTask {
     return _intervalSeconds;
   }
 
-  protected long getInitialDelay() {
-    return _initialDelay;
+  protected long getInitialDelaySeconds() {
+    return _initialDelaySeconds;
   }
 
   public String getTaskName() {

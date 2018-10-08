@@ -28,7 +28,7 @@ public class PeriodicTaskScheduler {
   private PriorityBlockingQueue<PeriodicTask> _periodicTasks;
   protected ScheduledExecutorService _executorService;
   private long _intervalSeconds;
-  private long _initialDelay;
+  private long _initialDelaySeconds;
 
   public PeriodicTaskScheduler() {
     _executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -36,7 +36,7 @@ public class PeriodicTaskScheduler {
       thread.setName("PeriodicTaskSchedulerExecutorService");
       return thread;
     });
-    _initialDelay = PeriodicTask.DEFAULT_INITIAL_DELAY;
+    _initialDelaySeconds = PeriodicTask.DEFAULT_INITIAL_DELAY_IN_SECOND;
     _intervalSeconds = PeriodicTask.DEFAULT_RUN_FREQUENCY_IN_SECOND;
     _periodicTasks = new PriorityBlockingQueue<>(10, (o1, o2) -> {
       if (o1.getExecutionTime() == o2.getExecutionTime()) {
@@ -50,12 +50,16 @@ public class PeriodicTaskScheduler {
     LOGGER.info("Starting PeriodicTaskScheduler. Run frequency in seconds: {}", _intervalSeconds);
 
     // Set up an executor that executes tasks periodically
-    _executorService.scheduleWithFixedDelay(() -> {
+    _executorService.scheduleAtFixedRate(() -> {
       if (_periodicTasks.isEmpty()) {
-        LOGGER.warn("No task assigned to PeriodicTaskScheduler");
+        LOGGER.info("No task assigned to PeriodicTaskScheduler");
         return;
       }
-      PeriodicTask task = _periodicTasks.poll();
+      PeriodicTask task = _periodicTasks.peek();
+      if (System.currentTimeMillis() < task.getExecutionTime()) {
+        return;
+      }
+      _periodicTasks.poll();
       try {
         task.runTask();
       } catch (Throwable e) {
@@ -66,7 +70,7 @@ public class PeriodicTaskScheduler {
         task.updateExecutionTime();
         _periodicTasks.offer(task);
       }
-    }, _initialDelay, _intervalSeconds, TimeUnit.SECONDS);
+    }, _initialDelaySeconds, _intervalSeconds, TimeUnit.SECONDS);
   }
 
   public void stop() {
@@ -76,7 +80,7 @@ public class PeriodicTaskScheduler {
     }
     _executorService.shutdown();
     try {
-      _executorService.awaitTermination(_initialDelay, TimeUnit.SECONDS);
+      _executorService.awaitTermination(_initialDelaySeconds, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       // Ignored
     }
@@ -93,7 +97,7 @@ public class PeriodicTaskScheduler {
       task.initTask();
       _periodicTasks.offer(task);
       _intervalSeconds = Math.min(_intervalSeconds, task.getIntervalSeconds());
-      _initialDelay = Math.min(_initialDelay, task.getInitialDelay());
+      _initialDelaySeconds = Math.min(_initialDelaySeconds, task.getInitialDelaySeconds());
     }
   }
 

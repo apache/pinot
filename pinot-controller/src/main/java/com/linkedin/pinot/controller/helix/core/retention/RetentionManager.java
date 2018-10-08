@@ -64,6 +64,12 @@ public class RetentionManager extends PeriodicTask {
     execute();
   }
 
+  @Override
+  public void initTask() {
+    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
+        getIntervalSeconds(), _deletedSegmentsRetentionInDays);
+  }
+
   public void execute() {
     LOGGER.info("Start managing retention for all tables");
     try {
