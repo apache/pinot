@@ -74,7 +74,6 @@ export default Component.extend({
     return namedToEpocMapping[this.get('granularity')];
   }),
 
-
   startFormatted: computed('anomalyRange.[]', function() {//investigation start
     return moment(this.get('anomalyRange')[0]).format(serverDateFormat);
   }),
@@ -100,6 +99,7 @@ export default Component.extend({
     const timeFormat = this.get('timeFormat');
     const { compareMode, onChange } = this.getProperties('compareMode', 'onChange');
 
+    // TODO: decide on where to reduce the to/from in the event of null trailing values in timeseries
     $range.ionRangeSlider({
       type: 'double',
       grid: true,
