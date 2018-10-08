@@ -32,8 +32,11 @@ import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationUtils;
@@ -43,8 +46,10 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
@@ -74,6 +79,7 @@ public class HelixServerStarter {
   private final HelixAdmin _helixAdmin;
   private final ServerInstance _serverInstance;
   private final AdminApiApplication _adminApiApplication;
+  private final String _zkServers;
 
   public HelixServerStarter(String helixClusterName, String zkServer, Configuration helixServerConfig)
       throws Exception {
@@ -96,27 +102,28 @@ public class HelixServerStarter {
 
     _maxQueryTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
-    _maxShutdownWaitTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME,
-        CommonConstants.Server.DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS);
+    _maxShutdownWaitTimeMs =
+        _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME,
+            CommonConstants.Server.DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS);
 
     LOGGER.info("Connecting Helix components");
     setupHelixSystemProperties(_helixServerConfig);
     // Replace all white-spaces from list of zkServers.
-    String zkServers = zkServer.replaceAll("\\s+", "");
+    _zkServers = zkServer.replaceAll("\\s+", "");
     _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkServers);
+        HelixManagerFactory.getZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkServers);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, _instanceId);
     ZkHelixPropertyStore<ZNRecord> propertyStore = _helixManager.getHelixPropertyStore();
 
-
     LOGGER.info("Starting server instance");
     Utils.logVersions();
     ServerConf serverInstanceConfig = DefaultHelixStarterServerConfig.getDefaultHelixServerConfig(_helixServerConfig);
     // Need to do this before we start receiving state transitions.
-    ServerSegmentCompletionProtocolHandler.init(_helixServerConfig.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
+    ServerSegmentCompletionProtocolHandler.init(
+        _helixServerConfig.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     _serverInstance = new ServerInstance();
     _serverInstance.init(serverInstanceConfig, propertyStore);
     _serverInstance.start();
@@ -226,6 +233,7 @@ public class HelixServerStarter {
     waitUntilNoIncomingQueries();
     _helixManager.disconnect();
     _serverInstance.shutDown();
+    waitUntilNoOnlineResources();
   }
 
   private void waitUntilNoIncomingQueries() {
@@ -235,9 +243,9 @@ public class HelixServerStarter {
     long endTime = _maxShutdownWaitTimeMs + System.currentTimeMillis();
 
     while (currentTime < endTime) {
-      if (currentTime > _serverInstance.getLatestQueryTime() + CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS) {
-        LOGGER.info("No incoming query within {}ms, safely shutdown Pinot server. Total waiting Time: {}ms", CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS,
-            (currentTime - startTime));
+      if (noIncomingQueries(currentTime)) {
+        LOGGER.info("No incoming query within {}ms. Total waiting Time: {}ms",
+            CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS, (currentTime - startTime));
         return;
       }
 
@@ -251,8 +259,100 @@ public class HelixServerStarter {
       }
       currentTime = System.currentTimeMillis();
     }
-    LOGGER.error("Reach timeout since Pinot server {} keeps receiving queries! Forcing Pinot server to shutdown. Max waiting time: {}",
-        _instanceId, _maxShutdownWaitTimeMs);
+    LOGGER.error("Reach timeout waiting for no incoming queries! Max waiting time: {}ms", _maxShutdownWaitTimeMs);
+  }
+
+  /**
+   * Init a helix spectator to watch the external view change.
+   */
+  private void waitUntilNoOnlineResources() {
+    LOGGER.info("Waiting upto {}ms until no online resources...", _maxShutdownWaitTimeMs);
+
+    // Initialize a helix spectator.
+    HelixManager spectatorManager =
+        HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.SPECTATOR, _zkServers);
+    try {
+      spectatorManager.connect();
+    } catch (Exception e) {
+      LOGGER.error("Exception connecting spectator helix manager to cluster. Skip checking external view.", e);
+      return;
+    }
+
+    Set<String> resources = fetchLatestTableResources(spectatorManager.getClusterManagmentTool());
+
+    long startTime = System.currentTimeMillis();
+    long currentTime = startTime;
+    long endTime = _maxShutdownWaitTimeMs + System.currentTimeMillis();
+
+    while (currentTime < endTime) {
+      if (noOnlineResource(spectatorManager, resources)) {
+        LOGGER.info("No online resource within {}ms. Total waiting Time: {}ms",
+            CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS, (currentTime - startTime));
+        return;
+      }
+
+      try {
+        // Sleep for 10 second.
+        Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
+      } catch (InterruptedException e) {
+        LOGGER.error("Interrupted when waiting for no online resources.", e);
+        Thread.currentThread().interrupt();
+        return;
+      }
+      currentTime = System.currentTimeMillis();
+    }
+    LOGGER.error(
+        "Reach timeout waiting for no online resources! Forcing Pinot server to shutdown. Max waiting time: {}ms",
+        _maxShutdownWaitTimeMs);
+    spectatorManager.disconnect();
+  }
+
+  private boolean noIncomingQueries(long currentTime) {
+    return currentTime > _serverInstance.getLatestQueryTime() + CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS;
+  }
+
+  private boolean noOnlineResource(HelixManager spectatorManager, Set<String> resources) {
+    Iterator<String> iterator = resources.iterator();
+    while (iterator.hasNext()) {
+      String resourceName = iterator.next();
+      ExternalView externalView =
+          spectatorManager.getClusterManagmentTool().getResourceExternalView(_helixClusterName, resourceName);
+      if (externalView == null) {
+        iterator.remove();
+        continue;
+      }
+      for (String partition : externalView.getPartitionSet()) {
+        Map<String, String> instanceStateMap = externalView.getStateMap(partition);
+        if (instanceStateMap.containsKey(_instanceId)) {
+          if ("ONLINE".equals(instanceStateMap.get(_instanceId))) {
+            return false;
+          }
+        }
+      }
+      iterator.remove();
+    }
+    return true;
+  }
+
+  private Set<String> fetchLatestTableResources(HelixAdmin helixAdmin) {
+    Set<String> resourcesToMonitor = new HashSet<>();
+    for (String resourceName : helixAdmin.getResourcesInCluster(_helixClusterName)) {
+      // Only monitor table resources
+      if (!TableNameBuilder.isTableResource(resourceName)) {
+        continue;
+      }
+      // Only monitor enabled resources
+      IdealState idealState = helixAdmin.getResourceIdealState(_helixClusterName, resourceName);
+      if (idealState.isEnabled()) {
+        for (String partitionName : idealState.getPartitionSet()) {
+          if (idealState.getInstanceSet(partitionName).contains(_instanceId)) {
+            resourcesToMonitor.add(resourceName);
+            break;
+          }
+        }
+      }
+    }
+    return resourcesToMonitor;
   }
 
   /**

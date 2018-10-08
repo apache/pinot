@@ -290,7 +290,7 @@ public class CommonConstants {
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
     public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
     public static final long DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS = 600_000L;
-    public static final long DEFAULT_CHECK_INTERVAL_TIME_MS = 10_000L;
+    public static final long DEFAULT_CHECK_INTERVAL_TIME_MS = 60_000L;
   }
 
   public static class Controller {
