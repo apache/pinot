@@ -16,32 +16,37 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
+import com.linkedin.pinot.core.data.aggregator.PercentileEstValueAggregator;
 import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
+import com.linkedin.pinot.core.query.aggregation.function.PercentileEstAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import java.util.Random;
 
 import static org.testng.Assert.*;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class PercentileEstStarTreeV2Test extends BaseStarTreeV2Test<Object, QuantileDigest> {
 
   @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
-    return new SumValueAggregator();
+  ValueAggregator<Object, QuantileDigest> getValueAggregator() {
+    return new PercentileEstValueAggregator();
   }
 
   @Override
   DataType getRawValueType() {
-    return DataType.INT;
+    return DataType.LONG;
   }
 
   @Override
-  Number getRandomRawValue(Random random) {
-    return random.nextInt();
+  Object getRandomRawValue(Random random) {
+    return random.nextLong();
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  void assertAggregatedValue(QuantileDigest starTreeResult, QuantileDigest nonStarTreeResult) {
+    double delta = Long.MAX_VALUE * PercentileEstAggregationFunction.DEFAULT_MAX_ERROR * 2;
+    for (int i = 0; i <= 100; i++) {
+      assertEquals(starTreeResult.getQuantile(i / 100), nonStarTreeResult.getQuantile(i / 100), delta);
+    }
   }
 }

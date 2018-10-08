@@ -16,32 +16,35 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
+import com.linkedin.pinot.core.data.aggregator.AvgValueAggregator;
 import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
 import java.util.Random;
 
 import static org.testng.Assert.*;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class PreAggregatedAvgStarTreeV2Test extends BaseStarTreeV2Test<Object, AvgPair> {
 
   @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
-    return new SumValueAggregator();
+  ValueAggregator<Object, AvgPair> getValueAggregator() {
+    return new AvgValueAggregator();
   }
 
   @Override
   DataType getRawValueType() {
-    return DataType.INT;
+    return DataType.BYTES;
   }
 
   @Override
-  Number getRandomRawValue(Random random) {
-    return random.nextInt();
+  Object getRandomRawValue(Random random) {
+    return ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(new AvgPair(random.nextInt(), random.nextInt(10) + 1));
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  protected void assertAggregatedValue(AvgPair starTreeResult, AvgPair nonStarTreeResult) {
+    assertEquals(starTreeResult.getSum(), nonStarTreeResult.getSum(), 1e-5);
+    assertEquals(starTreeResult.getCount(), nonStarTreeResult.getCount());
   }
 }

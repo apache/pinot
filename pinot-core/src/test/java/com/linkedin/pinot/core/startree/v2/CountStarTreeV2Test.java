@@ -16,32 +16,32 @@
 package com.linkedin.pinot.core.startree.v2;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
+import com.linkedin.pinot.core.data.aggregator.CountValueAggregator;
 import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
 import java.util.Random;
 
 import static org.testng.Assert.*;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class CountStarTreeV2Test extends BaseStarTreeV2Test<Void, Long> {
 
   @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
-    return new SumValueAggregator();
+  ValueAggregator<Void, Long> getValueAggregator() {
+    return new CountValueAggregator();
   }
 
   @Override
   DataType getRawValueType() {
-    return DataType.INT;
+    return null;
   }
 
   @Override
-  Number getRandomRawValue(Random random) {
-    return random.nextInt();
+  Void getRandomRawValue(Random random) {
+    return null;
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  protected void assertAggregatedValue(Long starTreeResult, Long nonStarTreeResult) {
+    assertEquals(starTreeResult, nonStarTreeResult);
   }
 }

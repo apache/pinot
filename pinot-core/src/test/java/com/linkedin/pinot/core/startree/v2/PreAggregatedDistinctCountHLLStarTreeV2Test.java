@@ -15,33 +15,40 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
+import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
+import com.linkedin.pinot.core.data.aggregator.DistinctCountHLLValueAggregator;
 import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
 import java.util.Random;
 
 import static org.testng.Assert.*;
 
 
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class PreAggregatedDistinctCountHLLStarTreeV2Test extends BaseStarTreeV2Test<Object, HyperLogLog> {
+  // Use non-default log2m
+  private static final int LOG2M = 7;
 
   @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
-    return new SumValueAggregator();
+  ValueAggregator<Object, HyperLogLog> getValueAggregator() {
+    return new DistinctCountHLLValueAggregator();
   }
 
   @Override
   DataType getRawValueType() {
-    return DataType.INT;
+    return DataType.BYTES;
   }
 
   @Override
-  Number getRandomRawValue(Random random) {
-    return random.nextInt();
+  Object getRandomRawValue(Random random) {
+    HyperLogLog hyperLogLog = new HyperLogLog(LOG2M);
+    hyperLogLog.offer(random.nextInt(100));
+    hyperLogLog.offer(random.nextInt(100));
+    return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog);
   }
 
   @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  void assertAggregatedValue(HyperLogLog starTreeResult, HyperLogLog nonStarTreeResult) {
+    assertEquals(starTreeResult.cardinality(), nonStarTreeResult.cardinality());
   }
 }
