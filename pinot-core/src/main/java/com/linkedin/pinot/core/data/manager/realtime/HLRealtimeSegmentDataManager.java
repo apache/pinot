@@ -38,10 +38,10 @@ import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
@@ -76,7 +76,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final File resourceTmpDir;
   private final MutableSegmentImpl realtimeSegment;
   private final String tableStreamName;
-  private final StreamMetadata _streamMetadata;
+  private final StreamConfig _streamConfig;
 
   private final long start = System.currentTimeMillis();
   private long segmentEndTimeThreshold;
@@ -165,12 +165,12 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       resourceTmpDir.mkdirs();
     }
     // create and init stream level consumer
-    _streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
+    _streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamLevelConsumer = _streamConsumerFactory.createStreamLevelConsumer(
-        HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamMetadata.getKafkaTopicName());
+        HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getKafkaTopicName());
     // TODO: define a contract for StreamLevelConsumer.init() or get rid of it completely
-    // A future refactoring work of unifying StreamMetadata and StreamProviderConfig into StreamConfigs should give some clarity into this
+    // A future refactoring work of unifying StreamConfig and StreamProviderConfig should give some clarity into this
     _streamLevelConsumer.init(kafkaStreamProviderConfig, tableName, serverMetrics);
     _streamLevelConsumer.start();
 

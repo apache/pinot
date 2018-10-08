@@ -19,7 +19,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -95,42 +95,42 @@ public class KafkaConnectionHandler {
 
   /**
    * Creates a kafka connection given the stream metadata
-   * @param streamMetadata
+   * @param streamConfig
    * @param simpleConsumerFactory
    */
-  public KafkaConnectionHandler(String clientId, StreamMetadata streamMetadata,
+  public KafkaConnectionHandler(String clientId, StreamConfig streamConfig,
       KafkaSimpleConsumerFactory simpleConsumerFactory) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = streamMetadata.getKafkaTopicName();
-    _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
+    _topic = streamConfig.getKafkaTopicName();
+    _connectTimeoutMillis = streamConfig.getKafkaConnectionTimeoutMillis();
     _simpleConsumer = null;
 
     isPartitionProvided = false;
     _partition = Integer.MIN_VALUE;
 
-    initializeBootstrapNodeList(streamMetadata.getBootstrapHosts());
+    initializeBootstrapNodeList(streamConfig.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
   /**
    * Creates a kafka connection given the stream metadata and partition
-   * @param streamMetadata
+   * @param streamConfig
    * @param partition
    * @param simpleConsumerFactory
    */
-  public KafkaConnectionHandler(String clientId, StreamMetadata streamMetadata, int partition,
+  public KafkaConnectionHandler(String clientId, StreamConfig streamConfig, int partition,
       KafkaSimpleConsumerFactory simpleConsumerFactory) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = streamMetadata.getKafkaTopicName();
-    _connectTimeoutMillis = streamMetadata.getKafkaConnectionTimeoutMillis();
+    _topic = streamConfig.getKafkaTopicName();
+    _connectTimeoutMillis = streamConfig.getKafkaConnectionTimeoutMillis();
     _simpleConsumer = null;
 
     isPartitionProvided = true;
     _partition = partition;
 
-    initializeBootstrapNodeList(streamMetadata.getBootstrapHosts());
+    initializeBootstrapNodeList(streamConfig.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
 

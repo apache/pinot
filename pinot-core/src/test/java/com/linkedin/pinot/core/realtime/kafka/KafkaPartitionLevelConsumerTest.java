@@ -19,7 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaPartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamMetadataProvider;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -220,7 +220,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    StreamMetadata streamMetadata = new StreamMetadata(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
@@ -232,7 +232,7 @@ public class KafkaPartitionLevelConsumerTest {
     );
 
     KafkaStreamMetadataProvider streamMetadataProvider =
-        new KafkaStreamMetadataProvider(clientId, streamMetadata, mockKafkaSimpleConsumerFactory);
+        new KafkaStreamMetadataProvider(clientId, streamConfig, mockKafkaSimpleConsumerFactory);
     Assert.assertEquals(streamMetadataProvider.fetchPartitionCount(10000L), 2);
   }
 
@@ -249,7 +249,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    StreamMetadata streamMetadata = new StreamMetadata(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
@@ -262,7 +262,7 @@ public class KafkaPartitionLevelConsumerTest {
 
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
-        new KafkaPartitionLevelConsumer(clientId, streamMetadata, partition, mockKafkaSimpleConsumerFactory);
+        new KafkaPartitionLevelConsumer(clientId, streamConfig, partition, mockKafkaSimpleConsumerFactory);
     kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
   }
 
@@ -279,7 +279,7 @@ public class KafkaPartitionLevelConsumerTest {
     streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    StreamMetadata streamMetadata = new StreamMetadata(streamConfigMap);
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
@@ -291,7 +291,7 @@ public class KafkaPartitionLevelConsumerTest {
 
     int partition = 0;
     KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
-        new KafkaStreamMetadataProvider(clientId, streamMetadata, partition, mockKafkaSimpleConsumerFactory);
+        new KafkaStreamMetadataProvider(clientId, streamConfig, partition, mockKafkaSimpleConsumerFactory);
     kafkaStreamMetadataProvider.fetchPartitionOffset("smallest", 10000);
   }
 }

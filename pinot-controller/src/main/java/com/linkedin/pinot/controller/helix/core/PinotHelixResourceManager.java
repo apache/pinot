@@ -69,7 +69,7 @@ import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrate
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1205,11 +1205,11 @@ public class PinotHelixResourceManager {
 
   private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
-    StreamMetadata streamMetadata = new StreamMetadata(indexingConfig.getStreamConfigs());
+    StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
 
-    if (streamMetadata.hasHighLevelKafkaConsumerType()) {
-      if (streamMetadata.hasSimpleKafkaConsumerType()) {
+    if (streamConfig.hasHighLevelKafkaConsumerType()) {
+      if (streamConfig.hasSimpleKafkaConsumerType()) {
         // We may be adding on low-level, or creating both.
         if (idealState == null) {
           // Need to create both. Create high-level consumer first.
@@ -1227,7 +1227,7 @@ public class PinotHelixResourceManager {
     }
 
     // Either we have only low-level consumer, or both.
-    if (streamMetadata.hasSimpleKafkaConsumerType()) {
+    if (streamConfig.hasSimpleKafkaConsumerType()) {
       // Will either create idealstate entry, or update the IS entry with new segments
       // (unless there are low-level segments already present)
       final List<LLCRealtimeSegmentZKMetadata> llcSegmentMetadatas =

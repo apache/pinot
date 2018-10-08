@@ -47,8 +47,8 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
  * - Decoder-specific properties
  * Add a derived class that is Kafka-specific that includes members like zk string and bootstrap hosts.
  */
-public class StreamMetadata {
-  private static final Logger LOGGER = LoggerFactory.getLogger(StreamMetadata.class);
+public class StreamConfig {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StreamConfig.class);
 
   private final String _kafkaTopicName;
   private final List<ConsumerType> _consumerTypes = new ArrayList<>(2);
@@ -65,7 +65,7 @@ public class StreamMetadata {
   private static final long DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS = 30000L;
   private static final int DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS = 5000;
 
-  public StreamMetadata(Map<String, String> streamConfigMap) {
+  public StreamConfig(Map<String, String> streamConfigMap) {
     _zkBrokerUrl =
         streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
             Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
@@ -234,7 +234,7 @@ public class StreamMetadata {
       return false;
     }
 
-    StreamMetadata that = (StreamMetadata) o;
+    StreamConfig that = (StreamConfig) o;
 
     return isEqual(_kafkaTopicName, that._kafkaTopicName) &&
         isEqual(_consumerTypes, that._consumerTypes) &&

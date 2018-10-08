@@ -18,8 +18,8 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import java.util.HashMap;
@@ -197,7 +197,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
       // For LL segments, instanceZkMetadata will be null
       this.groupId = instanceMetadata.getGroupId(tableConfig.getTableName());
     }
-    StreamMetadata kafkaMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    StreamConfig kafkaMetadata = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
     this.kafkaTopicName = kafkaMetadata.getKafkaTopicName();
     this.decodeKlass = kafkaMetadata.getDecoderClass();
     this.decoderProps = kafkaMetadata.getDecoderProperties();

@@ -27,15 +27,15 @@ public class PartitionCountFetcher implements Callable<Boolean> {
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionCountFetcher.class);
 
   private int _partitionCount = -1;
-  private final StreamMetadata _streamMetadata;
+  private final StreamConfig _streamConfig;
   private StreamConsumerFactory _streamConsumerFactory;
   private Exception _exception;
   private final String _topicName;
 
-  public PartitionCountFetcher(StreamMetadata streamMetadata) {
-    _streamMetadata = streamMetadata;
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamMetadata);
-    _topicName = streamMetadata.getKafkaTopicName();
+  public PartitionCountFetcher(StreamConfig streamConfig) {
+    _streamConfig = streamConfig;
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
+    _topicName = streamConfig.getKafkaTopicName();
   }
 
   public int getPartitionCount() {

@@ -22,14 +22,14 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
  * Factory for a stream which provides a consumer and a metadata provider for the stream
  */
 public abstract class StreamConsumerFactory {
-  protected StreamMetadata _streamMetadata;
+  protected StreamConfig _streamConfig;
 
   /**
    * Initializes the stream consumer factory with the stream metadata for the table
-   * @param streamMetadata
+   * @param streamConfig
    */
-  void init(StreamMetadata streamMetadata) {
-    _streamMetadata = streamMetadata;
+  void init(StreamConfig streamConfig) {
+    _streamConfig = streamConfig;
   }
 
   /**

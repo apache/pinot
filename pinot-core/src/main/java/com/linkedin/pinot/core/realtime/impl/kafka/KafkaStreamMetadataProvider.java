@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import java.io.IOException;
 import java.util.Collections;
@@ -44,31 +44,31 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
 
   /**
    * Create a partition specific metadata provider
-   * @param streamMetadata
+   * @param streamConfig
    * @param partition
    */
-  public KafkaStreamMetadataProvider(String clientId, StreamMetadata streamMetadata, int partition) {
-    super(clientId, streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
+  public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition) {
+    super(clientId, streamConfig, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
   /**
    * Create a stream specific metadata provider
-   * @param streamMetadata
+   * @param streamConfig
    */
-  public KafkaStreamMetadataProvider(String clientId, StreamMetadata streamMetadata) {
-    super(clientId, streamMetadata, new KafkaSimpleConsumerFactoryImpl());
+  public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig) {
+    super(clientId, streamConfig, new KafkaSimpleConsumerFactoryImpl());
   }
 
   @VisibleForTesting
-  public KafkaStreamMetadataProvider(String clientId, StreamMetadata streamMetadata, int partition,
+  public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    super(clientId, streamMetadata, partition, kafkaSimpleConsumerFactory);
+    super(clientId, streamConfig, partition, kafkaSimpleConsumerFactory);
   }
 
   @VisibleForTesting
-  public KafkaStreamMetadataProvider(String clientId, StreamMetadata streamMetadata,
+  public KafkaStreamMetadataProvider(String clientId, StreamConfig streamConfig,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    super(clientId, streamMetadata, kafkaSimpleConsumerFactory);
+    super(clientId, streamConfig, kafkaSimpleConsumerFactory);
   }
 
   /**
