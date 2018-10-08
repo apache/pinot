@@ -19,9 +19,8 @@ import com.linkedin.pinot.common.Utils;
 
 
 /**
-* Enumeration containing all the metrics exposed by the Pinot broker.
-*
-*/
+ * Enumeration containing all the metrics exposed by the Pinot broker.
+ */
 public enum BrokerMeter implements AbstractMetrics.Meter {
   UNCAUGHT_GET_EXCEPTIONS("exceptions", true),
   UNCAUGHT_POST_EXCEPTIONS("exceptions", true),
@@ -88,8 +87,12 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
 
   // tracks a case a segment is not hosted by any server
   // this is different from NO_SERVER_FOUND_EXCEPTIONS which tracks unavailability across all segments
-  NO_SERVING_HOST_FOR_SEGMENT("badResponses", false);
+  NO_SERVING_HOST_FOR_SEGMENT("badResponses", false),
 
+  // Netty connection metrics
+  NETTY_CONNECTION_REQUESTS_SENT("nettyConnection", true),
+  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true);
 
   private final String brokerMeterName;
   private final String unit;
