@@ -65,7 +65,8 @@ const sensitivityDefaults = {
   defaultPercentChange: '0.3',
   mttdGranularityMinimums: {
     days: 24,
-    hours: 1
+    hours: 1,
+    minutes: 0.25
   }
 };
 
