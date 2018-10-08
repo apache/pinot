@@ -17,7 +17,6 @@ package com.linkedin.pinot.controller.validation;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -29,7 +28,7 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -157,8 +156,8 @@ public class ValidationManager {
     List<RealtimeSegmentZKMetadata> metadataList =
             ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertystore, tableNameWithType);
     boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
-    StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-    if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
+    StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+    if (streamConfig.hasSimpleKafkaConsumerType() && !streamConfig.hasHighLevelKafkaConsumerType()) {
       countHLCSegments = false;
     }
     // Update the gauge to contain the total document count in the segments

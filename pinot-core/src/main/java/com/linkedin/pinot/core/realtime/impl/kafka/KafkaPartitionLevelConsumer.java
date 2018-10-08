@@ -19,7 +19,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.io.IOException;
 import kafka.api.FetchRequestBuilder;
 import kafka.javaapi.FetchResponse;
@@ -35,14 +35,14 @@ import org.slf4j.LoggerFactory;
 public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implements PartitionLevelConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
-  public KafkaPartitionLevelConsumer(String clientId, StreamMetadata streamMetadata, int partition) {
-    super(clientId, streamMetadata, partition, new KafkaSimpleConsumerFactoryImpl());
+  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
+    super(clientId, streamConfig, partition, new KafkaSimpleConsumerFactoryImpl());
   }
 
   @VisibleForTesting
-  public KafkaPartitionLevelConsumer(String clientId, StreamMetadata streamMetadata, int partition,
+  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
-    super(clientId, streamMetadata, partition, kafkaSimpleConsumerFactory);
+    super(clientId, streamConfig, partition, kafkaSimpleConsumerFactory);
   }
 
   /**

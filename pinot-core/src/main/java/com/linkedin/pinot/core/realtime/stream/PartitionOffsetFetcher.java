@@ -35,14 +35,14 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
   private Exception _exception = null;
   private long _offset = -1;
   private StreamConsumerFactory _streamConsumerFactory;
-  StreamMetadata _streamMetadata;
+  StreamConfig _streamConfig;
 
-  public PartitionOffsetFetcher(final String offsetCriteria, int partitionId, StreamMetadata streamMetadata) {
+  public PartitionOffsetFetcher(final String offsetCriteria, int partitionId, StreamConfig streamConfig) {
     _offsetCriteria = offsetCriteria;
     _partitionId = partitionId;
-    _streamMetadata = streamMetadata;
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamMetadata);
-    _topicName = streamMetadata.getKafkaTopicName();
+    _streamConfig = streamConfig;
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    _topicName = streamConfig.getKafkaTopicName();
   }
 
   public long getOffset() {

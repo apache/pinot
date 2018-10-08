@@ -40,7 +40,7 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
@@ -1410,7 +1410,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected long getKafkaPartitionOffset(StreamMetadata streamMetadata, final String offsetCriteria,
+    protected long getKafkaPartitionOffset(StreamConfig streamConfig, final String offsetCriteria,
         int partitionId) {
       if (offsetCriteria.equals(KAFKA_LARGEST_OFFSET)) {
         return _kafkaLargestOffsetToReturn;
@@ -1456,7 +1456,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected int getKafkaPartitionCount(StreamMetadata metadata) {
+    protected int getKafkaPartitionCount(StreamConfig metadata) {
       return _tableConfigStore.getNKafkaPartitions(_currentTable);
     }
   }
