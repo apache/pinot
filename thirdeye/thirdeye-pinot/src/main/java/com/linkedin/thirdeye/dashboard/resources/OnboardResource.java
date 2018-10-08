@@ -101,7 +101,8 @@ public class OnboardResource {
     // For each metric create a new anomaly function & replay it
     List<Long> ids = new ArrayList<>();
     for (MetricConfigDTO metric : metrics) {
-      String functionName = functionPrefix + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getName());
+      String functionName = functionPrefix + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getName())
+          + "_" + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getDataset());
 
       AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findWhereNameEquals(functionName);
       if (anomalyFunctionDTO != null) {
