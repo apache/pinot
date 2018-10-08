@@ -84,17 +84,6 @@ public class PinotTaskManager extends PeriodicTask {
   }
 
   /**
-   * Start the task scheduler with the given running frequency.
-   *
-   */
-  public void start() {
-    if (getIntervalSeconds() > 0) {
-      LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalSeconds());
-      super.start();
-    }
-  }
-
-  /**
    * Check the Pinot cluster status and schedule new tasks.
    *
    * @return Map from task type to task scheduled

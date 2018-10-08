@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.PeriodicTaskScheduler;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
 import com.linkedin.pinot.controller.api.access.AccessControlFactory;
@@ -75,6 +76,7 @@ public class ControllerStarter {
   private final PinotRealtimeSegmentManager _realtimeSegmentsManager;
   private final SegmentStatusChecker _segmentStatusChecker;
   private final ExecutorService _executorService;
+  private final PeriodicTaskScheduler _periodicTaskScheduler;
 
   // Can only be constructed after resource manager getting started
   private ValidationManager _validationManager;
@@ -95,6 +97,7 @@ public class ControllerStarter {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
     _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
+    _periodicTaskScheduler = new PeriodicTaskScheduler();
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -151,10 +154,10 @@ public class ControllerStarter {
 
     LOGGER.info("Starting task manager");
     _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
-    _taskManager.start();
+    _periodicTaskScheduler.addPeriodicTask(_taskManager);
 
     LOGGER.info("Starting retention manager");
-    _retentionManager.start();
+    _periodicTaskScheduler.addPeriodicTask(_retentionManager);
 
     LOGGER.info("Starting validation manager");
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
@@ -162,17 +165,20 @@ public class ControllerStarter {
     _validationManager =
         new ValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
             new ValidationMetrics(_metricsRegistry));
-    _validationManager.start();
+    _periodicTaskScheduler.addPeriodicTask(_validationManager);
 
     LOGGER.info("Starting realtime segment manager");
     _realtimeSegmentsManager.start(_controllerMetrics);
     PinotLLCRealtimeSegmentManager.getInstance().start();
 
     LOGGER.info("Starting segment status manager");
-    _segmentStatusChecker.start();
+    _periodicTaskScheduler.addPeriodicTask(_segmentStatusChecker);
 
     LOGGER.info("Starting realtime segment relocation manager");
-    _realtimeSegmentRelocator.start();
+    _periodicTaskScheduler.addPeriodicTask(_realtimeSegmentRelocator);
+
+    LOGGER.info("Starting periodic task scheduler");
+    _periodicTaskScheduler.start();
 
     LOGGER.info("Creating rebalance segments factory");
     RebalanceSegmentStrategyFactory.createInstance(helixManager);
@@ -282,13 +288,13 @@ public class ControllerStarter {
       PinotFSFactory.shutdown();
 
       LOGGER.info("Stopping validation manager");
-      _validationManager.stop();
+      _periodicTaskScheduler.removePeriodicTask(_validationManager);
 
       LOGGER.info("Stopping realtime segment relocation manager");
-      _realtimeSegmentRelocator.stop();
+      _periodicTaskScheduler.removePeriodicTask(_realtimeSegmentRelocator);
 
       LOGGER.info("Stopping retention manager");
-      _retentionManager.stop();
+      _periodicTaskScheduler.removePeriodicTask(_retentionManager);
 
       LOGGER.info("Stopping Jersey admin API");
       _adminApp.stop();
@@ -300,10 +306,12 @@ public class ControllerStarter {
       _helixResourceManager.stop();
 
       LOGGER.info("Stopping segment status manager");
-      _segmentStatusChecker.stop();
+      _periodicTaskScheduler.removePeriodicTask(_segmentStatusChecker);
 
       LOGGER.info("Stopping task manager");
-      _taskManager.stop();
+      _periodicTaskScheduler.removePeriodicTask(_taskManager);
+
+      _periodicTaskScheduler.stop();
 
       _executorService.shutdownNow();
     } catch (final Exception e) {

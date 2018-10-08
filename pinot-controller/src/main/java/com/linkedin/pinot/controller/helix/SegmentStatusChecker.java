@@ -82,15 +82,15 @@ public class SegmentStatusChecker extends PeriodicTask {
   }
 
   /**
-   * Starts the segment status checker.
+   * Init the segment status checker.
    */
-  public void start() {
+  @Override
+  public void initTask() {
     if (getIntervalSeconds() == -1) {
       LOGGER.warn("Segment status check interval is -1, status checks disabled.");
       return;
     }
     setStatusToDefault();
-    super.start();
   }
 
   /**

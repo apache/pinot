@@ -55,17 +55,13 @@ public class RetentionManager extends PeriodicTask {
     super("PinotRetentionManager", runFrequencyInSeconds, Math.min(60, runFrequencyInSeconds));
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
+    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
+        getIntervalSeconds(), _deletedSegmentsRetentionInDays);
   }
 
   @Override
   public void runTask() {
     execute();
-  }
-
-  public void start() {
-    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        getIntervalSeconds(), _deletedSegmentsRetentionInDays);
-    super.start();
   }
 
   public void execute() {
@@ -195,11 +191,5 @@ public class RetentionManager extends PeriodicTask {
       return states.size() == 1 && states.contains(
           CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
     }
-  }
-
-  public void stop() {
-    LOGGER.info("Stopping RetentionManager");
-    _executorService.shutdown();
-    LOGGER.info("RetentionManager stopped");
   }
 }
