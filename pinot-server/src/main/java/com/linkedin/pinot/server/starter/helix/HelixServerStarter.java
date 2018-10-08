@@ -250,7 +250,7 @@ public class HelixServerStarter {
       }
 
       try {
-        // Sleep for 10 second.
+        // Sleep for 60 second.
         Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted when waiting for Pinot server not to receive any queries.", e);
@@ -292,7 +292,7 @@ public class HelixServerStarter {
       }
 
       try {
-        // Sleep for 10 second.
+        // Sleep for 60 second.
         Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted when waiting for no online resources.", e);
