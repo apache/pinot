@@ -121,7 +121,7 @@ export default Component.extend({
         selectionEditable,
         searchInputSelector
       } = getProperties(this, 'onFocus', 'selectionEditable', 'searchInputSelector');
-      if (selectionEditable && selectObj.isActive) {
+      if (selectionEditable && selectObj.selected && selectObj.isActive) {
         const selectInputEl = document.querySelector(searchInputSelector);
         selectInputEl.value = selectObj.selected.alias;
       }

@@ -31,6 +31,7 @@ export default Component.extend({
   compareMode: null, // ""
   onChange: null, // func (start, end, compareMode)
   slider: null,
+  timeseries: null,
   originalMinInvestigatePeriod: null,
   originalMaxInvestigatePeriod: null,
 
@@ -100,6 +101,7 @@ export default Component.extend({
     const timeFormat = this.get('timeFormat');
     const { compareMode, onChange } = this.getProperties('compareMode', 'onChange');
 
+    // TODO: decide on where to reduce the to/from in the event of null trailing values in timeseries
     $range.ionRangeSlider({
       type: 'double',
       grid: true,
