@@ -63,6 +63,7 @@ const sensitivityDefaults = {
   selectedSeverityOption: 'Percentage of Change',
   selectedTunePattern: 'Up and Down',
   defaultPercentChange: '0.3',
+  // Set granularity minimums in number of hours
   mttdGranularityMinimums: {
     days: 24,
     hours: 1,
