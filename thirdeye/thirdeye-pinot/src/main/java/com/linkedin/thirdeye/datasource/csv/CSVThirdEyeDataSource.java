@@ -154,6 +154,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
 
       DataFrame data = dataSets.get(function.getDataset());
 
+      // filter constraints
       if (request.getStartTimeInclusive() != null) {
         data = data.filter(new Series.LongConditional() {
           @Override
@@ -184,7 +185,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
         }
       }
 
-      data = data.dropNull();
+      data = data.dropNull(inputName);
 
       //
       // with grouping
