@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.server.util.SegmentTestUtils;
 import java.io.ByteArrayOutputStream;
@@ -218,7 +219,7 @@ public class ClusterIntegrationTestUtils {
   }
 
   /**
-   * Build segments from the given Avro files. Each segment will be built using a separate thread.
+   * Builds segments from the given Avro files. Each segment will be built using a separate thread.
    *
    * @param avroFiles List of Avro files
    * @param baseSegmentIndex Base segment index number
@@ -226,55 +227,74 @@ public class ClusterIntegrationTestUtils {
    * @param tarDir Output directory for the tarred segments
    * @param tableName Table name
    * @param createStarTreeIndex Whether to create Star-tree index
+   * @param starTreeV2BuilderConfigs List of star-tree V2 builder configs
    * @param rawIndexColumns Columns to create raw index with
    * @param pinotSchema Pinot schema
    * @param executor Executor
    */
-  public static void buildSegmentsFromAvro(@Nonnull List<File> avroFiles, int baseSegmentIndex,
-      @Nonnull final File segmentDir, @Nonnull final File tarDir, @Nonnull final String tableName,
-      final boolean createStarTreeIndex, @Nullable final List<String> rawIndexColumns,
-      @Nullable final com.linkedin.pinot.common.data.Schema pinotSchema, @Nonnull Executor executor) {
+  public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
+      String tableName, boolean createStarTreeIndex, @Nullable List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs,
+      @Nullable List<String> rawIndexColumns, @Nullable com.linkedin.pinot.common.data.Schema pinotSchema,
+      Executor executor) {
     int numSegments = avroFiles.size();
     for (int i = 0; i < numSegments; i++) {
       final File avroFile = avroFiles.get(i);
       final int segmentIndex = i + baseSegmentIndex;
-      executor.execute(new Runnable() {
-        @Override
-        public void run() {
-          try {
-            File outputDir = new File(segmentDir, "segment-" + segmentIndex);
-            SegmentGeneratorConfig segmentGeneratorConfig =
-                SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
+      executor.execute(() -> {
+        try {
+          File outputDir = new File(segmentDir, "segment-" + segmentIndex);
+          SegmentGeneratorConfig segmentGeneratorConfig =
+              SegmentTestUtils.getSegmentGeneratorConfig(avroFile, outputDir, TimeUnit.DAYS, tableName, pinotSchema);
 
-            // Test segment with space and special character in the file name
-            segmentGeneratorConfig.setSegmentNamePostfix(String.valueOf(segmentIndex) + " %");
+          // Test segment with space and special character in the file name
+          segmentGeneratorConfig.setSegmentNamePostfix(String.valueOf(segmentIndex) + " %");
 
+          // Cannot build star-tree V1 and V2 at same time
+          if (starTreeV2BuilderConfigs != null) {
+            segmentGeneratorConfig.setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
+          } else {
             if (createStarTreeIndex) {
               segmentGeneratorConfig.enableStarTreeIndex(null);
             }
-
-            if (rawIndexColumns != null) {
-              segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexColumns);
-            }
-
-            // Build the segment
-            SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-            driver.init(segmentGeneratorConfig);
-            driver.build();
-
-            // Tar the segment
-            File[] files = outputDir.listFiles();
-            Assert.assertNotNull(files);
-            File segmentFile = files[0];
-            String segmentName = segmentFile.getName();
-            TarGzCompressionUtils.createTarGzOfDirectory(segmentFile.getAbsolutePath(),
-                new File(tarDir, segmentName).getAbsolutePath());
-          } catch (Exception e) {
-            // Ignored
           }
+
+          if (rawIndexColumns != null) {
+            segmentGeneratorConfig.setRawIndexCreationColumns(rawIndexColumns);
+          }
+
+          // Build the segment
+          SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+          driver.init(segmentGeneratorConfig);
+          driver.build();
+
+          // Tar the segment
+          File[] files = outputDir.listFiles();
+          Assert.assertNotNull(files);
+          File segmentFile = files[0];
+          String segmentName = segmentFile.getName();
+          TarGzCompressionUtils.createTarGzOfDirectory(segmentFile.getAbsolutePath(),
+              new File(tarDir, segmentName).getAbsolutePath());
+        } catch (Exception e) {
+          // Ignored
         }
       });
     }
+  }
+
+  /**
+   * Builds segments from the given Avro files. Each segment will be built using a separate thread.
+   *
+   * @param avroFiles List of Avro files
+   * @param baseSegmentIndex Base segment index number
+   * @param segmentDir Output directory for the un-tarred segments
+   * @param tarDir Output directory for the tarred segments
+   * @param tableName Table name
+   * @param executor Executor
+   */
+  public static void buildSegmentsFromAvro(List<File> avroFiles, int baseSegmentIndex, File segmentDir, File tarDir,
+      String tableName, Executor executor) {
+    buildSegmentsFromAvro(avroFiles, baseSegmentIndex, segmentDir, tarDir, tableName, false, null, null, null,
+        executor);
   }
 
   /**
