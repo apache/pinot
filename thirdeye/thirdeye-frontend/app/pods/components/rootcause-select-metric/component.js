@@ -41,6 +41,7 @@ export default Component.extend({
     function() {
       const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
       const result = filterPrefix(selectedUrns, 'thirdeye:metric:')
+        .filter(urn => urn in entities)
         .map((urn) => {
           const entity = entities[urn];
           const agg = entity ? { alias: entity.label, id: entity.urn.split(':')[2] } : {};
@@ -117,11 +118,10 @@ export default Component.extend({
      */
     onFocus(selectObj) {
       const {
-        onFocus,
         selectionEditable,
         searchInputSelector
       } = getProperties(this, 'onFocus', 'selectionEditable', 'searchInputSelector');
-      if (selectionEditable && selectObj.isActive) {
+      if (selectionEditable && selectObj.isActive && selectObj.selected) {
         const selectInputEl = document.querySelector(searchInputSelector);
         selectInputEl.value = selectObj.selected.alias;
       }
