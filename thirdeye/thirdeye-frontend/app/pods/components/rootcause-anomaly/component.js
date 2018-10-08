@@ -11,7 +11,9 @@ import {
   toOffsetUrn,
   toColorDirection,
   isInverse,
-  toMetricLabel
+  toMetricLabel,
+  makeTime,
+  dateFormatFull
 } from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import { equal, reads } from '@ember/object/computed';
@@ -193,7 +195,7 @@ export default Component.extend({
    * @type {string}
    */
   startFormatted: computed('anomaly', function () {
-    return moment(get(this, 'anomaly').start).format('MMM D YYYY, hh:mm a');
+    return makeTime(get(this, 'anomaly').start).format(dateFormatFull);
   }),
 
   /**
@@ -201,7 +203,7 @@ export default Component.extend({
    * @type {string}
    */
   endFormatted: computed('anomaly', function () {
-    return moment(get(this, 'anomaly').end).format('MMM D YYYY, hh:mm a');
+    return makeTime(get(this, 'anomaly').end).format(dateFormatFull);
   }),
 
   /**
