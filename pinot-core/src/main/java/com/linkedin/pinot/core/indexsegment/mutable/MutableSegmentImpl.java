@@ -117,10 +117,6 @@ public class MutableSegmentImpl implements MutableSegment {
 
     Set<String> noDictionaryColumns = config.getNoDictionaryColumns();
 
-    // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
-    // and no metrics have dictionary. If not enabled, the map returned is null.
-    _recordIdMap = enableMetricsAggregationIfPossible(config, _schema, noDictionaryColumns);
-
     Set<String> invertedIndexColumns = config.getInvertedIndexColumns();
     int avgNumMultiValues = config.getAvgNumMultiValues();
 
@@ -150,6 +146,9 @@ public class MutableSegmentImpl implements MutableSegment {
             MutableDictionaryFactory.getMutableDictionary(dataType, _offHeap, _memoryManager, dictionaryColumnSize,
                 Math.min(_statsHistory.getEstimatedCardinality(column), _capacity), allocationContext);
         _dictionaryMap.put(column, dictionary);
+
+        // Even though the column is defined as 'no-dictionary' in the config, we did create dictionary for consuming segment.
+        noDictionaryColumns.remove(column);
       }
 
       DataFileReader indexReaderWriter;
@@ -172,6 +171,10 @@ public class MutableSegmentImpl implements MutableSegment {
         _invertedIndexMap.put(column, new RealtimeInvertedIndexReader());
       }
     }
+
+    // Metric aggregation can be enabled only if config is specified, and all dimensions have dictionary,
+    // and no metrics have dictionary. If not enabled, the map returned is null.
+    _recordIdMap = enableMetricsAggregationIfPossible(config, _schema, noDictionaryColumns);
   }
 
   public SegmentPartitionConfig getSegmentPartitionConfig() {

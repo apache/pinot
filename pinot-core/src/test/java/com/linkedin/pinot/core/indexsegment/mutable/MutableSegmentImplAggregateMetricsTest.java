@@ -18,8 +18,10 @@ package com.linkedin.pinot.core.indexsegment.mutable;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.lang.RandomStringUtils;
@@ -45,8 +47,8 @@ public class MutableSegmentImplAggregateMetricsTest {
         .addSingleValueDimension(DIMENSION_2, FieldSpec.DataType.STRING)
         .addMetric(METRIC, FieldSpec.DataType.LONG)
         .build();
-    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(METRIC),
-        Collections.singleton(DIMENSION_1), true);
+    _mutableSegmentImpl = MutableSegmentImplTestUtils.createMutableSegmentImpl(schema,
+        new HashSet<>(Arrays.asList(DIMENSION_1, METRIC)), Collections.singleton(DIMENSION_1), true);
   }
 
   @Test
@@ -75,6 +77,9 @@ public class MutableSegmentImplAggregateMetricsTest {
 
     int numDocsIndexed = _mutableSegmentImpl.getNumDocsIndexed();
     Assert.assertEquals(numDocsIndexed, expectedValues.size());
+
+    // Assert that aggregation happened.
+    Assert.assertTrue(numDocsIndexed < NUM_ROWS);
 
     GenericRow reuse = new GenericRow();
     for (int docId = 0; docId < numDocsIndexed; docId++) {
