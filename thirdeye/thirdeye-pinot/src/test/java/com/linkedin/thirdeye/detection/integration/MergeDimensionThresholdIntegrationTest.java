@@ -149,7 +149,6 @@ public class MergeDimensionThresholdIntegrationTest {
 
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(null, start, end, METRIC, DATASET, dimensions);
     anomaly.setMetricUrn(metricUrn);
-    anomaly.setAvgCurrentVal(Double.NaN);
     return anomaly;
   }
 }

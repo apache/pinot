@@ -32,7 +32,7 @@ import java.util.Map;
  * Useful when merging anomalies from different source, e.g, different algorithms/rules, this merger allows tracing back to anomalies before merging.
  * Will not merge anomalies if potential merged anomaly is beyond max duration.
  */
-public class ChildKeepingMergeWrapper extends MergeWrapper {
+public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
   public ChildKeepingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
     super(provider, config, startTime, endTime);

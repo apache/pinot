@@ -16,19 +16,14 @@
 
 package com.linkedin.thirdeye.detection.algorithm;
 
-import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.comparison.Row;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.MockPipeline;
 import com.linkedin.thirdeye.detection.MockPipelineLoader;
 import com.linkedin.thirdeye.detection.MockPipelineOutput;
-import com.linkedin.thirdeye.detection.baseline.MockBaselineProvider;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -41,7 +36,6 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
 
 
@@ -64,8 +58,6 @@ public class MergeWrapperTest {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_MAX_GAP = "maxGap";
   private static final String PROP_MAX_DURATION = "maxDuration";
-  private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
-  private static final String PROP_CURRENT_PROVIDER = "currentValueProvider";
 
   @BeforeMethod
   public void beforeMethod() {
@@ -275,27 +267,4 @@ public class MergeWrapperTest {
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2700, 2900, Collections.singletonMap("otherKey", "otherValue"))));
   }
 
-  @Test
-  public void testMergerCurrentAndBaselineLoading() throws Exception {
-    MergedAnomalyResultDTO anomaly = makeAnomaly(3000, 3600);
-    anomaly.setMetricUrn("thirdeye:metric:1");
-
-    Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
-    aggregates.put(MetricSlice.from(1, 3000, 3600), DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(-1, 100).build());
-
-    DataProvider provider = new MockDataProvider().setLoader(new MockPipelineLoader(this.runs, Collections.<MockPipelineOutput>emptyList())).setAnomalies(Collections.singletonList(anomaly)).setAggregates(aggregates);
-
-    this.config.getProperties().put(PROP_MAX_GAP, 100);
-    this.config.getProperties().put(PROP_CURRENT_PROVIDER, ImmutableMap.of("className", MockBaselineProvider.class.getName()));
-    this.config.getProperties().put(PROP_BASELINE_PROVIDER, ImmutableMap.of("className", MockBaselineProvider.class.getName()));
-
-    this.wrapper = new MergeWrapper(provider, this.config, 2900, 3600);
-    DetectionPipelineResult output = this.wrapper.run();
-
-    List<MergedAnomalyResultDTO> anomalyResults = output.getAnomalies();
-    Assert.assertEquals(anomalyResults.size(), 1);
-    Assert.assertTrue(anomalyResults.contains(anomaly));
-    Assert.assertEquals(anomalyResults.get(0).getAvgBaselineVal(), 100.0);
-    Assert.assertEquals(anomalyResults.get(0).getAvgCurrentVal(), 100.0);
-  }
 }
