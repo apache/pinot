@@ -62,8 +62,7 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
           || anomaly.getEndTime() - parent.getStartTime() <= this.maxDuration) {
         // fully merge into existing
         if (parent.getChildren().isEmpty()){
-          MergedAnomalyResultDTO newAnomaly = new MergedAnomalyResultDTO();
-          parent.getChildren().add(copyAnomalyInfo(parent, newAnomaly));
+          parent.getChildren().add(copyAnomalyInfo(parent, new MergedAnomalyResultDTO()));
         }
         parent.setEndTime(Math.max(parent.getEndTime(), anomaly.getEndTime()));
 

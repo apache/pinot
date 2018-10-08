@@ -73,7 +73,7 @@ public class MergeWrapper extends DetectionPipeline {
    * @param startTime the start time
    * @param endTime the end time
    */
-  public MergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) throws Exception {
+  public MergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
 
     this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", 0);
