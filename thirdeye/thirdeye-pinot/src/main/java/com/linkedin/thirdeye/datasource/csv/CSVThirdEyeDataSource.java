@@ -16,6 +16,8 @@
 
 package com.linkedin.thirdeye.datasource.csv;
 
+import com.google.common.base.Predicate;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
@@ -36,9 +38,12 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 import static com.linkedin.thirdeye.dataframe.Series.SeriesType.*;
 
@@ -176,12 +181,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
       if (request.getFilterSet() != null) {
         Multimap<String, String> filters = request.getFilterSet();
         for (final Map.Entry<String, Collection<String>> filter : filters.asMap().entrySet()) {
-          data = data.filter(new Series.StringConditional() {
-            @Override
-            public boolean apply(String... values) {
-              return filter.getValue().contains(values[0]);
-            }
-          }, filter.getKey());
+          data = data.filter(makeFilter(filter.getValue()), filter.getKey());
         }
       }
 
@@ -359,6 +359,31 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
       // ignore
     }
     return this.getClass().getResource(input);
+  }
+
+  /**
+   * Returns a filter function with inclusion and exclusion support
+   *
+   * @param values dimension filter values
+   * @return StringConditional
+   */
+  private Series.StringConditional makeFilter(Collection<String> values) {
+    final Set<String> exclusions = new HashSet<>(Collections2.filter(values, new Predicate<String>() {
+      @Override
+      public boolean apply(@Nullable String s) {
+        return s != null && s.startsWith("!");
+      }
+    }));
+
+    final Set<String> inclusions = new HashSet<>(values);
+    inclusions.removeAll(exclusions);
+
+    return new Series.StringConditional() {
+      @Override
+      public boolean apply(String... values) {
+        return (inclusions.isEmpty() || inclusions.contains(values[0])) && !exclusions.contains("!" + values[0]);
+      }
+    };
   }
 }
 
