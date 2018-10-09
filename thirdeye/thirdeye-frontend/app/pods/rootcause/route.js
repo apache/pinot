@@ -93,6 +93,16 @@ const toAnalysisOffset = (granularity) => {
   return UNIT_MAPPING[granularity[1]] || -1;
 };
 
+/**
+ * Returns the array for start/end dates of the analysis range
+ */
+const toAnalysisRangeArray = (anomalyStart, anomalyEnd, metricGranularity) => {
+  const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
+  const analysisRangeEnd = makeTime(anomalyEnd).startOf('day').add(1, 'day').valueOf();
+  const analysisRangeStart = makeTime(anomalyStart).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
+  return [analysisRangeStart, analysisRangeEnd];
+};
+
 export default Route.extend(AuthenticatedRouteMixin, {
   authService: service('session'),
   session: service(),
@@ -243,23 +253,23 @@ export default Route.extend(AuthenticatedRouteMixin, {
     if (metricId && metricUrn) {
       if (!_.isEmpty(metricEntity)) {
         const granularity = adjustGranularity(metricEntity.attributes.granularity[0]);
+        const isDailyGranularity = granularity === '1_DAYS';
         const metricGranularity = toMetricGranularity(granularity);
         const maxTime = adjustMaxTime(metricEntity.attributes.maxTime[0], metricGranularity);
-
-        const anomalyRangeEnd = makeTime(maxTime).startOf(metricGranularity[1]).valueOf();
+        const rawRangeEnd = makeTime(maxTime).startOf(metricGranularity[1]);
         const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
+        // Set default anomaly range to end of timeseries. If daily metric, back it up a day (data available to graph)
+        const anomalyRangeEnd = isDailyGranularity ? rawRangeEnd.subtract(1, 'day').valueOf() : rawRangeEnd.valueOf();
         const anomalyRangeStart = makeTime(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
         const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
-        const analysisRangeEnd = makeTime(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
-        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
-        const analysisRangeStart = makeTime(anomalyRangeEnd).add(analysisRangeStartOffset, 'day').valueOf();
-        const analysisRange = [analysisRangeStart, analysisRangeEnd];
+        // align to local end of day
+        const analysisRange = toAnalysisRangeArray(anomalyRangeEnd, anomalyRangeEnd, metricGranularity);
 
         context = {
           urns: new Set([metricUrn]),
           anomalyRange,
           analysisRange,
-          granularity: (granularity === '1_DAYS') ? '1_HOURS' : granularity,
+          granularity: isDailyGranularity ? '1_HOURS' : granularity,
           compareMode,
           anomalyUrns: new Set()
         };
@@ -274,14 +284,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       if (!_.isEmpty(anomalyEntity)) {
         const granularity = adjustGranularity(anomalyEntity.attributes.metricGranularity[0]);
         const metricGranularity = toMetricGranularity(granularity);
-
         const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10) + 1];
-
-        // align to local end of day
-        const analysisRangeEnd = makeTime(anomalyRange[1]).startOf('day').add(1, 'day').valueOf();
-        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
-        const analysisRangeStart = makeTime(anomalyRange[0]).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
-        const analysisRange = [analysisRangeStart, analysisRangeEnd];
+        // align to local end of day (anomalyStart, anomalyEnd, metricGranularity)
+        const analysisRange = toAnalysisRangeArray(anomalyRange[0], anomalyRange[1], metricGranularity);
 
         const anomalyDimNames = anomalyEntity.attributes['dimensions'] || [];
         const anomalyFilters = [];
