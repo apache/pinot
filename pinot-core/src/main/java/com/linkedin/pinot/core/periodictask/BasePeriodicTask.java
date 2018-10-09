@@ -13,58 +13,48 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.utils;
+package com.linkedin.pinot.core.periodictask;
 
 
-public abstract class PeriodicTask {
+public abstract class BasePeriodicTask implements PeriodicTask {
   private final String _taskName;
   private long _executionTime;
   private long _intervalSeconds;
-  private long _initialDelaySeconds;
 
-  public static final long DEFAULT_RUN_FREQUENCY_IN_SECOND = 3600L;
   public static final long DEFAULT_INITIAL_DELAY_IN_SECOND = 120L;
 
-  public PeriodicTask(String taskName) {
-    this(taskName, DEFAULT_RUN_FREQUENCY_IN_SECOND);
-  }
-
-  public PeriodicTask(String taskName, long runFrequencyInSeconds) {
+  public BasePeriodicTask(String taskName, long runFrequencyInSeconds) {
     this(taskName, runFrequencyInSeconds, DEFAULT_INITIAL_DELAY_IN_SECOND);
   }
 
-  public PeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelaySeconds) {
+  public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelaySeconds) {
     _taskName = taskName;
     _intervalSeconds = runFrequencyInSeconds;
-    _initialDelaySeconds = initialDelaySeconds;
     _executionTime = System.currentTimeMillis() + initialDelaySeconds;
   }
 
   public abstract void runTask();
 
+  @Override
   public void initTask() {
   }
 
-  protected void setIntervalSeconds(long intervalSeconds) {
-    _intervalSeconds = intervalSeconds;
-  }
-
-  protected long getIntervalSeconds() {
+  @Override
+  public long getIntervalSeconds() {
     return _intervalSeconds;
   }
 
-  protected long getInitialDelaySeconds() {
-    return _initialDelaySeconds;
-  }
-
+  @Override
   public String getTaskName() {
     return _taskName;
   }
 
+  @Override
   public long getExecutionTime() {
     return _executionTime;
   }
 
+  @Override
   public void updateExecutionTime() {
     _executionTime += _intervalSeconds;
   }

@@ -20,13 +20,13 @@ import com.google.common.base.Function;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.common.utils.PeriodicTask;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -48,14 +48,13 @@ import org.slf4j.LoggerFactory;
  * We only relocate segments for realtime tables, and only if tenant config indicates that relocation is required
  * A segment will be relocated, one replica at a time, once all of its replicas are in ONLINE state and on consuming servers
  */
-public class RealtimeSegmentRelocator extends PeriodicTask {
+public class RealtimeSegmentRelocator extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocator.class);
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
-    super("RealtimeSegmentRelocator");
-    setIntervalSeconds(getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency()));
+    super("RealtimeSegmentRelocator", getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency()));
     _pinotHelixResourceManager = pinotHelixResourceManager;
   }
 
@@ -259,7 +258,7 @@ public class RealtimeSegmentRelocator extends PeriodicTask {
     return newInstanceStateMap;
   }
 
-  private long getRunFrequencySeconds(String timeStr) {
+  private static long getRunFrequencySeconds(String timeStr) {
     long seconds;
     try {
       Long millis = TimeUtils.convertPeriodToMillis(timeStr);

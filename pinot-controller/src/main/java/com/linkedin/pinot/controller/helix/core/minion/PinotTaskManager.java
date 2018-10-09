@@ -20,11 +20,11 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.PeriodicTask;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import com.linkedin.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
+import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * <p><code>PinotTaskManager</code> is also responsible for checking the health status on each type of tasks, detect and
  * fix issues accordingly.
  */
-public class PinotTaskManager extends PeriodicTask {
+public class PinotTaskManager extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManager.class);
 
   private final PinotHelixResourceManager _helixResourceManager;
@@ -97,6 +97,8 @@ public class PinotTaskManager extends PeriodicTask {
       return new HashMap<>();
     }
 
+    long startTime = System.currentTimeMillis();
+    LOGGER.info("Start scheduling tasks on leader controller.");
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -141,6 +143,7 @@ public class PinotTaskManager extends PeriodicTask {
       }
     }
 
+    LOGGER.info("Finished scheduling tasks in {}ms.", (System.currentTimeMillis() - startTime));
     return tasksScheduled;
   }
 

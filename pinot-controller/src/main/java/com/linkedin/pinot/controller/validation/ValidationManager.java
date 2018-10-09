@@ -24,12 +24,13 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.PeriodicTask;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
+import com.linkedin.pinot.core.periodictask.PeriodicTask;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,30 +77,6 @@ public class ValidationManager extends PeriodicTask {
   @Override
   public void runTask() {
     runValidation();
-  }
-
-  /**
-   * Starts the validation manager.
-   */
-  public void start() {
-    LOGGER.info("Starting validation manager");
-
-    // Set up an executor that executes validation tasks periodically
-    _executorService.scheduleWithFixedDelay(() -> {
-      try {
-        runValidation();
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while running validation", e);
-      }
-    }, 120, _validationIntervalSeconds, TimeUnit.SECONDS);
-  }
-
-  /**
-   * Stops the validation manager.
-   */
-  public void stop() {
-    // Shut down the executor
-    _executorService.shutdown();
   }
 
   /**
