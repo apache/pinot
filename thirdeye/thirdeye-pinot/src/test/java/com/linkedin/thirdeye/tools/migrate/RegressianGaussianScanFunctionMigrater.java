@@ -14,6 +14,7 @@ public class RegressianGaussianScanFunctionMigrater extends BaseAnomalyFunctionM
     defaultProperties = ImmutableMap.copyOf(new HashMap<String, String>(){
       {
         put(FUNCTION, "ConfigurableAnomalyDetectionFunction");
+        put(WORKFLOW, "RegressionWorkflow");
         put(moduleConfigKey(DATA), "ContinuumDataModule");
         put(moduleConfigKey(TRAINING_PREPROCESS), "AnomalyRemovalByWeight");
         put(moduleConfigKey(TESTING_PREPROCESS), "AnomalyRemovalByWeight");

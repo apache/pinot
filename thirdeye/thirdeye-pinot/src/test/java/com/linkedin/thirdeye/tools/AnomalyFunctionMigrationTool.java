@@ -120,7 +120,7 @@ public class AnomalyFunctionMigrationTool {
             LOG.info("Replay anomaly functions in range");
             for (long functionId : originalFunctionIds) {
               deleteAnomaliesForFunction(functionId, this.monitoringWindowStartTime.minus(Days.days(120)), this.monitoringWindowEndTime);
-              removeFunction(functionId);
+              replayByFunction(functionId, this.monitoringWindowStartTime, this.monitoringWindowEndTime, true);
             }
             isReplayed = true;
             break;

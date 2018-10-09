@@ -12,6 +12,7 @@ public abstract class BaseAnomalyFunctionMigrater implements AnomalyFunctionMigr
 
   protected static final String FUNCTION = "function";
   protected static final String DATA = "data";
+  protected static final String WORKFLOW = "workflow";
   protected static final String TESTING_PREPROCESS = "testingPreprocessors";
   protected static final String TRAINING_PREPROCESS = "trainingPreprocessors";
   protected static final String TRAINING = "training";
