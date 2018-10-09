@@ -239,11 +239,9 @@ export default Component.extend({
         return {};
       }
 
-      const charts = filterPrefix(displayableUrns, 'frontend:metric:current:')
+      return filterPrefix(displayableUrns, 'frontend:metric:current:')
         .map(urn => [toMetricLabel(toMetricUrn(urn), entities), urn])
         .map(t => t[1]);
-
-      return charts;
     }
   ),
 
