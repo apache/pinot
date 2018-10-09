@@ -275,7 +275,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const granularity = adjustGranularity(anomalyEntity.attributes.metricGranularity[0]);
         const metricGranularity = toMetricGranularity(granularity);
 
-        const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10) + 1];
+        const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10)];
 
         // align to local end of day
         const analysisRangeEnd = makeTime(anomalyRange[1]).startOf('day').add(1, 'day').valueOf();
