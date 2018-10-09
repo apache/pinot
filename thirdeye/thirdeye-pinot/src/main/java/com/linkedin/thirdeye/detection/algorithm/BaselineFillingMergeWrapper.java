@@ -40,8 +40,8 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   private static final String PROP_CURRENT_PROVIDER = "currentValueProvider";
 
-  protected BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
-  protected BaselineProvider currentValueProvider;
+  private BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
+  private BaselineProvider currentValueProvider;
 
   public BaselineFillingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
@@ -69,7 +69,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
    * @param mergedAnomalies anomalies
    * @return anomalies with current and baseline value filled
    */
-  private List<MergedAnomalyResultDTO> fillCurrentAndBaselineValue(List<MergedAnomalyResultDTO> mergedAnomalies) {
+  List<MergedAnomalyResultDTO> fillCurrentAndBaselineValue(List<MergedAnomalyResultDTO> mergedAnomalies) {
     Map<MetricSlice, MergedAnomalyResultDTO> metricSlicesToAnomaly = new HashMap<>();
 
     for (MergedAnomalyResultDTO anomaly : mergedAnomalies) {
