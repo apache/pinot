@@ -190,7 +190,14 @@ export default Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: [], // FIXME: this is broken across all of RCA and works by accident only
+  preselectedItems: computed({
+    get () {
+      return [];
+    },
+    set () {
+      // ignore
+    }
+  }),
 
   actions: {
     /**
