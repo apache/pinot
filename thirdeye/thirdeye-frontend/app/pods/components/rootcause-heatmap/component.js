@@ -440,7 +440,7 @@ export default Component.extend({
 
       // selection
       if (role === ROOTCAUSE_ROLE_VALUE) {
-        const metricUrn = appendFilters(selectedUrn, [[dimName, dimValue]]);
+        const metricUrn = appendFilters(selectedUrn, [[dimName, '=', dimValue]]);
         const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
         if (onSelection) {
           onSelection(updates);

@@ -30,10 +30,19 @@
       </label>
 
       {{filter-select
-        selected=filters
+        selected=inclusions
         options=filterOptions
+        placeholder="  Add a dimension filter (Type to Search)"
         triggerId="select-filters"
-        onChange=(action "onFilters")
+        onChange=(action "onSelect")
+      }}
+
+      {{filter-select
+        selected=exclusions
+        options=filterOptions
+        placeholder="  Add an exclusion filter (Type to Search)"
+        triggerId="select-exclusion"
+        onChange=(action "onSelect")
       }}
     {{/if}}
   </div>
