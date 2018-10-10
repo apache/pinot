@@ -54,6 +54,7 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Date;
@@ -258,9 +259,6 @@ public class PinotSegmentUploadRestletResource {
 
     // Get crypter class
     String crypterClassHeader = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
-    if (crypterClassHeader == null) {
-      crypterClassHeader = DefaultPinotCrypter.class.getName();
-    }
 
     // Get URI of current segment location
     String currentSegmentLocationURI = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
@@ -273,36 +271,31 @@ public class PinotSegmentUploadRestletResource {
     try {
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
       String tempFileName = TMP_DIR_PREFIX + System.nanoTime();
-      tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
       tempDecryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
+
+      // Set default crypter and encrypted file accordingly
+      if (crypterClassHeader == null) {
+        crypterClassHeader = DefaultPinotCrypter.class.getName();
+        tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
+      } else {
+        tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
+      }
 
       // TODO: Change when metadata upload added
       String metadataProviderClass = DefaultMetadataExtractor.class.getName();
 
       switch (uploadType) {
         case URI:
-          if (currentSegmentLocationURI == null || currentSegmentLocationURI.isEmpty()) {
-            throw new ControllerApplicationException(LOGGER, "Failed to get downloadURI, needed for URI upload",
-                Response.Status.BAD_REQUEST);
-          }
           segmentMetadata =
-              getSegmentMetadata(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
-                  metadataProviderClass);
-          if (new URI(currentSegmentLocationURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
-            zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(), provider.getVip());
-          } else {
-            LOGGER.info("Using configured data dir {}", _controllerConf.getDataDir());
-            zkDownloadUri = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
-                URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
-          }
+              getMetadataForURI(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile,
+                  tempSegmentDir, metadataProviderClass);
+          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, provider);
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
-          currentSegmentLocationURI = tempDecryptedFile.toURI().toString();
           segmentMetadata =
-              getSegmentMetadata(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
-                  metadataProviderClass);
+              getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir, metadataProviderClass);
           zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(), provider.getVip());
           break;
         default:
@@ -343,17 +336,37 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private SegmentMetadata getSegmentMetadata(String crypterClassHeader, String currentSegmentLocationURI, File tempEncryptedFile,
-      File tempDecryptedFile, File tempSegmentDir, String metadataProviderClass) throws Exception {
-    if (crypterClassHeader.equalsIgnoreCase(DefaultPinotCrypter.class.getName())) {
-      SegmentFetcherFactory.getInstance()
-          .getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
-          .fetchSegmentToLocal(currentSegmentLocationURI, tempDecryptedFile);
+  private String getZkDownloadURIForURIUpload(String currentSegmentLocationURI, SegmentMetadata segmentMetadata,
+      FileUploadPathProvider provider) throws URISyntaxException, UnsupportedEncodingException {
+    String zkDownloadUri;
+    if (new URI(currentSegmentLocationURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+      zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(), provider.getVip());
     } else {
-      SegmentFetcherFactory.getInstance()
-          .getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
-          .fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
+      LOGGER.info("Using configured data dir {}", _controllerConf.getDataDir());
+      zkDownloadUri = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+          URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
     }
+    return zkDownloadUri;
+  }
+
+  private SegmentMetadata getMetadataForURI(String crypterClassHeader, String currentSegmentLocationURI,
+      File tempEncryptedFile, File tempDecryptedFile, File tempSegmentDir, String metadataProviderClass)
+      throws Exception {
+    SegmentMetadata segmentMetadata;
+    if (currentSegmentLocationURI == null || currentSegmentLocationURI.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "Failed to get downloadURI, needed for URI upload",
+          Response.Status.BAD_REQUEST);
+    }
+    SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
+        .fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
+    segmentMetadata =
+        getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir, metadataProviderClass);
+    return segmentMetadata;
+  }
+
+  private SegmentMetadata getSegmentMetadata(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile,
+      File tempSegmentDir, String metadataProviderClass) throws Exception {
+
     decryptFile(crypterClassHeader, tempEncryptedFile, tempDecryptedFile);
 
     // Call metadata provider to extract metadata with file object uri

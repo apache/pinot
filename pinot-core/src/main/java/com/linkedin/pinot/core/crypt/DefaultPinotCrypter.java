@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This class is the default implementation for the PinotCrypter. It simply copies the file to the given location.
+ * This class is the default implementation for the PinotCrypter. It is a noop crypter and will not do any operations.
  */
 public class DefaultPinotCrypter implements PinotCrypter {
   public static final Logger LOGGER = LoggerFactory.getLogger(DefaultPinotCrypter.class);
