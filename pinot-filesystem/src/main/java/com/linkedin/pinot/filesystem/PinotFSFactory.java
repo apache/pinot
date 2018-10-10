@@ -75,4 +75,8 @@ public class PinotFSFactory {
     }
     return pinotFS;
   }
+
+  public static Map<String, PinotFS> getFileSystemMap() {
+    return _fileSystemMap;
+  }
 }
