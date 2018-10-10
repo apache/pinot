@@ -24,8 +24,8 @@ import org.slf4j.LoggerFactory;
 /**
  * This class is the default implementation for the PinotCrypter. It is a noop crypter and will not do any operations.
  */
-public class DefaultPinotCrypter implements PinotCrypter {
-  public static final Logger LOGGER = LoggerFactory.getLogger(DefaultPinotCrypter.class);
+public class NoOpPinotCrypter implements PinotCrypter {
+  public static final Logger LOGGER = LoggerFactory.getLogger(NoOpPinotCrypter.class);
 
   @Override
   public void init(Configuration config) {

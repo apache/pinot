@@ -36,7 +36,7 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import com.linkedin.pinot.controller.validation.StorageQuotaChecker;
-import com.linkedin.pinot.core.crypt.DefaultPinotCrypter;
+import com.linkedin.pinot.core.crypt.NoOpPinotCrypter;
 import com.linkedin.pinot.core.crypt.PinotCrypter;
 import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.core.metadata.DefaultMetadataExtractor;
@@ -274,9 +274,11 @@ public class PinotSegmentUploadRestletResource {
       tempDecryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       tempSegmentDir = new File(provider.getTmpUntarredPath(), tempFileName);
 
-      // Set default crypter and encrypted file accordingly
+      // Set default crypter to the noop crypter when no crypter header is sent
+      // In this case, the noop crypter will not do any operations, so the encrypted and decrypted file will have the same
+      // file path.
       if (crypterClassHeader == null) {
-        crypterClassHeader = DefaultPinotCrypter.class.getName();
+        crypterClassHeader = NoOpPinotCrypter.class.getName();
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       } else {
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
