@@ -138,7 +138,7 @@ public class MinionStarter {
     LOGGER.info("Initializing segment fetchers for all protocols");
     Configuration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
-    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
+    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
 
     // Need to do this before we start receiving state transitions.
     LOGGER.info("Initializing ssl context for segment uploader");
