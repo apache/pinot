@@ -825,6 +825,7 @@ public class AnomalyResource {
   }
 
   // Delete anomaly function
+  @Deprecated
   @DELETE
   @Path("/anomaly-function")
   @ApiOperation(value = "Delete anomaly function")
@@ -859,6 +860,53 @@ public class AnomalyResource {
     // delete from db
     anomalyFunctionDAO.deleteById(id);
     return Response.noContent().build();
+  }
+
+  /**
+   * Delete multiple anomaly functions
+   *
+   * @param ids a string containing multiple anomaly function ids, separated by comma (e.g. f1,f2,f3)
+   * @return HTTP response of this request with the deletion status and skipped warnings
+   */
+  @DELETE
+  @Path("/delete-functions")
+  @ApiOperation(value = "Delete anomaly functions")
+  public Response deleteAnomalyFunctions(@NotNull @QueryParam("ids") String ids) {
+    Map<String, String> responseMessage = new HashMap<>();
+    List<String> idsDeleted = new ArrayList<>();
+    if (StringUtils.isEmpty(ids)) {
+      throw new IllegalArgumentException("ids is a required query param");
+    }
+    String[] functionIds = ids.split(",");
+
+    for (String idString : functionIds) {
+      idString = idString.trim();
+      Long id = Long.parseLong(idString);
+      AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+      if (anomalyFunctionSpec != null) {
+        // Remove function from subscription alert groups
+        List<AlertConfigDTO> emailConfigurations = emailConfigurationDAO.findByFunctionId(id);
+        for (AlertConfigDTO emailConfiguration : emailConfigurations) {
+          emailConfiguration.getEmailConfig().getFunctionIds().remove(anomalyFunctionSpec.getId());
+          emailConfigurationDAO.update(emailConfiguration);
+        }
+
+        // Delete merged anomalies
+        List<MergedAnomalyResultDTO> mergedResults = anomalyMergedResultDAO.findByFunctionId(id);
+        for (MergedAnomalyResultDTO result : mergedResults) {
+          anomalyMergedResultDAO.delete(result);
+        }
+
+        anomalyFunctionDAO.deleteById(id);
+        idsDeleted.add(idString);
+      } else {
+        responseMessage.put("warnings", "true");
+        responseMessage.put("id: " + id, "skipped! anomaly function doesn't exist.");
+      }
+    }
+
+    responseMessage.put("message", "successfully deleted the following anomalies. function ids = " + idsDeleted);
+    return Response.ok(responseMessage).build();
   }
 
   /**
