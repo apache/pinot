@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.filesystem;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -24,7 +25,7 @@ import org.apache.commons.configuration.Configuration;
  * The PinotFS is intended to be a thin wrapper on top of different filesystems. This interface is intended for internal
  * Pinot use only. This class will be implemented for each pluggable storage type.
  */
-public abstract class PinotFS {
+public abstract class PinotFS implements Closeable {
   /**
    * Initializes the configurations specific to that filesystem. For instance, any security related parameters can be
    * initialized here and will not be logged.
@@ -108,4 +109,13 @@ public abstract class PinotFS {
    * @throws IOException for IO Error
    */
   public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws Exception;
+
+  /**
+   * For certain filesystems, we may need to close the filesystem and do relevant operations to prevent leaks.
+   * By default, this method does nothing.
+   * @throws IOException
+   */
+  public void close() throws IOException {
+
+  }
 }
