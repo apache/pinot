@@ -230,88 +230,85 @@ public class HelixServerStarter {
     if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, true)) {
       Uninterruptibles.sleepUninterruptibly(_maxQueryTimeMs, TimeUnit.MILLISECONDS);
     }
-    waitUntilNoIncomingQueries();
+    long currentTime = System.currentTimeMillis();
+    long endTime = _maxShutdownWaitTimeMs + System.currentTimeMillis();
+    currentTime = waitUntilNoIncomingQueries(currentTime, endTime);
     _helixManager.disconnect();
     _serverInstance.shutDown();
-    waitUntilNoOnlineResources();
+    waitUntilNoOnlineResources(currentTime, endTime);
   }
 
-  private void waitUntilNoIncomingQueries() {
+  private long waitUntilNoIncomingQueries(long startTime, long endTime) {
     LOGGER.info("Waiting upto {}ms until Pinot server doesn't receive any incoming queries...", _maxShutdownWaitTimeMs);
-    long startTime = System.currentTimeMillis();
     long currentTime = startTime;
-    long endTime = _maxShutdownWaitTimeMs + System.currentTimeMillis();
 
     while (currentTime < endTime) {
       if (noIncomingQueries(currentTime)) {
         LOGGER.info("No incoming query within {}ms. Total waiting Time: {}ms",
             CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS, (currentTime - startTime));
-        return;
+        return currentTime;
       }
 
       try {
-        // Sleep for 60 second.
         Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted when waiting for Pinot server not to receive any queries.", e);
         Thread.currentThread().interrupt();
-        return;
+        return currentTime;
       }
       currentTime = System.currentTimeMillis();
     }
     LOGGER.error("Reach timeout waiting for no incoming queries! Max waiting time: {}ms", _maxShutdownWaitTimeMs);
+    return currentTime;
   }
 
   /**
    * Init a helix spectator to watch the external view change.
    */
-  private void waitUntilNoOnlineResources() {
-    LOGGER.info("Waiting upto {}ms until no online resources...", _maxShutdownWaitTimeMs);
+  private void waitUntilNoOnlineResources(long startTime, long endTime) {
+    LOGGER.info("Waiting upto {}ms until no online resources...", (endTime - startTime));
 
     // Initialize a helix spectator.
     HelixManager spectatorManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.SPECTATOR, _zkServers);
     try {
       spectatorManager.connect();
+
+      Set<String> resources = fetchLatestTableResources(spectatorManager.getClusterManagmentTool());
+
+      long currentTime = startTime;
+      while (currentTime < endTime) {
+        if (noOnlineResources(spectatorManager, resources)) {
+          LOGGER.info("No online resource within {}ms. Total waiting Time: {}ms",
+              CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS, (currentTime - startTime));
+          return;
+        }
+
+        try {
+          Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
+        } catch (InterruptedException e) {
+          LOGGER.error("Interrupted when waiting for no online resources.", e);
+          Thread.currentThread().interrupt();
+          return;
+        }
+        currentTime = System.currentTimeMillis();
+      }
+      LOGGER.error(
+          "Reach timeout waiting for no online resources! Forcing Pinot server to shutdown. Max waiting time: {}ms",
+          _maxShutdownWaitTimeMs);
+
     } catch (Exception e) {
-      LOGGER.error("Exception connecting spectator helix manager to cluster. Skip checking external view.", e);
-      return;
+      LOGGER.error("Exception waiting until no online resources. Skip checking external view.", e);
+    } finally {
+      spectatorManager.disconnect();
     }
-
-    Set<String> resources = fetchLatestTableResources(spectatorManager.getClusterManagmentTool());
-
-    long startTime = System.currentTimeMillis();
-    long currentTime = startTime;
-    long endTime = _maxShutdownWaitTimeMs + System.currentTimeMillis();
-
-    while (currentTime < endTime) {
-      if (noOnlineResource(spectatorManager, resources)) {
-        LOGGER.info("No online resource within {}ms. Total waiting Time: {}ms",
-            CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS, (currentTime - startTime));
-        return;
-      }
-
-      try {
-        // Sleep for 60 second.
-        Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
-      } catch (InterruptedException e) {
-        LOGGER.error("Interrupted when waiting for no online resources.", e);
-        Thread.currentThread().interrupt();
-        return;
-      }
-      currentTime = System.currentTimeMillis();
-    }
-    LOGGER.error(
-        "Reach timeout waiting for no online resources! Forcing Pinot server to shutdown. Max waiting time: {}ms",
-        _maxShutdownWaitTimeMs);
-    spectatorManager.disconnect();
   }
 
   private boolean noIncomingQueries(long currentTime) {
     return currentTime > _serverInstance.getLatestQueryTime() + CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS;
   }
 
-  private boolean noOnlineResource(HelixManager spectatorManager, Set<String> resources) {
+  private boolean noOnlineResources(HelixManager spectatorManager, Set<String> resources) {
     Iterator<String> iterator = resources.iterator();
     while (iterator.hasNext()) {
       String resourceName = iterator.next();
