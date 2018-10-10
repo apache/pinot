@@ -157,12 +157,12 @@ public class PinotTaskManager extends BasePeriodicTask {
   }
 
   @Override
-  public void runTask() {
+  public void run() {
     scheduleTasks();
   }
 
   @Override
-  public void initTask() {
-    LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalSeconds());
+  public void init() {
+    LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalInSeconds());
   }
 }

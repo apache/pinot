@@ -77,7 +77,7 @@ public class SegmentStatusChecker extends BasePeriodicTask {
   }
 
   @Override
-  public void runTask() {
+  public void run() {
     updateSegmentMetrics();
   }
 
@@ -85,8 +85,8 @@ public class SegmentStatusChecker extends BasePeriodicTask {
    * Init the segment status checker.
    */
   @Override
-  public void initTask() {
-    if (getIntervalSeconds() == -1) {
+  public void init() {
+    if (getIntervalInSeconds() == -1) {
       LOGGER.warn("Segment status check interval is -1, status checks disabled.");
       return;
     }

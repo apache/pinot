@@ -38,6 +38,7 @@ import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrate
 import com.linkedin.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.linkedin.pinot.core.periodictask.PeriodicTask;
 import com.linkedin.pinot.core.periodictask.PeriodicTaskScheduler;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -45,10 +46,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.configuration.Configuration;
+import java.util.concurrent.PriorityBlockingQueue;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
@@ -97,7 +101,7 @@ public class ControllerStarter {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
     _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
-    _periodicTaskScheduler = new PeriodicTaskScheduler();
+    _periodicTaskScheduler = new PeriodicTaskScheduler(_config.getPeriodicTaskInitDelayInSeconds());
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -152,12 +156,17 @@ public class ControllerStarter {
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixManager));
 
-    LOGGER.info("Starting task manager");
+    PriorityBlockingQueue<PeriodicTaskScheduler.PeriodicTaskEntry> periodicTasks =
+        new PriorityBlockingQueue<>(10);
+
     _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
-    _periodicTaskScheduler.addPeriodicTask(_taskManager);
+    if (_taskManager.getIntervalInSeconds() > 0L) {
+      LOGGER.info("Starting task manager");
+      periodicTasks.add(new PeriodicTaskScheduler.PeriodicTaskEntry(_taskManager));
+    }
 
     LOGGER.info("Starting retention manager");
-    _periodicTaskScheduler.addPeriodicTask(_retentionManager);
+    periodicTasks.add(new PeriodicTaskScheduler.PeriodicTaskEntry(_retentionManager));
 
     LOGGER.info("Starting validation manager");
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
@@ -165,20 +174,24 @@ public class ControllerStarter {
     _validationManager =
         new ValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
             new ValidationMetrics(_metricsRegistry));
-    _periodicTaskScheduler.addPeriodicTask(_validationManager);
+    periodicTasks.add(new PeriodicTaskScheduler.PeriodicTaskEntry(_validationManager));
 
     LOGGER.info("Starting realtime segment manager");
     _realtimeSegmentsManager.start(_controllerMetrics);
     PinotLLCRealtimeSegmentManager.getInstance().start();
 
-    LOGGER.info("Starting segment status manager");
-    _periodicTaskScheduler.addPeriodicTask(_segmentStatusChecker);
+    if (_segmentStatusChecker.getIntervalInSeconds() == -1L) {
+      LOGGER.warn("Segment status check interval is -1, status checks disabled.");
+    } else {
+      LOGGER.info("Starting segment status manager");
+      periodicTasks.add(new PeriodicTaskScheduler.PeriodicTaskEntry(_segmentStatusChecker));
+    }
 
     LOGGER.info("Starting realtime segment relocation manager");
-    _periodicTaskScheduler.addPeriodicTask(_realtimeSegmentRelocator);
+    periodicTasks.add(new PeriodicTaskScheduler.PeriodicTaskEntry(_realtimeSegmentRelocator));
 
     LOGGER.info("Starting periodic task scheduler");
-    _periodicTaskScheduler.start();
+    _periodicTaskScheduler.start(periodicTasks);
 
     LOGGER.info("Creating rebalance segments factory");
     RebalanceSegmentStrategyFactory.createInstance(helixManager);
@@ -287,15 +300,6 @@ public class ControllerStarter {
       LOGGER.info("Closing PinotFS classes");
       PinotFSFactory.shutdown();
 
-      LOGGER.info("Stopping validation manager");
-      _periodicTaskScheduler.removePeriodicTask(_validationManager);
-
-      LOGGER.info("Stopping realtime segment relocation manager");
-      _periodicTaskScheduler.removePeriodicTask(_realtimeSegmentRelocator);
-
-      LOGGER.info("Stopping retention manager");
-      _periodicTaskScheduler.removePeriodicTask(_retentionManager);
-
       LOGGER.info("Stopping Jersey admin API");
       _adminApp.stop();
 
@@ -305,12 +309,7 @@ public class ControllerStarter {
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
 
-      LOGGER.info("Stopping segment status manager");
-      _periodicTaskScheduler.removePeriodicTask(_segmentStatusChecker);
-
-      LOGGER.info("Stopping task manager");
-      _periodicTaskScheduler.removePeriodicTask(_taskManager);
-
+      LOGGER.info("Stopping validation manager, realtime segment relocation manager, retention manager, segment status checker, task manager");
       _periodicTaskScheduler.stop();
 
       _executorService.shutdownNow();

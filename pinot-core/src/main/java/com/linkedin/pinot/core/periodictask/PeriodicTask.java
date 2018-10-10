@@ -15,17 +15,16 @@
  */
 package com.linkedin.pinot.core.periodictask;
 
-public interface PeriodicTask {
+public interface PeriodicTask extends Runnable {
 
-  void initTask();
+  void init();
 
-  void runTask();
+  @Override
+  void run();
 
-  long getIntervalSeconds();
+  long getIntervalInSeconds();
 
-  long getExecutionTime();
-
-  void updateExecutionTime();
+  long getInitialDelayInSeconds();
 
   String getTaskName();
 }

@@ -56,18 +56,18 @@ public class RetentionManager extends BasePeriodicTask {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        getIntervalSeconds(), _deletedSegmentsRetentionInDays);
+        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
   }
 
   @Override
-  public void runTask() {
+  public void run() {
     execute();
   }
 
   @Override
-  public void initTask() {
+  public void init() {
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        getIntervalSeconds(), _deletedSegmentsRetentionInDays);
+        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
   }
 
   public void execute() {

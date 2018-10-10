@@ -59,7 +59,7 @@ public class RealtimeSegmentRelocator extends BasePeriodicTask {
   }
 
   @Override
-  public void runTask() {
+  public void run() {
     runRelocation();
   }
 
@@ -74,6 +74,7 @@ public class RealtimeSegmentRelocator extends BasePeriodicTask {
       return;
     }
 
+    long startTime = System.currentTimeMillis();
     LOGGER.info("Starting relocation of realtime segments");
     List<String> allRealtimeTableNames = _pinotHelixResourceManager.getAllRealtimeTables();
 
@@ -107,7 +108,7 @@ public class RealtimeSegmentRelocator extends BasePeriodicTask {
         LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
       }
     }
-    LOGGER.info("Realtime segment relocation completed");
+    LOGGER.info("Realtime segment relocation completed in {}ms.", (System.currentTimeMillis() - startTime));
   }
 
   /**

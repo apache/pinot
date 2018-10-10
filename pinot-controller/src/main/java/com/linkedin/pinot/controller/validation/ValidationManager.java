@@ -52,30 +52,25 @@ import org.slf4j.LoggerFactory;
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
  */
-public class ValidationManager extends PeriodicTask {
+public class ValidationManager extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ValidationManager.class);
 
-  private final long _validationIntervalSeconds;
   private final boolean _enableSegmentLevelValidation;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
-  private final ScheduledExecutorService _executorService;
 
   public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
     super("ValidationManager", config.getValidationControllerFrequencyInSeconds());
-    _validationIntervalSeconds = config.getValidationControllerFrequencyInSeconds();
     _enableSegmentLevelValidation = config.getEnableSegmentLevelValidation();
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
-    _executorService =
-        Executors.newSingleThreadScheduledExecutor(runnable -> new Thread(runnable, "ValidationManagerThread"));
   }
 
   @Override
-  public void runTask() {
+  public void run() {
     runValidation();
   }
 
@@ -89,6 +84,7 @@ public class ValidationManager extends PeriodicTask {
       return;
     }
 
+    long startTime = System.currentTimeMillis();
     LOGGER.info("Starting validation");
     // Cache instance configs to reduce ZK access
     List<InstanceConfig> instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
@@ -122,7 +118,7 @@ public class ValidationManager extends PeriodicTask {
         LOGGER.warn("Caught exception while validating table: {}", tableNameWithType, e);
       }
     }
-    LOGGER.info("Validation completed");
+    LOGGER.info("Validation completed in {}ms.", (System.currentTimeMillis() - startTime));
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics

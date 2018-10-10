@@ -18,10 +18,10 @@ package com.linkedin.pinot.core.periodictask;
 
 public abstract class BasePeriodicTask implements PeriodicTask {
   private final String _taskName;
-  private long _executionTime;
-  private long _intervalSeconds;
+  private long _intervalInSeconds;
+  private long _initialDelayInSeconds;
 
-  public static final long DEFAULT_INITIAL_DELAY_IN_SECOND = 120L;
+  private static final long DEFAULT_INITIAL_DELAY_IN_SECOND = 120L;
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds) {
     this(taskName, runFrequencyInSeconds, DEFAULT_INITIAL_DELAY_IN_SECOND);
@@ -29,33 +29,28 @@ public abstract class BasePeriodicTask implements PeriodicTask {
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelaySeconds) {
     _taskName = taskName;
-    _intervalSeconds = runFrequencyInSeconds;
-    _executionTime = System.currentTimeMillis() + initialDelaySeconds;
+    _intervalInSeconds = runFrequencyInSeconds;
+    _initialDelayInSeconds = initialDelaySeconds;
   }
 
-  public abstract void runTask();
+  public abstract void run();
 
   @Override
-  public void initTask() {
+  public void init() {
   }
 
   @Override
-  public long getIntervalSeconds() {
-    return _intervalSeconds;
+  public long getIntervalInSeconds() {
+    return _intervalInSeconds;
+  }
+
+  @Override
+  public long getInitialDelayInSeconds() {
+    return _initialDelayInSeconds;
   }
 
   @Override
   public String getTaskName() {
     return _taskName;
-  }
-
-  @Override
-  public long getExecutionTime() {
-    return _executionTime;
-  }
-
-  @Override
-  public void updateExecutionTime() {
-    _executionTime += _intervalSeconds;
   }
 }

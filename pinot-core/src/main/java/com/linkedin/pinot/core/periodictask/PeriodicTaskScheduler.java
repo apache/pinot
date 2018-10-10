@@ -25,85 +25,81 @@ import org.slf4j.LoggerFactory;
 
 public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
-  private PriorityBlockingQueue<PeriodicTask> _periodicTasks;
-  private ScheduledExecutorService _executorService;
-  private long _intervalSeconds;
-  private long _initialDelaySeconds;
+  private final ScheduledExecutorService _executorService;
+  private long _initialDelayInSeconds;
 
-  public PeriodicTaskScheduler() {
-    _executorService = Executors.newSingleThreadScheduledExecutor(runnable -> {
-      Thread thread = new Thread(runnable);
-      thread.setName("PeriodicTaskSchedulerExecutorService");
-      return thread;
-    });
-    _initialDelaySeconds = 120L;
-    _intervalSeconds = 300L;
-    _periodicTasks = new PriorityBlockingQueue<>(10, (o1, o2) -> {
-      if (o1.getExecutionTime() == o2.getExecutionTime()) {
+  public static class PeriodicTaskEntry implements Comparable<PeriodicTaskEntry> {
+    private PeriodicTask _periodicTask;
+    private long _executionTime;
+
+    public PeriodicTaskEntry(PeriodicTask periodicTask) {
+      _periodicTask = periodicTask;
+      _executionTime = System.currentTimeMillis() + _periodicTask.getInitialDelayInSeconds();
+      if (_periodicTask.getIntervalInSeconds() > 0L) {
+        _periodicTask.init();
+      }
+    }
+
+    PeriodicTask getPeriodicTask() {
+      return _periodicTask;
+    }
+
+    long getExecutionTime() {
+      return _executionTime;
+    }
+
+    void updateExecutionTime() {
+      _executionTime = System.currentTimeMillis() + _periodicTask.getIntervalInSeconds();
+    }
+
+    @Override
+    public int compareTo(PeriodicTaskEntry o) {
+      if (this._executionTime == o._executionTime) {
         return 0;
       }
-      return o1.getExecutionTime() < o2.getExecutionTime() ? -1 : 1;
-    });
+      return this._executionTime < o._executionTime ? -1 : 1;
+    }
   }
 
-  public void start() {
-    LOGGER.info("Starting PeriodicTaskScheduler. Run frequency in seconds: {}", _intervalSeconds);
+  public PeriodicTaskScheduler(long initialDelayInSeconds) {
+    LOGGER.info("Initializing PeriodicTaskScheduler. Initial delay in seconds: {}", initialDelayInSeconds);
+    _executorService =
+        Executors.newSingleThreadScheduledExecutor(runnable -> new Thread("PeriodicTaskSchedulerExecutorService"));
+    _initialDelayInSeconds = initialDelayInSeconds;
+  }
+
+  public void start(PriorityBlockingQueue<PeriodicTaskScheduler.PeriodicTaskEntry> periodicTasks) {
+    LOGGER.info("Starting PeriodicTaskScheduler.");
 
     // Set up an executor that executes tasks periodically
     _executorService.schedule(() -> {
       while (true) {
-        PeriodicTask task = null;
+        PeriodicTaskScheduler.PeriodicTaskEntry taskEntry = null;
         try {
-          task = _periodicTasks.take();
-          if (System.currentTimeMillis() < task.getExecutionTime()) {
-            Thread.sleep(System.currentTimeMillis() - task.getExecutionTime());
+          taskEntry = periodicTasks.take();
+          if (System.currentTimeMillis() < taskEntry.getExecutionTime()) {
+            Thread.sleep(System.currentTimeMillis() - taskEntry.getExecutionTime());
           }
-          task.runTask();
+          taskEntry.getPeriodicTask().run();
         } catch (InterruptedException ie) {
-          LOGGER.warn("Interrupted when running periodic task");
+          LOGGER.warn("Interrupted when running periodic task", ie);
           Thread.currentThread().interrupt();
         } catch (Throwable e) {
           // catch all errors to prevent subsequent executions from being silently suppressed
           // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
           LOGGER.warn("Caught exception while running PeriodicTaskScheduler", e);
         } finally {
-          if (task != null) {
-            task.updateExecutionTime();
-            _periodicTasks.offer(task);
+          if (taskEntry != null) {
+            taskEntry.updateExecutionTime();
+            periodicTasks.offer(taskEntry);
           }
         }
       }
-    }, _initialDelaySeconds, TimeUnit.SECONDS);
+    }, _initialDelayInSeconds, TimeUnit.SECONDS);
   }
 
   public void stop() {
     LOGGER.info("Stopping PeriodicTaskScheduler");
-    if (_executorService == null) {
-      return;
-    }
-    _executorService.shutdown();
-    try {
-      _executorService.awaitTermination(_initialDelaySeconds, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      // Ignored
-    }
-    _executorService = null;
-  }
-
-  /**
-   * Add periodic task before starting the scheduler.
-   */
-  public void addPeriodicTask(PeriodicTask task) {
-    if (task.getIntervalSeconds() > 0L) {
-      LOGGER.info("Adding {} to PeriodicTaskScheduler, run frequency in seconds: {}", task.getTaskName(),
-          task.getIntervalSeconds());
-      task.initTask();
-      _periodicTasks.offer(task);
-      _intervalSeconds = Math.min(_intervalSeconds, task.getIntervalSeconds());
-    }
-  }
-
-  public void removePeriodicTask(PeriodicTask task) {
-    _periodicTasks.remove(task);
+    _executorService.shutdownNow();
   }
 }

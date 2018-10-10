@@ -58,6 +58,8 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
   private static final String JERSEY_ADMIN_IS_PRIMARY = "jersey.admin.isprimary";
   private static final String ACCESS_CONTROL_FACTORY_CLASS = "controller.admin.access.control.factory.class";
+  private static final String CONFIG_OF_PERIODIC_TASK_SCHEDULER_INIT_DELAY_IN_SECONDS =
+      "controller.periodicTask.initDelayInSeconds";
   // Amount of the time the segment can take from the beginning of upload to the end of upload. Used when parallel push
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
@@ -87,6 +89,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
   private static final boolean DEFAULT_ENABLE_SEGMENT_LEVEL_VALIDATION = true;
+  private static final long DEFAULT_PERIODIC_TASK_SCHEDULER_INIT_DELAY_IN_SECONDS = 120L;
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
@@ -424,5 +427,10 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public boolean getEnableSegmentLevelValidation() {
     return getBoolean(ENABLE_SEGMENT_LEVEL_VALIDATION, DEFAULT_ENABLE_SEGMENT_LEVEL_VALIDATION);
+  }
+
+  public long getPeriodicTaskInitDelayInSeconds() {
+    return getLong(CONFIG_OF_PERIODIC_TASK_SCHEDULER_INIT_DELAY_IN_SECONDS,
+        DEFAULT_PERIODIC_TASK_SCHEDULER_INIT_DELAY_IN_SECONDS);
   }
 }
