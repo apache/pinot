@@ -231,7 +231,7 @@ public class MetricConfigResource {
   public Response createMetricTag(
       @PathParam("id") Long id,
       @NotNull @QueryParam("tag") String tag) throws Exception {
-    if (org.apache.commons.lang3.StringUtils.isBlank(tag)) {
+    if (StringUtils.isBlank(tag)) {
       throw new IllegalArgumentException(String.format("Received a null/empty tag: ", tag));
     }
 
@@ -252,6 +252,33 @@ public class MetricConfigResource {
 
     metricConfigDao.update(metricConfigDTO);
     responseMessage.put("message", "successfully tagged metric" + id + " with tag " + tag);
+    return Response.ok(responseMessage).build();
+  }
+
+  @PUT
+  @Path("{id}/remove-tag")
+  @ApiOperation("Endpoint for removing a metric tag")
+  public Response removeMetricTag(
+      @PathParam("id") Long id,
+      @NotNull @QueryParam("tag") String tag) throws Exception {
+    if (StringUtils.isBlank(tag)) {
+      throw new IllegalArgumentException(String.format("Received a null/empty tag: ", tag));
+    }
+
+    Map<String, String> responseMessage = new HashMap<>();
+
+    MetricConfigDTO metricConfigDTO = metricConfigDao.findById(id);
+    if (metricConfigDTO == null) {
+      responseMessage.put("message", "cannot find the metric " + id + ".");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
+
+    if (metricConfigDTO.getTags() != null) {
+      metricConfigDTO.getTags().removeAll(Collections.singleton(tag));
+    }
+
+    metricConfigDao.update(metricConfigDTO);
+    responseMessage.put("message", "successfully removed tag " + tag + " from metric" + id);
     return Response.ok(responseMessage).build();
   }
 
