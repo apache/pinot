@@ -535,6 +535,16 @@ export function value2filter(key, value) {
 }
 
 /**
+ * Returns true if the list of filters contains non-inclusion expressions.
+ *
+ * @param {Array} filters filter trples [key, op, value]
+ * @returns {boolean}
+ */
+export function hasExclusionFilters(filters) {
+  return !_.isEmpty(filters.map(t => t[1]).filter(op => op !== '='));
+}
+
+/**
  * Returns a color identify based on static mapping of an entity urn's id portion. Supports 'thirdeye:metric:' and 'thirdeye:event:' prefixes.
  *
  * @see colorMapping
@@ -618,6 +628,19 @@ export function isAdditive(urn, entities) {
 }
 
 /**
+ * Extracts information about non-additivity and the presence of exclusion filters
+ * @param {string} urn metric urn
+ * @param {object} entities entities cache
+ */
+export function isExclusionWarning(urn, entities) {
+  try {
+    return !isAdditive(urn, entities) && hasExclusionFilters(toFilters([urn]));
+  } catch(error) {
+    return false;
+  }
+}
+
+/**
  * finds the corresponding labelMapping field given a label in the filterBarConfig
  * This is only a placeholder since the filterBarConfig is not finalized
  */
@@ -688,5 +711,7 @@ export default {
   splitFilterFragment,
   makeTime,
   filter2value,
-  value2filter
+  value2filter,
+  hasExclusionFilters,
+  isExclusionWarning
 };

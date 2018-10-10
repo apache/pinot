@@ -9,7 +9,8 @@ export default [
     template: 'custom/table-checkbox',
     className: 'metrics-table__column  metrics-table__column--checkbox'
   }, {
-    propertyName: 'label',
+    template: 'custom/metrics-table-label',
+    sortedBy: 'label',
     title: 'Metric',
     template: 'custom/metrics-table-metric',
     className: 'metrics-table__column metrics-table__column--large'

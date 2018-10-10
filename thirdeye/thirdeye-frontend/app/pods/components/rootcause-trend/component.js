@@ -13,7 +13,8 @@ import {
   isInverse,
   toColorDirection,
   makeSortable,
-  makeTime
+  makeTime,
+  isExclusionWarning
 } from 'thirdeye-frontend/utils/rca-utils';
 import Component from '@ember/component';
 import { humanizeChange } from 'thirdeye-frontend/utils/utils';
@@ -185,7 +186,8 @@ export default Component.extend({
         template: 'custom/table-checkbox',
         className: 'metrics-table__column'
       }, {
-        propertyName: 'label',
+        template: 'custom/metrics-table-label',
+        sortedBy: 'label',
         title: 'Metric',
         className: 'metrics-table__column metrics-table__column--large'
       }
@@ -280,7 +282,8 @@ export default Component.extend({
           urn,
           label: toMetricLabel(urn, entities),
           isSelected: selectedUrns.has(urn),
-          links: links[urn]
+          links: links[urn],
+          isExclusionWarning: isExclusionWarning(urn, entities)
         };
 
         buckets.forEach((t, i) => {

@@ -46,6 +46,9 @@
     {{#if showExclusions}}
       <div class="col-xs-3">
         <label class="te-label te-label--small" for="select-filters">
+          {{#if isExclusionWarning}}
+            {{partial 'partials/rootcause/exclusion-warning'}}
+          {{/if}}
           Exclude
           <span>
             <i class="glyphicon glyphicon-question-sign"></i>

@@ -9,7 +9,8 @@ import {
   toMetricLabel,
   isInverse,
   toColorDirection,
-  makeSortable
+  makeSortable,
+  isExclusionWarning
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   humanizeChange,
@@ -143,7 +144,8 @@ export default Component.extend({
             sortable_current: this._makeChange(urn, 'current', aggregates),
             sortable_baseline: this._makeChange(urn, 'baseline', aggregates),
             sortable_wo1w: this._makeChange(urn, 'wo1w', aggregates),
-            sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates)
+            sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates),
+            isExclusionWarning: isExclusionWarning(urn, entities)
           };
         });
 

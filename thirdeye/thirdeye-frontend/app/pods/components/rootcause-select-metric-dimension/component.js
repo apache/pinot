@@ -10,7 +10,8 @@ import {
   fromFilterMap,
   toBaselineUrn,
   toCurrentUrn,
-  value2filter
+  value2filter,
+  isAdditive
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
@@ -93,6 +94,11 @@ export default Component.extend({
   }),
 
   showExclusions: computed.or('hasExclusions', 'forceShowExclusions'),
+
+  isExclusionWarning: computed('selectedUrn', 'entities', function () {
+    const { selectedUrn, entities } = getProperties(this, 'selectedUrn', 'entities');
+    return (selectedUrn in entities) && !isAdditive(selectedUrn, entities);
+  }),
 
   _pruneFilters(filterOptions, filterMap) {
     const newFilterMap = {};
