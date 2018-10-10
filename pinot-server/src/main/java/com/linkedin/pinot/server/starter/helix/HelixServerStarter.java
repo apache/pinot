@@ -75,6 +75,7 @@ public class HelixServerStarter {
   private final String _instanceId;
   private final long _maxQueryTimeMs;
   private final long _maxShutdownWaitTimeMs;
+  private final long _checkIntervalTimeMs;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
   private final ServerInstance _serverInstance;
@@ -105,6 +106,8 @@ public class HelixServerStarter {
     _maxShutdownWaitTimeMs =
         _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME,
             CommonConstants.Server.DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS);
+    _checkIntervalTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME,
+        CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
 
     LOGGER.info("Connecting Helix components");
     setupHelixSystemProperties(_helixServerConfig);
@@ -244,13 +247,13 @@ public class HelixServerStarter {
 
     while (currentTime < endTime) {
       if (noIncomingQueries(currentTime)) {
-        LOGGER.info("No incoming query within {}ms. Total waiting Time: {}ms",
-            CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS, (currentTime - startTime));
+        LOGGER.info("No incoming query within {}ms. Total waiting Time: {}ms", _checkIntervalTimeMs,
+            (currentTime - startTime));
         return currentTime;
       }
 
       try {
-        Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
+        Thread.sleep(_checkIntervalTimeMs);
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted when waiting for Pinot server not to receive any queries.", e);
         Thread.currentThread().interrupt();
@@ -279,13 +282,13 @@ public class HelixServerStarter {
       long currentTime = startTime;
       while (currentTime < endTime) {
         if (noOnlineResources(spectatorManager, resources)) {
-          LOGGER.info("No online resource within {}ms. Total waiting Time: {}ms",
-              CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS, (currentTime - startTime));
+          LOGGER.info("No online resource within {}ms. Total waiting Time: {}ms", _checkIntervalTimeMs,
+              (currentTime - startTime));
           return;
         }
 
         try {
-          Thread.sleep(CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
+          Thread.sleep(_checkIntervalTimeMs);
         } catch (InterruptedException e) {
           LOGGER.error("Interrupted when waiting for no online resources.", e);
           Thread.currentThread().interrupt();
@@ -296,7 +299,6 @@ public class HelixServerStarter {
       LOGGER.error(
           "Reach timeout waiting for no online resources! Forcing Pinot server to shutdown. Max waiting time: {}ms",
           _maxShutdownWaitTimeMs);
-
     } catch (Exception e) {
       LOGGER.error("Exception waiting until no online resources. Skip checking external view.", e);
     } finally {
@@ -305,7 +307,7 @@ public class HelixServerStarter {
   }
 
   private boolean noIncomingQueries(long currentTime) {
-    return currentTime > _serverInstance.getLatestQueryTime() + CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS;
+    return currentTime > _serverInstance.getLatestQueryTime() + _checkIntervalTimeMs;
   }
 
   private boolean noOnlineResources(HelixManager spectatorManager, Set<String> resources) {
