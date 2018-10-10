@@ -28,7 +28,7 @@ public class GenericSplineFunctionMigrater extends BaseAnomalyFunctionMigrater{
         put(variableConfigKey("pValueThreshold"), "0.025");
         put(variableConfigKey("recentPeriod"), "P14D");
         put(variableConfigKey("r2Cutoff"), "0.9");
-        put(variableConfigKey("predictionMode"), "ROBUST");
+        put(variableConfigKey("predictionMode"), "TRENDING");
       }
     });
     directKeyMap = ImmutableMap.copyOf(new HashMap<String, String>(){

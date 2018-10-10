@@ -264,22 +264,25 @@ public class AnomalyFunctionMigrationTool {
         if (resultDTO.getFeedback() != null && resultDTO.getFeedback().getFeedbackType() != null) {
           feedbackType = resultDTO.getFeedback().getFeedbackType();
         }
-        bw.write(String.format("%d,%d,%s,%f,%f,%f,%f,%s", resultDTO.getStartTime(), resultDTO.getEndTime(),
-            resultDTO.getDimensions().toString(), resultDTO.getAvgCurrentVal(), resultDTO.getAvgBaselineVal(),
-            resultDTO.getWeight(), resultDTO.getScore(), feedbackType.toString()));
+        bw.write(String.format("%s,%s,%s,%f,%f,%f,%f,%s", new DateTime(resultDTO.getStartTime()),
+            new DateTime(resultDTO.getEndTime()), resultDTO.getDimensions().toString(), resultDTO.getAvgCurrentVal(),
+            resultDTO.getAvgBaselineVal(), resultDTO.getWeight(), resultDTO.getScore(), feedbackType.toString()));
       } else {
         bw.write(",,,,,,,");
       }
       if (!sameFunction) {
         if (i < clonedResults.size()) {
           MergedAnomalyResultDTO resultDTO = clonedResults.get(i);
+          // Update replay result as notified
+          resultDTO.setNotified(true);
+          mergedResultDAO.save(resultDTO);
           AnomalyFeedbackType feedbackType = AnomalyFeedbackType.NO_FEEDBACK;
           if (resultDTO.getFeedback() != null && resultDTO.getFeedback().getFeedbackType() != null) {
             feedbackType = resultDTO.getFeedback().getFeedbackType();
           }
-          bw.write(String.format(",%d,%d,%s,%f,%f,%f,%f,%s", resultDTO.getStartTime(), resultDTO.getEndTime(),
-              resultDTO.getDimensions().toString(), resultDTO.getAvgCurrentVal(), resultDTO.getAvgBaselineVal(),
-              resultDTO.getWeight(), resultDTO.getScore(), feedbackType.toString()));
+          bw.write(String.format(",%s,%s,%s,%f,%f,%f,%f,%s", new DateTime(resultDTO.getStartTime()),
+              new DateTime(resultDTO.getEndTime()), resultDTO.getDimensions().toString(), resultDTO.getAvgCurrentVal(),
+              resultDTO.getAvgBaselineVal(), resultDTO.getWeight(), resultDTO.getScore(), feedbackType.toString()));
         } else {
           bw.write(",,,,,,,,");
         }
