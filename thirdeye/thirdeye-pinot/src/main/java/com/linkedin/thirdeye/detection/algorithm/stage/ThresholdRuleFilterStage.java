@@ -20,7 +20,9 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStage;
+import com.linkedin.thirdeye.detection.annotations.Detection;
+import com.linkedin.thirdeye.detection.annotations.DetectionParam;
+import com.linkedin.thirdeye.detection.annotations.DetectionTags;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.Map;
@@ -32,6 +34,10 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 /**
  * This threshold rule filter stage filters the anomalies if either the min or max thresholds do not pass.
  */
+@Detection(name = "Threshold Filter",
+    type = "THRESHOLD_RULE_FILTER",
+    tags = {DetectionTags.RULE_FILTER},
+    description = "Threshold rule filter. filters the anomalies if either the min or max thresholds do not satisfied.")
 public class ThresholdRuleFilterStage implements AnomalyFilterStage {
     private static final String PROP_MIN = "min";
     private static final double PROP_MIN_DEFAULT = Double.NaN;
@@ -39,7 +45,9 @@ public class ThresholdRuleFilterStage implements AnomalyFilterStage {
     private static final String PROP_MAX = "max";
     private static final double PROP_MAX_DEFAULT = Double.NaN;
 
+    @DetectionParam(name = "min", description = "Minimal aggregate value to pass the filter.")
     private double min;
+    @DetectionParam(name = "max", description = "Maximum aggregate value of the anomaly.")
     private double max;
 
     @Override

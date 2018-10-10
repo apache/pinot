@@ -68,6 +68,7 @@ import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detection.DetectionMigrationResource;
 import com.linkedin.thirdeye.detection.DetectionResource;
+import com.linkedin.thirdeye.detection.annotations.DetectionConfigurationResource;
 import com.linkedin.thirdeye.detection.yaml.YamlResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -153,6 +154,7 @@ public class ThirdEyeDashboardApplication
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
     AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
 
+    env.jersey().register(new DetectionConfigurationResource());
     env.jersey().register(new DatasetAutoOnboardResource());
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());

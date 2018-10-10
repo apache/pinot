@@ -23,6 +23,9 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.annotations.Detection;
+import com.linkedin.thirdeye.detection.annotations.DetectionParam;
+import com.linkedin.thirdeye.detection.annotations.DetectionTags;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
@@ -39,6 +42,10 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 /**
  * This filter stage filters the anomalies if either the absolute changeThreshold, percentage changeThreshold or site wide impact does not pass the threshold.
  */
+@Detection(name = "Baseline Filter",
+    type = "BASELINE_RULE_FILTER",
+    tags = {DetectionTags.RULE_FILTER},
+    description = "Baseline rule filter. Filters the anomalies if percentage change, absolute difference or site wide impact is below certain threshold.")
 public class BaselineRuleFilterStage implements AnomalyFilterStage {
   private static final String PROP_CHANGE = "changeThreshold";
   private static final double PROP_CHANGE_DEFAULT = Double.NaN;
@@ -49,10 +56,12 @@ public class BaselineRuleFilterStage implements AnomalyFilterStage {
   private static final String PROP_DIFFERENCE = "differenceThreshold";
   private static final double PROP_DIFFERENCE_DEFAULT = Double.NaN;
 
-  private static final String PROP_TIMEZONE = "timezone";
   private static final String PROP_TIMEZONE_DEFAULT = "UTC";
+  @DetectionParam(name = "timezone", description = "timezone.", defaultValue = PROP_TIMEZONE_DEFAULT)
+  private static final String PROP_TIMEZONE = "timezone";
 
   private static final String PROP_SITEWIDE_METRIC = "siteWideMetricUrn";
+  @DetectionParam(name = "site wide impact threshold", description = "site wide impact threshold.")
   private static final String PROP_SITEWIDE_THRESHOLD = "siteWideImpactThreshold";
   private static final double PROP_SITEWIDE_THRESHOLD_DEFAULT = Double.NaN;
 

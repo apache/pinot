@@ -19,13 +19,12 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
-import com.linkedin.thirdeye.detection.StaticDetectionPipeline;
+import com.linkedin.thirdeye.detection.annotations.Detection;
+import com.linkedin.thirdeye.detection.annotations.DetectionParam;
+import com.linkedin.thirdeye.detection.annotations.DetectionTags;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.List;
@@ -38,12 +37,18 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 /**
  * Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.
  */
+@Detection(name = "Threshold Detection Rule",
+    type = "THRESHOLD_DETECTION",
+    tags = {DetectionTags.RULE_DETECTION},
+    description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.")
 public class ThresholdRuleDetectionStage extends StaticAnomalyDetectionStage {
   private final String COL_TOO_HIGH = "tooHigh";
   private final String COL_TOO_LOW = "tooLow";
   private final String COL_ANOMALY = "anomaly";
 
+  @DetectionParam(name = "min", description = "Minimal allowed value. If metric value is less than this min value, mark as an anomaly.")
   private double min;
+  @DetectionParam(name = "max", description = "Maximum allowed value. If metric value is larger than this max value, mark as an anomaly.")
   private double max;
   private MetricSlice slice;
   private Long configId;
