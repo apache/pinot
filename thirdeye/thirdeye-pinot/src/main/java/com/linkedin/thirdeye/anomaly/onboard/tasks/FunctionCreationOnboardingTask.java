@@ -374,7 +374,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setCron("0 0 14 * * ? *");
         anomalyFunctionSpec.setWindowSize(1);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
-        anomalyFunctionSpec.setProperties("variables.continuumOffset=P90D;module.training=parametric.GenericSplineTrainingModule;variables.numberOfKnots=0;variables.degree=3;variables.predictionMode=TRENDING;variables.anomalyRemovalThreshold=0.6,-0.6;module.data=ContinuumDataModule;variables.pValueThreshold=0.025;function=ConfigurableAnomalyDetectionFunction;variables.seasonalities=DAILY_SEASONALITY;module.detection=ConfidenceIntervalDetectionModule;module.testingPreprocessors=DummyPreprocessModule;workflow=RegressionWorkflow;variables.recentPeriod=P14D;module.trainingPreprocessors=AnomalyRemovalByWeight;variables.r2Cutoff=0.9");
+        anomalyFunctionSpec.setProperties("variables.continuumOffset=P90D;module.training=parametric.GenericSplineTrainingModule;variables.numberOfKnots=0;variables.degree=3;variables.predictionMode=TRENDING;variables.anomalyRemovalThreshold=0.6,-0.6;module.data=ContinuumDataModule;variables.pValueThreshold=0.025;function=SelfRecoverableAnomalyDetectionFunction;variables.seasonalities=DAILY_SEASONALITY;module.detection=ConfidenceIntervalDetectionModule;module.testingPreprocessors=DummyPreprocessModule;workflow=RegressionWorkflow;variables.recentPeriod=P14D;module.trainingPreprocessors=AnomalyRemovalByWeight;variables.r2Cutoff=0.9;downgrade.variables.seasonalities=");
         anomalyFunctionSpec.setRequiresCompletenessCheck(true);
         break;
       default:
