@@ -314,13 +314,8 @@ public class PinotSegmentUploadRestletResource {
           .validateSegment(segmentMetadata, tempSegmentDir);
 
       // Zk operations
-      if (crypterClassHeader.equalsIgnoreCase(DefaultPinotCrypter.class.getName())) {
-        completeZkOperations(enableParallelPushProtection, headers, tempDecryptedFile, provider, segmentMetadata,
-            segmentName, zkDownloadUri);
-      } else {
-        completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
-            segmentName, zkDownloadUri);
-      }
+      completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
+          segmentName, zkDownloadUri);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + segmentMetadata.getTableName());
     } catch (WebApplicationException e) {
