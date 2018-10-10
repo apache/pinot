@@ -27,17 +27,20 @@ public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
   private final ScheduledExecutorService _executorService;
   private long _initialDelayInSeconds;
+  private volatile boolean _running;
 
   public static class PeriodicTaskEntry implements Comparable<PeriodicTaskEntry> {
     private PeriodicTask _periodicTask;
     private long _executionTime;
+    private boolean _executed;
 
     public PeriodicTaskEntry(PeriodicTask periodicTask) {
       _periodicTask = periodicTask;
-      _executionTime = System.currentTimeMillis() + _periodicTask.getInitialDelayInSeconds();
+      _executionTime = System.currentTimeMillis() + _periodicTask.getInitialDelayInSeconds() * 1000L;
       if (_periodicTask.getIntervalInSeconds() > 0L) {
         _periodicTask.init();
       }
+      _executed = false;
     }
 
     PeriodicTask getPeriodicTask() {
@@ -49,7 +52,15 @@ public class PeriodicTaskScheduler {
     }
 
     void updateExecutionTime() {
-      _executionTime = System.currentTimeMillis() + _periodicTask.getIntervalInSeconds();
+      _executionTime = System.currentTimeMillis() + _periodicTask.getIntervalInSeconds() * 1000L;
+    }
+
+    void setExecuted(boolean isExecuted) {
+      _executed = isExecuted;
+    }
+
+    boolean getExecuted() {
+      return _executed;
     }
 
     @Override
@@ -63,9 +74,9 @@ public class PeriodicTaskScheduler {
 
   public PeriodicTaskScheduler(long initialDelayInSeconds) {
     LOGGER.info("Initializing PeriodicTaskScheduler. Initial delay in seconds: {}", initialDelayInSeconds);
-    _executorService =
-        Executors.newSingleThreadScheduledExecutor(runnable -> new Thread("PeriodicTaskSchedulerExecutorService"));
+    _executorService = Executors.newScheduledThreadPool(1);
     _initialDelayInSeconds = initialDelayInSeconds;
+    _running = true;
   }
 
   public void start(PriorityBlockingQueue<PeriodicTaskScheduler.PeriodicTaskEntry> periodicTasks) {
@@ -73,16 +84,18 @@ public class PeriodicTaskScheduler {
 
     // Set up an executor that executes tasks periodically
     _executorService.schedule(() -> {
-      while (true) {
+      while (_running) {
         PeriodicTaskScheduler.PeriodicTaskEntry taskEntry = null;
         try {
           taskEntry = periodicTasks.take();
-          if (System.currentTimeMillis() < taskEntry.getExecutionTime()) {
-            Thread.sleep(System.currentTimeMillis() - taskEntry.getExecutionTime());
+          long currentTime = System.currentTimeMillis();
+          if (currentTime < taskEntry.getExecutionTime()) {
+            Thread.sleep(taskEntry.getExecutionTime() - currentTime);
           }
+          LOGGER.info("Running Task {}", taskEntry.getPeriodicTask().getTaskName());
           taskEntry.getPeriodicTask().run();
         } catch (InterruptedException ie) {
-          LOGGER.warn("Interrupted when running periodic task", ie);
+          LOGGER.warn("Interrupted when running periodic task scheduler", ie);
           Thread.currentThread().interrupt();
         } catch (Throwable e) {
           // catch all errors to prevent subsequent executions from being silently suppressed
@@ -100,6 +113,7 @@ public class PeriodicTaskScheduler {
 
   public void stop() {
     LOGGER.info("Stopping PeriodicTaskScheduler");
-    _executorService.shutdownNow();
+    _running = false;
+    _executorService.shutdown();
   }
 }
