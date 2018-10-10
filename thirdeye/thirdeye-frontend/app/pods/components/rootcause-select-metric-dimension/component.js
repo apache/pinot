@@ -1,4 +1,4 @@
-import { computed, getProperties, setProperties } from '@ember/object';
+import { computed, get, set, getProperties, setProperties } from '@ember/object';
 import Component from '@ember/component';
 import fetch from 'fetch';
 import {
@@ -30,6 +30,8 @@ export default Component.extend({
   filterMap: {},
 
   filterOptions: {},
+
+  forceShowExclusions: false,
 
   didReceiveAttrs() {
     this._super(...arguments);
@@ -85,6 +87,12 @@ export default Component.extend({
       setProperties(this, { filterMap: toFilterMap([...exclusions, ...withoutExclusions])});
     }
   }),
+
+  hasExclusions: computed('exclusions', function () {
+    return get(this, 'exclusions') !== '{}';
+  }),
+
+  showExclusions: computed.or('hasExclusions', 'forceShowExclusions'),
 
   _pruneFilters(filterOptions, filterMap) {
     const newFilterMap = {};
@@ -144,6 +152,14 @@ export default Component.extend({
       const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
 
       onSelection(updates);
+    },
+
+    showExclusions() {
+      set(this, 'forceShowExclusions', true);
+    },
+
+    hideExclusions() {
+      set(this, 'forceShowExclusions', false);
     }
   }
 });
