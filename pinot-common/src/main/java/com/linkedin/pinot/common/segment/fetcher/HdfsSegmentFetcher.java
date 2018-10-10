@@ -41,7 +41,7 @@ public class HdfsSegmentFetcher implements SegmentFetcher {
   private int _retryWaitMs = RETRY_WAITIME_MS_DEFAULT;
 
   @Override
-  public void init(org.apache.commons.configuration.Configuration configs) {
+  public void init(org.apache.commons.configuration.Configuration configs, String protocol) {
     try {
       _retryCount = configs.getInt(RETRY, _retryCount);
       _retryWaitMs = configs.getInt(RETRY_WAITIME_MS, _retryWaitMs);

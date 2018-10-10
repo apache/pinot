@@ -29,7 +29,7 @@ public class NoOpFetcher implements SegmentFetcher {
   public static Logger LOGGER = LoggerFactory.getLogger(NoOpFetcher.class);
 
   @Override
-  public void init(Configuration configs) {
+  public void init(Configuration configs, String protocol) {
     LOGGER.info("NoOpFetcher initialized.");
   }
 

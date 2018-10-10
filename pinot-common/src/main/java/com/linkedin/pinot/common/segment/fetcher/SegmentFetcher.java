@@ -25,8 +25,9 @@ public interface SegmentFetcher {
   /**
    * Initializes configurations
    * @param configs
+   * @param protocol
    */
-  void init(Configuration configs);
+  void init(Configuration configs, String protocol);
 
   /**
    * Fetches segment from a uri location to the local filesystem. Can come from a remote fs or a local fs.

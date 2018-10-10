@@ -72,7 +72,7 @@ public class SegmentFetcherFactory {
       LOGGER.info("Initializing segment fetcher for protocol: {}", protocol);
       Configuration segmentFetcherConfig = segmentFetcherClassConfig.subset(protocol);
       logFetcherInitConfig(segmentFetcher, protocol, segmentFetcherConfig);
-      segmentFetcher.init(segmentFetcherConfig);
+      segmentFetcher.init(segmentFetcherConfig, protocol);
       _segmentFetcherMap.put(protocol, segmentFetcher);
     }
   }

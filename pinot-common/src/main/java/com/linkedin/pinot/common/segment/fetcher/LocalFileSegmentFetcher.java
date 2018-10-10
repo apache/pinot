@@ -29,7 +29,7 @@ public class LocalFileSegmentFetcher implements SegmentFetcher {
   private static final Logger LOGGER = LoggerFactory.getLogger(LocalFileSegmentFetcher.class);
 
   @Override
-  public void init(Configuration configs) {
+  public void init(Configuration configs, String protocol) {
   }
 
   @Override

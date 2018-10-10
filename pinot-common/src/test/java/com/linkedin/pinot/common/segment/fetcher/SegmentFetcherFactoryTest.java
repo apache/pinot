@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.filesystem.LocalPinotFS;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.net.URISyntaxException;
@@ -41,6 +44,11 @@ public class SegmentFetcherFactoryTest {
 
   @Test
   public void testDefaultSegmentFetcherFactory() throws Exception {
+    // Adding file pinot fs
+    PropertiesConfiguration pinotFSConfig = new PropertiesConfiguration();
+    pinotFSConfig.addProperty(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(pinotFSConfig);
     _segmentFetcherFactory.init(new PropertiesConfiguration(), new PropertiesConfiguration());
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("file"));
     Assert.assertTrue(_segmentFetcherFactory.containsProtocol("http"));
@@ -68,6 +76,11 @@ public class SegmentFetcherFactoryTest {
 
   @Test
   public void testGetSegmentFetcherBasedOnURI() throws Exception {
+    // Adding file pinot fs
+    PropertiesConfiguration pinotFSConfig = new PropertiesConfiguration();
+    pinotFSConfig.addProperty(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(pinotFSConfig);
     _segmentFetcherFactory.init(new PropertiesConfiguration(), new PropertiesConfiguration());
 
     Assert.assertTrue(
@@ -88,7 +101,7 @@ public class SegmentFetcherFactoryTest {
     public int initCalled = 0;
 
     @Override
-    public void init(Configuration configs) {
+    public void init(Configuration configs, String protocol) {
       initCalled++;
     }
 

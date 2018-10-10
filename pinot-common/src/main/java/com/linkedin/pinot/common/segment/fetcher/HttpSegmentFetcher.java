@@ -37,7 +37,7 @@ public class HttpSegmentFetcher implements SegmentFetcher {
   protected int _retryWaitMs;
 
   @Override
-  public void init(Configuration configs) {
+  public void init(Configuration configs, String protocol) {
     initHttpClient(configs);
     _retryCount = configs.getInt(RETRY, RETRY_DEFAULT);
     _retryWaitMs = configs.getInt(RETRY_WAITIME_MS, RETRY_WAITIME_MS_DEFAULT);
