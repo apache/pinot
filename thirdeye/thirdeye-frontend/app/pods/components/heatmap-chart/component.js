@@ -40,17 +40,37 @@ export default Component.extend({
    * @param {String[]} subdimension
    * @return {Function}
    */
-  heatmapClickHandler(subdimension) {
-    const callback = this.attrs.onHeatmapClick;
+  includeHandler(subdimension) {
+    const onInclude = get(this, 'onInclude');
     const {
       role,
       dimName,
       dimValue
     } = subdimension;
 
-    if (!callback) { return; }
+    if (!onInclude) { return; }
 
-    callback(role, dimName, dimValue);
+    onInclude(role, dimName, dimValue);
+  },
+
+  /**
+   * Bubbles the right-click up to the parent component
+   * @param {String[]} subdimension
+   * @return {Function}
+   */
+  excludeHandler(subdimension) {
+    d3.event.preventDefault();
+
+    const onExclude = get(this, 'onExclude');
+    const {
+      role,
+      dimName,
+      dimValue
+    } = subdimension;
+
+    if (!onExclude) { return; }
+
+    onExclude(role, dimName, dimValue);
   },
 
   /**
@@ -173,7 +193,8 @@ export default Component.extend({
         return getTextColor(d.actualValue, d.inverse);
       });
 
-    cell.on('click', get(this, 'heatmapClickHandler').bind(this));
+    cell.on('click', get(this, 'includeHandler').bind(this));
+    cell.on("contextmenu", get(this, 'excludeHandler').bind(this));
   },
 
   init() {

@@ -434,13 +434,27 @@ export default Component.extend({
   },
 
   actions: {
-    onHeatmapClick(role, dimName, dimValue) {
+    onInclude(role, dimName, dimValue) {
       const { selectedUrn, onSelection } =
         this.getProperties('selectedUrn', 'onSelection');
 
       // selection
       if (role === ROOTCAUSE_ROLE_VALUE) {
         const metricUrn = appendFilters(selectedUrn, [[dimName, '=', dimValue]]);
+        const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
+        if (onSelection) {
+          onSelection(updates);
+        }
+      }
+    },
+
+    onExclude(role, dimName, dimValue) {
+      const { selectedUrn, onSelection } =
+        this.getProperties('selectedUrn', 'onSelection');
+
+      // selection
+      if (role === ROOTCAUSE_ROLE_VALUE) {
+        const metricUrn = appendFilters(selectedUrn, [[dimName, '!=', dimValue]]);
         const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
         if (onSelection) {
           onSelection(updates);
