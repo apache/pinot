@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -52,6 +53,15 @@ import org.apache.commons.lang.StringUtils;
  */
 public class EntityUtils {
   private static Pattern PATTERN_FILTER_OPERATOR = Pattern.compile("!=|>=|<=|==|>|<|=");
+
+  private static Map<String, String> FILTER_TO_OPERATOR = new LinkedHashMap<>();
+  static {
+    FILTER_TO_OPERATOR.put("!", "!=");
+    FILTER_TO_OPERATOR.put("<=", "<=");
+    FILTER_TO_OPERATOR.put("<", "<");
+    FILTER_TO_OPERATOR.put(">=", ">=");
+    FILTER_TO_OPERATOR.put(">", ">");
+  }
 
   /**
    * Returns {@code true} if the URN encodes the specified entity type {@code type}, or
@@ -394,7 +404,19 @@ public class EntityUtils {
 
     Multimap<String, String> sorted = TreeMultimap.create(filters);
     for(Map.Entry<String, String> entry : sorted.entries()) {
-      output.add(EntityUtils.encodeURNComponent(String.format("%s=%s", entry.getKey(), entry.getValue())));
+      String operator = "=";
+      String value = entry.getValue();
+
+      // check for exclusion case
+      for (Map.Entry<String, String> prefix : FILTER_TO_OPERATOR.entrySet()) {
+        if (entry.getValue().startsWith(prefix.getKey())) {
+          operator = prefix.getValue();
+          value = entry.getValue().substring(prefix.getKey().length());
+          break;
+        }
+      }
+
+      output.add(EntityUtils.encodeURNComponent(String.format("%s%s%s", entry.getKey(), operator, value)));
     }
 
     return output;
