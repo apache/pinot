@@ -266,9 +266,15 @@ export function toMetricLabel(urn, entities) {
   }
 
   const filters = toFilters(urn).map(t => filter2value(t));
-  const filterString = filters.length ? ` (${filters.join(', ')})` : '';
 
-  return `${metricName}${filterString}`;
+  // TODO support range filters
+  const inclusionFilters = filters.filter(f => !f.startsWith('!')).sort();
+  const exclusionFilters = filters.filter(f => f.startsWith('!')).map(f => f.substring(1)).sort();
+
+  const inclusionFiltersString = _.isEmpty(inclusionFilters) ? '' : ` (${inclusionFilters.join(', ')})`;
+  const exclusionFiltersString = _.isEmpty(exclusionFilters) ? '' : ` (Excludes ${exclusionFilters.join(', ')})`;
+
+  return `${metricName}${inclusionFiltersString}${exclusionFiltersString}`;
 }
 
 /**
