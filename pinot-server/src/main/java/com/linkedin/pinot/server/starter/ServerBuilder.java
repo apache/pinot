@@ -29,6 +29,7 @@ import com.linkedin.pinot.transport.netty.NettyTCPServer;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -106,8 +107,8 @@ public class ServerBuilder {
     return queryExecutor;
   }
 
-  public QueryScheduler buildQueryScheduler(QueryExecutor queryExecutor) {
-    return QuerySchedulerFactory.create(_serverConf.getSchedulerConfig(), queryExecutor, _serverMetrics);
+  public QueryScheduler buildQueryScheduler(QueryExecutor queryExecutor, LongAccumulator latestQueryTime) {
+    return QuerySchedulerFactory.create(_serverConf.getSchedulerConfig(), queryExecutor, _serverMetrics,latestQueryTime);
   }
 
   public NettyServer buildNettyServer(NettyServer.RequestHandlerFactory requestHandlerFactory)

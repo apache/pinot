@@ -30,6 +30,7 @@ import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.List;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -51,8 +52,8 @@ public abstract class PriorityScheduler extends QueryScheduler {
   Thread scheduler;
 
   public PriorityScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics) {
-    super(queryExecutor, resourceManager, metrics);
+      @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics, @Nonnull LongAccumulator latestQueryTime) {
+    super(queryExecutor, resourceManager, metrics, latestQueryTime);
     Preconditions.checkNotNull(queue);
     this.queryQueue = queue;
     this.numRunners = resourceManager.getNumQueryRunnerThreads();
