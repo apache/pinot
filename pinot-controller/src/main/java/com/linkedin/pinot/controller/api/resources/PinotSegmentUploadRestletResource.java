@@ -321,8 +321,13 @@ public class PinotSegmentUploadRestletResource {
           .validateSegment(segmentMetadata, tempSegmentDir);
 
       // Zk operations
-      completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
-          segmentName, zkDownloadUri);
+      if (crypterClassHeader.equalsIgnoreCase(DefaultPinotCrypter.class.getName())) {
+        completeZkOperations(enableParallelPushProtection, headers, tempDecryptedFile, provider, segmentMetadata,
+            segmentName, zkDownloadUri);
+      } else {
+        completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
+            segmentName, zkDownloadUri);
+      }
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentMetadata.getName() + " of table: " + segmentMetadata.getTableName());
     } catch (WebApplicationException e) {
@@ -340,8 +345,15 @@ public class PinotSegmentUploadRestletResource {
 
   private SegmentMetadata getSegmentMetadata(String crypterClassHeader, String currentSegmentLocationURI, File tempEncryptedFile,
       File tempDecryptedFile, File tempSegmentDir, String metadataProviderClass) throws Exception {
-    SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(currentSegmentLocationURI).fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
-
+    if (crypterClassHeader.equalsIgnoreCase(DefaultPinotCrypter.class.getName())) {
+      SegmentFetcherFactory.getInstance()
+          .getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
+          .fetchSegmentToLocal(currentSegmentLocationURI, tempDecryptedFile);
+    } else {
+      SegmentFetcherFactory.getInstance()
+          .getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
+          .fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
+    }
     decryptFile(crypterClassHeader, tempEncryptedFile, tempDecryptedFile);
 
     // Call metadata provider to extract metadata with file object uri
