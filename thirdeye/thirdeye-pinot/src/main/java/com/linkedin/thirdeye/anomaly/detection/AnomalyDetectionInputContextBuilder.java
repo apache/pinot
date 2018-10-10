@@ -683,7 +683,7 @@ public class AnomalyDetectionInputContextBuilder {
         TimeSeriesResponse response = futureResponse.get();
         timeSeriesRowSet.addAll(response.getRows());
       } catch (InterruptedException e) {
-        LOG.warn("Failed to fetch data with request: [{}]", request);
+        LOG.warn("Failed to fetch data with request: [{}]", request, e);
       }
     }
 

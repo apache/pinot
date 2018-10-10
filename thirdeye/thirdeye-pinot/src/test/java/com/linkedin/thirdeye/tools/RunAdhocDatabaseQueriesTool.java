@@ -459,6 +459,7 @@ public class RunAdhocDatabaseQueriesTool {
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
     dq.deleteAllJobsAndTasks();
+    dq.disableAllActiveFunction();
 
   }
 

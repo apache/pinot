@@ -317,7 +317,8 @@ public class AnomalyFunctionMigrationTool {
         LOG.info("Function migrated: {}", anomalyFunction);
         break;
       case "SPLINE_REGRESSION_VANILLA":
-        new GenericSplineFunctionMigrater().migrate(anomalyFunction);
+//        new GenericSplineFunctionMigrater().migrate(anomalyFunction);
+        new SplineRegressionFunctionMigrater().migrate(anomalyFunction);
         LOG.info("Function migrated: {}", anomalyFunction);
         break;
       default:
@@ -512,7 +513,13 @@ public class AnomalyFunctionMigrationTool {
         exportPath,
         token);
 
-    tool.run(actions);
+//    tool.run(actions);
+    tool.cloneFunctions();
+    tool.migrageAnomalyFunctions();
+    tool.deleteAnomalies();
+    tool.repaly();
+    tool.waitForFunctionTasksDone();
+    tool.exportAnomalyResultComparison();
     System.exit(0);
   }
 }

@@ -17,11 +17,12 @@ public class RegressianGaussianScanFunctionMigrater extends BaseAnomalyFunctionM
         put(WORKFLOW, "RegressionWorkflow");
         put(moduleConfigKey(DATA), "ContinuumDataModule");
         put(moduleConfigKey(TRAINING_PREPROCESS), "AnomalyRemovalByWeight");
-        put(moduleConfigKey(TESTING_PREPROCESS), "AnomalyRemovalByWeight");
+        put(moduleConfigKey(TESTING_PREPROCESS), "DummyPreprocessModule");
         put(moduleConfigKey(TRAINING), "parametric.NullBasisRegressionTrainingModule");
         put(moduleConfigKey(DETECTION), "GaussianScanDetectionModule");
         put(variableConfigKey("continuumOffset"), "P60D");
         put(variableConfigKey("seasonalities"), "HOURLY_SEASONALITY,DAILY_SEASONALITY");
+        put(variableConfigKey("isMajor"), "false");
         put(variableConfigKey("anomalyRemovalThreshold"), "1.0,-1.0");
         put(variableConfigKey("scanStepSize"), "1");
         put(variableConfigKey("scanMinWindowSize"), "1");
@@ -30,6 +31,7 @@ public class RegressianGaussianScanFunctionMigrater extends BaseAnomalyFunctionM
         put(variableConfigKey("scanNumSimulations"), "500");
         put(variableConfigKey("pValueThreshold"), "0.01");
         put(variableConfigKey("scanTargetNumAnomalies"), "1");
+        put(DOWNGRADE_PREFIX + "." + variableConfigKey("seasonalities"), "");
       }
     });
     directKeyMap = ImmutableMap.copyOf(new HashMap<String, String>(){

@@ -587,8 +587,7 @@ public class AnomalyResource {
         // If offline, request baseline in user-defined data range
         List<Pair<Long, Long>> dataRangeIntervals = new ArrayList<>();
         // Assign the view window as training window and mock window with end time as test window
-        dataRangeIntervals.add(new Pair<Long, Long>(endTime.getMillis(),
-            endTime.plus(bucketTimeGranularity.toPeriod()).getMillis()));
+        dataRangeIntervals.add(new Pair<Long, Long>(endTime.getMillis(), endTime.plusDays(1).getMillis()));
         dataRangeIntervals.add(new Pair<Long, Long>(startTime.getMillis(), endTime.getMillis()));
         anomalyTimelinesView =
             anomaliesResource.getTimelinesViewInMonitoringWindow(anomalyFunctionSpec, datasetConfigDTO,

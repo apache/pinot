@@ -50,6 +50,7 @@ public class ConfidenceIntervalSignTestFunctionMigrater extends BaseAnomalyFunct
   public void migrate(AnomalyFunctionDTO anomalyFunction) {
     Properties oldProperties = anomalyFunction.toProperties();
     Properties newProperties = applyDefaultProperties(new Properties());
+    Period bucketPeriod = new TimeGranularity(anomalyFunction.getBucketSize(), anomalyFunction.getBucketUnit()).toPeriod();
     newProperties = mapNewKeys(oldProperties, newProperties);
     if (oldProperties.containsKey("anomalyRemovalThreshold")) {
       double anomalyRemovalThreshold = Math.abs(Double.valueOf(oldProperties.getProperty("anomalyRemovalThreshold")));
@@ -57,9 +58,10 @@ public class ConfidenceIntervalSignTestFunctionMigrater extends BaseAnomalyFunct
           anomalyRemovalThreshold, -1 * anomalyRemovalThreshold));
     }
     int slidingWindowWidth = Integer.valueOf(oldProperties.getProperty("slidingWindowWidth", "8"));
-    Period slidingWindowPeriod = (new TimeGranularity(slidingWindowWidth/2 * anomalyFunction.getBucketSize(),
+    Period preSlidingWindowPeriod = (new TimeGranularity(slidingWindowWidth/2 * anomalyFunction.getBucketSize(),
         anomalyFunction.getBucketUnit())).toPeriod();
-    newProperties.put(variableConfigKey("trainPadding"), slidingWindowPeriod.toString() + "," + slidingWindowPeriod.toString());
+    Period postSlidingWindowPeriod = preSlidingWindowPeriod.plus(bucketPeriod);
+    newProperties.put(variableConfigKey("trainPadding"), preSlidingWindowPeriod.toString() + "," + postSlidingWindowPeriod.toString());
     anomalyFunction.setProperties(StringUtils.encodeCompactedProperties(newProperties));
     anomalyFunction.setType(ANOMALY_FUNCTION_TYPE);
   }

@@ -11,8 +11,9 @@ public abstract class BaseAnomalyFunctionMigrater implements AnomalyFunctionMigr
   protected ImmutableMap<String, String> directKeyMap;
 
   protected static final String FUNCTION = "function";
-  protected static final String DATA = "data";
   protected static final String WORKFLOW = "workflow";
+  protected static final String DATA = "data";
+  protected static final String DOWNGRADE_PREFIX = "downgrade";
   protected static final String TESTING_PREPROCESS = "testingPreprocessors";
   protected static final String TRAINING_PREPROCESS = "trainingPreprocessors";
   protected static final String TRAINING = "training";

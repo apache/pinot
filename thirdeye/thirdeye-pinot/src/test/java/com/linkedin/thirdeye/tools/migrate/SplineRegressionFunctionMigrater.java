@@ -13,7 +13,7 @@ public class SplineRegressionFunctionMigrater extends BaseAnomalyFunctionMigrate
   public SplineRegressionFunctionMigrater() {
     defaultProperties = ImmutableMap.copyOf(new HashMap<String, String>(){
       {
-        put(FUNCTION, "ConfigurableAnomalyDetectionFunction");
+        put(FUNCTION, "SelfRecoverableAnomalyDetectionFunction");
         put(WORKFLOW, "RegressionWorkflow");
         put(moduleConfigKey(DATA), "ContinuumDataModule");
         put(moduleConfigKey(TRAINING_PREPROCESS), "AnomalyRemovalByWeight");
@@ -28,6 +28,7 @@ public class SplineRegressionFunctionMigrater extends BaseAnomalyFunctionMigrate
         put(variableConfigKey("pValueThreshold"), "0.05");
         put(variableConfigKey("recentPeriod"), "P28D");
         put(variableConfigKey("r2Cutoff"), "0.8");
+        put(DOWNGRADE_PREFIX + "." + variableConfigKey("seasonalities"), "");
       }
     });
     directKeyMap = ImmutableMap.copyOf(new HashMap<String, String>(){
