@@ -38,7 +38,7 @@ import org.testng.annotations.Test;
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
-public class ThresholdAlgorithmDetectionStageTest {
+public class ThresholdRuleDetectionStageTest {
   private DataProvider testDataProvider;
   private DetectionPipeline detectionPipeline;
 
@@ -65,8 +65,8 @@ public class ThresholdAlgorithmDetectionStageTest {
     Map<String, Object> stageSpecs = new HashMap<>();
     stageSpecs.put("min", 100);
     stageSpecs.put("max", 500);
-    stageSpecs.put("metricUrn", "thirdeye:metric:123");
     Map<String, Object> properties = new HashMap<>();
+    properties.put("metricUrn", "thirdeye:metric:123");
     properties.put("specs", stageSpecs);
     properties.put("stageClassName", ThresholdRuleDetectionStage.class.getName());
     detectionConfigDTO.setProperties(properties);

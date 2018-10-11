@@ -40,7 +40,7 @@ import org.testng.annotations.Test;
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
-public class BaselineAlgorithmDetectionStageTest {
+public class BaselineRuleDetectionStageTest {
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_AGGREGATION = "aggregation";
   private static final String PROP_WEEKS = "weeks";
@@ -77,7 +77,7 @@ public class BaselineAlgorithmDetectionStageTest {
     this.properties = new HashMap<>();
     this.properties.put("stageClassName", BaselineRuleDetectionStage.class.getName());
     this.stageSpecs = new HashMap<>();
-    this.stageSpecs.put(PROP_METRIC_URN, "thirdeye:metric:1");
+    this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put("specs", this.stageSpecs);
 
     this.config = new DetectionConfigDTO();
