@@ -53,6 +53,7 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   @Override
   protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
     long responseSize = msg.readableBytes();
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_RECEIVED, responseSize);
     try {
       long deserializationStartTimeMs = System.currentTimeMillis();
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());

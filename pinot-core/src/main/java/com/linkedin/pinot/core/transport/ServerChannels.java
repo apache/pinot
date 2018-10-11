@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.transport;
 
+import com.linkedin.pinot.common.metrics.BrokerGauge;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import io.netty.bootstrap.Bootstrap;
@@ -88,11 +90,16 @@ public class ServerChannels {
 
     synchronized void sendRequest(InstanceRequest instanceRequest) throws Exception {
       if (_channel == null || !_channel.isActive()) {
+        long startTime = System.currentTimeMillis();
         _channel = _bootstrap.connect().sync().channel();
+        _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.NETTY_CONNECTION_CONNECT_TIME_MS,
+            System.currentTimeMillis() - startTime);
       }
       byte[] requestBytes = _serializer.serialize(instanceRequest);
       _channel.writeAndFlush(_channel.alloc().buffer(requestBytes.length).writeBytes(requestBytes),
           _channel.voidPromise());
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1L);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);
     }
   }
 }

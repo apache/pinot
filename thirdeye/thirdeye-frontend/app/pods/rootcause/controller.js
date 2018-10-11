@@ -863,7 +863,12 @@ export default Controller.extend({
         newSelectedUrns.add(toBaselineUrn(urn));
       });
 
-    if (_.isEqual(selectedUrns, newSelectedUrns)) { return; }
+    if (_.isEqual(selectedUrns, newSelectedUrns)) {
+      if (loadingFrameworks.size <= 0) {
+        this.set('setupMode', ROOTCAUSE_SETUP_MODE_NONE);
+      }
+      return;
+    }
 
     this.setProperties({
       selectedUrns: newSelectedUrns,

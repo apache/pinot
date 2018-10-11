@@ -209,8 +209,9 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
 
   /**
    * Reads the dimensions for a record of the given document Id in the segment.
-   * @param docId
-   * @return
+   *
+   * @param docId Document Id
+   * @return Dimensions (dictionary Ids) for a segment record
    */
   int[] getSegmentRecordDimensions(int docId) {
     int[] dimensions = new int[_numDimensions];

@@ -22,6 +22,7 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 
@@ -85,5 +86,26 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   public void setChildren(Set<MergedAnomalyResultDTO> children) {
     this.children = children;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof MergedAnomalyResultDTO)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    MergedAnomalyResultDTO that = (MergedAnomalyResultDTO) o;
+    return Objects.equals(feedback, that.feedback) && Objects.equals(function, that.function) && Objects.equals(
+        children, that.children);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), feedback, function, children);
   }
 }

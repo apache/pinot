@@ -24,6 +24,7 @@ import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.request.ScheduledRequestHandler;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
@@ -46,6 +47,7 @@ public class ServerInstance {
   private QueryScheduler _queryScheduler;
   private ScheduledRequestHandler _requestHandler;
   private NettyServer _nettyServer;
+  private LongAccumulator _latestQueryTime;
 
   private boolean _started = false;
 
@@ -58,7 +60,8 @@ public class ServerInstance {
     _serverMetrics = serverBuilder.getServerMetrics();
     _instanceDataManager = serverBuilder.buildInstanceDataManager();
     _queryExecutor = serverBuilder.buildQueryExecutor(_instanceDataManager);
-    _queryScheduler = serverBuilder.buildQueryScheduler(_queryExecutor);
+    _latestQueryTime = new LongAccumulator(Long::max, 0);
+    _queryScheduler = serverBuilder.buildQueryScheduler(_queryExecutor, _latestQueryTime);
     _requestHandler = new ScheduledRequestHandler(_queryScheduler, _serverMetrics);
     _nettyServer = serverBuilder.buildNettyServer(new RequestHandlerFactory() {
       @Override
@@ -118,10 +121,14 @@ public class ServerInstance {
     return _instanceDataManager;
   }
 
+  public long getLatestQueryTime() {
+    return _latestQueryTime.get();
+  }
+
   public void resetQueryScheduler(String schedulerName) {
     Configuration schedulerConfig = _serverConf.getSchedulerConfig();
     schedulerConfig.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, schedulerName);
-    _queryScheduler = QuerySchedulerFactory.create(schedulerConfig, _queryExecutor, _serverMetrics);
+    _queryScheduler = QuerySchedulerFactory.create(schedulerConfig, _queryExecutor, _serverMetrics, _latestQueryTime);
     _queryScheduler.start();
     _requestHandler.setScheduler(_queryScheduler);
   }

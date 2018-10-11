@@ -16,18 +16,16 @@
 package com.linkedin.pinot.core.crypt;
 
 import java.io.File;
-import java.io.IOException;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * This class is the default implementation for the PinotCrypter. It simply copies the file to the given location.
+ * This class is the default implementation for the PinotCrypter. It is a noop crypter and will not do any operations.
  */
-public class DefaultPinotCrypter implements PinotCrypter {
-  public static final Logger LOGGER = LoggerFactory.getLogger(DefaultPinotCrypter.class);
+public class NoOpPinotCrypter implements PinotCrypter {
+  public static final Logger LOGGER = LoggerFactory.getLogger(NoOpPinotCrypter.class);
 
   @Override
   public void init(Configuration config) {
@@ -36,21 +34,11 @@ public class DefaultPinotCrypter implements PinotCrypter {
 
   @Override
   public void encrypt(File decryptedFile, File encryptedFile) {
-    try {
-      FileUtils.copyFile(decryptedFile, encryptedFile);
-    } catch (IOException e) {
-      LOGGER.warn("Could not encrypt file");
-      FileUtils.deleteQuietly(encryptedFile);
-    }
+    return;
   }
 
   @Override
   public void decrypt(File encryptedFile, File decryptedFile) {
-    try {
-      FileUtils.copyFile(encryptedFile, decryptedFile);
-    } catch (IOException e) {
-      LOGGER.warn("Could not decrypt file");
-      FileUtils.deleteQuietly(decryptedFile);
-    }
+    return;
   }
 }

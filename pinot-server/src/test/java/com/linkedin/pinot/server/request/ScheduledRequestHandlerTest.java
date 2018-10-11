@@ -45,6 +45,7 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.thrift.protocol.TCompactProtocol;
@@ -65,6 +66,7 @@ public class ScheduledRequestHandlerTest {
   private QueryScheduler queryScheduler;
   private QueryExecutor queryExecutor;
   private UnboundedResourceManager resourceManager;
+  private LongAccumulator latestQueryTime;
 
   @BeforeClass
   public void setUp() {
@@ -75,6 +77,7 @@ public class ScheduledRequestHandlerTest {
 
     queryScheduler = mock(QueryScheduler.class);
     queryExecutor = new ServerQueryExecutorV1Impl();
+    latestQueryTime = new LongAccumulator(Long::max, 0);
     resourceManager = new UnboundedResourceManager(new PropertiesConfiguration());
   }
 
@@ -110,7 +113,7 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testQueryProcessingException() throws Exception {
     ScheduledRequestHandler handler =
-        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
+        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics, latestQueryTime) {
           @Nonnull
           @Override
           public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
@@ -149,7 +152,7 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testValidQueryResponse() throws InterruptedException, ExecutionException, TimeoutException, IOException {
     ScheduledRequestHandler handler =
-        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
+        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics, latestQueryTime) {
           @Nonnull
           @Override
           public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
