@@ -39,6 +39,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
 
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   private static final String PROP_CURRENT_PROVIDER = "currentValueProvider";
+  private static final String PROP_METRIC_URN = "metricUrn";
 
   private BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
   private BaselineProvider currentValueProvider;
@@ -56,6 +57,11 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
       // default current provider
       this.currentValueProvider = new RuleBaselineProvider();
       this.currentValueProvider.init(Collections.<String, Object>singletonMap("offset", "current"));
+    }
+    if (config.getProperties().containsKey(PROP_METRIC_URN)){
+      for (Map<String, Object> properties : this.nestedProperties){
+        properties.put(PROP_METRIC_URN, MapUtils.getString(config.getProperties(), PROP_METRIC_URN));
+      }
     }
   }
 
