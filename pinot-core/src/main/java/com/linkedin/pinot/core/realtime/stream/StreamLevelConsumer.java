@@ -24,7 +24,7 @@ public interface StreamLevelConsumer {
   /**
    *
    */
-  void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics) throws Exception;
+  void init(StreamProviderConfig streamProviderConfig, ServerMetrics serverMetrics) throws Exception;
 
   /**
    *
@@ -40,14 +40,14 @@ public interface StreamLevelConsumer {
   /**
    * return GenericRow
    */
-  GenericRow next(GenericRow destination);
+  GenericRow nextDecoded(GenericRow destination);
 
   /**
    *
    * @param offset
    * @return
    */
-  GenericRow next(long offset);
+  GenericRow nextDecoded(long offset);
 
   /**
    *

@@ -15,11 +15,16 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import java.util.Random;
 import org.testng.annotations.BeforeClass;
 
@@ -37,18 +42,46 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     super.setUp();
   }
 
+  @Override
+  protected String getStreamConsumerFactoryClassName() {
+    return FlakyStreamFactory.class.getName();
+  }
+
+  public static class FlakyStreamFactory extends StreamConsumerFactory {
+
+    @Override
+    public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName)   {
+      return new FlakyStreamLevelConsumer(clientId, tableName, _streamConfig, _schema);
+    }
+
+    @Override
+    public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+      throw new UnsupportedOperationException();
+    }
+  }
+
   public static class FlakyStreamLevelConsumer implements StreamLevelConsumer {
     private StreamLevelConsumer _streamLevelConsumer;
     private Random _random = new Random();
 
-    public FlakyStreamLevelConsumer() throws Exception {
-      _streamLevelConsumer = ORIGINAL_STREAM_LEVEL_CONSUMER.newInstance();
+    public FlakyStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema) {
+      _streamLevelConsumer = new KafkaStreamLevelConsumer(clientId, tableName, streamConfig, schema);
     }
 
     @Override
-    public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
+    public void init(StreamProviderConfig streamProviderConfig, ServerMetrics serverMetrics)
         throws Exception {
-      _streamLevelConsumer.init(streamProviderConfig, tableName, serverMetrics);
+      _streamLevelConsumer.init(streamProviderConfig, serverMetrics);
     }
 
     @Override
@@ -63,7 +96,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public GenericRow next(GenericRow destination) {
+    public GenericRow nextDecoded(GenericRow destination) {
       // Return a null row every ~1/1000 rows and an exception every ~1/1000 rows
       int randomValue = _random.nextInt(1000);
 
@@ -72,13 +105,13 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
       } else if (randomValue == 1) {
         throw new RuntimeException("Flaky stream level consumer exception");
       } else {
-        return _streamLevelConsumer.next(destination);
+        return _streamLevelConsumer.nextDecoded(destination);
       }
     }
 
     @Override
-    public GenericRow next(long offset) {
-      return _streamLevelConsumer.next(offset);
+    public GenericRow nextDecoded(long offset) {
+      return _streamLevelConsumer.nextDecoded(offset);
     }
 
     @Override

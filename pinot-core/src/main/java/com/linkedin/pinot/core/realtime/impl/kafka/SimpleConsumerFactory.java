@@ -36,7 +36,7 @@ public class SimpleConsumerFactory extends StreamConsumerFactory {
    */
   @Override
   public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    return new KafkaPartitionLevelConsumer(clientId, _streamConfig, partition);
+    return new KafkaPartitionLevelConsumer(clientId, _streamConfig, partition, _schema);
   }
 
   /**
@@ -45,8 +45,8 @@ public class SimpleConsumerFactory extends StreamConsumerFactory {
    * @return
    */
   @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId) {
-    return new KafkaStreamLevelConsumer();
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName) {
+    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, _schema);
   }
 
   /**

@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.net.URL;
@@ -96,6 +97,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected boolean useLlc() {
     return false;
+  }
+
+  protected String getStreamConsumerFactoryClassName() {
+    return SimpleConsumerFactory.class.getName();
   }
 
   protected int getRealtimeSegmentFlushSize() {

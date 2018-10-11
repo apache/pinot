@@ -17,27 +17,30 @@ package com.linkedin.pinot.core.realtime.stream;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.Schema;
+import java.util.Map;
 
 
 /**
- * Provider class for {@link StreamConsumerFactory}
+ * Provider for {@link StreamMessageDecoder}
  */
-public abstract class StreamConsumerFactoryProvider {
+public abstract class StreamDecoderProvider {
 
   /**
-   * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig ::getConsumerFactoryName()} property and initializes it
+   * Constructs a {@link StreamMessageDecoder} using properties in {@link StreamConfig} and initializes it
    * @param streamConfig
+   * @param schema
    * @return
    */
-  public static StreamConsumerFactory create(StreamConfig streamConfig, Schema schema) {
-    StreamConsumerFactory factory = null;
+  public static StreamMessageDecoder create(StreamConfig streamConfig, Schema schema) {
+    StreamMessageDecoder decoder = null;
+    String decoderClass = streamConfig.getDecoderClass();
+    Map<String, String> decoderProperties = streamConfig.getDecoderProperties();
     try {
-      factory = (StreamConsumerFactory) Class.forName(streamConfig.getConsumerFactoryName()).newInstance();
+      decoder = (StreamMessageDecoder) Class.forName(decoderClass).newInstance();
+      decoder.init(decoderProperties, schema, streamConfig.getKafkaTopicName());
     } catch (Exception e) {
       Utils.rethrowException(e);
     }
-    factory.init(streamConfig, schema);
-    return factory;
+    return decoder;
   }
-
 }

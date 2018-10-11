@@ -34,7 +34,7 @@ public class PartitionCountFetcher implements Callable<Boolean> {
 
   public PartitionCountFetcher(StreamConfig streamConfig) {
     _streamConfig = streamConfig;
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig, null);
     _topicName = streamConfig.getKafkaTopicName();
   }
 

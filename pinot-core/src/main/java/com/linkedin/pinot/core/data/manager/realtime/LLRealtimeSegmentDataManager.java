@@ -46,12 +46,11 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
-import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
-import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -183,7 +182,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
-  private final StreamMessageDecoder _messageDecoder;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
   private final IndexLoadingConfig _indexLoadingConfig;
@@ -420,13 +418,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         throw new RuntimeException("Realtime segment full");
       }
 
-      // Index each message
+      // decode each message
       decodedRow = GenericRow.createOrReuseRow(decodedRow);
+      _partitionLevelConsumer.decodeRow(messagesAndOffsets, index, decodedRow);
 
-      decodedRow = _messageDecoder
-          .decode(messagesAndOffsets.getMessageAtIndex(index), messagesAndOffsets.getMessageOffsetAtIndex(index),
-              messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow);
-
+      // Index each message
       if (decodedRow != null) {
         transformedRow = GenericRow.createOrReuseRow(transformedRow);
         transformedRow = _fieldExtractor.transform(decodedRow, transformedRow);
@@ -991,7 +987,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
     _streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig, _schema);
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
     _streamBootstrapNodes = indexingConfig.getStreamConfigs()
@@ -1070,8 +1066,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.getAggregateMetrics());
 
-    // Create message decoder
-    _messageDecoder = _streamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor

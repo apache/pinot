@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.stream;
 
+import com.linkedin.pinot.core.data.GenericRow;
 import java.io.Closeable;
 
 
@@ -33,4 +34,13 @@ public interface PartitionLevelConsumer extends Closeable {
    */
   MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis)
       throws java.util.concurrent.TimeoutException;
+
+  /**
+   * Decodes a message from the message batch into a generic row
+   * @param messageBatch
+   * @param index
+   * @param destination
+   * @return
+   */
+  void decodeRow(MessageBatch messageBatch, int index, GenericRow destination);
 }

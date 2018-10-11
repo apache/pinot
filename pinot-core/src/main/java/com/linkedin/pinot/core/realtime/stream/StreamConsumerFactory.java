@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.stream;
 
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
+import com.linkedin.pinot.common.data.Schema;
 
 
 /**
@@ -23,13 +23,15 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
  */
 public abstract class StreamConsumerFactory {
   protected StreamConfig _streamConfig;
+  protected Schema _schema;
 
   /**
    * Initializes the stream consumer factory with the stream metadata for the table
    * @param streamConfig
    */
-  void init(StreamConfig streamConfig) {
+  void init(StreamConfig streamConfig, Schema schema) {
     _streamConfig = streamConfig;
+    _schema = schema;
   }
 
   /**
@@ -45,7 +47,7 @@ public abstract class StreamConsumerFactory {
    * @param clientId
    * @return
    */
-  public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId);
+  public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName);
 
   /**
    * Creates a metadata provider which provides partition specific metadata
@@ -60,8 +62,4 @@ public abstract class StreamConsumerFactory {
    */
   public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);
 
-  // TODO First split KafkaLowLevelStreamProviderConfig to be kafka agnostic and kafka-specific and then rename.
-  public StreamMessageDecoder getDecoder(KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig) throws Exception {
-    return kafkaStreamProviderConfig.getDecoder();
-  }
 }

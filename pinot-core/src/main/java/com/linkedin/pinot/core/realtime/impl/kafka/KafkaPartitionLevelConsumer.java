@@ -17,9 +17,13 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamDecoderProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import java.io.IOException;
 import kafka.api.FetchRequestBuilder;
 import kafka.javaapi.FetchResponse;
@@ -35,8 +39,11 @@ import org.slf4j.LoggerFactory;
 public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implements PartitionLevelConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaPartitionLevelConsumer.class);
 
-  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition) {
+  private StreamMessageDecoder _messageDecoder;
+
+  public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition, Schema schema) {
     super(clientId, streamConfig, partition, new KafkaSimpleConsumerFactoryImpl());
+    _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
   }
 
   @VisibleForTesting
@@ -85,6 +92,13 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
     } else {
       throw exceptionForKafkaErrorCode(fetchResponse.errorCode(_topic, _partition));
     }
+  }
+
+  @Override
+  public void decodeRow(MessageBatch messagesAndOffsets, int index, GenericRow decodedRow) {
+    _messageDecoder.decode(messagesAndOffsets.getMessageAtIndex(index),
+        messagesAndOffsets.getMessageOffsetAtIndex(index), messagesAndOffsets.getMessageLengthAtIndex(index),
+        decodedRow);
   }
 
   private Iterable<MessageAndOffset> buildOffsetFilteringIterable(final ByteBufferMessageSet messageAndOffsets,

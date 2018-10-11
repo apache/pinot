@@ -166,12 +166,12 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
     // create and init stream level consumer
     _streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
-    _streamLevelConsumer = _streamConsumerFactory.createStreamLevelConsumer(
-        HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getKafkaTopicName());
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig, schema);
+    String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getKafkaTopicName();
+    _streamLevelConsumer = _streamConsumerFactory.createStreamLevelConsumer(clientId, tableName);
     // TODO: define a contract for StreamLevelConsumer.init() or get rid of it completely
     // A future refactoring work of unifying StreamConfig and StreamProviderConfig should give some clarity into this
-    _streamLevelConsumer.init(kafkaStreamProviderConfig, tableName, serverMetrics);
+    _streamLevelConsumer.init(kafkaStreamProviderConfig, serverMetrics);
     _streamLevelConsumer.start();
 
     tableStreamName = tableName + "_" + kafkaStreamProviderConfig.getStreamName();
@@ -226,7 +226,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           GenericRow row = null;
           try {
             readRow = GenericRow.createOrReuseRow(readRow);
-            readRow = _streamLevelConsumer.next(readRow);
+            readRow = _streamLevelConsumer.nextDecoded(readRow);
             row = readRow;
 
             if (readRow != null) {

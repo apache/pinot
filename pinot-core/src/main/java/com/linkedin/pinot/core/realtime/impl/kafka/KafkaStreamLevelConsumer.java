@@ -15,24 +15,26 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamDecoderProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.yammer.metrics.core.Meter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * An implementation of a {@link StreamLevelConsumer} which consumes from the kafka stream
  */
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
-  private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaStreamLevelConsumer.class);
 
   private KafkaHighLevelStreamProviderConfig streamProviderConfig;
   private StreamMessageDecoder decoder;
@@ -43,7 +45,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private long lastCount = 0;
   private ConsumerAndIterator consumerAndIterator;
 
-  private Logger INSTANCE_LOGGER = STATIC_LOGGER;
+  private Logger INSTANCE_LOGGER;
 
   private ServerMetrics serverMetrics;
   private String tableAndStreamName;
@@ -52,15 +54,19 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private Meter tableAndStreamRowsConsumed = null;
   private Meter tableRowsConsumed = null;
 
+  public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema) {
+    tableAndStreamName = tableName + "-" + streamConfig.getKafkaTopicName();
+    decoder = StreamDecoderProvider.create(streamConfig, schema);
+
+    INSTANCE_LOGGER = LoggerFactory.getLogger(
+        KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getKafkaTopicName());
+  }
+
+  // TODO: remove StreamProviderConfig, and depend only on StreamConfig. Could also remove init method if possible
   @Override
-  public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
+  public void init(StreamProviderConfig streamProviderConfig, ServerMetrics serverMetrics)
       throws Exception {
     this.streamProviderConfig = (KafkaHighLevelStreamProviderConfig) streamProviderConfig;
-    this.decoder = this.streamProviderConfig.getDecoder();
-    tableAndStreamName = tableName + "-" + streamProviderConfig.getStreamName();
-    INSTANCE_LOGGER = LoggerFactory.getLogger(
-        KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamProviderConfig
-            .getStreamName());
     this.serverMetrics = serverMetrics;
   }
 
@@ -77,7 +83,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public GenericRow next(GenericRow destination) {
+  public GenericRow nextDecoded(GenericRow destination) {
     if (kafkaIterator.hasNext()) {
       try {
         destination = decoder.decode(kafkaIterator.next().message(), destination);
@@ -111,7 +117,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public GenericRow next(long offset) {
+  public GenericRow nextDecoded(long offset) {
     throw new UnsupportedOperationException();
   }
 

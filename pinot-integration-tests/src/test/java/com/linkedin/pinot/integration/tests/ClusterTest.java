@@ -374,20 +374,21 @@ public abstract class ClusterTest extends ControllerTest {
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig,
-      String kafkaConsumerFactoryName) throws Exception {
+      String streamConsumerFactoryName) throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
     if (useLlc) {
       // LLC
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
-      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_FACTORY, kafkaConsumerFactoryName);
+      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_FACTORY, streamConsumerFactoryName);
     } else {
       // HLC
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
       streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
     }
+    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_FACTORY, streamConsumerFactoryName);
     streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
     streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
