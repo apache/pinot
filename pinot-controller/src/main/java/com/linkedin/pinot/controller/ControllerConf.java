@@ -89,7 +89,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
   private static final boolean DEFAULT_ENABLE_SEGMENT_LEVEL_VALIDATION = true;
-  private static final long DEFAULT_PERIODIC_TASK_SCHEDULER_INIT_DELAY_IN_SECONDS = 120L;
+  private static final long DEFAULT_PERIODIC_TASK_SCHEDULER_INITIAL_DELAY_IN_SECONDS = 120L;
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 

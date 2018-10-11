@@ -83,10 +83,6 @@ public class SegmentStatusChecker extends BasePeriodicTask {
 
   @Override
   public void init() {
-    if (getIntervalInSeconds() == -1) {
-      LOGGER.warn("Segment status check interval is -1, status checks disabled.");
-      return;
-    }
     setStatusToDefault();
   }
 

@@ -35,7 +35,6 @@ public class PeriodicTaskScheduler {
   private static class PeriodicTaskEntry implements Comparable<PeriodicTaskEntry> {
     private PeriodicTask _periodicTask;
     private long _executionTime;
-    private boolean _executed;
 
     PeriodicTaskEntry(PeriodicTask periodicTask) {
       _periodicTask = periodicTask;
@@ -43,7 +42,6 @@ public class PeriodicTaskScheduler {
       if (_periodicTask.getIntervalInSeconds() > 0L) {
         _periodicTask.init();
       }
-      _executed = false;
     }
 
     PeriodicTask getPeriodicTask() {
@@ -58,20 +56,9 @@ public class PeriodicTaskScheduler {
       _executionTime = System.currentTimeMillis() + _periodicTask.getIntervalInSeconds() * 1000L;
     }
 
-    void setExecuted(boolean isExecuted) {
-      _executed = isExecuted;
-    }
-
-    boolean getExecuted() {
-      return _executed;
-    }
-
     @Override
     public int compareTo(PeriodicTaskEntry o) {
-      if (this._executionTime == o._executionTime) {
-        return 0;
-      }
-      return this._executionTime < o._executionTime ? -1 : 1;
+      return Long.compare(this._executionTime, o._executionTime);
     }
   }
 
@@ -82,9 +69,17 @@ public class PeriodicTaskScheduler {
     _running = true;
   }
 
+  /**
+   * Start scheduling periodic tasks.
+   */
   public void start(List<PeriodicTask> periodicTasks) {
+    if (periodicTasks == null || periodicTasks.isEmpty()) {
+      LOGGER.warn("No periodic task assigned to scheduler!");
+      return;
+    }
+
     LOGGER.info("Starting PeriodicTaskScheduler.");
-    PriorityBlockingQueue<PeriodicTaskEntry> queue = new PriorityBlockingQueue<>(Math.max(1, periodicTasks.size()));
+    PriorityBlockingQueue<PeriodicTaskEntry> queue = new PriorityBlockingQueue<>(periodicTasks.size());
     for (PeriodicTask task : periodicTasks) {
       queue.offer(new PeriodicTaskEntry(task));
     }
@@ -103,7 +98,7 @@ public class PeriodicTaskScheduler {
           taskEntry.getPeriodicTask().run();
         } catch (InterruptedException ie) {
           LOGGER.warn("Interrupted when running periodic task scheduler", ie);
-          Thread.currentThread().interrupt();
+          return;
         } catch (Throwable e) {
           // catch all errors to prevent subsequent executions from being silently suppressed
           // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-

@@ -26,7 +26,7 @@ import org.testng.annotations.Test;
 public class PeriodicTaskSchedulerTest {
 
   @Test
-  public void testSchedulerWithOneTask() {
+  public void testSchedulerWithOneTask() throws InterruptedException {
     AtomicInteger count = new AtomicInteger(0);
     PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(0L);
     long runFrequencyInSeconds = 1L;
@@ -44,24 +44,21 @@ public class PeriodicTaskSchedulerTest {
 
     long start = System.currentTimeMillis();
     periodicTaskScheduler.start(periodicTasks);
-    try {
-      Thread.sleep(totalRunTimeInMilliseconds);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    Thread.sleep(totalRunTimeInMilliseconds);
+
     periodicTaskScheduler.stop();
 
     Assert.assertTrue(count.get() > 0);
     Assert.assertTrue(count.get() < (totalRunTimeInMilliseconds / runFrequencyInSeconds));
-    Assert.assertTrue(totalRunTimeInMilliseconds < (System.currentTimeMillis() - start));
+    Assert.assertTrue(totalRunTimeInMilliseconds <= (System.currentTimeMillis() - start));
   }
 
   @Test
-  public void testSchedulerWithTwoStaggeredTasks() {
+  public void testSchedulerWithTwoStaggeredTasks() throws InterruptedException {
     AtomicInteger count = new AtomicInteger(0);
     PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(0L);
-    long runFrequencyInSeconds = 4L;
-    long totalRunTimeInMilliseconds = 15_000L;
+    long runFrequencyInSeconds = 2L;
+    long totalRunTimeInMilliseconds = 7_000L;
 
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task1 = new BasePeriodicTask("Task1", runFrequencyInSeconds, 0L) {
@@ -85,28 +82,24 @@ public class PeriodicTaskSchedulerTest {
 
     long start = System.currentTimeMillis();
     periodicTaskScheduler.start(periodicTasks);
-    try {
-      Thread.sleep(totalRunTimeInMilliseconds);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    Thread.sleep(totalRunTimeInMilliseconds);
     periodicTaskScheduler.stop();
 
     Assert.assertTrue(count.get() == 0);
     Assert.assertTrue(count.get() < (totalRunTimeInMilliseconds / runFrequencyInSeconds));
-    Assert.assertTrue(totalRunTimeInMilliseconds < (System.currentTimeMillis() - start));
+    Assert.assertTrue(totalRunTimeInMilliseconds <= (System.currentTimeMillis() - start));
   }
 
   @Test
-  public void testSchedulerWithTwoTasksDifferentFrequencies() {
+  public void testSchedulerWithTwoTasksDifferentFrequencies() throws InterruptedException {
     long startTime = System.currentTimeMillis();
     AtomicLong count = new AtomicLong(startTime);
     AtomicLong count2 = new AtomicLong(startTime);
     final long[] maxRunTimeForTask1 = {0L};
     final long[] maxRunTimeForTask2 = {0L};
     PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(0L);
-    long runFrequencyInSeconds = 2L;
-    long totalRunTimeInMilliseconds = 20_000L;
+    long runFrequencyInSeconds = 1L;
+    long totalRunTimeInMilliseconds = 10_000L;
 
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task1 = new BasePeriodicTask("Task1", runFrequencyInSeconds, 0L) {
@@ -121,10 +114,10 @@ public class PeriodicTaskSchedulerTest {
     };
     periodicTasks.add(task1);
 
-    // The time for Task 2 to run is 5 seconds, which is larger than the frequency of Task 1.
-    long TimeToRun = 5_000L;
+    // The time for Task 2 to run is 5 seconds, which is higher than the interval time of Task 1.
+    long TimeToRunMs = 5_000L;
     // Frequency of Task2 is 4x the one of Task1, and it takes 5 seconds to finish each task().
-    PeriodicTask task2 = new BasePeriodicTask("Task2", runFrequencyInSeconds * 4, 0L) {
+    PeriodicTask task2 = new BasePeriodicTask("Task2", runFrequencyInSeconds * 3, 0L) {
       @Override
       public void run() {
         // Calculate the max waiting time between the same task.
@@ -133,7 +126,7 @@ public class PeriodicTaskSchedulerTest {
         maxRunTimeForTask2[0] = Math.max(maxRunTimeForTask2[0], (now - lastTime));
         count2.set(now);
         try {
-          Thread.sleep(TimeToRun);
+          Thread.sleep(TimeToRunMs);
         } catch (InterruptedException e) {
           e.printStackTrace();
         }
@@ -141,25 +134,20 @@ public class PeriodicTaskSchedulerTest {
     };
     periodicTasks.add(task2);
 
-    long start = System.currentTimeMillis();
     periodicTaskScheduler.start(periodicTasks);
-    try {
-      Thread.sleep(totalRunTimeInMilliseconds);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    Thread.sleep(totalRunTimeInMilliseconds);
+
     periodicTaskScheduler.stop();
 
     Assert.assertTrue(count.get() > startTime);
     Assert.assertTrue(count2.get() > startTime);
-    Assert.assertTrue(totalRunTimeInMilliseconds < (System.currentTimeMillis() - start));
     // Task1 waited until Task2 finished.
-    Assert.assertTrue(maxRunTimeForTask1[0] > (task1.getIntervalInSeconds() + TimeToRun));
+    Assert.assertTrue(maxRunTimeForTask1[0] > (task1.getIntervalInSeconds() + TimeToRunMs));
     Assert.assertTrue(maxRunTimeForTask2[0] > task2.getIntervalInSeconds());
   }
 
   @Test
-  public void testNoTaskAssignedToQueue() {
+  public void testNoTaskAssignedToQueue() throws InterruptedException {
     AtomicInteger count = new AtomicInteger(0);
     PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(2L);
     long totalRunTimeInMilliseconds = 5_000L;
@@ -168,14 +156,11 @@ public class PeriodicTaskSchedulerTest {
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     long start = System.currentTimeMillis();
     periodicTaskScheduler.start(periodicTasks);
-    try {
-      Thread.sleep(totalRunTimeInMilliseconds);
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
+    Thread.sleep(totalRunTimeInMilliseconds);
+
     periodicTaskScheduler.stop();
 
     Assert.assertTrue(count.get() == 0);
-    Assert.assertTrue(totalRunTimeInMilliseconds < (System.currentTimeMillis() - start));
+    Assert.assertTrue(totalRunTimeInMilliseconds <= (System.currentTimeMillis() - start));
   }
 }
