@@ -354,6 +354,7 @@ public class PinotSegmentUploadRestletResource {
       throw new ControllerApplicationException(LOGGER, "Failed to get downloadURI, needed for URI upload",
           Response.Status.BAD_REQUEST);
     }
+    LOGGER.info("Downloading segment from {} to {}", currentSegmentLocationURI, tempEncryptedFile.getAbsolutePath());
     SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(currentSegmentLocationURI)
         .fetchSegmentToLocal(currentSegmentLocationURI, tempEncryptedFile);
     segmentMetadata =

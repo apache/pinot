@@ -176,7 +176,6 @@ public class AzurePinotFS extends PinotFS {
        */
       Files.copy(adlStream, dstFilePath);
 
-      LOGGER.info("Copied file {} from ADL to {}", srcUri, dstFile);
     } catch (Exception ex) {
       throw ex;
     }

@@ -80,6 +80,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       for (int i = 0; i < downloadURLs.length; i++) {
         // Download the segment file
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
+        LOGGER.info("Downloading segment from {} to {}", downloadURLs[i], tarredSegmentFile.getAbsolutePath());
         SegmentFetcherFactory.getInstance()
             .getSegmentFetcherBasedOnURI(downloadURLs[i])
             .fetchSegmentToLocal(downloadURLs[i], tarredSegmentFile);

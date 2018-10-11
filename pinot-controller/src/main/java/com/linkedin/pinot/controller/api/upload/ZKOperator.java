@@ -208,6 +208,7 @@ public class ZKOperator {
     PinotFS pinotFS = PinotFSFactory.create(finalSegmentLocationURI.getScheme());
 
     // Overwrites current segment file
+    LOGGER.info("Copying segment from {} to {}", currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.toString());
     pinotFS.copyFromLocalFile(currentSegmentLocation, finalSegmentLocationURI);
   }
 }
