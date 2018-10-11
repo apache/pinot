@@ -758,6 +758,8 @@ export default Controller.extend({
   _onCheckSessionTimer() {
     const { sessionId } = this.getProperties('sessionId');
 
+    if (!sessionId) { return; }
+
     // debounce: do not run if destroyed
     if (this.isDestroyed) { return; }
 
@@ -785,6 +787,8 @@ export default Controller.extend({
   _updateAnomalyFeedbackDebounce() {
     const { anomalyUrn, anomalyFeedback, sessionText } =
       this.getProperties('anomalyUrn', 'anomalyFeedback', 'sessionText');
+
+    if (!anomalyUrn) { return; }
 
     // debounce: do not run if destroyed
     if (this.isDestroyed) { return; }
