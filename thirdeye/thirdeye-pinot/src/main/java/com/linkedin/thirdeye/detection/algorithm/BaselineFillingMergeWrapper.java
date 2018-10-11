@@ -58,9 +58,10 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
       this.currentValueProvider = new RuleBaselineProvider();
       this.currentValueProvider.init(Collections.<String, Object>singletonMap("offset", "current"));
     }
-    if (config.getProperties().containsKey(PROP_METRIC_URN)){
+    String nestedUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
+    if (nestedUrn != null){
       for (Map<String, Object> properties : this.nestedProperties){
-        properties.put(PROP_METRIC_URN, MapUtils.getString(config.getProperties(), PROP_METRIC_URN));
+        properties.put(PROP_METRIC_URN, nestedUrn);
       }
     }
   }

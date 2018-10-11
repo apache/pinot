@@ -21,6 +21,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.util.StringUtils;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
@@ -41,9 +42,11 @@ public class AnomalyFilterStageWrapper extends DetectionPipeline {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_STAGE_CLASSNAME = "stageClassName";
   private static final String PROP_SPECS = "specs";
+  private static final String PROP_METRIC_URN = "metricUrn";
 
   private final List<Map<String, Object>> nestedProperties;
-  private AnomalyFilterStage anomalyFilter;
+  private final AnomalyFilterStage anomalyFilter;
+  private String metricUrn;
 
   public AnomalyFilterStageWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
@@ -54,6 +57,7 @@ public class AnomalyFilterStageWrapper extends DetectionPipeline {
 
     this.anomalyFilter = loadAnomalyFilterStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
     this.anomalyFilter.init(MapUtils.getMap(properties, PROP_SPECS), config.getId(), startTime, endTime);
+    this.metricUrn = MapUtils.getString(properties, PROP_METRIC_URN);
   }
 
   /**
@@ -71,7 +75,9 @@ public class AnomalyFilterStageWrapper extends DetectionPipeline {
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
       nestedConfig.setProperties(properties);
-
+      if (this.metricUrn != null){
+        properties.put(PROP_METRIC_URN, this.metricUrn);
+      }
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 
       DetectionPipelineResult intermediate = pipeline.run();
