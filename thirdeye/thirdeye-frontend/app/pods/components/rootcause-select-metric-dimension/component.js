@@ -17,21 +17,50 @@ import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
 export default Component.extend({
+  /**
+   * Currently selected metric urn including base metric and filters
+   * @type {string}
+   */
   selectedUrn: null,
 
+  /**
+   * Callback on change in selected urn
+   * @type {function}
+   */
   onSelection: null,
 
   //
   // internal
   //
+
+  /**
+   * Base metric urn (without filters)
+   * @type {string}
+   */
   baseUrn: null, // ""
 
+  /**
+   * Cache of most recent base metric urn. Used to prevent triggering the callback on re-selecting same metric.
+   * @type {string}
+   */
   baseUrnCache: null, // ""
 
+  /**
+   * Multimap (map of sets) of selected dimension values keyed by dimension name
+   * @type {object}
+   */
   filterMap: {},
 
+  /**
+   * Multimap (map of arrays) of available dimension names and values for the current base metric. Loaded dynamically from the backend.
+   * @type {object}
+   */
   filterOptions: {},
 
+  /**
+   * Toggle (for show/hide) to force the UI to display the exclusions field even if no exclusions are selected.
+   * @type {boolean}
+   */
   forceShowExclusions: false,
 
   didReceiveAttrs() {
@@ -59,6 +88,11 @@ export default Component.extend({
     setProperties(this, { baseUrn, filterMap });
   },
 
+  /**
+   * Backwards-compatible filter map string for filter-select component for inclusion filters.
+   * The component only understands JSON-serialized maps of arrays of dimension names and values.
+   * @type {string}
+   */
   inclusions: computed('filterMap', {
     get () {
       const { filterMap } = getProperties(this, 'filterMap');
@@ -73,6 +107,13 @@ export default Component.extend({
     }
   }),
 
+  /**
+   * Backwards-compatible filter map string for filter-select component for exclusions.
+   * The component only understands JSON-serialized maps of arrays of dimension names and values.
+   * We therefore have to filter and translate negated values to to positive one (e.g. "!us" to "us")
+   * and back when setting the value.
+   * @type {string}
+   */
   exclusions: computed('filterMap', {
     get () {
       const { filterMap } = getProperties(this, 'filterMap');
@@ -89,17 +130,37 @@ export default Component.extend({
     }
   }),
 
+  /**
+   * Flag for selected urn with and without exclusion filters.\
+   * @type {boolean}
+   */
   hasExclusions: computed('exclusions', function () {
     return get(this, 'exclusions') !== '{}';
   }),
 
+  /**
+   * Flag for displaying or hiding the exclusions filter input box
+   * @type {boolean}
+   */
   showExclusions: computed.or('hasExclusions', 'forceShowExclusions'),
 
+  /**
+   * Flag for displaying warning icon next to exclusion filter box on non-additive metric
+   * @type {boolean}
+   */
   isExclusionWarning: computed('selectedUrn', 'entities', function () {
     const { selectedUrn, entities } = getProperties(this, 'selectedUrn', 'entities');
     return (selectedUrn in entities) && !isAdditive(selectedUrn, entities);
   }),
 
+  /**
+   * Prunes the currently selected filter map based on the dimension names and values supported
+   * by the newly-selected base metric urn.
+   *
+   * @param {object} filterOptions map of arrays of available dimension names to dimension values
+   * @param {object} filterMap map of sets of selected dimension names to dimension values
+   * @private
+   */
   _pruneFilters(filterOptions, filterMap) {
     const newFilterMap = {};
 
@@ -118,6 +179,15 @@ export default Component.extend({
     return newFilterMap;
   },
 
+  /**
+   * Retrieves a map of arrays of dimension names and values for the currently selected base metric urn
+   * and prunes the selected filters based on available filters.
+   *
+   * @param {string} baseUrn currently selected base metric urn
+   * @param {object} filterMap map of sets of selected dimension names to dimension values
+   * @returns {boolean}
+   * @private
+   */
   _fetchFilters(baseUrn, filterMap) {
     if (!baseUrn) { return; }
 
