@@ -267,6 +267,13 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Returns the config for all the Helix instances in the cluster.
+   */
+  public List<InstanceConfig> getAllHelixInstanceConfigs() {
+    return HelixHelper.getInstanceConfigs(_helixZkManager);
+  }
+
+  /**
    * Get the Helix instance config for the given instance Id.
    *
    * @param instanceId Instance Id
@@ -571,12 +578,8 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.SUCCESS;
   }
 
-  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(@Nonnull final String tableNameWithType)
-      throws Exception {
-    // Get the broker tag for this table
-    String brokerTag;
+  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType) throws Exception {
     TableConfig tableConfig;
-
     try {
       tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     } catch (Exception e) {
@@ -589,49 +592,36 @@ public class PinotHelixResourceManager {
       throw new InvalidConfigException(
           "Invalid table configuration for table " + tableNameWithType + ". Table does not exist");
     }
-    TenantConfig tenantConfig = tableConfig.getTenantConfig();
-    brokerTag = tenantConfig.getBroker();
+    return rebuildBrokerResource(tableNameWithType,
+        getAllInstancesForBrokerTenant(tableConfig.getTenantConfig().getBroker()));
+  }
 
-    // Look for all instances tagged with this broker tag
-    final Set<String> brokerInstances = getAllInstancesForBrokerTenant(brokerTag);
-
-    // If we add a new broker, we want to rebuild the broker resource.
-    HelixAdmin helixAdmin = getHelixAdmin();
-    String clusterName = getHelixClusterName();
-    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(helixAdmin, clusterName);
-
-    Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableNameWithType);
-
-    if (idealStateBrokerInstances.equals(brokerInstances)) {
+  public PinotResourceManagerResponse rebuildBrokerResource(String tableNameWithType, Set<String> brokerInstances) {
+    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(_helixAdmin, _helixClusterName);
+    Set<String> brokerInstancesInIdealState = brokerIdealState.getInstanceSet(tableNameWithType);
+    if (brokerInstancesInIdealState.equals(brokerInstances)) {
       return PinotResourceManagerResponse.success(
           "Broker resource is not rebuilt because ideal state is the same for table: " + tableNameWithType);
     }
 
-    // Reset ideal state with the instance list
+    // Update ideal state with the new broker instances
     try {
-      HelixHelper.updateIdealState(getHelixZkManager(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
-          new Function<IdealState, IdealState>() {
-            @Nullable
-            @Override
-            public IdealState apply(@Nullable IdealState idealState) {
-              Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableNameWithType);
-              if (instanceStateMap != null) {
-                instanceStateMap.clear();
-              }
+      HelixHelper.updateIdealState(getHelixZkManager(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
+        assert idealState != null;
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableNameWithType);
+        if (instanceStateMap != null) {
+          instanceStateMap.clear();
+        }
+        for (String brokerInstance : brokerInstances) {
+          idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerOnlineOfflineStateModel.ONLINE);
+        }
+        return idealState;
+      }, DEFAULT_RETRY_POLICY);
 
-              for (String brokerInstance : brokerInstances) {
-                idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerOnlineOfflineStateModel.ONLINE);
-              }
-
-              return idealState;
-            }
-          }, DEFAULT_RETRY_POLICY);
-
-      LOGGER.info("Successfully rebuilt brokerResource for table {}", tableNameWithType);
-      return PinotResourceManagerResponse.success("Rebuilt brokerResource for table " + tableNameWithType);
+      LOGGER.info("Successfully rebuilt brokerResource for table: {}", tableNameWithType);
+      return PinotResourceManagerResponse.success("Rebuilt brokerResource for table: " + tableNameWithType);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e,
-          tableNameWithType);
+      LOGGER.error("Caught exception while rebuilding broker resource for table: {}", tableNameWithType, e);
       throw e;
     }
   }
@@ -958,20 +948,28 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.SUCCESS;
   }
 
+  /**
+   * TODO: refactor code to use this method over {@link #getAllInstancesForServerTenant(String)} if applicable to reuse
+   * instance configs in order to reduce ZK accesses
+   */
+  public Set<String> getAllInstancesForServerTenant(List<InstanceConfig> instanceConfigs, String tenantName) {
+    return HelixHelper.getServerInstancesForTenant(instanceConfigs, tenantName);
+  }
+
   public Set<String> getAllInstancesForServerTenant(String tenantName) {
-    Set<String> instancesSet = new HashSet<>();
-    instancesSet.addAll(
-        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getOfflineTagForTenant(tenantName)));
-    instancesSet.addAll(
-        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getRealtimeTagForTenant(tenantName)));
-    return instancesSet;
+    return getAllInstancesForServerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
+  }
+
+  /**
+   * TODO: refactor code to use this method over {@link #getAllInstancesForBrokerTenant(String)} if applicable to reuse
+   * instance configs in order to reduce ZK accesses
+   */
+  public Set<String> getAllInstancesForBrokerTenant(List<InstanceConfig> instanceConfigs, String tenantName) {
+    return HelixHelper.getBrokerInstancesForTenant(instanceConfigs, tenantName);
   }
 
   public Set<String> getAllInstancesForBrokerTenant(String tenantName) {
-    Set<String> instancesSet = new HashSet<>();
-    instancesSet.addAll(
-        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getBrokerTagForTenant(tenantName)));
-    return instancesSet;
+    return getAllInstancesForBrokerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
   }
 
   /**

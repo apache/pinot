@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.utils.helix;
 
 import com.google.common.base.Function;
+import com.linkedin.pinot.common.config.TagNameUtils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
@@ -188,13 +189,15 @@ public class HelixHelper {
     }
   }
 
-  public static void setStateForInstanceSet(Set<String> instances, String clusterName, HelixAdmin admin, boolean enable) {
+  public static void setStateForInstanceSet(Set<String> instances, String clusterName, HelixAdmin admin,
+      boolean enable) {
     for (final String instanceName : instances) {
       setInstanceState(instanceName, clusterName, admin, enable);
     }
   }
 
-  public static Map<String, String> getInstanceConfigsMapFor(String instanceName, String clusterName, HelixAdmin admin) {
+  public static Map<String, String> getInstanceConfigsMapFor(String instanceName, String clusterName,
+      HelixAdmin admin) {
     final HelixConfigScope scope = getInstanceScopefor(clusterName, instanceName);
     final List<String> keys = admin.getConfigKeys(scope);
     return admin.getConfig(scope, keys);
@@ -244,7 +247,8 @@ public class HelixHelper {
     return HelixHelper.getResourceConfigsFor(clusterName, BROKER_RESOURCE, admin);
   }
 
-  public static void updateBrokerConfig(Map<String, String> brokerResourceConfig, HelixAdmin admin, String clusterName) {
+  public static void updateBrokerConfig(Map<String, String> brokerResourceConfig, HelixAdmin admin,
+      String clusterName) {
     HelixHelper.updateResourceConfigsFor(brokerResourceConfig, BROKER_RESOURCE, clusterName, admin);
   }
 
@@ -324,7 +328,8 @@ public class HelixHelper {
    * @param tableName Name of the table to which the new segment is to be added.
    * @param segmentName Name of the new segment to be added
    */
-  public static void removeSegmentFromIdealState(HelixManager helixManager, String tableName, final String segmentName) {
+  public static void removeSegmentFromIdealState(HelixManager helixManager, String tableName,
+      final String segmentName) {
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Override
       public IdealState apply(IdealState idealState) {
@@ -343,7 +348,8 @@ public class HelixHelper {
     updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
   }
 
-  public static void removeSegmentsFromIdealState(HelixManager helixManager, String tableName, final List<String> segments) {
+  public static void removeSegmentsFromIdealState(HelixManager helixManager, String tableName,
+      final List<String> segments) {
     Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Nullable
       @Override
@@ -399,45 +405,79 @@ public class HelixHelper {
   }
 
   /**
-   * Helper method which gets all instances which are enabled and contains the instanceTag
-   * @param helixManager
-   * @param instanceTag
-   * @return
+   * Returns the config for all the instances in the cluster.
    */
-  public static List<String> getEnabledInstancesWithTag(final HelixManager helixManager, String instanceTag) {
-    return getInstancesWithTag(helixManager, instanceTag, true);
-  }
-
-  /**
-   * Helper method which gets all instances which contain the instanceTag
-   * @param helixManager
-   * @param instanceTag
-   * @return
-   */
-  public static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag) {
-    return getInstancesWithTag(helixManager, instanceTag, false);
-  }
-
-  /**
-   * Helper method which fetches all instance configs and applies instanceTag and enabled filtering
-   * @param helixManager
-   * @param instanceTag
-   * @return
-   */
-  private static List<String> getInstancesWithTag(final HelixManager helixManager, String instanceTag, boolean isEnabled) {
+  public static List<InstanceConfig> getInstanceConfigs(HelixManager helixManager) {
     HelixDataAccessor helixDataAccessor = helixManager.getHelixDataAccessor();
-    List<InstanceConfig> instanceConfigs =
-        helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
+    return helixDataAccessor.getChildValues(helixDataAccessor.keyBuilder().instanceConfigs());
+  }
 
+  /**
+   * Returns the instances in the cluster with the given tag.
+   */
+  public static List<String> getInstancesWithTag(HelixManager helixManager, String tag) {
+    return getInstancesWithTag(getInstanceConfigs(helixManager), tag);
+  }
+
+  /**
+   * Returns the instances in the cluster with the given tag.
+   *
+   * TODO: refactor code to use this method over {@link #getInstancesWithTag(HelixManager, String)} if applicable to
+   * reuse instance configs in order to reduce ZK accesses
+   */
+  public static List<String> getInstancesWithTag(List<InstanceConfig> instanceConfigs, String tag) {
     List<String> instancesWithTag = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
-      if (instanceConfig.containsTag(instanceTag)) {
-        if (!isEnabled || (isEnabled && instanceConfig.getInstanceEnabled())) {
-          instancesWithTag.add(instanceConfig.getInstanceName());
-        }
+      if (instanceConfig.containsTag(tag)) {
+        instancesWithTag.add(instanceConfig.getInstanceName());
       }
     }
     return instancesWithTag;
   }
 
+  /**
+   * Returns the enabled instances in the cluster with the given tag.
+   */
+  public static List<String> getEnabledInstancesWithTag(HelixManager helixManager, String tag) {
+    return getEnabledInstancesWithTag(getInstanceConfigs(helixManager), tag);
+  }
+
+  /**
+   * Returns the enabled instances in the cluster with the given tag.
+   *
+   * TODO: refactor code to use this method over {@link #getEnabledInstancesWithTag(HelixManager, String)} if applicable
+   * to reuse instance configs in order to reduce ZK accesses
+   */
+  public static List<String> getEnabledInstancesWithTag(List<InstanceConfig> instanceConfigs, String tag) {
+    List<String> enabledInstancesWithTag = new ArrayList<>();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      if (instanceConfig.getInstanceEnabled() && instanceConfig.containsTag(tag)) {
+        enabledInstancesWithTag.add(instanceConfig.getInstanceName());
+      }
+    }
+    return enabledInstancesWithTag;
+  }
+
+  /**
+   * Returns the server instances in the cluster for the given tenant.
+   *
+   * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
+   */
+  public static Set<String> getServerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
+    Set<String> serverInstances = new HashSet<>();
+    serverInstances.addAll(
+        HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getOfflineTagForTenant(tenant)));
+    serverInstances.addAll(
+        HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getRealtimeTagForTenant(tenant)));
+    return serverInstances;
+  }
+
+  /**
+   * Returns the broker instances in the cluster for the given tenant.
+   *
+   * TODO: refactor code to use this method if applicable to reuse instance configs in order to reduce ZK accesses
+   */
+  public static Set<String> getBrokerInstancesForTenant(List<InstanceConfig> instanceConfigs, String tenant) {
+    return new HashSet<>(HelixHelper.getInstancesWithTag(instanceConfigs, TagNameUtils.getBrokerTagForTenant(tenant)));
+  }
 }
