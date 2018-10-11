@@ -40,7 +40,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * Simple baseline algorithm. Computes a multi-week aggregate baseline and compares
  * the current value based on relative change or absolute difference.
  */
-public class BaselineAlgorithmDetectionStage extends StaticAnomalyDetectionStage {
+public class BaselineRuleDetectionStage extends StaticAnomalyDetectionStage {
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";
   private static final String COL_DIFF = "diff";

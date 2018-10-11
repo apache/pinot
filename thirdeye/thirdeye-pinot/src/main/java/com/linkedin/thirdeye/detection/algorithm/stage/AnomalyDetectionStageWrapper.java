@@ -33,6 +33,7 @@ import org.apache.commons.collections.MapUtils;
 public class AnomalyDetectionStageWrapper extends DetectionPipeline {
   private static final String PROP_STAGE_CLASSNAME = "stageClassName";
   private static final String PROP_SPECS = "specs";
+  private static final String PROP_METRIC_URN = "metricUrn";
 
   private final AnomalyDetectionStage anomalyDetectionStage;
 
@@ -44,7 +45,9 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
     Preconditions.checkArgument(properties.containsKey(PROP_STAGE_CLASSNAME), "Missing " + PROP_STAGE_CLASSNAME);
 
     this.anomalyDetectionStage = loadAnomalyDetectorStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
-    this.anomalyDetectionStage.init(MapUtils.getMap(properties, PROP_SPECS), config.getId(), startTime, endTime);
+    Map<String, Object> specs = MapUtils.getMap(properties, PROP_SPECS);
+    specs.put(PROP_METRIC_URN, MapUtils.getString(properties, PROP_METRIC_URN));
+    this.anomalyDetectionStage.init(specs, config.getId(), startTime, endTime);
   }
 
   @Override
