@@ -137,7 +137,7 @@ public class ControllerStarter {
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
       SegmentFetcherFactory.getInstance()
-          .init(segmentFetcherFactoryConfig, pinotFSConfig);
+          .init(segmentFetcherFactoryConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
     }
