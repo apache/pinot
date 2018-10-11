@@ -116,7 +116,6 @@ public class OnboardResource {
         properties.put(DefaultDetectionOnboardJob.FUNCTION_NAME, functionName);
         properties.put(DefaultDetectionOnboardJob.METRIC_NAME, metric.getName());
         properties.put(DefaultDetectionOnboardJob.COLLECTION_NAME, metric.getDataset());
-        properties.put(DefaultDetectionOnboardJob.IS_LEGACY, "false");
         properties.put("alertId", alertConfigDTO.getId().toString());
         String propertiesJson = OBJECT_MAPPER.writeValueAsString(properties);
         DetectionOnboardResource detectionOnboardResource = new DetectionOnboardResource(taskDAO, anomalyFunctionDAO);
