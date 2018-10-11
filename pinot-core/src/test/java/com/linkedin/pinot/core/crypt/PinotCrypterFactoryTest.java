@@ -22,10 +22,10 @@ import org.testng.annotations.Test;
 public class PinotCrypterFactoryTest {
   @Test
   public void testDefaultPinotCrypter() {
-    Assert.assertTrue(PinotCrypterFactory.create(null) instanceof DefaultPinotCrypter);
+    Assert.assertTrue(PinotCrypterFactory.create(null) instanceof NoOpPinotCrypter);
   }
   @Test
   public void testConfiguredPinotCrypter() {
-    Assert.assertTrue(PinotCrypterFactory.create(DefaultPinotCrypter.class.getName()) instanceof DefaultPinotCrypter);
+    Assert.assertTrue(PinotCrypterFactory.create(NoOpPinotCrypter.class.getName()) instanceof NoOpPinotCrypter);
   }
 }
