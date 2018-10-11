@@ -15,16 +15,33 @@
  */
 package com.linkedin.pinot.core.periodictask;
 
+/**
+ * An interface to describe the functionality of periodic task. Periodic tasks will be added to a list, scheduled
+ * and run in the periodic task scheduler with the fixed interval time.
+ */
 public interface PeriodicTask extends Runnable {
 
+  /**
+   * Initialize the task before running the task.
+   */
   void init();
 
-  @Override
-  void run();
-
+  /**
+   * Get the interval time of running the same task.
+   * @return the interval time in seconds.
+   */
   long getIntervalInSeconds();
 
+  /**
+   * Get the initial delay of the fist run.
+   * @return initial delay in seconds.
+   */
   long getInitialDelayInSeconds();
 
+
+  /**
+   * Get the periodic task name.
+   * @return task name.
+   */
   String getTaskName();
 }

@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.periodictask;
 
-import java.util.concurrent.PriorityBlockingQueue;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.testng.Assert;
@@ -31,7 +32,7 @@ public class PeriodicTaskSchedulerTest {
     long runFrequencyInSeconds = 1L;
     long totalRunTimeInMilliseconds = 4_000L;
 
-    PriorityBlockingQueue<PeriodicTaskScheduler.PeriodicTaskEntry> queue = new PriorityBlockingQueue<>();
+    List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task = new BasePeriodicTask("Task", runFrequencyInSeconds, 0L) {
       @Override
       public void run() {
@@ -39,10 +40,10 @@ public class PeriodicTaskSchedulerTest {
         count.incrementAndGet();
       }
     };
-    queue.offer(new PeriodicTaskScheduler.PeriodicTaskEntry(task));
+    periodicTasks.add(task);
 
     long start = System.currentTimeMillis();
-    periodicTaskScheduler.start(queue);
+    periodicTaskScheduler.start(periodicTasks);
     try {
       Thread.sleep(totalRunTimeInMilliseconds);
     } catch (InterruptedException e) {
@@ -62,7 +63,7 @@ public class PeriodicTaskSchedulerTest {
     long runFrequencyInSeconds = 4L;
     long totalRunTimeInMilliseconds = 15_000L;
 
-    PriorityBlockingQueue<PeriodicTaskScheduler.PeriodicTaskEntry> queue = new PriorityBlockingQueue<>();
+    List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task1 = new BasePeriodicTask("Task1", runFrequencyInSeconds, 0L) {
       @Override
       public void run() {
@@ -70,7 +71,7 @@ public class PeriodicTaskSchedulerTest {
         count.incrementAndGet();
       }
     };
-    queue.offer(new PeriodicTaskScheduler.PeriodicTaskEntry(task1));
+    periodicTasks.add(task1);
 
     // Stagger 2 tasks.
     PeriodicTask task2 = new BasePeriodicTask("Task2", runFrequencyInSeconds, runFrequencyInSeconds / 2) {
@@ -80,10 +81,10 @@ public class PeriodicTaskSchedulerTest {
         count.decrementAndGet();
       }
     };
-    queue.offer(new PeriodicTaskScheduler.PeriodicTaskEntry(task2));
+    periodicTasks.add(task2);
 
     long start = System.currentTimeMillis();
-    periodicTaskScheduler.start(queue);
+    periodicTaskScheduler.start(periodicTasks);
     try {
       Thread.sleep(totalRunTimeInMilliseconds);
     } catch (InterruptedException e) {
@@ -107,7 +108,7 @@ public class PeriodicTaskSchedulerTest {
     long runFrequencyInSeconds = 2L;
     long totalRunTimeInMilliseconds = 20_000L;
 
-    PriorityBlockingQueue<PeriodicTaskScheduler.PeriodicTaskEntry> queue = new PriorityBlockingQueue<>();
+    List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task1 = new BasePeriodicTask("Task1", runFrequencyInSeconds, 0L) {
       @Override
       public void run() {
@@ -118,7 +119,7 @@ public class PeriodicTaskSchedulerTest {
         count.set(now);
       }
     };
-    queue.offer(new PeriodicTaskScheduler.PeriodicTaskEntry(task1));
+    periodicTasks.add(task1);
 
     // The time for Task 2 to run is 5 seconds, which is larger than the frequency of Task 1.
     long TimeToRun = 5_000L;
@@ -138,10 +139,10 @@ public class PeriodicTaskSchedulerTest {
         }
       }
     };
-    queue.offer(new PeriodicTaskScheduler.PeriodicTaskEntry(task2));
+    periodicTasks.add(task2);
 
     long start = System.currentTimeMillis();
-    periodicTaskScheduler.start(queue);
+    periodicTaskScheduler.start(periodicTasks);
     try {
       Thread.sleep(totalRunTimeInMilliseconds);
     } catch (InterruptedException e) {
@@ -163,9 +164,10 @@ public class PeriodicTaskSchedulerTest {
     PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(2L);
     long totalRunTimeInMilliseconds = 5_000L;
 
-    PriorityBlockingQueue<PeriodicTaskScheduler.PeriodicTaskEntry> queue = new PriorityBlockingQueue<>();
+    // An empty list.
+    List<PeriodicTask> periodicTasks = new ArrayList<>();
     long start = System.currentTimeMillis();
-    periodicTaskScheduler.start(queue);
+    periodicTaskScheduler.start(periodicTasks);
     try {
       Thread.sleep(totalRunTimeInMilliseconds);
     } catch (InterruptedException e) {

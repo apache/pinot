@@ -81,9 +81,6 @@ public class SegmentStatusChecker extends BasePeriodicTask {
     updateSegmentMetrics();
   }
 
-  /**
-   * Init the segment status checker.
-   */
   @Override
   public void init() {
     if (getIntervalInSeconds() == -1) {

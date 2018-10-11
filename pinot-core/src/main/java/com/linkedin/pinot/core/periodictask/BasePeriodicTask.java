@@ -15,16 +15,20 @@
  */
 package com.linkedin.pinot.core.periodictask;
 
+import java.util.Random;
 
+/**
+ * A base class to implement periodic task interface.
+ */
 public abstract class BasePeriodicTask implements PeriodicTask {
   private final String _taskName;
   private long _intervalInSeconds;
   private long _initialDelayInSeconds;
 
-  private static final long DEFAULT_INITIAL_DELAY_IN_SECOND = 120L;
+  private static final int DEFAULT_INITIAL_DELAY_IN_SECOND = 120;
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds) {
-    this(taskName, runFrequencyInSeconds, DEFAULT_INITIAL_DELAY_IN_SECOND);
+    this(taskName, runFrequencyInSeconds, new Random().nextInt(DEFAULT_INITIAL_DELAY_IN_SECOND));
   }
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelaySeconds) {
@@ -32,8 +36,6 @@ public abstract class BasePeriodicTask implements PeriodicTask {
     _intervalInSeconds = runFrequencyInSeconds;
     _initialDelayInSeconds = initialDelaySeconds;
   }
-
-  public abstract void run();
 
   @Override
   public void init() {

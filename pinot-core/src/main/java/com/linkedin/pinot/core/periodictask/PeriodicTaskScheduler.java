@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.periodictask;
 
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
@@ -22,19 +23,21 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+/**
+ * Periodic task scheduler will schedule a list of tasks based on their initial delay time and interval time.
+ */
 public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
   private final ScheduledExecutorService _executorService;
   private long _initialDelayInSeconds;
   private volatile boolean _running;
 
-  public static class PeriodicTaskEntry implements Comparable<PeriodicTaskEntry> {
+  private static class PeriodicTaskEntry implements Comparable<PeriodicTaskEntry> {
     private PeriodicTask _periodicTask;
     private long _executionTime;
     private boolean _executed;
 
-    public PeriodicTaskEntry(PeriodicTask periodicTask) {
+    PeriodicTaskEntry(PeriodicTask periodicTask) {
       _periodicTask = periodicTask;
       _executionTime = System.currentTimeMillis() + _periodicTask.getInitialDelayInSeconds() * 1000L;
       if (_periodicTask.getIntervalInSeconds() > 0L) {
@@ -79,15 +82,19 @@ public class PeriodicTaskScheduler {
     _running = true;
   }
 
-  public void start(PriorityBlockingQueue<PeriodicTaskScheduler.PeriodicTaskEntry> periodicTasks) {
+  public void start(List<PeriodicTask> periodicTasks) {
     LOGGER.info("Starting PeriodicTaskScheduler.");
+    PriorityBlockingQueue<PeriodicTaskEntry> queue = new PriorityBlockingQueue<>(Math.max(1, periodicTasks.size()));
+    for (PeriodicTask task : periodicTasks) {
+      queue.offer(new PeriodicTaskEntry(task));
+    }
 
     // Set up an executor that executes tasks periodically
     _executorService.schedule(() -> {
       while (_running) {
         PeriodicTaskScheduler.PeriodicTaskEntry taskEntry = null;
         try {
-          taskEntry = periodicTasks.take();
+          taskEntry = queue.take();
           long currentTime = System.currentTimeMillis();
           if (currentTime < taskEntry.getExecutionTime()) {
             Thread.sleep(taskEntry.getExecutionTime() - currentTime);
@@ -104,7 +111,7 @@ public class PeriodicTaskScheduler {
         } finally {
           if (taskEntry != null) {
             taskEntry.updateExecutionTime();
-            periodicTasks.offer(taskEntry);
+            queue.offer(taskEntry);
           }
         }
       }
