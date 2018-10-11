@@ -27,7 +27,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
@@ -220,10 +219,7 @@ public class HelixServerStarter {
   public void stop() {
     try {
       LOGGER.info("Closing PinotFS classes");
-      Map<String, PinotFS> fileSystemMap = PinotFSFactory.getFileSystemMap();
-      for (PinotFS pinotFS : fileSystemMap.values()) {
-        pinotFS.close();
-      }
+      PinotFSFactory.shutdown();
     } catch (IOException e) {
       LOGGER.warn("Caught exception closing PinotFS classes", e);
     }

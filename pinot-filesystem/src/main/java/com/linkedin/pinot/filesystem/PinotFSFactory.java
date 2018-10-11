@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.filesystem;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -76,7 +77,9 @@ public class PinotFSFactory {
     return pinotFS;
   }
 
-  public static Map<String, PinotFS> getFileSystemMap() {
-    return _fileSystemMap;
+  public static void shutdown() throws IOException {
+    for (PinotFS pinotFS : _fileSystemMap.values()) {
+      pinotFS.close();
+    }
   }
 }

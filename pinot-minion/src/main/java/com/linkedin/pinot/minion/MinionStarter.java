@@ -23,7 +23,6 @@ import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.linkedin.pinot.minion.events.EventObserverFactoryRegistry;
 import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
@@ -35,7 +34,6 @@ import com.linkedin.pinot.minion.taskfactory.TaskFactoryRegistry;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
@@ -188,10 +186,7 @@ public class MinionStarter {
   public void stop() {
     try {
       LOGGER.info("Closing PinotFS classes");
-      Map<String, PinotFS> fileSystemMap = PinotFSFactory.getFileSystemMap();
-      for (PinotFS pinotFS : fileSystemMap.values()) {
-        pinotFS.close();
-      }
+      PinotFSFactory.shutdown();
     } catch (IOException e) {
       LOGGER.warn("Caught exception closing PinotFS classes", e);
     }
