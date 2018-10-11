@@ -208,8 +208,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
   setupController(controller, model) {
     this._super(...arguments);
 
-    console.log('model : ', model);
-
     const {
       analysisRangeStart,
       analysisRangeEnd,
