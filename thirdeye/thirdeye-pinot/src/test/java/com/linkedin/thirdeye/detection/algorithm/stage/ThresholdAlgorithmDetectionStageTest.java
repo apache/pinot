@@ -68,7 +68,7 @@ public class ThresholdAlgorithmDetectionStageTest {
     stageSpecs.put("metricUrn", "thirdeye:metric:123");
     Map<String, Object> properties = new HashMap<>();
     properties.put("specs", stageSpecs);
-    properties.put("stageClassName", ThresholdAlgorithmDetectionStage.class.getName());
+    properties.put("stageClassName", ThresholdRuleDetectionStage.class.getName());
     detectionConfigDTO.setProperties(properties);
 
 

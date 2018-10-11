@@ -17,8 +17,8 @@ import java.util.Map;
 /**
  * The static map that converts rule/algorithm/filter names to class name
  */
-public class YamlTranslatorInfoMap {
-  private static final Map<String, String> YAML_INFO_MAP = ImmutableMap.<String, String>builder()
+public class DetectionRegistry {
+  private static final Map<String, String> REGISTRY_MAP = ImmutableMap.<String, String>builder()
       // rule filter
       .put("BUSINESS_RULE_FILTER", BaselineRuleFilterStage.class.getName())
       // rule detection
@@ -49,7 +49,22 @@ public class YamlTranslatorInfoMap {
       .put("DUMMY", DummyAlertFilter.class.getName())
       .build();
 
-  public String get(String key) {
-    return YAML_INFO_MAP.get(key.toUpperCase());
+  /**
+   * Singleton
+   */
+  public static DetectionRegistry getInstance() {
+    return INSTANCE;
+  }
+
+  /**
+   * Internal constructor.
+   */
+  private DetectionRegistry() {
+  }
+
+  private static final DetectionRegistry INSTANCE = new DetectionRegistry();
+
+  public String lookup(String type) {
+    return REGISTRY_MAP.get(type.toUpperCase());
   }
 }

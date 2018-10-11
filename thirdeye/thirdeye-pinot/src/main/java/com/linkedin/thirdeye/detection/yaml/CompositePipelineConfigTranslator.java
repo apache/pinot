@@ -110,7 +110,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_ALERT_FILTER = "alertFilter";
   private static final String PROP_METRIC_URN = "metricUrn";
 
-  private static final YamlTranslatorInfoMap YAML_TRANSLATOR_INFO_MAP = new YamlTranslatorInfoMap();
+  private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
 
   @Override
   Map<String, Object> buildDetectionProperties(Map<String, Object> yamlConfig) {
@@ -137,12 +137,12 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
             PROP_ALGORITHM_FILTER + " property missing " + PROP_TYPE);
 
         algorithmDetectionSpecs.put(PROP_ALERT_FILTER, algorithmFilterYamlConfigs);
-        algorithmDetectionProperties.put(PROP_LEGACY_ALERT_FILTER_CLASS_NAME, YAML_TRANSLATOR_INFO_MAP.get(MapUtils.getString(algorithmFilterYamlConfigs, PROP_TYPE)));
+        algorithmDetectionProperties.put(PROP_LEGACY_ALERT_FILTER_CLASS_NAME, DETECTION_REGISTRY.lookup(MapUtils.getString(algorithmFilterYamlConfigs, PROP_TYPE)));
         algorithmDetectionProperties.put(PROP_CLASS_NAME, LegacyAlertFilterWrapper.class.getName());
       } else {
         algorithmDetectionProperties.put(PROP_CLASS_NAME, LegacyMergeWrapper.class.getName());
       }
-      algorithmDetectionProperties.put(PROP_ANOMALY_FUNCTION_CLASS, YAML_TRANSLATOR_INFO_MAP.get(MapUtils.getString(algorithmDetectionYamlConfigs, PROP_TYPE)));
+      algorithmDetectionProperties.put(PROP_ANOMALY_FUNCTION_CLASS, DETECTION_REGISTRY.lookup(MapUtils.getString(algorithmDetectionYamlConfigs, PROP_TYPE)));
       algorithmDetectionProperties.put(PROP_SPEC, algorithmDetectionSpecs);
 
       ((List<Object>) properties.get(PROP_NESTED)).add(algorithmDetectionProperties);
@@ -187,7 +187,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Map<String, Object> specs = new HashMap<>();
     for (Map.Entry<String, Object> entry : yamlConfigs.entrySet()) {
       if (entry.getKey().equals(PROP_TYPE)) {
-        properties.put(PROP_STAGE_CLASSNAME, YAML_TRANSLATOR_INFO_MAP.get(MapUtils.getString(yamlConfigs, PROP_TYPE)));
+        properties.put(PROP_STAGE_CLASSNAME, DETECTION_REGISTRY.lookup(MapUtils.getString(yamlConfigs, PROP_TYPE)));
       } else {
         specs.put(entry.getKey(), entry.getValue());
       }
@@ -198,7 +198,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private void fillInProperties(Map<String, Object> properties, Map<String, Object> yamlConfigs) {
     for (Map.Entry<String, Object> entry : yamlConfigs.entrySet()) {
       if (entry.getKey().equals(PROP_TYPE)) {
-        properties.put(PROP_CLASS_NAME, YAML_TRANSLATOR_INFO_MAP.get(MapUtils.getString(yamlConfigs, PROP_TYPE)));
+        properties.put(PROP_CLASS_NAME, DETECTION_REGISTRY.lookup(MapUtils.getString(yamlConfigs, PROP_TYPE)));
       } else {
         properties.put(entry.getKey(), entry.getValue());
       }

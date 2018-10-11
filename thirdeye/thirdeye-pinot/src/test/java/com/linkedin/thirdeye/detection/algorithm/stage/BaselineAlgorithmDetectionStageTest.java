@@ -75,7 +75,7 @@ public class BaselineAlgorithmDetectionStageTest {
     timeseries.put(MetricSlice.from(1L, 1814400000L, 2419200000L), this.data);
 
     this.properties = new HashMap<>();
-    this.properties.put("stageClassName", BaselineAlgorithmDetectionStage.class.getName());
+    this.properties.put("stageClassName", BaselineRuleDetectionStage.class.getName());
     this.stageSpecs = new HashMap<>();
     this.stageSpecs.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put("specs", this.stageSpecs);
