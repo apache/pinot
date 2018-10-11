@@ -74,7 +74,7 @@ const toMetricGranularity = (attrGranularity) => {
  */
 const toAnomalyOffset = (granularity) => {
   const UNIT_MAPPING = {
-    minute: -30,
+    minute: -120,
     hour: -3,
     day: -1
   };
@@ -208,6 +208,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
   setupController(controller, model) {
     this._super(...arguments);
 
+    console.log('model : ', model);
+
     const {
       analysisRangeStart,
       analysisRangeEnd,
@@ -253,15 +255,14 @@ export default Route.extend(AuthenticatedRouteMixin, {
     if (metricId && metricUrn) {
       if (!_.isEmpty(metricEntity)) {
         const granularity = adjustGranularity(metricEntity.attributes.granularity[0]);
-        const isDailyGranularity = granularity === '1_DAYS';
         const metricGranularity = toMetricGranularity(granularity);
         const maxTime = adjustMaxTime(metricEntity.attributes.maxTime[0], metricGranularity);
-        const rawRangeEnd = makeTime(maxTime).startOf(metricGranularity[1]);
+
+        const anomalyRangeEnd = makeTime(maxTime).startOf(metricGranularity[1]).valueOf();
         const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
-        // Set default anomaly range to end of timeseries. If daily metric, back it up a day (data available to graph)
-        const anomalyRangeEnd = isDailyGranularity ? rawRangeEnd.subtract(1, 'day').valueOf() : rawRangeEnd.valueOf();
         const anomalyRangeStart = makeTime(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
         const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
+
         // align to local end of day
         const analysisRange = toAnalysisRangeArray(anomalyRangeEnd, anomalyRangeEnd, metricGranularity);
 
@@ -269,7 +270,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
           urns: new Set([metricUrn]),
           anomalyRange,
           analysisRange,
-          granularity: isDailyGranularity ? '1_HOURS' : granularity,
+          granularity: (granularity === '1_DAYS') ? '1_HOURS' : granularity,
           compareMode,
           anomalyUrns: new Set()
         };
