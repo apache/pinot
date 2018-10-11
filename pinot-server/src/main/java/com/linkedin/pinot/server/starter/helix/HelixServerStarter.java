@@ -265,7 +265,7 @@ public class HelixServerStarter {
       }
 
       try {
-        Thread.sleep(Math.min(_checkIntervalTimeMs, (endTime - currentTime)));
+        Thread.sleep(Math.min(_maxQueryTimeMs, (endTime - currentTime)));
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted when waiting for Pinot server not to receive any queries.", e);
         Thread.currentThread().interrupt();
