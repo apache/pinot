@@ -192,7 +192,7 @@ export default Controller.extend({
     'selectedResolution',
     function() {
       let anomalies = this.get('filteredAnomalies');
-      const { pageSize, currentPage, selectedSortMode } = this.getProperties('pageSize', 'currentPage', 'selectedSortMode');
+      const { pageSize, currentPage, selectedSortMode } = getProperties(this, 'pageSize', 'currentPage', 'selectedSortMode');
 
       if (selectedSortMode) {
         let [ sortKey, sortDir ] = selectedSortMode.split(':');
@@ -356,7 +356,7 @@ export default Controller.extend({
         set(this, 'isAnomalyListFiltered', anomalyData.length !== newAnomalies.length);
         // Add an index number to each row
         newAnomalies.forEach((anomaly, index) => {
-          set(anomaly, 'index', index + 1);
+          set(anomaly, 'index', ++index);
         });
       }
       return newAnomalies;
