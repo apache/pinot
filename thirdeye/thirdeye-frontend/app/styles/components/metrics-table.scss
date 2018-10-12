@@ -31,5 +31,10 @@
   &__value {
     margin: 0;
     padding: 0;
+
+    &--small {
+      font-size: 10px;
+      color: app-shade(black, 0.60);
+    }
   }
 }
