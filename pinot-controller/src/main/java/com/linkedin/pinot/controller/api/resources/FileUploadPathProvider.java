@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.filesystem.LocalPinotFS;
 import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import org.slf4j.Logger;
@@ -30,79 +30,79 @@ import org.slf4j.LoggerFactory;
 
 // TODO This is a misc class used by many jersey apis. Need to rename it correctly
 public class FileUploadPathProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadPathProvider.class);
+
   public final static String STATE = "state";
   public final static String TABLE_NAME = "tableName";
-  private final static String DEFAULT_SCHEME = "file";
+
   private final static String FILE_UPLOAD_TEMP_PATH = "/fileUploadTemp";
   private final static String UNTARRED_PATH = "/untarred";
   private final static String SCHEMAS_TEMP = "/schemasTemp";
-  private static final Logger LOGGER = LoggerFactory.getLogger(FileUploadPathProvider.class);
 
-  private final ControllerConf _controllerConf;
-
-  private final URI _fileUploadTmpDirURI;
   private final URI _baseDataDirURI;
-  private final URI _tmpUntarredPathURI;
   private final URI _schemasTmpDirURI;
   private final URI _localTempDirURI;
+  private final URI _fileUploadTmpDirURI;
+  private final URI _tmpUntarredPathURI;
   private final String _vip;
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
-    _controllerConf = controllerConf;
-
-    // Pick the correct scheme for PinotFS. For pluggable storage, we will expect that the directory is configured
-    // with a storage prefix. For backwards compatibility, we will assume local/mounted NFS storage if nothing is configured.
-    String scheme = DEFAULT_SCHEME;
-    String dataDir = _controllerConf.getDataDir();
+    String dataDir = controllerConf.getDataDir();
     try {
-      URI uri = new URI(_controllerConf.getDataDir());
-      String dataDirScheme = uri.getScheme();
-      if (dataDirScheme ==  null) {
-        // Assume local fs
-        dataDir = new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, _controllerConf.getDataDir(), null).toString();
-      } else {
-        scheme = dataDirScheme;
-      }
-    } catch (URISyntaxException e) {
-      LOGGER.error("Invalid path set as data dir {}", _controllerConf.getDataDir());
-      Utils.rethrowException(e);
-    }
-
-    String localTempDir = _controllerConf.getLocalTempDir();
-    if (localTempDir == null) {
-      localTempDir = dataDir;
-    }
-
-
-    try {
-      // Remote storage will use PinotFS with the proper scheme
-      PinotFS pinotFS = PinotFSFactory.create(scheme);
-      _baseDataDirURI = new URI(dataDir);
-      if (!pinotFS.exists(_baseDataDirURI)) {
-        pinotFS.mkdir(_baseDataDirURI);
-      }
+      // URIs that are allowed to be remote
+      _baseDataDirURI = getUriFromPath(dataDir);
+      LOGGER.info("Data directory: {}", _baseDataDirURI);
       _schemasTmpDirURI = new URI(_baseDataDirURI + SCHEMAS_TEMP);
-      if (!pinotFS.exists(_schemasTmpDirURI)) {
-        pinotFS.mkdir(_schemasTmpDirURI);
-      }
+      LOGGER.info("Schema temporary directory: {}", _schemasTmpDirURI);
+      String scheme = _baseDataDirURI.getScheme();
+      PinotFS pinotFS = PinotFSFactory.create(scheme);
+      mkdirIfNotExists(pinotFS, _baseDataDirURI);
+      mkdirIfNotExists(pinotFS, _schemasTmpDirURI);
 
-      // All directories that are always local
-      PinotFS localPinotFS = new LocalPinotFS();
-      _localTempDirURI = new URI(localTempDir);
-      if (!localPinotFS.exists(_localTempDirURI)) {
-        localPinotFS.mkdir(_localTempDirURI);
+      // URIs that are always local
+      String localTempDir = controllerConf.getLocalTempDir();
+      if (localTempDir == null) {
+        LOGGER.info("Local temporary directory is not configured, use data directory as the local temporary directory");
+        _localTempDirURI = _baseDataDirURI;
+      } else {
+        _localTempDirURI = getUriFromPath(localTempDir);
+      }
+      LOGGER.info("Local temporary directory: {}", _localTempDirURI);
+      if (!_localTempDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+        throw new IllegalStateException("URI scheme must be file for local temporary directory: " + _localTempDirURI);
       }
       _fileUploadTmpDirURI = new URI(_localTempDirURI + FILE_UPLOAD_TEMP_PATH);
-      if (!localPinotFS.exists(_fileUploadTmpDirURI)) {
-        localPinotFS.mkdir(_fileUploadTmpDirURI);
-      }
+      LOGGER.info("File upload temporary directory: {}", _fileUploadTmpDirURI);
       _tmpUntarredPathURI = new URI(_fileUploadTmpDirURI + UNTARRED_PATH);
-      if (!localPinotFS.exists(_tmpUntarredPathURI)) {
-        localPinotFS.mkdir(_tmpUntarredPathURI);
-      }
-      _vip = _controllerConf.generateVipUrl();
+      LOGGER.info("Untarred file temporary directory: {}", _tmpUntarredPathURI);
+      PinotFS localPinotFS = new LocalPinotFS();
+      mkdirIfNotExists(localPinotFS, _localTempDirURI);
+      mkdirIfNotExists(localPinotFS, _fileUploadTmpDirURI);
+      mkdirIfNotExists(localPinotFS, _tmpUntarredPathURI);
+
+      _vip = controllerConf.generateVipUrl();
     } catch (Exception e) {
-      throw new InvalidControllerConfigException("Bad controller configuration", e);
+      throw new InvalidControllerConfigException("Caught exception while initializing file upload path provider", e);
+    }
+  }
+
+  /**
+   * Returns the URI for the given path, appends the local (file) scheme to the URI if no scheme exists.
+   */
+  private static URI getUriFromPath(String path) throws URISyntaxException {
+    URI uri = new URI(path);
+    if (uri.getScheme() != null) {
+      return uri;
+    } else {
+      return new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, path, null);
+    }
+  }
+
+  private static void mkdirIfNotExists(PinotFS pinotFS, URI uri) throws IOException {
+    if (!pinotFS.exists(uri)) {
+      if (!pinotFS.mkdir(uri)) {
+        throw new IOException("Failed to create directory at URI: " + uri);
+      }
     }
   }
 
