@@ -11,6 +11,7 @@ export default [
   }, {
     propertyName: 'label',
     title: 'Metric',
+    template: 'custom/metrics-table-metric',
     className: 'metrics-table__column metrics-table__column--large'
   }, {
     propertyName: 'current',

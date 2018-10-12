@@ -29,7 +29,7 @@ export default Component.extend({
   searchInputSelector: '#ember-basic-dropdown-wormhole input',
 
   /**
-   * @summary Concurrency task that triggers returning the selected metrics as recommended list
+   * @summary Concurrency task that triggers returning the selected metrics and related metrics lists
    * @return {Array} array of groupName and options list
    * @example
      [
@@ -40,16 +40,24 @@ export default Component.extend({
     'entities', 'selectedUrns',
     function() {
       const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
-      const result = filterPrefix(selectedUrns, 'thirdeye:metric:')
+      const selectedMetrics = filterPrefix(selectedUrns, 'thirdeye:metric:')
         .filter(urn => urn in entities)
         .map((urn) => {
           const entity = entities[urn];
-          const agg = entity ? { alias: entity.label, id: entity.urn.split(':')[2] } : {};
+          const agg = { alias: entity.label, id: entity.urn.split(':')[2] };
           return agg;
         });
+      const relatedMetrics = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
+      .filter(urn => urn in entities)
+      .map((urn) => {
+        const entity = entities[urn];
+        const agg = { alias: entity.label, id: entity.urn.split(':')[2] };
+        return agg;
+      });
 
       return [
-        { groupName: 'Selected Metrics', options: _.sortBy(result, (row) => row.alias) || [] }
+        { groupName: 'Selected Metrics', options: _.sortBy(selectedMetrics, (row) => row.alias) || [] },
+        { groupName: 'Related Metrics', options: _.sortBy(relatedMetrics, (row) => row.alias) || [] }
       ];
     }
   ),

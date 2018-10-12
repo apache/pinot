@@ -134,6 +134,7 @@ export default Component.extend({
             links: links[urn],
             isSelected: selectedUrns.has(urn),
             label: toMetricLabel(urn, entities),
+            datasetMetricLabel: entities[urn].attributes.dataset,
             score: humanizeScore(scores[urn]),
             current: this._makeRecord(urn, 'current', entities, aggregates),
             baseline: this._makeRecord(urn, 'baseline', entities, aggregates),
