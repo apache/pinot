@@ -373,6 +373,8 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
     public static final String LOCAL_SEGMENT_SCHEME = "file";
 
+    public static final String PERSIST_TO_PINOT_MANAGED_FILESYSTEM = "persistToPinotManagedFilesystem";
+
     public enum SegmentType {
       OFFLINE,
       REALTIME
