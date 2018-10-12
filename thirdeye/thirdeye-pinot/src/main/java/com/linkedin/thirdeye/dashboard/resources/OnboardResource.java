@@ -27,6 +27,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
@@ -163,9 +164,11 @@ public class OnboardResource {
         String propertiesJson = OBJECT_MAPPER.writeValueAsString(properties);
         DetectionOnboardResource detectionOnboardResource = new DetectionOnboardResource(taskDAO, anomalyFunctionDAO);
         detectionOnboardResource.createDetectionOnboardingJob(functionName, propertiesJson);
-        ids.add(anomalyFunctionDAO.findWhereNameEquals(functionName).getId());
-        responseMessage.put("metric " + metric.getName(), "success! onboarded and added to subscription alertGroup = "
-            + alertConfigDTO.getName());
+        long functionId = anomalyFunctionDAO.findWhereNameEquals(functionName).getId();
+        ids.add(functionId);
+        subscribeAlertGroupToFunction(alertConfigDTO, functionId);
+        responseMessage.put("metric " + metric.getName(), "success! onboarded and added function id " + functionId
+            + " to subscription alertGroup = " + alertConfigDTO.getName());
         counter.inc();
       } catch (Exception e) {
         LOG.error("[bulk-onboard] There was an exception onboarding metric {} function {}.", metric, functionName, e);
@@ -175,6 +178,19 @@ public class OnboardResource {
 
     responseMessage.put("message", "successfully onboarded " + counter.getCount() + " metrics with function ids " + ids);
     return Response.ok(responseMessage).build();
+  }
+
+  private void subscribeAlertGroupToFunction(AlertConfigDTO alertConfigDTO, long functionId) {
+    if (alertConfigDTO.getEmailConfig() == null) {
+      AlertConfigBean.EmailConfig emailConfig = new AlertConfigBean.EmailConfig();
+      List<Long> functionIds = new ArrayList<>();
+      functionIds.add(functionId);
+      emailConfig.setFunctionIds(functionIds);
+      alertConfigDTO.setEmailConfig(emailConfig);
+    } else {
+      alertConfigDTO.getEmailConfig().getFunctionIds().add(functionId);
+    }
+    emailConfigurationDAO.update(alertConfigDTO);
   }
 
   private AlertConfigDTO getAlertConfigGroupForMetric(MetricConfigDTO metric, boolean forceSyncAlertGroup,
