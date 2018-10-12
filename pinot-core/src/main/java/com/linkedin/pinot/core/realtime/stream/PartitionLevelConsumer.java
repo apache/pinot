@@ -37,10 +37,10 @@ public interface PartitionLevelConsumer extends Closeable {
 
   /**
    * Decodes a message from the message batch into a generic row
-   * @param messageBatch
+   * @param messagesAndOffsets
    * @param index
    * @param destination
    * @return
    */
-  void decodeRow(MessageBatch messageBatch, int index, GenericRow destination);
+  void decodeRow(MessageBatch messagesAndOffsets, int index, GenericRow destination);
 }

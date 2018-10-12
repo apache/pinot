@@ -94,6 +94,12 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
     }
   }
 
+  /**
+   * Given the messages and offsets message batch from a kafka simple stream, decode the row at the given index
+   * @param messagesAndOffsets
+   * @param index
+   * @param decodedRow
+   */
   @Override
   public void decodeRow(MessageBatch messagesAndOffsets, int index, GenericRow decodedRow) {
     _messageDecoder.decode(messagesAndOffsets.getMessageAtIndex(index),
