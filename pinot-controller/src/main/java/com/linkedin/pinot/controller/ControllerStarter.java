@@ -47,9 +47,9 @@ import java.io.OutputStream;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.task.TaskDriver;
@@ -282,6 +282,9 @@ public class ControllerStarter {
 
   public void stop() {
     try {
+      LOGGER.info("Closing PinotFS classes");
+      PinotFSFactory.shutdown();
+
       LOGGER.info("Stopping validation manager");
       _validationManager.stop();
 

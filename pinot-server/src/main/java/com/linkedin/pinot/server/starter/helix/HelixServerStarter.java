@@ -27,10 +27,12 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import com.linkedin.pinot.server.starter.ServerInstance;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -228,6 +230,12 @@ public class HelixServerStarter {
   }
 
   public void stop() {
+    try {
+      LOGGER.info("Closing PinotFS classes");
+      PinotFSFactory.shutdown();
+    } catch (IOException e) {
+      LOGGER.warn("Caught exception closing PinotFS classes", e);
+    }
     _adminApiApplication.stop();
     setShuttingDownStatus(true);
     if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, true)) {
