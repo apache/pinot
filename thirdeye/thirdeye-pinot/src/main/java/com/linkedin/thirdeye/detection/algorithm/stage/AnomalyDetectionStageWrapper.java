@@ -46,7 +46,10 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
 
     this.anomalyDetectionStage = loadAnomalyDetectorStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
     Map<String, Object> specs = MapUtils.getMap(properties, PROP_SPECS);
-    specs.put(PROP_METRIC_URN, MapUtils.getString(properties, PROP_METRIC_URN));
+    String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
+    if (metricUrn != null){
+      specs.put(PROP_METRIC_URN, metricUrn);
+    }
     this.anomalyDetectionStage.init(specs, config.getId(), startTime, endTime);
   }
 

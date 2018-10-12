@@ -60,7 +60,7 @@ public class MergeWrapper extends DetectionPipeline {
     }
   };
 
-  private final List<Map<String, Object>> nestedProperties;
+  protected final List<Map<String, Object>> nestedProperties;
   protected final long maxGap; // max time gap for merge
   protected final long maxDuration; // max overall duration of merged anomaly
   private final AnomalySlice slice;

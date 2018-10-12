@@ -65,7 +65,6 @@ public class ChildKeepingMergeWrapperTest {
     this.runs = new ArrayList<>();
 
     this.properties = new HashMap<>();
-    this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put(PROP_PROPERTIES, Collections.singletonMap("key", "value"));
 
     Map<String, Object> nestedPropertiesOne = new HashMap<>();
