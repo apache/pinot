@@ -50,25 +50,21 @@ import org.slf4j.LoggerFactory;
  */
 public class ValidationManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ValidationManager.class);
-  private final ValidationMetrics _validationMetrics;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
+
   private final long _validationIntervalSeconds;
+  private final boolean _enableSegmentLevelValidation;
+  private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
+  private final ValidationMetrics _validationMetrics;
   private final ScheduledExecutorService _executorService;
 
-  /**
-   * Constructs the validation manager.
-   * @param validationMetrics The validation metrics utility used to publish the metrics.
-   * @param pinotHelixResourceManager The resource manager used to interact with Helix
-   * @param config
-   * @param llcRealtimeSegmentManager
-   */
-  public ValidationManager(ValidationMetrics validationMetrics, PinotHelixResourceManager pinotHelixResourceManager,
-      ControllerConf config, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager) {
-    _validationMetrics = validationMetrics;
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+  public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
+      PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
     _validationIntervalSeconds = config.getValidationControllerFrequencyInSeconds();
+    _enableSegmentLevelValidation = config.getEnableSegmentLevelValidation();
+    _pinotHelixResourceManager = pinotHelixResourceManager;
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
+    _validationMetrics = validationMetrics;
     _executorService =
         Executors.newSingleThreadScheduledExecutor(runnable -> new Thread(runnable, "ValidationManagerThread"));
   }
@@ -127,9 +123,13 @@ public class ValidationManager {
         // Perform validation based on the table type
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
         if (tableType == TableType.OFFLINE) {
-          validateOfflineSegmentPush(tableConfig);
+          if (_enableSegmentLevelValidation) {
+            validateOfflineSegmentPush(tableConfig);
+          }
         } else {
-          updateRealtimeDocumentCount(tableConfig);
+          if (_enableSegmentLevelValidation) {
+            updateRealtimeDocumentCount(tableConfig);
+          }
           _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
         }
       } catch (Exception e) {

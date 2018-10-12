@@ -163,9 +163,9 @@ public class ControllerStarter {
     LOGGER.info("Starting validation manager");
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
-    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-    _validationManager = new ValidationManager(validationMetrics, _helixResourceManager, _config,
-        PinotLLCRealtimeSegmentManager.getInstance());
+    _validationManager =
+        new ValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
+            new ValidationMetrics(_metricsRegistry));
     _validationManager.start();
 
     LOGGER.info("Starting realtime segment manager");
