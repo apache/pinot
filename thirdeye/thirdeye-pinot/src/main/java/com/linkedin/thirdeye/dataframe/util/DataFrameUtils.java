@@ -486,32 +486,17 @@ public class DataFrameUtils {
    * @throws ExecutionException
    */
   private static ThirdEyeRequest.ThirdEyeRequestBuilder makeThirdEyeRequestBuilder(MetricSlice slice, MetricConfigDTO metric, DatasetConfigDTO dataset, List<MetricExpression> expressions, MetricConfigManager metricDAO) throws ExecutionException {
-    List<MetricConfigDTO> datasetMetrics = metricDAO.findByDataset(dataset.getDataset());
-    Set<String> metricNames = new HashSet<>();
-    for (MetricConfigDTO metricDTO : datasetMetrics) {
-      metricNames.add(metricDTO.getName());
-    }
-
     List<MetricFunction> functions = new ArrayList<>();
     for(MetricExpression exp : expressions) {
       functions.addAll(exp.computeMetricFunctions());
     }
 
-    Multimap<String, String> effectiveFilters = ArrayListMultimap.create();
-    for (String dimName : slice.filters.keySet()) {
-      if (dataset.getDimensions().contains(dimName)
-          || metricNames.contains(dimName)) {
-        effectiveFilters.putAll(dimName, slice.filters.get(dimName));
-      }
-    }
-
     return ThirdEyeRequest.newBuilder()
         .setStartTimeInclusive(slice.start)
         .setEndTimeExclusive(slice.end)
-        .setFilterSet(effectiveFilters)
+        .setFilterSet(slice.filters)
         .setMetricFunctions(functions)
         .setDataSource(dataset.getDataSource());
-
   }
 
   /**
