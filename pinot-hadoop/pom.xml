@@ -65,6 +65,14 @@
   </profiles>
   <dependencies>
     <dependency>
+      <groupId>com.linkedin.azkaban</groupId>
+      <artifactId>azkaban-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.azkaban</groupId>
+      <artifactId>az-core</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-core</artifactId>
       <exclusions>

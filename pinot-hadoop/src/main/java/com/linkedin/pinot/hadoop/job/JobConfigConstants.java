@@ -20,7 +20,8 @@ public class JobConfigConstants {
   public static final String PATH_TO_INPUT = "path.to.input";
   public static final String PATH_TO_OUTPUT = "path.to.output";
   public static final String PATH_TO_READER_CONFIG = "path.to.reader.config";
-  // Leave this for backward compatibility. We prefer to use the schema fetched from the controller.
+
+  // Leaving this here for backwards compatibility. We prefer to use the schema fetched from the controller.
   public static final String PATH_TO_SCHEMA = "path.to.schema";
 
   public static final String TARGZ = ".tar.gz";
@@ -37,4 +38,5 @@ public class JobConfigConstants {
   public static final String TABLE_CONFIG = "table.config";
 
   public static final String DEFAULT_PERMISSIONS_MASK = "fs.permissions.umask-mode";
+  public static final String EVENT_NOTIFIER_CLASS = "event.notifier.class.";
 }

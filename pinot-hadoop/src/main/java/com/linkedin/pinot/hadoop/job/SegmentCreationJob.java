@@ -24,6 +24,7 @@ import com.linkedin.pinot.hadoop.utils.PushLocation;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
@@ -241,7 +242,7 @@ public class SegmentCreationJob extends Configured {
     // Check host and port information before set table config dependent properties
     if (_hosts == null || _port == 0) {
       LOGGER.warn("Unable to set TableConfig-dependent properties. Please set host {} ({}) and port {} ({})",
-          JobConfigConstants.PUSH_TO_HOSTS, _port, JobConfigConstants.PUSH_TO_PORT, _port);
+          JobConfigConstants.PUSH_TO_HOSTS, Arrays.toString(_hosts), JobConfigConstants.PUSH_TO_PORT, _port);
       return;
     }
 

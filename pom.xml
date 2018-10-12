@@ -205,6 +205,26 @@
         <version>4.4.6</version>
       </dependency>
       <dependency>
+        <groupId>com.linkedin.azkaban</groupId>
+        <artifactId>azkaban-common</artifactId>
+        <version>3.50.3</version>
+        <exclusions>
+          <exclusion>
+            <groupId>com.linkedin.azkaban</groupId>
+            <artifactId>azkaban-spi</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.linkedin.azkaban</groupId>
+            <artifactId>azkaban-db</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.azkaban</groupId>
+        <artifactId>az-core</artifactId>
+        <version>3.50.3</version>
+      </dependency>
+      <dependency>
         <groupId>com.linkedin.pinot</groupId>
         <artifactId>pinot-common</artifactId>
         <version>${project.version}</version>
