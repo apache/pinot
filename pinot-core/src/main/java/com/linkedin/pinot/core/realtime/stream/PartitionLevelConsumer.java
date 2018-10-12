@@ -36,7 +36,7 @@ public interface PartitionLevelConsumer extends Closeable {
       throws java.util.concurrent.TimeoutException;
 
   /**
-   * Decodes a message from the message batch into a generic row
+   * Decodes a message from the message batch into a generic row, given the message index
    * @param messagesAndOffsets
    * @param index
    * @param destination
