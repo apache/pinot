@@ -496,8 +496,9 @@ export default Route.extend({
     this.controller.setProperties({
       anomalyData,
       dimensionOptions,
-      resolutionOptions,
+      resolutionOptions: [ ...new Set(resolutionOptions) ],
       anomaliesLoaded: true,
+      totalLoadedAnomalies: anomalyData.length,
       baselineOptionsLoading: false
     });
     // Fetch and append extra WoW data for each anomaly record
