@@ -16,21 +16,28 @@
 
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.codahale.metrics.Counter;
 import com.google.common.base.CaseFormat;
 import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
 import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardUtility;
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
+import java.util.Collections;
+import java.util.Set;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.format.ISODateTimeFormat;
 import org.joda.time.DateTime;
+import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,13 +68,17 @@ public class OnboardResource {
   private MetricConfigManager metricConfigDAO;
   private AlertConfigManager emailConfigurationDAO;
   private TaskManager taskDAO;
+  private ThirdEyeDashboardConfiguration config;
 
   private static final String DEFAULT_FUNCTION_PREFIX = "thirdEyeAutoOnboard_";
   private static final String DEFAULT_ALERT_GROUP = "te_bulk_onboard_alerts";
+  private static final String DEFAULT_ALERT_GROUP_APPLICATION = "others";
+  private static final String DEFAULT_ALERT_GROUP_CRON = "0 0 12 ? * FRI *"; // Weekly - Friday Noon
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(OnboardResource.class);
 
-  public OnboardResource() {
+  public OnboardResource(ThirdEyeDashboardConfiguration config) {
+    this.config = config;
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
@@ -81,18 +92,40 @@ public class OnboardResource {
     this.mergedAnomalyResultDAO = mergedAnomalyResultManager;
   }
 
+  /**
+   * Endpoint for bulk onboarding of metrics
+   *
+   * This endpoint will create anomaly functions for all the metrics under the given tag
+   * and also has the ability to auto create alert config groups with dataset owners as
+   * recipients and send out email alerts.
+   *
+   * @param tag the tag belonging to the metrics which you would like to onboard
+   * @param functionPrefix (optional, DEFAULT_FUNCTION_PREFIX) a custom anomaly function prefix
+   * @param forceSyncAlertGroup (optional, true) force create alert groups based on dataset owners
+   * @param alertGroupName (optional) subscribe to a custom subscription alert group
+   * @param application (optional) the application to which this alert belongs to.
+   * @return HTTP response containing onboard statistics and warnings
+   */
   @POST
   @Path("/bulk-onboard")
   @ApiOperation("Endpoint used for bulk on-boarding alerts leveraging the create-job endpoint.")
   public Response bulkOnboardAlert(
       @NotNull @QueryParam("tag") String tag,
       @DefaultValue(DEFAULT_FUNCTION_PREFIX) @QueryParam("functionPrefix") String functionPrefix,
-      @DefaultValue(DEFAULT_ALERT_GROUP) @QueryParam("alertGroupName") String alertGroupName) throws Exception {
+      @DefaultValue("true") @QueryParam("forceSyncAlertGroup") boolean forceSyncAlertGroup,
+      @QueryParam("alertGroupName") String alertGroupName, @QueryParam("alertGroupCron") String alertGroupCron,
+      @QueryParam("application") String application)
+      throws Exception {
     Map<String, String> responseMessage = new HashMap<>();
-    AlertConfigDTO alertConfigDTO = emailConfigurationDAO.findWhereNameEquals(alertGroupName);
-    if (alertConfigDTO == null) {
-      responseMessage.put("message", "cannot find the alert group with name " + alertGroupName + ".");
-      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    Counter counter = new Counter();
+
+    AlertConfigDTO alertConfigDTO = null;
+    if (StringUtils.isNotEmpty(alertGroupName)) {
+      alertConfigDTO = emailConfigurationDAO.findWhereNameEquals(alertGroupName);
+      if (alertConfigDTO == null) {
+        responseMessage.put("message", "cannot find an alert group with name " + alertGroupName + ".");
+        return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+      }
     }
 
     List<MetricConfigDTO> metrics = fetchMetrics(tag);
@@ -101,13 +134,23 @@ public class OnboardResource {
     // For each metric create a new anomaly function & replay it
     List<Long> ids = new ArrayList<>();
     for (MetricConfigDTO metric : metrics) {
-      String functionName = functionPrefix + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getName())
-          + "_" + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getDataset());
+      String functionName = functionPrefix
+          + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getName()) + "_"
+          + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getDataset());
+
+      if (alertConfigDTO == null) {
+        alertConfigDTO = getAlertConfigGroupForMetric(metric, forceSyncAlertGroup, application, alertGroupCron);
+        if (alertConfigDTO == null) {
+          responseMessage.put("message", "cannot find an alert group for metric " + metric.getName() + ".");
+          return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+        }
+      }
 
       AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findWhereNameEquals(functionName);
       if (anomalyFunctionDTO != null) {
         LOG.error("[bulk-onboard] Anomaly function {} already exists.", anomalyFunctionDTO.getFunctionName());
-        responseMessage.put("skipped " + metric.getName(), "Anomaly function already exists.");
+        responseMessage.put("metric " + metric.getName(), "skipped! Anomaly function "
+            + anomalyFunctionDTO.getFunctionName() + " already exists.");
         continue;
       }
 
@@ -120,16 +163,77 @@ public class OnboardResource {
         String propertiesJson = OBJECT_MAPPER.writeValueAsString(properties);
         DetectionOnboardResource detectionOnboardResource = new DetectionOnboardResource(taskDAO, anomalyFunctionDAO);
         detectionOnboardResource.createDetectionOnboardingJob(functionName, propertiesJson);
-        anomalyFunctionDTO = anomalyFunctionDAO.findWhereNameEquals(functionName);
-        ids.add(anomalyFunctionDTO.getId());
+        ids.add(anomalyFunctionDAO.findWhereNameEquals(functionName).getId());
+        responseMessage.put("metric " + metric.getName(), "success! onboarded and added to subscription alertGroup = "
+            + alertConfigDTO.getName());
+        counter.inc();
       } catch (Exception e) {
         LOG.error("[bulk-onboard] There was an exception onboarding metric {} function {}.", metric, functionName, e);
         responseMessage.put("skipped " + metric.getName(), "Exception onboarding metric : " + e);
       }
     }
 
-    responseMessage.put("message", "successfully on-boarded the following function ids: " + ids);
+    responseMessage.put("message", "successfully onboarded " + counter.getCount() + " metrics with function ids " + ids);
     return Response.ok(responseMessage).build();
+  }
+
+  private AlertConfigDTO getAlertConfigGroupForMetric(MetricConfigDTO metric, boolean forceSyncAlertGroup,
+      String application, String cron) {
+    String alertGroupName = AutoOnboardUtility.getAutoAlertGroupName(metric.getDataset());
+    AlertConfigDTO alertConfigDTO = emailConfigurationDAO.findWhereNameEquals(alertGroupName);
+
+    if (forceSyncAlertGroup) {
+      syncAlertConfig(alertConfigDTO, alertGroupName, metric, application, cron);
+      alertConfigDTO = emailConfigurationDAO.findWhereNameEquals(alertGroupName);
+    } else {
+      if (alertConfigDTO == null) {
+        LOG.warn("Cannot find alert group {} corresponding to dataset {} for metric {}. Loading default alert group {}",
+            alertGroupName, metric.getDataset(), metric.getName(), DEFAULT_ALERT_GROUP);
+        alertConfigDTO = emailConfigurationDAO.findWhereNameEquals(DEFAULT_ALERT_GROUP);
+      }
+    }
+
+    return alertConfigDTO;
+  }
+
+  private void syncAlertConfig(AlertConfigDTO alertConfigDTO, String alertGroupName, MetricConfigDTO metric,
+      String application, String cron) {
+
+    if (alertConfigDTO == null) {
+      Set<String> recipients = metric.getDatasetConfig() != null ? metric.getDatasetConfig().getOwners() : Collections.<String>emptySet();
+      createAlertConfig(alertGroupName, application, cron, recipients);
+    } else {
+      // Note: Since we support only one subscription group per function in the legacy code, we append
+      // dataset owners and interested stakeholders to the same auto created subscription group.
+      // Side effect:
+      // If a dataset owner is removed at source, which rarely is the case, then we will continue to
+      // retain the owner in our subscription group and send him alerts unless manually removed.
+      alertConfigDTO.getReceiverAddresses().getTo().addAll(metric.getDatasetConfig().getOwners());
+      this.emailConfigurationDAO.update(alertConfigDTO);
+    }
+  }
+
+  private Long createAlertConfig(String alertGroupName, String application, String cron, Set<String> recipients) {
+    if (StringUtils.isEmpty(cron)) {
+      cron = DEFAULT_ALERT_GROUP_CRON;
+    } else {
+      if (!CronExpression.isValidExpression(cron)) {
+        throw new IllegalArgumentException("Invalid cron expression : " + cron);
+      }
+    }
+
+    if (StringUtils.isEmpty(application)) {
+      application = DEFAULT_ALERT_GROUP_APPLICATION;
+    }
+
+    AlertConfigDTO alertConfigDTO = new AlertConfigDTO();
+    alertConfigDTO.setName(alertGroupName);
+    alertConfigDTO.setApplication(application);
+    alertConfigDTO.setActive(true);
+    alertConfigDTO.setFromAddress(config.getFailureFromAddress());
+    alertConfigDTO.setCronExpression(cron);
+    alertConfigDTO.setReceiverAddresses(new DetectionAlertFilterRecipients(recipients));
+    return this.emailConfigurationDAO.save(alertConfigDTO);
   }
 
   private List<MetricConfigDTO> fetchMetrics(String tag) {
