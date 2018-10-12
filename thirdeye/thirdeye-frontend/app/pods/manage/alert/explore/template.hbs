@@ -90,7 +90,6 @@
           </div>
         {{/if}}
         {{!-- Resolution selector --}}
-        {{log "resolutionOptions: " resolutionOptions}}
         <div class="col-md-3">
           {{#power-select
             triggerId="select-resolution"
@@ -177,8 +176,7 @@
             <thead>
               <tr class="te-anomaly-table__row te-anomaly-table__head">
                 <th class="te-anomaly-table__cell-head te-anomaly-table__cell-head--lefter">
-                  <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "number"}}>
-                    #
+                  <a class="te-anomaly-table__cell-link" {{action "toggleSortDirection" "number"}}>#
                     <i class="te-anomaly-table__icon glyphicon {{if sortColumnNumberUp "glyphicon-menu-down" "glyphicon-menu-up"}}"></i>
                   </a>
                 </th>
@@ -216,9 +214,7 @@
           <tbody>
             {{#each paginatedFilteredAnomalies as |anomaly|}}
               <tr class="te-anomaly-table__row">
-                 <td class="te-anomaly-table__cell te-anomaly-table__cell--index">
-                  <span>{{anomaly.index}}</span>
-                 </td>
+                 <td class="te-anomaly-table__cell te-anomaly-table__cell--index">{{anomaly.index}}</td>
                  <td class="te-anomaly-table__cell">
                   <ul class="te-anomaly-table__list te-anomaly-table__list--lefter">
                     <li class="te-anomaly-table__list-item te-anomaly-table__list-item--stronger">
