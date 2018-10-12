@@ -67,10 +67,15 @@ public class OnboardResourceTest {
     Assert.assertEquals(anomalyFunctionDTOList.size(), 1);
     Assert.assertEquals(anomalyFunctionDTOList.get(0).getFunctionName(), "test_prefix_testMetric_testDataset");
 
+    // Check if alert group has subscribed to the function
+    Assert.assertEquals(alertConfigDTOList.get(0).getEmailConfig().getFunctionIds().size(), 1);
+    Assert.assertEquals(alertConfigDTOList.get(0).getEmailConfig().getFunctionIds().get(0), anomalyFunctionDTOList.get(0).getId());
+
     // Verify response
     Assert.assertEquals(response.getStatus(), 200);
     Assert.assertEquals(((Map<String, String>)response.getEntity()).get("metric test_metric"),
-        "success! onboarded and added to subscription alertGroup = auto_onboard_dataset_testDataset_alert");
+        "success! onboarded and added function id " + anomalyFunctionDTOList.get(0).getId()
+            + " to subscription alertGroup = auto_onboard_dataset_testDataset_alert");
     Assert.assertEquals(((Map<String, String>)response.getEntity()).get("message"),
         "successfully onboarded 1 metrics with function ids [" + anomalyFunctionDTOList.get(0).getId() + "]");
   }
