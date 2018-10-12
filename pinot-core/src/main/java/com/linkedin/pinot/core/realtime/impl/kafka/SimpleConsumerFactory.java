@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
@@ -45,8 +46,8 @@ public class SimpleConsumerFactory extends StreamConsumerFactory {
    * @return
    */
   @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId) {
-    return new KafkaStreamLevelConsumer();
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, Schema schema) {
+    return new KafkaStreamLevelConsumer(clientId, _streamConfig, schema);
   }
 
   /**

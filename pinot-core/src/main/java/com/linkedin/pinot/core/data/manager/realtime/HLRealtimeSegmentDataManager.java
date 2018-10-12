@@ -167,8 +167,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // create and init stream level consumer
     _streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
-    _streamLevelConsumer = _streamConsumerFactory.createStreamLevelConsumer(
-        HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getKafkaTopicName());
+    String clientId =
+        HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getKafkaTopicName();
+    _streamLevelConsumer = _streamConsumerFactory.createStreamLevelConsumer(clientId, schema);
     // TODO: define a contract for StreamLevelConsumer.init() or get rid of it completely
     // A future refactoring work of unifying StreamConfig and StreamProviderConfig should give some clarity into this
     _streamLevelConsumer.init(kafkaStreamProviderConfig, tableName, serverMetrics);
