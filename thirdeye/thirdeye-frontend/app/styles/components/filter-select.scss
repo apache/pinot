@@ -23,3 +23,13 @@
     }
   }
 }
+
+#select-exclusion {
+  .ember-power-select-multiple-option {
+    background-color: $te-red-5;
+
+    &:hover {
+      background-color: $te-red-7;
+    }
+  }
+}
