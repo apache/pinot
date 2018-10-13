@@ -46,11 +46,11 @@ public class TableQueryQuotaManager {
   private final HelixManager _helixManager;
   private final AtomicInteger _lastKnownBrokerResourceVersion;
   private final Map<String, QueryQuotaConfig> _rateLimiterMap;
-  private static int TIME_RANGE_IN_SECOND = 1;
+  private static final int TIME_RANGE_IN_SECOND = 1;
 
   public TableQueryQuotaManager(HelixManager helixManager) {
     _helixManager = helixManager;
-    _rateLimiterMap  = new ConcurrentHashMap<>();
+    _rateLimiterMap = new ConcurrentHashMap<>();
     _lastKnownBrokerResourceVersion = new AtomicInteger();
   }
 
@@ -60,9 +60,9 @@ public class TableQueryQuotaManager {
    * @param brokerResource broker resource which stores all the broker states of each table.
    */
   public void initTableQueryQuota(TableConfig tableConfig, ExternalView brokerResource) {
-    String tableName = tableConfig.getTableName();
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
-    LOGGER.info("Initializing rate limiter for table {}", rawTableName);
+    String tableNameWithType = tableConfig.getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    LOGGER.info("Initializing rate limiter for table {}", tableNameWithType);
 
     // Check whether qps quotas from both tables are the same.
     QuotaConfig offlineQuotaConfig;
@@ -76,26 +76,26 @@ public class TableQueryQuotaManager {
       offlineQuotaConfig = getQuotaConfigFromPropertyStore(rawTableName, CommonConstants.Helix.TableType.OFFLINE);
     }
     // Log a warning if MaxQueriesPerSecond are set different.
-    if ((offlineQuotaConfig != null && !Strings.isNullOrEmpty(offlineQuotaConfig.getMaxQueriesPerSecond()))
-        && (realtimeQuotaConfig != null && !Strings.isNullOrEmpty(realtimeQuotaConfig.getMaxQueriesPerSecond()))) {
+    if ((offlineQuotaConfig != null && !Strings.isNullOrEmpty(offlineQuotaConfig.getMaxQueriesPerSecond())) && (
+        realtimeQuotaConfig != null && !Strings.isNullOrEmpty(realtimeQuotaConfig.getMaxQueriesPerSecond()))) {
       if (!offlineQuotaConfig.getMaxQueriesPerSecond().equals(realtimeQuotaConfig.getMaxQueriesPerSecond())) {
-        LOGGER.warn("Attention! The values of MaxQueriesPerSecond for table {} are set different! Offline table qps quota: {}, Real-time table qps quota: {}",
+        LOGGER.warn(
+            "Attention! The values of MaxQueriesPerSecond for table {} are set different! Offline table qps quota: {}, Real-time table qps quota: {}",
             rawTableName, offlineQuotaConfig.getMaxQueriesPerSecond(), realtimeQuotaConfig.getMaxQueriesPerSecond());
       }
     }
 
     // Create rate limiter
-    createRateLimiter(tableName, brokerResource, tableConfig.getQuotaConfig());
+    createRateLimiter(tableNameWithType, brokerResource, tableConfig.getQuotaConfig());
   }
-
 
   /**
    * Drop table query quota.
-   * @param tableName table name with type.
+   * @param tableNameWithType table name with type.
    */
-  public void dropTableQueryQuota(String tableName) {
-    LOGGER.info("Dropping rate limiter for table {}", tableName);
-    removeRateLimiter(tableName);
+  public void dropTableQueryQuota(String tableNameWithType) {
+    LOGGER.info("Dropping rate limiter for table {}", tableNameWithType);
+    removeRateLimiter(tableNameWithType);
   }
 
   /** Remove or update rate limiter if another table with the same raw table name but different type is still using the quota config.
@@ -124,36 +124,36 @@ public class TableQueryQuotaManager {
 
   /**
    * Create a rate limiter for a table.
-   * @param tableName table name with table type.
+   * @param tableNameWithType table name with table type.
    * @param brokerResource broker resource which stores all the broker states of each table.
    * @param quotaConfig quota config of the table.
    */
-  private void createRateLimiter(String tableName, ExternalView brokerResource, QuotaConfig quotaConfig) {
+  private void createRateLimiter(String tableNameWithType, ExternalView brokerResource, QuotaConfig quotaConfig) {
     if (quotaConfig == null || Strings.isNullOrEmpty(quotaConfig.getMaxQueriesPerSecond())) {
-      LOGGER.info("No qps config specified for table: {}", tableName);
+      LOGGER.info("No qps config specified for table: {}", tableNameWithType);
       return;
     }
 
     if (brokerResource == null) {
-      LOGGER.warn("Failed to init qps quota for table {}. No broker resource connected!", tableName);
+      LOGGER.warn("Failed to init qps quota for table {}. No broker resource connected!", tableNameWithType);
       return;
     }
 
-    Map<String, String> stateMap = brokerResource.getStateMap(tableName);
+    Map<String, String> stateMap = brokerResource.getStateMap(tableNameWithType);
     int otherOnlineBrokerCount = 0;
 
     // If stateMap is null, that means this broker is the first broker for this table.
     if (stateMap != null) {
       for (Map.Entry<String, String> state : stateMap.entrySet()) {
-        if (!_helixManager.getInstanceName().equals(state.getKey())
-            && state.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+        if (!_helixManager.getInstanceName().equals(state.getKey()) && state.getValue()
+            .equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
           otherOnlineBrokerCount++;
         }
       }
     }
 
     int onlineCount = otherOnlineBrokerCount + 1;
-    LOGGER.info("The number of online brokers for table {} is {}", tableName, onlineCount);
+    LOGGER.info("The number of online brokers for table {} is {}", tableNameWithType, onlineCount);
 
     // Get the dynamic rate
     double overallRate;
@@ -161,15 +161,17 @@ public class TableQueryQuotaManager {
       overallRate = Double.parseDouble(quotaConfig.getMaxQueriesPerSecond());
     } else {
       LOGGER.error("Failed to init qps quota: error when parsing qps quota: {} for table: {}",
-          quotaConfig.getMaxQueriesPerSecond(), tableName);
+          quotaConfig.getMaxQueriesPerSecond(), tableNameWithType);
       return;
     }
 
-    double perBrokerRate =  overallRate / onlineCount;
-    QueryQuotaConfig queryQuotaConfig = new QueryQuotaConfig(RateLimiter.create(perBrokerRate), new HitCounter(TIME_RANGE_IN_SECOND));
-    _rateLimiterMap.put(tableName, queryQuotaConfig);
-    LOGGER.info("Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}",
-        tableName, overallRate, perBrokerRate, onlineCount);
+    double perBrokerRate = overallRate / onlineCount;
+    QueryQuotaConfig queryQuotaConfig =
+        new QueryQuotaConfig(RateLimiter.create(perBrokerRate), new HitCounter(TIME_RANGE_IN_SECOND));
+    _rateLimiterMap.put(tableNameWithType, queryQuotaConfig);
+    LOGGER.info(
+        "Rate limiter for table: {} has been initialized. Overall rate: {}. Per-broker rate: {}. Number of online broker instances: {}",
+        tableNameWithType, overallRate, perBrokerRate, onlineCount);
   }
 
   /**
@@ -198,8 +200,10 @@ public class TableQueryQuotaManager {
       realtimeTableQueryQuotaConfig = _rateLimiterMap.get(realtimeTableName);
     }
 
-    boolean offlineQuotaOk = offlineTableQueryQuotaConfig == null || tryAcquireToken(offlineTableName, offlineTableQueryQuotaConfig);
-    boolean realtimeQuotaOk = realtimeTableQueryQuotaConfig == null || tryAcquireToken(realtimeTableName, realtimeTableQueryQuotaConfig);
+    boolean offlineQuotaOk =
+        offlineTableQueryQuotaConfig == null || tryAcquireToken(offlineTableName, offlineTableQueryQuotaConfig);
+    boolean realtimeQuotaOk =
+        realtimeTableQueryQuotaConfig == null || tryAcquireToken(realtimeTableName, realtimeTableQueryQuotaConfig);
 
     return offlineQuotaOk && realtimeQuotaOk;
   }
@@ -220,13 +224,15 @@ public class TableQueryQuotaManager {
     // Emit the qps capacity utilization rate.
     int numHits = queryQuotaConfig.getHitCounter().getHitCount();
     if (_brokerMetrics != null) {
-      int percentageOfCapacityUtilization = (int)(numHits * 100 / perBrokerRate);
+      int percentageOfCapacityUtilization = (int) (numHits * 100 / perBrokerRate);
       LOGGER.debug("The percentage of rate limit capacity utilization is {}", percentageOfCapacityUtilization);
-      _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.QUERY_QUOTA_CAPACITY_UTILIZATION_RATE, percentageOfCapacityUtilization);
+      _brokerMetrics.setValueOfTableGauge(tableNameWithType, BrokerGauge.QUERY_QUOTA_CAPACITY_UTILIZATION_RATE,
+          percentageOfCapacityUtilization);
     }
 
     if (!rateLimiter.tryAcquire()) {
-      LOGGER.info("Quota is exceeded for table: {}. Per-broker rate: {}. Current qps: {}", tableNameWithType, perBrokerRate, numHits);
+      LOGGER.info("Quota is exceeded for table: {}. Per-broker rate: {}. Current qps: {}", tableNameWithType,
+          perBrokerRate, numHits);
       return false;
     }
     // Token is successfully acquired.
@@ -254,8 +260,9 @@ public class TableQueryQuotaManager {
     LOGGER.info("Start processing qps quota change.");
     long startTime = System.currentTimeMillis();
 
-    ExternalView currentBrokerResource = HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(),
-        _helixManager.getClusterName(), BROKER_RESOURCE_INSTANCE);
+    ExternalView currentBrokerResource =
+        HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(), _helixManager.getClusterName(),
+            BROKER_RESOURCE_INSTANCE);
     if (currentBrokerResource == null) {
       LOGGER.warn("Finish processing qps quota change: external view for broker resource is null!");
       return;
@@ -275,7 +282,10 @@ public class TableQueryQuotaManager {
 
       // Get latest quota config for table.
       QuotaConfig quotaConfig = getQuotaConfigFromPropertyStore(rawTableName, tableType);
-      if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null || !quotaConfig.isMaxQueriesPerSecondValid()) {
+      if (quotaConfig == null || quotaConfig.getMaxQueriesPerSecond() == null
+          || !quotaConfig.isMaxQueriesPerSecondValid()) {
+        LOGGER.info("No query quota config or the config is invalid for Table {}. Removing its rate limit.",
+            tableNameWithType);
         removeRateLimiter(tableNameWithType);
         continue;
       }
@@ -283,13 +293,14 @@ public class TableQueryQuotaManager {
       // Get number of online brokers.
       Map<String, String> stateMap = currentBrokerResource.getStateMap(tableNameWithType);
       if (stateMap == null) {
+        LOGGER.info("No broker resource for Table {}. Removing its rate limit.", tableNameWithType);
         removeRateLimiter(tableNameWithType);
         continue;
       }
       int otherOnlineBrokerCount = 0;
       for (Map.Entry<String, String> state : stateMap.entrySet()) {
-        if (!_helixManager.getInstanceName().equals(state.getKey())
-            && state.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
+        if (!_helixManager.getInstanceName().equals(state.getKey()) && state.getValue()
+            .equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)) {
           otherOnlineBrokerCount++;
         }
       }
@@ -297,14 +308,18 @@ public class TableQueryQuotaManager {
 
       double overallRate = Double.parseDouble(quotaConfig.getMaxQueriesPerSecond());
       double latestRate = overallRate / onlineBrokerCount;
-      if (Math.abs(latestRate - queryQuotaConfig.getRateLimiter().getRate()) > 0.001) {
+      double previousRate = queryQuotaConfig.getRateLimiter().getRate();
+      if (Math.abs(latestRate - previousRate) > 0.001) {
         queryQuotaConfig.getRateLimiter().setRate(latestRate);
+        LOGGER.info(
+            "Rate limiter for table: {} has been updated. Overall rate: {}. Previous per-broker rate: {}. New per-broker rate: {}. Number of online broker instances: {}",
+            tableNameWithType, overallRate, previousRate, latestRate, onlineBrokerCount);
         numRebuilt++;
       }
     }
     _lastKnownBrokerResourceVersion.set(currentVersionNumber);
     long endTime = System.currentTimeMillis();
-    LOGGER.info("Processed query quota change in {}ms, {} / {} query quota config rebuilt.", (endTime - startTime),
-        numRebuilt, _rateLimiterMap.size());
+    LOGGER.info("Processed query quota change in {}ms, {} out of {} query quota configs rebuilt.",
+        (endTime - startTime), numRebuilt, _rateLimiterMap.size());
   }
 }
