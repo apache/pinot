@@ -278,6 +278,20 @@ export function toMetricLabel(urn, entities) {
 }
 
 /**
+ * Returns a human-readable dataset name for a metric urn, using information from the entities cache.
+ *
+ * @param {string} urn metric urn
+ * @param {object} entities entities cache
+ */
+export function toMetricDataset(urn, entities) {
+  try {
+    return entities[urn].attributes.dataset[0];
+  } catch (err) {
+    return '-';
+  }
+}
+
+/**
  * Returns a human-readable label for an event urn
  *
  * @param {string} urn event urn
@@ -697,6 +711,7 @@ export default {
   toFilterMap,
   findLabelMapping,
   toMetricLabel,
+  toMetricDataset,
   toColor,
   toColorDirection,
   toWidthNumber,

@@ -10,6 +10,7 @@ import {
   hasPrefix,
   filterPrefix,
   toMetricLabel,
+  toMetricDataset,
   isInverse,
   toColorDirection,
   makeSortable,
@@ -186,8 +187,8 @@ export default Component.extend({
         template: 'custom/table-checkbox',
         className: 'metrics-table__column'
       }, {
-        template: 'custom/metrics-table-label',
-        sortedBy: 'label',
+        propertyName: 'label',
+        template: 'custom/metrics-table-metric',
         title: 'Metric',
         className: 'metrics-table__column metrics-table__column--large'
       }
@@ -281,6 +282,7 @@ export default Component.extend({
         const row = {
           urn,
           label: toMetricLabel(urn, entities),
+          dataset: toMetricDataset(urn, entities),
           isSelected: selectedUrns.has(urn),
           links: links[urn],
           isExclusionWarning: isExclusionWarning(urn, entities)
