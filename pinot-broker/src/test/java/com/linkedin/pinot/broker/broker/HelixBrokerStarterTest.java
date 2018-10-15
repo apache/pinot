@@ -238,8 +238,7 @@ public class HelixBrokerStarterTest {
       Assert.assertNotNull(offlineSegmentZKMetadata);
       _pinotResourceManager.refreshSegment(
               SegmentMetadataMockUtils.mockSegmentMetadataWithEndTimeInfo(RAW_DINING_TABLE_NAME, segment, endTime ++),
-              offlineSegmentZKMetadata,
-              "downloadUrl");
+              offlineSegmentZKMetadata);
     }
     // Due to the asynchronous nature of the TimeboundaryInfo update and thread scheduling, the updated time boundary
     // may not always be the max endtime of segments. We do not expect such exact update either as long as the timestamp
