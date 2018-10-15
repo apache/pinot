@@ -1728,25 +1728,23 @@ public class PinotHelixResourceManager {
     return true;
   }
 
-  public Map<String, List<String>> getInstanceToSegmentsInATableMap(String tableName) {
-    Map<String, List<String>> instancesToSegmentsMap = new HashMap<String, List<String>>();
-    IdealState is = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-    Set<String> segments = is.getPartitionSet();
+  /**
+   * Returns a map from server instance to list of segments it serves for the given table.
+   */
+  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
+    Map<String, List<String>> serverToSegmentsMap = new HashMap<>();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
 
-    for (String segment : segments) {
-      Set<String> instances = is.getInstanceSet(segment);
-      for (String instance : instances) {
-        if (instancesToSegmentsMap.containsKey(instance)) {
-          instancesToSegmentsMap.get(instance).add(segment);
-        } else {
-          List<String> a = new ArrayList<String>();
-          a.add(segment);
-          instancesToSegmentsMap.put(instance, a);
-        }
+    for (String segment : idealState.getPartitionSet()) {
+      for (String server : idealState.getInstanceStateMap(segment).keySet()) {
+        serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segment);
       }
     }
 
-    return instancesToSegmentsMap;
+    return serverToSegmentsMap;
   }
 
   public synchronized Map<String, String> getSegmentsCrcForTable(String tableName) {
