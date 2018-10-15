@@ -7,6 +7,7 @@
  */
 import Controller from '@ember/controller';
 import $ from 'jquery';
+import _ from 'lodash';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 import { isBlank } from '@ember/utils';
 import { task } from 'ember-concurrency';
@@ -40,7 +41,7 @@ const CUSTOMIZE_OPTIONS = [{
 
 export default Controller.extend({
   shareDashboardApiService: service('services/api/share-dashboard'),
-  anomalyResponseObj: anomalyUtil.anomalyResponseObj,
+  anomalyResponseObj: _.cloneDeep(anomalyUtil.anomalyResponseObj),
   showCopyTooltip: false,
   showSharedTooltip: false,
   shareUrl: null,
