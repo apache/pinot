@@ -290,7 +290,7 @@ export default Controller.extend({
         const isDataGood = this.isMetricGraphable(metricData);
         this.setProperties({
           metricId: metric.id,
-          isMetricSelected: isDataGood,
+          isMetricSelected: true,
           isMetricDataLoading: false,
           isSecondaryDataLoading: false,
           showGraphLegend: true,
