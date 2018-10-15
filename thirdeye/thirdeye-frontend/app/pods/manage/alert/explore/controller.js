@@ -213,7 +213,7 @@ export default Controller.extend({
    * @type {String}
    */
   uiDateFormat: computed('alertData.windowUnit', function() {
-    const rawGranularity = this.get('alertData.windowUnit');
+    const rawGranularity = this.get('alertData.bucketUnit');
     const granularity = rawGranularity ? rawGranularity.toLowerCase() : '';
 
     switch(granularity) {
