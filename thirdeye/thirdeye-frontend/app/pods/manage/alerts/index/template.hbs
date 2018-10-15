@@ -101,11 +101,11 @@
     {{#if paginatedSelectedAlerts}}
       <section class="te-search-header">
         <span class="te-search-title">
-          Alerts Found({{selectedAlerts.length}})
+          Alerts Found({{totalFilteredAlerts}})
         </span>
         <span class="pull-right">
           Showing {{paginatedSelectedAlerts.length}} of
-          {{selectedAlerts.length}} {{if (gt selectedAlerts.length 1) 'alerts' 'alert'}}
+          {{totalFilteredAlerts}} {{if (gt totalFilteredAlerts 1) 'alerts' 'alert'}}
         </span>
       </section>
     {{/if}}
