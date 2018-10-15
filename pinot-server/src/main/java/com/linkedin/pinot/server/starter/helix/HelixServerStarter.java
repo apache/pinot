@@ -108,8 +108,15 @@ public class HelixServerStarter {
     _maxShutdownWaitTimeMs =
         _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_MAX_SHUTDOWN_WAIT_TIME,
             CommonConstants.Server.DEFAULT_MAX_SHUTDOWN_WAIT_TIME_MS);
-    _checkIntervalTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME,
+    long checkIntervalTimeMs = _helixServerConfig.getLong(CommonConstants.Server.CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME,
         CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS);
+    if (checkIntervalTimeMs <= 0L) {
+      _checkIntervalTimeMs = CommonConstants.Server.DEFAULT_CHECK_INTERVAL_TIME_MS;
+      LOGGER.warn("Cannot set check interval time to non-positive value. Using the default setting: {}ms",
+          _checkIntervalTimeMs);
+    } else {
+      _checkIntervalTimeMs = checkIntervalTimeMs;
+    }
 
     LOGGER.info("Connecting Helix components");
     setupHelixSystemProperties(_helixServerConfig);
@@ -238,45 +245,53 @@ public class HelixServerStarter {
     }
     _adminApiApplication.stop();
     setShuttingDownStatus(true);
+
+    // Total waiting time should include max query time.
+    final long endTime = _maxShutdownWaitTimeMs + System.currentTimeMillis();
     if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_ENABLE_SHUTDOWN_DELAY, true)) {
       Uninterruptibles.sleepUninterruptibly(_maxQueryTimeMs, TimeUnit.MILLISECONDS);
     }
-    long currentTime = System.currentTimeMillis();
-    long endTime = _maxShutdownWaitTimeMs + System.currentTimeMillis();
-    currentTime = waitUntilNoIncomingQueries(currentTime, endTime);
+    waitUntilNoIncomingQueries(System.currentTimeMillis(), endTime);
     _helixManager.disconnect();
     _serverInstance.shutDown();
-    waitUntilNoOnlineResources(currentTime, endTime);
+    waitUntilNoOnlineResources(System.currentTimeMillis(), endTime);
   }
 
-  private long waitUntilNoIncomingQueries(long startTime, long endTime) {
-    LOGGER.info("Waiting upto {}ms until Pinot server doesn't receive any incoming queries...", _maxShutdownWaitTimeMs);
+  private void waitUntilNoIncomingQueries(long startTime, final long endTime) {
+    if (startTime >= endTime) {
+      LOGGER.warn("Skip waiting until no incoming queries.");
+      return;
+    }
+    LOGGER.info("Waiting upto {}ms until Pinot server doesn't receive any incoming queries...", (endTime - startTime));
     long currentTime = startTime;
 
     while (currentTime < endTime) {
       if (noIncomingQueries(currentTime)) {
         LOGGER.info("No incoming query within {}ms. Total waiting Time: {}ms", _checkIntervalTimeMs,
             (currentTime - startTime));
-        return currentTime;
+        return;
       }
 
       try {
-        Thread.sleep(_checkIntervalTimeMs);
+        Thread.sleep(Math.min(_maxQueryTimeMs, (endTime - currentTime)));
       } catch (InterruptedException e) {
         LOGGER.error("Interrupted when waiting for Pinot server not to receive any queries.", e);
         Thread.currentThread().interrupt();
-        return currentTime;
+        return;
       }
       currentTime = System.currentTimeMillis();
     }
-    LOGGER.error("Reach timeout waiting for no incoming queries! Max waiting time: {}ms", _maxShutdownWaitTimeMs);
-    return currentTime;
+    LOGGER.error("Reach timeout when waiting for no incoming queries! Max waiting time: {}ms", _maxShutdownWaitTimeMs);
   }
 
   /**
-   * Init a helix spectator to watch the external view change.
+   * Init a helix spectator to watch the external view updates.
    */
-  private void waitUntilNoOnlineResources(long startTime, long endTime) {
+  private void waitUntilNoOnlineResources(long startTime, final long endTime) {
+    if (startTime >= endTime) {
+      LOGGER.warn("Skip waiting until no online resources.");
+      return;
+    }
     LOGGER.info("Waiting upto {}ms until no online resources...", (endTime - startTime));
 
     // Initialize a helix spectator.
@@ -296,7 +311,7 @@ public class HelixServerStarter {
         }
 
         try {
-          Thread.sleep(_checkIntervalTimeMs);
+          Thread.sleep(Math.min(_checkIntervalTimeMs, (endTime - currentTime)));
         } catch (InterruptedException e) {
           LOGGER.error("Interrupted when waiting for no online resources.", e);
           Thread.currentThread().interrupt();
