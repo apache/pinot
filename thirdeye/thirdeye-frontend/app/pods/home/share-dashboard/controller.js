@@ -41,7 +41,7 @@ const CUSTOMIZE_OPTIONS = [{
 
 export default Controller.extend({
   shareDashboardApiService: service('services/api/share-dashboard'),
-  anomalyResponseObj: _.cloneDeep(anomalyUtil.anomalyResponseObj),
+  anomalyResponseFilterTypes: _.cloneDeep(anomalyUtil.anomalyResponseObj),
   showCopyTooltip: false,
   showSharedTooltip: false,
   shareUrl: null,
@@ -57,7 +57,7 @@ export default Controller.extend({
   init() {
     this._super(...arguments);
     //Add one more option
-    get(this, 'anomalyResponseObj').push({
+    get(this, 'anomalyResponseFilterTypes').push({
       name: 'All Resolutions',
       value: 'ALL',
       status: 'All Resolutions'
@@ -240,7 +240,7 @@ export default Controller.extend({
    * @return {string}
    */
   _checkFeedback: function(selected) {
-    return get(this, 'anomalyResponseObj').find((type) => {
+    return get(this, 'anomalyResponseFilterTypes').find((type) => {
       return type.name === selected;
     });
   },

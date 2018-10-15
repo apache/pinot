@@ -27,15 +27,15 @@ export default Controller.extend({
   init() {
     this._super(...arguments);
     // Add ALL option to copy of global anomaly response object
-    const anomalyResponseObj = _.cloneDeep(anomalyUtil.anomalyResponseObj);
-    anomalyResponseObj.push({
+    const anomalyResponseFilterTypes = _.cloneDeep(anomalyUtil.anomalyResponseObj);
+    anomalyResponseFilterTypes.push({
       name: 'All Resolutions',
       value: 'ALL',
       status: 'All Resolutions'
     });
     setProperties(this, {
-      anomalyResponseObj,
-      anomalyResponseNames: anomalyResponseObj.mapBy('name')
+      anomalyResponseFilterTypes,
+      anomalyResponseNames: anomalyResponseFilterTypes.mapBy('name')
     });
   },
 
@@ -154,7 +154,7 @@ export default Controller.extend({
    * @return {string}
    */
   _checkFeedback: function(selected) {
-    return get(this, 'anomalyResponseObj').find((type) => {
+    return get(this, 'anomalyResponseFilterTypes').find((type) => {
       return type.name === selected;
     });
   },
