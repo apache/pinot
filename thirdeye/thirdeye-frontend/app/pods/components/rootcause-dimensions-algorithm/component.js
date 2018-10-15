@@ -42,7 +42,9 @@ import {
   toBaselineUrn,
   hasPrefix,
   toWidthNumber,
-  toBaselineRange
+  toBaselineRange,
+  toFilters,
+  hasExclusionFilters
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   groupedHeaders,
@@ -237,6 +239,11 @@ export default Component.extend({
     }
   ),
 
+  hasExclusion: computed('metricUrn', function () {
+    const metricUrn = get(this, 'metricUrn');
+    return hasExclusionFilters(toFilters(metricUrn));
+  }),
+
   /**
    * Builds the columns array, pushing incoming dimensions into the base columns
    * @type {Array} Array of column objects
@@ -370,7 +377,8 @@ export default Component.extend({
       metricUrn,
       previousMetricSettings,
       previousCustomSettings,
-      customTableSettings
+      customTableSettings,
+      hasExclusion
     } = this.getProperties(
       'mode',
       'range',
@@ -378,8 +386,10 @@ export default Component.extend({
       'metricUrn',
       'previousMetricSettings',
       'previousCustomSettings',
-      'customTableSettings'
+      'customTableSettings',
+      'hasExclusion'
     );
+
     const metricEntity = entities[metricUrn];
     let isUserCustomizingRequest = get(this, 'isUserCustomizingRequest');
     // Concatenate incoming settings for bulk comparison
@@ -394,6 +404,9 @@ export default Component.extend({
       isUserCustomizingRequest = true;
       this._resetSettings(['customTableSettings', 'savedSettings'], 'initialTableSettings');
     }
+
+    // Abort if metric with exclusion filters
+    if (hasExclusion) { return; }
 
     // If we have new settings, and a metric to work with, we can trigger fetch/reload. Otherwise, do nothing
     if (metricEntity && (!isSameCustomSettings || isUserCustomizingRequest)) {
