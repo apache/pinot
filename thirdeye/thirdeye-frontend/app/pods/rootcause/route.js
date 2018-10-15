@@ -74,7 +74,7 @@ const toMetricGranularity = (attrGranularity) => {
  */
 const toAnomalyOffset = (granularity) => {
   const UNIT_MAPPING = {
-    minute: -30,
+    minute: -120,
     hour: -3,
     day: -1
   };
@@ -91,6 +91,16 @@ const toAnalysisOffset = (granularity) => {
     day: -7
   };
   return UNIT_MAPPING[granularity[1]] || -1;
+};
+
+/**
+ * Returns the array for start/end dates of the analysis range
+ */
+const toAnalysisRangeArray = (anomalyStart, anomalyEnd, metricGranularity) => {
+  const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
+  const analysisRangeEnd = makeTime(anomalyEnd).startOf('day').add(1, 'day').valueOf();
+  const analysisRangeStart = makeTime(anomalyStart).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
+  return [analysisRangeStart, analysisRangeEnd];
 };
 
 export default Route.extend(AuthenticatedRouteMixin, {
@@ -250,10 +260,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
         const anomalyRangeStart = makeTime(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
         const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
-        const analysisRangeEnd = makeTime(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
-        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
-        const analysisRangeStart = makeTime(anomalyRangeEnd).add(analysisRangeStartOffset, 'day').valueOf();
-        const analysisRange = [analysisRangeStart, analysisRangeEnd];
+
+        // align to local end of day
+        const analysisRange = toAnalysisRangeArray(anomalyRangeEnd, anomalyRangeEnd, metricGranularity);
 
         context = {
           urns: new Set([metricUrn]),
@@ -274,14 +283,9 @@ export default Route.extend(AuthenticatedRouteMixin, {
       if (!_.isEmpty(anomalyEntity)) {
         const granularity = adjustGranularity(anomalyEntity.attributes.metricGranularity[0]);
         const metricGranularity = toMetricGranularity(granularity);
-
         const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10)];
-
-        // align to local end of day
-        const analysisRangeEnd = makeTime(anomalyRange[1]).startOf('day').add(1, 'day').valueOf();
-        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
-        const analysisRangeStart = makeTime(anomalyRange[0]).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
-        const analysisRange = [analysisRangeStart, analysisRangeEnd];
+        // align to local end of day (anomalyStart, anomalyEnd, metricGranularity)
+        const analysisRange = toAnalysisRangeArray(anomalyRange[0], anomalyRange[1], metricGranularity);
 
         const anomalyDimNames = anomalyEntity.attributes['dimensions'] || [];
         const anomalyFilters = [];
