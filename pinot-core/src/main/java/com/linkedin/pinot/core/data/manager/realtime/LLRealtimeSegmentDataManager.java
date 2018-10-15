@@ -51,6 +51,7 @@ import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamDecoderProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import com.linkedin.pinot.core.realtime.stream.TransientConsumerException;
@@ -1071,7 +1072,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setAggregateMetrics(indexingConfig.getAggregateMetrics());
 
     // Create message decoder
-    _messageDecoder = _streamConsumerFactory.getDecoder(kafkaStreamProviderConfig);
+    _messageDecoder = StreamDecoderProvider.create(_streamConfig, _schema);
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor

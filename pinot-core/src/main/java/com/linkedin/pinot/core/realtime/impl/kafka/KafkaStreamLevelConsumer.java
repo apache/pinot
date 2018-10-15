@@ -15,8 +15,11 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamDecoderProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.yammer.metrics.core.Meter;
 import org.slf4j.Logger;
@@ -35,7 +38,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaStreamLevelConsumer.class);
 
   private KafkaHighLevelStreamProviderConfig streamProviderConfig;
-  private StreamMessageDecoder decoder;
+  private StreamMessageDecoder _messageDecoder;
 
   private ConsumerConnector consumer;
   private ConsumerIterator<byte[], byte[]> kafkaIterator;
@@ -52,11 +55,14 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   private Meter tableAndStreamRowsConsumed = null;
   private Meter tableRowsConsumed = null;
 
+  public KafkaStreamLevelConsumer(String clientId, StreamConfig streamConfig, Schema schema) {
+    _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
+  }
+
   @Override
   public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
       throws Exception {
     this.streamProviderConfig = (KafkaHighLevelStreamProviderConfig) streamProviderConfig;
-    this.decoder = this.streamProviderConfig.getDecoder();
     tableAndStreamName = tableName + "-" + streamProviderConfig.getStreamName();
     INSTANCE_LOGGER = LoggerFactory.getLogger(
         KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamProviderConfig
@@ -80,7 +86,7 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   public GenericRow next(GenericRow destination) {
     if (kafkaIterator.hasNext()) {
       try {
-        destination = decoder.decode(kafkaIterator.next().message(), destination);
+        destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);
         tableAndStreamRowsConsumed = serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableAndStreamRowsConsumed);
         tableRowsConsumed = serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableRowsConsumed);
         ++currentCount;
