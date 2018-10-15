@@ -203,7 +203,6 @@ public class HelixServerStarter {
           int numSegmentsLoaded = getNumSegmentLoaded();
           int numSegmentsToLoad = getNumSegmentsToLoad();
           LOGGER.warn("Waiting for all segments to be loaded, current progress: [ {} / {} ], sleep {} seconds...", numSegmentsLoaded, numSegmentsToLoad, timeToSleep);
-          logSegmentsLoadingInfo();
           Thread.sleep(TimeUnit.SECONDS.toMillis(timeToSleep));
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -214,6 +213,7 @@ public class HelixServerStarter {
       }
       if (!allSegmentsLoaded) {
         LOGGER.info("Segments are not fully loaded within {} seconds...", serverStarterTimeout);
+        logSegmentsLoadingInfo();
       }
     }
   }
@@ -270,7 +270,7 @@ public class HelixServerStarter {
       int numSegmentsLoaded = instanceDataManager.getAllSegmentsMetadata(tableName).size();
       if (currentState != null && currentState.isValid()) {
         int numSegmentsToLoad = currentState.getPartitionStateMap().size();
-        LOGGER.info("Waiting for all segments to be loaded, table: {}, progress [ {} / {} ]", tableName, numSegmentsLoaded, numSegmentsToLoad);
+        LOGGER.info("Segments are not fully loaded during server bootstrap, current progress: table: {}, segments loading progress [ {} / {} ]", tableName, numSegmentsLoaded, numSegmentsToLoad);
       }
     }
   }
