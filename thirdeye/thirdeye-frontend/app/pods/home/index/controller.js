@@ -1,8 +1,9 @@
 import Controller from '@ember/controller';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
-import { computed, set, get } from '@ember/object';
+import { computed, set, get, setProperties } from '@ember/object';
 import { isBlank } from '@ember/utils';
 import moment from 'moment';
+import _ from 'lodash';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 
@@ -13,7 +14,6 @@ const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently acro
 const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
 
 export default Controller.extend({
-  anomalyResponseObj: anomalyUtil.anomalyResponseObj,
   toggleCollapsed: false, /* hide/show accordians */
   isReportAnomalyEnabled: false,
 
@@ -26,19 +26,18 @@ export default Controller.extend({
 
   init() {
     this._super(...arguments);
-    get(this, 'anomalyResponseObj').push({
+    // Add ALL option to copy of global anomaly response object
+    const anomalyResponseFilterTypes = _.cloneDeep(anomalyUtil.anomalyResponseObj);
+    anomalyResponseFilterTypes.push({
       name: 'All Resolutions',
       value: 'ALL',
       status: 'All Resolutions'
     });
+    setProperties(this, {
+      anomalyResponseFilterTypes,
+      anomalyResponseNames: anomalyResponseFilterTypes.mapBy('name')
+    });
   },
-
-  anomalyResponseNames: computed(
-    'anomalyResponseObj',
-    function() {
-      return anomalyUtil.anomalyResponseObj.mapBy('name');
-    }
-  ),
 
   filteredAnomalyMapping: computed(
     'model.{anomalyMapping,feedbackType}',
@@ -155,7 +154,7 @@ export default Controller.extend({
    * @return {string}
    */
   _checkFeedback: function(selected) {
-    return get(this, 'anomalyResponseObj').find((type) => {
+    return get(this, 'anomalyResponseFilterTypes').find((type) => {
       return type.name === selected;
     });
   },
