@@ -52,7 +52,7 @@ import static com.linkedin.thirdeye.detection.ConfigUtils.*;
  *       v                v
  * +-----+----+     +-----+----+
  * |Rule      |     |Algorithm |
- * |Filter    |     |Filter    |
+ * |Filters   |     |Filters   |
  * +-----+----+     +-----+----+
  *       +-------+--------+
  *               |
@@ -71,17 +71,17 @@ import static com.linkedin.thirdeye.detection.ConfigUtils.*;
  * This translator translates a yaml that describes the above detection flow
  * to the flowing wrapper structure to be execute in the detection pipeline.
  * +-----------------------------------------+
- * |  Rule Filter                            |
+ * |  Merger                                 |
  * |  +--------------------------------------+
- * |  |   Merger                            ||
- * |  | +--Dimension Exploration & Filter-+ ||
- * |  | |        Filter                   | ||
+ * |  |   Dimension Exploration & Filter    ||
+ * |  | +---------------------------------+ ||
+ * |  | |        Filters                  | ||
  * |  | |  +--------Merger--------------+ | ||
- * |  | |  |  Rule detection            | | ||
+ * |  | |  |  Rule detections           | | ||
  * |  | |  +----------------------------+ | ||
  * |  | +---------------------------------+ ||
  * |  | +---------------------------------+ ||
- * |  | |  Algorithm Alert Filter         | ||
+ * |  | |              Filters            | ||
  * |  | | +-----------Merger------------+ | ||
  * |  | | | +---------------------------| | ||
  * |  | | | | Algorithm detection       | | ||
