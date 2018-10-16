@@ -20,16 +20,16 @@ import com.linkedin.pinot.tools.admin.command.SegmentCreationCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import javax.validation.constraints.Max;
+import java.io.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -57,11 +57,15 @@ public abstract class QueryExecutor {
     protected Properties config;
     protected PostQueryCommand postQueryCommand;
     protected String _dataDir;
+    protected String _recordFile;
     protected int _testDuration;
+    protected int _slotDuration;
+    protected AtomicBoolean[] thread_Status;
 
     public static final String QUERY_CONFIG_PATH = "pinot_benchmark/query_generator_config/";
     public static final String PINOT_TOOLS_RESOURCES = "pinot-tools/src/main/resources/";
     ReentrantLock lock = new ReentrantLock();
+
     public static QueryExecutor getInstance(){
         return null;
     }
@@ -78,33 +82,123 @@ public abstract class QueryExecutor {
         return queryExecutors;
     }
 
+//    public void start() throws InterruptedException {
+//        loadConfig();
+//        //int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
+//        int threadCnt = Integer.parseInt(config.getProperty("QPS"));
+//
+//        List<ExecutorService> threadPool = new ArrayList<>();
+//
+//        QueryTask queryTask = getTask(config);
+//        queryTask.setPostQueryCommand(this.postQueryCommand);
+//
+//        for(int i=0; i < threadCnt; i++)
+//        {
+//            //_threadPool.add(Executors.newFixedThreadPool(1));
+//            threadPool.add(Executors.newSingleThreadScheduledExecutor());
+//        }
+//        for(int i=0; i < threadCnt; i++)
+//        {
+//            threadPool.get(i).execute(queryTask);
+//        }
+//
+//        Thread.sleep(_testDuration*1000);
+//        LOGGER.info("Test duration is completed! Ending threads then!");
+//        for(int i=0; i<threadCnt;i++)
+//        {
+//            threadPool.get(i).shutdown();
+//        }
+//    }
+
     public void start() throws InterruptedException {
         loadConfig();
-        //int threadCnt = Integer.parseInt(config.getProperty("ThreadCount"));
+        List<Double> records = readFromTraces();
+
         int threadCnt = Integer.parseInt(config.getProperty("QPS"));
+        double query_Factor = threadCnt/100;
+        thread_Status = new AtomicBoolean[threadCnt+1];
 
         List<ExecutorService> threadPool = new ArrayList<>();
 
-        QueryTask queryTask = getTask(config);
-        queryTask.setPostQueryCommand(this.postQueryCommand);
+        QueryTaskDaemon queryTask;
+
 
         for(int i=0; i < threadCnt; i++)
         {
             //_threadPool.add(Executors.newFixedThreadPool(1));
+            thread_Status[i]=new AtomicBoolean(false);
             threadPool.add(Executors.newSingleThreadScheduledExecutor());
         }
         for(int i=0; i < threadCnt; i++)
         {
+            queryTask = (QueryTaskDaemon) getTask(config);
+            queryTask.setPostQueryCommand(this.postQueryCommand);
+            queryTask.setThread_status(thread_Status);
+            queryTask.setThread_id(i);
+            //System.out.println("INside thread");
             threadPool.get(i).execute(queryTask);
         }
+        int prevThreadCount = 0;
+        int currThreadCount = 0;
 
-        Thread.sleep(_testDuration*1000);
+        boolean status;
+        for(int i=0;i<records.size();i++){
+
+            /*
+            TODO: modify tread_status array according to the load
+             */
+            currThreadCount =  (int)(records.get(i)*query_Factor);
+            if(prevThreadCount<=currThreadCount) status = true;
+            else status =false;
+            for(int j= Math.min(prevThreadCount,currThreadCount);j<=Math.max(prevThreadCount,currThreadCount);j++){
+                thread_Status[j].set(status);
+            }
+            prevThreadCount = currThreadCount;
+            Thread.sleep(_slotDuration*1000);
+        }
+
         LOGGER.info("Test duration is completed! Ending threads then!");
         for(int i=0; i<threadCnt;i++)
         {
             threadPool.get(i).shutdown();
         }
     }
+    //Will contain only one column
+    private List<Double> readFromTraces(){
+        List<Double> recordsList = new ArrayList<>();
+        FileReader fileReader = null;
+        BufferedReader bufferedReader = null;
+        String line;
+        try {
+            File file = new File(_recordFile);
+            fileReader = new FileReader(file);
+            bufferedReader = new BufferedReader(fileReader);
+            while ((line = bufferedReader.readLine()) != null) {
+                recordsList.add(Double.parseDouble(line));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }finally {
+            closeStream(fileReader,bufferedReader);
+        }
+        return recordsList;
+    }
+
+    private void closeStream(Closeable... args) {
+        for(Closeable file:args) {
+            try {
+                file.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private int calculateThreadCount(Double maxUtilization, double queryLoad) {
+        //TODO from the load mapping find maximum thread count
+        return (int)Math.ceil(maxUtilization/queryLoad);
+    }
+
 
     public void loadConfig() {
         String configFile = getPathOfConfigFile();
@@ -133,7 +227,8 @@ public abstract class QueryExecutor {
         String prop = PINOT_TOOLS_RESOURCES+QUERY_CONFIG_PATH+getConfigFile();
         //String prop = getConfigFile();
         String config;
-        String propDir = System.getenv("PINOT_HOME");
+        //String propDir = System.getenv("PINOT_HOME");
+        String propDir = "/Users/robinmanhas/Desktop/StonyBrook/SecondSem/CSE523/pinot";
         if(propDir==null){
             //TODO We can load config from class loader also as default config to handle null pointer exception
             System.out.println("Environment variable is null. Check PINOT_HOME environment variable");
@@ -171,4 +266,11 @@ public abstract class QueryExecutor {
         return _dataDir;
     }
 
+    public void setRecordFile(String recordFile) {
+        _recordFile = recordFile;
+    }
+
+    public void setSlotDuration(int slotDuration) {
+        _slotDuration = slotDuration;
+    }
 }

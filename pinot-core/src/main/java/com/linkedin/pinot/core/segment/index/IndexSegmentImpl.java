@@ -42,6 +42,7 @@ public class IndexSegmentImpl implements IndexSegment {
   private static final Logger LOGGER = LoggerFactory.getLogger(IndexSegmentImpl.class);
 
   private SegmentDirectory segmentDirectory;
+  private volatile long segmentHitCount = 0;
   private final SegmentMetadataImpl segmentMetadata;
   private final Map<String, ColumnIndexContainer> indexContainerMap;
   private final StarTree starTree;
@@ -52,7 +53,22 @@ public class IndexSegmentImpl implements IndexSegment {
     this.segmentMetadata = segmentMetadata;
     this.indexContainerMap = columnIndexContainerMap;
     this.starTree = starTree;
+    this.segmentHitCount = 0;
     LOGGER.info("Successfully loaded the index segment : " + segmentDirectory);
+  }
+
+  public long getSegmentHitCount(){
+    return segmentHitCount;
+  }
+
+  public synchronized void incrementSegmentHitCount(){
+      segmentHitCount++;
+      System.out.println("Segment: "+segmentMetadata.getName()+" count changed to "+segmentHitCount);
+  }
+
+  // Synchronized avoided as everyone would be resetting to 0.
+  public void resetSegmentHitCount(){
+    this.segmentHitCount = 0;
   }
 
   public ImmutableDictionaryReader getDictionaryFor(String column) {

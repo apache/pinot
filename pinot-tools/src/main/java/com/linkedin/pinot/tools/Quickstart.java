@@ -169,7 +169,7 @@ public class Quickstart {
     printStatus(Color.CYAN, "***** Building index segment for baseballStats *****");
     runner.buildSegment();
     printStatus(Color.CYAN, "***** Pushing segment to the controller *****");
-    runner.pushSegment();
+    //runner.pushSegment();
     printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
     Thread.sleep(5000);
 
@@ -188,35 +188,35 @@ public class Quickstart {
 
     printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
-    String q1 = "select count(*) from baseballStats limit 0";
-    printStatus(Color.YELLOW, "Total number of documents in the table");
-    printStatus(Color.CYAN, "Query : " + q1);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
-    printStatus(Color.GREEN, "***************************************************");
-
-    String q2 = "select sum('runs') from baseballStats group by playerName top 5 limit 0";
-    printStatus(Color.YELLOW, "Top 5 run scorers of all time ");
-    printStatus(Color.CYAN, "Query : " + q2);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
-    printStatus(Color.GREEN, "***************************************************");
-
-    String q3 = "select sum('runs') from baseballStats where yearID=2000 group by playerName top 5 limit 0";
-    printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
-    printStatus(Color.CYAN, "Query : " + q3);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
-    printStatus(Color.GREEN, "***************************************************");
-
-    String q4 = "select sum('runs') from baseballStats where yearID>=2000 group by playerName limit 0";
-    printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
-    printStatus(Color.CYAN, "Query : " + q4);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
-    printStatus(Color.GREEN, "***************************************************");
-
-    String q5 = "select playerName,runs,homeRuns from baseballStats order by yearID limit 10";
-    printStatus(Color.YELLOW, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID");
-    printStatus(Color.CYAN, "Query : " + q5);
-    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
-    printStatus(Color.GREEN, "***************************************************");
+//    String q1 = "select count(*) from baseballStats limit 0";
+//    printStatus(Color.YELLOW, "Total number of documents in the table");
+//    printStatus(Color.CYAN, "Query : " + q1);
+//    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+//    printStatus(Color.GREEN, "***************************************************");
+//
+//    String q2 = "select sum('runs') from baseballStats group by playerName top 5 limit 0";
+//    printStatus(Color.YELLOW, "Top 5 run scorers of all time ");
+//    printStatus(Color.CYAN, "Query : " + q2);
+//    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
+//    printStatus(Color.GREEN, "***************************************************");
+//
+//    String q3 = "select sum('runs') from baseballStats where yearID=2000 group by playerName top 5 limit 0";
+//    printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
+//    printStatus(Color.CYAN, "Query : " + q3);
+//    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
+//    printStatus(Color.GREEN, "***************************************************");
+//
+//    String q4 = "select sum('runs') from baseballStats where yearID>=2000 group by playerName limit 0";
+//    printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
+//    printStatus(Color.CYAN, "Query : " + q4);
+//    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
+//    printStatus(Color.GREEN, "***************************************************");
+//
+//    String q5 = "select playerName,runs,homeRuns from baseballStats order by yearID limit 10";
+//    printStatus(Color.YELLOW, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID");
+//    printStatus(Color.CYAN, "Query : " + q5);
+//    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
+//    printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "You can always go to http://localhost:9000/query/ to play around in the query console");
   }

@@ -67,6 +67,23 @@ public interface IndexSegment {
   long getDiskSizeBytes();
 
   /**
+  * Returns the number of times the segment was accessed since last request.
+  *
+  * @return Segment access count information
+  */
+  long getSegmentHitCount();
+
+  /**
+  * Increments the number of times the segment was accessed.
+  */
+  void incrementSegmentHitCount();
+
+  /**
+  * Resets the number of times the segment was accessed to 0.
+  */
+  void resetSegmentHitCount();
+
+  /**
    * Destroys segment in memory and closes file handlers if in MMAP mode.
    */
   void destroy();

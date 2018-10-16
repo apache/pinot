@@ -132,13 +132,17 @@ public class ServerPerfResource {
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
           IndexSegment segment = segmentDataManager.getSegment();
           serverPerfMetrics.segmentDiskSizeInBytes += segment.getDiskSizeBytes();
+
+          serverPerfMetrics.segmentsHitCount += segment.getSegmentHitCount();
+          // TODO Robin: reset the statistics after fetching from server.
+          //segment.resetSegmentHitCount();
           //serverPerfMetrics.segmentList.add(segment.getSegmentMetadata());
 
           // LOGGER.info("adding segment " + segment.getSegmentName() + " to the list in server side! st: " + segment.getSegmentMetadata().getStartTime() + " et: " + segment.getSegmentMetadata().getEndTime());
           String tableName= tableDataManager.getTableName();
           if(!tableCPULoadFormulation.containsKey(tableName))
           {
-            LOGGER.error("Table {} does not have an entry in {}", tableName, TableCPULoadConfigFilePath);
+            LOGGER.debug("Table {} does not have an entry in {}", tableName, TableCPULoadConfigFilePath);
             continue;
           }
           double segmentLoad = tableCPULoadFormulation.get(tableName).computeCPULoad(segment.getSegmentMetadata(),1519948890);
