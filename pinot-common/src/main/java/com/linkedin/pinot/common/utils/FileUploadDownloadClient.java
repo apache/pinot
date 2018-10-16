@@ -70,19 +70,10 @@ public class FileUploadDownloadClient implements Closeable {
     public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
     public static final String SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER = "Pinot-SegmentZKMetadataCustomMapModifier";
     public static final String CRYPTER = "CRYPTER";
-    public static final String UPLOAD_VERSION = "UPLOAD_VERSION";
   }
 
   public static class QueryParameters {
     public static final String ENABLE_PARALLEL_PUSH_PROTECTION = "enableParallelPushProtection";
-  }
-
-  public enum UploadVersion {
-    V1, V2;
-
-    public static UploadVersion getDefaultUploadVersion() {
-      return V2;
-    }
   }
 
   public enum FileUploadType {

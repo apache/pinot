@@ -236,7 +236,7 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private SuccessResponse uploadSegment(FormDataMultiPart multiPart, boolean enableParallelPushProtection,
-      HttpHeaders headers, Request request) {
+      HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
     if (headers != null) {
       // TODO: Add these headers into open source hadoop jobs
       LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER,
@@ -244,10 +244,6 @@ public class PinotSegmentUploadRestletResource {
       LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.TABLE_NAME_HTTP_HEADER,
           headers.getRequestHeader(CommonConstants.Controller.TABLE_NAME_HTTP_HEADER));
     }
-
-    // Get version of upload
-    String uploadVersionString = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_VERSION);
-    FileUploadDownloadClient.UploadVersion uploadVersion = getUploadVersion(uploadVersionString);
 
     // Get upload type
     String uploadTypeStr = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE);
@@ -288,7 +284,7 @@ public class PinotSegmentUploadRestletResource {
           segmentMetadata =
               getMetadataForURI(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile,
                   tempSegmentDir, metadataProviderClass);
-          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, provider, uploadVersion);
+          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, provider, moveSegmentToFinalLocation);
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
@@ -313,7 +309,7 @@ public class PinotSegmentUploadRestletResource {
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
-          segmentName, zkDownloadUri, uploadVersion);
+          segmentName, zkDownloadUri, moveSegmentToFinalLocation);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentMetadata.getName() + " of table: "
           + segmentMetadata.getTableName());
@@ -339,12 +335,12 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private String getZkDownloadURIForURIUpload(String currentSegmentLocationURI, SegmentMetadata segmentMetadata,
-      FileUploadPathProvider provider, FileUploadDownloadClient.UploadVersion uploadVersion) throws URISyntaxException, UnsupportedEncodingException {
+      FileUploadPathProvider provider, boolean moveSegmentToFinalLocation) throws URISyntaxException, UnsupportedEncodingException {
     String zkDownloadUri;
     if (new URI(currentSegmentLocationURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
       zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
           provider.getVip());
-    } else if (uploadVersion.equals(FileUploadDownloadClient.UploadVersion.V1)) {
+    } else if (moveSegmentToFinalLocation) {
       zkDownloadUri = currentSegmentLocationURI;
     } else {
       LOGGER.info("Using configured data dir {}", _controllerConf.getDataDir());
@@ -382,7 +378,7 @@ public class PinotSegmentUploadRestletResource {
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempDecryptedFile,
       FileUploadPathProvider provider, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
-      FileUploadDownloadClient.UploadVersion uploadVersion)
+      boolean moveSegmentToFinalLocation)
       throws Exception {
     String finalSegmentPath =
         StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
@@ -390,7 +386,7 @@ public class PinotSegmentUploadRestletResource {
     URI finalSegmentLocationURI = new URI(finalSegmentPath);
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(segmentMetadata, finalSegmentLocationURI, tempDecryptedFile,
-        enableParallelPushProtection, headers, zkDownloadURI, uploadVersion);
+        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation);
   }
 
   private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {
@@ -412,9 +408,7 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      headers.getRequestHeaders().add(FileUploadDownloadClient.CustomHeaders.UPLOAD_VERSION,
-          FileUploadDownloadClient.UploadVersion.V1.toString());
-      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request));
+      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request, false));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -430,7 +424,7 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request));
+      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request, false));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -448,7 +442,7 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request));
+      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -464,7 +458,7 @@ public class PinotSegmentUploadRestletResource {
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request));
+      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
