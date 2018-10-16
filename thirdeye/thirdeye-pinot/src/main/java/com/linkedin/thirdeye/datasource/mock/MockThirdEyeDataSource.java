@@ -44,6 +44,9 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 public class MockThirdEyeDataSource implements ThirdEyeDataSource {
   private static final Logger LOG = LoggerFactory.getLogger(MockThirdEyeDataSource.class);
 
+  private static double COMPONENT_ALPHA_DAILY = 0.25;
+  private static double COMPONENT_ALPHA_WEEKLY = 0.5;
+
   private static final String PROP_POPULATE_META_DATA = "populateMetaData";
   private static final String PROP_LOOKBACK = "lookback";
   private static final String PROP_DATASETS = "datasets";
@@ -233,6 +236,8 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
 
     double mean = MapUtils.getDoubleValue(config, "mean", 0);
     double std = MapUtils.getDoubleValue(config, "std", 1);
+    double daily = MapUtils.getDoubleValue(config, "daily", mean);
+    double weekly = MapUtils.getDoubleValue(config, "weekly", daily);
     NormalDistribution dist = new NormalDistribution(mean, std);
 
     DateTime origin = start.withFields(DataFrameUtils.makeOrigin(PeriodType.days()));
@@ -243,7 +248,12 @@ public class MockThirdEyeDataSource implements ThirdEyeDataSource {
       }
 
       timestamps.add(origin.getMillis());
-      values.add((double) Math.max(Math.round(dist.sample()), 0));
+
+      double compDaily = weekly * (COMPONENT_ALPHA_WEEKLY + Math.sin(origin.getDayOfWeek() / 7.0 * 2 * Math.PI + 1) / 2 * (1 - COMPONENT_ALPHA_WEEKLY));
+      double compHourly = daily * (COMPONENT_ALPHA_DAILY + Math.sin(origin.getHourOfDay() / 24.0 * 2 * Math.PI + 1) / 2 * (1 - COMPONENT_ALPHA_DAILY));
+      double compEpsilon = dist.sample();
+
+      values.add((double) Math.max(Math.round(compDaily + compHourly + compEpsilon), 0));
       origin = origin.plus(interval);
     }
 

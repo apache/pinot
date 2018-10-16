@@ -27,9 +27,11 @@ dataSourceConfigs:
                   desktop:
                     mean: 30
                     std: 5
+                    daily: 150
                   mobile:
                     mean: 20
                     std: 3
+                    daily: 100
                 edge:
                   desktop:
                     mean: 85
@@ -53,9 +55,11 @@ dataSourceConfigs:
                   desktop:
                     mean: 12
                     std: 2
+                    daily: 60
                   mobile:
                     mean: 7
                     std: 1
+                    daily: 35
                 edge:
                   desktop:
                     mean: 32
@@ -79,9 +83,11 @@ dataSourceConfigs:
                   desktop:
                     mean: 15
                     std: 3
+                    daily: 750
                   mobile:
                     mean: 12
                     std: 2
+                    daily: 600
                 edge:
                   desktop:
                     mean: 32
