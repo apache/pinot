@@ -18,7 +18,7 @@ package com.linkedin.thirdeye.detection.annotation;
 
 public class DetectionTags {
   public static final String ALGORITHM_DETECTION = "algorithmDetection";
-  public static final String ALGORITHM_FILTER = "algorithmFilter";
   public static final String RULE_DETECTION = "ruleDetection";
+  public static final String ALGORITHM_FILTER = "algorithmFilter";
   public static final String RULE_FILTER = "ruleFilter";
 }

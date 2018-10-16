@@ -39,7 +39,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 @Detection(name = "Threshold Detection Rule",
     type = "THRESHOLD_DETECTION",
-    tags = {DetectionTags.RULE_DETECTION},
+    tags = { DetectionTags.RULE_DETECTION },
     description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.")
 public class ThresholdRuleDetectionStage extends StaticAnomalyDetectionStage {
   private final String COL_TOO_HIGH = "tooHigh";

@@ -24,6 +24,8 @@ import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
+import com.linkedin.thirdeye.detection.annotation.Detection;
+import com.linkedin.thirdeye.detection.annotation.DetectionTags;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
@@ -41,6 +43,10 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * Simple baseline algorithm. Computes a multi-week aggregate baseline and compares
  * the current value based on relative change or absolute difference.
  */
+@Detection(name = "Baseline rule detection",
+    type = "BASELINE_RULE_FILTER",
+    tags = {DetectionTags.RULE_FILTER},
+    description = "Baseline rule filter. Filters the anomalies if percentage change, absolute difference or site wide impact is below certain threshold.")
 public class BaselineRuleDetectionStage extends StaticAnomalyDetectionStage {
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";
