@@ -57,6 +57,10 @@ public abstract class YamlDetectionConfigTranslator {
     return config;
   }
 
+  /**
+   * Check the yaml configuration is semantically valid. Throws an IllegalArgumentException if not.
+   * @param yamlConfig yamlConfiguration to be checked
+   */
   protected void validateYAML(Map<String, Object> yamlConfig) {
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "Property missing " + PROP_NAME);
   }

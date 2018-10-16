@@ -81,6 +81,7 @@ public class YamlResource {
     Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
 
+    // optionally set up an alerter for the detection pipeline
     if (yamlConfig.containsKey("alert")) {
       Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
       DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
@@ -88,9 +89,7 @@ public class YamlResource {
       Preconditions.checkNotNull(detectionAlertConfigId, "Save detection alerter config failed");
     }
 
-    Map<String, Object> result = new HashMap<>();
-    result.put("detectionConfig", detectionConfig);
-    return Response.ok(result).build();
+    return Response.ok(detectionConfig).build();
   }
 
   /**

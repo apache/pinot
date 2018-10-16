@@ -16,7 +16,7 @@ import java.util.Map;
 
 
 /**
- * The static map that converts rule/algorithm/filter names to class name
+ * The detection registry.
  */
 public class DetectionRegistry {
   private static final Map<String, String> REGISTRY_MAP = ImmutableMap.<String, String>builder()
@@ -64,6 +64,11 @@ public class DetectionRegistry {
 
   private static final DetectionRegistry INSTANCE = new DetectionRegistry();
 
+  /**
+   * Look up the class name for a given algorithm
+   * @param type
+   * @return algorithm class name
+   */
   public String lookup(String type) {
     return REGISTRY_MAP.get(type.toUpperCase());
   }
