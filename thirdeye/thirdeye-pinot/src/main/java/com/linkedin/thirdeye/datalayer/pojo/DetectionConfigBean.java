@@ -35,6 +35,15 @@ public class DetectionConfigBean extends AbstractBean {
   long lastTimestamp;
   Map<String, Object> properties;
   boolean active;
+  String yaml;
+
+  public String getYaml() {
+    return yaml;
+  }
+
+  public void setYaml(String yaml) {
+    this.yaml = yaml;
+  }
 
   public String getName() {
     return name;
@@ -81,16 +90,17 @@ public class DetectionConfigBean extends AbstractBean {
     if (this == o) {
       return true;
     }
-    if (o == null || getClass() != o.getClass()) {
+    if (!(o instanceof DetectionConfigBean)) {
       return false;
     }
     DetectionConfigBean that = (DetectionConfigBean) o;
     return lastTimestamp == that.lastTimestamp && active == that.active && Objects.equals(cron, that.cron)
-        && Objects.equals(name, that.name) && Objects.equals(properties, that.properties);
+        && Objects.equals(name, that.name) && Objects.equals(properties, that.properties) && Objects.equals(yaml,
+        that.yaml);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(cron, name, lastTimestamp, properties, active);
+    return Objects.hash(cron, name, lastTimestamp, properties, active, yaml);
   }
 }
