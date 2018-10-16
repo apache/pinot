@@ -35,6 +35,8 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String from;
   String cronExpression;
   String application;
+
+  String alertSchemes;
   AlertConfigBean.SubjectType subjectType = AlertConfigBean.SubjectType.ALERT;
 
   Map<Long, Long> vectorClocks;
@@ -112,6 +114,14 @@ public class DetectionAlertConfigBean extends AbstractBean {
 
   public void setSubjectType(AlertConfigBean.SubjectType subjectType) {
     this.subjectType = subjectType;
+  }
+
+  public String getAlertSchemes() {
+    return alertSchemes;
+  }
+
+  public void setAlertSchemes(String alertSchemes) {
+    this.alertSchemes = alertSchemes;
   }
 
   @Override

@@ -112,6 +112,7 @@ public class SendAlertTest {
     properties.put(PROP_RECIPIENTS, PROP_RECIPIENTS_VALUE);
     properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(this.detectionConfigId));
 
+    this.alertConfigDTO.setAlertSchemes("com.linkedin.thirdeye.detection.alert.scheme.DetectionEmailAlerter");
     this.alertConfigDTO.setProperties(properties);
     this.alertConfigDTO.setFrom(FROM_ADDRESS_VALUE);
     this.alertConfigDTO.setName(ALERT_NAME_VALUE);
