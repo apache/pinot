@@ -10,10 +10,13 @@ import {
   set,
   get,
   computed,
+  getProperties,
   setProperties,
   getWithDefault
 } from '@ember/object';
+import { isPresent, isBlank } from '@ember/utils';
 import Controller from '@ember/controller';
+import { reads } from '@ember/object/computed';
 import { task, timeout } from 'ember-concurrency';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
@@ -29,6 +32,11 @@ export default Controller.extend({
    * Alerts Search Mode options
    */
   sortModes: ['Edited:first', 'Edited:last', 'A to Z', 'Z to A'],
+
+  /**
+   * One-way CP to store all sub groups
+   */
+  subscriptionGroups: reads('model.subscriberGroups'),
 
   /**
    * True when results appear
@@ -58,6 +66,9 @@ export default Controller.extend({
   selectedsubscriberGroupName: [],
   selectedApplicationName: [],
 
+  // Total displayed alerts
+  totalFilteredAlerts: 0,
+
   // default current Page
   currentPage: 1,
 
@@ -78,12 +89,11 @@ export default Controller.extend({
 
   // Total Number of pages to display
   pagesNum: computed(
-    'selectedAlerts.length',
+    'totalFilteredAlerts',
     'pageSize',
     function() {
-      const numAlerts = this.get('selectedAlerts').length;
-      const pageSize = this.get('pageSize');
-      return Math.ceil(numAlerts/pageSize);
+      const { pageSize, totalFilteredAlerts } = getProperties(this, 'pageSize', 'totalFilteredAlerts');
+      return Math.ceil(totalFilteredAlerts/pageSize);
     }
   ),
 
@@ -136,19 +146,23 @@ export default Controller.extend({
     'currentPage',
     'selectedSortMode',
     function() {
-      const pageSize = this.get('pageSize');
-      const pageNumber = this.get('currentPage');
-      const sortOrder = this.get('selectedSortMode');
-      const allGroups = this.get('model.subscriberGroups');
-      let alerts = this.get('selectedAlerts');
+      const {
+        pageSize,
+        currentPage,
+        selectedSortMode,
+        subscriptionGroups
+      } = getProperties(this, 'pageSize', 'currentPage', 'selectedSortMode', 'subscriptionGroups');
+      // Use only alerts containing valid metric data
+      let alerts = this.get('selectedAlerts').filter(alert => isPresent(alert.metric));
+      // Add subscription group/application names to each alert
+      this._processAlerts(alerts, subscriptionGroups);
+      //set(this, 'totalFilteredAlerts', this.get('selectedAlerts').length);
+      // Alpha sort accounting for spaces in function name
       let alphaSortedAlerts = alerts.sort((a, b) => {
         return a.functionName.trim().localeCompare(b.functionName.trim());
       });
-      let groupFunctionIds = [];
-      let foundAlert = {};
-
       // Handle selected sort order
-      switch(sortOrder) {
+      switch(selectedSortMode) {
         case 'Edited:first': {
           alerts = alerts.sortBy('id');
           break;
@@ -166,22 +180,8 @@ export default Controller.extend({
           break;
         }
       }
-
-      // Itereate through config groups to enhance all alerts with extra properties (group name, application)
-      for (let config of allGroups) {
-        groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
-        for (let id of groupFunctionIds) {
-          foundAlert = _.find(alerts, function(alert) {
-            return alert.id === id;
-          });
-          if (foundAlert) {
-            set(foundAlert, 'application', config.application);
-            set(foundAlert, 'group', config.name);
-          }
-        }
-      }
-
-      return alerts.slice((pageNumber - 1) * pageSize, pageNumber * pageSize);
+      // Return one page of sorted alerts
+      return alerts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
     }
   ),
 
@@ -191,8 +191,8 @@ export default Controller.extend({
    */
   searchByFunctionName: task(function* (alert) {
     yield timeout(600);
-    return fetch(selfServeApiCommon.alertFunctionByName(alert))
-      .then(checkStatus);
+    const results = yield fetch(selfServeApiCommon.alertFunctionByName(alert)).then(checkStatus);
+    return results.filter(alert => isPresent(alert.metric));
   }),
 
   /**
@@ -242,6 +242,28 @@ export default Controller.extend({
       selectedAlerts
     });
   }),
+
+ /**
+   * Itereate through config groups to enhance all alerts with extra properties (group name, application)
+   * Also filter out any possible alert records with no data.
+   * @param {Array} alerts - list of all found alert records
+   * @param {Array} allGroups - list of all found subscription group records
+   */
+  _processAlerts(alerts, allGroups) {
+    for (let config of allGroups) {
+      let groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
+      for (let id of groupFunctionIds) {
+        let foundAlert = _.find(alerts, function(alert) {
+          return alert.id === id;
+        });
+        if (foundAlert) {
+          set(foundAlert, 'application', config.application);
+          set(foundAlert, 'group', config.name);
+        }
+      }
+    }
+    set(this, 'totalFilteredAlerts', alerts.length);
+  },
 
   actions: {
     // Handles alert selection from type ahead
