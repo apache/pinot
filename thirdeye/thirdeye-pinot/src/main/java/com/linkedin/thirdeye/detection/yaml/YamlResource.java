@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -60,9 +61,14 @@ public class YamlResource {
     }
     Map<String, Object> yamlConfig = (Map<String, Object>) this.YAML_READER.load(payload);
 
+    DetectionConfigDTO detectionConfig;
     // translate yaml to detection config
-    YamlDetectionConfigTranslator translator = translatorLoader.from(yamlConfig);
-    DetectionConfigDTO detectionConfig = translator.generateDetectionConfig(yamlConfig);
+    try {
+      YamlDetectionConfigTranslator translator = translatorLoader.from(yamlConfig);
+      detectionConfig = translator.generateDetectionConfig(yamlConfig);
+    } catch (Exception e) {
+      return Response.status(400).entity(ImmutableMap.of("status", 400, "message", e.getMessage())).build();
+    }
 
     // retrieve id if detection config already exists
     List<DetectionConfigDTO> detectionConfigDTOs =
@@ -75,14 +81,15 @@ public class YamlResource {
     Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
 
-    Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
-    DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
-    Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfigDTO);
-    Preconditions.checkNotNull(detectionAlertConfigId, "Save detection alerter config failed");
+    if (yamlConfig.containsKey("alert")) {
+      Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
+      DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
+      Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfigDTO);
+      Preconditions.checkNotNull(detectionAlertConfigId, "Save detection alerter config failed");
+    }
 
     Map<String, Object> result = new HashMap<>();
     result.put("detectionConfig", detectionConfig);
-    result.put("detectionAlertConfig", alertConfigDTO);
     return Response.ok(result).build();
   }
 

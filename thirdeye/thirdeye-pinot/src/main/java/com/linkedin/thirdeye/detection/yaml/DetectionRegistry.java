@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.anomalydetection.function.WeekOverWeekRuleFunction;
 import com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
 import com.linkedin.thirdeye.detection.algorithm.BaselineAlgorithm;
 import com.linkedin.thirdeye.detection.algorithm.MovingWindowAlgorithm;
+import com.linkedin.thirdeye.detection.algorithm.stage.BaselineRuleDetectionStage;
 import com.linkedin.thirdeye.detection.algorithm.stage.BaselineRuleFilterStage;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AverageChangeThresholdAlertFilter;
@@ -22,8 +23,7 @@ public class DetectionRegistry {
       // rule filter
       .put("BUSINESS_RULE_FILTER", BaselineRuleFilterStage.class.getName())
       // rule detection
-      .put("BASELINE", String.valueOf(BaselineAlgorithm.class.getName()))
-      .put("MOVING_WINDOW", MovingWindowAlgorithm.class.getName())
+      .put("BASELINE", BaselineRuleDetectionStage.class.getName())
       // alerter
       .put("TO_ALL_RECIPIENTS", ToAllRecipientsDetectionAlertFilter.class.getName())
       // algorithm detection

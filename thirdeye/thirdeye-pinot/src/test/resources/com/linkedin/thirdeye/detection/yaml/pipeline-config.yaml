@@ -4,27 +4,26 @@ dataset: test_dataset
 pipelineType: Composite
 filters:
   D1:
-    - v1
-    - v2
+  - v1
+  - v2
   D2:
-    - v3
+  - v3
 dimensionExploration:
   dimensions:
-    - D1
-    - D2
-dimensionFilter:
+  - D1
+  - D2
   minContribution: 0.05
-ruleDetection:
-  type: BASELINE
-  change: 0.1
-ruleFilter:
-  type: BUSINESS_RULE_FILTER
-  siteWideImpactThreshold: 0.05
-algorithmDetection:
-  type: REGRESSION_GAUSSIAN_SCAN
-  bucketSize: 1
-  bucketUnit: HOURS
-  windowDelay: 0
-algorithmFilter:
-  type: alpha_beta_logistic_two_side
-  pattern: UP,DOWN
+anomalyDetection:
+- detection:
+  - type: BASELINE
+    change: 0.3
+  filter:
+  - type: BUSINESS_RULE_FILTER
+    siteWideImpactThreshold: 0.1
+- detection:
+  - type: BASELINE
+    change: 0.2
+  filter:
+  - type: BUSINESS_RULE_FILTER
+    siteWideImpactThreshold: 0.2
+
