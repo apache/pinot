@@ -41,6 +41,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -52,6 +53,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.math.Ordering;
 
 
 /**
@@ -73,6 +75,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
     List<QueryProcessingException> processingExceptions = brokerResponseNative.getProcessingExceptions();
+    List<String> pruningReasons = brokerResponseNative.getPruningReasons();
     long numDocsScanned = 0L;
     long numEntriesScannedInFilter = 0L;
     long numEntriesScannedPostFilter = 0L;
@@ -132,12 +135,17 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       if (numSegmentsMatchedString != null) {
         numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
       }
-      
+
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
       }
       numGroupsLimitReached |= Boolean.valueOf(metadata.get(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY));
+
+      String pruningReasonsString = metadata.get(DataTable.PRUNING_REASON_METADATA_KEY);
+      if (pruningReasonsString != null) {
+        pruningReasons.addAll(Arrays.asList(pruningReasonsString.split(",")));
+      }
 
       // After processing the metadata, remove data tables without data rows inside.
       DataSchema dataSchema = dataTable.getDataSchema();
@@ -165,6 +173,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
+    brokerResponseNative.setPruningReasons(pruningReasons);
 
     // Update broker metrics.
     String tableName = brokerRequest.getQuerySource().getTableName();

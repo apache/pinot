@@ -34,13 +34,16 @@ import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
+import com.linkedin.pinot.core.query.pruner.SegmentPruner;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
 import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.request.context.TimerContext;
 import com.linkedin.pinot.core.util.trace.TraceContext;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.concurrent.ThreadSafe;
@@ -129,8 +132,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     DataTable dataTable = null;
     try {
+      Set<SegmentPruner> matchedSegmentPruners = new HashSet<>();
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      long totalRawDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
+      long totalRawDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest, matchedSegmentPruners);
       segmentPruneTimer.stopAndRecord();
       int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
       LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
@@ -143,6 +147,22 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
         metadata.put(DataTable.NUM_SEGMENTS_PROCESSED, "0");
         metadata.put(DataTable.NUM_SEGMENTS_MATCHED, "0");
+
+        // adds pruning reasons to metadata.
+        StringBuilder pruningReasons = new StringBuilder();
+        for (SegmentPruner segmentPruner : matchedSegmentPruners) {
+          // emits metric when querying non-existing columns.
+          if ("DataSchemaSegmentPruner".equals(segmentPruner.toString())) {
+            LOGGER.info("Request:{} is querying non-existing columns on Table {}! Query columns:{}",
+                queryRequest.getRequestId(), queryRequest.getTableNameWithType(), queryRequest.getAllColumns());
+            _serverMetrics.addMeteredTableValue(tableDataManager.getTableName(), ServerMeter.QUERY_NON_EXISTING_COLUMNS,
+                1L);
+          }
+          pruningReasons.append(segmentPruner.toString()).append(',');
+        }
+        if (pruningReasons.length() != 0) {
+          metadata.put(DataTable.PRUNING_REASON_METADATA_KEY, pruningReasons.substring(0, pruningReasons.length() - 1));
+        }
       } else {
         TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
         Plan globalQueryPlan =
@@ -205,8 +225,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * @return Total number of docs across all segments (including the ones that were pruned).
    */
   private long pruneSegments(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
-      ServerQueryRequest serverQueryRequest) {
-    long totalRawDocs = 0;
+      ServerQueryRequest serverQueryRequest, Set<SegmentPruner> matchedSegmentPruners) {
+    long totalRawDocs = 0L;
 
     Iterator<SegmentDataManager> iterator = segmentDataManagers.iterator();
     while (iterator.hasNext()) {
@@ -214,12 +234,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       IndexSegment indexSegment = segmentDataManager.getSegment();
       // We need to compute the total raw docs for the table before any pruning.
       totalRawDocs += indexSegment.getSegmentMetadata().getTotalRawDocs();
-      if (_segmentPrunerService.prune(indexSegment, serverQueryRequest)) {
+      SegmentPruner matchedSegmentPruner = _segmentPrunerService.matchPruningCriterion(indexSegment, serverQueryRequest);
+      if (matchedSegmentPruner != null) {
+        matchedSegmentPruners.add(matchedSegmentPruner);
         iterator.remove();
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-
     return totalRawDocs;
   }
 

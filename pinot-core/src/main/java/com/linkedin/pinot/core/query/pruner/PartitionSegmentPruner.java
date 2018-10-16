@@ -110,4 +110,9 @@ public class PartitionSegmentPruner extends AbstractSegmentPruner {
     }
     return true;
   }
+
+  @Override
+  public String toString() {
+    return "PartitionSegmentPruner";
+  }
 }

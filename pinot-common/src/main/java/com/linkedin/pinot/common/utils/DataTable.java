@@ -37,6 +37,7 @@ public interface DataTable {
   String TIME_USED_MS_METADATA_KEY = "timeUsedMs";
   String TRACE_INFO_METADATA_KEY = "traceInfo";
   String REQUEST_ID_METADATA_KEY = "requestId";
+  String PRUNING_REASON_METADATA_KEY = "pruningReasons";
 
   void addException(@Nonnull ProcessingException processingException);
 

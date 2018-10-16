@@ -40,8 +40,7 @@ import org.json.JSONObject;
  * Supports serialization via JSON.
  */
 @JsonPropertyOrder({ "selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached",
-    "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo" })
+    "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached", "totalDocs", "timeUsedMs", "segmentStatistics", "pruningReasons", "traceInfo" })
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -57,7 +56,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsQueried = 0L;
   private long _numSegmentsProcessed = 0L;
   private long _numSegmentsMatched = 0L;
-  
+
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
@@ -68,6 +67,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
   private List<String> _segmentStatistics = new ArrayList<>();
+  private List<String> _pruningReasons = new ArrayList<>();
 
   public BrokerResponseNative() {
   }
@@ -248,6 +248,16 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("segmentStatistics")
   public void setSegmentStatistics(List<String> segmentStatistics) {
     _segmentStatistics = segmentStatistics;
+  }
+
+  @JsonProperty("pruningReasons")
+  public List<String> getPruningReasons() {
+    return _pruningReasons;
+  }
+
+  @JsonProperty("pruningReasons")
+  public void setPruningReasons(List<String> pruningReasons) {
+    _pruningReasons = pruningReasons;
   }
 
   @JsonProperty("traceInfo")
