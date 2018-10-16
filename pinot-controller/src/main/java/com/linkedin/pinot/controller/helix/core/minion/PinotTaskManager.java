@@ -96,6 +96,7 @@ public class PinotTaskManager {
       // Only schedule new tasks from leader controller
       if (!_helixResourceManager.isLeader()) {
         LOGGER.info("Skip scheduling new tasks on non-leader controller");
+        nonLeaderCleanUp();
         return;
       }
       scheduleTasks();
@@ -163,5 +164,14 @@ public class PinotTaskManager {
     }
 
     return tasksScheduled;
+  }
+
+  /**
+   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
+   */
+  private void nonLeaderCleanUp() {
+    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
+      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
+    }
   }
 }
