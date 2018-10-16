@@ -42,6 +42,12 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
     @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Directory containing the data.")
     private String _dataDir;
 
+    @Option(name = "-recordFile", required = false, metaVar = "<String>", usage = "File containing the Traces of CPU.")
+    private String _recordFile;
+
+    @Option(name = "-slotDuration", required = false, metaVar = "<int>", usage = "Slot duration.")
+    private  int _slotDuration = DEFAULT_TEST_DURATION;
+
     public PinotBenchmarkQueryGeneratorCommand setBrokerHost (String brokerHost) {
         _brokerHost = brokerHost;
         return this;
@@ -67,7 +73,9 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
         for (QueryExecutor executor : executorList) {
             executor.setPostQueryCommand(postQueryCommand);
             executor.setDataDir(_dataDir);
+            executor.setRecordFile(_recordFile);
             executor.setTestDuration(_testDuration);
+            executor.setSlotDuration(_slotDuration);
             executor.start();
         }
 

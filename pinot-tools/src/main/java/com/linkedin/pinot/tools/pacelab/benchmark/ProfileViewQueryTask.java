@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Random;
 
-public class ProfileViewQueryTask extends QueryTask {
+public class ProfileViewQueryTask extends QueryTaskDaemon {
     List<GenericRow> _profileTable;
 
     ZipfRandom _zipfRandom;
