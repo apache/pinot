@@ -22,7 +22,7 @@ import com.linkedin.pinot.transport.pool.KeyedPool;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.helix.LiveInstanceChangeListener;
+import org.apache.helix.api.listeners.LiveInstanceChangeListener;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.LiveInstance;
 import org.slf4j.Logger;
