@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.annotations;
+package com.linkedin.thirdeye.detection.annotation;
 
 public class DetectionTags {
   public static final String ALGORITHM_DETECTION = "algorithmDetection";
