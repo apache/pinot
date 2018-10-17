@@ -29,16 +29,6 @@ Router.map(function() {
     });
   });
 
-  this.route('rca', function() {
-    this.route('details', { path: '/:metric_id' }, function () {
-      this.route('metrics');
-      this.route('events');
-      this.route('dimensions', function() {
-        this.route('heatmap', {path: '/'});
-      });
-    });
-  });
-
   this.route('self-serve', function() {
     this.route('create-alert');
     this.route('import-metric');
