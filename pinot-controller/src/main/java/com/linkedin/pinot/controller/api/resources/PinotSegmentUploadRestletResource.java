@@ -236,7 +236,7 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private SuccessResponse uploadSegment(FormDataMultiPart multiPart, boolean enableParallelPushProtection,
-      HttpHeaders headers, Request request) {
+      HttpHeaders headers, Request request, boolean moveSegmentToFinalLocation) {
     if (headers != null) {
       // TODO: Add these headers into open source hadoop jobs
       LOGGER.info("HTTP Header {} is {}", CommonConstants.Controller.SEGMENT_NAME_HTTP_HEADER,
@@ -284,7 +284,7 @@ public class PinotSegmentUploadRestletResource {
           segmentMetadata =
               getMetadataForURI(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile,
                   tempSegmentDir, metadataProviderClass);
-          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, provider);
+          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, provider, moveSegmentToFinalLocation);
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
@@ -309,7 +309,7 @@ public class PinotSegmentUploadRestletResource {
 
       // Zk operations
       completeZkOperations(enableParallelPushProtection, headers, tempEncryptedFile, provider, segmentMetadata,
-          segmentName, zkDownloadUri);
+          segmentName, zkDownloadUri, moveSegmentToFinalLocation);
 
       return new SuccessResponse("Successfully uploaded segment: " + segmentMetadata.getName() + " of table: "
           + segmentMetadata.getTableName());
@@ -327,13 +327,18 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private String getZkDownloadURIForURIUpload(String currentSegmentLocationURI, SegmentMetadata segmentMetadata,
-      FileUploadPathProvider provider) throws URISyntaxException, UnsupportedEncodingException {
+      FileUploadPathProvider provider, boolean moveSegmentToFinalLocation) throws URISyntaxException, UnsupportedEncodingException {
     String zkDownloadUri;
     if (new URI(currentSegmentLocationURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
       zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
           provider.getVip());
+    } else if (!moveSegmentToFinalLocation) {
+      LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
+          segmentMetadata.getName(), segmentMetadata.getTableName());
+      zkDownloadUri = currentSegmentLocationURI;
     } else {
-      LOGGER.info("Using configured data dir {}", _controllerConf.getDataDir());
+      LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(),
+          segmentMetadata.getName(), segmentMetadata.getTableName());
       zkDownloadUri = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
           URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
     }
@@ -367,7 +372,8 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private void completeZkOperations(boolean enableParallelPushProtection, HttpHeaders headers, File tempDecryptedFile,
-      FileUploadPathProvider provider, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI)
+      FileUploadPathProvider provider, SegmentMetadata segmentMetadata, String segmentName, String zkDownloadURI,
+      boolean moveSegmentToFinalLocation)
       throws Exception {
     String finalSegmentPath =
         StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
@@ -375,7 +381,7 @@ public class PinotSegmentUploadRestletResource {
     URI finalSegmentLocationURI = new URI(finalSegmentPath);
     ZKOperator zkOperator = new ZKOperator(_pinotHelixResourceManager, _controllerConf, _controllerMetrics);
     zkOperator.completeSegmentOperations(segmentMetadata, finalSegmentLocationURI, tempDecryptedFile,
-        enableParallelPushProtection, headers, zkDownloadURI);
+        enableParallelPushProtection, headers, zkDownloadURI, moveSegmentToFinalLocation);
   }
 
   private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {
@@ -392,12 +398,13 @@ public class PinotSegmentUploadRestletResource {
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
-  // request if a multipart object is not sent
+  // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
+  // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
   public void uploadSegmentAsJson(String segmentJsonStr,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request));
+      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request, false));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -409,11 +416,48 @@ public class PinotSegmentUploadRestletResource {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request));
+      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request, true));
+    } catch (Throwable t) {
+      asyncResponse.resume(t);
+    }
+  }
+
+  @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Path("/v2/segments")
+  @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
+  // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
+  // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
+  // endpoint in how it moves the segment to a Pinot-determined final directory.
+  public void uploadSegmentAsJsonV2(String segmentJsonStr,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+    try {
+      asyncResponse.resume(uploadSegment(null, enableParallelPushProtection, headers, request, true));
+    } catch (Throwable t) {
+      asyncResponse.resume(t);
+    }
+  }
+
+  @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.MULTIPART_FORM_DATA)
+  @Path("/v2/segments")
+  @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  // This behavior does not differ from v1 of the same endpoint.
+  public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
+      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+    try {
+      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
