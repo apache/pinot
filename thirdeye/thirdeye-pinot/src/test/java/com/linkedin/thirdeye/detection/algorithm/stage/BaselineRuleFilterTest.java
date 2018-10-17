@@ -16,8 +16,6 @@
 
 package com.linkedin.thirdeye.detection.algorithm.stage;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -98,6 +96,7 @@ public class BaselineRuleFilterTest {
     this.properties = new HashMap<>();
     this.properties.put("nested", Collections.singletonList(Collections.singletonMap("className", "dummy")));
     this.properties.put("stageClassName", BaselineRuleFilterStage.class.getName());
+    this.properties.put("offset", "median1w");
     this.specs = new HashMap<>();
 
     this.properties.put("specs", specs);

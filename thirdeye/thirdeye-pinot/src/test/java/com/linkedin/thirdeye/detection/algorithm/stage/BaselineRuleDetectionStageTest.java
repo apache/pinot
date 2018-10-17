@@ -42,11 +42,9 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 public class BaselineRuleDetectionStageTest {
   private static final String PROP_METRIC_URN = "metricUrn";
-  private static final String PROP_AGGREGATION = "aggregation";
-  private static final String PROP_WEEKS = "weeks";
+  private static final String PROP_OFFSET = "offset";
   private static final String PROP_CHANGE = "change";
   private static final String PROP_DIFFERENCE = "difference";
-  private static final String PROP_TIMEZONE = "timezone";
 
   private DataProvider provider;
   private DetectionPipeline detectionPipeline;
@@ -120,8 +118,7 @@ public class BaselineRuleDetectionStageTest {
 
   @Test
   public void testThreeWeekMedianChange() throws Exception {
-    this.stageSpecs.put(PROP_WEEKS, 3);
-    this.stageSpecs.put(PROP_AGGREGATION, BaselineAggregateType.MEDIAN.toString());
+    this.stageSpecs.put(PROP_OFFSET, "median3w");
     this.stageSpecs.put(PROP_CHANGE, 0.3);
     this.detectionPipeline = new AnomalyDetectionStageWrapper(this.provider, this.config, 1814400000L, 2419200000L);
 
