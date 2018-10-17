@@ -250,7 +250,11 @@ export default Component.extend({
     const { preselectedFunctionId, groupOptionsRaw } =
       getProperties(this, 'preselectedFunctionId', 'groupOptionsRaw');
 
-    return groupOptionsRaw.filter(group => group.emailConfig.functionIds.includes(preselectedFunctionId));
+    return groupOptionsRaw.filter((group) => {
+      if (group.emailConfig && group.emailConfig.functionIds) {
+        return group.emailConfig.functionIds.includes(preselectedFunctionId);
+      }
+    });
   }),
 
   /**
