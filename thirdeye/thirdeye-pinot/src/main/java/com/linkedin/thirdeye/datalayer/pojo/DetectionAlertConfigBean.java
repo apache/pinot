@@ -17,6 +17,7 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -36,7 +37,7 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String cronExpression;
   String application;
 
-  String alertSchemes;
+  List<String> alertSchemes;
   AlertConfigBean.SubjectType subjectType = AlertConfigBean.SubjectType.ALERT;
 
   Map<Long, Long> vectorClocks;
@@ -116,11 +117,11 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.subjectType = subjectType;
   }
 
-  public String getAlertSchemes() {
+  public List<String> getAlertSchemes() {
     return alertSchemes;
   }
 
-  public void setAlertSchemes(String alertSchemes) {
+  public void setAlertSchemes(List<String> alertSchemes) {
     this.alertSchemes = alertSchemes;
   }
 

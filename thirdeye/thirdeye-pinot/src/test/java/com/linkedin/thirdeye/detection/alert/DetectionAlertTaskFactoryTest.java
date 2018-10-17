@@ -7,11 +7,13 @@ import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -28,9 +30,14 @@ public class DetectionAlertTaskFactoryTest {
   private DAOTestBase testDAOProvider;
   private DetectionAlertConfigDTO alertConfigDTO;
   private DetectionAlertConfigManager alertConfigDAO;
+  private List<String> alerters;
 
   @BeforeMethod
   public void beforeClass() throws Exception {
+    alerters = new ArrayList<>();
+    alerters.add("com.linkedin.thirdeye.detection.alert.scheme.RandomAlerter");
+    alerters.add("com.linkedin.thirdeye.detection.alert.scheme.AnotherRandomAlerter");
+
     this.testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
     this.alertConfigDAO = daoRegistry.getDetectionAlertConfigManager();
@@ -42,7 +49,7 @@ public class DetectionAlertTaskFactoryTest {
     testDAOProvider.cleanup();
   }
 
-  private long createAlertConfig(String schemes, String filter) {
+  private long createAlertConfig(List<String> schemes, String filter) {
     Map<String, Object> properties = new HashMap<>();
     properties.put("className", filter);
     properties.put("detectionConfigIds", Collections.singletonList(1000));
@@ -60,8 +67,7 @@ public class DetectionAlertTaskFactoryTest {
 
   @Test
   public void testLoadAlertFilter() throws Exception {
-    long alertConfigId = createAlertConfig(
-        "com.linkedin.thirdeye.detection.alert.scheme.RandomAlerter, com.linkedin.thirdeye.detection.alert.scheme.AnotherRandomAlerter",
+    long alertConfigId = createAlertConfig(alerters,
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     long endTime = 9999l;
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
@@ -74,8 +80,7 @@ public class DetectionAlertTaskFactoryTest {
 
   @Test
   public void testLoadAlertSchemes() throws Exception {
-    long alertConfigId = createAlertConfig(
-        "com.linkedin.thirdeye.detection.alert.scheme.RandomAlerter, com.linkedin.thirdeye.detection.alert.scheme.AnotherRandomAlerter",
+    long alertConfigId = createAlertConfig(alerters,
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
     Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfigId, null, null);
@@ -102,7 +107,7 @@ public class DetectionAlertTaskFactoryTest {
   public void testLoadDefaultAlertSchemes() throws Exception {
     TaskContext context = new TaskContext();
     context.setThirdEyeAnomalyConfiguration(new ThirdEyeAnomalyConfiguration());
-    long alertConfigId = createAlertConfig("",
+    long alertConfigId = createAlertConfig(Collections.<String>emptyList(),
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
     Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfigId, context, null);

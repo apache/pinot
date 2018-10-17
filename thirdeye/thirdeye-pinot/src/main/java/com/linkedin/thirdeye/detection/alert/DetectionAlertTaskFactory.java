@@ -18,9 +18,10 @@ import com.linkedin.thirdeye.detection.DefaultDataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
 import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import java.lang.reflect.Constructor;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,13 +67,12 @@ public class DetectionAlertTaskFactory {
       DetectionAlertFilterResult result) throws Exception {
     DetectionAlertConfigDTO alertConfig = loadDetectionAlertConfig(detectionAlertConfigId);
 
-    String alertSchemes = alertConfig.getAlertSchemes();
-    if (StringUtils.isEmpty(alertSchemes)) {
-      alertSchemes = DEFAULT_ALERT_SCHEME;
+    List<String> alertSchemes = alertConfig.getAlertSchemes();
+    if (alertSchemes == null || alertSchemes.isEmpty()) {
+      alertSchemes = Collections.singletonList(DEFAULT_ALERT_SCHEME);
     }
-    String[] alertSchemeClasses = alertSchemes.split(",");
     Set<DetectionAlertScheme> detectionAlertSchemeSet = new HashSet<>();
-    for (String alertSchemeClass : alertSchemeClasses) {
+    for (String alertSchemeClass : alertSchemes) {
       Constructor<?> constructor = Class.forName(alertSchemeClass.trim())
           .getConstructor(DetectionAlertConfigDTO.class, TaskContext.class, DetectionAlertFilterResult.class);
       detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(alertConfig, taskContext, result));
