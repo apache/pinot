@@ -90,7 +90,8 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String HTTP = "http";
   private static final String HTTPS = "https";
   private static final String SCHEMA_PATH = "/schemas";
-  private static final String SEGMENT_PATH = "/v2/segments";
+  private static final String SEGMENT_PATH = "/segments";
+  private static final String SEGMENT_PATH_V2 = "/v2/segments";
   private static final String SEGMENT_METADATA_PATH = "/segmentmetadata";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "?type=";
@@ -136,8 +137,20 @@ public class FileUploadDownloadClient implements Closeable {
     return getURI(HTTPS, host, port, SCHEMA_PATH);
   }
 
+  /**
+   * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
+   * getUploadSegmentV2HttpURI to construct your request.
+   */
+  @Deprecated
   public static URI getUploadSegmentHttpURI(String host, int port) throws URISyntaxException {
     return getURI(HTTP, host, port, SEGMENT_PATH);
+  }
+
+  /**
+   * Preferred way to construct an upload segment request
+   */
+  public static URI getUploadSegmentV2HttpURI(String host, int port) throws URISyntaxException {
+    return getURI(HTTP, host, port, SEGMENT_PATH_V2);
   }
 
   public static URI getUploadSegmentMetadataHttpURI(String host, int port) throws URISyntaxException {

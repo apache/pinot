@@ -110,7 +110,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
       URI uploadSegmentHttpURI =
-          FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, Integer.parseInt(_controllerPort));
+          FileUploadDownloadClient.getUploadSegmentV2HttpURI(_controllerHost, Integer.parseInt(_controllerPort));
       for (File file : files) {
         File tgzFile = file;
 

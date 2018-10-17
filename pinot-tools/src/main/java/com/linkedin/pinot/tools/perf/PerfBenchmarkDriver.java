@@ -285,7 +285,7 @@ public class PerfBenchmarkDriver {
     File[] indexFiles = new File(indexDirectory).listFiles();
     Preconditions.checkNotNull(indexFiles);
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, _controllerPort);
+      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentV2HttpURI(_controllerHost, _controllerPort);
       for (File indexFile : indexFiles) {
         LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
         fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, indexFile.getName(), indexFile);
