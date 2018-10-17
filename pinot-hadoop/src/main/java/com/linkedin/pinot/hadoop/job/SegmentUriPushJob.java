@@ -84,7 +84,8 @@ public class SegmentUriPushJob extends Configured {
             host, _port, uri);
         try {
           SimpleHttpResponse response =
-              fileUploadDownloadClient.sendSegmentUri(FileUploadDownloadClient.getUploadSegmentV2HttpURI(host, _port),
+              fileUploadDownloadClient.sendSegmentUri(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port,
+                  true),
                   uri);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {

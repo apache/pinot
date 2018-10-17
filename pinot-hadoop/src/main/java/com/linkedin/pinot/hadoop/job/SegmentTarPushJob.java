@@ -80,7 +80,8 @@ public class SegmentTarPushJob extends Configured {
           fileName = fileName.split(JobConfigConstants.TARGZ)[0];
           LOGGER.info("******** Uploading file: {} to Host: {} and Port: {} *******", fileName, host, _port);
           SimpleHttpResponse response =
-              fileUploadDownloadClient.uploadSegment(FileUploadDownloadClient.getUploadSegmentV2HttpURI(host, _port),
+              fileUploadDownloadClient.uploadSegment(FileUploadDownloadClient.getUploadSegmentHttpURI(host, _port,
+                  true),
                   fileName, inputStream);
           LOGGER.info("Response {}: {}", response.getStatusCode(), response.getResponse());
         } catch (Exception e) {

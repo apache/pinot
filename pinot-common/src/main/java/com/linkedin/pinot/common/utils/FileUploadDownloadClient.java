@@ -139,18 +139,22 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
-   * getUploadSegmentV2HttpURI to construct your request.
+   * getUploadSegmentHttpURI to construct your request.
    */
   @Deprecated
   public static URI getUploadSegmentHttpURI(String host, int port) throws URISyntaxException {
-    return getURI(HTTP, host, port, SEGMENT_PATH);
+    return getUploadSegmentHttpURI(host, port, false);
   }
 
   /**
    * Preferred way to construct an upload segment request
    */
-  public static URI getUploadSegmentV2HttpURI(String host, int port) throws URISyntaxException {
-    return getURI(HTTP, host, port, SEGMENT_PATH_V2);
+  public static URI getUploadSegmentHttpURI(String host, int port, boolean useV2) throws URISyntaxException {
+    if (useV2) {
+      return getURI(HTTP, host, port, SEGMENT_PATH_V2);
+    } else {
+      return getURI(HTTP, host, port, SEGMENT_PATH);
+    }
   }
 
   public static URI getUploadSegmentMetadataHttpURI(String host, int port) throws URISyntaxException {
