@@ -23,15 +23,18 @@ import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardUtility;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
@@ -67,6 +70,7 @@ public class OnboardResource {
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private MetricConfigManager metricConfigDAO;
+  private DatasetConfigManager datasetFunctionDAO;
   private AlertConfigManager emailConfigurationDAO;
   private TaskManager taskDAO;
   private ThirdEyeDashboardConfiguration config;
@@ -81,6 +85,7 @@ public class OnboardResource {
   public OnboardResource(ThirdEyeDashboardConfiguration config) {
     this.config = config;
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.datasetFunctionDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
@@ -214,20 +219,38 @@ public class OnboardResource {
 
   private void syncAlertConfig(AlertConfigDTO alertConfigDTO, String alertGroupName, MetricConfigDTO metric,
       String application, String cron) {
-
+    Set<String> metricOwners = getOwners(metric);
     if (alertConfigDTO == null) {
-      Set<String> recipients = metric.getDatasetConfig() != null ? metric.getDatasetConfig().getOwners() : Collections.<String>emptySet();
-      createAlertConfig(alertGroupName, application, cron, recipients);
+      createAlertConfig(alertGroupName, application, cron, metricOwners);
     } else {
       // Note: Since we support only one subscription group per function in the legacy code, we append
       // dataset owners and interested stakeholders to the same auto created subscription group.
       // Side effect:
       // If a dataset owner is removed at source, which rarely is the case, then we will continue to
       // retain the owner in our subscription group and send him alerts unless manually removed.
-      alertConfigDTO.getReceiverAddresses().getTo().addAll(metric.getDatasetConfig().getOwners());
+      if (alertConfigDTO.getReceiverAddresses() == null) {
+        alertConfigDTO.setReceiverAddresses(new DetectionAlertFilterRecipients(metricOwners));
+      } else if (alertConfigDTO.getReceiverAddresses().getTo() == null) {
+        alertConfigDTO.getReceiverAddresses().setTo(metricOwners);
+      } else {
+        alertConfigDTO.getReceiverAddresses().getTo().addAll(metricOwners);
+      }
       this.emailConfigurationDAO.update(alertConfigDTO);
+      LOG.info("Alert config {} with id {} has been updated.", alertConfigDTO.getName(), alertConfigDTO.getId());
     }
   }
+
+  private Set<String> getOwners(MetricConfigDTO metric) {
+    Set<String> owners = new HashSet<>();
+    if (metric != null && metric.getDataset() != null) {
+      DatasetConfigDTO datasetConfigDTO = datasetFunctionDAO.findByDataset(metric.getDataset());
+      if (datasetConfigDTO != null && datasetConfigDTO.getOwners() != null) {
+        owners.addAll(datasetConfigDTO.getOwners());
+      }
+    }
+    return owners;
+  }
+
 
   private Long createAlertConfig(String alertGroupName, String application, String cron, Set<String> recipients) {
     if (StringUtils.isEmpty(cron)) {
