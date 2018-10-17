@@ -25,8 +25,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.OffHeapStarTree;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeNode;
 import java.io.File;
@@ -106,11 +104,12 @@ public class StarTreeIndexViewer {
       valueIterators.put(columnName, itr);
       dictionaries.put(columnName, dataSource.getDictionary());
     }
-    File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(segmentDir);
-    StarTree tree = new OffHeapStarTree(starTreeFile, ReadMode.mmap);
+    StarTree tree = indexSegment.getStarTrees().get(0).getStarTree();
     _dimensionNames = tree.getDimensionNames();
     StarTreeJsonNode jsonRoot = new StarTreeJsonNode("ROOT");
     build(tree.getRoot(), jsonRoot);
+    indexSegment.destroy();
+
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.getSerializationConfig().withSerializationInclusion(Inclusion.NON_NULL);
     String writeValueAsString = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonRoot);

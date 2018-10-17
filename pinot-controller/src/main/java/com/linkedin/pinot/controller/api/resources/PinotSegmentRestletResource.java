@@ -473,8 +473,8 @@ public class PinotSegmentRestletResource {
       try {
         resultForTable.put(FileUploadPathProvider.TABLE_NAME, tableNameWithType);
         // TODO: maybe better to put as json instead of json string
-        resultForTable.put("segments", objectMapper.writeValueAsString(
-            _pinotHelixResourceManager.getInstanceToSegmentsInATableMap(tableNameWithType)));
+        resultForTable.put("segments",
+            objectMapper.writeValueAsString(_pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType)));
       } catch (JSONException | JsonProcessingException e) {
         throw new ControllerApplicationException(LOGGER,
             "Caught JSON exception while getting instance to segments map for table: " + tableNameWithType,

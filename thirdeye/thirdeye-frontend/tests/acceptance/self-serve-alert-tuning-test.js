@@ -1,8 +1,7 @@
 import $ from 'jquery';
-import moment from 'moment';
 import { module, test } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
-import { selfServeConst, selfServeSettings, optionsToString } from 'thirdeye-frontend/tests/utils/constants';
+import { selfServeConst } from 'thirdeye-frontend/tests/utils/constants';
 import { visit, fillIn, click, currentURL, triggerKeyEvent, waitUntil } from '@ember/test-helpers';
 import { filters, dimensions, granularities } from 'thirdeye-frontend/mocks/metricPeripherals';
 import { selectChoose, clickTrigger } from 'thirdeye-frontend/tests/helpers/ember-power-select';
@@ -14,13 +13,13 @@ module('Acceptance | tune alert settings', function(hooks) {
   const alertProps = [
     'Metric',
     'Dataset',
-    'Filtered by',
-    'Breakdown by',
-    'Owner',
+    'Granularity',
     'Application',
-    'Anomaly Pattern',
-    'Mailing List',
-    'Granularity'
+    'Alert Owner',
+    'Data Filter',
+    'Dimensions',
+    'Detection Type',
+    'Subscription Group'
   ];
 
   test(`visiting alert page to test self-serve tuning flow`, async (assert) => {

@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -141,6 +142,8 @@ public class PrioritySchedulerTest {
     assertEquals(group.totalReservedThreads(), 0);
     // -1 because we expect that 1 permit is blocked by the scheduler main thread
     assertEquals(scheduler.getRunningQueriesSemaphore().availablePermits(), totalPermits - 1);
+    assertTrue(scheduler.getLatestQueryTime() > 0 &&
+        scheduler.getLatestQueryTime() <= System.currentTimeMillis());
     scheduler.stop();
   }
 
@@ -217,6 +220,7 @@ public class PrioritySchedulerTest {
 
   static class TestPriorityScheduler extends PriorityScheduler {
     static TestSchedulerGroupFactory groupFactory;
+    static LongAccumulator latestQueryTime;
 
     public static TestPriorityScheduler create(Configuration conf) {
       ResourceManager rm = new PolicyBasedResourceManager(conf);
@@ -224,7 +228,8 @@ public class PrioritySchedulerTest {
       groupFactory = new TestSchedulerGroupFactory();
       MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(conf, rm,
           groupFactory, new TableBasedGroupMapper());
-      return new TestPriorityScheduler(rm, qe, queue, metrics);
+      latestQueryTime = new LongAccumulator(Long::max, 0);
+      return new TestPriorityScheduler(rm, qe, queue, metrics, latestQueryTime);
     }
 
     public static TestPriorityScheduler create() {
@@ -234,8 +239,9 @@ public class PrioritySchedulerTest {
 
     // store locally for easy access
     public TestPriorityScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,
-        @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics) {
-      super(resourceManager, queryExecutor, queue, metrics);
+        @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics,
+        @Nonnull LongAccumulator latestQueryTime) {
+      super(resourceManager, queryExecutor, queue, metrics, latestQueryTime);
     }
 
     ResourceManager getResourceManager() {
@@ -257,6 +263,10 @@ public class PrioritySchedulerTest {
 
     SchedulerPriorityQueue getQueue() {
       return queryQueue;
+    }
+
+    public long getLatestQueryTime() {
+      return latestQueryTime.get();
     }
   }
 

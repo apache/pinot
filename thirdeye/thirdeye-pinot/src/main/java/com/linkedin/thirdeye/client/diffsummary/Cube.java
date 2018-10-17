@@ -134,6 +134,11 @@ public class Cube { // the cube (Ca|Cb)
       LOG.info("Auto-dimension order: " + this.dimensions);
 
       buildSubCube(olapClient, this.dimensions, dataFilter);
+
+    } catch (Exception e) {
+      ThirdeyeMetricsUtil.cubeExceptionCounter.inc();
+      throw e;
+
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);
@@ -153,6 +158,11 @@ public class Cube { // the cube (Ca|Cb)
     long tStart = System.nanoTime();
     try {
       buildSubCube(olapClient, dimensions, dataFilter);
+
+    } catch (Exception e) {
+      ThirdeyeMetricsUtil.cubeExceptionCounter.inc();
+      throw e;
+
     } finally {
       ThirdeyeMetricsUtil.cubeCallCounter.inc();
       ThirdeyeMetricsUtil.cubeDurationCounter.inc(System.nanoTime() - tStart);

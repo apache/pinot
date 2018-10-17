@@ -1,5 +1,5 @@
 import Component from '@ember/component';
-import { observer, getProperties, computed } from '@ember/object';
+import { observer, get, getProperties, computed } from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
@@ -100,7 +100,7 @@ export default Component.extend({
     'sizeMetricUrn', 'sizeOptions',
     function() {
       const { sizeMetricUrn, sizeOptions } =
-        this.getProperties('sizeMetricUrn', 'sizeOptions');
+        getProperties(this, 'sizeMetricUrn', 'sizeOptions');
       return sizeOptions.find(opt => opt.urn === sizeMetricUrn);
     }
   ).readOnly(),
@@ -109,7 +109,7 @@ export default Component.extend({
    * Options for heatmap size
    */
   sizeOptions: computed('entities', function () {
-    const entities = this.get('entities');
+    const entities = get(this, 'entities');
     const metricUrns = filterPrefix(Object.keys(entities), 'thirdeye:metric:');
     return _.sortBy(metricUrns.map(urn => Object.assign({}, { urn, name: toMetricLabel(urn, entities) })), "name");
   }),
@@ -144,7 +144,7 @@ export default Component.extend({
     'selectedUrn',
     function () {
       const { breakdowns, selectedUrn } =
-        this.getProperties('breakdowns', 'selectedUrn');
+        getProperties(this, 'breakdowns', 'selectedUrn');
 
       if (!selectedUrn) {
         return {};
@@ -166,7 +166,7 @@ export default Component.extend({
     'sizeMetricUrn',
     function () {
       const { breakdowns, sizeMetricUrn } =
-        this.getProperties('breakdowns', 'sizeMetricUrn');
+        getProperties(this, 'breakdowns', 'sizeMetricUrn');
       if (!sizeMetricUrn) {
         return {};
       }
@@ -183,7 +183,7 @@ export default Component.extend({
     'selectedUrn',
     function () {
       const { breakdowns, selectedUrn } =
-        this.getProperties('breakdowns', 'selectedUrn');
+        getProperties(this, 'breakdowns', 'selectedUrn');
       if (!selectedUrn) {
         return {};
       }
@@ -200,7 +200,7 @@ export default Component.extend({
     'current',
     'isLoadingBreakdowns',
     function () {
-      const { current, isLoadingBreakdowns } = this.getProperties('current', 'isLoadingBreakdowns');
+      const { current, isLoadingBreakdowns } = getProperties(this, 'current', 'isLoadingBreakdowns');
       return isLoadingBreakdowns || !_.isEmpty(current);
     }
   ),
@@ -209,7 +209,7 @@ export default Component.extend({
     'baseline',
     'isLoadingBreakdowns',
     function () {
-      const { baseline, isLoadingBreakdowns } = this.getProperties('baseline', 'isLoadingBreakdowns');
+      const { baseline, isLoadingBreakdowns } = getProperties(this, 'baseline', 'isLoadingBreakdowns');
       return isLoadingBreakdowns || !_.isEmpty(baseline);
     }
   ),
@@ -218,7 +218,7 @@ export default Component.extend({
     'selectedUrn',
     'entities',
     function () {
-      const { selectedUrn, entities } = this.getProperties('selectedUrn', 'entities');
+      const { selectedUrn, entities } = getProperties(this, 'selectedUrn', 'entities');
       return isInverse(selectedUrn, entities);
     }
   ),
@@ -227,7 +227,7 @@ export default Component.extend({
     'selectedUrn',
     'entities',
     function () {
-      const { selectedUrn, entities } = this.getProperties('selectedUrn', 'entities');
+      const { selectedUrn, entities } = getProperties(this, 'selectedUrn', 'entities');
       // prevent flashing error message
       if (!(selectedUrn in entities)) {
         return true;
@@ -244,7 +244,7 @@ export default Component.extend({
     'rollupRange',
     function () {
       const { current, baseline, sizeMetricCurrent } =
-        this.getProperties('current', 'baseline', 'sizeMetricCurrent');
+        getProperties(this, 'current', 'baseline', 'sizeMetricCurrent');
 
       if (!sizeMetricCurrent) {
         return;
@@ -309,7 +309,7 @@ export default Component.extend({
     'isInverse',
     function () {
       const { _dataRollup: values, mode, isInverse } =
-        this.getProperties('_dataRollup', 'mode', 'isInverse');
+        getProperties(this, '_dataRollup', 'mode', 'isInverse');
       const transformation = this._makeTransformation(mode);
       const cells = {};
       Object.keys(values).forEach(n => {
@@ -434,13 +434,27 @@ export default Component.extend({
   },
 
   actions: {
-    onHeatmapClick(role, dimName, dimValue) {
+    onInclude(role, dimName, dimValue) {
       const { selectedUrn, onSelection } =
-        this.getProperties('selectedUrn', 'onSelection');
+        getProperties(this, 'selectedUrn', 'onSelection');
 
       // selection
       if (role === ROOTCAUSE_ROLE_VALUE) {
-        const metricUrn = appendFilters(selectedUrn, [[dimName, dimValue]]);
+        const metricUrn = appendFilters(selectedUrn, [[dimName, '=', dimValue]]);
+        const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
+        if (onSelection) {
+          onSelection(updates);
+        }
+      }
+    },
+
+    onExclude(role, dimName, dimValue) {
+      const { selectedUrn, onSelection } =
+        getProperties(this, 'selectedUrn', 'onSelection');
+
+      // selection
+      if (role === ROOTCAUSE_ROLE_VALUE) {
+        const metricUrn = appendFilters(selectedUrn, [[dimName, '!=', dimValue]]);
         const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
         if (onSelection) {
           onSelection(updates);
@@ -452,7 +466,7 @@ export default Component.extend({
      * Load size metric
      */
     onSizeMetric(option) {
-      const { onSizeMetric } = this.getProperties('onSizeMetric');
+      const { onSizeMetric } = getProperties(this, 'onSizeMetric');
       if (onSizeMetric) {
         onSizeMetric(option.urn);
       }

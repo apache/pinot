@@ -1,10 +1,13 @@
 import { computed } from '@ember/object';
 import Component from '@ember/component';
 import moment from 'moment';
-import { toEventLabel } from 'thirdeye-frontend/utils/rca-utils';
+import {
+  makeTime,
+  toEventLabel
+} from 'thirdeye-frontend/utils/rca-utils';
 import _ from 'lodash';
 
-const ROOTCAUSE_EVENT_DATE_FORMAT = 'ddd, MMM DD hh:mm A';
+const ROOTCAUSE_EVENT_DATE_FORMAT = 'ddd, MMM DD hh:mm a z';
 
 export default Component.extend({
   columns: null, // []
@@ -34,7 +37,7 @@ export default Component.extend({
           return Object.assign({}, e, {
             isSelected: selectedUrns.has(e.urn),
             duration,
-            humanStart: moment(e.start).format(ROOTCAUSE_EVENT_DATE_FORMAT),
+            humanStart: makeTime(e.start).format(ROOTCAUSE_EVENT_DATE_FORMAT),
             humanDuration: this._formatDuration(duration),
             label: toEventLabel(e.urn, entities)
           });

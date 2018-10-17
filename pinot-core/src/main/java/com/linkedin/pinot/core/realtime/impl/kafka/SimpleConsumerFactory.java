@@ -15,28 +15,59 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.core.realtime.stream.StreamConsumer;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 
 
 /**
  * A {@link StreamConsumerFactory} implementation for consuming a kafka stream using Kafka's Simple Consumer
  */
+// TODO: this should ideally be called KafkaConsumerFactory. It is not a factory for simple consumer.
+// We cannot change this because open source usages of this factory will need to change the class name defined in their stream configs inside table configs
 public class SimpleConsumerFactory extends StreamConsumerFactory {
 
+  /**
+   * Creates a partition level consumer for fetching from a partition of a kafka stream
+   * @param clientId
+   * @param partition
+   * @return
+   */
   @Override
-  public StreamConsumer createStreamConsumer(String clientId, int partition) {
-    return new KafkaSimpleStreamConsumer(clientId, _streamMetadata, partition);
+  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+    return new KafkaPartitionLevelConsumer(clientId, _streamConfig, partition);
   }
 
+  /**
+   * Creates a stream level consumer for a kafka stream
+   * @param clientId
+   * @return
+   */
+  @Override
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, Schema schema) {
+    return new KafkaStreamLevelConsumer(clientId, _streamConfig, schema);
+  }
+
+  /**
+   * Creates a partition metadata provider for a kafka stream
+   * @param clientId
+   * @param partition
+   * @return
+   */
   @Override
   public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
-    return new KafkaSimpleStreamMetadataProvider(clientId, _streamMetadata, partition);
+    return new KafkaStreamMetadataProvider(clientId, _streamConfig, partition);
   }
 
+  /**
+   * Creates a stream metadata provider for a kafka stream
+   * @param clientId
+   * @return
+   */
   @Override
   public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
-    return new KafkaSimpleStreamMetadataProvider(clientId, _streamMetadata);
+    return new KafkaStreamMetadataProvider(clientId, _streamConfig);
   }
 }

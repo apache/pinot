@@ -12,12 +12,12 @@ import {
   dateFormatFull,
   appendTail,
   stripTail,
-  extractTail
+  extractTail,
+  makeTime
 } from 'thirdeye-frontend/utils/rca-utils';
 import EVENT_TABLE_COLUMNS from 'thirdeye-frontend/shared/eventTableColumns';
 import filterBarConfig from 'thirdeye-frontend/shared/filterBarConfig';
 import fetch from 'fetch';
-import moment from 'moment';
 import config from 'thirdeye-frontend/config/environment';
 import _ from 'lodash';
 
@@ -681,7 +681,7 @@ export default Controller.extend({
     this.setProperties({
       sessionId,
       sessionUpdatedBy: username,
-      sessionUpdatedTime: moment().valueOf(),
+      sessionUpdatedTime: makeTime().valueOf(),
       sessionModified: false
     });
 
@@ -743,7 +743,7 @@ export default Controller.extend({
       .then((res) => {
         if (res.updated > sessionUpdatedTime) {
           this.setProperties({
-            sessionUpdateWarning: `This investigation (${sessionId}) was updated by ${res.updatedBy} on ${moment(res.updated).format(dateFormatFull)}. Please refresh the page.`
+            sessionUpdateWarning: `This investigation (${sessionId}) was updated by ${res.updatedBy} on ${makeTime(res.updated).format(dateFormatFull)}. Please refresh the page.`
           });
         }
       })
@@ -757,6 +757,8 @@ export default Controller.extend({
    */
   _onCheckSessionTimer() {
     const { sessionId } = this.getProperties('sessionId');
+
+    if (!sessionId) { return; }
 
     // debounce: do not run if destroyed
     if (this.isDestroyed) { return; }
@@ -785,6 +787,8 @@ export default Controller.extend({
   _updateAnomalyFeedbackDebounce() {
     const { anomalyUrn, anomalyFeedback, sessionText } =
       this.getProperties('anomalyUrn', 'anomalyFeedback', 'sessionText');
+
+    if (!anomalyUrn) { return; }
 
     // debounce: do not run if destroyed
     if (this.isDestroyed) { return; }
@@ -863,7 +867,12 @@ export default Controller.extend({
         newSelectedUrns.add(toBaselineUrn(urn));
       });
 
-    if (_.isEqual(selectedUrns, newSelectedUrns)) { return; }
+    if (_.isEqual(selectedUrns, newSelectedUrns)) {
+      if (loadingFrameworks.size <= 0) {
+        this.set('setupMode', ROOTCAUSE_SETUP_MODE_NONE);
+      }
+      return;
+    }
 
     this.setProperties({
       selectedUrns: newSelectedUrns,
@@ -1119,10 +1128,10 @@ export default Controller.extend({
       // adjust display window if necessary
       let analysisRange = [...context.analysisRange];
       if (analysisRange[0] >= start) {
-        analysisRange[0] = moment(start).startOf('day').valueOf();
+        analysisRange[0] = makeTime(start).startOf('day').valueOf();
       }
       if (analysisRange[1] <= end) {//not sure we need this now? -lohuynh
-        analysisRange[1] = moment(end).startOf('day').add(1, 'days').valueOf();
+        analysisRange[1] = makeTime(end).startOf('day').add(1, 'days').valueOf();
       }
 
       const newContext = Object.assign({}, context, {

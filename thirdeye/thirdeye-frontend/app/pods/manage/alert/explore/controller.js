@@ -47,6 +47,7 @@ export default Controller.extend({
    * Mapping anomaly table column names to corresponding prop keys
    */
   sortMap: {
+    number: 'index',
     start: 'anomalyStart',
     score: 'severityScore',
     change: 'changeRate',
@@ -96,6 +97,8 @@ export default Controller.extend({
       sortColumnStartUp: false,
       sortColumnScoreUp: false,
       sortColumnChangeUp: false,
+      sortColumnNumberUp: true,
+      isAnomalyListFiltered: false,
       isDimensionFetchDone: false,
       sortColumnResolutionUp: false,
       checkReplayInterval: 2000, // 2 seconds
@@ -186,9 +189,10 @@ export default Controller.extend({
     'currentPage',
     'loadedWoWData',
     'selectedSortMode',
+    'selectedResolution',
     function() {
       let anomalies = this.get('filteredAnomalies');
-      const { pageSize, currentPage, selectedSortMode } = this.getProperties('pageSize', 'currentPage', 'selectedSortMode');
+      const { pageSize, currentPage, selectedSortMode } = getProperties(this, 'pageSize', 'currentPage', 'selectedSortMode');
 
       if (selectedSortMode) {
         let [ sortKey, sortDir ] = selectedSortMode.split(':');
@@ -209,7 +213,7 @@ export default Controller.extend({
    * @type {String}
    */
   uiDateFormat: computed('alertData.windowUnit', function() {
-    const rawGranularity = this.get('alertData.windowUnit');
+    const rawGranularity = this.get('alertData.bucketUnit');
     const granularity = rawGranularity ? rawGranularity.toLowerCase() : '';
 
     switch(granularity) {
@@ -247,10 +251,11 @@ export default Controller.extend({
    */
   isAnomalyLoadError: computed(
     'totalAnomalies',
-    'filteredAnomalies.length',
+    'anomalyData.length',
     function() {
-      const { totalAnomalies, filteredAnomalies } = getProperties(this, 'totalAnomalies', 'filteredAnomalies');
-      return totalAnomalies !== filteredAnomalies.length;
+      const { totalAnomalies, anomalyData } = getProperties(this, 'totalAnomalies', 'anomalyData');
+      const totalsMatching = anomalyData ? (totalAnomalies !== anomalyData.length) : true;
+      return totalsMatching;
     }
   ),
 
@@ -330,28 +335,31 @@ export default Controller.extend({
     'anomaliesLoaded',
     function() {
       const {
+        anomalyData,
         anomaliesLoaded,
         selectedDimension: targetDimension,
         selectedResolution: targetResolution
-      } = this.getProperties('selectedDimension', 'selectedResolution', 'anomaliesLoaded');
-      let anomalies = [];
+      } = this.getProperties('anomalyData', 'selectedDimension', 'selectedResolution', 'anomaliesLoaded');
+      let newAnomalies = [];
 
-      if (anomaliesLoaded) {
-        anomalies = this.get('anomalyData');
+      if (anomaliesLoaded  && anomalyData) {
+        newAnomalies = this.get('anomalyData');
         if (targetDimension !== 'All Dimensions') {
           // Filter for selected dimension
-          anomalies = anomalies.filter(data => targetDimension === data.dimensionString);
+          newAnomalies = newAnomalies.filter(data => targetDimension === data.dimensionString);
         }
         if (targetResolution !== 'All Resolutions') {
           // Filter for selected resolution
-          anomalies = anomalies.filter(data => targetResolution === data.anomalyFeedback);
+          newAnomalies = newAnomalies.filter(data => targetResolution === data.anomalyFeedback);
         }
+        // Let page know whether anomalies viewed are filtered or not
+        set(this, 'isAnomalyListFiltered', anomalyData.length !== newAnomalies.length);
         // Add an index number to each row
-        anomalies.forEach((anomaly, index) => {
-          anomaly.index = index + 1;
+        newAnomalies.forEach((anomaly, index) => {
+          set(anomaly, 'index', ++index);
         });
       }
-      return anomalies;
+      return newAnomalies;
     }
   ),
 

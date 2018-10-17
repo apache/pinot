@@ -129,7 +129,7 @@ public class PinotURIUploadIntegrationTest extends BaseClusterIntegrationTest {
     TestUtils.ensureDirectoriesExistAndEmpty(segmentTarDir);
     ExecutorService executor = MoreExecutors.newDirectExecutorService();
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(Collections.singletonList(avroFile), segmentIndex,
-        new File(_segmentDir, segmentName), segmentTarDir, this._tableName, false, null, null, executor);
+        new File(_segmentDir, segmentName), segmentTarDir, this._tableName, executor);
     executor.shutdown();
     executor.awaitTermination(1L, TimeUnit.MINUTES);
 

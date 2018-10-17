@@ -37,7 +37,15 @@ export const eventColorMapping = {
   custom: 'pink'
 };
 
-export const dateFormatFull = 'ddd, MMM D YYYY, h:mm a';
+export const dateFormatFull = 'ddd, MMM D YYYY, h:mm a z';
+
+/**
+ * Returns a timestamp pinned to the default RCA time zone
+ */
+export function makeTime(t, args) {
+  if (typeof t === 'undefined') { t = moment().valueOf(); }
+  return moment(t, args).tz('America/Los_Angeles');
+}
 
 /**
  * Parses the input as float and returns it, unless it is NaN where it returns Number.NEGATIVE_INFINITY instead
@@ -155,7 +163,7 @@ export function appendTail(urn, tail) {
  * @returns {string} merged metric urn
  */
 export function appendFilters(urn, filters) {
-  const tail = filters.map(t => encodeURIComponent(`${t[0]}=${t[1]}`));
+  const tail = filters.map(t => encodeURIComponent(`${t[0]}${t[1]}${t[2]}`));
   return appendTail(urn, tail);
 }
 
@@ -257,10 +265,30 @@ export function toMetricLabel(urn, entities) {
     metricName = urn;
   }
 
-  const filters = toFilters(urn).map(t => t[1]);
-  const filterString = filters.length ? ` (${filters.join(', ')})` : '';
+  const filters = toFilters(urn).map(t => filter2value(t));
 
-  return `${metricName}${filterString}`;
+  // TODO support range filters
+  const inclusionFilters = filters.filter(f => !f.startsWith('!')).sort();
+  const exclusionFilters = filters.filter(f => f.startsWith('!')).map(f => f.substring(1)).sort();
+
+  const inclusionFiltersString = _.isEmpty(inclusionFilters) ? '' : ` (${inclusionFilters.join(', ')})`;
+  const exclusionFiltersString = _.isEmpty(exclusionFilters) ? '' : ` (Excludes ${exclusionFilters.join(', ')})`;
+
+  return `${metricName}${inclusionFiltersString}${exclusionFiltersString}`;
+}
+
+/**
+ * Returns a human-readable dataset name for a metric urn, using information from the entities cache.
+ *
+ * @param {string} urn metric urn
+ * @param {object} entities entities cache
+ */
+export function toMetricDataset(urn, entities) {
+  try {
+    return entities[urn].attributes.dataset[0];
+  } catch (err) {
+    return '-';
+  }
 }
 
 /**
@@ -374,7 +402,7 @@ export function toBaselineRange(range, offset) {
     return range;
   }
 
-  const start = moment(range[0]).subtract(offsetWeeks, 'weeks').valueOf();
+  const start = makeTime(range[0]).subtract(offsetWeeks, 'weeks').valueOf();
   const end = start + (range[1] - range[0]);
 
   return [start, end];
@@ -405,15 +433,17 @@ export function toAbsoluteRange(urn, currentRange, baselineCompareMode) {
  * Extract filter tuples from urns. Supports 'thirdeye:dimension:', 'thirdeye:metric:', 'frontend:metric:' prefixes.
  *
  * @param {Array} urns array of urns
- * @returns {Array} array of sorted unique filter tuples ([key, value])
+ * @returns {Array} array of sorted unique filter triplets ([key, op, value])
  */
 export function toFilters(urns) {
   const flatten = (agg, l) => agg.concat(l);
-  const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':').map(decodeURIComponent), 2, 4));
+  const dimensionFilters = filterPrefix(urns, 'thirdeye:dimension:').map(urn => _.slice(urn.split(':').map(decodeURIComponent), 2, 4).insertAt(1, '='));
+
   const metricFilters = filterPrefix(urns, 'thirdeye:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
   const frontendMetricFilters = filterPrefix(urns, 'frontend:metric:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
-  const anomalyFunctoinFilters = filterPrefix(urns, 'frontend:anomalyfunction:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
-  return [...new Set([...dimensionFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctoinFilters])].sort();
+  const anomalyFunctionFilters = filterPrefix(urns, 'frontend:anomalyfunction:').map(extractTail).map(enc => enc.map(tup => splitFilterFragment(decodeURIComponent(tup)))).reduce(flatten, []);
+
+  return [...new Set([...dimensionFilters, ...metricFilters, ...frontendMetricFilters, ...anomalyFunctionFilters])].sort();
 }
 
 /**
@@ -423,50 +453,109 @@ export function toFilters(urns) {
  * @returns {Array} filter tuples
  */
 export function splitFilterFragment(fragment) {
-  const parts = fragment.split('=');
-  return [parts[0], _.slice(parts, 1).join('=')];
+  // Note: matching order not respected by regex, so split into two parts manually
+
+  const reLong = /^(.+)(!=|<=|>=)(.*)$/;
+  const partsLong = reLong.exec(fragment);
+  if (!_.isEmpty(partsLong)) {
+    return [partsLong[1], partsLong[2], partsLong[3]];
+  }
+
+  const reShort = /^(.+)(=|<|>)(.*)$/;
+  const partsShort = reShort.exec(fragment);
+  if (!_.isEmpty(partsShort)) {
+    return [partsShort[1], partsShort[2], partsShort[3]];
+  }
+
+  throw new Error(`Unsupported fragment '${fragment}'`);
 }
 
 /**
- * Converts a filter multimap/object into an array of filter tuples [key, value]
+ * Converts a filter multimap/object into an array of filter triplets [key, op, value]
  *
  * @see toFilterMap(filters)
  *
  * @param {Object} filterMap filter values, keyed by filter keys
- * @returns {Array} filter tuples
+ * @returns {Array} filter triplets
  */
 export function fromFilterMap(filterMap) {
   const filters = [];
   Object.keys(filterMap).forEach(key => {
     [...filterMap[key]].forEach(value => {
-      filters.push([key, value]);
+      filters.push(value2filter(key, value));
     });
   });
   return filters;
 }
 
 /**
- * Converts an array of filter tuples [key, value] into a filter multimap/object.
+ * Converts an array of filter triplets [key, op, value] into a filter multimap/object.
  *
  * @see fromFilterMap(filterMap)
  *
- * @param {Array} filters array fo filter tuples
+ * @param {Array} filters array fo filter triplets
  * @returns {Object} multimap of filter values, keyed by filter keys
  */
 export function toFilterMap(filters) {
   const filterMap = {};
   filters.forEach(t => {
-    const [dimName, dimValue] = t;
+    const dimName = t[0];
     if (!filterMap[dimName]) {
       filterMap[dimName] = new Set();
     }
-    filterMap[dimName].add(dimValue);
+    filterMap[dimName].add(`${filter2value(t)}`);
   });
 
   // Set to list
   Object.keys(filterMap).forEach(dimName => filterMap[dimName] = [...filterMap[dimName]]);
 
   return filterMap;
+}
+
+/**
+ * Converts a single filter triplet ([key, op, value]) into a filter map value.
+ *
+ * @param {Array} filter filter triplet
+ * @returns {string}
+ */
+export function filter2value(filter) {
+  if (filter[1] === '=') {
+    return filter[2];
+  }
+  if (filter[1] === '!=') {
+    return `!${filter[2]}`;
+  }
+  return `${filter[1]}${filter[2]}`;
+}
+
+/**
+ * Converts a single filter map key-value pair into a filter triplet.
+ *
+ * @param {string} key map entry key
+ * @param {string} value map entry value
+ * @returns {Array}
+ */
+export function value2filter(key, value) {
+  if (value.startsWith('!')) {
+    return [key, '!=', value.substring(1)];
+  }
+  if (value.startsWith('<=') || value.startsWith('>=')) {
+    return [key, value.substring(0, 2), value.substring(2)];
+  }
+  if (value.startsWith('<') || value.startsWith('>')) {
+    return [key, value.substring(0, 1), value.substring(1)];
+  }
+  return [key, '=', value];
+}
+
+/**
+ * Returns true if the list of filters contains non-inclusion expressions.
+ *
+ * @param {Array} filters filter trples [key, op, value]
+ * @returns {boolean}
+ */
+export function hasExclusionFilters(filters) {
+  return !_.isEmpty(filters.map(t => t[1]).filter(op => op !== '='));
 }
 
 /**
@@ -553,6 +642,19 @@ export function isAdditive(urn, entities) {
 }
 
 /**
+ * Extracts information about non-additivity and the presence of exclusion filters
+ * @param {string} urn metric urn
+ * @param {object} entities entities cache
+ */
+export function isExclusionWarning(urn, entities) {
+  try {
+    return !isAdditive(urn, entities) && hasExclusionFilters(toFilters([urn]));
+  } catch(error) {
+    return false;
+  }
+}
+
+/**
  * finds the corresponding labelMapping field given a label in the filterBarConfig
  * This is only a placeholder since the filterBarConfig is not finalized
  */
@@ -609,6 +711,7 @@ export default {
   toFilterMap,
   findLabelMapping,
   toMetricLabel,
+  toMetricDataset,
   toColor,
   toColorDirection,
   toWidthNumber,
@@ -620,5 +723,10 @@ export default {
   eventColorMapping,
   dateFormatFull,
   trimTimeRanges,
-  splitFilterFragment
+  splitFilterFragment,
+  makeTime,
+  filter2value,
+  value2filter,
+  hasExclusionFilters,
+  isExclusionWarning
 };

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import com.linkedin.thirdeye.api.Constants;
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
@@ -367,7 +368,7 @@ public class DetectionJobResource {
       }
       // if isRemoveAnomaliesInWindow is true, remove existing anomalies within same replay window
       if (isRemoveAnomaliesInWindow) {
-        OnboardResource onboardResource = new OnboardResource();
+        OnboardResource onboardResource = new OnboardResource(new ThirdEyeDashboardConfiguration());
         onboardResource.deleteExistingAnomalies(functionId, startTime.getMillis(), endTime.getMillis());
       }
 

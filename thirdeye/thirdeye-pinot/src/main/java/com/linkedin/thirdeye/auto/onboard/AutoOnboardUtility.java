@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.auto.onboard;
 
+import com.google.common.base.CaseFormat;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.DataSources;
 import com.linkedin.thirdeye.datasource.DataSourcesLoader;
@@ -17,6 +18,9 @@ import org.slf4j.LoggerFactory;
 
 public class AutoOnboardUtility {
   private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardUtility.class);
+
+  private static final String DEFAULT_ALERT_GROUP_PREFIX = "auto_onboard_dataset_";
+  private static final String DEFAULT_ALERT_GROUP_SUFFIX = "_alert";
 
   public static Map<String, List<AutoOnboard>> getDataSourceToAutoOnboardMap(URL dataSourcesUrl) {
     Map<String, List<AutoOnboard>> dataSourceToOnboardMap = new HashMap<>();
@@ -56,5 +60,10 @@ public class AutoOnboardUtility {
     }
 
     return dataSourceToOnboardMap;
+  }
+
+  public static String getAutoAlertGroupName(String dataset) {
+    return DEFAULT_ALERT_GROUP_PREFIX
+        + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, dataset) + DEFAULT_ALERT_GROUP_SUFFIX;
   }
 }

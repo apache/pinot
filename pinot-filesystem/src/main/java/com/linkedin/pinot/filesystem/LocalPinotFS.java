@@ -129,6 +129,11 @@ public class LocalPinotFS extends PinotFS {
     copy(new URI(encodeURI(srcFile.getAbsolutePath())), dstUri);
   }
 
+  @Override
+  public boolean isDirectory(URI uri) throws IOException {
+    return new File(uri).isDirectory();
+  }
+
   private String encodeURI(String uri) throws UnsupportedEncodingException {
     return URLEncoder.encode(uri, DEFAULT_ENCODING);
   }

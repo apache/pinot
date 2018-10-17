@@ -15,44 +15,33 @@
  */
 package com.linkedin.pinot.core.startree.v2;
 
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import java.util.List;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.data.aggregator.SumValueAggregator;
+import com.linkedin.pinot.core.data.aggregator.ValueAggregator;
+import java.util.Random;
+
+import static org.testng.Assert.*;
 
 
-// TODO: this is an example test class. To enable the test, add setUp method and queries.
-public class SumStarTreeV2Test extends BaseStarTreeV2Test<Double, Double> {
+public class SumStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
 
-  @Test
-  public void testQueries() {
-    // TODO: add queries
-    // testQuery("SELECT SUM(column) FROM table WHERE ... GROUP BY ...");
+  @Override
+  ValueAggregator<Number, Double> getValueAggregator() {
+    return new SumValueAggregator();
   }
 
   @Override
-  protected Double getNextValue(@Nonnull BlockSingleValIterator valueIterator, @Nullable Dictionary dictionary) {
-    if (dictionary == null) {
-      return valueIterator.nextDoubleVal();
-    } else {
-      return dictionary.getDoubleValue(valueIterator.nextIntVal());
-    }
+  DataType getRawValueType() {
+    return DataType.INT;
   }
 
   @Override
-  protected Double aggregate(@Nonnull List<Double> values) {
-    double sum = 0;
-    for (Double value : values) {
-      sum += value;
-    }
-    return sum;
+  Number getRandomRawValue(Random random) {
+    return random.nextInt();
   }
 
   @Override
   protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    Assert.assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
   }
 }

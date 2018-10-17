@@ -50,4 +50,9 @@ public interface PinotTaskGenerator {
    * @return Maximum number of concurrent tasks allowed per instance
    */
   int getNumConcurrentTasksPerInstance();
+
+  /**
+   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
+   */
+  void nonLeaderCleanUp();
 }

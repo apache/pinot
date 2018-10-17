@@ -44,7 +44,7 @@ public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
 
-  private static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
+  protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
     public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
       // earlier
@@ -60,9 +60,9 @@ public class MergeWrapper extends DetectionPipeline {
     }
   };
 
-  private final List<Map<String, Object>> nestedProperties;
-  private final long maxGap; // max time gap for merge
-  private final long maxDuration; // max overall duration of merged anomaly
+  protected final List<Map<String, Object>> nestedProperties;
+  protected final long maxGap; // max time gap for merge
+  protected final long maxDuration; // max overall duration of merged anomaly
   private final AnomalySlice slice;
 
   /**
@@ -122,8 +122,7 @@ public class MergeWrapper extends DetectionPipeline {
     all.addAll(retrieved);
     all.addAll(generated);
 
-    return new DetectionPipelineResult(this.merge(all))
-        .setDiagnostics(diagnostics);
+    return new DetectionPipelineResult(this.merge(all)).setDiagnostics(diagnostics);
   }
 
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
@@ -188,7 +187,7 @@ public class MergeWrapper extends DetectionPipeline {
     return time;
   }
 
-  private static class AnomalyKey {
+  protected static class AnomalyKey {
     final String metric;
     final String collection;
     final DimensionMap dimensions;

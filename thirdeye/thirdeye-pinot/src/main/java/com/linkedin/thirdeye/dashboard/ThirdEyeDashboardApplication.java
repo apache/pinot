@@ -151,11 +151,12 @@ public class ThirdEyeDashboardApplication
 
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+    AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
 
     env.jersey().register(new DatasetAutoOnboardResource());
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
-    env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
+    env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory, alertFilterAutotuneFactory));
     env.jersey().register(new EmailResource(config));
     env.jersey().register(new EntityManagerResource(config));
     env.jersey().register(new MetricConfigResource());
@@ -168,7 +169,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DetectionMigrationResource(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
         DAO_REGISTRY.getDetectionConfigManager(), anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new OnboardResource());
+    env.jersey().register(new OnboardResource(config));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
     env.jersey().register(new AutoOnboardResource(config));
@@ -177,7 +178,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new UserDashboardResource(
         DAO_REGISTRY.getMergedAnomalyResultDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
-        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(),
+        DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getDatasetConfigDAO(), DAO_REGISTRY.getAlertConfigDAO(),
         DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDetectionAlertConfigManager()));
     env.jersey().register(new DetectionOnboardResource(
         DAO_REGISTRY.getTaskDAO(), DAO_REGISTRY.getAnomalyFunctionDAO()));
@@ -207,7 +208,6 @@ public class ThirdEyeDashboardApplication
       Do not call start() as this instance is only meant to run replay/autotune
      */
     DetectionJobScheduler detectionJobScheduler = new DetectionJobScheduler();
-    AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
     env.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
 
     try {
@@ -308,10 +308,12 @@ public class ThirdEyeDashboardApplication
    * @throws Exception the exception
    */
   public static void main(String[] args) throws Exception {
-    if (args.length == 0) {
-      throw new IllegalArgumentException("Please provide config directory as parameter");
+    String thirdEyeConfigDir = "./config";
+    if (args.length >= 1) {
+      thirdEyeConfigDir = args[0];
     }
-    String thirdEyeConfigDir = args[0];
+    LOG.info("Using config path '{}'", thirdEyeConfigDir);
+
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
     String dashboardApplicationConfigFile = thirdEyeConfigDir + "/" + "dashboard.yml";
     new ThirdEyeDashboardApplication().run("server", dashboardApplicationConfigFile);

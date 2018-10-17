@@ -275,7 +275,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       ExecutorService executor = Executors.newCachedThreadPool();
       Schema schema = Schema.fromFile(_schemaFile);
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(_offlineAvroFiles, 0, _segmentDir, _tarDir, _tableName, false,
-          getRawIndexColumns(), schema, executor);
+          null, getRawIndexColumns(), schema, executor);
       executor.shutdown();
       executor.awaitTermination(10, TimeUnit.MINUTES);
 

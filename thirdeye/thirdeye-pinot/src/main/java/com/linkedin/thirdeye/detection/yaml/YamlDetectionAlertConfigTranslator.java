@@ -23,7 +23,7 @@ public class YamlDetectionAlertConfigTranslator {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_DETECTION_CONFIG_ID = "detectionConfigIds";
   private static final String CRON_SCHEDULE_DEFAULT = "0 21 * * * ? *";
-  private static final YamlTranslatorInfoMap YAML_TRANSLATOR_INFO_MAP = new YamlTranslatorInfoMap();
+  private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
 
   /**
    * generate detection alerter from YAML
@@ -71,7 +71,7 @@ public class YamlDetectionAlertConfigTranslator {
         continue;
       }
       if (entry.getKey().equals(PROP_TYPE)) {
-        properties.put(PROP_CLASS_NAME, YAML_TRANSLATOR_INFO_MAP.get(MapUtils.getString(alertYamlConfigs, PROP_TYPE)));
+        properties.put(PROP_CLASS_NAME, DETECTION_REGISTRY.lookup(MapUtils.getString(alertYamlConfigs, PROP_TYPE)));
       } else {
         properties.put(entry.getKey(), entry.getValue());
       }

@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.query.request.context.TimerContext;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -49,6 +50,7 @@ public abstract class QueryScheduler {
   protected final ServerMetrics serverMetrics;
   protected final QueryExecutor queryExecutor;
   protected final ResourceManager resourceManager;
+  protected final LongAccumulator latestQueryTime;
   protected volatile boolean isRunning = false;
 
   /**
@@ -58,7 +60,7 @@ public abstract class QueryScheduler {
    * @param serverMetrics server metrics collector
    */
   public QueryScheduler(@Nonnull QueryExecutor queryExecutor, @Nonnull ResourceManager resourceManager,
-      @Nonnull ServerMetrics serverMetrics) {
+      @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(queryExecutor);
     Preconditions.checkNotNull(resourceManager);
     Preconditions.checkNotNull(serverMetrics);
@@ -66,6 +68,7 @@ public abstract class QueryScheduler {
     this.serverMetrics = serverMetrics;
     this.resourceManager = resourceManager;
     this.queryExecutor = queryExecutor;
+    this.latestQueryTime = latestQueryTime;
   }
 
   /**
@@ -118,6 +121,7 @@ public abstract class QueryScheduler {
   @Nullable
   protected byte[] processQueryAndSerialize(@Nonnull ServerQueryRequest queryRequest,
       @Nonnull ExecutorService executorService) {
+    latestQueryTime.accumulate(System.currentTimeMillis());
     DataTable dataTable;
     try {
       dataTable = queryExecutor.processQuery(queryRequest, executorService);

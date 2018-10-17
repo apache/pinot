@@ -31,7 +31,6 @@ import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.manager.zk.ZkClient;
@@ -45,6 +44,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 /**
@@ -73,7 +74,8 @@ public class ValidationManagerTest {
     Thread.sleep(1000);
 
     _pinotHelixResourceManager =
-        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/
+        new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L,
+            true, /*isUpdateStateModel=*/
             false);
     _pinotHelixResourceManager.start();
 
@@ -138,7 +140,7 @@ public class ValidationManagerTest {
     // Check that the segment has been pushed in the last 30 seconds
     Assert.assertTrue(System.currentTimeMillis() - pushTime < 30_000);
     // Check that there is no refresh time
-    Assert.assertEquals(offlineSegmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
+    assertEquals(offlineSegmentZKMetadata.getRefreshTime(), Long.MIN_VALUE);
 
     // Refresh the segment
     Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
@@ -147,7 +149,7 @@ public class ValidationManagerTest {
     offlineSegmentZKMetadata =
         _pinotHelixResourceManager.getOfflineSegmentZKMetadata(TEST_TABLE_NAME, TEST_SEGMENT_NAME);
     // Check that the segment still has the same push time
-    Assert.assertEquals(offlineSegmentZKMetadata.getPushTime(), pushTime);
+    assertEquals(offlineSegmentZKMetadata.getPushTime(), pushTime);
     // Check that the refresh time is in the last 30 seconds
     Assert.assertTrue(System.currentTimeMillis() - offlineSegmentZKMetadata.getRefreshTime() < 30_000L);
   }
@@ -173,7 +175,7 @@ public class ValidationManagerTest {
     segmentZKMetadataList.add(
         SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName4, 20));
 
-    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, true), 60);
+    assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, true), 60);
 
     // Now add some low level segment names
     String segmentName5 = new LLCSegmentName(TEST_TABLE_NAME, 1, 0, 1000).getSegmentName();
@@ -183,7 +185,7 @@ public class ValidationManagerTest {
     segmentZKMetadataList.add(SegmentMetadataMockUtils.mockRealtimeSegmentZKMetadata(TEST_TABLE_NAME, segmentName6, 5));
 
     // Only the LLC segments should get counted.
-    Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, false), 15);
+    assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentZKMetadataList, false), 15);
   }
 
   @AfterClass
@@ -194,98 +196,29 @@ public class ValidationManagerTest {
   }
 
   @Test
-  public void testCountMissingSegments() {
-    // Should not crash with an empty or one element arrays
-    ValidationManager.countMissingSegments(new long[0], TimeUnit.DAYS);
-    ValidationManager.countMissingSegments(new long[1], TimeUnit.DAYS);
-
-    // Should be no missing segments on two consecutive days
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 22,
-            0).toInstant().getMillis(),}, TimeUnit.DAYS), 0);
-
-    // Should be no missing segments on five consecutive days
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 22,
-            0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(), new DateTime(2014, 1,
-            4, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 0).toInstant().getMillis(),},
-        TimeUnit.DAYS), 0);
-
-    // Should be no missing segments on five consecutive days, even if the interval between them isn't exactly 24 hours
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 21,
-            0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1,
-            4, 21, 5).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),},
-        TimeUnit.DAYS), 0);
-
-    // Should be no missing segments on five consecutive days, even if there is a duplicate segment
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 21,
-            0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22, 0).toInstant().getMillis(), new DateTime(2014, 1,
-            3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(), new DateTime(
-            2014, 1, 5, 22, 15).toInstant().getMillis(),}, TimeUnit.DAYS), 0);
-
-    // Should be exactly one missing segment
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 2, 21,
-            0).toInstant().getMillis(), new DateTime(2014, 1, 4, 21, 5).toInstant().getMillis(), new DateTime(2014, 1,
-            5, 22, 15).toInstant().getMillis(),}, TimeUnit.DAYS), 1);
-
-    // Should be one missing segment, even if there is a duplicate segment
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 22,
-            0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23, 0).toInstant().getMillis(), new DateTime(2014, 1,
-            4, 21, 5).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),},
-        TimeUnit.DAYS), 1);
-
-    // Should be two missing segments
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 3, 23,
-            0).toInstant().getMillis(), new DateTime(2014, 1, 5, 22, 15).toInstant().getMillis(),}, TimeUnit.DAYS), 2);
-
-    // Should be three missing segments
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 0).toInstant().getMillis(), new DateTime(2014, 1, 5, 22,
-            15).toInstant().getMillis(),}, TimeUnit.DAYS), 3);
-
-    // Should be three missing segments
-    Assert.assertEquals(ValidationManager.countMissingSegments(
-        new long[]{new DateTime(2014, 1, 1, 22, 25).toInstant().getMillis(), new DateTime(2014, 1, 5, 22,
-            15).toInstant().getMillis(),}, TimeUnit.DAYS), 3);
-  }
-
-  @Test
-  public void testComputeMissingIntervals() {
+  public void testComputeNumMissingSegments() {
     Interval jan1st = new Interval(new DateTime(2015, 1, 1, 0, 0, 0), new DateTime(2015, 1, 1, 23, 59, 59));
     Interval jan2nd = new Interval(new DateTime(2015, 1, 2, 0, 0, 0), new DateTime(2015, 1, 2, 23, 59, 59));
     Interval jan3rd = new Interval(new DateTime(2015, 1, 3, 0, 0, 0), new DateTime(2015, 1, 3, 23, 59, 59));
     Interval jan4th = new Interval(new DateTime(2015, 1, 4, 0, 0, 0), new DateTime(2015, 1, 4, 23, 59, 59));
     Interval jan5th = new Interval(new DateTime(2015, 1, 5, 0, 0, 0), new DateTime(2015, 1, 5, 23, 59, 59));
 
-    ArrayList<Interval> jan1st2nd3rd = new ArrayList<Interval>();
+    ArrayList<Interval> jan1st2nd3rd = new ArrayList<>();
     jan1st2nd3rd.add(jan1st);
     jan1st2nd3rd.add(jan2nd);
     jan1st2nd3rd.add(jan3rd);
-    List<Interval> missingIntervalsForJan1st2nd3rd =
-        ValidationManager.computeMissingIntervals(jan1st2nd3rd, Duration.standardDays(1));
+    assertEquals(ValidationManager.computeNumMissingSegments(jan1st2nd3rd, Duration.standardDays(1)), 0);
 
-    Assert.assertTrue(missingIntervalsForJan1st2nd3rd.isEmpty());
-
-    ArrayList<Interval> jan1st2nd3rd5th = new ArrayList<Interval>(jan1st2nd3rd);
+    ArrayList<Interval> jan1st2nd3rd5th = new ArrayList<>(jan1st2nd3rd);
     jan1st2nd3rd5th.add(jan5th);
-    List<Interval> missingIntervalsForJan1st2nd3rd5th =
-        ValidationManager.computeMissingIntervals(jan1st2nd3rd5th, Duration.standardDays(1));
-
-    Assert.assertEquals(missingIntervalsForJan1st2nd3rd5th.size(), 1);
+    assertEquals(ValidationManager.computeNumMissingSegments(jan1st2nd3rd5th, Duration.standardDays(1)), 1);
 
     // Should also work if the intervals are in random order
-    ArrayList<Interval> jan5th2nd1st = new ArrayList<Interval>();
+    ArrayList<Interval> jan5th2nd1st = new ArrayList<>();
     jan5th2nd1st.add(jan5th);
     jan5th2nd1st.add(jan2nd);
     jan5th2nd1st.add(jan1st);
-    List<Interval> missingIntervalsForJan5th2nd1st =
-        ValidationManager.computeMissingIntervals(jan5th2nd1st, Duration.standardDays(1));
-    Assert.assertEquals(missingIntervalsForJan5th2nd1st.size(), 2);
+    assertEquals(ValidationManager.computeNumMissingSegments(jan5th2nd1st, Duration.standardDays(1)), 2);
 
     // Should also work if the intervals are of different sizes
     Interval jan1stAnd2nd = new Interval(new DateTime(2015, 1, 1, 0, 0, 0), new DateTime(2015, 1, 2, 23, 59, 59));
@@ -293,20 +226,6 @@ public class ValidationManagerTest {
     jan1st2nd4th5th.add(jan1stAnd2nd);
     jan1st2nd4th5th.add(jan4th);
     jan1st2nd4th5th.add(jan5th);
-    List<Interval> missingIntervalsForJan1st2nd4th5th =
-        ValidationManager.computeMissingIntervals(jan1st2nd4th5th, Duration.standardDays(1));
-    Assert.assertEquals(missingIntervalsForJan1st2nd4th5th.size(), 1);
-  }
-
-  @Test
-  public void testExtremeSenario() {
-    List<Interval> intervals = new ArrayList<Interval>();
-    intervals.add(new Interval(1, 2));
-    intervals.add(new Interval(Integer.MAX_VALUE - 5, Integer.MAX_VALUE));
-    intervals.add(new Interval(Integer.MAX_VALUE / 2 - 5, Integer.MAX_VALUE / 2));
-    Duration frequency = new Duration(1);
-
-    List<Interval> computeMissingIntervals = ValidationManager.computeMissingIntervals(intervals, frequency);
-    Assert.assertEquals(computeMissingIntervals.size(), 22);
+    assertEquals(ValidationManager.computeNumMissingSegments(jan1st2nd4th5th, Duration.standardDays(1)), 1);
   }
 }

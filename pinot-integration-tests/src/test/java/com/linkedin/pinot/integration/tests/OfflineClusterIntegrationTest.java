@@ -17,7 +17,6 @@ package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -108,7 +107,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     ExecutorService executor = Executors.newCachedThreadPool();
 
     // Create segments from Avro data
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), false,
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), false, null,
         getRawIndexColumns(), null, executor);
 
     // Load data into H2
@@ -384,7 +383,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
     groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
     Assert.assertEquals(groupByEntry.getDouble("value"), 605.0);
-    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), Double.toString((double) (16138 + 16138 + 15)));
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0),
+        Double.toString((double) (16138 + 16138 + 15)));
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
         "add(DaysSinceEpoch,DaysSinceEpoch,'15')");
 

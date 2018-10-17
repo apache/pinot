@@ -16,17 +16,16 @@
 
 package com.linkedin.thirdeye.datasource.csv;
 
+import com.google.common.base.Predicate;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Grouping;
 import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.ObjectSeries;
 import com.linkedin.thirdeye.dataframe.Series;
-import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.MetricFunction;
@@ -39,9 +38,12 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 import static com.linkedin.thirdeye.dataframe.Series.SeriesType.*;
 
@@ -157,6 +159,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
 
       DataFrame data = dataSets.get(function.getDataset());
 
+      // filter constraints
       if (request.getStartTimeInclusive() != null) {
         data = data.filter(new Series.LongConditional() {
           @Override
@@ -178,16 +181,11 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
       if (request.getFilterSet() != null) {
         Multimap<String, String> filters = request.getFilterSet();
         for (final Map.Entry<String, Collection<String>> filter : filters.asMap().entrySet()) {
-          data = data.filter(new Series.StringConditional() {
-            @Override
-            public boolean apply(String... values) {
-              return filter.getValue().contains(values[0]);
-            }
-          }, filter.getKey());
+          data = data.filter(makeFilter(filter.getValue()), filter.getKey());
         }
       }
 
-      data = data.dropNull();
+      data = data.dropNull(inputName);
 
       //
       // with grouping
@@ -246,6 +244,7 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
       } else {
         if (request.getGroupByTimeGranularity() != null) {
           // group by time granularity only
+          // TODO handle non-UTC time zone gracefully
           df = data.groupByInterval(COL_TIMESTAMP, request.getGroupByTimeGranularity().toMillis())
               .aggregate(inputName + ":sum");
           df.renameSeries(inputName, outputName);
@@ -255,11 +254,17 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
           df.addSeries(COL_TIMESTAMP, LongSeries.buildFrom(-1));
         }
       }
+
+      df = df.dropNull(outputName);
     }
 
-    CSVThirdEyeResponse response = new CSVThirdEyeResponse(request,
-        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT), df);
-    return response;
+    // TODO handle non-dataset granularity gracefully
+    TimeSpec timeSpec = new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT);
+    if (request.getGroupByTimeGranularity() != null) {
+      timeSpec = new TimeSpec("timestamp", request.getGroupByTimeGranularity(), TimeSpec.SINCE_EPOCH_FORMAT);
+    }
+
+    return new CSVThirdEyeResponse(request, timeSpec, df);
   }
 
   @Override
@@ -354,6 +359,31 @@ public class CSVThirdEyeDataSource implements ThirdEyeDataSource {
       // ignore
     }
     return this.getClass().getResource(input);
+  }
+
+  /**
+   * Returns a filter function with inclusion and exclusion support
+   *
+   * @param values dimension filter values
+   * @return StringConditional
+   */
+  private Series.StringConditional makeFilter(Collection<String> values) {
+    final Set<String> exclusions = new HashSet<>(Collections2.filter(values, new Predicate<String>() {
+      @Override
+      public boolean apply(@Nullable String s) {
+        return s != null && s.startsWith("!");
+      }
+    }));
+
+    final Set<String> inclusions = new HashSet<>(values);
+    inclusions.removeAll(exclusions);
+
+    return new Series.StringConditional() {
+      @Override
+      public boolean apply(String... values) {
+        return (inclusions.isEmpty() || inclusions.contains(values[0])) && !exclusions.contains("!" + values[0]);
+      }
+    };
   }
 }
 

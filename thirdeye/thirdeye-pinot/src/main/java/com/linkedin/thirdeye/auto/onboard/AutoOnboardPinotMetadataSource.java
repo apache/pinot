@@ -17,12 +17,15 @@
 package com.linkedin.thirdeye.auto.onboard;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.CaseFormat;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -62,6 +65,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
   private static final Set<String> DIMENSION_SUFFIX_BLACKLIST = new HashSet<>(Arrays.asList("_topk", "_approximate", "_tDigest"));
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private final AlertConfigManager alertDAO;
   private final DatasetConfigManager datasetDAO;
   private final MetricConfigManager metricDAO;
 
@@ -78,6 +82,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     }
     this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
+    this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
   }
 
   public AutoOnboardPinotMetadataSource(MetadataSourceConfig metadataSourceConfig, AutoOnboardPinotMetricsUtils utils) {
@@ -85,6 +90,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     autoLoadPinotMetricsUtils = utils;
     this.datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
+    this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
   }
 
   public void run() {
@@ -124,7 +130,18 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
       if (shouldRemoveDataset(datasetConfigDTO, datasets)) {
         LOG.info("Deleting pinot dataset '{}'", datasetConfigDTO.getDataset());
         datasetDAO.deleteByPredicate(Predicate.EQ("dataset", datasetConfigDTO.getDataset()));
+        deleteAutoCreatedAlertGroup(datasetConfigDTO);
       }
+    }
+  }
+
+  private void deleteAutoCreatedAlertGroup(DatasetConfigDTO datasetConfigDTO) {
+    String alertGroupName = AutoOnboardUtility.getAutoAlertGroupName(datasetConfigDTO.getDataset());
+    AlertConfigDTO alertGroupDTO = alertDAO.findWhereNameEquals(alertGroupName);
+    if (alertGroupDTO != null) {
+      alertDAO.deleteById(alertGroupDTO.getId());
+      LOG.info("Deleting auto created alert group {} associated with pinot dataset '{}'", alertGroupDTO.getName(),
+          datasetConfigDTO.getDataset());
     }
   }
 

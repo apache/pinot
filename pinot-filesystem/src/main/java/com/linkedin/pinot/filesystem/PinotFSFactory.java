@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.filesystem;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -74,5 +75,11 @@ public class PinotFSFactory {
       throw new RuntimeException("Pinot file system not configured for scheme: " + scheme);
     }
     return pinotFS;
+  }
+
+  public static void shutdown() throws IOException {
+    for (PinotFS pinotFS : _fileSystemMap.values()) {
+      pinotFS.close();
+    }
   }
 }

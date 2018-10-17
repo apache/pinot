@@ -20,7 +20,6 @@ import com.linkedin.thirdeye.TestDBResources;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 
 import java.io.File;
 import java.io.FileReader;

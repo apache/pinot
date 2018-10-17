@@ -69,7 +69,7 @@ import com.linkedin.pinot.controller.helix.core.sharding.SegmentAssignmentStrate
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -264,6 +264,13 @@ public class PinotHelixResourceManager {
   @Nonnull
   public Builder getKeyBuilder() {
     return _keyBuilder;
+  }
+
+  /**
+   * Returns the config for all the Helix instances in the cluster.
+   */
+  public List<InstanceConfig> getAllHelixInstanceConfigs() {
+    return HelixHelper.getInstanceConfigs(_helixZkManager);
   }
 
   /**
@@ -571,12 +578,8 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.SUCCESS;
   }
 
-  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(@Nonnull final String tableNameWithType)
-      throws Exception {
-    // Get the broker tag for this table
-    String brokerTag;
+  public PinotResourceManagerResponse rebuildBrokerResourceFromHelixTags(String tableNameWithType) throws Exception {
     TableConfig tableConfig;
-
     try {
       tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
     } catch (Exception e) {
@@ -589,49 +592,36 @@ public class PinotHelixResourceManager {
       throw new InvalidConfigException(
           "Invalid table configuration for table " + tableNameWithType + ". Table does not exist");
     }
-    TenantConfig tenantConfig = tableConfig.getTenantConfig();
-    brokerTag = tenantConfig.getBroker();
+    return rebuildBrokerResource(tableNameWithType,
+        getAllInstancesForBrokerTenant(tableConfig.getTenantConfig().getBroker()));
+  }
 
-    // Look for all instances tagged with this broker tag
-    final Set<String> brokerInstances = getAllInstancesForBrokerTenant(brokerTag);
-
-    // If we add a new broker, we want to rebuild the broker resource.
-    HelixAdmin helixAdmin = getHelixAdmin();
-    String clusterName = getHelixClusterName();
-    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(helixAdmin, clusterName);
-
-    Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableNameWithType);
-
-    if (idealStateBrokerInstances.equals(brokerInstances)) {
+  public PinotResourceManagerResponse rebuildBrokerResource(String tableNameWithType, Set<String> brokerInstances) {
+    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(_helixAdmin, _helixClusterName);
+    Set<String> brokerInstancesInIdealState = brokerIdealState.getInstanceSet(tableNameWithType);
+    if (brokerInstancesInIdealState.equals(brokerInstances)) {
       return PinotResourceManagerResponse.success(
           "Broker resource is not rebuilt because ideal state is the same for table: " + tableNameWithType);
     }
 
-    // Reset ideal state with the instance list
+    // Update ideal state with the new broker instances
     try {
-      HelixHelper.updateIdealState(getHelixZkManager(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
-          new Function<IdealState, IdealState>() {
-            @Nullable
-            @Override
-            public IdealState apply(@Nullable IdealState idealState) {
-              Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableNameWithType);
-              if (instanceStateMap != null) {
-                instanceStateMap.clear();
-              }
+      HelixHelper.updateIdealState(getHelixZkManager(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState -> {
+        assert idealState != null;
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(tableNameWithType);
+        if (instanceStateMap != null) {
+          instanceStateMap.clear();
+        }
+        for (String brokerInstance : brokerInstances) {
+          idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerOnlineOfflineStateModel.ONLINE);
+        }
+        return idealState;
+      }, DEFAULT_RETRY_POLICY);
 
-              for (String brokerInstance : brokerInstances) {
-                idealState.setPartitionState(tableNameWithType, brokerInstance, BrokerOnlineOfflineStateModel.ONLINE);
-              }
-
-              return idealState;
-            }
-          }, DEFAULT_RETRY_POLICY);
-
-      LOGGER.info("Successfully rebuilt brokerResource for table {}", tableNameWithType);
-      return PinotResourceManagerResponse.success("Rebuilt brokerResource for table " + tableNameWithType);
+      LOGGER.info("Successfully rebuilt brokerResource for table: {}", tableNameWithType);
+      return PinotResourceManagerResponse.success("Rebuilt brokerResource for table: " + tableNameWithType);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e,
-          tableNameWithType);
+      LOGGER.error("Caught exception while rebuilding broker resource for table: {}", tableNameWithType, e);
       throw e;
     }
   }
@@ -958,20 +948,28 @@ public class PinotHelixResourceManager {
     return PinotResourceManagerResponse.SUCCESS;
   }
 
+  /**
+   * TODO: refactor code to use this method over {@link #getAllInstancesForServerTenant(String)} if applicable to reuse
+   * instance configs in order to reduce ZK accesses
+   */
+  public Set<String> getAllInstancesForServerTenant(List<InstanceConfig> instanceConfigs, String tenantName) {
+    return HelixHelper.getServerInstancesForTenant(instanceConfigs, tenantName);
+  }
+
   public Set<String> getAllInstancesForServerTenant(String tenantName) {
-    Set<String> instancesSet = new HashSet<>();
-    instancesSet.addAll(
-        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getOfflineTagForTenant(tenantName)));
-    instancesSet.addAll(
-        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getRealtimeTagForTenant(tenantName)));
-    return instancesSet;
+    return getAllInstancesForServerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
+  }
+
+  /**
+   * TODO: refactor code to use this method over {@link #getAllInstancesForBrokerTenant(String)} if applicable to reuse
+   * instance configs in order to reduce ZK accesses
+   */
+  public Set<String> getAllInstancesForBrokerTenant(List<InstanceConfig> instanceConfigs, String tenantName) {
+    return HelixHelper.getBrokerInstancesForTenant(instanceConfigs, tenantName);
   }
 
   public Set<String> getAllInstancesForBrokerTenant(String tenantName) {
-    Set<String> instancesSet = new HashSet<>();
-    instancesSet.addAll(
-        HelixHelper.getInstancesWithTag(_helixZkManager, TagNameUtils.getBrokerTagForTenant(tenantName)));
-    return instancesSet;
+    return getAllInstancesForBrokerTenant(HelixHelper.getInstanceConfigs(_helixZkManager), tenantName);
   }
 
   /**
@@ -1205,11 +1203,11 @@ public class PinotHelixResourceManager {
 
   private void ensureRealtimeClusterIsSetUp(TableConfig config, String realtimeTableName,
       IndexingConfig indexingConfig) {
-    StreamMetadata streamMetadata = new StreamMetadata(indexingConfig.getStreamConfigs());
+    StreamConfig streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, realtimeTableName);
 
-    if (streamMetadata.hasHighLevelKafkaConsumerType()) {
-      if (streamMetadata.hasSimpleKafkaConsumerType()) {
+    if (streamConfig.hasHighLevelKafkaConsumerType()) {
+      if (streamConfig.hasSimpleKafkaConsumerType()) {
         // We may be adding on low-level, or creating both.
         if (idealState == null) {
           // Need to create both. Create high-level consumer first.
@@ -1227,7 +1225,7 @@ public class PinotHelixResourceManager {
     }
 
     // Either we have only low-level consumer, or both.
-    if (streamMetadata.hasSimpleKafkaConsumerType()) {
+    if (streamConfig.hasSimpleKafkaConsumerType()) {
       // Will either create idealstate entry, or update the IS entry with new segments
       // (unless there are low-level segments already present)
       final List<LLCRealtimeSegmentZKMetadata> llcSegmentMetadatas =
@@ -1730,25 +1728,23 @@ public class PinotHelixResourceManager {
     return true;
   }
 
-  public Map<String, List<String>> getInstanceToSegmentsInATableMap(String tableName) {
-    Map<String, List<String>> instancesToSegmentsMap = new HashMap<String, List<String>>();
-    IdealState is = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-    Set<String> segments = is.getPartitionSet();
+  /**
+   * Returns a map from server instance to list of segments it serves for the given table.
+   */
+  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
+    Map<String, List<String>> serverToSegmentsMap = new HashMap<>();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal state does not exist for table: " + tableNameWithType);
+    }
 
-    for (String segment : segments) {
-      Set<String> instances = is.getInstanceSet(segment);
-      for (String instance : instances) {
-        if (instancesToSegmentsMap.containsKey(instance)) {
-          instancesToSegmentsMap.get(instance).add(segment);
-        } else {
-          List<String> a = new ArrayList<String>();
-          a.add(segment);
-          instancesToSegmentsMap.put(instance, a);
-        }
+    for (String segment : idealState.getPartitionSet()) {
+      for (String server : idealState.getInstanceStateMap(segment).keySet()) {
+        serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segment);
       }
     }
 
-    return instancesToSegmentsMap;
+    return serverToSegmentsMap;
   }
 
   public synchronized Map<String, String> getSegmentsCrcForTable(String tableName) {

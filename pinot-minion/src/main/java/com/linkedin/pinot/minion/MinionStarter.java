@@ -33,6 +33,7 @@ import com.linkedin.pinot.minion.metrics.MinionMetrics;
 import com.linkedin.pinot.minion.taskfactory.TaskFactoryRegistry;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
+import java.io.IOException;
 import javax.annotation.Nonnull;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
@@ -138,7 +139,7 @@ public class MinionStarter {
     LOGGER.info("Initializing segment fetchers for all protocols");
     Configuration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
-    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig, pinotFSConfig);
+    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
 
     // Need to do this before we start receiving state transitions.
     LOGGER.info("Initializing ssl context for segment uploader");
@@ -183,6 +184,12 @@ public class MinionStarter {
    * Stop the Pinot Minion instance.
    */
   public void stop() {
+    try {
+      LOGGER.info("Closing PinotFS classes");
+      PinotFSFactory.shutdown();
+    } catch (IOException e) {
+      LOGGER.warn("Caught exception closing PinotFS classes", e);
+    }
     LOGGER.info("Stopping Pinot minion: " + _instanceId);
     _helixManager.disconnect();
     LOGGER.info("Pinot minion stopped");

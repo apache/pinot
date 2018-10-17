@@ -9,8 +9,11 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
+
+import static com.linkedin.thirdeye.detection.ConfigUtils.*;
 
 
 /**
@@ -41,16 +44,24 @@ public abstract class YamlDetectionConfigTranslator {
    * Fill in common fields of detection config. Properties of the pipeline is filled by the subclass.
    */
   DetectionConfigDTO generateDetectionConfig(Map<String, Object> yamlConfig) {
+    validateYAML(yamlConfig);
+
     DetectionConfigDTO config = new DetectionConfigDTO();
-
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "Property missing " + PROP_NAME);
-
     config.setName(MapUtils.getString(yamlConfig, PROP_NAME));
     config.setCron(MapUtils.getString(yamlConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     config.setLastTimestamp(System.currentTimeMillis());
     config.setActive(true);
-
-    config.setProperties(buildDetectionProperties(yamlConfig));
+    Map<String, Object> properties = buildDetectionProperties(yamlConfig);
+    Preconditions.checkArgument(!properties.isEmpty(), "Empty detection property");
+    config.setProperties(properties);
     return config;
+  }
+
+  /**
+   * Check the yaml configuration is semantically valid. Throws an IllegalArgumentException if not.
+   * @param yamlConfig yamlConfiguration to be checked
+   */
+  protected void validateYAML(Map<String, Object> yamlConfig) {
+    Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "Property missing " + PROP_NAME);
   }
 }

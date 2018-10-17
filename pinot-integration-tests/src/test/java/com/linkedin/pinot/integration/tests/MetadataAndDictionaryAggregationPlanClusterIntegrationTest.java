@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.util.TestUtils;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,9 +28,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import javax.annotation.Nonnull;
-
 import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.testng.Assert;
@@ -147,13 +144,12 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
   }
 
   private void createAndUploadSegments(List<File> avroFiles, String tableName, boolean createStarTreeIndex,
-      List<String> rawIndexColumns, Schema pinotSchema)
-      throws Exception {
+      List<String> rawIndexColumns, Schema pinotSchema) throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName,
-        createStarTreeIndex, rawIndexColumns, pinotSchema, executor);
+        createStarTreeIndex, null, rawIndexColumns, pinotSchema, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 

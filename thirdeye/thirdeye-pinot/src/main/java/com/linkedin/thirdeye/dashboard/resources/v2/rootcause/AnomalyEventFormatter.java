@@ -170,7 +170,7 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     String label = String.format("%s%s", functionName, dimensionString);
     String link = String.format("#/rootcause?anomalyId=%d", anomaly.getId());
 
-    RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, anomaly.getStartTime(), anomaly.getEndTime(), null);
+    RootCauseEventEntity out = makeRootCauseEventEntity(entity, label, link, anomaly.getStartTime(), getAdjustedEndTime(anomaly), null);
     out.setAttributes(attributes);
 
     return out;
@@ -200,5 +200,18 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
     } else {
       return 1.0;
     }
+  }
+
+  /**
+   * (Business logic) Returns the end time of an anomaly rounded up to a full minute.
+   *
+   * @param anomaly anomaly
+   * @return adjusted timestamp (in millis) rounded to full seconds
+   */
+  private static long getAdjustedEndTime(MergedAnomalyResultDTO anomaly) {
+    if (anomaly.getEndTime() % 60000 == 0) {
+      return anomaly.getEndTime();
+    }
+    return (long) Math.floor((anomaly.getEndTime() + 59999) / 60000.0) * 60000;
   }
 }

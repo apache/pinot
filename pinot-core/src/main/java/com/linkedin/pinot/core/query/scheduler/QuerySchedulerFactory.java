@@ -22,6 +22,7 @@ import com.linkedin.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
 import com.linkedin.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
 import java.lang.reflect.Constructor;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
@@ -49,7 +50,7 @@ public class QuerySchedulerFactory {
    * @return returns an instance of query scheduler
    */
   public static @Nonnull  QueryScheduler create(@Nonnull Configuration schedulerConfig,
-      @Nonnull QueryExecutor queryExecutor, ServerMetrics serverMetrics) {
+      @Nonnull QueryExecutor queryExecutor, ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
 
@@ -57,12 +58,12 @@ public class QuerySchedulerFactory {
         DEFAULT_QUERY_SCHEDULER_ALGORITHM).toLowerCase();
     if (schedulerName.equals(FCFS_ALGORITHM)) {
       LOGGER.info("Using FCFS query scheduler");
-      return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics);
+      return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
     } else if (schedulerName.equals(TOKEN_BUCKET_ALGORITHM)) {
       LOGGER.info("Using Priority Token Bucket scheduler");
-      return TokenPriorityScheduler.create(schedulerConfig, queryExecutor, serverMetrics);
+      return TokenPriorityScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
     } else if (schedulerConfig.equals(BOUNDED_FCFS_ALGORITHM)) {
-      return BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics);
+      return BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
     }
 
     // didn't find by name so try by classname
@@ -77,7 +78,7 @@ public class QuerySchedulerFactory {
     // will provide degraded service
 
     LOGGER.warn("Scheduler {} not found. Using default FCFS query scheduler", schedulerName);
-    return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics);
+    return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
   }
 
   private static @Nullable QueryScheduler getQuerySchedulerByClassName(String className, Configuration schedulerConfig,

@@ -60,7 +60,7 @@ public class SegmentFetcherFactory {
    * @param segmentFetcherClassConfig Segment fetcher factory config
    *
    */
-  public void init(Configuration segmentFetcherClassConfig, Configuration pinotFSConfig) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+  public void init(Configuration segmentFetcherClassConfig) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
     @SuppressWarnings("unchecked")
     List<String> protocols = segmentFetcherClassConfig.getList(PROTOCOLS_KEY, DEFAULT_PROTOCOLS);
     for (String protocol : protocols) {

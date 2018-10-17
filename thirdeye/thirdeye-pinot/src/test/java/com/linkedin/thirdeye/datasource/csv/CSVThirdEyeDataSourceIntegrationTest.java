@@ -52,7 +52,7 @@ public class CSVThirdEyeDataSourceIntegrationTest {
   }
 
   @Test
-  public void intergrationTest() throws Exception{
+  public void integrationTest() throws Exception{
     URL dataSourcesConfig = this.getClass().getResource("data-sources-config.yml");
 
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();

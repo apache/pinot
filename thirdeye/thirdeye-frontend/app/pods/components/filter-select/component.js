@@ -117,6 +117,8 @@ const getSearchResults = (filterOptions, filterToMatch, maxNum) => {
 
 
 export default Component.extend({
+  placeholder: '  Add a filter (Type to search)',
+
   // Maximum filters by filter group
   maxNumFilters: 25,
 
@@ -124,6 +126,7 @@ export default Component.extend({
   maxTotalFilters: 500,
 
   triggerId: '',
+
   noMatchesMessage: '',
 
   classNames: 'filter-select',

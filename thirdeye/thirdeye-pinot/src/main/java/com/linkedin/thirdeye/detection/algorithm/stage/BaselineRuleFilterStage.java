@@ -18,6 +18,7 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
+import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -39,11 +40,11 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * This filter stage filters the anomalies if either the absolute changeThreshold, percentage changeThreshold or site wide impact does not pass the threshold.
  */
 public class BaselineRuleFilterStage implements AnomalyFilterStage {
-  private static final String PROP_WEEKS = "weeks";
-  private static final int PROP_WEEKS_DEFAULT = 1;
-
   private static final String PROP_CHANGE = "changeThreshold";
   private static final double PROP_CHANGE_DEFAULT = Double.NaN;
+
+  private static final String PROP_OFFSET = "offset";
+  private static final String PROP_OFFSET_DEFAULT = "median1w";
 
   private static final String PROP_DIFFERENCE = "differenceThreshold";
   private static final double PROP_DIFFERENCE_DEFAULT = Double.NaN;
@@ -93,10 +94,9 @@ public class BaselineRuleFilterStage implements AnomalyFilterStage {
 
   @Override
   public void init(Map<String, Object> properties, Long configId, long startTime, long endTime) {
-    int weeks = MapUtils.getIntValue(properties, PROP_WEEKS, PROP_WEEKS_DEFAULT);
-    DateTimeZone timezone =
-        DateTimeZone.forID(MapUtils.getString(properties, PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
-    this.baseline = BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, weeks, 1, timezone);
+    String offset = MapUtils.getString(properties, PROP_OFFSET, PROP_OFFSET_DEFAULT);
+    String timezone = MapUtils.getString(properties, PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT);
+    this.baseline = BaselineParsingUtils.parseOffset(offset, timezone);
     // percentage changeThreshold
     this.changeThreshold = MapUtils.getDoubleValue(properties, PROP_CHANGE, PROP_CHANGE_DEFAULT);
     // absolute changeThreshold

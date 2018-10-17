@@ -6,19 +6,19 @@
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import Route from '@ember/routing/route';
-import { task, timeout } from 'ember-concurrency';
-import { get, getWithDefault } from '@ember/object';
+import { task } from 'ember-concurrency';
+import { get } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
-import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-utils';
 import { inject as service } from '@ember/service';
 
 export default Route.extend({
   session: service(),
+  notifications: service('toast'),
 
-/**
- * Optional params to load a fresh view
- */
+  /**
+   * Optional params to load a fresh view
+   */
   queryParams: {
     refresh: {
       refreshModel: true,
@@ -121,6 +121,7 @@ export default Route.extend({
         this.set('session.store.fromUrl', {lastIntentTransition: transition});
       }
     },
+
     /**
      * Handle any errors occurring in model/afterModel in parent route
      * https://www.emberjs.com/api/ember/2.16/classes/Route/events/error?anchor=error
@@ -128,6 +129,22 @@ export default Route.extend({
      */
     error() {
       return true;
+    },
+
+    /**
+     * Toast confirmation of save status
+     */
+    confirmSaveStatus(isSuccess) {
+      const notifications = this.get('notifications');
+      const toastOptions = {
+        timeOut: '4000',
+        positionClass: 'toast-bottom-right'
+      };
+      if (isSuccess) {
+        notifications.success('Alert options saved successfully', 'Done', toastOptions);
+      } else {
+        notifications.error('Alert options failed to save', 'Error', toastOptions);
+      }
     },
 
     /**

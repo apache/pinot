@@ -46,6 +46,8 @@ import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
+import com.linkedin.pinot.core.startree.v2.builder.MultipleTreesBuilder;
+import com.linkedin.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import com.linkedin.pinot.core.util.CrcUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.DataOutputStream;
@@ -55,6 +57,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.apache.commons.io.FileUtils;
@@ -198,7 +201,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   private void buildStarTree() throws Exception {
     // Create stats collector
-    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(dataSchema, config.getSegmentPartitionConfig());
+    StatsCollectorConfig statsCollectorConfig =
+        new StatsCollectorConfig(dataSchema, config.getSegmentPartitionConfig());
     SegmentPreIndexStatsCollectorImpl statsCollector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
     statsCollector.init();
     segmentStats = statsCollector;
@@ -218,8 +222,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
     starTreeBuilderConfig.setSchema(dataSchema);
     starTreeBuilderConfig.setDimensionsSplitOrder(starTreeIndexSpec.getDimensionsSplitOrder());
-    starTreeBuilderConfig.setSkipStarNodeCreationDimensions(
-        starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
+    starTreeBuilderConfig.setSkipStarNodeCreationDimensions(starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
     starTreeBuilderConfig.setSkipMaterializationDimensions(starTreeIndexSpec.getSkipMaterializationForDimensions());
     starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(
         starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
@@ -301,8 +304,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  private void buildRaw()
-      throws Exception {
+  private void buildRaw() throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
     buildIndexCreationInfo();
@@ -358,8 +360,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     handlePostCreation();
   }
 
-  private void handlePostCreation()
-      throws Exception {
+  private void handlePostCreation() throws Exception {
     final String timeColumn = config.getTimeColumnName();
     segmentName = config.getSegmentNameGenerator().generateSegmentName(segmentStats.getColumnProfileFor(timeColumn));
 
@@ -388,6 +389,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Convert segment format if necessary
     convertFormatIfNeeded(segmentOutputDir);
 
+    // Build star-tree V2 if necessary
+    buildStarTreeV2IfNecessary(segmentOutputDir);
+
     // Compute CRC and creation time
     long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
     long creationTime;
@@ -411,6 +415,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, indexing time : {}", totalIndexTime);
   }
 
+  private void buildStarTreeV2IfNecessary(File indexDir) throws Exception {
+    List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = config.getStarTreeV2BuilderConfigs();
+    if (starTreeV2BuilderConfigs != null && !starTreeV2BuilderConfigs.isEmpty()) {
+      MultipleTreesBuilder.BuildMode buildMode =
+          config.isOnHeap() ? MultipleTreesBuilder.BuildMode.ON_HEAP : MultipleTreesBuilder.BuildMode.OFF_HEAP;
+      new MultipleTreesBuilder(starTreeV2BuilderConfigs, indexDir, buildMode).build();
+    }
+  }
+
   // Explanation of why we are using format converter:
   // There are 3 options to correctly generate segments to v3 format
   // 1. Generate v3 directly: This is efficient but v3 index writer needs to know buffer size upfront.
@@ -425,8 +438,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   // Using converter is similar to option (2), plus it's battle-tested code. We will roll out with
   // this change to keep changes limited. Once we've migrated we can implement approach (1) with option to
   // copy for indexes for which we don't know sizes upfront.
-  private void convertFormatIfNeeded(File segmentDirectory)
-      throws Exception {
+  private void convertFormatIfNeeded(File segmentDirectory) throws Exception {
     SegmentVersion versionToGenerate = config.getSegmentVersion();
     if (versionToGenerate.equals(SegmentVersion.v1)) {
       // v1 by default
@@ -436,8 +448,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     converter.convert(segmentDirectory);
   }
 
-  public ColumnStatistics getColumnStatisticsCollector(final String columnName)
-      throws Exception {
+  public ColumnStatistics getColumnStatisticsCollector(final String columnName) throws Exception {
     return segmentStats.getColumnProfileFor(columnName);
   }
 
@@ -453,8 +464,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   /**
    * Complete the stats gathering process and store the stats information in indexCreationInfoMap.
    */
-  void buildIndexCreationInfo()
-      throws Exception {
+  void buildIndexCreationInfo() throws Exception {
     for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       String column = spec.getName();
 
@@ -466,7 +476,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       ColumnStatistics columnProfile = segmentStats.getColumnProfileFor(column);
       indexCreationInfoMap.put(column,
           new ColumnIndexCreationInfo(columnProfile, true/*createDictionary*/, ForwardIndexType.FIXED_BIT_COMPRESSED,
-              InvertedIndexType.ROARING_BITMAPS, false/*isAutoGenerated*/, dataSchema.getFieldSpecFor(column).getDefaultNullValue()));
+              InvertedIndexType.ROARING_BITMAPS, false/*isAutoGenerated*/,
+              dataSchema.getFieldSpecFor(column).getDefaultNullValue()));
     }
     segmentIndexCreationInfo.setTotalDocs(totalDocs);
     segmentIndexCreationInfo.setTotalRawDocs(totalRawDocs);

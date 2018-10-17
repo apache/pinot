@@ -27,7 +27,7 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.stream.PartitionCountFetcher;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.HelixAdmin;
@@ -139,14 +139,14 @@ public class PinotTableIdealStateBuilder {
     }
   }
 
-  public static int getPartitionCount(StreamMetadata streamMetadata) {
-    PartitionCountFetcher partitionCountFetcher = new PartitionCountFetcher(streamMetadata);
+  public static int getPartitionCount(StreamConfig streamConfig) {
+    PartitionCountFetcher partitionCountFetcher = new PartitionCountFetcher(streamConfig);
     try {
       RetryPolicies.noDelayRetryPolicy(3).attempt(partitionCountFetcher);
       return partitionCountFetcher.getPartitionCount();
     } catch (Exception e) {
       Exception fetcherException = partitionCountFetcher.getException();
-      LOGGER.error("Could not get partition count for {}", streamMetadata.getKafkaTopicName(), fetcherException);
+      LOGGER.error("Could not get partition count for {}", streamConfig.getKafkaTopicName(), fetcherException);
       throw new RuntimeException(fetcherException);
     }
   }

@@ -31,6 +31,7 @@ import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
+import com.linkedin.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.File;
@@ -93,6 +94,7 @@ public class SegmentGeneratorConfig {
   private RecordReaderConfig _readerConfig = null;
   private boolean _enableStarTreeIndex = false;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
+  private List<StarTreeV2BuilderConfig> _starTreeV2BuilderConfigs = null;
   private String _creatorVersion = null;
   private HllConfig _hllConfig = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
@@ -100,7 +102,7 @@ public class SegmentGeneratorConfig {
   private int _sequenceId = -1;
   private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
   private String _simpleDateFormat = null;
-  // Use on-heap or off-heap memory to generate index (currently only affect inverted index)
+  // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
 
   public SegmentGeneratorConfig() {
@@ -118,6 +120,7 @@ public class SegmentGeneratorConfig {
     _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
     _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
+    _columnSortOrder.addAll(config._columnSortOrder);
     _dataDir = config._dataDir;
     _inputFilePath = config._inputFilePath;
     _format = config._format;
@@ -138,6 +141,7 @@ public class SegmentGeneratorConfig {
     _readerConfig = config._readerConfig;
     _enableStarTreeIndex = config._enableStarTreeIndex;
     _starTreeIndexSpec = config._starTreeIndexSpec;
+    _starTreeV2BuilderConfigs = config._starTreeV2BuilderConfigs;
     _creatorVersion = config._creatorVersion;
     _hllConfig = config._hllConfig;
     _segmentNameGenerator = config._segmentNameGenerator;
@@ -171,9 +175,11 @@ public class SegmentGeneratorConfig {
 
       if (noDictionaryColumnMap != null) {
         Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
-            noDictionaryColumnMap.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey,
-                e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
+            noDictionaryColumnMap.entrySet()
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                    e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(
+                        e.getValue())));
         this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
       }
     }
@@ -189,7 +195,6 @@ public class SegmentGeneratorConfig {
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
   }
-
 
   public SegmentGeneratorConfig(Schema schema) {
     _schema = schema;
@@ -501,6 +506,14 @@ public class SegmentGeneratorConfig {
   public void enableStarTreeIndex(@Nullable StarTreeIndexSpec starTreeIndexSpec) {
     setEnableStarTreeIndex(true);
     setStarTreeIndexSpec(starTreeIndexSpec);
+  }
+
+  public List<StarTreeV2BuilderConfig> getStarTreeV2BuilderConfigs() {
+    return _starTreeV2BuilderConfigs;
+  }
+
+  public void setStarTreeV2BuilderConfigs(List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs) {
+    _starTreeV2BuilderConfigs = starTreeV2BuilderConfigs;
   }
 
   public HllConfig getHllConfig() {

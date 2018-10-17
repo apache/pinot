@@ -24,11 +24,13 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
@@ -37,6 +39,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
+import java.util.Map;
 import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.common.protocol.Errors;
@@ -82,7 +85,7 @@ public class LLRealtimeSegmentDataManagerTest {
       + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
       + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
       + "      \"stream.kafka.consumer.type\": \"simple\", \n"
-      + "      \"stream.kafka.decoder.class.name\": \"com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder\", \n"
+      + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
       + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
       + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
       + "      \"stream.kafka.hlc.zk.connect.string\": \"zoo:2181/kafka-queuing\", \n"
@@ -132,6 +135,24 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentZKMetadata.setSegmentName(_segmentNameStr);
     segmentZKMetadata.setStartOffset(_startOffset);
     return segmentZKMetadata;
+  }
+
+  public static class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
+
+    @Override
+    public void init(Map<String, String> props, Schema indexingSchema, String kafkaTopicName) throws Exception {
+
+    }
+
+    @Override
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      return null;
+    }
+
+    @Override
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+      return null;
+    }
   }
 
   private FakeLLRealtimeSegmentDataManager createFakeSegmentManager() throws Exception {

@@ -7,9 +7,11 @@ import {
   hasPrefix,
   filterPrefix,
   toMetricLabel,
+  toMetricDataset,
   isInverse,
   toColorDirection,
-  makeSortable
+  makeSortable,
+  isExclusionWarning
 } from 'thirdeye-frontend/utils/rca-utils';
 import {
   humanizeChange,
@@ -134,6 +136,7 @@ export default Component.extend({
             links: links[urn],
             isSelected: selectedUrns.has(urn),
             label: toMetricLabel(urn, entities),
+            dataset: toMetricDataset(urn, entities),
             score: humanizeScore(scores[urn]),
             current: this._makeRecord(urn, 'current', entities, aggregates),
             baseline: this._makeRecord(urn, 'baseline', entities, aggregates),
@@ -142,7 +145,8 @@ export default Component.extend({
             sortable_current: this._makeChange(urn, 'current', aggregates),
             sortable_baseline: this._makeChange(urn, 'baseline', aggregates),
             sortable_wo1w: this._makeChange(urn, 'wo1w', aggregates),
-            sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates)
+            sortable_wo2w: this._makeChange(urn, 'wo2w', aggregates),
+            isExclusionWarning: isExclusionWarning(urn, entities)
           };
         });
 
@@ -190,7 +194,14 @@ export default Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: [], // FIXME: this is broken across all of RCA and works by accident only
+  preselectedItems: computed({
+    get () {
+      return [];
+    },
+    set () {
+      // ignore
+    }
+  }),
 
   actions: {
     /**

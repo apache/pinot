@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
 import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManager;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 
@@ -37,8 +38,8 @@ import org.apache.commons.configuration.Configuration;
 public class FCFSQueryScheduler extends QueryScheduler {
 
   public FCFSQueryScheduler(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull ServerMetrics serverMetrics) {
-    super(queryExecutor, new UnboundedResourceManager(config), serverMetrics);
+      @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
+    super(queryExecutor, new UnboundedResourceManager(config), serverMetrics, latestQueryTime);
   }
 
   @Nonnull

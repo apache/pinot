@@ -230,7 +230,7 @@ public class TableSizeReaderTest {
 
   private TableSizeReader.TableSizeDetails testRunner(final String[] servers, String table)
       throws InvalidConfigException {
-    when(helix.getInstanceToSegmentsInATableMap(anyString()))
+    when(helix.getServerToSegmentsMap(anyString()))
         .thenAnswer(new Answer<Object>() {
           @Override
           public Object answer(InvocationOnMock invocationOnMock)

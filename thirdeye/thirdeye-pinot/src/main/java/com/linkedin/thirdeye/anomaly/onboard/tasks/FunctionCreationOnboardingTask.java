@@ -264,12 +264,34 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     if (configuration.containsKey(ALERT_ID)) {
       alertConfig = alertConfigDAO.findById(configuration.getLong(ALERT_ID));
       EmailConfig emailConfig = alertConfig.getEmailConfig();
-      emailConfig.getFunctionIds().add(anomalyFunction.getId());
+      if (emailConfig == null) {
+        EmailConfig emailConf = new EmailConfig();
+        emailConf.setFunctionIds(Arrays.asList(anomalyFunction.getId()));
+      } else {
+        emailConfig.getFunctionIds().add(anomalyFunction.getId());
+      }
+      alertConfig.setEmailConfig(emailConfig);
 
       // Add recipients to existing alert group
-      alertConfig.getReceiverAddresses().getTo().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_TO)));
-      alertConfig.getReceiverAddresses().getCc().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_CC)));
-      alertConfig.getReceiverAddresses().getBcc().addAll(EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_BCC)));
+      DetectionAlertFilterRecipients recipients = alertConfig.getReceiverAddresses();
+      Set<String> toAddr = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_TO));
+      if (recipients.getTo() == null) {
+        recipients.setTo(toAddr);
+      } else {
+        recipients.getTo().addAll(toAddr);
+      }
+      Set<String> ccAddr = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_CC));
+      if (recipients.getCc() == null) {
+        recipients.setCc(ccAddr);
+      } else {
+        recipients.getCc().addAll(ccAddr);
+      }
+      Set<String> bccAddr = EmailUtils.getValidEmailAddresses(configuration.getString(ALERT_BCC));
+      if (recipients.getBcc() == null) {
+        recipients.setBcc(bccAddr);
+      } else {
+        recipients.getBcc().addAll(bccAddr);
+      }
 
       alertConfigDAO.update(alertConfig);
     } else {
@@ -319,11 +341,11 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
         anomalyFunctionSpec.setRequiresCompletenessCheck(false);
         break;
       case DAYS:
-        anomalyFunctionSpec.setType("SPLINE_REGRESSION_VANILLA");
+        anomalyFunctionSpec.setType("SPLINE_REGRESSION_WRAPPER");
         anomalyFunctionSpec.setCron("0 0 14 * * ? *");
         anomalyFunctionSpec.setWindowSize(1);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.DAYS);
-        anomalyFunctionSpec.setProperties("");
+        anomalyFunctionSpec.setProperties("variables.continuumOffset=P90D;module.training=parametric.GenericSplineTrainingModule;variables.numberOfKnots=0;variables.degree=3;variables.predictionMode=TRENDING;variables.anomalyRemovalThreshold=0.6,-0.6;module.data=ContinuumDataModule;variables.pValueThreshold=0.025;function=SelfRecoverableAnomalyDetectionFunction;variables.seasonalities=DAILY_SEASONALITY;module.detection=ConfidenceIntervalDetectionModule;module.testingPreprocessors=DummyPreprocessModule;workflow=RegressionWorkflow;variables.recentPeriod=P14D;module.trainingPreprocessors=AnomalyRemovalByWeight;variables.r2Cutoff=0.9;downgrade.variables.seasonalities=");
         anomalyFunctionSpec.setRequiresCompletenessCheck(true);
         break;
       default:

@@ -15,11 +15,16 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.StreamProvider;
 import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.linkedin.pinot.core.realtime.StreamProviderFactory;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import java.util.Random;
 import org.testng.annotations.BeforeClass;
 
@@ -28,41 +33,41 @@ import org.testng.annotations.BeforeClass;
  * Integration test that simulates a flaky Kafka consumer.
  */
 public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
-  private static final Class<? extends StreamProvider> ORIGINAL_STREAM_PROVIDER =
-      StreamProviderFactory.getStreamProviderClass();
 
   @BeforeClass
   @Override
-  public void setUp()
-      throws Exception {
-    StreamProviderFactory.setStreamProviderClass(FlakyStreamProvider.class);
+  public void setUp() throws Exception {
     super.setUp();
   }
 
-  public static class FlakyStreamProvider implements StreamProvider {
-    private StreamProvider _streamProvider;
+  @Override
+  protected String getStreamConsumerFactoryClassName() {
+    return FlakyStreamFactory.class.getName();
+  }
+
+  public static class FlakyStreamLevelConsumer implements StreamLevelConsumer {
+    private StreamLevelConsumer _streamLevelConsumer;
     private Random _random = new Random();
 
-    public FlakyStreamProvider()
-        throws Exception {
-      _streamProvider = ORIGINAL_STREAM_PROVIDER.newInstance();
+    public FlakyStreamLevelConsumer(String clientId, StreamConfig streamConfig, Schema schema) {
+      _streamLevelConsumer = new KafkaStreamLevelConsumer(clientId, streamConfig, schema);
     }
 
     @Override
     public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
         throws Exception {
-      _streamProvider.init(streamProviderConfig, tableName, serverMetrics);
+      _streamLevelConsumer.init(streamProviderConfig, tableName, serverMetrics);
     }
 
     @Override
     public void start()
         throws Exception {
-      _streamProvider.start();
+      _streamLevelConsumer.start();
     }
 
     @Override
     public void setOffset(long offset) {
-      _streamProvider.setOffset(offset);
+      _streamLevelConsumer.setOffset(offset);
     }
 
     @Override
@@ -73,20 +78,20 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
       if (randomValue == 0) {
         return null;
       } else if (randomValue == 1) {
-        throw new RuntimeException("Flaky stream provider exception");
+        throw new RuntimeException("Flaky stream level consumer exception");
       } else {
-        return _streamProvider.next(destination);
+        return _streamLevelConsumer.next(destination);
       }
     }
 
     @Override
     public GenericRow next(long offset) {
-      return _streamProvider.next(offset);
+      return _streamLevelConsumer.next(offset);
     }
 
     @Override
     public long currentOffset() {
-      return _streamProvider.currentOffset();
+      return _streamLevelConsumer.currentOffset();
     }
 
     @Override
@@ -95,21 +100,41 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
       boolean failToCommit = _random.nextBoolean();
 
       if (failToCommit) {
-        throw new RuntimeException("Flaky stream provider exception");
+        throw new RuntimeException("Flaky stream level consumer exception");
       } else {
-        _streamProvider.commit();
+        _streamLevelConsumer.commit();
       }
     }
 
     @Override
     public void commit(long offset) {
-      _streamProvider.commit(offset);
+      _streamLevelConsumer.commit(offset);
     }
 
     @Override
     public void shutdown()
         throws Exception {
-      _streamProvider.shutdown();
+      _streamLevelConsumer.shutdown();
+    }
+  }
+
+
+  public static class FlakyStreamFactory extends StreamConsumerFactory {
+    @Override
+    public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+      throw new UnsupportedOperationException();
+    }
+    @Override
+    public StreamLevelConsumer createStreamLevelConsumer(String clientId, Schema schema) {
+      return new FlakyStreamLevelConsumer(clientId, _streamConfig, schema);
+    }
+    @Override
+    public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+      throw new UnsupportedOperationException();
+    }
+    @Override
+    public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+      throw new UnsupportedOperationException();
     }
   }
 }

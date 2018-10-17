@@ -64,6 +64,8 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils.*;
+
 
 /**
  * <p>RootCauseMetricResource is a central endpoint for querying different views on metrics as used by the
@@ -71,7 +73,7 @@ import org.slf4j.LoggerFactory;
  * The endpoint parses metric urns and a unified set of "offsets", i.e. time-warped baseline of the
  * specified metric. It further aligns queried time stamps to sensibly match the raw dataset.</p>
  *
- * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+ * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
  */
 @Path(value = "/rootcause/metric")
 @Produces(MediaType.APPLICATION_JSON)
@@ -92,15 +94,6 @@ public class RootCauseMetricResource {
   private static final String TIMEZONE_DEFAULT = "UTC";
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
   private static final int LIMIT_DEFAULT = 100;
-
-  private static final Pattern PATTERN_NONE = Pattern.compile("none");
-  private static final Pattern PATTERN_PREDICTED = Pattern.compile("predicted");
-  private static final Pattern PATTERN_CURRENT = Pattern.compile("current");
-  private static final Pattern PATTERN_WEEK_OVER_WEEK = Pattern.compile("wo([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MEAN = Pattern.compile("mean([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MEDIAN = Pattern.compile("median([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MIN = Pattern.compile("min([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MAX = Pattern.compile("max([1-9][0-9]*)w");
 
   private final ExecutorService executor;
   private final AggregationLoader aggregationLoader;
@@ -127,7 +120,7 @@ public class RootCauseMetricResource {
    * @param offset offset identifier (e.g. "current", "wo2w")
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    *
-   * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
@@ -175,7 +168,7 @@ public class RootCauseMetricResource {
    * @param offsets A list of offset identifier (e.g. "current", "wo2w")
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    *
-   * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
@@ -245,7 +238,7 @@ public class RootCauseMetricResource {
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    * @param limit limit results to the top k elements, plus a rollup element
    *
-   * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
@@ -306,7 +299,7 @@ public class RootCauseMetricResource {
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    * @param granularityString time granularity (e.g. "5_MINUTES", "1_HOURS")
    *
-   * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
@@ -557,73 +550,6 @@ public class RootCauseMetricResource {
     }
 
     return output;
-  }
-
-  /**
-   * Returns a configured instance of Baseline for the given, named offset. The method uses slice and
-   * timezone information to adjust for daylight savings time.
-   *
-   * <p>Supported offsets:</p>
-   * <pre>
-   *   current   the time range as specified by start and end)
-   *   none      empty time range
-   *   woXw      week-over-week data points with a lag of X weeks)
-   *   meanXw    average of data points from the the past X weeks, with a lag of 1 week)
-   *   medianXw  median of data points from the the past X weeks, with a lag of 1 week)
-   *   minXw     minimum of data points from the the past X weeks, with a lag of 1 week)
-   *   maxXw     maximum of data points from the the past X weeks, with a lag of 1 week)
-   * </pre>
-   *
-   * @param offset offset identifier
-   * @param timeZoneString timezone identifier (location long format)
-   * @return Baseline instance
-   * @throws IllegalArgumentException if the offset cannot be parsed
-   */
-  private Baseline parseOffset(String offset, String timeZoneString) {
-    DateTimeZone timeZone = DateTimeZone.forID(timeZoneString);
-
-    Matcher mCurrent = PATTERN_CURRENT.matcher(offset);
-    if (mCurrent.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, 0, timeZone);
-    }
-
-    Matcher mNone = PATTERN_NONE.matcher(offset);
-    if (mNone.find()) {
-      return new BaselineNone();
-    }
-
-    // TODO link with generic metric baseline prediction when available
-    Matcher mPredicted = PATTERN_PREDICTED.matcher(offset);
-    if (mPredicted.find()) {
-      return new BaselineNone();
-    }
-
-    Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
-    if (mWeekOverWeek.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, Integer.valueOf(mWeekOverWeek.group(1)), timeZone);
-    }
-
-    Matcher mMean = PATTERN_MEAN.matcher(offset);
-    if (mMean.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, Integer.valueOf(mMean.group(1)), 1, timeZone);
-    }
-
-    Matcher mMedian = PATTERN_MEDIAN.matcher(offset);
-    if (mMedian.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timeZone);
-    }
-
-    Matcher mMin = PATTERN_MIN.matcher(offset);
-    if (mMin.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MIN, Integer.valueOf(mMin.group(1)), 1, timeZone);
-    }
-
-    Matcher mMax = PATTERN_MAX.matcher(offset);
-    if (mMax.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MAX, Integer.valueOf(mMax.group(1)), 1, timeZone);
-    }
-
-    throw new IllegalArgumentException(String.format("Unknown offset '%s'", offset));
   }
 
   /**

@@ -42,10 +42,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.task.TaskState;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 /**
@@ -101,29 +102,29 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     HOLD.set(true);
 
     // Should create the task queues and generate a task
-    Assert.assertTrue(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
-    Assert.assertTrue(_helixTaskResourceManager.getTaskQueues()
+    assertTrue(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
+    assertTrue(_helixTaskResourceManager.getTaskQueues()
         .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(TestTaskGenerator.TASK_TYPE)));
 
     // Should generate one more task
-    Assert.assertTrue(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
+    assertTrue(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
 
     // Should not generate more tasks
-    Assert.assertFalse(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
+    assertFalse(_taskManager.scheduleTasks().containsKey(TestTaskGenerator.TASK_TYPE));
 
     // Wait at most 60 seconds for all tasks IN_PROGRESS
     TestUtils.waitForCondition(input -> {
       Collection<TaskState> taskStates = _helixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values();
-      Assert.assertEquals(taskStates.size(), 2);
+      assertEquals(taskStates.size(), 2);
       for (TaskState taskState : taskStates) {
         if (taskState != TaskState.IN_PROGRESS) {
           return false;
         }
       }
-      Assert.assertTrue(TASK_START_NOTIFIED.get());
-      Assert.assertFalse(TASK_SUCCESS_NOTIFIED.get());
-      Assert.assertFalse(TASK_CANCELLED_NOTIFIED.get());
-      Assert.assertFalse(TASK_ERROR_NOTIFIED.get());
+      assertTrue(TASK_START_NOTIFIED.get());
+      assertFalse(TASK_SUCCESS_NOTIFIED.get());
+      assertFalse(TASK_CANCELLED_NOTIFIED.get());
+      assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
     }, 60_000L, "Failed to get all tasks IN_PROGRESS");
 
@@ -133,16 +134,16 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     // Wait at most 60 seconds for all tasks STOPPED
     TestUtils.waitForCondition(input -> {
       Collection<TaskState> taskStates = _helixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values();
-      Assert.assertEquals(taskStates.size(), 2);
+      assertEquals(taskStates.size(), 2);
       for (TaskState taskState : taskStates) {
         if (taskState != TaskState.STOPPED) {
           return false;
         }
       }
-      Assert.assertTrue(TASK_START_NOTIFIED.get());
-      Assert.assertFalse(TASK_SUCCESS_NOTIFIED.get());
-      Assert.assertTrue(TASK_CANCELLED_NOTIFIED.get());
-      Assert.assertFalse(TASK_ERROR_NOTIFIED.get());
+      assertTrue(TASK_START_NOTIFIED.get());
+      assertFalse(TASK_SUCCESS_NOTIFIED.get());
+      assertTrue(TASK_CANCELLED_NOTIFIED.get());
+      assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
     }, 60_000L, "Failed to get all tasks STOPPED");
 
@@ -153,16 +154,16 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     // Wait at most 60 seconds for all tasks COMPLETED
     TestUtils.waitForCondition(input -> {
       Collection<TaskState> taskStates = _helixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE).values();
-      Assert.assertEquals(taskStates.size(), 2);
+      assertEquals(taskStates.size(), 2);
       for (TaskState taskState : taskStates) {
         if (taskState != TaskState.COMPLETED) {
           return false;
         }
       }
-      Assert.assertTrue(TASK_START_NOTIFIED.get());
-      Assert.assertTrue(TASK_SUCCESS_NOTIFIED.get());
-      Assert.assertTrue(TASK_CANCELLED_NOTIFIED.get());
-      Assert.assertFalse(TASK_ERROR_NOTIFIED.get());
+      assertTrue(TASK_START_NOTIFIED.get());
+      assertTrue(TASK_SUCCESS_NOTIFIED.get());
+      assertTrue(TASK_CANCELLED_NOTIFIED.get());
+      assertFalse(TASK_ERROR_NOTIFIED.get());
       return true;
     }, 60_000L, "Failed to get all tasks COMPLETED");
 
@@ -200,7 +201,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     @Nonnull
     @Override
     public List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs) {
-      Assert.assertEquals(tableConfigs.size(), 2);
+      assertEquals(tableConfigs.size(), 2);
 
       // Generate at most 2 tasks
       if (_clusterInfoProvider.getTaskStates(TASK_TYPE).size() >= 2) {
@@ -221,6 +222,10 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     public int getNumConcurrentTasksPerInstance() {
       return DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
     }
+
+    @Override
+    public void nonLeaderCleanUp() {
+    }
   }
 
   public static class TestTaskExecutorFactory implements PinotTaskExecutorFactory {
@@ -229,18 +234,18 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
       return new BaseTaskExecutor() {
         @Override
         public Boolean executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
-          Assert.assertTrue(MINION_CONTEXT.getDataDir().exists());
-          Assert.assertNotNull(MINION_CONTEXT.getMinionMetrics());
-          Assert.assertNotNull(MINION_CONTEXT.getMinionVersion());
+          assertTrue(MINION_CONTEXT.getDataDir().exists());
+          assertNotNull(MINION_CONTEXT.getMinionMetrics());
+          assertNotNull(MINION_CONTEXT.getMinionVersion());
 
-          Assert.assertTrue(pinotTaskConfig.getTaskType().equals(TestTaskGenerator.TASK_TYPE));
+          assertEquals(pinotTaskConfig.getTaskType(), TestTaskGenerator.TASK_TYPE);
           Map<String, String> configs = pinotTaskConfig.getConfigs();
-          Assert.assertTrue(configs.size() == 2);
+          assertEquals(configs.size(), 2);
           String offlineTableName = configs.get("tableName");
-          Assert.assertEquals(TableNameBuilder.getTableTypeFromTableName(offlineTableName), TableType.OFFLINE);
+          assertEquals(TableNameBuilder.getTableTypeFromTableName(offlineTableName), TableType.OFFLINE);
           String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
-          Assert.assertTrue(rawTableName.equals(TABLE_NAME_1) || rawTableName.equals(TABLE_NAME_2));
-          Assert.assertEquals(configs.get("tableType"), TableType.OFFLINE.toString());
+          assertTrue(rawTableName.equals(TABLE_NAME_1) || rawTableName.equals(TABLE_NAME_2));
+          assertEquals(configs.get("tableType"), TableType.OFFLINE.toString());
 
           do {
             if (_cancelled) {
@@ -265,8 +270,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
 
         @Override
         public void notifyTaskSuccess(@Nonnull PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
-          Assert.assertTrue(executionResult instanceof Boolean);
-          Assert.assertTrue((Boolean) executionResult);
+          assertTrue(executionResult instanceof Boolean);
+          assertTrue((Boolean) executionResult);
           TASK_SUCCESS_NOTIFIED.set(true);
         }
 

@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.startree;
 
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import java.io.Closeable;
 import java.util.List;
 import java.util.Map;
 
@@ -24,7 +23,7 @@ import java.util.Map;
 /**
  * Interface for StarTree.
  */
-public interface StarTree extends Closeable {
+public interface StarTree {
 
   /**
    * Get the root node of the star tree.

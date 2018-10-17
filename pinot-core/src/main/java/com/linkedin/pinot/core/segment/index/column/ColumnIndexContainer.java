@@ -17,17 +17,26 @@ package com.linkedin.pinot.core.segment.index.column;
 
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 
 
 /**
- * Interface for column index containers.
+ * A container for all the indexes for a column.
  */
 public interface ColumnIndexContainer {
+
+  /**
+   * Returns the forward index for the column.
+   */
   DataFileReader getForwardIndex();
 
+  /**
+   * Returns the inverted index for the column, or {@code null} if it does not exist.
+   */
   InvertedIndexReader getInvertedIndex();
 
+  /**
+   * Returns the dictionary for the column, or {@code null} if it does not exist.
+   */
   Dictionary getDictionary();
 }

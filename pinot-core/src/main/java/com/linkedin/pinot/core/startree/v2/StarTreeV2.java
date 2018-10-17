@@ -17,14 +17,13 @@ package com.linkedin.pinot.core.startree.v2;
 
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.startree.StarTree;
-import java.io.Closeable;
 
 
 /**
- * The class <code>StarTreeV2</code> is a wrapper on top of star-tree, its metadata, and the data sources associated
+ * The {@code StarTreeV2} class is a wrapper on top of star-tree, its metadata, and the data sources associated
  * with it.
  */
-public interface StarTreeV2 extends Closeable {
+public interface StarTreeV2 {
 
   /**
    * Returns the {@link StarTree} data structure.

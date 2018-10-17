@@ -1,10 +1,11 @@
 .te-anomaly-table {
   width: 100%;
   margin-top: 12px;
+  background-color: white;
   border: 1px solid app-shade(black, 1);
 
   &__comment {
-    margin-top: 10px;
+    margin-left: 10px;
     float: left;
   }
 
@@ -27,11 +28,18 @@
   }
 
   &__cell {
-    padding: 5px 20px;
+    padding: 5px 15px;
     font-size: 15px;
     font-weight: 500;
     color: app-shade(black, 8);
     position: relative;
+
+    &--index {
+      font-size: 14px;
+      padding: 7px 0 0 11px;
+      vertical-align: top;
+      color: app-shade(black, 4);
+    }
 
     &:last-child {
       max-width: 90px;
@@ -45,11 +53,15 @@
     font-size: 15px;
     font-weight: bold;
     color: app-shade(black, 6);
-    padding-left: 20px;
+    padding-left: 15px;
     line-height: 45px;
 
     &--fixed {
       width: 215px;
+    }
+
+    &--left {
+      padding-left: 10px;
     }
   }
 
@@ -71,9 +83,13 @@
 
   &__list {
     list-style: none;
-    margin-left: -39px;
+    margin-left: -37px;
     margin-bottom: 0;
     max-width: 280px;
+
+    &--left {
+      margin-left: -45px;
+    }
   }
 
   &__list-item {

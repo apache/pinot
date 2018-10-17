@@ -34,8 +34,7 @@ import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnContext;
 import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProvider;
 import com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory;
-import com.linkedin.pinot.core.startree.OffHeapStarTree;
-import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.v2.store.StarTreeIndexContainer;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
@@ -114,13 +113,6 @@ public class ImmutableSegmentLoader {
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
 
-    // Load star tree index if it exists
-    StarTree starTree = null;
-    if (segmentReader.hasStarTree()) {
-      LOGGER.info("Loading star tree for segment: {}", segmentName);
-      starTree = new OffHeapStarTree(segmentReader.getStarTreeFile(), readMode);
-    }
-
     // Synthesize schema if necessary, adding virtual columns
     if (schema != null) {
       VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
@@ -135,7 +127,8 @@ public class ImmutableSegmentLoader {
     for (String columnName : schema.getColumnNames()) {
       if (schema.isVirtualColumn(columnName)) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(columnName);
-        VirtualColumnProvider provider = VirtualColumnProviderFactory.buildProvider(fieldSpec.getVirtualColumnProvider());
+        VirtualColumnProvider provider =
+            VirtualColumnProviderFactory.buildProvider(fieldSpec.getVirtualColumnProvider());
         VirtualColumnContext context =
             new VirtualColumnContext(NetUtil.getHostnameOrAddress(), segmentMetadata.getTableName(), segmentName,
                 columnName, segmentMetadata.getTotalDocs());
@@ -144,6 +137,14 @@ public class ImmutableSegmentLoader {
       }
     }
 
-    return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
+    // Load star-tree index if it exists
+    StarTreeIndexContainer starTreeIndexContainer = null;
+    if (segmentMetadata.getStarTreeV2MetadataList() != null || segmentMetadata.getStarTreeMetadata() != null) {
+      starTreeIndexContainer =
+          new StarTreeIndexContainer(SegmentDirectoryPaths.findSegmentDirectory(indexDir), segmentMetadata,
+              indexContainerMap, readMode);
+    }
+
+    return new ImmutableSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTreeIndexContainer);
   }
 }

@@ -28,7 +28,7 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -125,9 +125,9 @@ public class RoutingTableBuilderFactory {
         break;
       case PartitionAwareRealtime:
         // Check that the table uses LLC kafka consumer.
-        StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+        StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
 
-        if (streamMetadata.getConsumerTypes().size() == 1 && streamMetadata.getConsumerTypes().get(0)
+        if (streamConfig.getConsumerTypes().size() == 1 && streamConfig.getConsumerTypes().get(0)
             == CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType.simple) {
           builder = new PartitionAwareRealtimeRoutingTableBuilder();
         } else {

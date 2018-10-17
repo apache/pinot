@@ -22,6 +22,7 @@ import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.onboard.utils.FunctionCreationUtils;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.api.Constants;
@@ -114,12 +115,14 @@ public class AnomalyResource {
   private DatasetConfigManager datasetConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
+  private AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
   private LoadingCache<String, String> dimensionFiltersCache;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
+  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory,
+      AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getAlertConfigDAO();
@@ -129,6 +132,7 @@ public class AnomalyResource {
     this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;
+    this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getDatasetMaxDataTimeCache();
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
   }
@@ -286,7 +290,6 @@ public class AnomalyResource {
       @QueryParam("windowDelayUnit") String windowDelayUnit, @QueryParam("exploreDimension") String exploreDimensions,
       @QueryParam("filters") String filters, @QueryParam("dataGranularity") String userInputDataGranularity,
       @NotNull @QueryParam("properties") String properties, @QueryParam("isActive") boolean isActive) throws Exception {
-
     if (StringUtils.isEmpty(dataset) || StringUtils.isEmpty(functionName) || StringUtils.isEmpty(metric)
         || StringUtils.isEmpty(windowSize) || StringUtils.isEmpty(windowUnit) || properties == null) {
       throw new IllegalArgumentException(String.format("Received nulll or emtpy String for one of the mandatory params: "
@@ -377,6 +380,7 @@ public class AnomalyResource {
     anomalyFunctionSpec.setCron(cron);
 
     Long id = anomalyFunctionDAO.save(anomalyFunctionSpec);
+
     return Response.ok(id).build();
   }
 
@@ -821,6 +825,7 @@ public class AnomalyResource {
   }
 
   // Delete anomaly function
+  @Deprecated
   @DELETE
   @Path("/anomaly-function")
   @ApiOperation(value = "Delete anomaly function")
@@ -858,6 +863,53 @@ public class AnomalyResource {
   }
 
   /**
+   * Delete multiple anomaly functions
+   *
+   * @param ids a string containing multiple anomaly function ids, separated by comma (e.g. f1,f2,f3)
+   * @return HTTP response of this request with the deletion status and skipped warnings
+   */
+  @DELETE
+  @Path("/delete-functions")
+  @ApiOperation(value = "Delete anomaly functions")
+  public Response deleteAnomalyFunctions(@NotNull @QueryParam("ids") String ids) {
+    Map<String, String> responseMessage = new HashMap<>();
+    List<String> idsDeleted = new ArrayList<>();
+    if (StringUtils.isEmpty(ids)) {
+      throw new IllegalArgumentException("ids is a required query param");
+    }
+    String[] functionIds = ids.split(",");
+
+    for (String idString : functionIds) {
+      idString = idString.trim();
+      Long id = Long.parseLong(idString);
+      AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+      if (anomalyFunctionSpec != null) {
+        // Remove function from subscription alert groups
+        List<AlertConfigDTO> emailConfigurations = emailConfigurationDAO.findByFunctionId(id);
+        for (AlertConfigDTO emailConfiguration : emailConfigurations) {
+          emailConfiguration.getEmailConfig().getFunctionIds().remove(anomalyFunctionSpec.getId());
+          emailConfigurationDAO.update(emailConfiguration);
+        }
+
+        // Delete merged anomalies
+        List<MergedAnomalyResultDTO> mergedResults = anomalyMergedResultDAO.findByFunctionId(id);
+        for (MergedAnomalyResultDTO result : mergedResults) {
+          anomalyMergedResultDAO.delete(result);
+        }
+
+        anomalyFunctionDAO.deleteById(id);
+        idsDeleted.add(idString);
+      } else {
+        responseMessage.put("warnings", "true");
+        responseMessage.put("id: " + id, "skipped! anomaly function doesn't exist.");
+      }
+    }
+
+    responseMessage.put("message", "successfully deleted the following anomalies. function ids = " + idsDeleted);
+    return Response.ok(responseMessage).build();
+  }
+
+  /**
    * @param anomalyResultId : anomaly merged result id
    * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
    *                        eg. payload
@@ -889,5 +941,4 @@ public class AnomalyResource {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
   }
-
 }

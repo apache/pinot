@@ -47,9 +47,9 @@ import java.io.OutputStream;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.task.TaskDriver;
@@ -124,7 +124,7 @@ public class ControllerStarter {
 
     Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
-        _config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+        _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
 
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
@@ -137,7 +137,7 @@ public class ControllerStarter {
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
       SegmentFetcherFactory.getInstance()
-          .init(segmentFetcherFactoryConfig, pinotFSConfig);
+          .init(segmentFetcherFactoryConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
     }
@@ -163,9 +163,9 @@ public class ControllerStarter {
     LOGGER.info("Starting validation manager");
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
-    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-    _validationManager = new ValidationManager(validationMetrics, _helixResourceManager, _config,
-        PinotLLCRealtimeSegmentManager.getInstance());
+    _validationManager =
+        new ValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
+            new ValidationMetrics(_metricsRegistry));
     _validationManager.start();
 
     LOGGER.info("Starting realtime segment manager");
@@ -282,6 +282,9 @@ public class ControllerStarter {
 
   public void stop() {
     try {
+      LOGGER.info("Closing PinotFS classes");
+      PinotFSFactory.shutdown();
+
       LOGGER.info("Stopping validation manager");
       _validationManager.stop();
 

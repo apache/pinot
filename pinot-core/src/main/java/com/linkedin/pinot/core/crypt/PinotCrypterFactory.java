@@ -36,8 +36,8 @@ public class PinotCrypterFactory {
       PinotCrypter pinotCrypter =  (PinotCrypter) Class.forName(crypterClassName).newInstance();
       return pinotCrypter;
     } catch (Exception e) {
-      LOGGER.warn("Unable to instantiate {}, creating default crypter {}", crypterClassName, DefaultPinotCrypter.class.getName(), e);
-      return new DefaultPinotCrypter();
+      LOGGER.warn("Unable to instantiate {}, creating default crypter {}", crypterClassName, NoOpPinotCrypter.class.getName(), e);
+      return new NoOpPinotCrypter();
     }
   }
 }

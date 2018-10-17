@@ -5,8 +5,11 @@ import {
   getProperties
 } from '@ember/object';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import moment from 'moment';
 import fetch from 'fetch';
+import {
+  makeTime,
+  dateFormatFull
+} from 'thirdeye-frontend/utils/rca-utils';
 import _ from 'lodash';
 
 export default Component.extend({
@@ -70,7 +73,7 @@ export default Component.extend({
 
     if (!maxTime) { return; }
 
-    return moment(maxTime).format('MMM D, hh:mm a');
+    return makeTime(maxTime).format(dateFormatFull);
   })
 
 });

@@ -15,16 +15,14 @@
  */
 package com.linkedin.pinot.common.http;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
-import javax.annotation.Nonnull;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.methods.GetMethod;
+import org.apache.commons.httpclient.params.HttpClientParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,20 +70,16 @@ import org.slf4j.LoggerFactory;
 public class MultiGetRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiGetRequest.class);
 
-  Executor executor;
-  HttpConnectionManager connectionManager;
+  private final Executor _executor;
+  private final HttpConnectionManager _connectionManager;
 
   /**
    * @param executor executor service to use for making parallel requests
    * @param connectionManager http connection manager to use.
    */
-  public MultiGetRequest(@Nonnull Executor executor,
-      @Nonnull HttpConnectionManager connectionManager) {
-    Preconditions.checkNotNull(executor);
-    Preconditions.checkNotNull(connectionManager);
-
-    this.executor = executor;
-    this.connectionManager = connectionManager;
+  public MultiGetRequest(Executor executor, HttpConnectionManager connectionManager) {
+    _executor = executor;
+    _connectionManager = connectionManager;
   }
 
   /**
@@ -95,24 +89,23 @@ public class MultiGetRequest {
    * @return instance of CompletionService. Completion service will provide
    *   results as they arrive. The order is NOT same as the order of URLs
    */
-  public CompletionService<GetMethod> execute(@Nonnull List<String> urls, final int timeoutMs) {
-    Preconditions.checkNotNull(urls);
-    Preconditions.checkArgument(timeoutMs > 0, "Timeout value for multi-get must be greater than 0");
+  public CompletionService<GetMethod> execute(List<String> urls, int timeoutMs) {
+    HttpClientParams clientParams = new HttpClientParams();
+    clientParams.setConnectionManagerTimeout(timeoutMs);
+    HttpClient client = new HttpClient(clientParams, _connectionManager);
 
-    CompletionService<GetMethod> completionService = new ExecutorCompletionService<>(executor);
-    for (final String url : urls) {
-      completionService.submit(new Callable<GetMethod>() {
-        @Override
-        public GetMethod call()
-            throws Exception {
-          HttpClient client = new HttpClient(connectionManager);
+    CompletionService<GetMethod> completionService = new ExecutorCompletionService<>(_executor);
+    for (String url : urls) {
+      completionService.submit(() -> {
+        try {
           GetMethod getMethod = new GetMethod(url);
           getMethod.getParams().setSoTimeout(timeoutMs);
-          // if all connections in the connection manager are busy this will wait to retrieve a connection
-          // set time to wait to retrieve a connection from connection manager
-          client.getParams().setConnectionManagerTimeout(timeoutMs);
           client.executeMethod(getMethod);
           return getMethod;
+        } catch (Exception e) {
+          // Log only exception type and message instead of the whole stack trace
+          LOGGER.warn("Caught '{}' while executing GET on URL: {}", e.toString(), url);
+          throw e;
         }
       });
     }

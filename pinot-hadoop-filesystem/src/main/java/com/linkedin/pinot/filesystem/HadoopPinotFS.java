@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import org.apache.commons.configuration.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -159,6 +160,13 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     _hadoopFS.copyFromLocalFile(new Path(srcFile.toURI()), new Path(dstUri));
+  }
+
+  @Override
+  public boolean isDirectory(URI uri) throws IOException {
+    FileStatus fileStatus = new FileStatus();
+    fileStatus.setPath(new Path(uri));
+    return fileStatus.isDirectory();
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {

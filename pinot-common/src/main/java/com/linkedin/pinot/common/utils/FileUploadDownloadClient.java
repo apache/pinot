@@ -90,7 +90,7 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String HTTP = "http";
   private static final String HTTPS = "https";
   private static final String SCHEMA_PATH = "/schemas";
-  private static final String SEGMENT_PATH = "/segments";
+  private static final String SEGMENT_PATH = "/v2/segments";
   private static final String SEGMENT_METADATA_PATH = "/segmentmetadata";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "?type=";

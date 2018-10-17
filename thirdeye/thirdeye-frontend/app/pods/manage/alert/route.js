@@ -6,6 +6,7 @@
 import RSVP from 'rsvp';
 import fetch from 'fetch';
 import moment from 'moment';
+import { later } from '@ember/runloop';
 import { isPresent } from "@ember/utils";
 import Route from '@ember/routing/route';
 import { inject as service } from '@ember/service';
@@ -124,7 +125,6 @@ export default Route.extend({
       isEditModeActive,
       alertData: newAlertData,
       isTransitionDone: true,
-      isOverViewModeActive: !isEditModeActive,
       isReplayPending: isPresent(jobId)
     });
   },
@@ -150,53 +150,13 @@ export default Route.extend({
      */
     didTransition() {
       this.controller.set('isTransitionDone', true);
-    },
-
-    /**
-     * Toggle button modes and handle transition for edit
-     */
-    transitionToEditPage(alertId) {
-      this.controller.setProperties({
-        isOverViewModeActive: false,
-        isEditModeActive: true
+      // This is needed in order to update the links in this parent route,
+      // giving the "currentRouteName" time to resolve
+      later(this, () => {
+        if (this.router.currentRouteName.includes('explore')) {
+          this.controller.set('isEditModeActive', false);
+        }
       });
-      this.transitionTo('manage.alert.edit', alertId, { queryParams: { refresh: true }});
-    },
-
-    /**
-     * Toggle button modes and handle transition for Alert Page (overview)
-     * Persist query params as much as possible
-     */
-    transitionToAlertPage(alertId) {
-      const tuneModel = this.modelFor('manage.alert.tune');
-      this.controller.setProperties({
-        isOverViewModeActive: true,
-        isEditModeActive: false
-      });
-      if (tuneModel && tuneModel.duration === 'custom') {
-        const { id, duration, startDate, endDate } = tuneModel;
-        this.transitionTo('manage.alert.explore', id, { queryParams: { duration, startDate, endDate }});
-      } else {
-        this.transitionTo('manage.alert.explore', alertId);
-      }
-    },
-
-    /**
-     * Toggle button modes and handle transition for tuning page
-     * Persist query params as much as possible
-     */
-    transitionToTunePage(alertId) {
-      const exploreModel = this.modelFor('manage.alert.explore');
-      this.controller.setProperties({
-        isOverViewModeActive: false,
-        isEditModeActive: true
-      });
-      if (exploreModel && exploreModel.duration === 'custom') {
-        const { id, duration, startDate, endDate } = exploreModel;
-        this.transitionTo('manage.alert.tune', id, { queryParams: { duration, startDate, endDate }});
-      } else {
-        this.transitionTo('manage.alert.tune', alertId);
-      }
     },
 
     // // Sub-route errors will bubble up to this

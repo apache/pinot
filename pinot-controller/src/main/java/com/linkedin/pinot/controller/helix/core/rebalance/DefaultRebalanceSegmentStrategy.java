@@ -28,7 +28,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.Realtime
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,7 +50,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Basic rebalance segments strategy, which rebalances offline segments using autorebalance strategy,
+ * Basic rebalance segments strategy, which rebalances offline segments using auto-rebalance strategy,
  * and consuming segments using the partition assignment strategy for the table
  */
 public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy {
@@ -86,8 +86,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableNameWithType);
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
-      StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-      if (!streamMetadata.hasSimpleKafkaConsumerType()) {
+      StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+      if (!streamConfig.hasSimpleKafkaConsumerType()) {
         LOGGER.info("Table {} does not have LLC and will have no partition assignment", tableNameWithType);
         return newPartitionAssignment;
       }
