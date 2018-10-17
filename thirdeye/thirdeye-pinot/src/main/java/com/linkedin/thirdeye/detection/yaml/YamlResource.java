@@ -78,6 +78,7 @@ public class YamlResource {
       detectionConfig.setId(detectionConfigDTOs.get(0).getId());
       detectionConfig.setLastTimestamp(existingDetectionConfig.getLastTimestamp());
     }
+    detectionConfig.setYaml(payload);
     Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
 
