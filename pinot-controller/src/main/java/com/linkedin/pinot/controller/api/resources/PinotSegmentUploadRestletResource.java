@@ -326,21 +326,14 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private FileUploadDownloadClient.UploadVersion getUploadVersion(String uploadVersionString) {
-    if (uploadVersionString != null) {
-      return FileUploadDownloadClient.UploadVersion.valueOf(uploadVersionString);
-    } else {
-      return FileUploadDownloadClient.UploadVersion.getDefaultUploadVersion();
-    }
-  }
-
   private String getZkDownloadURIForURIUpload(String currentSegmentLocationURI, SegmentMetadata segmentMetadata,
       FileUploadPathProvider provider, boolean moveSegmentToFinalLocation) throws URISyntaxException, UnsupportedEncodingException {
     String zkDownloadUri;
     if (new URI(currentSegmentLocationURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
       zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
           provider.getVip());
-    } else if (moveSegmentToFinalLocation) {
+    } else if (!moveSegmentToFinalLocation) {
+      LOGGER.info("Setting zkDownloadUri to {}, skipping move", currentSegmentLocationURI);
       zkDownloadUri = currentSegmentLocationURI;
     } else {
       LOGGER.info("Using configured data dir {}", _controllerConf.getDataDir());

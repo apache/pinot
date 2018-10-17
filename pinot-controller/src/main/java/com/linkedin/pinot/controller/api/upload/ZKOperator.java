@@ -79,14 +79,14 @@ public class ZKOperator {
   }
 
   private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
-      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String downloadURI,
+      File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI,
       String offlineTableName, String segmentName, ZNRecord znRecord, boolean moveSegmentToFinalLocation) throws Exception {
 
     OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
     long existingCrc = existingSegmentZKMetadata.getCrc();
 
     // Set the download URL.
-    existingSegmentZKMetadata.setDownloadUrl(downloadURI);
+    existingSegmentZKMetadata.setDownloadUrl(zkDownloadURI);
 
     // Set the crypter name (even if null, so it can be removed from metadata).
     String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
@@ -161,6 +161,8 @@ public class ZKOperator {
         if (moveSegmentToFinalLocation) {
           moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
           LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
+        } else {
+          LOGGER.info("Skipping segment move, keeping segment at {}", zkDownloadURI);
         }
 
         _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata);
