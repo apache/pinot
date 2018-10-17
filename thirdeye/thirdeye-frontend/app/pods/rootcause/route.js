@@ -10,7 +10,8 @@ import {
   dateFormatFull,
   appendFilters,
   filterPrefix,
-  makeTime
+  makeTime,
+  value2filter
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
@@ -291,7 +292,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const anomalyFilters = [];
         anomalyDimNames.forEach(dimName => {
           anomalyEntity.attributes[dimName].forEach(dimValue => {
-            anomalyFilters.pushObject([dimName, dimValue]);
+            anomalyFilters.pushObject(value2filter(dimName, dimValue));
           });
         });
 
