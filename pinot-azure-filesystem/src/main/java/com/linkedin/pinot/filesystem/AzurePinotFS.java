@@ -149,7 +149,9 @@ public class AzurePinotFS extends PinotFS {
   private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry) throws IOException {
     List<DirectoryEntry> fileList = new ArrayList<>();
     if (origDirEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
+      fileList.add(origDirEntry);
       for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
+        fileList.add(directoryEntry);
         fileList.addAll(listFiles(directoryEntry));
       }
     } else {
@@ -188,5 +190,12 @@ public class AzurePinotFS extends PinotFS {
     byte[] inputStream = IOUtils.toByteArray(new FileInputStream(srcFile));
     out.write(inputStream);
     out.close();
+  }
+
+  @Override
+  public boolean isDirectory(URI uri) throws IOException {
+    DirectoryEntry dirEntry = _adlStoreClient.getDirectoryEntry(uri.getPath());
+
+    return dirEntry.type.equals(DirectoryEntryType.DIRECTORY);
   }
 }

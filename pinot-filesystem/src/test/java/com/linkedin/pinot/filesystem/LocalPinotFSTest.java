@@ -64,8 +64,10 @@ public class LocalPinotFSTest {
     URI testFileUri = testFile.toURI();
     // Check whether a directory exists
     Assert.assertTrue(localPinotFS.exists(_absoluteTmpDirPath.toURI()));
+    Assert.assertTrue(localPinotFS.isDirectory(_absoluteTmpDirPath.toURI()));
     // Check whether a file exists
     Assert.assertTrue(localPinotFS.exists(testFileUri));
+    Assert.assertFalse(localPinotFS.isDirectory(testFileUri));
 
     File file = new File(_absoluteTmpDirPath, "secondTestFile");
     URI secondTestFileUri = file.toURI();
