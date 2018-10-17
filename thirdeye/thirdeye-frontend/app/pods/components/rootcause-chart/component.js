@@ -400,11 +400,17 @@ export default Component.extend({
     const { entities, timeseries, timeseriesMode, _eventValues, context } =
       this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues', 'context');
 
+    const timeseriesPostProcessing = (metricEntity, timeseries) => {
+      return (metricEntity.attributes.granularity[0] === '1_DAYS' || context.granularity === '1_DAYS') ?
+        this._convertToDailyStepSeries(timeseries) : timeseries;
+    }
+
     if (hasPrefix(urn, 'frontend:metric:current:')) {
       const metricEntity = entities[toMetricUrn(urn)];
+      const outputTimeseries = timeseriesPostProcessing(metricEntity, timeseries[urn]);
       const series = {
-        timestamps: timeseries[urn].timestamp,
-        values: timeseries[urn].value,
+        timestamps: outputTimeseries.timestamp,
+        values: outputTimeseries.value,
         color: metricEntity ? metricEntity.color : 'none',
         type: 'line',
         axis: 'y'
@@ -414,9 +420,10 @@ export default Component.extend({
 
     } else if (hasPrefix(urn, 'frontend:metric:baseline:')) {
       const metricEntity = entities[toMetricUrn(urn)];
+      const outputTimeseries = timeseriesPostProcessing(metricEntity, timeseries[urn]);
       const series = {
-        timestamps: timeseries[urn].timestamp,
-        values: timeseries[urn].value,
+        timestamps: outputTimeseries.timestamp,
+        values: outputTimeseries.value,
         color: metricEntity ? 'light-' + metricEntity.color : 'none',
         type: 'line',
         axis: 'y'
@@ -437,6 +444,34 @@ export default Component.extend({
         axis: 'y2'
       };
     }
+  },
+
+  /**
+   * Returns a post-processed timeseries emulating a step function (because C3 support is insufficient)
+   *
+   * @param {Array} timeseries timeseries
+   * @returns {{timestamp: Array, value: Array}}
+   * @private
+   */
+  _convertToDailyStepSeries(timeseries) {
+    const newTimeseries = {
+      timestamp: [],
+      value: []
+    };
+
+    // crudely guess end timestamp
+    const virtualEnd = timeseries.timestamp[timeseries.timestamp.length - 1] + 86400000;
+    const virtualTimestamps = [...timeseries.timestamp, virtualEnd];
+
+    for (let i = 0; i < virtualTimestamps.length - 1; i++) {
+      newTimeseries.timestamp.push(virtualTimestamps[i]);
+      newTimeseries.timestamp.push(virtualTimestamps[i + 1] - 1);
+
+      newTimeseries.value.push(timeseries.value[i]);
+      newTimeseries.value.push(timeseries.value[i]);
+    }
+
+    return newTimeseries;
   },
 
   /**
