@@ -58,10 +58,10 @@ public class AzureFs extends AbstractBaseCommand implements Command {
 //    if (true) return true;
     AzurePinotFS fs = new AzurePinotFS();
     Configuration configuration = new PropertiesConfiguration();
-    configuration.addProperty("azure.account", "k2pcxdls.azuredatalakestore.net");
-    configuration.addProperty("azure.authendpoint", "https://login.microsoftonline.com/588e8fae-da1b-4c8b-810f-3229806c04fe/oauth2/token");
-    configuration.addProperty("azure.clientid", "757c4f11-8d69-47d4-9e18-e540c72911f0");
-    configuration.addProperty("azure.clientsecret", "BEnEccsQHd/QbvQmGO6f17V0LFLEdssypAYrd4qhXCw=");
+    configuration.addProperty("accountId", "k2pcxdls.azuredatalakestore.net");
+    configuration.addProperty("authEndpoint", "https://login.microsoftonline.com/588e8fae-da1b-4c8b-810f-3229806c04fe/oauth2/token");
+    configuration.addProperty("clientId", "757c4f11-8d69-47d4-9e18-e540c72911f0");
+    configuration.addProperty("clientSecret", "BEnEccsQHd/QbvQmGO6f17V0LFLEdssypAYrd4qhXCw=");
 
     fs.init(configuration);
 
