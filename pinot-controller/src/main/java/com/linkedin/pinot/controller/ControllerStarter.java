@@ -100,7 +100,7 @@ public class ControllerStarter {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
     _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
-    _periodicTaskScheduler = new PeriodicTaskScheduler(_config.getPeriodicTaskInitialDelayInSeconds());
+    _periodicTaskScheduler = new PeriodicTaskScheduler();
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {

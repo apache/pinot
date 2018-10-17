@@ -28,9 +28,9 @@ public class PeriodicTaskSchedulerTest {
   @Test
   public void testSchedulerWithOneTask() throws InterruptedException {
     AtomicInteger count = new AtomicInteger(0);
-    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(0L);
+    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler();
     long runFrequencyInSeconds = 1L;
-    long totalRunTimeInMilliseconds = 4_000L;
+    long totalRunTimeInMilliseconds = 3_500L;
 
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task = new BasePeriodicTask("Task", runFrequencyInSeconds, 0L) {
@@ -49,16 +49,16 @@ public class PeriodicTaskSchedulerTest {
     periodicTaskScheduler.stop();
 
     Assert.assertTrue(count.get() > 0);
-    Assert.assertTrue(count.get() < (totalRunTimeInMilliseconds / runFrequencyInSeconds));
+    Assert.assertTrue(count.get() == (totalRunTimeInMilliseconds / (runFrequencyInSeconds * 1000)));
     Assert.assertTrue(totalRunTimeInMilliseconds <= (System.currentTimeMillis() - start));
   }
 
   @Test
   public void testSchedulerWithTwoStaggeredTasks() throws InterruptedException {
     AtomicInteger count = new AtomicInteger(0);
-    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(0L);
+    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler();
     long runFrequencyInSeconds = 2L;
-    long totalRunTimeInMilliseconds = 7_000L;
+    long totalRunTimeInMilliseconds = 1_500L;
 
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task1 = new BasePeriodicTask("Task1", runFrequencyInSeconds, 0L) {
@@ -86,7 +86,6 @@ public class PeriodicTaskSchedulerTest {
     periodicTaskScheduler.stop();
 
     Assert.assertTrue(count.get() == 0);
-    Assert.assertTrue(count.get() < (totalRunTimeInMilliseconds / runFrequencyInSeconds));
     Assert.assertTrue(totalRunTimeInMilliseconds <= (System.currentTimeMillis() - start));
   }
 
@@ -97,7 +96,7 @@ public class PeriodicTaskSchedulerTest {
     AtomicLong count2 = new AtomicLong(startTime);
     final long[] maxRunTimeForTask1 = {0L};
     final long[] maxRunTimeForTask2 = {0L};
-    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(0L);
+    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler();
     long runFrequencyInSeconds = 1L;
     long totalRunTimeInMilliseconds = 10_000L;
 
@@ -114,9 +113,8 @@ public class PeriodicTaskSchedulerTest {
     };
     periodicTasks.add(task1);
 
-    // The time for Task 2 to run is 5 seconds, which is higher than the interval time of Task 1.
-    long TimeToRunMs = 5_000L;
-    // Frequency of Task2 is 4x the one of Task1, and it takes 5 seconds to finish each task().
+    // The time for Task 2 to run is 4 seconds, which is higher than the interval time of Task 1.
+    long TimeToRunMs = 4_000L;
     PeriodicTask task2 = new BasePeriodicTask("Task2", runFrequencyInSeconds * 3, 0L) {
       @Override
       public void run() {
@@ -141,16 +139,16 @@ public class PeriodicTaskSchedulerTest {
 
     Assert.assertTrue(count.get() > startTime);
     Assert.assertTrue(count2.get() > startTime);
-    // Task1 waited until Task2 finished.
-    Assert.assertTrue(maxRunTimeForTask1[0] > (task1.getIntervalInSeconds() + TimeToRunMs));
-    Assert.assertTrue(maxRunTimeForTask2[0] > task2.getIntervalInSeconds());
+    // Task1 didn't waited until Task2 finished.
+    Assert.assertTrue(maxRunTimeForTask1[0] - task1.getIntervalInSeconds() * 1000L < 100L);
+    Assert.assertTrue(maxRunTimeForTask2[0] >= Math.max(task2.getIntervalInSeconds() * 1000L, TimeToRunMs));
   }
 
   @Test
   public void testNoTaskAssignedToQueue() throws InterruptedException {
     AtomicInteger count = new AtomicInteger(0);
-    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler(2L);
-    long totalRunTimeInMilliseconds = 5_000L;
+    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler();
+    long totalRunTimeInMilliseconds = 2_000L;
 
     // An empty list.
     List<PeriodicTask> periodicTasks = new ArrayList<>();
