@@ -333,10 +333,12 @@ public class PinotSegmentUploadRestletResource {
       zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
           provider.getVip());
     } else if (!moveSegmentToFinalLocation) {
-      LOGGER.info("Setting zkDownloadUri to {}, skipping move", currentSegmentLocationURI);
+      LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
+          segmentMetadata.getName(), segmentMetadata.getTableName());
       zkDownloadUri = currentSegmentLocationURI;
     } else {
-      LOGGER.info("Using configured data dir {}", _controllerConf.getDataDir());
+      LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(),
+          segmentMetadata.getName(), segmentMetadata.getTableName());
       zkDownloadUri = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
           URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
     }
@@ -396,7 +398,8 @@ public class PinotSegmentUploadRestletResource {
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
-  // request if a multipart object is not sent
+  // request if a multipart object is not sent. This endpoint does not move the segment to its final location;
+  // it keeps it at the downloadURI header that is set. We will not support this endpoint going forward.
   public void uploadSegmentAsJson(String segmentJsonStr,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
@@ -413,11 +416,12 @@ public class PinotSegmentUploadRestletResource {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  // For the multipart endpoint, we will always move segment to final location regardless of the segment endpoint.
   public void uploadSegmentAsMultiPart(FormDataMultiPart multiPart,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
-      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request, false));
+      asyncResponse.resume(uploadSegment(multiPart, enableParallelPushProtection, headers, request, true));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -430,7 +434,8 @@ public class PinotSegmentUploadRestletResource {
   @Path("/v2/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   // We use this endpoint with URI upload because a request sent with the multipart content type will reject the POST
-  // request if a multipart object is not sent
+  // request if a multipart object is not sent. This endpoint is recommended for use. It differs from the first
+  // endpoint in how it moves the segment to a Pinot-determined final directory.
   public void uploadSegmentAsJsonV2(String segmentJsonStr,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
@@ -447,6 +452,7 @@ public class PinotSegmentUploadRestletResource {
   @Consumes(MediaType.MULTIPART_FORM_DATA)
   @Path("/v2/segments")
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
+  // This behavior does not differ from v1 of the same endpoint.
   public void uploadSegmentAsMultiPartV2(FormDataMultiPart multiPart,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false") @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION) boolean enableParallelPushProtection,
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {

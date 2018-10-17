@@ -65,14 +65,14 @@ public class ZKOperator {
 
     // Brand new segment, not refresh, directly add the segment
     if (znRecord == null) {
-      LOGGER.info("Adding new segment: {}", segmentName);
+      LOGGER.info("Adding new segment {} from table {}", segmentName, rawTableName);
       String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, crypter,
           rawTableName, segmentName, moveSegmentToFinalLocation);
       return;
     }
 
-    LOGGER.info("Segment {} already exists, refreshing if necessary", segmentName);
+    LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, rawTableName);
 
     processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
         enableParallelPushProtection, headers, zkDownloadURI, offlineTableName, segmentName, znRecord, moveSegmentToFinalLocation);
@@ -162,7 +162,7 @@ public class ZKOperator {
           moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
           LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
         } else {
-          LOGGER.info("Skipping segment move, keeping segment at {}", zkDownloadURI);
+          LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, offlineTableName, zkDownloadURI);
         }
 
         _pinotHelixResourceManager.refreshSegment(segmentMetadata, existingSegmentZKMetadata);
@@ -207,6 +207,8 @@ public class ZKOperator {
         LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, rawTableName, e);
         throw new RuntimeException(e);
       }
+    } else {
+      LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, rawTableName, zkDownloadURI);
     }
     _pinotHelixResourceManager.addNewSegment(segmentMetadata, zkDownloadURI, crypter);
   }
