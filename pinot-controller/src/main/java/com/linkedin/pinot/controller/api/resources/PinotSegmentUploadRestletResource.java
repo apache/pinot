@@ -255,6 +255,11 @@ public class PinotSegmentUploadRestletResource {
     // Get URI of current segment location
     String currentSegmentLocationURI = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
 
+    // Get strategy of segment persistence
+    String segmentPersistenceStratey = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_PERSISTENCE_STRATEGY);
+
+
+
     File tempEncryptedFile = null;
     File tempDecryptedFile = null;
     File tempSegmentDir = null;
@@ -284,7 +289,7 @@ public class PinotSegmentUploadRestletResource {
           segmentMetadata =
               getMetadataForURI(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile,
                   tempSegmentDir, metadataProviderClass);
-          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, provider);
+          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, segmentPersistenceStratey, provider);
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
@@ -327,15 +332,19 @@ public class PinotSegmentUploadRestletResource {
   }
 
   private String getZkDownloadURIForURIUpload(String currentSegmentLocationURI, SegmentMetadata segmentMetadata,
-      FileUploadPathProvider provider) throws URISyntaxException, UnsupportedEncodingException {
+      String segmentPersistenceStratey, FileUploadPathProvider provider) throws URISyntaxException, UnsupportedEncodingException {
     String zkDownloadUri;
     if (new URI(currentSegmentLocationURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
       zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
           provider.getVip());
     } else {
-      LOGGER.info("Using configured data dir {}", _controllerConf.getDataDir());
-      zkDownloadUri = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
-          URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
+      if (CommonConstants.Segment.PERSIST_TO_PINOT_MANAGED_FILESYSTEM.equalsIgnoreCase(segmentPersistenceStratey)) {
+        LOGGER.info("Using configured data dir {}", _controllerConf.getDataDir());
+        zkDownloadUri = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+            URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
+      } else {
+        zkDownloadUri = currentSegmentLocationURI;
+      }
     }
     return zkDownloadUri;
   }
