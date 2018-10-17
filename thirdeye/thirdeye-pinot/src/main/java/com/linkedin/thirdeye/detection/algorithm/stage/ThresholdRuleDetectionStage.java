@@ -37,18 +37,19 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 /**
  * Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.
  */
-@Detection(name = "Threshold Detection Rule",
+@Detection(name = "Threshold",
     type = "THRESHOLD_DETECTION",
     tags = { DetectionTags.RULE_DETECTION },
-    description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.")
+    description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.",
+    template = "When metric is lower than ${1} or higher than ${2}",
+    params = {@DetectionParam(name = "min"), @DetectionParam(name = "max")}
+    )
 public class ThresholdRuleDetectionStage extends StaticAnomalyDetectionStage {
   private final String COL_TOO_HIGH = "tooHigh";
   private final String COL_TOO_LOW = "tooLow";
   private final String COL_ANOMALY = "anomaly";
 
-  @DetectionParam(name = "min", description = "Minimal allowed value. If metric value is less than this min value, mark as an anomaly.")
   private double min;
-  @DetectionParam(name = "max", description = "Maximum allowed value. If metric value is larger than this max value, mark as an anomaly.")
   private double max;
   private MetricSlice slice;
   private Long configId;

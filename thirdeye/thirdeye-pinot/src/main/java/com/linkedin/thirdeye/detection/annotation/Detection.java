@@ -37,5 +37,9 @@ public @interface Detection {
   @JsonProperty String description() default "";
 
   @JsonProperty boolean hidden() default false;
+
+  @JsonProperty String template() default "";
+
+  @JsonProperty DetectionParam[] params() default {};
 }
 

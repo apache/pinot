@@ -29,11 +29,9 @@ public @interface DetectionParam {
 
   @JsonProperty String name() default "";
 
-  @JsonProperty String value() default "";
-
   @JsonProperty String defaultValue() default "";
 
-  @JsonProperty String allowableValues() default "";
+  @JsonProperty String[] allowableValues() default {};
 
   @JsonProperty boolean required() default false;
 

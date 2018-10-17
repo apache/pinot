@@ -34,10 +34,13 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 /**
  * This threshold rule filter stage filters the anomalies if either the min or max thresholds do not pass.
  */
-@Detection(name = "Threshold Filter",
+@Detection(name = "Aggregate Threshold",
     type = "THRESHOLD_RULE_FILTER",
     tags = {DetectionTags.RULE_FILTER},
-    description = "Threshold rule filter. filters the anomalies if either the min or max thresholds do not satisfied.")
+    description = "Threshold rule filter. filters the anomalies if either the min or max thresholds do not satisfied.",
+    template = "When aggregate value of a time range is larger than ${1} and smaller than ${2}",
+    params = {@DetectionParam(name = "min"), @DetectionParam(name = "max")}
+)
 public class ThresholdRuleFilterStage implements AnomalyFilterStage {
     private static final String PROP_MIN = "min";
     private static final double PROP_MIN_DEFAULT = Double.NaN;
@@ -45,9 +48,7 @@ public class ThresholdRuleFilterStage implements AnomalyFilterStage {
     private static final String PROP_MAX = "max";
     private static final double PROP_MAX_DEFAULT = Double.NaN;
 
-    @DetectionParam(name = "min", description = "Minimal aggregate value to pass the filter.")
     private double min;
-    @DetectionParam(name = "max", description = "Maximum aggregate value of the anomaly.")
     private double max;
 
     @Override
