@@ -17,6 +17,7 @@
 package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
@@ -48,14 +49,10 @@ public class BaselineRuleDetectionStage extends StaticAnomalyDetectionStage {
   private static final String COL_CHANGE = "change";
   private static final String COL_CHANGE_VIOLATION = "change_violation";
   private static final String COL_ANOMALY = "anomaly";
+  private static final String PROP_OFFSET = "offset";
+  private static final String PROP_OFFSET_DEFAULT = "median1w";
 
   private static final String PROP_METRIC_URN = "metricUrn";
-
-  private static final String PROP_AGGREGATION = "aggregation";
-  private static final String PROP_AGGREGATION_DEFAULT = "MEDIAN";
-
-  private static final String PROP_WEEKS = "weeks";
-  private static final int PROP_WEEKS_DEFAULT = 1;
 
   private static final String PROP_CHANGE = "change";
   private static final double PROP_CHANGE_DEFAULT = Double.NaN;
@@ -80,12 +77,10 @@ public class BaselineRuleDetectionStage extends StaticAnomalyDetectionStage {
     MetricEntity me = MetricEntity.fromURN(metricUrn);
     this.slice = MetricSlice.from(me.getId(), startTime, endTime, me.getFilters());
 
-    int weeks = MapUtils.getIntValue(specs, PROP_WEEKS, PROP_WEEKS_DEFAULT);
-    BaselineAggregateType
-        aggregation = BaselineAggregateType.valueOf(MapUtils.getString(specs, PROP_AGGREGATION, PROP_AGGREGATION_DEFAULT));
-    DateTimeZone timezone = DateTimeZone.forID(MapUtils.getString(specs, PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT));
-    this.baseline = BaselineAggregate.fromWeekOverWeek(aggregation, weeks, 1, timezone);
+    String timezone = MapUtils.getString(specs, PROP_TIMEZONE, PROP_TIMEZONE_DEFAULT);
+    String offset = MapUtils.getString(specs, PROP_OFFSET, PROP_OFFSET_DEFAULT);
 
+    this.baseline = BaselineParsingUtils.parseOffset(offset, timezone);
     this.change = MapUtils.getDoubleValue(specs, PROP_CHANGE, PROP_CHANGE_DEFAULT);
     this.difference = MapUtils.getDoubleValue(specs, PROP_DIFFERENCE, PROP_DIFFERENCE_DEFAULT);
     this.configId = configId;
