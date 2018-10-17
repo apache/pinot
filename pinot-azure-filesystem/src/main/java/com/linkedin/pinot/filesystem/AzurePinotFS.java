@@ -189,4 +189,11 @@ public class AzurePinotFS extends PinotFS {
     out.write(inputStream);
     out.close();
   }
+
+  @Override
+  public boolean isDirectory(URI uri) throws IOException {
+    DirectoryEntry dirEntry = _adlStoreClient.getDirectoryEntry(uri.getPath());
+
+    return dirEntry.type.equals(DirectoryEntryType.DIRECTORY);
+  }
 }

@@ -66,7 +66,7 @@ public class PinotFSFactoryTest {
 
     @Override
     public void init(Configuration configuration) {
-      initCalled ++;
+      initCalled++;
     }
 
     @Override
@@ -110,6 +110,11 @@ public class PinotFSFactoryTest {
 
     @Override
     public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
+    }
+
+    @Override
+    public boolean isDirectory(URI uri) throws IOException {
+      return false;
     }
   }
 }

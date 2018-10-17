@@ -111,6 +111,13 @@ public abstract class PinotFS implements Closeable {
   public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws Exception;
 
   /**
+   * Allows us the ability to determine whether the uri is a directory.
+   * @param uri location of file or directory
+   * @return true if uri is a directory, false otherwise.
+   */
+  public abstract boolean isDirectory(URI uri) throws IOException;
+
+  /**
    * For certain filesystems, we may need to close the filesystem and do relevant operations to prevent leaks.
    * By default, this method does nothing.
    * @throws IOException
