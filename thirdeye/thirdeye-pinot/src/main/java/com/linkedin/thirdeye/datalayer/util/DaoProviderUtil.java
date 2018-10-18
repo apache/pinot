@@ -58,6 +58,7 @@ import java.net.URL;
 import java.sql.Connection;
 import javax.validation.Validation;
 import org.apache.tomcat.jdbc.pool.DataSource;
+import org.h2.store.fs.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +67,7 @@ public abstract class DaoProviderUtil {
   private static final Logger LOG = LoggerFactory.getLogger(DaoProviderUtil.class);
 
   private static final String DEFAULT_DATABASE_PATH = "jdbc:h2:./config/h2db";
+  private static final String DEFAULT_DATABASE_FILE = "./config/h2db.mv.db";
 
   private static DataSource dataSource;
   private static ManagerProvider provider;
@@ -93,24 +95,23 @@ public abstract class DaoProviderUtil {
     dataSource.setRemoveAbandoned(true);
 
     // create schema for default database
-    if (configuration.getDatabaseConfiguration().getUrl().equals(DEFAULT_DATABASE_PATH)) {
+    if (configuration.getDatabaseConfiguration().getUrl().equals(DEFAULT_DATABASE_PATH)
+        && !FileUtils.exists(DEFAULT_DATABASE_FILE)) {
       try {
-        LOG.info("Using default database path. Re-creating database schema.");
+        LOG.info("Creating database schema for default URL '{}'", DEFAULT_DATABASE_PATH);
         Connection conn = dataSource.getConnection();
         ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
         scriptRunner.setDelimiter(";", true);
 
-        LOG.info("Dropping existing schema");
-        InputStream dropSchema = DaoProviderUtil.class.getResourceAsStream("/schema/drop-tables.sql");
-        scriptRunner.runScript(new InputStreamReader(dropSchema));
-
-        LOG.info("Creating new schema");
         InputStream createSchema = DaoProviderUtil.class.getResourceAsStream("/schema/create-schema.sql");
         scriptRunner.runScript(new InputStreamReader(createSchema));
 
       } catch (Exception e) {
-        LOG.error("Could not re-create database schema. Attempting to use existing.", e);
+        LOG.error("Could not create database schema. Attempting to use existing.", e);
       }
+
+    } else {
+      LOG.info("Using existing database at '{}'", configuration.getDatabaseConfiguration().getUrl());
     }
 
     init(dataSource);
