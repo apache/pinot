@@ -151,7 +151,7 @@ public class SegmentCompletionIntegrationTests extends LLCRealtimeClusterIntegra
     final String oldSegment = _currentSegment;
 
     // Now call the validation manager, and the segment should fix itself
-    _controllerStarter.getValidationManager().runValidation();
+    _controllerStarter.getValidationManager().run();
 
     // Check if a new segment get into CONSUMING state
     TestUtils.waitForCondition(new Function<Void, Boolean>() {

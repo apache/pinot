@@ -104,7 +104,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
@@ -169,7 +169,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
@@ -205,7 +205,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), Long.MIN_VALUE);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -278,7 +278,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
@@ -324,7 +324,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -358,7 +358,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -426,7 +426,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
@@ -470,7 +470,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -508,7 +508,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -558,7 +558,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
         ControllerGauge.DISABLED_TABLE_COUNT), 0);
     // update metrics
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
         ControllerGauge.DISABLED_TABLE_COUNT), 1);
   }
@@ -605,7 +605,7 @@ public class SegmentStatusCheckerTest {
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.updateSegmentMetrics();
+    segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,

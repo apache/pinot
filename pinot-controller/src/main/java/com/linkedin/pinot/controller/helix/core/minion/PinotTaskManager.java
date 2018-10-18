@@ -24,7 +24,7 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import com.linkedin.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
-import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,10 +41,9 @@ import org.slf4j.LoggerFactory;
  * <p><code>PinotTaskManager</code> is also responsible for checking the health status on each type of tasks, detect and
  * fix issues accordingly.
  */
-public class PinotTaskManager extends BasePeriodicTask {
+public class PinotTaskManager extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManager.class);
 
-  private final PinotHelixResourceManager _helixResourceManager;
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoProvider _clusterInfoProvider;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
@@ -54,8 +53,7 @@ public class PinotTaskManager extends BasePeriodicTask {
       @Nonnull PinotHelixResourceManager helixResourceManager, @Nonnull ControllerConf controllerConf,
       @Nonnull ControllerMetrics controllerMetrics) {
     super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
-        Math.min(60, controllerConf.getTaskManagerFrequencyInSeconds()));
-    _helixResourceManager = helixResourceManager;
+        Math.min(60, controllerConf.getTaskManagerFrequencyInSeconds()), helixResourceManager);
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);
@@ -85,17 +83,11 @@ public class PinotTaskManager extends BasePeriodicTask {
 
   /**
    * Check the Pinot cluster status and schedule new tasks.
-   *
+   * @param allTableNames List of all the table names
    * @return Map from task type to task scheduled
    */
   @Nonnull
-  public Map<String, String> scheduleTasks() {
-    // Only schedule new tasks from leader controller
-    if (!_helixResourceManager.isLeader()) {
-      LOGGER.info("Skip scheduling new tasks on non-leader controller");
-      nonLeaderCleanUp();
-      return new HashMap<>();
-    }
+  private Map<String, String> scheduleTasks(List<String> allTableNames) {
 
     long startTime = System.currentTimeMillis();
     LOGGER.info("Start scheduling tasks on leader controller.");
@@ -113,8 +105,8 @@ public class PinotTaskManager extends BasePeriodicTask {
     }
 
     // Scan all table configs to get the tables with tasks enabled
-    for (String tableName : _helixResourceManager.getAllTables()) {
-      TableConfig tableConfig = _helixResourceManager.getTableConfig(tableName);
+    for (String tableName : allTableNames) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
       if (tableConfig != null) {
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
         if (taskConfig != null) {
@@ -148,6 +140,13 @@ public class PinotTaskManager extends BasePeriodicTask {
   }
 
   /**
+   * Public API to schedule tasks. It doesn't matter whether current pinot controller is leader.
+   */
+  public Map<String, String> scheduleTasks() {
+    return scheduleTasks(_pinotHelixResourceManager.getAllTables());
+  }
+
+  /**
    * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
    */
   private void nonLeaderCleanUp() {
@@ -157,12 +156,18 @@ public class PinotTaskManager extends BasePeriodicTask {
   }
 
   @Override
-  public void run() {
-    scheduleTasks();
+  public void init() {
+    LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalInSeconds());
   }
 
   @Override
-  public void init() {
-    LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalInSeconds());
+  public void onBecomeNotLeader() {
+    LOGGER.info("Skip scheduling new tasks on non-leader controller");
+    nonLeaderCleanUp();
+  }
+
+  @Override
+  public void process(List<String> allTableNames) {
+    scheduleTasks(allTableNames);
   }
 }

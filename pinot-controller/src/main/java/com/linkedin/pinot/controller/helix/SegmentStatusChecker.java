@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -43,9 +43,9 @@ import org.slf4j.LoggerFactory;
  * and segments in error state
  *
  * May 15, 2016
-*/
+ */
 
-public class SegmentStatusChecker extends BasePeriodicTask {
+public class SegmentStatusChecker extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final int MaxOfflineSegmentsToLog = 5;
   public static final String ONLINE = "ONLINE";
@@ -53,7 +53,6 @@ public class SegmentStatusChecker extends BasePeriodicTask {
   public static final String CONSUMING = "CONSUMING";
   private final ControllerMetrics _metricsRegistry;
   private final ControllerConf _config;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final HelixAdmin _helixAdmin;
   private final int _waitForPushTimeSeconds;
 
@@ -66,9 +65,9 @@ public class SegmentStatusChecker extends BasePeriodicTask {
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
    * @param config The controller configuration object
    */
-  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config, ControllerMetrics metricsRegistry) {
-    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds());
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
+      ControllerMetrics metricsRegistry) {
+    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(), pinotHelixResourceManager);
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
     _config = config;
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
@@ -77,42 +76,42 @@ public class SegmentStatusChecker extends BasePeriodicTask {
   }
 
   @Override
-  public void run() {
-    updateSegmentMetrics();
-  }
-
-  @Override
   public void init() {
     setStatusToDefault();
   }
 
+  @Override
+  public void onBecomeNotLeader() {
+    LOGGER.info("Skipping Segment Status check, not leader!");
+    setStatusToDefault();
+  }
+
+  @Override
+  public void process(List<String> allTableNames) {
+    updateSegmentMetrics(allTableNames);
+  }
+
   /**
    * Runs a segment status pass over the currently loaded tables.
+   * @param allTableNames List of all the table names
    */
-  void updateSegmentMetrics() {
-    if (!_pinotHelixResourceManager.isLeader()) {
-      LOGGER.info("Skipping Segment Status check, not leader!");
-      setStatusToDefault();
-      return;
-    }
-
+  private void updateSegmentMetrics(List<String> allTableNames) {
     long startTime = System.nanoTime();
 
     LOGGER.info("Starting Segment Status check for metrics");
 
     // Fetch the list of tables
-    List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     int realTimeTableCount = 0;
     int offlineTableCount = 0;
     int disabledTableCount = 0;
-    ZkHelixPropertyStore<ZNRecord> propertyStore= _pinotHelixResourceManager.getPropertyStore();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
     // check if we need to log disabled tables log messages
     boolean logDisabledTables = false;
     long now = System.currentTimeMillis();
-    if (now -_lastDisabledTableLogTimestamp >= DISABLED_TABLE_LOG_INTERVAL_MS) {
+    if (now - _lastDisabledTableLogTimestamp >= DISABLED_TABLE_LOG_INTERVAL_MS) {
       logDisabledTables = true;
       _lastDisabledTableLogTimestamp = now;
     } else {
@@ -151,8 +150,10 @@ public class SegmentStatusChecker extends BasePeriodicTask {
           continue;
         }
 
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENT_COUNT, (long)(idealState.getPartitionSet().size()));
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE,
+            idealState.toString().length());
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENT_COUNT,
+            (long) (idealState.getPartitionSet().size()));
         ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
 
         int nReplicasIdealMax = 0; // Keeps track of maximum number of replicas in ideal state
@@ -178,7 +179,8 @@ public class SegmentStatusChecker extends BasePeriodicTask {
             // No online segments in ideal state
             continue;
           }
-          nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState.getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
+          nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax)
+              ? idealState.getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
           if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
             // No replicas for this segment
             TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -216,7 +218,8 @@ public class SegmentStatusChecker extends BasePeriodicTask {
             }
             nOffline++;
           }
-          nReplicasExternal = ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
+          nReplicasExternal =
+              ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
         }
         if (nReplicasExternal == -1) {
           nReplicasExternal = (nReplicasIdealMax == 0) ? 1 : 0;

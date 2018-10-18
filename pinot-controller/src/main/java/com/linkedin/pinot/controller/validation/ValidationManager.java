@@ -28,8 +28,8 @@ import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -48,44 +48,43 @@ import org.slf4j.LoggerFactory;
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
  */
-public class ValidationManager extends BasePeriodicTask {
+public class ValidationManager extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ValidationManager.class);
 
   private final boolean _enableSegmentLevelValidation;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
 
   public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
-    super("ValidationManager", config.getValidationControllerFrequencyInSeconds());
+    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(), pinotHelixResourceManager);
     _enableSegmentLevelValidation = config.getEnableSegmentLevelValidation();
-    _pinotHelixResourceManager = pinotHelixResourceManager;
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
   }
 
   @Override
-  public void run() {
-    runValidation();
+  public void onBecomeNotLeader() {
+    _validationMetrics.unregisterAllMetrics();
+    LOGGER.info("Skipping validation, not leader!");
+  }
+
+  @Override
+  public void process(List<String> allTableNames) {
+    runValidation(allTableNames);
   }
 
   /**
    * Runs a validation pass over the currently loaded tables.
+   * @param allTableNames List of all the table names
    */
-  public void runValidation() {
-    if (!_pinotHelixResourceManager.isLeader()) {
-      _validationMetrics.unregisterAllMetrics();
-      LOGGER.info("Skipping validation, not leader!");
-      return;
-    }
-
+  private void runValidation(List<String> allTableNames) {
     long startTime = System.currentTimeMillis();
     LOGGER.info("Starting validation");
     // Cache instance configs to reduce ZK access
     List<InstanceConfig> instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
 
-    for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+    for (String tableNameWithType : allTableNames) {
       try {
         TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
         if (tableConfig == null) {

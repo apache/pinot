@@ -20,13 +20,14 @@ import com.google.common.base.Function;
 import com.google.common.collect.MinMaxPriorityQueue;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
 import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -48,37 +49,39 @@ import org.slf4j.LoggerFactory;
  * We only relocate segments for realtime tables, and only if tenant config indicates that relocation is required
  * A segment will be relocated, one replica at a time, once all of its replicas are in ONLINE state and on consuming servers
  */
-public class RealtimeSegmentRelocator extends BasePeriodicTask {
+public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentRelocator.class);
 
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
-
   public RealtimeSegmentRelocator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
-    super("RealtimeSegmentRelocator", getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency()));
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+    super("RealtimeSegmentRelocator", getRunFrequencySeconds(config.getRealtimeSegmentRelocatorFrequency()),
+        pinotHelixResourceManager);
   }
 
   @Override
-  public void run() {
-    runRelocation();
+  public void onBecomeNotLeader() {
+    LOGGER.info("Skipping realtime segment relocation, not leader!");
+  }
+
+  @Override
+  public void process(List<String> allTableNames) {
+    runRelocation(allTableNames);
   }
 
   /**
    * Check all tables. Perform relocation of segments if table is realtime and relocation is required
    * TODO: Model this to implement {@link com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy} interface
    * https://github.com/linkedin/pinot/issues/2609
+   * @param allTableNames List of all the table names
    */
-  public void runRelocation() {
-    if (!_pinotHelixResourceManager.isLeader()) {
-      LOGGER.info("Skipping realtime segment relocation, not leader!");
-      return;
-    }
-
+  private void runRelocation(List<String> allTableNames) {
     long startTime = System.currentTimeMillis();
     LOGGER.info("Starting relocation of realtime segments");
-    List<String> allRealtimeTableNames = _pinotHelixResourceManager.getAllRealtimeTables();
 
-    for (final String tableNameWithType : allRealtimeTableNames) {
+    for (final String tableNameWithType : allTableNames) {
+      // Only consider realtime tables.
+      if (!TableNameBuilder.REALTIME.tableHasTypeSuffix(tableNameWithType)) {
+        continue;
+      }
       try {
         LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
 
@@ -134,7 +137,8 @@ public class RealtimeSegmentRelocator extends BasePeriodicTask {
 
     if (completedServers.size() < Integer.valueOf(idealState.getReplicas())) {
       throw new IllegalStateException(
-          "Number of completed servers: " + completedServers.size() + " is less than num replicas: " + idealState.getReplicas());
+          "Number of completed servers: " + completedServers.size() + " is less than num replicas: "
+              + idealState.getReplicas());
     }
     // TODO: use segment assignment strategy to decide where to place relocated segment
 

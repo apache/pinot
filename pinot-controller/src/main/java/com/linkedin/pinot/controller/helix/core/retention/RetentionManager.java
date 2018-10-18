@@ -24,9 +24,9 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -42,26 +42,30 @@ import org.slf4j.LoggerFactory;
  * The <code>RetentionManager</code> class manages retention for all segments and delete expired segments.
  * <p>It is scheduled to run only on leader controller.
  */
-public class RetentionManager extends BasePeriodicTask {
+public class RetentionManager extends ControllerPeriodicTask {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final int _deletedSegmentsRetentionInDays;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
       int deletedSegmentsRetentionInDays) {
-    super("PinotRetentionManager", runFrequencyInSeconds, Math.min(60, runFrequencyInSeconds));
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+    super("PinotRetentionManager", runFrequencyInSeconds, Math.min(60, runFrequencyInSeconds),
+        pinotHelixResourceManager);
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
         getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
   }
 
   @Override
-  public void run() {
-    execute();
+  public void onBecomeNotLeader() {
+    LOGGER.info("Controller is not leader, skip");
+  }
+
+  @Override
+  public void process(List<String> allTableNames) {
+    execute(allTableNames);
   }
 
   @Override
@@ -70,26 +74,24 @@ public class RetentionManager extends BasePeriodicTask {
         getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
   }
 
-  public void execute() {
+  /**
+   * Manages retention for all tables.
+   * @param allTableNames List of all the table names
+   */
+  private void execute(List<String> allTableNames) {
     LOGGER.info("Start managing retention for all tables");
     try {
-      if (_pinotHelixResourceManager.isLeader()) {
-        long startTime = System.currentTimeMillis();
+      long startTime = System.currentTimeMillis();
 
-        for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-          LOGGER.info("Start managing retention for table: {}", tableNameWithType);
-          manageRetentionForTable(tableNameWithType);
-        }
-
-        LOGGER.info("Removing aged (more than {} days) deleted segments for all tables",
-            _deletedSegmentsRetentionInDays);
-        _pinotHelixResourceManager.getSegmentDeletionManager()
-            .removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
-
-        LOGGER.info("Finished managing retention for all tables in {}ms", System.currentTimeMillis() - startTime);
-      } else {
-        LOGGER.info("Controller is not leader, skip");
+      for (String tableNameWithType : allTableNames) {
+        LOGGER.info("Start managing retention for table: {}", tableNameWithType);
+        manageRetentionForTable(tableNameWithType);
       }
+
+      LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
+      _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
+
+      LOGGER.info("Finished managing retention for all tables in {}ms", System.currentTimeMillis() - startTime);
     } catch (Exception e) {
       LOGGER.error("Caught exception while managing retention for all tables", e);
     }

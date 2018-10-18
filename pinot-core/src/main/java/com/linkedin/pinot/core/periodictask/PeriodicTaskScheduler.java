@@ -27,8 +27,8 @@ import org.slf4j.LoggerFactory;
  */
 public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
-  private ScheduledExecutorService _executorService;
   private static final int CORE_POOL_SIZE = 5;
+  private final ScheduledExecutorService _executorService;
 
   public PeriodicTaskScheduler() {
     LOGGER.info("Initializing PeriodicTaskScheduler.");
@@ -45,9 +45,8 @@ public class PeriodicTaskScheduler {
     }
 
     if (periodicTasks.size() > CORE_POOL_SIZE) {
-      LOGGER.info("The number of tasks is more than the default number of threads:{}. Increase the number of threads to {}.",
-          CORE_POOL_SIZE, periodicTasks.size());
-      _executorService = Executors.newScheduledThreadPool(periodicTasks.size());
+      LOGGER.warn("The number of tasks:{} is more than the default number of threads:{}.", periodicTasks.size(),
+          CORE_POOL_SIZE);
     }
 
     LOGGER.info("Starting PeriodicTaskScheduler.");

@@ -38,7 +38,6 @@ public interface PeriodicTask extends Runnable {
    */
   long getInitialDelayInSeconds();
 
-
   /**
    * Get the periodic task name.
    * @return task name.
