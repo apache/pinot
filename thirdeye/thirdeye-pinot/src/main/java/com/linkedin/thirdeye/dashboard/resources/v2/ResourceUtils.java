@@ -340,7 +340,7 @@ public class ResourceUtils {
     if (anomaly.getAnomalyResultSource() != null) {
       if (AnomalyResultSource.USER_LABELED_ANOMALY.equals(anomaly.getAnomalyResultSource())) {
         if (anomaly.getFeedback() != null
-            && !AnomalyFeedbackType.NOT_ANOMALY.equals(anomaly.getFeedback().getFeedbackType())) {
+            && anomaly.getFeedback().getFeedbackType().isAnomaly()) {
           return AnomalyClassificationType.TRUE_NEGATIVE;
         }
 
