@@ -18,16 +18,11 @@ package com.linkedin.pinot.core.realtime;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import java.util.Map;
 
 
 public interface StreamProviderConfig {
 
-  void init(Map<String, String> properties, Schema schema);
-
   void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema);
-
-  String getStreamProviderClass();
 
   Schema getSchema();
 

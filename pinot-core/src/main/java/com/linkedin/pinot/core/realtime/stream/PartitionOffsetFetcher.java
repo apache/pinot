@@ -42,7 +42,7 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
     _partitionId = partitionId;
     _streamConfig = streamConfig;
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    _topicName = streamConfig.getKafkaTopicName();
+    _topicName = streamConfig.getTopicName();
   }
 
   public long getOffset() {

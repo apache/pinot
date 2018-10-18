@@ -55,6 +55,7 @@ import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrate
 import com.linkedin.pinot.core.realtime.segment.RealtimeSegmentAssignmentStrategy;
 import com.linkedin.pinot.core.realtime.stream.PartitionOffsetFetcher;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -619,10 +620,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
     TableConfig tableConfig = getRealtimeTableConfig(tableName);
     final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
-    if (streamConfigs != null && streamConfigs.containsKey(
-        CommonConstants.Helix.DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
-      final String commitTimeoutSecondsStr =
-          streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS);
+    if (streamConfigs != null && streamConfigs.containsKey(StreamConfigProperties.SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
+      final String commitTimeoutSecondsStr = streamConfigs.get(StreamConfigProperties.SEGMENT_COMMIT_TIMEOUT_SECONDS);
       try {
         return TimeUnit.MILLISECONDS.convert(Integer.parseInt(commitTimeoutSecondsStr), TimeUnit.SECONDS);
       } catch (Exception e) {
@@ -702,7 +701,7 @@ public class PinotLLCRealtimeSegmentManager {
       return partitionOffsetFetcher.getOffset();
     } catch (Exception e) {
       Exception fetcherException = partitionOffsetFetcher.getException();
-      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}", streamConfig.getKafkaTopicName(),
+      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}", streamConfig.getTopicName(),
           partitionId, offsetCriteria, fetcherException);
       throw new RuntimeException(fetcherException);
     }
@@ -941,8 +940,7 @@ public class PinotLLCRealtimeSegmentManager {
       newPartitions.add(partition);
     }
 
-    String offsetCriteria = streamConfig.getKafkaConsumerProperties()
-        .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+    String offsetCriteria = streamConfig.getOffsetCriteria();
     Set<String> consumingSegments =
         setupNewPartitions(tableConfig, streamConfig, offsetCriteria, partitionAssignment, newPartitions, now);
 

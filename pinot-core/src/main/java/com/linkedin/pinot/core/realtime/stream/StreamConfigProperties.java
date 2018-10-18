@@ -6,6 +6,8 @@ import com.google.common.base.Joiner;
 public class StreamConfigProperties {
   public static final String DOT_SEPARATOR = ".";
   public static final String STREAM_PREFIX = "stream";
+  // TODO: this can be removed, check all properties before doing so
+  public static final String LLC_SUFFIX = ".llc";
 
   /**
    * Generic properties
@@ -15,12 +17,14 @@ public class StreamConfigProperties {
   public static final String STREAM_CONSUMER_TYPES = "consumer.type";
   public static final String STREAM_CONSUMER_FACTORY_CLASS = "consumer.factory.class.name";
   public static final String STREAM_CONSUMER_OFFSET_CRITERIA = "consumer.prop.auto.offset.reset";
-  public static final String STREAM_FETCH_TIMEOUT_MILLIS = "stream.fetch.timeout.millis";
-  public static final String STREAM_CONNECTION_TIMEOUT_MILLIS = "stream.connection.timeout.millis";
+  public static final String STREAM_FETCH_TIMEOUT_MILLIS = "fetch.timeout.millis";
+  public static final String STREAM_CONNECTION_TIMEOUT_MILLIS = "connection.timeout.millis";
   public static final String STREAM_DECODER_CLASS = "decoder.class.name";
-  public static final String DECODER_PROPS_PREFIX = "decoder";
+  public static final String DECODER_PROPS_PREFIX = "decoder.prop";
 
-  // Time threshold that will keep the realtime segment open for before we convert it into an offline segment
+  /**
+   * Time threshold that will keep the realtime segment open for before we convert it into an offline segment
+   */
   public static final String SEGMENT_FLUSH_THRESHOLD_TIME = "realtime.segment.flush.threshold.time";
 
   /**
@@ -77,8 +81,8 @@ public class StreamConfigProperties {
     return Joiner.on(DOT_SEPARATOR).join(STREAM_PREFIX, streamType, property);
   }
 
-  public static String getPropertySuffix(String incoming, String streamDecoderPropPrefix) {
-    return incoming.split(streamDecoderPropPrefix + ".")[1];
+  public static String getPropertySuffix(String incoming, String propertyPrefix) {
+    return incoming.split(propertyPrefix + ".")[1];
   }
 
 }

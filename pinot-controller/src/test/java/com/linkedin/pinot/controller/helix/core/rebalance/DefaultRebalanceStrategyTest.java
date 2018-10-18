@@ -26,8 +26,8 @@ import com.linkedin.pinot.common.partition.IdealStateBuilderUtil;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.partition.StreamPartitionAssignmentGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -593,8 +593,14 @@ public class DefaultRebalanceStrategyTest {
     when(mockTableConfig.getTableType()).thenReturn(tableTypeFromTableName);
 
     Map<String, String> streamConfigMap = new HashMap<>(1);
-    streamConfigMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-        CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), consumerTypesCSV);
+    String streamType = "kafka";
+    String topic = "aTopic";
+    streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        consumerTypesCSV);
     IndexingConfig mockIndexConfig = mock(IndexingConfig.class);
     when(mockIndexConfig.getStreamConfigs()).thenReturn(streamConfigMap);
     when(mockTableConfig.getIndexingConfig()).thenReturn(mockIndexConfig);

@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -46,8 +45,8 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
-import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
@@ -237,7 +236,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final long _consumeStartTime;
   private final long _startOffset;
   private final StreamConfig _streamConfig;
-  private final String _streamBootstrapNodes;
 
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
@@ -326,7 +324,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected boolean consumeLoop() throws Exception {
     _fieldExtractor.resetCounters();
     final long idlePipeSleepTimeMillis = 100;
-    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/(idlePipeSleepTimeMillis + _streamConfig.getKafkaFetchTimeoutMillis());  // 3 minute count
+    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/(idlePipeSleepTimeMillis + _streamConfig.getFetchTimeoutMillis());  // 3 minute count
     long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
     long idleCount = 0;
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
@@ -341,7 +339,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       MessageBatch messageBatch;
       try {
         messageBatch =
-            _partitionLevelConsumer.fetchMessages(_currentOffset, _endOffset, _streamConfig.getKafkaFetchTimeoutMillis());
+            _partitionLevelConsumer.fetchMessages(_currentOffset, _endOffset, _streamConfig.getFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
@@ -995,9 +993,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
-    _streamBootstrapNodes = indexingConfig.getStreamConfigs()
-        .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "."
-            + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
     _streamTopic = kafkaStreamProviderConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);

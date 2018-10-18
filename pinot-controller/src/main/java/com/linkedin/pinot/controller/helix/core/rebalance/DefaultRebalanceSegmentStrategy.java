@@ -87,7 +87,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
       StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
-      if (!streamConfig.hasSimpleKafkaConsumerType()) {
+      if (!streamConfig.hasLowLevelConsumerType()) {
         LOGGER.info("Table {} does not have LLC and will have no partition assignment", tableNameWithType);
         return newPartitionAssignment;
       }
