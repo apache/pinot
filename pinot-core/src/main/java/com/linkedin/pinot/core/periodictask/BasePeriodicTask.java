@@ -23,10 +23,10 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   private long _intervalInSeconds;
   private long _initialDelayInSeconds;
 
-  public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelaySeconds) {
+  public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
     _taskName = taskName;
     _intervalInSeconds = runFrequencyInSeconds;
-    _initialDelayInSeconds = initialDelaySeconds;
+    _initialDelayInSeconds = initialDelayInSeconds;
   }
 
   @Override

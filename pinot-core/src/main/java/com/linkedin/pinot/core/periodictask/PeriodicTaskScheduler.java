@@ -52,7 +52,7 @@ public class PeriodicTaskScheduler {
     LOGGER.info("Starting PeriodicTaskScheduler.");
     // Set up an executor that executes tasks periodically
     for (PeriodicTask periodicTask : periodicTasks) {
-      _executorService.scheduleAtFixedRate(() -> {
+      _executorService.scheduleWithFixedDelay(() -> {
         try {
           periodicTask.run();
         } catch (Throwable e) {

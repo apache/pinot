@@ -30,10 +30,11 @@ public class PeriodicTaskSchedulerTest {
     AtomicInteger count = new AtomicInteger(0);
     PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler();
     long runFrequencyInSeconds = 1L;
+    long initialDelayInSeconds = 1L;
     long totalRunTimeInMilliseconds = 3_500L;
 
     List<PeriodicTask> periodicTasks = new ArrayList<>();
-    PeriodicTask task = new BasePeriodicTask("Task", runFrequencyInSeconds, 0L) {
+    PeriodicTask task = new BasePeriodicTask("Task", runFrequencyInSeconds, initialDelayInSeconds) {
       @Override
       public void run() {
         // Execute task.
@@ -70,7 +71,7 @@ public class PeriodicTaskSchedulerTest {
     };
     periodicTasks.add(task1);
 
-    // Stagger 2 tasks.
+    // Stagger 2 tasks by delaying the 2nd task half of the frequency.
     PeriodicTask task2 = new BasePeriodicTask("Task2", runFrequencyInSeconds, runFrequencyInSeconds / 2) {
       @Override
       public void run() {

@@ -32,14 +32,12 @@ import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicT
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
-import org.joda.time.base.BaseInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -217,7 +215,7 @@ public class ValidationManager extends ControllerPeriodicTask {
     }
 
     // Sort the intervals by ascending starting time
-    segmentIntervals.sort(Comparator.comparingLong(BaseInterval::getStartMillis));
+    segmentIntervals.sort((o1, o2) -> Long.compare(o1.getStartMillis(), o2.getStartMillis()));
 
     int numMissingSegments = 0;
     long frequencyMs = frequency.getMillis();

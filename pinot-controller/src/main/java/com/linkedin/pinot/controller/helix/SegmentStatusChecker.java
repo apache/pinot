@@ -40,11 +40,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manages the segment status metrics, regarding tables with fewer replicas than requested
- * and segments in error state
- *
- * May 15, 2016
+ * and segments in error state.
  */
-
 public class SegmentStatusChecker extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final int MaxOfflineSegmentsToLog = 5;
