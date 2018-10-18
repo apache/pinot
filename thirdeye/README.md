@@ -53,7 +53,7 @@ chmod +x install.sh run-frontend.sh run-backend.sh cleanup.sh
 Note: The build of thirdeye-frontend may take several minutes
 
 
-### 3: Run ThirdEye fronend
+### 3: Run ThirdEye frontend
 
 ```
 ./run-frontend.sh
