@@ -42,6 +42,16 @@ public class AutoOnboardMockDataSource extends AutoOnboard {
 
   @Override
   public void run() {
+    if (!this.datasetDAO.findAll().isEmpty()) {
+      LOG.info("Found existing data set configs. Skipping.");
+      return;
+    }
+
+    if (!this.metricDAO.findAll().isEmpty()) {
+      LOG.info("Found existing metric configs. Skipping.");
+      return;
+    }
+
     MetadataSourceConfig config = this.getMetadataSourceConfig();
 
     List<DatasetConfigDTO> datasetConfigs = new ArrayList<>();
