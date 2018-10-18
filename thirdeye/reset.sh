@@ -1,9 +1,8 @@
 #!/bin/bash
 echo "*******************************************************"
-echo "Cleaning up ThirdEye build and demo database"
+echo "Cleaning up ThirdEye demo database"
 echo "*******************************************************"
 
-mvn clean
-
-rm ./thirdeye-pinot/config/h2db.mv.db
-
+if [ -f ./thirdeye-pinot/config/h2db.mv.db ]; then
+  rm ./thirdeye-pinot/config/h2db.mv.db
+fi

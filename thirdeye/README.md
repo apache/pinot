@@ -46,7 +46,7 @@ You'll need Java 8+, Maven 3+, and NPM 3.10+
 ```
 git clone https://github.com/linkedin/pinot.git
 cd pinot/thirdeye
-chmod +x install.sh run-frontend.sh run-backend.sh cleanup.sh
+chmod +x install.sh run-frontend.sh run-backend.sh reset.sh
 ./install.sh
 ```
 
@@ -85,6 +85,87 @@ Note: These metrics are regenerated randomly every time you launch ThirdEye in d
 ### 6: Shutdown
 
 You can stop the ThirdEye dashboard server anytime by pressing **Ctrl + C** in the terminal
+
+
+## Start ThirdEye with Pinot
+
+### 0: Prerequisites
+
+Run through the **Quick Start** guide and shut down the frontend server process.
+
+
+### 1: Update the data sources configuration
+
+Insert the connector configuration for Pinot in `thirdeye-pinot/config/data-sources/data-sources-config.yml`. Your config should look like this:
+
+```
+dataSourceConfigs:
+  - className: com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource
+    properties:
+        zookeeperUrl: 'myZkCluster.myDomain:12913/pinot-cluster'
+        clusterName: 'myDemoCluster'
+        controllerConnectionScheme: 'https'
+        controllerHost: 'myPinotController.myDomain'
+        controllerPort: 10611
+        cacheLoaderClassName: com.linkedin.thirdeye.datasource.pinot.PinotControllerResponseCacheLoader
+    metadataSourceConfigs:
+      - className: com.linkedin.thirdeye.auto.onboard.AutoOnboardPinotMetadataSource
+
+  - className: com.linkedin.thirdeye.datasource.mock.MockThirdEyeDataSource
+    ...
+```
+
+Note: You'll have to change the host names and port numbers according to your setup
+
+
+### 2: Enable Pinot auto-onboarding
+
+Update the `thirdeye-pinot/config/detector.yml` file to enable auto onboarding of pinot data sets.
+
+```
+autoload: true
+```
+
+
+### 3: Run the backend worker to load all supported Pinot data sets
+
+```
+./run-backend.sh
+```
+
+Note: This process may take some time. The worker process will print log messages for each data set schema being processed. Schemas must contain a `timeFieldSpec` in order for ThirdEye to onboard it automatically
+
+
+### 4: Stop the backend worker
+
+By pressing **Ctrl-C** in the terminal
+
+
+### 5: Run ThirdEye frontend
+
+```
+./run-frontend.sh
+```
+
+
+### 4: Start an analysis
+
+Point your favorite browser to
+
+```
+http://localhost:1426/app/#/rootcause
+```
+
+and type any data set or metric name (fragment) in the search box. Auto-complete will now list the names of matching metrics. Select any metric to start an investigation.
+
+**Welcome to ThirdEye**
+
+
+## ThirdEye for production settings
+
+ThirdEye relies on a central meta data store to coordinate its workers and frontend processes. The first step towards moving ThirdEye into production should therefore be the setup of a dedicated (MySQL) database instance. You can use the `thirdeye-pinot/src/resources/schema/create-schema.sql` script to create your tables. Then, update the `thirdeye-pinot/config/persistence.yml` file with path and credentials. Once you have a dedicated database instance, you can run backend and frontend servers in parallel. 
+
+The next step could be the configuration of the holiday auto-loader. The holiday auto loader connects to the Google Calendar API. Once you obtain an API token, place it in `thirdeye-pinot/config/holiday-loader-key.json` and in `thirdeye-pinot/config/detector.yml` set `holidayEventsLoader: true`. Once the backend worker is restarted, it will periodically update the local cache of holiday events for ThirdEye's detection and Root-Cause Analysis components.
 
 
 ## More information
