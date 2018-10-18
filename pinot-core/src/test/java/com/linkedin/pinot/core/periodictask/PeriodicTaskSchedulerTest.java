@@ -36,6 +36,11 @@ public class PeriodicTaskSchedulerTest {
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task = new BasePeriodicTask("Task", runFrequencyInSeconds, initialDelayInSeconds) {
       @Override
+      public void init() {
+        count.set(0);
+      }
+
+      @Override
       public void run() {
         // Execute task.
         count.incrementAndGet();
@@ -50,7 +55,7 @@ public class PeriodicTaskSchedulerTest {
     periodicTaskScheduler.stop();
 
     Assert.assertTrue(count.get() > 0);
-    Assert.assertTrue(count.get() == (totalRunTimeInMilliseconds / (runFrequencyInSeconds * 1000)));
+    Assert.assertEquals(count.get(), (totalRunTimeInMilliseconds / (runFrequencyInSeconds * 1000)));
     Assert.assertTrue(totalRunTimeInMilliseconds <= (System.currentTimeMillis() - start));
   }
 
@@ -64,6 +69,10 @@ public class PeriodicTaskSchedulerTest {
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task1 = new BasePeriodicTask("Task1", runFrequencyInSeconds, 0L) {
       @Override
+      public void init() {
+      }
+
+      @Override
       public void run() {
         // Execute task.
         count.incrementAndGet();
@@ -73,6 +82,10 @@ public class PeriodicTaskSchedulerTest {
 
     // Stagger 2 tasks by delaying the 2nd task half of the frequency.
     PeriodicTask task2 = new BasePeriodicTask("Task2", runFrequencyInSeconds, runFrequencyInSeconds / 2) {
+      @Override
+      public void init() {
+      }
+
       @Override
       public void run() {
         // Execute task.
@@ -86,7 +99,7 @@ public class PeriodicTaskSchedulerTest {
     Thread.sleep(totalRunTimeInMilliseconds);
     periodicTaskScheduler.stop();
 
-    Assert.assertTrue(count.get() == 0);
+    Assert.assertEquals(count.get(), 0);
     Assert.assertTrue(totalRunTimeInMilliseconds <= (System.currentTimeMillis() - start));
   }
 
@@ -104,6 +117,10 @@ public class PeriodicTaskSchedulerTest {
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     PeriodicTask task1 = new BasePeriodicTask("Task1", runFrequencyInSeconds, 0L) {
       @Override
+      public void init() {
+      }
+
+      @Override
       public void run() {
         // Calculate the max waiting time between the same task.
         long lastTime = count.get();
@@ -117,6 +134,10 @@ public class PeriodicTaskSchedulerTest {
     // The time for Task 2 to run is 4 seconds, which is higher than the interval time of Task 1.
     long TimeToRunMs = 4_000L;
     PeriodicTask task2 = new BasePeriodicTask("Task2", runFrequencyInSeconds * 3, 0L) {
+      @Override
+      public void init() {
+      }
+
       @Override
       public void run() {
         // Calculate the max waiting time between the same task.
@@ -159,7 +180,7 @@ public class PeriodicTaskSchedulerTest {
 
     periodicTaskScheduler.stop();
 
-    Assert.assertTrue(count.get() == 0);
+    Assert.assertEquals(count.get(), 0);
     Assert.assertTrue(totalRunTimeInMilliseconds <= (System.currentTimeMillis() - start));
   }
 }

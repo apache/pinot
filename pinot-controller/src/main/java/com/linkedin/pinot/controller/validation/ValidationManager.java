@@ -62,7 +62,7 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void onBecomeNotLeader() {
+  public void nonLeaderCleanUp() {
     _validationMetrics.unregisterAllMetrics();
     LOGGER.info("Skipping validation, not leader!");
   }

@@ -146,24 +146,21 @@ public class PinotTaskManager extends ControllerPeriodicTask {
     return scheduleTasks(_pinotHelixResourceManager.getAllTables());
   }
 
-  /**
-   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
-   */
-  private void nonLeaderCleanUp() {
-    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
-      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
-    }
-  }
-
   @Override
   public void init() {
     LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalInSeconds());
   }
 
+  /**
+   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
+   */
   @Override
-  public void onBecomeNotLeader() {
+  public void nonLeaderCleanUp() {
     LOGGER.info("Skip scheduling new tasks on non-leader controller");
-    nonLeaderCleanUp();
+    // Performs necessary cleanups for each task type.
+    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
+      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
+    }
   }
 
   @Override

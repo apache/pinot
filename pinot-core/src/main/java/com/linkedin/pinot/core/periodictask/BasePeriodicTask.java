@@ -30,10 +30,6 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   }
 
   @Override
-  public void init() {
-  }
-
-  @Override
   public long getIntervalInSeconds() {
     return _intervalInSeconds;
   }

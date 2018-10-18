@@ -58,7 +58,7 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
-  public void onBecomeNotLeader() {
+  public void nonLeaderCleanUp() {
     LOGGER.info("Skipping realtime segment relocation, not leader!");
   }
 

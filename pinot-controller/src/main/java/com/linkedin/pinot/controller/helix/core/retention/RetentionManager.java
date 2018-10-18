@@ -59,7 +59,7 @@ public class RetentionManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void onBecomeNotLeader() {
+  public void nonLeaderCleanUp() {
     LOGGER.info("Controller is not leader, skip");
   }
 

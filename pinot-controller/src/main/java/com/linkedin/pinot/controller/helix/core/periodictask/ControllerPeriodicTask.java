@@ -33,16 +33,20 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
     this(taskName, runFrequencyInSeconds, DEFAULT_INITIAL_DELAY_IN_SECOND, pinotHelixResourceManager);
   }
 
-  public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelaySeconds,
+  public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
       PinotHelixResourceManager pinotHelixResourceManager) {
-    super(taskName, runFrequencyInSeconds, initialDelaySeconds);
+    super(taskName, runFrequencyInSeconds, initialDelayInSeconds);
     _pinotHelixResourceManager = pinotHelixResourceManager;
+  }
+
+  @Override
+  public void init() {
   }
 
   @Override
   public void run() {
     if (!_pinotHelixResourceManager.isLeader()) {
-      onBecomeNotLeader();
+      nonLeaderCleanUp();
       return;
     }
     List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
@@ -52,7 +56,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   /**
    * Does the following logic when not being a lead controller.
    */
-  public abstract void onBecomeNotLeader();
+  public abstract void nonLeaderCleanUp();
 
   /**
    * Processes the periodic task as lead controller.

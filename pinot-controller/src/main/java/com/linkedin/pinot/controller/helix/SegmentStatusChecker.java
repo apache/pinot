@@ -78,7 +78,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   }
 
   @Override
-  public void onBecomeNotLeader() {
+  public void nonLeaderCleanUp() {
     LOGGER.info("Skipping Segment Status check, not leader!");
     setStatusToDefault();
   }
