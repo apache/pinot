@@ -146,21 +146,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     invalidConfig = true;
     testSetupNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, invalidConfig, badStream);
 
-    /*// bad stream configs
-    badStream = true;
-    tableConfig =
-        makeTableConfig(tableName, nReplicas, null, null, DEFAULT_SERVER_TENANT);
-    idealState = idealStateBuilder.build();
-    nPartitions = 4;
-    instances = getInstanceList(3);
-    testSetupNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, invalidConfig, badStream);
-*/
     // noop path - 0 partitions
     badStream = false;
     tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_LARGEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 0;
     invalidConfig = false;
+    instances = getInstanceList(3);
     testSetupNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, invalidConfig, badStream);
 
     // noop path - ideal state disabled - this can happen in the code path only if there is already an idealstate with HLC segments in it, and it has been disabled.
