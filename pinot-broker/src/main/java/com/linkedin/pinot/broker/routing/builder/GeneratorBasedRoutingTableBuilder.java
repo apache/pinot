@@ -25,8 +25,6 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
 
 
 /**
@@ -37,20 +35,19 @@ import org.apache.helix.model.InstanceConfig;
 public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTableBuilder {
 
   /** Number of routing tables to keep */
-  protected static final int ROUTING_TABLE_COUNT = 500;
+  private static final int ROUTING_TABLE_COUNT = 500;
 
   /** Number of routing tables to generate during the optimization phase */
-  protected static final int ROUTING_TABLE_GENERATION_COUNT = 1000;
+  private static final int ROUTING_TABLE_GENERATION_COUNT = 1000;
 
   /**
    * Generates a routing table, decorated with a metric.
    *
-   * @param routingTableGenerator The routing table generator to use to generate routing tables.
    * @return A pair of a routing table and its associated metric.
    */
   private Pair<Map<String, List<String>>, Float> generateRoutingTableWithMetric(
-      RoutingTableGenerator routingTableGenerator) {
-    Map<String, List<String>> routingTable = routingTableGenerator.generateRoutingTable();
+      Map<String, List<String>> segmentToServersMap) {
+    Map<String, List<String>> routingTable = generateRoutingTable(segmentToServersMap);
     int segmentCount = 0;
     int serverCount = 0;
 
@@ -73,36 +70,21 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
     return new ImmutablePair<>(routingTable, variance);
   }
 
-  protected interface RoutingTableGenerator {
-    void init(ExternalView externalView, List<InstanceConfig> instanceConfigList);
+  Map<String, List<String>> generateRoutingTable(Map<String, List<String>> segmentToServersMap) {
 
-    Map<String, List<String>> generateRoutingTable();
-  }
+    Map<String, List<String>> routingTable = new HashMap<>();
 
-  protected abstract class BaseRoutingTableGenerator implements RoutingTableGenerator {
-    private final int _targetNumServersPerQuery;
-
-    public BaseRoutingTableGenerator(int targetNumServersPerQuery) {
-      _targetNumServersPerQuery = targetNumServersPerQuery;
+    if (segmentToServersMap.isEmpty()) {
+      return routingTable;
     }
 
-    /**
-     * Get the map from segment to list of servers that are serving it.
-     */
-    protected abstract Map<String, List<String>> getSegmentToServersMap();
+    // Construct the map from server to list of segments
+    Map<String, List<String>> serverToSegmentsMap = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : segmentToServersMap.entrySet()) {
+      List<String> servers = entry.getValue();
 
-    public Map<String, List<String>> generateRoutingTable() {
-      Map<String, List<String>> routingTable = new HashMap<>();
-
-      Map<String, List<String>> segmentToServersMap = getSegmentToServersMap();
-      if (segmentToServersMap.isEmpty()) {
-        return routingTable;
-      }
-
-      // Construct the map from server to list of segments
-      Map<String, List<String>> serverToSegmentsMap = new HashMap<>();
-      for (Map.Entry<String, List<String>> entry : segmentToServersMap.entrySet()) {
-        for (String serverName : entry.getValue()) {
+      if (servers.size() != 0) {
+        for (String serverName : servers) {
           List<String> segmentsForServer = serverToSegmentsMap.get(serverName);
           if (segmentsForServer == null) {
             segmentsForServer = new ArrayList<>();
@@ -110,81 +92,85 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
           }
           segmentsForServer.add(entry.getKey());
         }
-      }
-
-      int numSegments = segmentToServersMap.size();
-      List<String> servers = new ArrayList<>(serverToSegmentsMap.keySet());
-      int numServers = servers.size();
-
-      // Set of segments that have no instance serving them
-      Set<String> segmentsNotHandledByServers = new HashSet<>(segmentToServersMap.keySet());
-
-      // Set of servers in this routing table
-      Set<String> serversInRoutingTable = new HashSet<>(_targetNumServersPerQuery);
-
-      if (numServers <= _targetNumServersPerQuery) {
-        // If there are not enough instances, add them all
-        serversInRoutingTable.addAll(servers);
-        segmentsNotHandledByServers.clear();
       } else {
-        // Otherwise add _targetNumServersPerQuery instances
-        while (serversInRoutingTable.size() < _targetNumServersPerQuery) {
-          String randomServer = servers.get(_random.nextInt(numServers));
-          if (!serversInRoutingTable.contains(randomServer)) {
-            serversInRoutingTable.add(randomServer);
-            segmentsNotHandledByServers.removeAll(serverToSegmentsMap.get(randomServer));
-          }
-        }
+        handleNoServingHost();
       }
-
-      // If there are segments that have no instance that can serve them, add a server to serve them
-      while (!segmentsNotHandledByServers.isEmpty()) {
-        String segmentNotHandledByServers = segmentsNotHandledByServers.iterator().next();
-
-        // Pick a random server that can serve this segment
-        List<String> serversForSegment = segmentToServersMap.get(segmentNotHandledByServers);
-        String randomServer = serversForSegment.get(_random.nextInt(serversForSegment.size()));
-        serversInRoutingTable.add(randomServer);
-        segmentsNotHandledByServers.removeAll(serverToSegmentsMap.get(randomServer));
-      }
-
-      // Sort all the segments to be used during assignment in ascending order of replicas
-      PriorityQueue<Pair<String, List<String>>> segmentToReplicaSetQueue =
-          new PriorityQueue<>(numSegments, new Comparator<Pair<String, List<String>>>() {
-            @Override
-            public int compare(Pair<String, List<String>> firstPair, Pair<String, List<String>> secondPair) {
-              return Integer.compare(firstPair.getRight().size(), secondPair.getRight().size());
-            }
-          });
-
-      for (Map.Entry<String, List<String>> entry : segmentToServersMap.entrySet()) {
-        // Servers for the segment is the intersection of all servers for this segment and the servers that we have in
-        // this routing table
-        List<String> serversForSegment = new ArrayList<>(entry.getValue());
-        serversForSegment.retainAll(serversInRoutingTable);
-
-        segmentToReplicaSetQueue.add(new ImmutablePair<>(entry.getKey(), serversForSegment));
-      }
-
-      // Assign each segment to a server
-      Pair<String, List<String>> segmentServersPair;
-      while ((segmentServersPair = segmentToReplicaSetQueue.poll()) != null) {
-        String segmentName = segmentServersPair.getLeft();
-        List<String> serversForSegment = segmentServersPair.getRight();
-
-        String serverWithLeastSegmentsAssigned = getServerWithLeastSegmentsAssigned(serversForSegment, routingTable);
-        List<String> segmentsAssignedToServer = routingTable.get(serverWithLeastSegmentsAssigned);
-        if (segmentsAssignedToServer == null) {
-          segmentsAssignedToServer = new ArrayList<>();
-          routingTable.put(serverWithLeastSegmentsAssigned, segmentsAssignedToServer);
-        }
-        segmentsAssignedToServer.add(segmentName);
-      }
-
-      return routingTable;
     }
 
-    /*
+    int numSegments = segmentToServersMap.size();
+    List<String> servers = new ArrayList<>(serverToSegmentsMap.keySet());
+    int numServers = servers.size();
+
+    // Set of segments that have no instance serving them
+    Set<String> segmentsNotHandledByServers = new HashSet<>(segmentToServersMap.keySet());
+
+    // Set of servers in this routing table
+    int targetNumServersPerQuery = getTargetNumServersPerQuery();
+    Set<String> serversInRoutingTable = new HashSet<>(targetNumServersPerQuery);
+
+    if (numServers <= targetNumServersPerQuery) {
+      // If there are not enough instances, add them all
+      serversInRoutingTable.addAll(servers);
+      segmentsNotHandledByServers.clear();
+    } else {
+      // Otherwise add _targetNumServersPerQuery instances
+      while (serversInRoutingTable.size() < targetNumServersPerQuery) {
+        String randomServer = servers.get(_random.nextInt(numServers));
+        if (!serversInRoutingTable.contains(randomServer)) {
+          serversInRoutingTable.add(randomServer);
+          segmentsNotHandledByServers.removeAll(serverToSegmentsMap.get(randomServer));
+        }
+      }
+    }
+
+    // If there are segments that have no instance that can serve them, add a server to serve them
+    while (!segmentsNotHandledByServers.isEmpty()) {
+      String segmentNotHandledByServers = segmentsNotHandledByServers.iterator().next();
+
+      // Pick a random server that can serve this segment
+      List<String> serversForSegment = segmentToServersMap.get(segmentNotHandledByServers);
+      String randomServer = serversForSegment.get(_random.nextInt(serversForSegment.size()));
+      serversInRoutingTable.add(randomServer);
+      segmentsNotHandledByServers.removeAll(serverToSegmentsMap.get(randomServer));
+    }
+
+    // Sort all the segments to be used during assignment in ascending order of replicas
+    PriorityQueue<Pair<String, List<String>>> segmentToReplicaSetQueue =
+        new PriorityQueue<>(numSegments, new Comparator<Pair<String, List<String>>>() {
+          @Override
+          public int compare(Pair<String, List<String>> firstPair, Pair<String, List<String>> secondPair) {
+            return Integer.compare(firstPair.getRight().size(), secondPair.getRight().size());
+          }
+        });
+
+    for (Map.Entry<String, List<String>> entry : segmentToServersMap.entrySet()) {
+      // Servers for the segment is the intersection of all servers for this segment and the servers that we have in
+      // this routing table
+      List<String> serversForSegment = new ArrayList<>(entry.getValue());
+      serversForSegment.retainAll(serversInRoutingTable);
+
+      segmentToReplicaSetQueue.add(new ImmutablePair<>(entry.getKey(), serversForSegment));
+    }
+
+    // Assign each segment to a server
+    Pair<String, List<String>> segmentServersPair;
+    while ((segmentServersPair = segmentToReplicaSetQueue.poll()) != null) {
+      String segmentName = segmentServersPair.getLeft();
+      List<String> serversForSegment = segmentServersPair.getRight();
+
+      String serverWithLeastSegmentsAssigned = getServerWithLeastSegmentsAssigned(serversForSegment, routingTable);
+      List<String> segmentsAssignedToServer = routingTable.get(serverWithLeastSegmentsAssigned);
+      if (segmentsAssignedToServer == null) {
+        segmentsAssignedToServer = new ArrayList<>();
+        routingTable.put(serverWithLeastSegmentsAssigned, segmentsAssignedToServer);
+      }
+      segmentsAssignedToServer.add(segmentName);
+    }
+
+    return routingTable;
+  }
+
+  /*
     The weighted random selection logic for reference
     This can be used to replace getServerWithLeastSegmentsAssigned()
 
@@ -246,13 +232,10 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
       return replicas[i];
     }
     */
-  }
-
-  protected abstract RoutingTableGenerator buildRoutingTableGenerator();
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigs) {
+  List<Map<String, List<String>>> computeRoutingTablesOnExternalViewChange(
+      Map<String, List<String>> segmentToServersMap) {
     // The default routing table algorithm tries to balance all available segments across all servers, so that each
     // server is hit on every query. This works fine with small clusters (say less than 20 servers) but for larger
     // clusters, this adds up to significant overhead (one request must be enqueued for each server, processed,
@@ -291,26 +274,20 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
     // in workload per server across all the routing tables. To do so, we generate an initial set of routing tables
     // according to a per-routing table metric and discard the worst routing tables.
 
-    RoutingTableGenerator routingTableGenerator = buildRoutingTableGenerator();
-    routingTableGenerator.init(externalView, instanceConfigs);
-
     PriorityQueue<Pair<Map<String, List<String>>, Float>> topRoutingTables =
-        new PriorityQueue<>(ROUTING_TABLE_COUNT, new Comparator<Pair<Map<String, List<String>>, Float>>() {
-          @Override
-          public int compare(Pair<Map<String, List<String>>, Float> left,
-              Pair<Map<String, List<String>>, Float> right) {
-            // Float.compare sorts in ascending order and we want a max heap, so we need to return the negative of the comparison
-            return -Float.compare(left.getValue(), right.getValue());
-          }
+        new PriorityQueue<>(ROUTING_TABLE_COUNT, (left, right) -> {
+          // Float.compare sorts in ascending order and we want a max heap, so we need to return the negative
+          // of the comparison
+          return -Float.compare(left.getValue(), right.getValue());
         });
 
     for (int i = 0; i < ROUTING_TABLE_COUNT; i++) {
-      topRoutingTables.add(generateRoutingTableWithMetric(routingTableGenerator));
+      topRoutingTables.add(generateRoutingTableWithMetric(segmentToServersMap));
     }
 
     // Generate routing more tables and keep the ROUTING_TABLE_COUNT top ones
     for (int i = 0; i < (ROUTING_TABLE_GENERATION_COUNT - ROUTING_TABLE_COUNT); ++i) {
-      Pair<Map<String, List<String>>, Float> newRoutingTable = generateRoutingTableWithMetric(routingTableGenerator);
+      Pair<Map<String, List<String>>, Float> newRoutingTable = generateRoutingTableWithMetric(segmentToServersMap);
       Pair<Map<String, List<String>>, Float> worstRoutingTable = topRoutingTables.peek();
 
       // If the new routing table is better than the worst one, keep it
@@ -326,6 +303,11 @@ public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTable
       routingTables.add(topRoutingTables.poll().getKey());
     }
 
-    setRoutingTables(routingTables);
+    return routingTables;
   }
+
+  /**
+   * Returns the number of target servers per query
+   */
+  abstract int getTargetNumServersPerQuery();
 }

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import java.util.List;
@@ -35,19 +36,19 @@ public interface RoutingTableBuilder {
   /**
    * Initiate the routing table builder.
    */
-  void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics);
+  void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics);
 
   /**
    * Compute routing tables (map from server to list of segments) that are used for query routing from ExternalView.
    * <p>Should be called whenever there is an ExternalView change.
    */
-  void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigs);
+  void computeOnExternalViewChange(String tableName, ExternalView externalView, List<InstanceConfig> instanceConfigs);
 
   /**
-   * Get the routing table based on the given lookup request.
+   * Get the routing table based on the given lookup request and segment selector.
    */
-  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request);
+  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector);
 
   /**
    * Get all pre-computed routing tables.

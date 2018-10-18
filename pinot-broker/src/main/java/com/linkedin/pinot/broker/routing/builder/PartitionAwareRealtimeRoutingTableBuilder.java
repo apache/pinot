@@ -48,13 +48,14 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwareRoutingTableBuilder {
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     super.init(configuration, tableConfig, propertyStore, brokerMetrics);
     _numReplicas = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
   }
 
   @Override
-  public synchronized void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+  public synchronized void computeOnExternalViewChange(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
     // Update the cache for the segment ZK metadata
     Set<String> segmentSet = externalView.getPartitionSet();
@@ -75,7 +76,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
 
     // Ensure that for each Kafka partition, we have at most one Helix partition (Pinot segment) in consuming state
     Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition =
-        KafkaLowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
+        RoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
             sortedSegmentsByKafkaPartition);
 
     RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);

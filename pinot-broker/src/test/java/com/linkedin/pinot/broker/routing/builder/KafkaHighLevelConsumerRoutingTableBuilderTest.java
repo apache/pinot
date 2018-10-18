@@ -16,6 +16,8 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.DefaultSegmentSelector;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
@@ -36,6 +38,7 @@ import org.testng.annotations.Test;
 public class KafkaHighLevelConsumerRoutingTableBuilderTest {
 
   public static final String ALL_PARTITIONS = "ALL";
+  private static final SegmentSelector SEGMENT_SELECTOR = new DefaultSegmentSelector();
 
   @Test
   public void testHlcRoutingTableBuilder() {
@@ -90,12 +93,12 @@ public class KafkaHighLevelConsumerRoutingTableBuilderTest {
       }
 
       // Compute routing table
-      routingTableBuilder.computeRoutingTableFromExternalView(tableNameWithType, externalView, instanceConfigs);
+      routingTableBuilder.computeOnExternalViewChange(tableNameWithType, externalView, instanceConfigs);
 
       // Check if the routing table result is correct
       for (int run = 0; run < MAX_NUM_GROUPS * 10; run++) {
         RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableNameWithType);
-        Map<String, List<String>> routingTable = routingTableBuilder.getRoutingTable(request);
+        Map<String, List<String>> routingTable = routingTableBuilder.getRoutingTable(request, SEGMENT_SELECTOR);
         Set<String> coveredSegments = new HashSet<>();
         for (List<String> segmentsForServer : routingTable.values()) {
           coveredSegments.addAll(segmentsForServer);

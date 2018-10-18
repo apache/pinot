@@ -17,19 +17,26 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SegmentName;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedSet;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 
 
 /**
- * Util class for Kafka low level routing table builder.
+ * Util class for routing table builders
  */
-public class KafkaLowLevelRoutingTableBuilderUtil {
+public class RoutingTableBuilderUtil {
+
+  private RoutingTableBuilderUtil() {
+  }
 
   /**
-   * Compute the map of allowed 'consuming' segments for each partition.
+   * Compute the map of allowed 'consuming' segments for each partition. This function is used when computing low level
+   * kafka routing table.
    *
    * @param externalView helix external view
    * @param sortedSegmentsByKafkaPartition map of Kafka partition to sorted set of segment names.
@@ -83,5 +90,31 @@ public class KafkaLowLevelRoutingTableBuilderUtil {
       }
     }
     return allowedSegmentInConsumingStateByKafkaPartition;
+  }
+
+  /**
+   * Compute the mapping of segment to servers based on the given external view and a list of instance configs
+   *
+   * @param externalView an external view
+   * @param instanceConfigs a list of instance config
+   * @return a mapping of segment to servers
+   */
+  public static Map<String, List<String>> computeSegmentToServersMapForOfflineTable(ExternalView externalView,
+      List<InstanceConfig> instanceConfigs) {
+    Map<String, List<String>> segmentToServersMap = new HashMap<>();
+    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
+    for (String segmentName : externalView.getPartitionSet()) {
+      // List of servers that are active and are serving the segment
+      List<String> servers = new ArrayList<>();
+      for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
+        String serverName = entry.getKey();
+        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
+            && !instancePruner.isInactive(serverName)) {
+          servers.add(serverName);
+        }
+      }
+      segmentToServersMap.put(segmentName, servers);
+    }
+    return segmentToServersMap;
   }
 }

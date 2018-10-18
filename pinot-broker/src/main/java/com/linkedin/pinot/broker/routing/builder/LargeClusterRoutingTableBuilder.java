@@ -17,9 +17,6 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
@@ -41,44 +38,8 @@ public class LargeClusterRoutingTableBuilder extends GeneratorBasedRoutingTableB
   private int _targetNumServersPerQuery = 20;
 
   @Override
-  protected RoutingTableGenerator buildRoutingTableGenerator() {
-    return new LargeClusterOfflineRoutingTableGenerator();
-  }
-
-  private class LargeClusterOfflineRoutingTableGenerator extends BaseRoutingTableGenerator {
-    private Map<String, List<String>> _segmentToServersMap = new HashMap<>();
-
-    public LargeClusterOfflineRoutingTableGenerator() {
-      super(_targetNumServersPerQuery);
-    }
-
-    public void init(ExternalView externalView, List<InstanceConfig> instanceConfigList) {
-      RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigList);
-      for (String segmentName : externalView.getPartitionSet()) {
-        List<String> serversForSegment = new ArrayList<>();
-        for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
-          String serverName = entry.getKey();
-          if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
-              && !instancePruner.isInactive(serverName)) {
-            serversForSegment.add(serverName);
-          }
-        }
-        if (!serversForSegment.isEmpty()) {
-          _segmentToServersMap.put(segmentName, serversForSegment);
-        } else {
-          handleNoServingHost(segmentName);
-        }
-      }
-    }
-
-    @Override
-    protected Map<String, List<String>> getSegmentToServersMap() {
-      return _segmentToServersMap;
-    }
-  }
-
-  @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     super.init(configuration, tableConfig, propertyStore, brokerMetrics);
     // TODO jfim This is a broker-level configuration for now, until we refactor the configuration of the routing table to allow per-table routing settings
     if (configuration.containsKey("offlineTargetServerCountPerQuery")) {
@@ -94,5 +55,16 @@ public class LargeClusterRoutingTableBuilder extends GeneratorBasedRoutingTableB
     } else {
       LOGGER.info("Using default value for offline target server count of {}", _targetNumServersPerQuery);
     }
+  }
+
+  @Override
+  Map<String, List<String>> computeSegmentToServersMapOnExternalViewChange(ExternalView externalView,
+      List<InstanceConfig> instanceConfigs) {
+    return RoutingTableBuilderUtil.computeSegmentToServersMapForOfflineTable(externalView, instanceConfigs);
+  }
+
+  @Override
+  int getTargetNumServersPerQuery() {
+    return _targetNumServersPerQuery;
   }
 }

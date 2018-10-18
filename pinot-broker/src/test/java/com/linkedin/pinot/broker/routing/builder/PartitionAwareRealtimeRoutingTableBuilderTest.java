@@ -17,6 +17,8 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.FakePropertyStore;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.DefaultSegmentSelector;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.config.RoutingConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
@@ -50,6 +52,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
   private static final String PARTITION_COLUMN = "memberId";
 
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private static final SegmentSelector SEGMENT_SELECTOR = new DefaultSegmentSelector();
   private static final Random RANDOM = new Random();
 
   private int NUM_REPLICA;
@@ -102,7 +105,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
       // Check the query that requires to scan all segment.
       String countStarQuery = "select count(*) from myTable";
       Map<String, List<String>> routingTable =
-          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), SEGMENT_SELECTOR);
 
       // Check that all segments are covered exactly for once.
       Set<String> assignedSegments = new HashSet<>();
@@ -117,7 +120,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
       // Check the broker side server and segment pruning.
       for (int queryPartition = 0; queryPartition < 100; queryPartition++) {
         String filterQuery = "select count(*) from myTable where " + PARTITION_COLUMN + " = " + queryPartition;
-        routingTable = routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery));
+        routingTable = routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery), SEGMENT_SELECTOR);
 
         int partition = queryPartition % NUM_PARTITION;
         assignedSegments = new HashSet<>();
@@ -178,7 +181,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
     // Check the query that requires to scan all segment.
     String countStarQuery = "select count(*) from myTable";
     Map<String, List<String>> routingTable =
-        routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+        routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), SEGMENT_SELECTOR);
 
     // Check that all segments are covered exactly for once.
     Set<String> assignedSegments = new HashSet<>();
@@ -247,13 +250,13 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
         buildExternalView(REALTIME_TABLE_NAME, fakePropertyStore, partitionToServerMapping, segmentList);
 
     // Compute routing table
-    routingTableBuilder.computeRoutingTableFromExternalView(REALTIME_TABLE_NAME, newExternalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(REALTIME_TABLE_NAME, newExternalView, instanceConfigs);
 
     Set<String> servers = new HashSet<>();
     for (int i = 0; i < 100; i++) {
       String countStarQuery = "select count(*) from " + REALTIME_TABLE_NAME;
       Map<String, List<String>> routingTable =
-          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), SEGMENT_SELECTOR);
       Assert.assertEquals(routingTable.keySet().size(), 1);
       servers.addAll(routingTable.keySet());
     }
@@ -306,7 +309,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
     PartitionAwareRealtimeRoutingTableBuilder routingTableBuilder = new PartitionAwareRealtimeRoutingTableBuilder();
     routingTableBuilder.init(null, tableConfig, propertyStore, null);
-    routingTableBuilder.computeRoutingTableFromExternalView(REALTIME_TABLE_NAME, externalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(REALTIME_TABLE_NAME, externalView, instanceConfigs);
 
     return routingTableBuilder;
   }

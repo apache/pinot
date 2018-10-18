@@ -134,6 +134,8 @@ public class RoutingTableBuilderFactory {
         }
         break;
     }
+
+    //TODO: Need to set dynamic routing flag based on table config
     builder.init(_configuration, tableConfig, _propertyStore, brokerMetrics);
     return builder;
   }

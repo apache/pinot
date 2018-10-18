@@ -30,6 +30,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -122,7 +123,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
 
       // Create routing tables
       long startTime = System.nanoTime();
-      routingTableBuilder.computeRoutingTableFromExternalView(
+      routingTableBuilder.computeOnExternalViewChange(
           "table_REALTIME", externalView, instanceConfigs);
 
       List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
@@ -157,12 +158,12 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
     KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), new TableConfig(), null, null);
 
-    List<SegmentName> segmentNames = new ArrayList<SegmentName>();
+    List<SegmentName> segmentNames = new ArrayList<>();
     for(int i = 0; i < SEGMENT_COUNT; ++i) {
       segmentNames.add(new LLCSegmentName("table", 0, i, System.currentTimeMillis()));
     }
 
-    List<InstanceConfig> instanceConfigs = new ArrayList<InstanceConfig>();
+    List<InstanceConfig> instanceConfigs = new ArrayList<>();
     InstanceConfig instanceConfig = new InstanceConfig("Server_localhost_1234");
     instanceConfigs.add(instanceConfig);
     instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, "false");
@@ -176,7 +177,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
       externalView.setState(segmentNames.get(i).getSegmentName(), "Server_localhost_1234", "CONSUMING");
     }
 
-    routingTableBuilder.computeRoutingTableFromExternalView("table", externalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange("table", externalView, instanceConfigs);
     List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
     for (Map<String, List<String>> routingTable : routingTables) {
       for (List<String> segmentsForServer : routingTable.values()) {
@@ -190,6 +191,40 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
               "Segment set contains a segment in consuming state that should not be there");
         }
       }
+    }
+  }
+
+  @Test
+  public void testShutdownInProgressServer() {
+    final int SEGMENT_COUNT = 10;
+    final int ONLINE_SEGMENT_COUNT = 8;
+
+    KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
+    routingTableBuilder.init(new BaseConfiguration(), new TableConfig(), null, null);
+
+    List<SegmentName> segmentNames = new ArrayList<>();
+    for(int i = 0; i < SEGMENT_COUNT; ++i) {
+      segmentNames.add(new LLCSegmentName("table", 0, i, System.currentTimeMillis()));
+    }
+
+    List<InstanceConfig> instanceConfigs = new ArrayList<>();
+    InstanceConfig instanceConfig = new InstanceConfig("Server_localhost_1234");
+    instanceConfigs.add(instanceConfig);
+    instanceConfig.getRecord().setSimpleField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, "true");
+
+    // Generate an external view for a single server with some consuming segments
+    ExternalView externalView = new ExternalView("table_REALTIME");
+    for (int i = 0; i < ONLINE_SEGMENT_COUNT; i++) {
+      externalView.setState(segmentNames.get(i).getSegmentName(), "Server_localhost_1234", "ONLINE");
+    }
+    for (int i = ONLINE_SEGMENT_COUNT; i < SEGMENT_COUNT; ++i) {
+      externalView.setState(segmentNames.get(i).getSegmentName(), "Server_localhost_1234", "CONSUMING");
+    }
+
+    routingTableBuilder.computeOnExternalViewChange("table", externalView, instanceConfigs);
+    List<Map<String, List<String>>> routingTables = routingTableBuilder.getRoutingTables();
+    for (Map<String, List<String>> routingTable : routingTables) {
+      Assert.assertTrue(routingTable.isEmpty());
     }
   }
 }

@@ -17,6 +17,8 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.FakePropertyStore;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.DefaultSegmentSelector;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
 import com.linkedin.pinot.common.config.RoutingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -33,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -43,12 +46,15 @@ import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class PartitionAwareOfflineRoutingTableBuilderTest {
   private static final String OFFLINE_TABLE_NAME = "myTable_OFFLINE";
   private static final String PARTITION_FUNCTION_NAME = "modulo";
   private static final String PARTITION_COLUMN = "memberId";
 
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private static final SegmentSelector DEFAULT_SEGMENT_SELECTOR = new DefaultSegmentSelector();
+
   private static final Random RANDOM = new Random();
 
   private int NUM_REPLICA;
@@ -93,7 +99,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       }
 
       // Update replica group mapping zk metadata
-      updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+      updateReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
 
       // Create the fake external view
       ExternalView externalView = buildExternalView(OFFLINE_TABLE_NAME, replicaToServerMapping);
@@ -111,8 +117,22 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
 
       // Check the query that requires to scan all segment.
       String countStarQuery = "select count(*) from myTable";
+
+      // Test selector
       Map<String, List<String>> routingTable =
-          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery),
+              new TestSegmentSelector());
+
+      Set<String> selectedSegments = new HashSet<>();
+      for (List<String> segments : routingTable.values()) {
+        selectedSegments.addAll(segments);
+      }
+      Assert.assertEquals(selectedSegments.size(), NUM_SEGMENTS - 1);
+      Assert.assertFalse(selectedSegments.contains("segment0"));
+
+      // Use default selector
+      routingTable =
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), DEFAULT_SEGMENT_SELECTOR);
 
       // Check that the number of servers picked are always equal or less than the number of servers
       // from a single replica group.
@@ -131,7 +151,8 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       // Check the broker side server and segment pruning.
       for (int queryPartition = 0; queryPartition < 100; queryPartition++) {
         String filterQuery = "select count(*) from myTable where " + PARTITION_COLUMN + " = " + queryPartition;
-        routingTable = routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery));
+        routingTable =
+            routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery), DEFAULT_SEGMENT_SELECTOR);
 
         // Check that the number of servers picked are always equal or less than the number of servers
         // in a single replica group.
@@ -177,7 +198,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     }
 
     // Update replica group mapping zk metadata
-    updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+    updateReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
 
     // Create the fake external view
     ExternalView externalView = buildExternalView(OFFLINE_TABLE_NAME, replicaToServerMapping);
@@ -202,20 +223,20 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     instanceConfigs.add(new InstanceConfig(newServerName));
 
     // Update replica group partition assignment
-    updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+    updateReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
 
     // Update external view
     Map<Integer, List<String>> newReplicaToServerMapping = buildReplicaGroupMapping();
     ExternalView newExternalView = buildExternalView(OFFLINE_TABLE_NAME, newReplicaToServerMapping);
 
     // Compute routing table and this should not throw null pointer exception
-    routingTableBuilder.computeRoutingTableFromExternalView(OFFLINE_TABLE_NAME, newExternalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(OFFLINE_TABLE_NAME, newExternalView, instanceConfigs);
 
     Set<String> servers = new HashSet<>();
     for (int i = 0; i < 100; i++) {
       String countStarQuery = "select count(*) from " + OFFLINE_TABLE_NAME;
       Map<String, List<String>> routingTable =
-          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), DEFAULT_SEGMENT_SELECTOR);
       Assert.assertEquals(routingTable.keySet().size(), 1);
       servers.add(routingTable.keySet().iterator().next());
     }
@@ -224,9 +245,10 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     Assert.assertEquals(servers.size(), 2);
   }
 
-  private void updatgeReplicaGroupPartitionAssignment(String tableNameWithType, FakePropertyStore propertyStore) {
+  private void updateReplicaGroupPartitionAssignment(String tableNameWithType, FakePropertyStore propertyStore) {
     // Create partition assignment mapping table.
-    ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment = new ReplicaGroupPartitionAssignment(tableNameWithType);
+    ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment =
+        new ReplicaGroupPartitionAssignment(tableNameWithType);
 
     int partitionId = 0;
     for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
@@ -245,7 +267,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       TableConfig tableConfig, ExternalView externalView, List<InstanceConfig> instanceConfigs) throws Exception {
     PartitionAwareOfflineRoutingTableBuilder routingTableBuilder = new PartitionAwareOfflineRoutingTableBuilder();
     routingTableBuilder.init(null, tableConfig, propertyStore, null);
-    routingTableBuilder.computeRoutingTableFromExternalView(OFFLINE_TABLE_NAME, externalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(OFFLINE_TABLE_NAME, externalView, instanceConfigs);
 
     return routingTableBuilder;
   }
@@ -315,5 +337,19 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     metadata.setPartitionMetadata(segmentPartitionMetadata);
 
     return metadata;
+  }
+
+  class TestSegmentSelector extends DefaultSegmentSelector {
+    @Override
+    public Set<String> selectSegments(RoutingTableLookupRequest request, Set<String> segments) {
+      Iterator<String> iterator = segments.iterator();
+      while (iterator.hasNext()) {
+        String segmentName = iterator.next();
+        if (segmentName.equals("segment0")) {
+          iterator.remove();
+        }
+      }
+      return segments;
+    }
   }
 }

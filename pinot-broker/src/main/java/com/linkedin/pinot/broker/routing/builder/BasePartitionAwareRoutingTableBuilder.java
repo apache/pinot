@@ -18,14 +18,17 @@ package com.linkedin.pinot.broker.routing.builder;
 import com.linkedin.pinot.broker.pruner.SegmentPrunerContext;
 import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.configuration.Configuration;
@@ -84,14 +87,18 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
+    Set<String> segmentsToQuery = new HashSet<>(_segmentToReplicaToServerMap.keySet());
+    if (segmentSelector != null) {
+      segmentsToQuery = segmentSelector.selectSegments(request, segmentsToQuery);
+    }
+
     Map<String, List<String>> routingTable = new HashMap<>();
     SegmentPrunerContext prunerContext = new SegmentPrunerContext(request.getBrokerRequest());
 
     // 1. Randomly pick a replica id
     int replicaId = _random.nextInt(_numReplicas);
-    for (Map.Entry<String, Map<Integer, String>> entry : _segmentToReplicaToServerMap.entrySet()) {
-      String segmentName = entry.getKey();
+    for (String segmentName : segmentsToQuery) {
       SegmentZKMetadata segmentZKMetadata = _segmentToZkMetadataMapping.get(segmentName);
 
       // 2a. Check if the segment can be pruned
@@ -99,7 +106,7 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
 
       if (!segmentPruned) {
         // 2b. Segment cannot be pruned. Assign the segment to a server with the replica id picked above.
-        Map<Integer, String> replicaIdToServerMap = entry.getValue();
+        Map<Integer, String> replicaIdToServerMap = _segmentToReplicaToServerMap.get(segmentName);
         String serverName = replicaIdToServerMap.get(replicaId);
 
         // When the server is not available with this replica id, we need to pick another available server.
@@ -107,7 +114,7 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
           if (!replicaIdToServerMap.isEmpty()) {
             serverName = replicaIdToServerMap.values().iterator().next();
           } else {
-            handleNoServingHost(segmentName);
+            handleNoServingHost();
             continue;
           }
         }
@@ -128,9 +135,7 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
     throw new UnsupportedOperationException("Partition aware routing table cannot be pre-computed");
   }
 
-  protected void handleNoServingHost(String segmentName) {
-
-    LOGGER.error("Found no server hosting segment {} for table {}", segmentName, _tableName);
+  protected void handleNoServingHost() {
     if (_brokerMetrics != null) {
       _brokerMetrics.addMeteredTableValue(_tableName, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
     }
