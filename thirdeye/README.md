@@ -46,18 +46,17 @@ You'll need Java 8+, Maven 3+, and NPM 3.10+
 ```
 git clone https://github.com/linkedin/pinot.git
 cd pinot/thirdeye
-chmod +x ./install.sh
+chmod +x install.sh run-frontend.sh run-backend.sh cleanup.sh
 ./install.sh
 ```
 
 Note: The build of thirdeye-frontend may take several minutes
 
 
-### 3: Run ThirdEye
+### 3: Run ThirdEye fronend
 
 ```
-chmod +x ./run.sh
-./run.sh
+./run-frontend.sh
 ```
 
 
