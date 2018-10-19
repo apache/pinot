@@ -43,6 +43,7 @@ import org.apache.commons.collections.MapUtils;
 public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_MERGE_KEY = "mergeKey";
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -191,15 +192,17 @@ public class MergeWrapper extends DetectionPipeline {
     final String metric;
     final String collection;
     final DimensionMap dimensions;
+    final String mergeKey;
 
-    public AnomalyKey(String metric, String collection, DimensionMap dimensions) {
+    public AnomalyKey(String metric, String collection, DimensionMap dimensions, String mergeKey) {
       this.metric = metric;
       this.collection = collection;
       this.dimensions = dimensions;
+      this.mergeKey = mergeKey;
     }
 
     public static AnomalyKey from(MergedAnomalyResultDTO anomaly) {
-      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions());
+      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY));
     }
 
     @Override
@@ -207,18 +210,17 @@ public class MergeWrapper extends DetectionPipeline {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof AnomalyKey)) {
         return false;
       }
       AnomalyKey that = (AnomalyKey) o;
       return Objects.equals(metric, that.metric) && Objects.equals(collection, that.collection) && Objects.equals(
-          dimensions, that.dimensions);
+          dimensions, that.dimensions) && Objects.equals(mergeKey, that.mergeKey);
     }
 
     @Override
     public int hashCode() {
-
-      return Objects.hash(metric, collection, dimensions);
+      return Objects.hash(metric, collection, dimensions, mergeKey);
     }
   }
 }
