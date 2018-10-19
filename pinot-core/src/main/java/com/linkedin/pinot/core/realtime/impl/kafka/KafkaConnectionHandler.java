@@ -102,8 +102,8 @@ public class KafkaConnectionHandler {
       KafkaSimpleConsumerFactory simpleConsumerFactory) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = streamConfig.getKafkaTopicName();
-    _connectTimeoutMillis = streamConfig.getKafkaConnectionTimeoutMillis();
+    _topic = streamConfig.getTopicName();
+    _connectTimeoutMillis = streamConfig.getConnectionTimeoutMillis();
     _simpleConsumer = null;
 
     isPartitionProvided = false;
@@ -123,8 +123,8 @@ public class KafkaConnectionHandler {
       KafkaSimpleConsumerFactory simpleConsumerFactory) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = streamConfig.getKafkaTopicName();
-    _connectTimeoutMillis = streamConfig.getKafkaConnectionTimeoutMillis();
+    _topic = streamConfig.getTopicName();
+    _connectTimeoutMillis = streamConfig.getConnectionTimeoutMillis();
     _simpleConsumer = null;
 
     isPartitionProvided = true;

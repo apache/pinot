@@ -277,7 +277,7 @@ public class ValidationManager {
         _pinotHelixResourceManager.getRealtimeSegmentMetadata(realtimeTableName);
     boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
     StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
-    if (streamConfig.hasSimpleKafkaConsumerType() && !streamConfig.hasHighLevelKafkaConsumerType()) {
+    if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {
       countHLCSegments = false;
     }
     // Update the gauge to contain the total document count in the segments

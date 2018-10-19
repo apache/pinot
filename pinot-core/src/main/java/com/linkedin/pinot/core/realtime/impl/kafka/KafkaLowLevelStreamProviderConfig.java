@@ -19,9 +19,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.DataSize;
-import java.util.Map;
+import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,39 +41,31 @@ public class KafkaLowLevelStreamProviderConfig extends KafkaHighLevelStreamProvi
   public void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
     super.init(tableConfig, instanceMetadata, schema);
 
-    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE)) {
+    String flushThresholdRowsProperty =
+        StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS + StreamConfigProperties.LLC_SUFFIX;
+    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(flushThresholdRowsProperty)) {
       llcRealtimeRecordsThreshold =
-          Integer.parseInt(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE));
+          Integer.parseInt(tableConfig.getIndexingConfig().getStreamConfigs().get(flushThresholdRowsProperty));
     }
 
-    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME)) {
+    String flushThresholdTimeProperty =
+        StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + StreamConfigProperties.LLC_SUFFIX;
+    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(flushThresholdTimeProperty)) {
       llcSegmentTimeInMillis =
-          Long.parseLong(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME));
+          Long.parseLong(tableConfig.getIndexingConfig().getStreamConfigs().get(flushThresholdTimeProperty));
     }
 
-    String desiredSegmentSizeStr = tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.REALTIME_DESIRED_SEGMENT_SIZE);
+    String desiredSegmentSizeStr =
+        tableConfig.getIndexingConfig().getStreamConfigs().get(StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE);
     if (desiredSegmentSizeStr != null) {
-      long longVal = DataSize.toBytes(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.REALTIME_DESIRED_SEGMENT_SIZE));
+      long longVal = DataSize.toBytes(
+          tableConfig.getIndexingConfig().getStreamConfigs().get(StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE));
       if (longVal > 0) {
         desiredSegmentSizeBytes = longVal;
       } else {
-        LOGGER.warn("Invalid value '{}' for {}. Ignored", desiredSegmentSizeStr, CommonConstants.Helix.DataSource.Realtime.REALTIME_DESIRED_SEGMENT_SIZE);
+        LOGGER.warn("Invalid value '{}' for {}. Ignored", desiredSegmentSizeStr,
+            StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE);
       }
-    }
-  }
-
-  @Override
-  public void init(Map<String, String> properties, Schema schema) {
-    super.init(properties, schema);
-
-    if (properties.containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE)) {
-      llcRealtimeRecordsThreshold =
-          Integer.parseInt(properties.get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE));
-    }
-
-    if (properties.containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME)) {
-      llcSegmentTimeInMillis =
-          convertToMs(properties.get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME));
     }
   }
 

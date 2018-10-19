@@ -15,24 +15,21 @@
  */
 package com.linkedin.pinot.core.realtime.stream;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import com.google.common.base.Splitter;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType;
-import com.linkedin.pinot.common.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
+import static com.linkedin.pinot.common.utils.EqualityUtils.*;
 
 
 /*
@@ -50,128 +47,161 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 public class StreamConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamConfig.class);
 
-  private final String _kafkaTopicName;
+  private final String _streamType;
+  private final String _topicName;
   private final List<ConsumerType> _consumerTypes = new ArrayList<>(2);
+  private final String _offsetCriteria;
   private final String _zkBrokerUrl;
   private final String _bootstrapHosts;
   private final String _decoderClass;
   private String _consumerFactoryName;
-  private final long _kafkaConnectionTimeoutMillis;
-  private final int _kafkaFetchTimeoutMillis;
+  private final long _connectionTimeoutMillis;
+  private final int _fetchTimeoutMillis;
   private final Map<String, String> _decoderProperties = new HashMap<String, String>();
   private final Map<String, String> _kafkaConsumerProperties = new HashMap<String, String>();
   private final Map<String, String> _streamConfigMap = new HashMap<String, String>();
 
-  private static final long DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS = 30000L;
-  private static final int DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS = 5000;
+  private static final long DEFAULT_CONNECTION_TIMEOUT_MILLIS = 30000L;
+  private static final int DEFAULT_FETCH_TIMEOUT_MILLIS = 5000;
+  private static final String DEFAULT_CONSUMER_FACTORY_CLASS = SimpleConsumerFactory.class.getName();
+  private static final String DEFAULT_OFFSET_CRITERIA = "largest";
+
+  public enum ConsumerType {
+    SIMPLE,
+    HIGHLEVEL
+  }
 
   public StreamConfig(Map<String, String> streamConfigMap) {
-    _zkBrokerUrl =
-        streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-            Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
+    _streamType = streamConfigMap.get(StreamConfigProperties.STREAM_TYPE);
+    Preconditions.checkNotNull(_streamType,
+        "Must provide stream type in property " + StreamConfigProperties.STREAM_TYPE);
 
-    final String bootstrapHostConfigKey = Helix.DataSource.STREAM_PREFIX + "." + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST;
+    final String streamTopicProperty =
+        StreamConfigProperties.constructStreamProperty(_streamType, StreamConfigProperties.STREAM_TOPIC_NAME);
+    _topicName = streamConfigMap.get(streamTopicProperty);
+    Preconditions.checkNotNull(_topicName, "Must provide stream topic name in property " + streamTopicProperty);
+
+    // TODO: Move zkBrokerURL and bootstrapHosts to kafka specific config objects
+    _zkBrokerUrl = streamConfigMap.get(KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING));
+
+    final String bootstrapHostConfigKey = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
     if (streamConfigMap.containsKey(bootstrapHostConfigKey)) {
       _bootstrapHosts = streamConfigMap.get(bootstrapHostConfigKey);
     } else {
       _bootstrapHosts = null;
     }
 
-    String consumerTypesCsv =streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE));
+    String consumerTypesCsv = streamConfigMap.get(
+        StreamConfigProperties.constructStreamProperty(_streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES));
     Iterable<String> parts = Splitter.on(',').trimResults().split(consumerTypesCsv);
     for (String part : parts) {
-      _consumerTypes.add(ConsumerType.valueOf(part));
+      _consumerTypes.add(ConsumerType.valueOf(part.toUpperCase()));
     }
     if (_consumerTypes.isEmpty()) {
       throw new RuntimeException("Empty consumer types: Must have 'highLevel' or 'simple'");
     }
     Collections.sort(_consumerTypes);
 
-    _kafkaTopicName =
-        streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-            CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME));
-    _decoderClass =
-        streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-            CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_CLASS));
+    String offsetCriteriaProperty = StreamConfigProperties.constructStreamProperty(_streamType, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA);
+    String offsetCriteria = streamConfigMap.get(offsetCriteriaProperty);
+    if (offsetCriteria == null) {
+      _offsetCriteria = DEFAULT_OFFSET_CRITERIA;
+    } else {
+      _offsetCriteria = offsetCriteria;
+    }
 
-    _consumerFactoryName = streamConfigMap.get(StringUtil
-        .join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_FACTORY));
+    _decoderClass = streamConfigMap.get(
+        StreamConfigProperties.constructStreamProperty(_streamType, StreamConfigProperties.STREAM_DECODER_CLASS));
+
+    String consumerFactoryProperty = StreamConfigProperties.constructStreamProperty(_streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
+    _consumerFactoryName = streamConfigMap.get(consumerFactoryProperty);
     if (_consumerFactoryName == null) {
-      _consumerFactoryName = Helix.DataSource.Realtime.Kafka.ConsumerFactory.SIMPLE_CONSUMER_FACTORY_STRING;
+       _consumerFactoryName = DEFAULT_CONSUMER_FACTORY_CLASS;
     }
     LOGGER.info("Setting consumer factory to {}", _consumerFactoryName);
 
-    final String kafkaConnectionTimeoutPropertyKey = StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-        Helix.DataSource.Realtime.Kafka.KAFKA_CONNECTION_TIMEOUT_MILLIS);
-    long kafkaConnectionTimeoutMillis;
-    if (streamConfigMap.containsKey(kafkaConnectionTimeoutPropertyKey)) {
+    final String connectionTimeoutPropertyKey = StreamConfigProperties.constructStreamProperty(_streamType,
+        StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS);
+    long connectionTimeoutMillis;
+    if (streamConfigMap.containsKey(connectionTimeoutPropertyKey)) {
       try {
-        kafkaConnectionTimeoutMillis = Long.parseLong(streamConfigMap.get(kafkaConnectionTimeoutPropertyKey));
+        connectionTimeoutMillis = Long.parseLong(streamConfigMap.get(connectionTimeoutPropertyKey));
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while parsing the Kafka connection timeout, defaulting to {} ms", e,
-            DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS);
-        kafkaConnectionTimeoutMillis = DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS;
+        LOGGER.warn("Caught exception while parsing the connection timeout, defaulting to {} ms", e,
+            DEFAULT_CONNECTION_TIMEOUT_MILLIS);
+        connectionTimeoutMillis = DEFAULT_CONNECTION_TIMEOUT_MILLIS;
       }
     } else {
-      kafkaConnectionTimeoutMillis = DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS;
+      connectionTimeoutMillis = DEFAULT_CONNECTION_TIMEOUT_MILLIS;
     }
-    _kafkaConnectionTimeoutMillis = kafkaConnectionTimeoutMillis;
+    _connectionTimeoutMillis = connectionTimeoutMillis;
 
-    final String kafkaFetchTimeoutPropertyKey = StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-        Helix.DataSource.Realtime.Kafka.KAFKA_FETCH_TIMEOUT_MILLIS);
-    int kafkaFetchTimeoutMillis;
-    if (streamConfigMap.containsKey(kafkaFetchTimeoutPropertyKey)) {
+    final String fetchTimeoutPropertyKey =
+        StreamConfigProperties.constructStreamProperty(_streamType, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS);
+    int fetchTimeoutMillis;
+    if (streamConfigMap.containsKey(fetchTimeoutPropertyKey)) {
       try {
-        kafkaFetchTimeoutMillis = Integer.parseInt(streamConfigMap.get(kafkaFetchTimeoutPropertyKey));
+        fetchTimeoutMillis = Integer.parseInt(streamConfigMap.get(fetchTimeoutPropertyKey));
       } catch (Exception e) {
-        LOGGER.warn("Caughe exception while parsing the Kafka fetch timeout, defaulting to {} ms", e,
-            DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS);
-        kafkaFetchTimeoutMillis = DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS;
+        LOGGER.warn("Caught exception while parsing the fetch timeout, defaulting to {} ms", e,
+            DEFAULT_FETCH_TIMEOUT_MILLIS);
+        fetchTimeoutMillis = DEFAULT_FETCH_TIMEOUT_MILLIS;
       }
     } else {
-      kafkaFetchTimeoutMillis = DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS;
+      fetchTimeoutMillis = DEFAULT_FETCH_TIMEOUT_MILLIS;
     }
-    _kafkaFetchTimeoutMillis = kafkaFetchTimeoutMillis;
+    _fetchTimeoutMillis = fetchTimeoutMillis;
 
     for (String key : streamConfigMap.keySet()) {
-      if (key.startsWith(CommonConstants.Helix.DataSource.STREAM_PREFIX + ".")) {
+      if (key.startsWith(StreamConfigProperties.STREAM_PREFIX)) {
         _streamConfigMap.put(key, streamConfigMap.get(key));
       }
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-          CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX))) {
-        _decoderProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key),
+      String decoderPropPrefix =
+          StreamConfigProperties.constructStreamProperty(_streamType, StreamConfigProperties.DECODER_PROPS_PREFIX);
+      if (key.startsWith(decoderPropPrefix)) {
+        _decoderProperties.put(StreamConfigProperties.getPropertySuffix(key, decoderPropPrefix),
             streamConfigMap.get(key));
       }
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-          Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX))) {
-        _kafkaConsumerProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getConsumerPropertyKey(key),
+
+      // TODO: Move kafkaConsumerProp to kafka specific StreamConfig
+      String kafkaConsumerPropPrefix =
+          KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.KAFKA_CONSUMER_PROP_PREFIX);
+      if (key.startsWith(kafkaConsumerPropPrefix)) {
+        _kafkaConsumerProperties.put(StreamConfigProperties.getPropertySuffix(key, kafkaConsumerPropPrefix),
             streamConfigMap.get(key));
       }
     }
   }
 
-  public boolean hasHighLevelKafkaConsumerType() {
-    return _consumerTypes.contains(ConsumerType.highLevel);
+  public boolean hasHighLevelConsumerType() {
+    return _consumerTypes.contains(ConsumerType.HIGHLEVEL);
   }
 
-  public boolean hasSimpleKafkaConsumerType() {
-    return _consumerTypes.contains(ConsumerType.simple);
+  public boolean hasLowLevelConsumerType() {
+    return _consumerTypes.contains(ConsumerType.SIMPLE);
   }
 
-  public long getKafkaConnectionTimeoutMillis() {
-    return _kafkaConnectionTimeoutMillis;
+  public long getConnectionTimeoutMillis() {
+    return _connectionTimeoutMillis;
   }
 
-  public int getKafkaFetchTimeoutMillis() {
-    return _kafkaFetchTimeoutMillis;
+  public int getFetchTimeoutMillis() {
+    return _fetchTimeoutMillis;
   }
 
-  public String getKafkaTopicName() {
-    return _kafkaTopicName;
+  public String getTopicName() {
+    return _topicName;
   }
 
   public List<ConsumerType> getConsumerTypes() {
     return _consumerTypes;
+  }
+
+  public String getOffsetCriteria() {
+    return _offsetCriteria;
   }
 
   public Map<String, String> getKafkaConfigs() {
@@ -210,8 +240,8 @@ public class StreamConfig {
     String[] keys = _streamConfigMap.keySet().toArray(new String[0]);
     Arrays.sort(keys);
     for (final String key : keys) {
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-          CommonConstants.Helix.DataSource.KAFKA))) {
+      if (key.startsWith(StringUtil.join(".", StreamConfigProperties.STREAM_PREFIX,
+          KafkaStreamConfigProperties.STREAM_TYPE))) {
         result.append("  ");
         result.append(key);
         result.append(": ");
@@ -236,7 +266,7 @@ public class StreamConfig {
 
     StreamConfig that = (StreamConfig) o;
 
-    return isEqual(_kafkaTopicName, that._kafkaTopicName) &&
+    return isEqual(_topicName, that._topicName) &&
         isEqual(_consumerTypes, that._consumerTypes) &&
         isEqual(_zkBrokerUrl, that._zkBrokerUrl) &&
         isEqual(_decoderClass, that._decoderClass) &&
@@ -247,7 +277,7 @@ public class StreamConfig {
 
   @Override
   public int hashCode() {
-    int result = hashCodeOf(_kafkaTopicName);
+    int result = hashCodeOf(_topicName);
     result = hashCodeOf(result, _consumerTypes);
     result = hashCodeOf(result, _zkBrokerUrl);
     result = hashCodeOf(result, _decoderClass);

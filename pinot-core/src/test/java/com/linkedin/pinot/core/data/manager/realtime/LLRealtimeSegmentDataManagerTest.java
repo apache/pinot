@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
@@ -30,6 +29,7 @@ import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
+import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -81,7 +81,7 @@ public class LLRealtimeSegmentDataManagerTest {
       + "    ], \n" + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
       + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n"
       + "    \"streamConfigs\": {\n" + "      \"realtime.segment.flush.threshold.size\": \"" + String.valueOf(maxRowsInSegment) + "\", \n"
-      + "      \"" + CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
+      + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
       + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
       + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
       + "      \"stream.kafka.consumer.type\": \"simple\", \n"
@@ -184,7 +184,7 @@ public class LLRealtimeSegmentDataManagerTest {
     JSONObject tableIndexConfig = (JSONObject)tableConfigJson.get("tableIndexConfig");
     JSONObject streamConfigs = (JSONObject)tableIndexConfig.get("streamConfigs");
     {
-      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h");
+      streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, "3h");
       TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
@@ -194,7 +194,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     {
-      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h30m");
+      streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, "3h30m");
       TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
@@ -205,7 +205,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     {
       final long segTime = 898789748357L;
-      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, String.valueOf(segTime));
+      streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, String.valueOf(segTime));
       TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());

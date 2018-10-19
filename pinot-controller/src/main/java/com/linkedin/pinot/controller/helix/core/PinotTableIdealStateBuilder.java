@@ -21,11 +21,11 @@ import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
 import com.linkedin.pinot.core.realtime.stream.PartitionCountFetcher;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.List;
@@ -146,7 +146,7 @@ public class PinotTableIdealStateBuilder {
       return partitionCountFetcher.getPartitionCount();
     } catch (Exception e) {
       Exception fetcherException = partitionCountFetcher.getException();
-      LOGGER.error("Could not get partition count for {}", streamConfig.getKafkaTopicName(), fetcherException);
+      LOGGER.error("Could not get partition count for {}", streamConfig.getTopicName(), fetcherException);
       throw new RuntimeException(fetcherException);
     }
   }
@@ -193,9 +193,8 @@ public class PinotTableIdealStateBuilder {
 
   private static String getGroupIdFromRealtimeDataTable(String realtimeTableName,
       Map<String, String> streamProviderConfig) {
-    String keyOfGroupId =
-        StringUtil
-            .join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.HighLevelConsumer.GROUP_ID);
+    String keyOfGroupId = KafkaStreamConfigProperties.constructStreamProperty(
+        KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_GROUP_ID);
     String groupId = StringUtil.join("_", realtimeTableName, System.currentTimeMillis() + "");
     if (streamProviderConfig.containsKey(keyOfGroupId) && !streamProviderConfig.get(keyOfGroupId).isEmpty()) {
       groupId = streamProviderConfig.get(keyOfGroupId);

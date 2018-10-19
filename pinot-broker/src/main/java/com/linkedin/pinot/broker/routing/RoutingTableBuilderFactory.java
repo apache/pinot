@@ -127,8 +127,7 @@ public class RoutingTableBuilderFactory {
         // Check that the table uses LLC kafka consumer.
         StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
 
-        if (streamConfig.getConsumerTypes().size() == 1 && streamConfig.getConsumerTypes().get(0)
-            == CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType.simple) {
+        if (streamConfig.getConsumerTypes().size() == 1 && streamConfig.hasLowLevelConsumerType()) {
           builder = new PartitionAwareRealtimeRoutingTableBuilder();
         } else {
           builder = new DefaultRealtimeRoutingTableBuilder();

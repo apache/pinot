@@ -37,7 +37,7 @@ public abstract class StreamDecoderProvider {
     Map<String, String> decoderProperties = streamConfig.getDecoderProperties();
     try {
       decoder = (StreamMessageDecoder) Class.forName(decoderClass).newInstance();
-      decoder.init(decoderProperties, schema, streamConfig.getKafkaTopicName());
+      decoder.init(decoderProperties, schema, streamConfig.getTopicName());
     } catch (Exception e) {
       Utils.rethrowException(e);
     }
