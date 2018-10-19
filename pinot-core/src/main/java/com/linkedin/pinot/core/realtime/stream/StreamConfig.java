@@ -76,7 +76,7 @@ public class StreamConfig {
     Preconditions.checkNotNull(_streamType,
         "Must provide stream type in property " + StreamConfigProperties.STREAM_TYPE);
 
-    String streamTopicProperty =
+    final String streamTopicProperty =
         StreamConfigProperties.constructStreamProperty(_streamType, StreamConfigProperties.STREAM_TOPIC_NAME);
     _topicName = streamConfigMap.get(streamTopicProperty);
     Preconditions.checkNotNull(_topicName, "Must provide stream topic name in property " + streamTopicProperty);

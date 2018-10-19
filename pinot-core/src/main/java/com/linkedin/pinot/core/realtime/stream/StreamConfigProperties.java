@@ -38,7 +38,7 @@ public class StreamConfigProperties {
   public static final String DECODER_PROPS_PREFIX = "decoder.prop";
 
   /**
-   * Time threshold that will keep the realtime segment open for before we convert it into an offline segment
+   * Time threshold that will keep the realtime segment open for before we complete the segment
    */
   public static final String SEGMENT_FLUSH_THRESHOLD_TIME = "realtime.segment.flush.threshold.time";
 

@@ -140,13 +140,13 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     this.kafkaConsumerProps = kafkaMetadata.getKafkaConsumerProperties();
     this.zkString = kafkaMetadata.getZkBrokerUrl();
 
-    String flushThresholdRowsProperty = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS;
+    final String flushThresholdRowsProperty = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS;
     if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(flushThresholdRowsProperty)) {
       realtimeRecordsThreshold =
           Integer.parseInt(tableConfig.getIndexingConfig().getStreamConfigs().get(flushThresholdRowsProperty));
     }
 
-    String flushThresholdTimeProperty = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME;
+    final String flushThresholdTimeProperty = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME;
     if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(flushThresholdTimeProperty)) {
       segmentTimeInMillis =
           convertToMs(tableConfig.getIndexingConfig().getStreamConfigs().get(flushThresholdTimeProperty));
