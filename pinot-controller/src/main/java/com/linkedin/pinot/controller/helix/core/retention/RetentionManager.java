@@ -51,16 +51,15 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
       int deletedSegmentsRetentionInDays) {
-    super("PinotRetentionManager", runFrequencyInSeconds, Math.min(60, runFrequencyInSeconds),
+    super("RetentionManager", runFrequencyInSeconds, Math.min(60, runFrequencyInSeconds),
         pinotHelixResourceManager);
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
-    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
   }
 
   @Override
-  public void nonLeaderCleanUp() {
-    LOGGER.info("Controller is not leader, skip");
+  public void onBecomeLeader() {
+    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
+        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
   }
 
   @Override
@@ -68,21 +67,12 @@ public class RetentionManager extends ControllerPeriodicTask {
     execute(allTableNames);
   }
 
-  @Override
-  public void init() {
-    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
-  }
-
   /**
    * Manages retention for all tables.
    * @param allTableNames List of all the table names
    */
   private void execute(List<String> allTableNames) {
-    LOGGER.info("Start managing retention for all tables");
     try {
-      long startTime = System.currentTimeMillis();
-
       for (String tableNameWithType : allTableNames) {
         LOGGER.info("Start managing retention for table: {}", tableNameWithType);
         manageRetentionForTable(tableNameWithType);
@@ -90,8 +80,6 @@ public class RetentionManager extends ControllerPeriodicTask {
 
       LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
       _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
-
-      LOGGER.info("Finished managing retention for all tables in {}ms", System.currentTimeMillis() - startTime);
     } catch (Exception e) {
       LOGGER.error("Caught exception while managing retention for all tables", e);
     }

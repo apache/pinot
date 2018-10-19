@@ -15,9 +15,12 @@
  */
 package com.linkedin.pinot.controller.helix.core.periodictask;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -25,7 +28,9 @@ import java.util.List;
  * which table resources should be managed by this Pinot controller.
  */
 public abstract class ControllerPeriodicTask extends BasePeriodicTask {
+  public static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTask.class);
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
+  private boolean _amILeader;
   private static final int DEFAULT_INITIAL_DELAY_IN_SECOND = 120;
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds,
@@ -37,6 +42,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
       PinotHelixResourceManager pinotHelixResourceManager) {
     super(taskName, runFrequencyInSeconds, initialDelayInSeconds);
     _pinotHelixResourceManager = pinotHelixResourceManager;
+    setAmILeader(false);
   }
 
   @Override
@@ -46,17 +52,57 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   @Override
   public void run() {
     if (!_pinotHelixResourceManager.isLeader()) {
-      nonLeaderCleanUp();
-      return;
+      skipLeaderTask();
+    } else {
+      List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
+      processLeaderTask(allTableNames);
     }
-    List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
+  }
+
+  private void skipLeaderTask() {
+    if (getAmILeader()) {
+      LOGGER.info("Current pinot controller lost leadership.");
+      onBecomeNotLeader();
+    }
+    setAmILeader(false);
+    LOGGER.info("Skip running periodic task: {} on non-leader controller", getTaskName());
+  }
+
+  private void processLeaderTask(List<String> allTableNames) {
+    if (!getAmILeader()) {
+      LOGGER.info("Current pinot controller became leader. Starting {} with running frequency of {} seconds.",
+          getTaskName(), getIntervalInSeconds());
+      onBecomeLeader();
+    }
+    setAmILeader(true);
+    long startTime = System.currentTimeMillis();
+    LOGGER.info("Starting to process {} tables in periodic task: {}", allTableNames.size(), getTaskName());
     process(allTableNames);
+    LOGGER.info("Finished processing {} tables in periodic task: {} in {}ms", allTableNames.size(), getTaskName(),
+        (System.currentTimeMillis() - startTime));
+  }
+
+  @VisibleForTesting
+  public boolean getAmILeader() {
+    return _amILeader;
+  }
+
+  @VisibleForTesting
+  public void setAmILeader(boolean amILeader) {
+    _amILeader = amILeader;
   }
 
   /**
-   * Does the following logic when not being a lead controller.
+   * Does the following logic when losing the leadership. This should be done only once during leadership transition.
    */
-  public abstract void nonLeaderCleanUp();
+  public void onBecomeNotLeader() {
+  }
+
+  /**
+   * Does the following logic when becoming lead controller. This should be done only once during leadership transition.
+   */
+  public void onBecomeLeader() {
+  }
 
   /**
    * Processes the periodic task as lead controller.

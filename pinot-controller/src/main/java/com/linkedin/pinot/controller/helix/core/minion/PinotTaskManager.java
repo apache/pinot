@@ -88,9 +88,6 @@ public class PinotTaskManager extends ControllerPeriodicTask {
    */
   @Nonnull
   private Map<String, String> scheduleTasks(List<String> allTableNames) {
-
-    long startTime = System.currentTimeMillis();
-    LOGGER.info("Start scheduling tasks on leader controller.");
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -135,7 +132,6 @@ public class PinotTaskManager extends ControllerPeriodicTask {
       }
     }
 
-    LOGGER.info("Finished scheduling tasks in {}ms.", (System.currentTimeMillis() - startTime));
     return tasksScheduled;
   }
 
@@ -146,17 +142,12 @@ public class PinotTaskManager extends ControllerPeriodicTask {
     return scheduleTasks(_pinotHelixResourceManager.getAllTables());
   }
 
-  @Override
-  public void init() {
-    LOGGER.info("Starting task manager with running frequency of {} seconds", getIntervalInSeconds());
-  }
-
   /**
    * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
    */
   @Override
-  public void nonLeaderCleanUp() {
-    LOGGER.info("Skip scheduling new tasks on non-leader controller");
+  public void onBecomeNotLeader() {
+    LOGGER.info("Perform task cleanups.");
     // Performs necessary cleanups for each task type.
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
       _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();

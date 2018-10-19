@@ -58,11 +58,6 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
-  public void nonLeaderCleanUp() {
-    LOGGER.info("Skipping realtime segment relocation, not leader!");
-  }
-
-  @Override
   public void process(List<String> allTableNames) {
     runRelocation(allTableNames);
   }
@@ -74,9 +69,6 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
    * @param allTableNames List of all the table names
    */
   private void runRelocation(List<String> allTableNames) {
-    long startTime = System.currentTimeMillis();
-    LOGGER.info("Starting relocation of realtime segments");
-
     for (final String tableNameWithType : allTableNames) {
       // Only consider realtime tables.
       if (!TableNameBuilder.REALTIME.tableHasTypeSuffix(tableNameWithType)) {
@@ -111,7 +103,6 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
         LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
       }
     }
-    LOGGER.info("Realtime segment relocation completed in {}ms.", (System.currentTimeMillis() - startTime));
   }
 
   /**

@@ -55,16 +55,17 @@ public class ValidationManager extends ControllerPeriodicTask {
 
   public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
-    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(), pinotHelixResourceManager);
+    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(),
+        config.getValidationControllerFrequencyInSeconds() / 2, pinotHelixResourceManager);
     _enableSegmentLevelValidation = config.getEnableSegmentLevelValidation();
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
   }
 
   @Override
-  public void nonLeaderCleanUp() {
+  public void onBecomeNotLeader() {
+    LOGGER.info("Unregister all the validation metrics.");
     _validationMetrics.unregisterAllMetrics();
-    LOGGER.info("Skipping validation, not leader!");
   }
 
   @Override
@@ -77,8 +78,6 @@ public class ValidationManager extends ControllerPeriodicTask {
    * @param allTableNames List of all the table names
    */
   private void runValidation(List<String> allTableNames) {
-    long startTime = System.currentTimeMillis();
-    LOGGER.info("Starting validation");
     // Cache instance configs to reduce ZK access
     List<InstanceConfig> instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
 
@@ -111,7 +110,6 @@ public class ValidationManager extends ControllerPeriodicTask {
         LOGGER.warn("Caught exception while validating table: {}", tableNameWithType, e);
       }
     }
-    LOGGER.info("Validation completed in {}ms.", (System.currentTimeMillis() - startTime));
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics

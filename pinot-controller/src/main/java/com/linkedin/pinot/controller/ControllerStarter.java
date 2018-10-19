@@ -181,7 +181,7 @@ public class ControllerStarter {
     if (_segmentStatusChecker.getIntervalInSeconds() == -1L) {
       LOGGER.warn("Segment status check interval is -1, status checks disabled.");
     } else {
-      LOGGER.info("Adding segment status manager to periodic task scheduler");
+      LOGGER.info("Adding segment status checker to periodic task scheduler");
       periodicTasks.add(_segmentStatusChecker);
     }
 

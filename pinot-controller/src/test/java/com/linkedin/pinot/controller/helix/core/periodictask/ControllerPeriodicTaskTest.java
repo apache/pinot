@@ -31,12 +31,10 @@ import static org.mockito.Mockito.*;
 
 public class ControllerPeriodicTaskTest {
   private PinotHelixResourceManager helixResourceManager;
-  private AtomicInteger numOfNotLeaderMessages;
   private AtomicInteger numOfProcessingMessages;
 
   @BeforeTest
   public void setUp() {
-    numOfNotLeaderMessages = new AtomicInteger(0);
     numOfProcessingMessages = new AtomicInteger(0);
     helixResourceManager = mock(PinotHelixResourceManager.class);
     List<String> allTableNames = new ArrayList<>();
@@ -58,8 +56,6 @@ public class ControllerPeriodicTaskTest {
     periodicTaskScheduler.start(Collections.singletonList(periodicTask));
     Thread.sleep(totalRunTimeInMilliseconds);
     periodicTaskScheduler.stop();
-
-    Assert.assertEquals(0, numOfNotLeaderMessages.get());
     Assert.assertEquals(totalRunTimeInMilliseconds / 1000L, numOfProcessingMessages.get());
   }
 
@@ -76,21 +72,13 @@ public class ControllerPeriodicTaskTest {
     periodicTaskScheduler.start(Collections.singletonList(periodicTask));
     Thread.sleep(totalRunTimeInMilliseconds);
     periodicTaskScheduler.stop();
-
-    Assert.assertEquals(totalRunTimeInMilliseconds / 1000L, numOfNotLeaderMessages.get());
     Assert.assertEquals(0, numOfProcessingMessages.get());
   }
 
   private PeriodicTask createMockPeriodicTask(long runFrequencyInSeconds, long initialDelayInSeconds) {
     return new ControllerPeriodicTask("Task", runFrequencyInSeconds, initialDelayInSeconds, helixResourceManager) {
       public void init() {
-        numOfNotLeaderMessages.set(0);
         numOfProcessingMessages.set(0);
-      }
-
-      @Override
-      public void nonLeaderCleanUp() {
-        numOfNotLeaderMessages.incrementAndGet();
       }
 
       @Override

@@ -74,12 +74,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
 
   @Override
   public void init() {
+    LOGGER.info("Initializing table metrics for all the tables.");
     setStatusToDefault();
   }
 
   @Override
-  public void nonLeaderCleanUp() {
-    LOGGER.info("Skipping Segment Status check, not leader!");
+  public void onBecomeNotLeader() {
+    LOGGER.info("Resetting table metrics for all the tables.");
     setStatusToDefault();
   }
 
@@ -93,10 +94,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
    * @param allTableNames List of all the table names
    */
   private void updateSegmentMetrics(List<String> allTableNames) {
-    long startTime = System.nanoTime();
-
-    LOGGER.info("Starting Segment Status check for metrics");
-
     // Fetch the list of tables
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
@@ -246,9 +243,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, realTimeTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, offlineTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, disabledTableCount);
-    long totalNanos = System.nanoTime() - startTime;
-    LOGGER.info("Segment status metrics completed in {}ms",
-        TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
   }
 
   private void setStatusToDefault() {
