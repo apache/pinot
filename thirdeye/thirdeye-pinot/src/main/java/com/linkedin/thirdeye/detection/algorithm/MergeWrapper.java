@@ -210,17 +210,17 @@ public class MergeWrapper extends DetectionPipeline {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof AnomalyKey)) {
         return false;
       }
       AnomalyKey that = (AnomalyKey) o;
       return Objects.equals(metric, that.metric) && Objects.equals(collection, that.collection) && Objects.equals(
-          dimensions, that.dimensions);
+          dimensions, that.dimensions) && Objects.equals(mergeKey, that.mergeKey);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(metric, collection, dimensions);
+      return Objects.hash(metric, collection, dimensions, mergeKey);
     }
   }
 }
