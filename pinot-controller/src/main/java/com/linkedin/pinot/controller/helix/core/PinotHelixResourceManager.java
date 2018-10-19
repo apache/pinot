@@ -40,7 +40,6 @@ import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -428,30 +427,14 @@ public class PinotHelixResourceManager {
    */
 
   /**
-   * Get segments for the given table name with type suffix.
+   * Returns the segments for the given table.
    *
    * @param tableNameWithType Table name with type suffix
    * @return List of segment names
    */
   @Nonnull
   public List<String> getSegmentsFor(@Nonnull String tableNameWithType) {
-    Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
-        "Table name: %s is not a valid table name with type suffix", tableNameWithType);
-
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-    List<String> segmentNames = new ArrayList<>();
-    if (tableType == TableType.OFFLINE) {
-      for (OfflineSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(
-          _propertyStore, tableNameWithType)) {
-        segmentNames.add(segmentZKMetadata.getSegmentName());
-      }
-    } else {
-      for (RealtimeSegmentZKMetadata segmentZKMetadata : ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(
-          _propertyStore, tableNameWithType)) {
-        segmentNames.add(segmentZKMetadata.getSegmentName());
-      }
-    }
-    return segmentNames;
+    return ZKMetadataProvider.getSegments(_propertyStore, tableNameWithType);
   }
 
   public OfflineSegmentZKMetadata getOfflineSegmentZKMetadata(@Nonnull String tableName, @Nonnull String segmentName) {
@@ -1222,9 +1205,7 @@ public class PinotHelixResourceManager {
     if (streamConfig.hasLowLevelConsumerType()) {
       // Will either create idealstate entry, or update the IS entry with new segments
       // (unless there are low-level segments already present)
-      final List<LLCRealtimeSegmentZKMetadata> llcSegmentMetadatas =
-          ZKMetadataProvider.getLLCRealtimeSegmentZKMetadataListForTable(_propertyStore, realtimeTableName);
-      if (llcSegmentMetadatas.isEmpty()) {
+      if (ZKMetadataProvider.getLLCRealtimeSegments(_propertyStore, realtimeTableName).isEmpty()) {
         PinotTableIdealStateBuilder.buildLowLevelRealtimeIdealStateFor(realtimeTableName, config, idealState);
         LOGGER.info("Successfully added Helix entries for low-level consumers for {} ", realtimeTableName);
       } else {
