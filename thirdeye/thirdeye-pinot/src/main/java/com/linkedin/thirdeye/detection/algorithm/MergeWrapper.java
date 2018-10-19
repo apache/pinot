@@ -202,8 +202,7 @@ public class MergeWrapper extends DetectionPipeline {
     }
 
     public static AnomalyKey from(MergedAnomalyResultDTO anomaly) {
-      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(
-          PROP_MERGE_KEY));
+      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY));
     }
 
     @Override
