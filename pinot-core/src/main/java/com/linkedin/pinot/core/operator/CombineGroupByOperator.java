@@ -156,7 +156,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
       if (!opCompleted) {
         // If this happens, the broker side should already timed out, just log the error and return
-        String errorMessage = "Timed out while combining group-by results after " + _timeOutMs + "ms";
+        String errorMessage = "Timed out while combining group-by results after " + _timeOutMs + "ms"
+            + " Broker request: " + _brokerRequest;
         LOGGER.error(errorMessage);
         return new IntermediateResultsBlock(new TimeoutException(errorMessage));
       }
