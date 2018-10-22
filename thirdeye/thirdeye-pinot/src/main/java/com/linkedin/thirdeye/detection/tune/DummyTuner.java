@@ -14,22 +14,26 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.finetune;
+package com.linkedin.thirdeye.detection.tune;
 
-import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
-import com.linkedin.thirdeye.detection.algorithm.stage.StageUtils;
 import java.util.Map;
 
 
-public abstract class StaticPipelineTuner implements PipelineTuner {
+public class DummyTuner extends StaticPipelineTuner {
   @Override
-  public Map<String, Object> tune(Map<String, Object> pipelineSpec, DataProvider provider) {
-    return this.tune(pipelineSpec, StageUtils.getDataForSpec(provider, this.getInputDataSpec()));
+  Map<String, Object> tune(Map<String, Object> pipelineProperties, InputData data) {
+    return pipelineProperties;
   }
 
-  abstract Map<String, Object> tune(Map<String, Object> configDTO, InputData data);
+  @Override
+  InputDataSpec getInputDataSpec() {
+    return new InputDataSpec();
+  }
 
-  abstract InputDataSpec getInputDataSpec();
+  @Override
+  public void init(Map<String, Object> tunerProperties, long configId, long start, long end) {
+  }
 }
+

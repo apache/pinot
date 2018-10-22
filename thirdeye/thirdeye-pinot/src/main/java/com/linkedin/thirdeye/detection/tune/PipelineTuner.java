@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.finetune;
+package com.linkedin.thirdeye.detection.tune;
 
 import com.linkedin.thirdeye.detection.DataProvider;
 import java.util.Map;
 
 
 public interface PipelineTuner {
-  void init(Map<String, Object> tunerProperties, long start, long end);
+  void init(Map<String, Object> tunerProperties, long configId, long start, long end);
 
-  Map<String, Object> tune(Map<String, Object> pipelineSpec, DataProvider provider);
+  Map<String, Object> tune(Map<String, Object> pipelineProperties, DataProvider provider);
 }

@@ -33,6 +33,8 @@ import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import com.linkedin.thirdeye.detection.finetune.TuningAlgorithm;
+import com.linkedin.thirdeye.detection.tune.PipelineTuner;
+import com.linkedin.thirdeye.detection.tune.TunerLoader;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -199,4 +201,18 @@ public class DetectionResource {
 
     return Response.ok(result).build();
   }
-}
+
+  @POST
+  @Path("/tune")
+  public Response tune(
+      @QueryParam("id") long configId,
+      @QueryParam("start") long start,
+      @QueryParam("end") long end) throws Exception {
+    DetectionConfigDTO detectionConfigDTO = this.configDAO.findById(configId);
+    TunerLoader tunerLoader = new TunerLoader();
+    PipelineTuner tuner = tunerLoader.from(detectionConfigDTO, start, end);
+    tuner.init(detectionConfigDTO.getTunerProperties(), configId, start, end);
+    tuner.tune(detectionConfigDTO.getProperties(), provider);
+    return Response.ok().build();
+    }
+  }
