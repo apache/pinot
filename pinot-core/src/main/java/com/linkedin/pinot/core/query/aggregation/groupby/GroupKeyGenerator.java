@@ -70,12 +70,6 @@ public interface GroupKeyGenerator {
   Iterator<GroupKey> getUniqueGroupKeys();
 
   /**
-   * Purge the given group keys.
-   * @param keysToPurge Group keys to purge
-   */
-  void purgeKeys(@Nonnull int[] keysToPurge);
-
-  /**
    * This class encapsulates the integer group id and the string group key.
    */
   class GroupKey {

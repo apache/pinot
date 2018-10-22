@@ -29,6 +29,7 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.plan.TransformPlanNode;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator;
@@ -65,7 +66,8 @@ public class NoDictionaryGroupKeyGeneratorTest {
   private static final String[] NO_DICT_COLUMN_NAMES =
       {"int_column", "long_column", "float_column", "double_column", "string_column"};
   private static final FieldSpec.DataType[] DATA_TYPES =
-      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.STRING};
+      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE,
+          FieldSpec.DataType.STRING, FieldSpec.DataType.STRING};
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final int NUM_ROWS = 1000;
 
@@ -130,9 +132,11 @@ public class NoDictionaryGroupKeyGeneratorTest {
 
     GroupKeyGenerator groupKeyGenerator;
     if (numGroupByColumns == 1) {
-      groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_transformOperator, groupByExpressions[0]);
+      groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_transformOperator, groupByExpressions[0],
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
     } else {
-      groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(_transformOperator, groupByExpressions);
+      groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(_transformOperator, groupByExpressions,
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
     }
     groupKeyGenerator.generateKeysForBlock(_transformBlock, new int[NUM_ROWS]);
 

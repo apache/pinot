@@ -28,12 +28,14 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.plan.TransformPlanNode;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.query.aggregation.groupby.DictionaryBasedGroupKeyGenerator;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -43,22 +45,23 @@ import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 public class DictionaryBasedGroupKeyGeneratorTest {
   private static final String SEGMENT_NAME = "testSegment";
   private static final String INDEX_DIR_PATH = FileUtils.getTempDirectoryPath() + File.separator + SEGMENT_NAME;
-  private static final int ARRAY_BASED_THRESHOLD = 10_000;
   private static final int NUM_ROWS = 1000;
   private static final int UNIQUE_ROWS = 100;
   private static final int MAX_STEP_LENGTH = 1000;
   private static final int MAX_NUM_MULTI_VALUES = 10;
-  private static final int[] SV_GROUP_KEY_BUFFER = new int[NUM_ROWS];
-  private static final int[][] MV_GROUP_KEY_BUFFER = new int[NUM_ROWS][];
+  private static final int NUM_GROUPS = 20;
+  private static final int[] SV_GROUP_KEY_BUFFER = new int[NUM_GROUPS];
+  private static final int[][] MV_GROUP_KEY_BUFFER = new int[NUM_GROUPS][];
   private static final String FILTER_COLUMN = "docId";
   private static final String[] SV_COLUMNS = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
   private static final String[] MV_COLUMNS = {"m1", "m2"};
@@ -77,7 +80,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     int value = _random.nextInt(MAX_STEP_LENGTH);
 
-    // Generate random values for the segment.
+    // Generate random values for the segment
     for (int i = 0; i < UNIQUE_ROWS; i++) {
       Map<String, Object> map = new HashMap<>();
       map.put(FILTER_COLUMN, i);
@@ -102,7 +105,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
       rows.add(rows.get(i % UNIQUE_ROWS));
     }
 
-    // Create an index segment with the random values.
+    // Create an index segment with the random values
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(FILTER_COLUMN, FieldSpec.DataType.INT, true));
     for (String singleValueColumn : SV_COLUMNS) {
@@ -136,56 +139,83 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
   @Test
   public void testArrayBasedSingleValue() {
-    // Cardinality product < threshold.
+    // Cardinality product (100) smaller than arrayBasedThreshold
     String[] groupByColumns = {"s1"};
 
-    // Test initial status.
+    // Test initial status
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
 
-    // Test group key generation.
+    // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 100, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
+    compareSingleValueBuffer();
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
+  }
+
+  @Test
+  public void testIntMapBasedSingleValue() {
+    // Cardinality product (1,000,000) larger than arrayBasedThreshold but smaller than Integer.MAX_VALUE
+    String[] groupByColumns = {"s1", "s2", "s3"};
+
+    // Test initial status
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+
+    // Test group key generation
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
   }
 
   @Test
   public void testLongMapBasedSingleValue() {
-    // Cardinality product > threshold.
-    String[] groupByColumns = {"s1", "s2", "s3", "s4"};
+    // Cardinality product (10,000,000,000) larger than Integer.MAX_VALUE but smaller than LONG.MAX_VALUE
+    String[] groupByColumns = {"s1", "s2", "s3", "s4", "s5"};
 
-    // Test initial status.
-    long expected = (long) Math.pow(UNIQUE_ROWS, groupByColumns.length);
+    // Test initial status
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), expected, _errorMessage);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
-    // Test group key generation.
+    // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
   }
 
   @Test
   public void testArrayMapBasedSingleValue() {
-    // Cardinality product > Long.MAX_VALUE.
+    // Cardinality product larger than Long.MAX_VALUE
     String[] groupByColumns = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
-    // Test initial status.
+    // Test initial status
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE,
-        _errorMessage);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
-    // Test group key generation.
+    // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, SV_GROUP_KEY_BUFFER);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), 2);
   }
@@ -197,68 +227,132 @@ public class DictionaryBasedGroupKeyGeneratorTest {
    * Odd number index values should be different from even number index values.
    */
   private void compareSingleValueBuffer() {
-    Assert.assertTrue(SV_GROUP_KEY_BUFFER[0] != SV_GROUP_KEY_BUFFER[1], _errorMessage);
-    for (int i = 0; i < 20; i += 2) {
-      Assert.assertEquals(SV_GROUP_KEY_BUFFER[i], SV_GROUP_KEY_BUFFER[0], _errorMessage);
-      Assert.assertEquals(SV_GROUP_KEY_BUFFER[i + 1], SV_GROUP_KEY_BUFFER[1], _errorMessage);
+    assertTrue(SV_GROUP_KEY_BUFFER[0] != SV_GROUP_KEY_BUFFER[1], _errorMessage);
+    for (int i = 2; i < NUM_GROUPS; i += 2) {
+      assertEquals(SV_GROUP_KEY_BUFFER[i], SV_GROUP_KEY_BUFFER[0], _errorMessage);
+      assertEquals(SV_GROUP_KEY_BUFFER[i + 1], SV_GROUP_KEY_BUFFER[1], _errorMessage);
     }
   }
 
   @Test
   public void testArrayBasedMultiValue() {
-    // Cardinality product < threshold.
+    // Cardinality product (100 - 1,000) smaller than arrayBasedThreshold
     String[] groupByColumns = {"m1"};
 
-    // Test initial status.
+    // Test initial status
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     int groupKeyUpperBound = dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound();
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound,
-        _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
 
-    // Test group key generation.
+    // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, MV_GROUP_KEY_BUFFER);
     int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound,
-        _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
+    compareMultiValueBuffer();
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
+  }
+
+  @Test
+  public void tesIntMapBasedMultiValue() {
+    // Cardinality product (1,000,000 - 100,000,000) larger than arrayBasedThreshold but smaller than Integer.MAX_VALUE
+    String[] groupByColumns = {"m1", "m2", "s1"};
+
+    // Test initial status
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+
+    // Test group key generation
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, MV_GROUP_KEY_BUFFER);
+    int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
   }
 
   @Test
   public void testLongMapBasedMultiValue() {
-    // Cardinality product > threshold.
-    String[] groupByColumns = {"m1", "m2", "s1", "s2"};
+    // Cardinality product (10,000,000,000 - 1,000,000,000,000) larger than Integer.MAX_VALUE but smaller than LONG.MAX_VALUE
+    String[] groupByColumns = {"m1", "m2", "s1", "s2", "s3"};
 
-    // Test initial status.
+    // Test initial status
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
-    // Test group key generation.
+    // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, MV_GROUP_KEY_BUFFER);
     int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
   }
 
   @Test
   public void testArrayMapBasedMultiValue() {
-    // Cardinality product > Long.MAX_VALUE.
+    // Cardinality product larger than Long.MAX_VALUE
     String[] groupByColumns = {"m1", "m2", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
-    // Test initial status.
+    // Test initial status
     DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
-        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), ARRAY_BASED_THRESHOLD);
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns),
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT,
+            InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(),
+        InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
-    // Test group key generation.
+    // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, MV_GROUP_KEY_BUFFER);
     int numUniqueKeys = MV_GROUP_KEY_BUFFER[0].length + MV_GROUP_KEY_BUFFER[1].length;
-    Assert.assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
     testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numUniqueKeys);
+  }
+
+  @Test
+  public void testNumGroupsLimit() {
+    String[] groupByColumns = {"m1", "m2"};
+    int numGroupsLimit = 1;
+    // NOTE: arrayBasedThreshold must be smaller or equal to numGroupsLimit
+    DictionaryBasedGroupKeyGenerator dictionaryBasedGroupKeyGenerator =
+        new DictionaryBasedGroupKeyGenerator(_transformOperator, getExpressions(groupByColumns), numGroupsLimit,
+            numGroupsLimit);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getGlobalGroupKeyUpperBound(), numGroupsLimit, _errorMessage);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
+
+    // Test group key generation
+    dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_transformBlock, MV_GROUP_KEY_BUFFER);
+    assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numGroupsLimit, _errorMessage);
+    // Only the first key should be 0, all others should be GroupKeyGenerator.INVALID_ID (-1)
+    boolean firstKey = true;
+    for (int groupKey : MV_GROUP_KEY_BUFFER[0]) {
+      if (firstKey) {
+        assertEquals(groupKey, 0);
+        firstKey = false;
+      } else {
+        assertEquals(groupKey, GroupKeyGenerator.INVALID_ID);
+      }
+    }
+    for (int groupKey : MV_GROUP_KEY_BUFFER[1]) {
+      assertEquals(groupKey, GroupKeyGenerator.INVALID_ID);
+    }
+    for (int i = 2; i < NUM_GROUPS; i += 2) {
+      assertEquals(MV_GROUP_KEY_BUFFER[i], MV_GROUP_KEY_BUFFER[0], _errorMessage);
+      assertEquals(MV_GROUP_KEY_BUFFER[i + 1], MV_GROUP_KEY_BUFFER[1], _errorMessage);
+    }
+    testGetUniqueGroupKeys(dictionaryBasedGroupKeyGenerator.getUniqueGroupKeys(), numGroupsLimit);
   }
 
   private static TransformExpressionTree[] getExpressions(String[] columns) {
@@ -277,19 +371,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
    * Odd number index values should be different from even number index values.
    */
   private void compareMultiValueBuffer() {
-    int length0 = MV_GROUP_KEY_BUFFER[0].length;
-    int length1 = MV_GROUP_KEY_BUFFER[1].length;
-    int compareLength = Math.min(length0, length1);
-    for (int i = 0; i < compareLength; i++) {
-      Assert.assertTrue(MV_GROUP_KEY_BUFFER[0][i] != MV_GROUP_KEY_BUFFER[1][i], _errorMessage);
-    }
-    for (int i = 0; i < 20; i += 2) {
-      for (int j = 0; j < length0; j++) {
-        Assert.assertEquals(MV_GROUP_KEY_BUFFER[i][j], MV_GROUP_KEY_BUFFER[0][j], _errorMessage);
-      }
-      for (int j = 0; j < length1; j++) {
-        Assert.assertEquals(MV_GROUP_KEY_BUFFER[i + 1][j], MV_GROUP_KEY_BUFFER[1][j], _errorMessage);
-      }
+    assertFalse(Arrays.equals(MV_GROUP_KEY_BUFFER[0], MV_GROUP_KEY_BUFFER[1]), _errorMessage);
+    for (int i = 2; i < NUM_GROUPS; i += 2) {
+      assertEquals(MV_GROUP_KEY_BUFFER[i], MV_GROUP_KEY_BUFFER[0], _errorMessage);
+      assertEquals(MV_GROUP_KEY_BUFFER[i + 1], MV_GROUP_KEY_BUFFER[1], _errorMessage);
     }
   }
 
@@ -311,9 +396,9 @@ public class DictionaryBasedGroupKeyGeneratorTest {
       groupKeySet.add(groupKey._stringKey);
     }
 
-    Assert.assertEquals(count, numUniqueKeys, _errorMessage);
-    Assert.assertEquals(idSet.size(), numUniqueKeys, _errorMessage);
-    Assert.assertEquals(groupKeySet.size(), numUniqueKeys, _errorMessage);
+    assertEquals(count, numUniqueKeys, _errorMessage);
+    assertEquals(idSet.size(), numUniqueKeys, _errorMessage);
+    assertEquals(groupKeySet.size(), numUniqueKeys, _errorMessage);
   }
 
   @AfterClass

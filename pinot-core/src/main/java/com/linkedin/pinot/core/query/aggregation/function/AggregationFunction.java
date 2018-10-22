@@ -57,7 +57,7 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
    * Create a group-by result holder with the given initial capacity, max capacity and trim size for this function.
    */
   @Nonnull
-  GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize);
+  GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity);
 
   /**
    * Perform aggregation on the given projection block value sets.

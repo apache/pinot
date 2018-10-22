@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.plan.maker;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
@@ -37,56 +39,57 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * The <code>InstancePlanMakerImplV2</code> class is the default implementation of {@link PlanMaker}.
  */
 public class InstancePlanMakerImplV2 implements PlanMaker {
+  private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
+
   public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY = "max.init.group.holder.capacity";
   public static final int DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
+  public static final String NUM_GROUPS_LIMIT = "num.groups.limit";
+  public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
 
   private final int _maxInitialResultHolderCapacity;
+  // Limit on number of groups, beyond which no new group will be created
+  private final int _numGroupsLimit;
 
-  // TODO: Fix the runtime trimming and add back the number of aggregation groups limit.
-  // TODO: Need to revisit the runtime trimming solution. Current solution will remove group keys that should not be removed.
-  // Limit on number of groups, beyond which results are truncated.
-  // private static final String NUM_AGGR_GROUPS_LIMIT = "num.aggr.groups.limit";
-  // private static final int DEFAULT_NUM_AGGR_GROUPS_LIMIT = 100_000;
-  private final int _numAggrGroupsLimit = Integer.MAX_VALUE;
-
-  /**
-   * Default constructor.
-   */
+  @VisibleForTesting
   public InstancePlanMakerImplV2() {
     _maxInitialResultHolderCapacity = DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
-//    _numAggrGroupsLimit = DEFAULT_NUM_AGGR_GROUPS_LIMIT;
+    _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
   }
 
   /**
    * Constructor for usage when client requires to pass {@link QueryExecutorConfig} to this class.
    * <ul>
-   *   <li>Set limit on number of aggregation groups in query result.</li>
+   *   <li>Set limit on the initial result holder capacity</li>
+   *   <li>Set limit on number of groups returned from each segment and combined result</li>
    * </ul>
    *
-   * @param queryExecutorConfig query executor configuration.
+   * @param queryExecutorConfig Query executor configuration
    */
   public InstancePlanMakerImplV2(QueryExecutorConfig queryExecutorConfig) {
     _maxInitialResultHolderCapacity = queryExecutorConfig.getConfig()
         .getInt(MAX_INITIAL_RESULT_HOLDER_CAPACITY_KEY, DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
-
-    // TODO: Read the limit on number of aggregation groups in query result from config.
-    // _numAggrGroupsLimit = queryExecutorConfig.getConfig().getInt(NUM_AGGR_GROUPS_LIMIT, DEFAULT_NUM_AGGR_GROUPS_LIMIT);
-    // LOGGER.info("Maximum number of allowed groups for group-by query results: '{}'", _numAggrGroupsLimit);
+    _numGroupsLimit = queryExecutorConfig.getConfig().getInt(NUM_GROUPS_LIMIT, DEFAULT_NUM_GROUPS_LIMIT);
+    Preconditions.checkState(_maxInitialResultHolderCapacity <= _numGroupsLimit,
+        "Invalid configuration: maxInitialResultHolderCapacity: %d must be smaller or equal to numGroupsLimit: %d",
+        _maxInitialResultHolderCapacity, _numGroupsLimit);
+    LOGGER.info("Initializing plan maker with maxInitialResultHolderCapacity: {}, numGroupsLimit: {}",
+        _maxInitialResultHolderCapacity, _numGroupsLimit);
   }
 
   @Override
   public PlanNode makeInnerSegmentPlan(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     if (brokerRequest.isSetAggregationsInfo()) {
-
       if (brokerRequest.isSetGroupBy()) {
         return new AggregationGroupByPlanNode(indexSegment, brokerRequest, _maxInitialResultHolderCapacity,
-            _numAggrGroupsLimit);
+            _numGroupsLimit);
       } else {
         if (isFitForMetadataBasedPlan(brokerRequest, indexSegment)) {
           return new MetadataBasedAggregationPlanNode(indexSegment, brokerRequest.getAggregationsInfo());
@@ -117,7 +120,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     for (IndexSegment indexSegment : indexSegments) {
       planNodes.add(makeInnerSegmentPlan(indexSegment, brokerRequest));
     }
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, brokerRequest, executorService, timeOutMs);
+    CombinePlanNode combinePlanNode =
+        new CombinePlanNode(planNodes, brokerRequest, executorService, timeOutMs, _numGroupsLimit);
 
     return new GlobalPlanImplV0(new InstanceResponsePlanNode(combinePlanNode));
   }

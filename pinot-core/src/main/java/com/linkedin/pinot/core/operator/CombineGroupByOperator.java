@@ -39,6 +39,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,18 +52,20 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
   private static final String OPERATOR_NAME = "CombineGroupByOperator";
 
   private final List<Operator> _operators;
-  private final ExecutorService _executorService;
   private final BrokerRequest _brokerRequest;
+  private final ExecutorService _executorService;
   private final long _timeOutMs;
+  private final int _numGroupsLimit;
 
-  public CombineGroupByOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
-      BrokerRequest brokerRequest) {
+  public CombineGroupByOperator(List<Operator> operators, BrokerRequest brokerRequest, ExecutorService executorService,
+      long timeOutMs, int numGroupsLimit) {
     Preconditions.checkArgument(brokerRequest.isSetAggregationsInfo() && brokerRequest.isSetGroupBy());
 
     _operators = operators;
-    _executorService = executorService;
     _brokerRequest = brokerRequest;
+    _executorService = executorService;
     _timeOutMs = timeOutMs;
+    _numGroupsLimit = numGroupsLimit;
   }
 
   /**
@@ -87,21 +90,22 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
   @Override
   protected IntermediateResultsBlock getNextBlock() {
     int numOperators = _operators.size();
-    final CountDownLatch operatorLatch = new CountDownLatch(numOperators);
-    final ConcurrentHashMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
-    final ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
+    CountDownLatch operatorLatch = new CountDownLatch(numOperators);
+    ConcurrentHashMap<String, Object[]> resultsMap = new ConcurrentHashMap<>();
+    AtomicInteger numGroups = new AtomicInteger();
+    ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     AggregationFunctionContext[] aggregationFunctionContexts =
         AggregationFunctionUtils.getAggregationFunctionContexts(_brokerRequest.getAggregationsInfo(), null);
-    final int numAggregationFunctions = aggregationFunctionContexts.length;
-    final AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
+    int numAggregationFunctions = aggregationFunctionContexts.length;
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       aggregationFunctions[i] = aggregationFunctionContexts[i].getAggregationFunction();
     }
 
     Future[] futures = new Future[numOperators];
     for (int i = 0; i < numOperators; i++) {
-      final int index = i;
+      int index = i;
       futures[i] = _executorService.submit(new TraceRunnable() {
         @SuppressWarnings("unchecked")
         @Override
@@ -127,9 +131,12 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
                 resultsMap.compute(groupKey._stringKey, (key, value) -> {
                   if (value == null) {
-                    value = new Object[numAggregationFunctions];
-                    for (int i = 0; i < numAggregationFunctions; i++) {
-                      value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                    if (numGroups.get() < _numGroupsLimit) {
+                      numGroups.getAndIncrement();
+                      value = new Object[numAggregationFunctions];
+                      for (int i = 0; i < numAggregationFunctions; i++) {
+                        value[i] = aggregationGroupByResult.getResultForKey(groupKey, i);
+                      }
                     }
                   } else {
                     for (int i = 0; i < numAggregationFunctions; i++) {
