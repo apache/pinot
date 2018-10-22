@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.realtime.stream;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 
 
 /**
@@ -45,7 +47,8 @@ public abstract class StreamConsumerFactory {
    * @param clientId
    * @return
    */
-  public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, Schema schema);
+  public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
+      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics);
 
   /**
    * Creates a metadata provider which provides partition specific metadata

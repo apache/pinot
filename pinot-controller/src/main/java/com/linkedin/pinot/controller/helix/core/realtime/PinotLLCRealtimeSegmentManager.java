@@ -217,7 +217,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public void setupNewTable(TableConfig tableConfig, IdealState emptyIdealState) throws InvalidConfigException {
     final StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
-    int partitionCount = getKafkaPartitionCount(streamConfig);
+    int partitionCount = getPartitionCount(streamConfig);
     List<String> currentSegments = getExistingSegments(tableConfig.getTableName());
     // Make sure that there are no low-level segments existing.
     if (currentSegments != null) {
@@ -688,12 +688,12 @@ public class PinotLLCRealtimeSegmentManager {
     return new LLCRealtimeSegmentZKMetadata(znRecord);
   }
 
-  protected long getKafkaPartitionOffset(StreamConfig streamConfig, final String offsetCriteria,
+  protected long getPartitionOffset(StreamConfig streamConfig, final String offsetCriteria,
       int partitionId) {
-    return getPartitionOffset(offsetCriteria, partitionId, streamConfig);
+    return fetchPartitionOffset(streamConfig, offsetCriteria, partitionId);
   }
 
-  private long getPartitionOffset(final String offsetCriteria, int partitionId, StreamConfig streamConfig) {
+  private long fetchPartitionOffset(StreamConfig streamConfig, final String offsetCriteria, int partitionId) {
     PartitionOffsetFetcher partitionOffsetFetcher =
         new PartitionOffsetFetcher(offsetCriteria, partitionId, streamConfig);
     try {
@@ -810,7 +810,7 @@ public class PinotLLCRealtimeSegmentManager {
     metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
   }
 
-  protected int getKafkaPartitionCount(StreamConfig streamConfig) {
+  protected int getPartitionCount(StreamConfig streamConfig) {
     return PinotTableIdealStateBuilder.getPartitionCount(streamConfig);
   }
 
@@ -884,7 +884,7 @@ public class PinotLLCRealtimeSegmentManager {
   public void validateLLCSegments(final TableConfig tableConfig) {
     final String tableNameWithType = tableConfig.getTableName();
     final StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
-    final int partitionCount = getKafkaPartitionCount(streamConfig);
+    final int partitionCount = getPartitionCount(streamConfig);
     HelixHelper.updateIdealState(_helixManager, tableNameWithType, new Function<IdealState, IdealState>() {
       @Nullable
       @Override
@@ -1118,7 +1118,8 @@ public class PinotLLCRealtimeSegmentManager {
 
             // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
             // depending on what the prev segment had.
-            long startOffset = getKafkaPartitionOffset(streamConfig, KAFKA_SMALLEST_OFFSET, partition);
+            // TODO: can add method fetchSmallestOffset to {@link StreamMetadataProvider} to be able to handle fetching smallest offset of generic stream
+            long startOffset = getPartitionOffset(streamConfig, KAFKA_SMALLEST_OFFSET, partition);
             LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType,
                 partition);
             startOffset = getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset,
@@ -1252,7 +1253,7 @@ public class PinotLLCRealtimeSegmentManager {
     for (int partition : newPartitions) {
       LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableName, partition,
           nextSeqNum);
-      long startOffset = getKafkaPartitionOffset(streamConfig, offsetCriteria, partition);
+      long startOffset = getPartitionOffset(streamConfig, offsetCriteria, partition);
 
       LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableName, partition);
 

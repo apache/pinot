@@ -383,7 +383,7 @@ public abstract class ClusterTest extends ControllerTest {
       // LLC
       streamConfigs.put(
           StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-          StreamConfig.ConsumerType.SIMPLE.toString());
+          StreamConfig.ConsumerType.LOWLEVEL.toString());
       streamConfigs.put(KafkaStreamConfigProperties.constructStreamProperty(
           KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST), kafkaBrokerList);
     } else {

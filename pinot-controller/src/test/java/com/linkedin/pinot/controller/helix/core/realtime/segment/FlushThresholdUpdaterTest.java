@@ -20,7 +20,8 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.partition.PartitionAssignment;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import java.io.IOException;
@@ -36,7 +37,7 @@ import org.testng.annotations.Test;
 
 
 public class FlushThresholdUpdaterTest {
-  private static final long DESIRED_SEGMENT_SIZE = KafkaLowLevelStreamProviderConfig.getDefaultDesiredSegmentSizeBytes();
+  private static final long DESIRED_SEGMENT_SIZE = StreamConfig.getDefaultDesiredSegmentSizeBytes();
   private Random _random;
   private Map<String, double[][]> datasetGraph;
 
@@ -282,13 +283,20 @@ public class FlushThresholdUpdaterTest {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     String streamTopic = "aTopic";
+    String consumerFactoryClass = SimpleConsumerFactory.class.getName();
+    String decoderClass = KafkaAvroMessageDecoder.class.getName();
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigs.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
         streamTopic);
     streamConfigs.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
-        StreamConfig.ConsumerType.SIMPLE.toString());
+        StreamConfig.ConsumerType.LOWLEVEL.toString());
+    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigs.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
     tableConfigBuilder.setStreamConfigs(streamConfigs);
 
     // flush size set
@@ -320,7 +328,7 @@ public class FlushThresholdUpdaterTest {
     Assert.assertEquals(flushThresholdUpdaterSame.getClass(), SegmentSizeBasedFlushThresholdUpdater.class);
     Assert.assertEquals(flushThresholdUpdater, flushThresholdUpdaterSame);
     Assert.assertEquals(((SegmentSizeBasedFlushThresholdUpdater)(flushThresholdUpdater)).getDesiredSegmentSizeBytes(),
-        KafkaLowLevelStreamProviderConfig.getDefaultDesiredSegmentSizeBytes());
+        StreamConfig.getDefaultDesiredSegmentSizeBytes());
 
     // flush size reset to some number - default received, map cleared of segmentsize based
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "20000");
@@ -336,7 +344,7 @@ public class FlushThresholdUpdaterTest {
     flushThresholdUpdater = manager.getFlushThresholdUpdater(realtimeTableConfig);
     Assert.assertEquals(flushThresholdUpdater.getClass(), SegmentSizeBasedFlushThresholdUpdater.class);
     Assert.assertEquals(((SegmentSizeBasedFlushThresholdUpdater)(flushThresholdUpdater)).getDesiredSegmentSizeBytes(),
-        KafkaLowLevelStreamProviderConfig.getDefaultDesiredSegmentSizeBytes());
+        StreamConfig.getDefaultDesiredSegmentSizeBytes());
 
     // Clear the flush threshold updater for this table.
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "20000");

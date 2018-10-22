@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
@@ -43,11 +45,16 @@ public class SimpleConsumerFactory extends StreamConsumerFactory {
   /**
    * Creates a stream level consumer for a kafka stream
    * @param clientId
+   * @param tableName
+   * @param schema
+   * @param instanceZKMetadata
+   * @param serverMetrics
    * @return
    */
   @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, Schema schema) {
-    return new KafkaStreamLevelConsumer(clientId, _streamConfig, schema);
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
+      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, instanceZKMetadata, serverMetrics);
   }
 
   /**

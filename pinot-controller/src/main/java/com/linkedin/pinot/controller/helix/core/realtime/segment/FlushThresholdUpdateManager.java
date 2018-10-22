@@ -16,7 +16,7 @@
 package com.linkedin.pinot.controller.helix.core.realtime.segment;
 
 import com.linkedin.pinot.common.config.TableConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.PartitionLevelStreamConfig;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
@@ -43,16 +43,15 @@ public class FlushThresholdUpdateManager {
    */
   public FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
     final String tableName = realtimeTableConfig.getTableName();
-    final KafkaLowLevelStreamProviderConfig streamProviderConfig = new KafkaLowLevelStreamProviderConfig();
-    // We instantiate KafkaLowLevelStreamProviderConfig locally here,
-    // so it is ok to pass null for schema and instancezk metadata
-    streamProviderConfig.init(realtimeTableConfig, null, null);
+    PartitionLevelStreamConfig streamConfig =
+        new PartitionLevelStreamConfig(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
 
-    final int tableFlushSize = streamProviderConfig.getSizeThresholdToFlushSegment();
-    final long desiredSegmentSize = streamProviderConfig.getDesiredSegmentSizeBytes();
+    final int tableFlushSize = streamConfig.getFlushThresholdRows();
+    final long desiredSegmentSize = streamConfig.getFlushSegmentDesiredSizeBytes();
 
     if (tableFlushSize == 0) {
-      return _flushThresholdUpdaterMap.computeIfAbsent(tableName, k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize));
+      return _flushThresholdUpdaterMap.computeIfAbsent(tableName,
+          k -> new SegmentSizeBasedFlushThresholdUpdater(desiredSegmentSize));
     } else {
       _flushThresholdUpdaterMap.remove(tableName);
       return new DefaultFlushThresholdUpdater(tableFlushSize);
