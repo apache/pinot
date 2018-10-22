@@ -111,6 +111,7 @@ public class PinotHelixResourceManager {
   private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS = 500L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
+  public static final String APPEND = "APPEND";
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
@@ -1504,14 +1505,18 @@ public class PinotHelixResourceManager {
           "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
     }
     LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
+    TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore,
+            offlineSegmentZKMetadata.getTableName());
 
-    if (shouldSendMessage(offlineSegmentZKMetadata)) {
+    if (shouldSendMessage(tableConfig)) {
       // Send a message to the servers to update the segment.
       // We return success even if we are not able to send messages (which can happen if no servers are alive).
       // For segment validation errors we would have returned earlier.
       sendSegmentRefreshMessage(offlineSegmentZKMetadata);
-      // Send a message to the brokers to update the table's time boundary info.
-      sendTimeboundaryRefreshMessageToBrokers(offlineSegmentZKMetadata);
+      // Send a message to the brokers to update the table's time boundary info if the segment push type is APPEND.
+      if (shouldSendTimeboundaryRefreshMsg(tableConfig)) {
+        sendTimeboundaryRefreshMessageToBrokers(offlineSegmentZKMetadata);
+      }
     } else {
       // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
       if (!updateExistedSegment(offlineSegmentZKMetadata)) {
@@ -1536,6 +1541,7 @@ public class PinotHelixResourceManager {
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
     recipientCriteria.setInstanceName("%");
     recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setResource(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     recipientCriteria.setDataSource(Criteria.DataSource.EXTERNALVIEW);
     // The brokerResource field in the EXTERNALVIEW stores the offline table name in the Partition subfield.
     recipientCriteria.setPartition(offlineTableName);
@@ -1604,9 +1610,10 @@ public class PinotHelixResourceManager {
   }
 
   // Check to see if the table has been explicitly configured to NOT use messageBasedRefresh.
-  private boolean shouldSendMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
-    final String rawTableName = segmentZKMetadata.getTableName();
-    TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
+  private boolean shouldSendMessage(TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return true;
+    }
     TableCustomConfig customConfig = tableConfig.getCustomConfig();
     if (customConfig != null) {
       Map<String, String> customConfigMap = customConfig.getCustomConfigs();
@@ -1618,6 +1625,15 @@ public class PinotHelixResourceManager {
       }
     }
     return true;
+  }
+
+  // Return true iff the segment push type is APPEND (i.e., there is time column info the segments).
+  private boolean shouldSendTimeboundaryRefreshMsg(TableConfig tableConfig) {
+    if (tableConfig == null) {
+      return false;
+    }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    return validationConfig != null && APPEND.equals(validationConfig.getSegmentPushType());
   }
 
   /**

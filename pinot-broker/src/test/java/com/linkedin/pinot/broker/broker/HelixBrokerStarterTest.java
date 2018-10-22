@@ -56,6 +56,7 @@ public class HelixBrokerStarterTest {
   private static final String RAW_DINING_TABLE_NAME = "dining";
   private static final String DINING_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_DINING_TABLE_NAME);
   private static final String COFFEE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("coffee");
+  private final Configuration _pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
 
   private ZkClient _zkClient;
   private HelixAdmin _helixAdmin;
@@ -72,12 +73,11 @@ public class HelixBrokerStarterTest {
     _pinotResourceManager.start();
     _helixAdmin = _pinotResourceManager.getHelixAdmin();
 
-    final Configuration pinotHelixBrokerProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf();
-    pinotHelixBrokerProperties.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
-    pinotHelixBrokerProperties.addProperty(
+    _pinotHelixBrokerProperties.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, 8943);
+    _pinotHelixBrokerProperties.addProperty(
             CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL, 100L);
     _helixBrokerStarter =
-        new HelixBrokerStarter(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, pinotHelixBrokerProperties);
+        new HelixBrokerStarter(HELIX_CLUSTER_NAME, ZkStarter.DEFAULT_ZK_STR, _pinotHelixBrokerProperties);
 
     ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME,
         ZkStarter.DEFAULT_ZK_STR, 5, true);
@@ -220,17 +220,18 @@ public class HelixBrokerStarterTest {
   }
 
   @Test
-  public void testTableSegmentRefresh() throws Exception {
+  public void testTimeBoundaryUpdate() throws Exception {
     // This test verifies that when the segments of an offline table are refreshed, the TimeBoundaryInfo is also updated
     // to a newer timestamp.
+    long currentTimeBoundary = 10;
     TimeBoundaryService.TimeBoundaryInfo tbi =
             _helixBrokerStarter.getHelixExternalViewBasedRouting().
                     getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
 
-    Assert.assertEquals(tbi.getTimeValue(), "10");
+    Assert.assertEquals(tbi.getTimeValue(), Long.toString(currentTimeBoundary));
 
     List<String> segmentNames = _pinotResourceManager.getSegmentsFor(DINING_TABLE_NAME);
-    long endTime = 20L;
+    long endTime = currentTimeBoundary + 10;
     // Refresh all 5 segments.
     for (String segment : segmentNames) {
       OfflineSegmentZKMetadata offlineSegmentZKMetadata =
@@ -246,11 +247,12 @@ public class HelixBrokerStarterTest {
     waitForPredicate(() -> {
       TimeBoundaryService.TimeBoundaryInfo timeBoundaryInfo = _helixBrokerStarter.getHelixExternalViewBasedRouting().
               getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
-      return 10 < Long.parseLong(timeBoundaryInfo.getTimeValue());
-    }, 30000L);
+      return currentTimeBoundary < Long.parseLong(timeBoundaryInfo.getTimeValue());
+    }, 5 * _pinotHelixBrokerProperties.getLong(
+            CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL));
     tbi = _helixBrokerStarter.getHelixExternalViewBasedRouting().
             getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);
-    Assert.assertTrue(10 < Long.parseLong(tbi.getTimeValue()));
+    Assert.assertTrue(currentTimeBoundary < Long.parseLong(tbi.getTimeValue()));
   }
 
   private void waitForPredicate(Callable<Boolean> predicate, long timeout) {

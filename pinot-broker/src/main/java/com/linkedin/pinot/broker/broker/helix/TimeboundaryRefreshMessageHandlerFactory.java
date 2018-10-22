@@ -49,7 +49,19 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
                                                     long sleepTimeInMilliseconds) {
         _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
         // Start a background thread to execute the TimeboundaryInfo update requests.
-        new Thread(new TimeboundaryRefreshMessageExecutor(sleepTimeInMilliseconds)).start();
+        Thread tbiUpdateThread = new Thread(new TimeboundaryRefreshMessageExecutor(sleepTimeInMilliseconds));
+        tbiUpdateThread.start();
+        // Shutting down the thread when the application quits.
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                try {
+                    tbiUpdateThread.stop();
+                } catch (final Exception e) {
+                    LOGGER.error("Caught exception while running shutdown hook for tbi update", e);
+                }
+            }
+        });
     }
 
     @Override
@@ -91,7 +103,7 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
             HelixTaskResult result = new HelixTaskResult();
             // Put the segment refresh request to a request queue instead of executing immediately. This will reduce the
             // burst of requests when a large number of segments are updated in a short time span.
-            _tablesToRefreshmap.put(_tableNameWithType, true);
+            _tablesToRefreshmap.put(_tableNameWithType, Boolean.TRUE);
             result.setSuccess(true);
             return result;
         }
@@ -128,5 +140,6 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
                 }
             }
         }
+
     }
 }
