@@ -82,13 +82,13 @@ public class TimeBucketF1ScoreFunction implements ScoreFunction {
       }
 
       for (MergedAnomalyResultDTO labeledAnomaly : groupedLabeled.get(key)) {
-        if (labeledAnomaly.getFeedback().getFeedbackType() == AnomalyFeedbackType.ANOMALY) {
+        if (labeledAnomaly.getFeedback().getFeedbackType().isAnomaly()) {
           totalLabeledTrueAnomaliesTime += (labeledAnomaly.getEndTime() - labeledAnomaly.getStartTime());
         }
         for (long time = labeledAnomaly.getStartTime(); time < labeledAnomaly.getEndTime(); time += BUCKET_SIZE) {
           if (resultAnomalyTimes.contains(time / BUCKET_SIZE)) {
             totalOverlappedTime += BUCKET_SIZE;
-            if (labeledAnomaly.getFeedback().getFeedbackType() == AnomalyFeedbackType.ANOMALY) {
+            if (labeledAnomaly.getFeedback().getFeedbackType().isAnomaly()) {
               totalTruePositiveTime += BUCKET_SIZE;
             }
           }

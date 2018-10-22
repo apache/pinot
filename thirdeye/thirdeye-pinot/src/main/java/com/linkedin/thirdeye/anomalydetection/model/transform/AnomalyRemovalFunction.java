@@ -165,10 +165,10 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
     } else {
       feedbackType = feedback.getFeedbackType();
     }
-    if (feedbackType == null || feedbackType.equals(AnomalyFeedbackType.NO_FEEDBACK)) {
+    if (feedbackType == null || feedbackType.isUnresolved()) {
       isUserLabeledAnomaly = null;
     } else {
-      isUserLabeledAnomaly = !feedbackType.equals(AnomalyFeedbackType.NOT_ANOMALY);
+      isUserLabeledAnomaly = feedbackType.isAnomaly();
     }
     return isUserLabeledAnomaly;
   }

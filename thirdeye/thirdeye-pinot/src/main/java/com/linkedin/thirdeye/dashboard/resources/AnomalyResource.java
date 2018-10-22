@@ -725,8 +725,7 @@ public class AnomalyResource {
       if (feedback == null) {
         continue;
       }
-      if (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY) || feedback.getFeedbackType()
-          .equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
+      if (feedback.getFeedbackType().isAnomaly()) {
         return true;
       }
     }
