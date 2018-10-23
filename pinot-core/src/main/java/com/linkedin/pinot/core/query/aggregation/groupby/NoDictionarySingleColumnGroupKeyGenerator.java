@@ -44,19 +44,21 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private final TransformExpressionTree _groupByExpression;
   private final FieldSpec.DataType _dataType;
   private final Map _groupKeyMap;
-  private int _numGroupKeys = 0;
+  private final int _globalGroupIdUpperBound;
 
-  public NoDictionarySingleColumnGroupKeyGenerator(@Nonnull TransformOperator transformOperator,
-      @Nonnull TransformExpressionTree groupByExpression) {
+  private int _numGroups = 0;
+
+  public NoDictionarySingleColumnGroupKeyGenerator(TransformOperator transformOperator,
+      TransformExpressionTree groupByExpression, int numGroupsLimit) {
     _groupByExpression = groupByExpression;
     _dataType = transformOperator.getResultMetadata(_groupByExpression).getDataType();
     _groupKeyMap = createGroupKeyMap(_dataType);
+    _globalGroupIdUpperBound = numGroupsLimit;
   }
 
   @Override
   public int getGlobalGroupKeyUpperBound() {
-    // Since there's no dictionary, we cannot find the cardinality
-    return Integer.MAX_VALUE;
+    return _globalGroupIdUpperBound;
   }
 
   @Override
@@ -162,19 +164,15 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     return new GroupKeyIterator(_groupKeyMap);
   }
 
-  @Override
-  public void purgeKeys(@Nonnull int[] keysToPurge) {
-    // TODO: Implement purging.
-    throw new UnsupportedOperationException("Purging keys not yet supported in GroupKeyGenerator without dictionary.");
-  }
-
   @SuppressWarnings("unchecked")
   private int getKeyForValue(int value) {
     Int2IntMap map = (Int2IntMap) _groupKeyMap;
     int groupId = map.get(value);
     if (groupId == INVALID_ID) {
-      groupId = _numGroupKeys;
-      map.put(value, _numGroupKeys++);
+      if (_numGroups < _globalGroupIdUpperBound) {
+        groupId = _numGroups;
+        map.put(value, _numGroups++);
+      }
     }
     return groupId;
   }
@@ -184,8 +182,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     Long2IntMap map = (Long2IntMap) _groupKeyMap;
     int groupId = map.get(value);
     if (groupId == INVALID_ID) {
-      groupId = _numGroupKeys;
-      map.put(value, _numGroupKeys++);
+      if (_numGroups < _globalGroupIdUpperBound) {
+        groupId = _numGroups;
+        map.put(value, _numGroups++);
+      }
     }
     return groupId;
   }
@@ -195,8 +195,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     Float2IntMap map = (Float2IntMap) _groupKeyMap;
     int groupId = map.get(value);
     if (groupId == INVALID_ID) {
-      groupId = _numGroupKeys;
-      map.put(value, _numGroupKeys++);
+      if (_numGroups < _globalGroupIdUpperBound) {
+        groupId = _numGroups;
+        map.put(value, _numGroups++);
+      }
     }
     return groupId;
   }
@@ -206,8 +208,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     Double2IntMap map = (Double2IntMap) _groupKeyMap;
     int groupId = map.get(value);
     if (groupId == INVALID_ID) {
-      groupId = _numGroupKeys;
-      map.put(value, _numGroupKeys++);
+      if (_numGroups < _globalGroupIdUpperBound) {
+        groupId = _numGroups;
+        map.put(value, _numGroups++);
+      }
     }
     return groupId;
   }
@@ -217,8 +221,10 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
     Object2IntMap<String> map = (Object2IntMap<String>) _groupKeyMap;
     int groupId = map.getInt(value);
     if (groupId == INVALID_ID) {
-      groupId = _numGroupKeys;
-      map.put(value, _numGroupKeys++);
+      if (_numGroups < _globalGroupIdUpperBound) {
+        groupId = _numGroups;
+        map.put(value, _numGroups++);
+      }
     }
     return groupId;
   }

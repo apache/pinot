@@ -61,8 +61,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   @Nonnull
   @Override
-  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
-    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
