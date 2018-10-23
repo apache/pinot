@@ -54,9 +54,9 @@ import javax.annotation.Nonnull;
  *     dictionary ids of all the group-by columns and map them onto contiguous group ids. (ARRAY_MAP_BASED)
  *   </li>
  * </ul>
- * <p>All the logic is maintained internally, and to the outside world, the group ids are always int type.
+ * <p>All the logic is maintained internally, and to the outside world, the group ids are always int type, and are
+ * bounded by the number of groups limit (globalGroupIdUpperBound is always smaller or equal to numGroupsLimit).
  */
-// TODO: Revisit to make trimming work. Currently trimming is disabled
 public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final TransformExpressionTree[] _groupByExpressions;
   private final int _numGroupByExpressions;
@@ -73,25 +73,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
 
-//  // The following data structures are used for trimming group keys.
-//  // TODO: the key will be contiguous so we should use array here.
-//  // Reverse mapping for trimming group keys
-//  private Int2LongOpenHashMap _idToGroupKey;
-//
-//  // Reverse mapping from KeyIds to groupKeys. purgeGroupKeys takes an array of keyIds to remove,
-//  // this map tracks keyIds to groupKeys, to serve the purging.
-//  private Int2ObjectOpenHashMap<IntArrayList> _idToArrayGroupKey;
-//
-//  // Enum to reflect if trimming of group keys is ON or OFF. Once ON, we need to start tracking
-//  // the keyIds that are removed.
-//  private enum TrimMode {
-//    OFF,
-//    ON
-//  }
-//  private TrimMode _trimMode;
+  public DictionaryBasedGroupKeyGenerator(TransformOperator transformOperator,
+      TransformExpressionTree[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold) {
+    assert numGroupsLimit >= arrayBasedThreshold;
 
-  public DictionaryBasedGroupKeyGenerator(@Nonnull TransformOperator transformOperator,
-      @Nonnull TransformExpressionTree[] groupByExpressions, int arrayBasedThreshold) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
 
@@ -120,14 +105,14 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     if (longOverflow) {
-      _globalGroupIdUpperBound = Integer.MAX_VALUE;
+      _globalGroupIdUpperBound = numGroupsLimit;
       _rawKeyHolder = new ArrayMapBasedHolder();
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
-        _globalGroupIdUpperBound = Integer.MAX_VALUE;
+        _globalGroupIdUpperBound = numGroupsLimit;
         _rawKeyHolder = new LongMapBasedHolder();
       } else {
-        _globalGroupIdUpperBound = (int) cardinalityProduct;
+        _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
         if (cardinalityProduct > arrayBasedThreshold) {
           _rawKeyHolder = new IntMapBasedHolder();
         } else {
@@ -176,11 +161,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   @Override
   public Iterator<GroupKey> getUniqueGroupKeys() {
     return _rawKeyHolder.iterator();
-  }
-
-  @Override
-  public void purgeKeys(@Nonnull int[] keyIdsToPurge) {
-    // TODO: Make trimming work
   }
 
   private interface RawKeyHolder extends Iterable<GroupKey> {
@@ -278,6 +258,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private class IntMapBasedHolder implements RawKeyHolder {
     private final Int2IntOpenHashMap _rawKeyToGroupIdMap = new Int2IntOpenHashMap();
 
+    private int _numGroups = 0;
+
     public IntMapBasedHolder() {
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
     }
@@ -308,15 +290,17 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private int getGroupId(int rawKey) {
       int groupId = _rawKeyToGroupIdMap.get(rawKey);
       if (groupId == INVALID_ID) {
-        groupId = _rawKeyToGroupIdMap.size();
-        _rawKeyToGroupIdMap.put(rawKey, groupId);
+        if (_numGroups < _globalGroupIdUpperBound) {
+          groupId = _numGroups;
+          _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
+        }
       }
       return groupId;
     }
 
     @Override
     public int getGroupIdUpperBound() {
-      return _rawKeyToGroupIdMap.size();
+      return _numGroups;
     }
 
     @Nonnull
@@ -452,6 +436,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private class LongMapBasedHolder implements RawKeyHolder {
     private final Long2IntOpenHashMap _rawKeyToGroupIdMap = new Long2IntOpenHashMap();
 
+    private int _numGroups = 0;
+
     public LongMapBasedHolder() {
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
     }
@@ -483,15 +469,17 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private int getGroupId(long rawKey) {
       int groupId = _rawKeyToGroupIdMap.get(rawKey);
       if (groupId == INVALID_ID) {
-        groupId = _rawKeyToGroupIdMap.size();
-        _rawKeyToGroupIdMap.put(rawKey, groupId);
+        if (_numGroups < _globalGroupIdUpperBound) {
+          groupId = _numGroups;
+          _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
+        }
       }
       return groupId;
     }
 
     @Override
     public int getGroupIdUpperBound() {
-      return _rawKeyToGroupIdMap.size();
+      return _numGroups;
     }
 
     @Nonnull
@@ -618,6 +606,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private class ArrayMapBasedHolder implements RawKeyHolder {
     private final Object2IntOpenHashMap<IntArray> _rawKeyToGroupIdMap = new Object2IntOpenHashMap<>();
 
+    private int _numGroups = 0;
+
     public ArrayMapBasedHolder() {
       _rawKeyToGroupIdMap.defaultReturnValue(INVALID_ID);
     }
@@ -649,15 +639,17 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     private int getGroupId(IntArray rawKey) {
       int groupId = _rawKeyToGroupIdMap.getInt(rawKey);
       if (groupId == INVALID_ID) {
-        groupId = _rawKeyToGroupIdMap.size();
-        _rawKeyToGroupIdMap.put(rawKey, groupId);
+        if (_numGroups < _globalGroupIdUpperBound) {
+          groupId = _numGroups;
+          _rawKeyToGroupIdMap.put(rawKey, _numGroups++);
+        }
       }
       return groupId;
     }
 
     @Override
     public int getGroupIdUpperBound() {
-      return _rawKeyToGroupIdMap.size();
+      return _numGroups;
     }
 
     @Nonnull
@@ -800,7 +792,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       return result;
     }
 
-    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+    @SuppressWarnings({"Contract", "EqualsWhichDoesntCheckParameterClass"})
     @Override
     public boolean equals(Object obj) {
       int[] that = ((IntArray) obj)._elements;

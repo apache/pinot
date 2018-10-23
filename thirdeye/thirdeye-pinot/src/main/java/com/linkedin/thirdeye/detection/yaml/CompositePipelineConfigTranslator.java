@@ -124,10 +124,12 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       if (filterYamls == null || filterYamls.isEmpty()) {
         nestedPipelines.add(detectionProperties);
       } else {
+        List<Map<String, Object>> filterNestedProperties = Collections.singletonList(detectionProperties);
         for (Map<String, Object> filterProperties : filterYamls) {
-          nestedPipelines.addAll(buildStageWrapperProperties(AnomalyFilterStageWrapper.class.getName(),
-              filterProperties, Collections.singletonList(detectionProperties)));
+          filterNestedProperties = new ArrayList<>(buildStageWrapperProperties(AnomalyFilterStageWrapper.class.getName(),
+              filterProperties, filterNestedProperties));
         }
+        nestedPipelines.addAll(filterNestedProperties);
       }
     }
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();

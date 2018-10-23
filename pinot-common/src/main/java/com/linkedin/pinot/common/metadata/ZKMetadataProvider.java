@@ -52,20 +52,26 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
   private static final String PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX = "/CONFIGS/CLUSTER";
 
-  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName, ZNRecord znRecord) {
-    propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeTableName), znRecord, AccessOption.PERSISTENT);
+  public static void setRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String realtimeTableName,
+      ZNRecord znRecord) {
+    propertyStore.set(constructPropertyStorePathForResourceConfig(realtimeTableName), znRecord,
+        AccessOption.PERSISTENT);
   }
 
-  public static void setOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName, ZNRecord znRecord) {
+  public static void setOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName,
+      ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForResourceConfig(offlineTableName), znRecord, AccessOption.PERSISTENT);
   }
 
-  public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, InstanceZKMetadata instanceZKMetadata) {
+  public static void setInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      InstanceZKMetadata instanceZKMetadata) {
     ZNRecord znRecord = instanceZKMetadata.toZNRecord();
-    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceZKMetadata.getId()), znRecord, AccessOption.PERSISTENT);
+    propertyStore.set(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceZKMetadata.getId()), znRecord,
+        AccessOption.PERSISTENT);
   }
 
-  public static InstanceZKMetadata getInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String instanceId) {
+  public static InstanceZKMetadata getInstanceZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String instanceId) {
     ZNRecord znRecord = propertyStore.get(StringUtil.join("/", PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX, instanceId), null,
         AccessOption.PERSISTENT);
     if (znRecord == null) {
@@ -98,26 +104,30 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_CLUSTER_CONFIGS_PREFIX, controllerConfigKey);
   }
 
-  public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource, String segmentName) {
+  public static boolean isSegmentExisted(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceNameForResource,
+      String segmentName) {
     return propertyStore.exists(constructPropertyStorePathForSegment(resourceNameForResource, segmentName),
         AccessOption.PERSISTENT);
   }
 
-  public static void removeResourceSegmentsFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+  public static void removeResourceSegmentsFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String resourceName) {
     String propertyStorePath = constructPropertyStorePathForResource(resourceName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }
   }
 
-  public static void removeResourceConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+  public static void removeResourceConfigFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String resourceName) {
     String propertyStorePath = constructPropertyStorePathForResourceConfig(resourceName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
     }
   }
 
-  public static void removeInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore, String offlineTableName) {
+  public static void removeInstancePartitionAssignmentFromPropertyStore(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String offlineTableName) {
     String propertyStorePath = constructPropertyStorePathForInstancePartitions(offlineTableName);
     if (propertyStore.exists(propertyStorePath, AccessOption.PERSISTENT)) {
       propertyStore.remove(propertyStorePath, AccessOption.PERSISTENT);
@@ -261,7 +271,7 @@ public class ZKMetadataProvider {
       }
     }
     // Try to fetch offline schema if realtime schema does not exist
-    if (schema == null &&  (tableType == null || tableType == CommonConstants.Helix.TableType.OFFLINE)) {
+    if (schema == null && (tableType == null || tableType == CommonConstants.Helix.TableType.OFFLINE)) {
       schema = getSchema(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
     }
     if (schema != null) {
@@ -335,7 +345,8 @@ public class ZKMetadataProvider {
     return resultList;
   }
 
-  public static void setClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore, boolean isSingleTenantCluster) {
+  public static void setClusterTenantIsolationEnabled(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      boolean isSingleTenantCluster) {
     final ZNRecord znRecord;
     final String path = constructPropertyStorePathForControllerConfig(CLUSTER_TENANT_ISOLATION_ENABLED_KEY);
 

@@ -43,6 +43,7 @@ public class CombinePlanNode implements PlanNode {
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
   private final long _timeOutMs;
+  private final int _numGroupsLimit;
 
   /**
    * Constructor for the class.
@@ -53,11 +54,12 @@ public class CombinePlanNode implements PlanNode {
    * @param timeOutMs Time out in milliseconds for query execution (not for planning phase)
    */
   public CombinePlanNode(List<PlanNode> planNodes, BrokerRequest brokerRequest, ExecutorService executorService,
-      long timeOutMs) {
+      long timeOutMs, int numGroupsLimit) {
     _planNodes = planNodes;
     _brokerRequest = brokerRequest;
     _executorService = executorService;
     _timeOutMs = timeOutMs;
+    _numGroupsLimit = numGroupsLimit;
   }
 
   @Override
@@ -115,7 +117,7 @@ public class CombinePlanNode implements PlanNode {
     // TODO: use the same combine operator for both aggregation and selection query.
     if (_brokerRequest.isSetAggregationsInfo() && _brokerRequest.getGroupBy() != null) {
       // Aggregation group-by query
-      return new CombineGroupByOperator(operators, _executorService, _timeOutMs, _brokerRequest);
+      return new CombineGroupByOperator(operators, _brokerRequest, _executorService, _timeOutMs, _numGroupsLimit);
     } else {
       // Selection or aggregation only query
       return new CombineOperator(operators, _executorService, _timeOutMs, _brokerRequest);

@@ -199,7 +199,7 @@ public class HelixServerStarter {
     if (_helixServerConfig.getBoolean(CommonConstants.Server.CONFIG_OF_STARTER_ENABLE_SEGMENTS_LOADING_CHECK, CommonConstants.Server.DEFAULT_STARTER_ENABLE_SEGMENTS_LOADING_CHECK)) {
       long startTime = System.currentTimeMillis();
       int serverStarterTimeout = _helixServerConfig.getInt(CommonConstants.Server.CONFIG_OF_STARTER_TIMEOUT_IN_SECONDS, CommonConstants.Server.DEFAULT_STARTER_TIMEOUT_IN_SECONDS);
-      long endTime = TimeUnit.SECONDS.toMillis(startTime + serverStarterTimeout);
+      long endTime = startTime + TimeUnit.SECONDS.toMillis(serverStarterTimeout);
       boolean allSegmentsLoaded = false;
       while (System.currentTimeMillis() < endTime) {
         long timeToSleep = Math.min(TimeUnit.MILLISECONDS.toSeconds(endTime - System.currentTimeMillis()), 10 /* Sleep 10 seconds as default*/);

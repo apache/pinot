@@ -16,9 +16,6 @@
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.Pairs.IntObjectPair;
-import com.linkedin.pinot.core.util.IntObjectIndexedPriorityQueue;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
 
 /**
@@ -26,64 +23,26 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
  */
 public class ObjectGroupByResultHolder implements GroupByResultHolder {
   private final int _maxCapacity;
-  private final int _trimSize;
-  private final boolean _minHeap;
 
   private int _resultHolderCapacity;
-  private StorageMode _storageMode;
   private Object[] _resultArray;
-  private Int2ObjectOpenHashMap _resultMap;
-  private IntObjectIndexedPriorityQueue _priorityQueue;
 
   /**
    * Constructor for the class.
    *
-   * @param initialCapacity Initial capacity of result holder
-   * @param maxCapacity Max capacity of result holder
-   * @param trimSize maximum number of groups returned after trimming.
-   * @param minOrder Min ordering for trim (in case of min aggregation functions)
+   * @param initialCapacity Initial capacity of the result holder
+   * @param maxCapacity Maximum capacity of the result holder
    */
-  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize, boolean minOrder) {
-    _resultArray = new Object[initialCapacity];
-    _resultHolderCapacity = initialCapacity;
-    _storageMode = StorageMode.ARRAY_STORAGE;
+  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity) {
     _maxCapacity = maxCapacity;
-    _trimSize = trimSize;
-    _minHeap = !minOrder; // Max order requires minHeap for trimming results, and vice-versa
 
-    _resultMap = null;
+    _resultHolderCapacity = initialCapacity;
+    _resultArray = new Object[initialCapacity];
   }
 
-  /**
-   * Constructor for the class, assumes max ordering for trim.
-   *
-   * @param initialCapacity Initial capacity of result holder
-   * @param maxCapacity Max capacity of result holder
-   * @param trimSize maximum number of groups returned after trimming.
-   */
-  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
-    this(initialCapacity, maxCapacity, trimSize, false /* minOrdering */);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @param capacity
-   */
   @Override
   public void ensureCapacity(int capacity) {
     Preconditions.checkArgument(capacity <= _maxCapacity);
-
-    // Nothing to be done for map mode.
-    if (_storageMode == StorageMode.MAP_STORAGE) {
-      return;
-    }
-
-    // If object is not comparable, we cannot use a priority queue and cannot compare.
-    if (capacity > _trimSize && (_resultArray[0] instanceof Comparable)) {
-      switchToMapMode(capacity);
-      return;
-    }
 
     if (capacity > _resultHolderCapacity) {
       int copyLength = _resultHolderCapacity;
@@ -98,91 +57,31 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * Array based result holder assumes group by key fit within integer.
-   * This is a valid assumption as ArrayBasedResultHolder gets instantiated
-   * iff groupKey are less than 1M.
-   *
-   * @param groupKey
-   * @return
-   */
   @Override
   public double getDoubleResult(int groupKey) {
-    throw new RuntimeException(
-        "Unsupported method getDoubleResult (returning double) for class " + getClass().getName());
+    throw new UnsupportedOperationException();
   }
 
   @Override
   @SuppressWarnings("unchecked")
   public <T> T getResult(int groupKey) {
-    return (T) ((_storageMode == StorageMode.ARRAY_STORAGE) ? _resultArray[groupKey] : _resultMap.get(groupKey));
+    if (groupKey == GroupKeyGenerator.INVALID_ID) {
+      return null;
+    } else {
+      return (T) _resultArray[groupKey];
+    }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param groupKey
-   * @param newValue
-   */
   @Override
   public void setValueForKey(int groupKey, double newValue) {
-    throw new RuntimeException(
-        "Unsupported method 'putValueForKey' (with double param) for class " + getClass().getName());
+    throw new UnsupportedOperationException();
   }
 
   @SuppressWarnings("unchecked")
   @Override
   public void setValueForKey(int groupKey, Object newValue) {
-    if (_storageMode == StorageMode.ARRAY_STORAGE) {
+    if (groupKey != GroupKeyGenerator.INVALID_ID) {
       _resultArray[groupKey] = newValue;
-    } else {
-      _resultMap.put(groupKey, newValue);
-      _priorityQueue.put(groupKey, (Comparable) newValue);
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * Keys with 'lowest' values (as per the sort order) are trimmed away to reduce the size to _trimSize.
-   *
-   * @return Array of keys that were trimmed.
-   */
-  @Override
-  public int[] trimResults() {
-    if (_storageMode == StorageMode.ARRAY_STORAGE) {
-      return EMPTY_ARRAY; // Still in array mode, trimming has not kicked in yet.
-    }
-
-    int numKeysToRemove = _resultMap.size() - _trimSize;
-    int[] removedGroupKeys = new int[numKeysToRemove];
-
-    for (int i = 0; i < numKeysToRemove; i++) {
-      IntObjectPair pair = _priorityQueue.poll();
-      int groupKey = pair.getIntValue();
-      _resultMap.remove(groupKey);
-      removedGroupKeys[i] = groupKey;
-    }
-    return removedGroupKeys;
-  }
-
-  /**
-   * Helper method to switch the storage from array mode to map mode.
-   *
-   * @param initialPriorityQueueSize Initial size of priority queue
-   */
-  @SuppressWarnings("unchecked")
-  private void switchToMapMode(int initialPriorityQueueSize) {
-    _storageMode = StorageMode.MAP_STORAGE;
-    _resultMap = new Int2ObjectOpenHashMap(_resultArray.length);
-
-    _priorityQueue = new IntObjectIndexedPriorityQueue(initialPriorityQueueSize, _minHeap);
-    for (int id = 0; id < _resultArray.length; id++) {
-      _resultMap.put(id, _resultArray[id]);
-      _priorityQueue.put(id, (Comparable) _resultArray[id]);
-    }
-    _resultArray = null;
   }
 }

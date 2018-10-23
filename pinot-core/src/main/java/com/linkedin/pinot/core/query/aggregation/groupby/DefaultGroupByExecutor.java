@@ -38,20 +38,12 @@ import javax.annotation.Nonnull;
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
   // Thread local (reusable) array for single-valued group keys
-  private static final ThreadLocal<int[]> THREAD_LOCAL_SV_GROUP_KEYS = new ThreadLocal<int[]>() {
-    @Override
-    protected int[] initialValue() {
-      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-  };
+  private static final ThreadLocal<int[]> THREAD_LOCAL_SV_GROUP_KEYS =
+      ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
 
   // Thread local (reusable) array for multi-valued group keys
-  private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS = new ThreadLocal<int[][]>() {
-    @Override
-    protected int[][] initialValue() {
-      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
-  };
+  private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS =
+      ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][]);
 
   protected final int _numFunctions;
   protected final AggregationFunction[] _functions;
@@ -104,13 +96,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize group key generator
     if (_hasNoDictionaryGroupByExpression) {
       if (numGroupByExpressions == 1) {
-        _groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0]);
+        _groupKeyGenerator =
+            new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0], numGroupsLimit);
       } else {
-        _groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions);
+        _groupKeyGenerator =
+            new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit);
       }
     } else {
-      _groupKeyGenerator =
-          new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, maxInitialResultHolderCapacity);
+      _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, numGroupsLimit,
+          maxInitialResultHolderCapacity);
     }
 
     // Initialize result holders
@@ -118,7 +112,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
     _resultHolders = new GroupByResultHolder[_numFunctions];
     for (int i = 0; i < _numFunctions; i++) {
-      _resultHolders[i] = _functions[i].createGroupByResultHolder(initialCapacity, maxNumResults, numGroupsLimit);
+      _resultHolders[i] = _functions[i].createGroupByResultHolder(initialCapacity, maxNumResults);
     }
 
     // Initialize map from document Id to group key
@@ -134,6 +128,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   @Override
   public void process(@Nonnull TransformBlock transformBlock) {
     // Generate group keys
+    // NOTE: groupKeyGenerator will limit the number of groups. Once reaching limit, no new group will be generated
     if (_hasMVGroupByExpression) {
       _groupKeyGenerator.generateKeysForBlock(transformBlock, _mvGroupKeys);
     } else {
@@ -145,16 +140,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     for (int i = 0; i < _numFunctions; i++) {
       GroupByResultHolder resultHolder = _resultHolders[i];
       resultHolder.ensureCapacity(capacityNeeded);
-
       aggregate(transformBlock, length, i);
-
-      // Result holder limits the max number of group keys (default 100k), if the number of groups
-      // exceeds beyond that limit, groups with lower values (as per sort order) are trimmed.
-      // Once result holder trims those groups, the group key generator needs to purge them.
-      if (!_hasNoDictionaryGroupByExpression) {
-        int[] trimmedKeys = resultHolder.trimResults();
-        _groupKeyGenerator.purgeKeys(trimmedKeys);
-      }
     }
   }
 

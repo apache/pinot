@@ -311,6 +311,10 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       }
       bean.setAnomalyFeedbackId(feedbackDTO.getId());
     }
+    for(MergedAnomalyResultDTO child: entity.getChildren()){
+      child.setFeedback(feedbackDTO);
+      this.updateAnomalyFeedback(child);
+    }
     genericPojoDao.update(bean);
   }
 

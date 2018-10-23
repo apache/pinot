@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -49,7 +50,8 @@ public class CombinePlanNodeTest {
         }
       });
     }
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, null, _executorService, 0);
+    CombinePlanNode combinePlanNode =
+        new CombinePlanNode(planNodes, null, _executorService, 0, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
@@ -75,7 +77,8 @@ public class CombinePlanNodeTest {
         }
       });
     }
-    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, null, _executorService, 0);
+    CombinePlanNode combinePlanNode =
+        new CombinePlanNode(planNodes, null, _executorService, 0, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
     try {
       combinePlanNode.run();
     } catch (RuntimeException e) {
