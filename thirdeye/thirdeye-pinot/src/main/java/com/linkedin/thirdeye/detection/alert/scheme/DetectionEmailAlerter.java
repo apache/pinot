@@ -27,6 +27,7 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.alert.AlertUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
@@ -54,6 +55,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final Comparator<AnomalyResult> COMPARATOR_DESC =
       (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
   private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
+  private static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
 
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
@@ -91,10 +93,12 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
       DetectionAlertFilterRecipients recipients = entry.getKey();
       Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
 
-      if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
-        recipients.getTo().retainAll(this.thirdeyeConfig.getEmailWhitelist());
-        recipients.getCc().retainAll(this.thirdeyeConfig.getEmailWhitelist());
-        recipients.getBcc().retainAll(this.thirdeyeConfig.getEmailWhitelist());
+      List<String> emailWhitelist = ConfigUtils.getList(
+          this.thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY).get(EMAIL_WHITELIST_KEY));
+      if (!emailWhitelist.isEmpty()) {
+        recipients.getTo().retainAll(emailWhitelist);
+        recipients.getCc().retainAll(emailWhitelist);
+        recipients.getBcc().retainAll(emailWhitelist);
       }
 
       if (recipients.getTo().isEmpty()) {

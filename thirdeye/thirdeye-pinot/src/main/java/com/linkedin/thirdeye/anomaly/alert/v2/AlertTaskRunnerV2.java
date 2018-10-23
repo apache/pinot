@@ -68,6 +68,7 @@ import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailFormatterConfig
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportConfigCollection;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.ReportMetricConfig;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import freemarker.template.Configuration;
@@ -107,6 +108,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
   public static final String CHARSET = "UTF-8";
+  public static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
 
   private final MergedAnomalyResultManager anomalyMergedResultDAO;
   private final AlertConfigManager alertConfigDAO;
@@ -310,8 +312,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         }
 
         // whitelisted recipients only
-        if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
-          recipientsForThisGroup = retainWhitelisted(recipientsForThisGroup, thirdeyeConfig.getEmailWhitelist());
+        List<String> emailWhitelist = ConfigUtils.getList(
+            this.thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY).get(EMAIL_WHITELIST_KEY));
+        if (!emailWhitelist.isEmpty()) {
+          recipientsForThisGroup = retainWhitelisted(recipientsForThisGroup, emailWhitelist);
         }
 
         EmailEntity emailEntity = emailContentFormatter
@@ -425,8 +429,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           template.process(templateData, out);
 
           DetectionAlertFilterRecipients recipients = alertConfig.getReceiverAddresses();
-          if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
-            recipients = retainWhitelisted(recipients, thirdeyeConfig.getEmailWhitelist());
+          List<String> emailWhitelist = ConfigUtils.getList(
+              this.thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY).get(EMAIL_WHITELIST_KEY));
+          if (!emailWhitelist.isEmpty()) {
+            recipients = retainWhitelisted(recipients, emailWhitelist);
           }
 
           // Send email

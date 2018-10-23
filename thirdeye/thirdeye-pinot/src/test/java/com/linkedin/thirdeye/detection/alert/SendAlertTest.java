@@ -149,9 +149,15 @@ public class SendAlertTest {
     DetectionAlertTaskInfo alertTaskInfo = new DetectionAlertTaskInfo();
     alertTaskInfo.setDetectionAlertConfigId(alertConfigId);
 
-    TaskContext taskContext = new TaskContext();
+    Map<String, Object> smtpProperties = new HashMap<>();
+    Map<String, Map<String, Object>> alerterProps = new HashMap<>();
+    alerterProps.put("smtpConfiguration", smtpProperties);
+
     ThirdEyeAnomalyConfiguration thirdEyeConfig = new ThirdEyeAnomalyConfiguration();
     thirdEyeConfig.setDashboardHost(DASHBOARD_HOST_VALUE);
+    thirdEyeConfig.setAlerterConfiguration(alerterProps);
+
+    TaskContext taskContext = new TaskContext();
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeConfig);
 
     taskRunner.execute(alertTaskInfo, taskContext);
