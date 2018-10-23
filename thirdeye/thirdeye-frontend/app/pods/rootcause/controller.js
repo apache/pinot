@@ -1,4 +1,4 @@
-import { observer, computed } from '@ember/object';
+import { observer, computed, get, set, getProperties, setProperties } from '@ember/object';
 import { later, debounce } from '@ember/runloop';
 import { reads, gt, or } from '@ember/object/computed';
 import { inject as service } from '@ember/service';
@@ -224,7 +224,7 @@ export default Controller.extend({
    * @type {string}
    */
   anomalyFeedback: computed('anomalyUrn', 'entities', function () {
-    const { anomalyUrn, entities } = this.getProperties('anomalyUrn', 'entities');
+    const { anomalyUrn, entities } = getProperties(this, 'anomalyUrn', 'entities');
 
     try {
       return entities[anomalyUrn].attributes.status[0];
@@ -254,7 +254,7 @@ export default Controller.extend({
    */
   init() {
     this._super(...arguments);
-    this.setProperties({
+    setProperties(this, {
       invisibleUrns: new Set(),
       hoverUrns: new Set(),
       filteredUrns: new Set(),
@@ -299,7 +299,7 @@ export default Controller.extend({
     'activeTab',
     function () {
       const { context, selectedUrns, sizeMetricUrns, entitiesService, timeseriesService, aggregatesService, breakdownsService, scoresService, anomalyFunctionService, activeTab, setupMode } =
-        this.getProperties('context', 'selectedUrns', 'sizeMetricUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
+        getProperties(this, 'context', 'selectedUrns', 'sizeMetricUrns', 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'scoresService', 'anomalyFunctionService', 'activeTab', 'setupMode');
       if (!context || !selectedUrns) {
         return;
       }
@@ -322,7 +322,7 @@ export default Controller.extend({
 
       if (activeTab === ROOTCAUSE_TAB_METRICS
           || activeTab === ROOTCAUSE_TAB_TREND) {
-        const entities = this.get('entitiesService.entities'); // cache may be stale, fetch directly
+        const entities = get(this, 'entitiesService.entities'); // cache may be stale, fetch directly
         filterPrefix(Object.keys(entities), 'thirdeye:metric:').forEach(urn => relatedMetricUrns.add(urn));
       }
 
@@ -398,7 +398,7 @@ export default Controller.extend({
     'setupMode',
     function () {
       const { setupMode } =
-        this.getProperties('setupMode');
+        getProperties(this, 'setupMode');
 
       switch (setupMode) {
         case ROOTCAUSE_SETUP_MODE_NONE:
@@ -439,7 +439,7 @@ export default Controller.extend({
     'context',
     function () {
       const { timeseriesService, anomalyFunctionService, context } =
-        this.getProperties('timeseriesService', 'anomalyFunctionService', 'context');
+        getProperties(this, 'timeseriesService', 'anomalyFunctionService', 'context');
 
       const timeseries = Object.assign({}, timeseriesService.timeseries);
 
@@ -484,10 +484,25 @@ export default Controller.extend({
   metricUrn: computed(
     'context',
     function () {
-      const { context } = this.getProperties('context');
+      const { context } = getProperties(this, 'context');
       const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
       if (!metricUrns) { return false; }
       return metricUrns[0];
+    }
+  ),
+
+  /**
+   * Number of data point remaining in service queue for metrics table
+   * @type {int}
+   */
+  metricsPendingCount: computed(
+    'aggregatesService.pending',
+    'scoresService.pending',
+    function () {
+      const nAggregates = get(this, 'aggregatesService.pending').size;
+      const nScores = get(this, 'scoresService.pending').size;
+
+      return nAggregates + nScores;
     }
   ),
 
@@ -498,7 +513,7 @@ export default Controller.extend({
   sizeMetricUrn: computed(
     'sizeMetricUrns',
     function () {
-      const { sizeMetricUrns } = this.getProperties('sizeMetricUrns');
+      const { sizeMetricUrns } = getProperties(this, 'sizeMetricUrns');
       const metricUrns = filterPrefix(sizeMetricUrns, 'thirdeye:metric:');
       if (!metricUrns) { return false; }
       return metricUrns[0];
@@ -512,7 +527,7 @@ export default Controller.extend({
   anomalyUrn: computed(
     'anomalyUrns',
     function () {
-      const { context } = this.getProperties('context');
+      const { context } = getProperties(this, 'context');
 
       const anomalyEventUrn = filterPrefix(context.anomalyUrns, 'thirdeye:event:anomaly:');
 
@@ -532,7 +547,7 @@ export default Controller.extend({
     'invisibleUrns',
     function () {
       const { selectedUrns, invisibleUrns } =
-        this.getProperties('selectedUrns', 'invisibleUrns');
+        getProperties(this, 'selectedUrns', 'invisibleUrns');
 
       const urns = new Set(selectedUrns);
       [...invisibleUrns].forEach(urn => urns.delete(urn));
@@ -549,7 +564,7 @@ export default Controller.extend({
     'entities',
     'filteredUrns',
     function () {
-      const { entities, filteredUrns } = this.getProperties('entities', 'filteredUrns');
+      const { entities, filteredUrns } = getProperties(this, 'entities', 'filteredUrns');
       return filterObject(entities, (e) => filteredUrns.has(e.urn));
     }
   ),
@@ -567,7 +582,7 @@ export default Controller.extend({
   eventFilterEntities: computed(
     'entities',
     function () {
-      const { entities } = this.getProperties('entities');
+      const { entities } = getProperties(this, 'entities');
       return filterObject(entities, (e) => e.type == 'event');
     }
   ),
@@ -581,7 +596,7 @@ export default Controller.extend({
     'invisibleUrns',
     'hoverUrns',
     function () {
-      const { entities, invisibleUrns, hoverUrns } = this.getProperties('entities', 'invisibleUrns', 'hoverUrns');
+      const { entities, invisibleUrns, hoverUrns } = getProperties(this, 'entities', 'invisibleUrns', 'hoverUrns');
       const visibleUrns = [...hoverUrns].filter(urn => !invisibleUrns.has(urn));
       return filterObject(entities, (e) => visibleUrns.has(e.urn));
     }
@@ -601,6 +616,8 @@ export default Controller.extend({
   isLoadingScores: gt('scoresService.pending.size', 0),
 
   isLoadingAnomalyFunctions: gt('anomalyFunctionService.pending.size', 0),
+
+  isLoadingMetricData: or('isLoadingAggregates', 'isLoadingScores'),
 
   loadingFrameworks: reads('entitiesService.pending'),
 
@@ -639,7 +656,7 @@ export default Controller.extend({
     'username',
     function () {
       const { sessionOwner, sessionPermissions, username } =
-        this.getProperties('sessionOwner', 'sessionPermissions', 'username');
+        getProperties(this, 'sessionOwner', 'sessionPermissions', 'username');
 
       if (sessionPermissions === ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE) {
         return true;
@@ -655,7 +672,7 @@ export default Controller.extend({
     'username',
     function () {
       const { sessionId, sessionOwner, sessionPermissions, username } =
-        this.getProperties('sessionId', 'sessionOwner', 'sessionPermissions', 'username');
+        getProperties(this, 'sessionId', 'sessionOwner', 'sessionPermissions', 'username');
 
       // NOTE: these conditions are temporary until full design for session copy is available
 
@@ -676,9 +693,9 @@ export default Controller.extend({
    * @private
    */
   _updateSession(sessionId) {
-    const { username, metricId, anomalyId } = this.getProperties('username', 'metricId', 'anomalyId');
+    const { username, metricId, anomalyId } = getProperties(this, 'username', 'metricId', 'anomalyId');
 
-    this.setProperties({
+    setProperties(this, {
       sessionId,
       sessionUpdatedBy: username,
       sessionUpdatedTime: makeTime().valueOf(),
@@ -707,7 +724,7 @@ export default Controller.extend({
    */
   _makeSession() {
     const { context, selectedUrns, sessionId, sessionName, sessionText, sessionOwner, sessionPermissions } =
-      this.getProperties('context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText', 'sessionOwner', 'sessionPermissions');
+      getProperties(this, 'context', 'selectedUrns', 'sessionId', 'sessionName', 'sessionText', 'sessionOwner', 'sessionPermissions');
 
     return {
       id: sessionId,
@@ -734,7 +751,7 @@ export default Controller.extend({
    */
   _checkSession() {
     const { sessionId, sessionUpdatedTime, sessionService } =
-      this.getProperties('sessionId', 'sessionUpdatedTime', 'sessionService');
+      getProperties(this, 'sessionId', 'sessionUpdatedTime', 'sessionService');
 
     if (!sessionId) { return; }
 
@@ -742,7 +759,7 @@ export default Controller.extend({
       .loadAsync(sessionId)
       .then((res) => {
         if (res.updated > sessionUpdatedTime) {
-          this.setProperties({
+          setProperties(this, {
             sessionUpdateWarning: `This investigation (${sessionId}) was updated by ${res.updatedBy} on ${makeTime(res.updated).format(dateFormatFull)}. Please refresh the page.`
           });
         }
@@ -756,7 +773,7 @@ export default Controller.extend({
    * @private
    */
   _onCheckSessionTimer() {
-    const { sessionId } = this.getProperties('sessionId');
+    const { sessionId } = getProperties(this, 'sessionId');
 
     if (!sessionId) { return; }
 
@@ -786,7 +803,7 @@ export default Controller.extend({
    */
   _updateAnomalyFeedbackDebounce() {
     const { anomalyUrn, anomalyFeedback, sessionText } =
-      this.getProperties('anomalyUrn', 'anomalyFeedback', 'sessionText');
+      getProperties(this, 'anomalyUrn', 'anomalyFeedback', 'sessionText');
 
     if (!anomalyUrn) { return; }
 
@@ -809,7 +826,7 @@ export default Controller.extend({
    */
   _setupContext() {
     const { context } =
-      this.getProperties('context');
+      getProperties(this, 'context');
 
     const contextMetricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
 
@@ -829,7 +846,7 @@ export default Controller.extend({
    */
   _setupSelected() {
     const { context, entities, scores, selectedUrns, loadingFrameworks, isLoadingScores } =
-      this.getProperties('context', 'entities', 'scores', 'selectedUrns', 'loadingFrameworks', 'isLoadingScores');
+      getProperties(this, 'context', 'entities', 'scores', 'selectedUrns', 'loadingFrameworks', 'isLoadingScores');
 
     const newSelectedUrns = new Set(selectedUrns);
 
@@ -869,12 +886,12 @@ export default Controller.extend({
 
     if (_.isEqual(selectedUrns, newSelectedUrns)) {
       if (loadingFrameworks.size <= 0) {
-        this.set('setupMode', ROOTCAUSE_SETUP_MODE_NONE);
+        set(this, 'setupMode', ROOTCAUSE_SETUP_MODE_NONE);
       }
       return;
     }
 
-    this.setProperties({
+    setProperties(this, {
       selectedUrns: newSelectedUrns,
       setupMode: (loadingFrameworks.size > 0 || isLoadingScores) ? ROOTCAUSE_SETUP_MODE_SELECTED : ROOTCAUSE_SETUP_MODE_NONE
     });
@@ -892,10 +909,10 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onSelection(updates) {
-      const { selectedUrns } = this.getProperties('selectedUrns');
+      const { selectedUrns } = getProperties(this, 'selectedUrns');
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => selectedUrns.add(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => selectedUrns.delete(urn));
-      this.setProperties({
+      setProperties(this, {
         selectedUrns: new Set(selectedUrns),
         sessionModified: true
       });
@@ -915,7 +932,7 @@ export default Controller.extend({
         focusUrns.add(toBaselineUrn(urn));
       });
 
-      this.set('focusedUrns', focusUrns);
+      set(this, 'focusedUrns', focusUrns);
     },
 
     /**
@@ -925,11 +942,11 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onVisibility(updates) {
-      const { invisibleUrns } = this.getProperties('invisibleUrns');
+      const { invisibleUrns } = getProperties(this, 'invisibleUrns');
       Object.keys(updates).filter(urn => updates[urn]).forEach(urn => invisibleUrns.delete(urn));
       Object.keys(updates).filter(urn => !updates[urn]).forEach(urn => invisibleUrns.add(urn));
 
-      this.setProperties({ invisibleUrns: new Set(invisibleUrns) });
+      setProperties(this, { invisibleUrns: new Set(invisibleUrns) });
     },
 
     /**
@@ -939,7 +956,7 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onContext(context) {
-      this.setProperties({ context, sessionModified: true });
+      setProperties(this, { context, sessionModified: true });
     },
 
     /**
@@ -949,7 +966,7 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onFilter(urns) {
-      this.setProperties({ filteredUrns: new Set(urns) });
+      setProperties(this, { filteredUrns: new Set(urns) });
     },
 
     /**
@@ -959,7 +976,7 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onChart(timeseriesMode) {
-      this.setProperties({ timeseriesMode });
+      setProperties(this, { timeseriesMode });
     },
 
     /**
@@ -970,7 +987,7 @@ export default Controller.extend({
      * @returns {undefined}
      */
     chartOnHover(urns, timestamp) {
-      this.setProperties({
+      setProperties(this, {
         hoverUrns: new Set(urns),
         hoverTimestamp: timestamp
       });
@@ -984,7 +1001,7 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onSessionChange(name, text) {
-      this.setProperties({
+      setProperties(this, {
         sessionName: name,
         sessionText: text,
         sessionModified: true
@@ -998,7 +1015,7 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onSessionSave() {
-      const { sessionService, sessionCanSave } = this.getProperties('sessionService', 'sessionCanSave');
+      const { sessionService, sessionCanSave } = getProperties(this, 'sessionService', 'sessionCanSave');
 
       if (sessionCanSave) {
         const session = this._makeSession();
@@ -1007,9 +1024,9 @@ export default Controller.extend({
           .saveAsync(session)
           .then(sessionId => this._updateSession(sessionId))
           .catch(() => {
-            const { routeErrors } = this.getProperties('routeErrors');
+            const { routeErrors } = getProperties(this, 'routeErrors');
             routeErrors.add('Could not save investigation');
-            this.setProperties({ routeErrors: new Set(routeErrors) });
+            setProperties(this, { routeErrors: new Set(routeErrors) });
           });
       }
     },
@@ -1020,10 +1037,10 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onSessionCopy() {
-      const { sessionId, sessionName, sessionService, sessionCanCopy } = this.getProperties('sessionId', 'sessionName', 'sessionService', 'sessionCanCopy');
+      const { sessionId, sessionName, sessionService, sessionCanCopy } = getProperties(this, 'sessionId', 'sessionName', 'sessionService', 'sessionCanCopy');
 
       if (sessionCanCopy) {
-        this.set('sessionName', `Copy of ${sessionName}`);
+        set(this, 'sessionName', `Copy of ${sessionName}`);
 
         const session = this._makeSession();
 
@@ -1035,9 +1052,9 @@ export default Controller.extend({
           .saveAsync(session)
           .then(sessionId => this._updateSession(sessionId))
           .catch(() => {
-            const { routeErrors } = this.getProperties('routeErrors');
+            const { routeErrors } = getProperties(this, 'routeErrors');
             routeErrors.add('Could not copy investigation');
-            this.setProperties({ routeErrors: new Set(routeErrors) });
+            setProperties(this, { routeErrors: new Set(routeErrors) });
           });
       }
     },
@@ -1049,7 +1066,7 @@ export default Controller.extend({
      * @param {String} feedback anomaly feedback type string
      */
     onFeedback(anomalyUrn, feedback) {
-      this.set('anomalyFeedback', feedback);
+      set(this, 'anomalyFeedback', feedback);
       this._updateAnomalyFeedback();
     },
 
@@ -1060,7 +1077,7 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onPrimaryChange(updates) {
-      const { context, sizeMetricUrns } = this.getProperties('context', 'sizeMetricUrns');
+      const { context, sizeMetricUrns } = getProperties(this, 'context', 'sizeMetricUrns');
 
       // NOTE: updates here do not conform to standard. Only newly selected urns are passed in, removed are omitted.
 
@@ -1089,7 +1106,7 @@ export default Controller.extend({
         metricUrns.forEach(urn => newSizeMetricUrns.add(urn));
       }
 
-      this.set('sizeMetricUrns', newSizeMetricUrns);
+      set(this, 'sizeMetricUrns', newSizeMetricUrns);
 
       const newContext = Object.assign({}, context, { urns });
       this.send('onContext', newContext);
@@ -1101,7 +1118,7 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onPrimarySelection() {
-      const { context } = this.getProperties('context');
+      const { context } = getProperties(this, 'context');
 
       const metricUrns = filterPrefix(context.urns, 'thirdeye:metric:');
       const currentUrns = metricUrns.map(toCurrentUrn);
@@ -1123,7 +1140,7 @@ export default Controller.extend({
      * @param {String} compareMode
      */
     onComparisonChange(start, end, compareMode) {
-      const { context } = this.getProperties('context');
+      const { context } = getProperties(this, 'context');
 
       // adjust display window if necessary
       let analysisRange = [...context.analysisRange];
@@ -1145,7 +1162,7 @@ export default Controller.extend({
 
     heatmapOnSizeMetric(sizeMetricUrn) {
       // TODO make this multi metric with "updates"
-      this.set('sizeMetricUrns', new Set([sizeMetricUrn]));
+      set(this, 'sizeMetricUrns', new Set([sizeMetricUrn]));
     },
 
     /**
@@ -1153,7 +1170,7 @@ export default Controller.extend({
      */
     clearErrors(type) {
       const { entitiesService, timeseriesService, aggregatesService, breakdownsService, anomalyFunctionService } =
-        this.getProperties('entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'anomalyFunctionService');
+        getProperties(this, 'entitiesService', 'timeseriesService', 'aggregatesService', 'breakdownsService', 'anomalyFunctionService');
 
       switch(type) {
         case ROOTCAUSE_SERVICE_ENTITIES:
@@ -1177,7 +1194,7 @@ export default Controller.extend({
           break;
 
         case ROOTCAUSE_SERVICE_ROUTE:
-          this.setProperties({ routeErrors: new Set() });
+          setProperties(this, { routeErrors: new Set() });
           break;
 
         case ROOTCAUSE_SERVICE_ALL:
@@ -1195,7 +1212,7 @@ export default Controller.extend({
      * Toggles the modal view
     */
     onEntityMappingClick() {
-      this.set('showEntityMappingModal', true);
+      set(this, 'showEntityMappingModal', true);
     },
 
     /**
@@ -1203,16 +1220,16 @@ export default Controller.extend({
      * Flushes the cache to reload the related entities
     */
     onModalSubmit() {
-      this.get('entitiesService').flushCache();
+      get(this, 'entitiesService').flushCache();
       this.notifyPropertyChange('context');
-      this.set('showEntityMappingModal', false);
+      set(this, 'showEntityMappingModal', false);
     },
 
     /**
      * Toggles the create event modal view
      */
     onCreateEventClick() {
-      this.set('showCreateEventModal', true);
+      set(this, 'showCreateEventModal', true);
     }
   }
 });
