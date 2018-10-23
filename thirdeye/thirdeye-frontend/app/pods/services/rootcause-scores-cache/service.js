@@ -1,12 +1,15 @@
 import Service from '@ember/service';
+import { inject as service } from '@ember/service';
 import {
   trimTimeRanges,
   filterPrefix,
   toBaselineRange
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import fetch from 'fetch';
 import _ from 'lodash';
+
+const ROOTCAUSE_SCORES_ENDPOINT = '/rootcause/query';
+const ROOTCAUSE_SCORES_PRIORITY = 20;
 
 export default Service.extend({
   scores: null, // {}
@@ -16,6 +19,8 @@ export default Service.extend({
   pending: null, // Set
 
   errors: null, // Set({ urn, error })
+
+  fetcher: service('services/rootcause-fetcher'),
 
   init() {
     this._super(...arguments);
@@ -38,6 +43,8 @@ export default Service.extend({
     let newScores;
     if(!_.isEqual(context, requestContext)) {
       // new analysis range: evict all, reload, keep stale copy of incoming
+      this.get('fetcher').resetPrefix(ROOTCAUSE_SCORES_ENDPOINT);
+
       missing = metrics;
       newPending = new Set(metrics);
       newScores = metrics.filter(urn => urn in scores).reduce((agg, urn) => { agg[urn] = scores[urn]; return agg; }, {});
@@ -57,11 +64,16 @@ export default Service.extend({
     }
 
     // metrics
-    fetch(this._makeUrl('metricAnalysis', requestContext, missing))
-      .then(checkStatus)
-      .then(res => this._extractScores(res, missing))
-      .then(res => this._complete(requestContext, res))
-      .catch(error => this._handleError(missing, error));
+    const fetcher = this.get('fetcher');
+
+    [...missing].sort().forEach((urn, i) => {
+      const url = this._makeUrl('metricAnalysis', requestContext, [urn]);
+      fetcher.fetch(url, ROOTCAUSE_SCORES_PRIORITY, i)
+        .then(checkStatus)
+        .then(res => this._extractScores(res, [urn]))
+        .then(res => this._complete(requestContext, res))
+        .catch(error => this._handleError([urn], error));
+    });
   },
 
   _complete(requestContext, incoming) {
@@ -84,7 +96,7 @@ export default Service.extend({
     const ranges = trimTimeRanges(context.anomalyRange, context.analysisRange);
 
     const baselineRange = toBaselineRange(ranges.anomalyRange, context.compareMode);
-    return `/rootcause/query?framework=${framework}` +
+    return `${ROOTCAUSE_SCORES_ENDPOINT}?framework=${framework}` +
       `&anomalyStart=${ranges.anomalyRange[0]}&anomalyEnd=${ranges.anomalyRange[1]}` +
       `&baselineStart=${baselineRange[0]}&baselineEnd=${baselineRange[1]}` +
       `&analysisStart=${ranges.analysisRange[0]}&analysisEnd=${ranges.analysisRange[1]}` +
