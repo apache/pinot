@@ -41,6 +41,9 @@ public class PinotCrypterFactory {
   /**
    * Initializes map of crypter classes at startup time. Will initialize map with lower case simple class names.
    * @param config
+   * Sample configuration:
+   * class.nooppinotcrypter = com.linkedin.pinot.core.crypt.NoOpPinotCrypter
+   * nooppinotcrypter.keyMap = sample_key
    */
   public static void init(Configuration config) {
     // Get schemes and their respective classes
@@ -66,7 +69,7 @@ public class PinotCrypterFactory {
     }
 
     if (!_crypterMap.containsKey(NOOP_PINOT_CRYPTER)) {
-      LOGGER.info("DefaultPinotCrypter not configured, adding as default");
+      LOGGER.info("NoOpPinotCrypter not configured, adding as default");
       _crypterMap.put(NOOP_PINOT_CRYPTER, new NoOpPinotCrypter());
     }
   }

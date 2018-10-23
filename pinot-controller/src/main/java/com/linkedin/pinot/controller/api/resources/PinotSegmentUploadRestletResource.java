@@ -270,7 +270,7 @@ public class PinotSegmentUploadRestletResource {
       // In this case, the noop crypter will not do any operations, so the encrypted and decrypted file will have the same
       // file path.
       if (crypterClassHeader == null) {
-        crypterClassHeader = NoOpPinotCrypter.class.getName();
+        crypterClassHeader = NoOpPinotCrypter.class.getSimpleName();
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       } else {
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
