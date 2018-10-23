@@ -172,7 +172,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class);
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
@@ -801,11 +800,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
-        LOGGER.info("Got response {}", response.toJsonString());
+        segmentLogger.info("Got response {}", response.toJsonString());
         break;
       }
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
-      LOGGER.info("Retrying after response {}", response.toJsonString());
+      segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
   }
 
@@ -1092,7 +1091,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _consumeStartTime = now;
     _consumeEndTime = now + _partitionLevelStreamConfig.getFlushThresholdTimeMillis();
 
-    LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
+    segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
         _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();
   }
