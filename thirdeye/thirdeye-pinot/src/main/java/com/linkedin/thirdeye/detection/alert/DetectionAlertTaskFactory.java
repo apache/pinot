@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detection.alert;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -34,11 +35,8 @@ public class DetectionAlertTaskFactory {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private final DataProvider provider;
-  private DetectionAlertConfigManager alertConfigDAO;
 
   public DetectionAlertTaskFactory() {
-    this.alertConfigDAO = DAO_REGISTRY.getDetectionAlertConfigManager();
-
     EventManager eventDAO = DAO_REGISTRY.getEventDAO();
     MetricConfigManager metricDAO = DAO_REGISTRY.getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAO_REGISTRY.getDatasetConfigDAO();
@@ -53,42 +51,31 @@ public class DetectionAlertTaskFactory {
         timeseriesLoader, aggregationLoader, new DetectionPipelineLoader());
   }
 
-  public DetectionAlertFilter loadAlertFilter(long detectionAlertConfigId, long endTime)
+  public DetectionAlertFilter loadAlertFilter(DetectionAlertConfigDTO alertConfig, long endTime)
       throws Exception {
-    DetectionAlertConfigDTO alertConfig = loadDetectionAlertConfig(detectionAlertConfigId);
+    Preconditions.checkNotNull(alertConfig);
     String className = alertConfig.getProperties().get(PROP_CLASS_NAME).toString();
+    LOG.debug("Loading Alert Filter : {}", className);
     Constructor<?> constructor = Class.forName(className)
         .getConstructor(DataProvider.class, DetectionAlertConfigDTO.class, long.class);
     return (DetectionAlertFilter) constructor.newInstance(provider, alertConfig, endTime);
 
   }
 
-  public Set<DetectionAlertScheme> loadAlertSchemes(long detectionAlertConfigId, TaskContext taskContext,
+  public Set<DetectionAlertScheme> loadAlertSchemes(DetectionAlertConfigDTO alertConfig, TaskContext taskContext,
       DetectionAlertFilterResult result) throws Exception {
-    DetectionAlertConfigDTO alertConfig = loadDetectionAlertConfig(detectionAlertConfigId);
-
+    Preconditions.checkNotNull(alertConfig);
     List<String> alertSchemes = alertConfig.getAlertSchemes();
     if (alertSchemes == null || alertSchemes.isEmpty()) {
       alertSchemes = Collections.singletonList(DEFAULT_ALERT_SCHEME);
     }
     Set<DetectionAlertScheme> detectionAlertSchemeSet = new HashSet<>();
     for (String alertSchemeClass : alertSchemes) {
+      LOG.debug("Loading Alert Scheme : {}", alertSchemeClass);
       Constructor<?> constructor = Class.forName(alertSchemeClass.trim())
           .getConstructor(DetectionAlertConfigDTO.class, TaskContext.class, DetectionAlertFilterResult.class);
       detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(alertConfig, taskContext, result));
     }
     return detectionAlertSchemeSet;
-  }
-
-  private DetectionAlertConfigDTO loadDetectionAlertConfig(long detectionAlertConfigId) {
-    DetectionAlertConfigDTO detectionAlertConfig = this.alertConfigDAO.findById(detectionAlertConfigId);
-    if (detectionAlertConfig == null) {
-      throw new RuntimeException("Cannot find detection alert config id " + detectionAlertConfigId);
-    }
-
-    if (detectionAlertConfig.getProperties() == null) {
-      LOG.warn(String.format("Detection alert %d contains no properties", detectionAlertConfigId));
-    }
-    return detectionAlertConfig;
   }
 }
