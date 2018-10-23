@@ -26,6 +26,7 @@ import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
 import com.linkedin.thirdeye.alert.feed.AnomalyFeed;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
@@ -95,6 +96,9 @@ import org.joda.time.DateTimeZone;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
 
 public class AlertTaskRunnerV2 implements TaskRunner {
 
@@ -313,7 +317,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         EmailEntity emailEntity = emailContentFormatter
             .getEmailEntity(alertConfig, recipientsForThisGroup, emailSubjectBuilder.toString(),
                 groupedAnomalyDTO.getId(), groupName, anomalyResultListOfGroup, new EmailContentFormatterContext());
-        EmailHelper.sendEmailWithEmailEntity(emailEntity, thirdeyeConfig.getSmtpConfiguration());
+        EmailHelper.sendEmailWithEmailEntity(emailEntity,
+            SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)));
         // Update notified flag
         if (alertGrouper instanceof DummyAlertGrouper) {
           // DummyAlertGroupFilter does not generate real GroupedAnomaly, so the flag has to be set on merged anomalies.
@@ -429,9 +434,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           String alertEmailSubject =
               String.format("Thirdeye data report : %s", alertConfig.getName());
           String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
-          EmailHelper
-              .sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
-                  alertEmailHtml, alertConfig.getFromAddress(), recipients);
+          EmailHelper.sendEmailWithHtml(email,
+              SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+              alertEmailSubject,
+              alertEmailHtml, alertConfig.getFromAddress(), recipients);
 
         } catch (Exception e) {
           throw new JobExecutionException(e);
@@ -455,10 +461,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     String textBody = String
         .format("%s%n%nException:%s", alertConfig.toString(), ExceptionUtils.getStackTrace(t));
     try {
-      EmailHelper
-          .sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
-              thirdeyeConfig.getFailureFromAddress(), new DetectionAlertFilterRecipients(
-                  EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress())));
+      EmailHelper.sendEmailWithTextBody(email,
+          SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+          subject, textBody, thirdeyeConfig.getFailureFromAddress(),
+          new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress())));
     } catch (EmailException e) {
       throw new JobExecutionException(e);
     }

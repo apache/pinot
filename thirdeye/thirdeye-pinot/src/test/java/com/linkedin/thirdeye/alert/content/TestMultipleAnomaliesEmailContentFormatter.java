@@ -38,7 +38,9 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.mail.HtmlEmail;
@@ -48,6 +50,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.*;
 
 
 public class TestMultipleAnomaliesEmailContentFormatter {
@@ -89,6 +93,13 @@ public class TestMultipleAnomaliesEmailContentFormatter {
     taskDriverConfiguration.setMaxParallelTasks(2);
     thirdeyeAnomalyConfig.setTaskDriverConfiguration(taskDriverConfiguration);
     thirdeyeAnomalyConfig.setRootDir(System.getProperty("dw.rootDir", "NOT_SET(dw.rootDir)"));
+    Map<String, Map<String, String>> alerters = new HashMap<>();
+    Map<String, String> smtpProps = new HashMap<>();
+    smtpProps.put(SMTP_HOST_KEY, "host");
+    smtpProps.put(SMTP_PORT_KEY, "9000");
+    alerters.put("smtpConfiguration", smtpProps);
+    thirdeyeAnomalyConfig.setAlerterConfiguration(alerters);
+
 
     List<AnomalyResult> anomalies = new ArrayList<>();
     AnomalyFunctionDTO anomalyFunction = DaoTestUtils.getTestFunctionSpec(TEST, TEST);

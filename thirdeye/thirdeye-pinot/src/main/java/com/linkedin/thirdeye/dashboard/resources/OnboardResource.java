@@ -33,7 +33,6 @@ import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import javax.ws.rs.core.Response;

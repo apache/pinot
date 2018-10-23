@@ -44,6 +44,8 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
 
 /**
  * Traditional ThirdEye task runner wrapping an onboarding framework job
@@ -119,7 +121,8 @@ public class ReplayTaskRunner implements TaskRunner {
 
   private static Configuration toConfiguration(ThirdEyeAnomalyConfiguration thirdeyeConfigs) {
     Preconditions.checkNotNull(thirdeyeConfigs);
-    SmtpConfiguration smtpConfiguration = thirdeyeConfigs.getSmtpConfiguration();
+    SmtpConfiguration smtpConfiguration = SmtpConfiguration.createFromProperties(
+        thirdeyeConfigs.getAlerterConfiguration().get(SMTP_CONFIG_KEY));
     Preconditions.checkNotNull(smtpConfiguration);
 
     Map<String, String> systemConfig = new HashMap<>();

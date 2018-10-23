@@ -16,11 +16,18 @@
 
 package com.linkedin.thirdeye.anomaly;
 
+import java.util.Map;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
 
 public class SmtpConfiguration {
+
+  public static final String SMTP_CONFIG_KEY = "smtpConfiguration";
+  public static final String SMTP_HOST_KEY = "smtpHost";
+  public static final String SMTP_PORT_KEY = "smtpPort";
+  public static final String SMTP_USER_KEY = "smtpUser";
+  public static final String SMTP_PASSWD_KEY = "smtpPassword";
 
   private String smtpHost;
   private int smtpPort = 25;
@@ -78,8 +85,20 @@ public class SmtpConfiguration {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add("smtpHost", smtpHost).add("smtpPort", smtpPort)
-        .add("smtpUser", smtpUser).toString();
+    return MoreObjects.toStringHelper(this).add(SMTP_HOST_KEY, smtpHost).add(SMTP_PORT_KEY, smtpPort)
+        .add(SMTP_USER_KEY, smtpUser).toString();
   }
 
+  public static SmtpConfiguration createFromProperties(Map<String,String> smtpConfiguration) {
+    SmtpConfiguration conf = new SmtpConfiguration();
+    try {
+      conf.setSmtpHost(smtpConfiguration.get(SMTP_HOST_KEY));
+      conf.setSmtpPort(Integer.parseInt(smtpConfiguration.get(SMTP_PORT_KEY)));
+      conf.setSmtpUser(smtpConfiguration.get(SMTP_USER_KEY));
+      conf.setSmtpPassword(smtpConfiguration.get(SMTP_PASSWD_KEY));
+    } catch (Exception e) {
+      throw new RuntimeException("Error occurred while parsing smtp configuration into object.", e);
+    }
+    return conf;
+  }
 }

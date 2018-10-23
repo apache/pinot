@@ -71,6 +71,9 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
+
 public class AnomalyReportGenerator {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyReportGenerator.class);
@@ -319,8 +322,9 @@ public class AnomalyReportGenerator {
       templateData.put("cid", cid);
 
       // TODO remove this code. It is dead (minus certain endpoints).
-      buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
-          recipients, alertConfig.getFromAddress(), email);
+      buildEmailTemplateAndSendAlert(templateData,
+          SmtpConfiguration.createFromProperties(configuration.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+          subject, recipients, alertConfig.getFromAddress(), email);
 
       if (StringUtils.isNotBlank(imgPath)) {
         try {
