@@ -16,9 +16,9 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
@@ -49,19 +49,14 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     private StreamLevelConsumer _streamLevelConsumer;
     private Random _random = new Random();
 
-    public FlakyStreamLevelConsumer(String clientId, StreamConfig streamConfig, Schema schema) {
-      _streamLevelConsumer = new KafkaStreamLevelConsumer(clientId, streamConfig, schema);
+    public FlakyStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
+        InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+      _streamLevelConsumer =
+          new KafkaStreamLevelConsumer(clientId, tableName, streamConfig, schema, instanceZKMetadata, serverMetrics);
     }
 
     @Override
-    public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
-        throws Exception {
-      _streamLevelConsumer.init(streamProviderConfig, tableName, serverMetrics);
-    }
-
-    @Override
-    public void start()
-        throws Exception {
+    public void start() throws Exception {
       _streamLevelConsumer.start();
     }
 
@@ -112,26 +107,29 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public void shutdown()
-        throws Exception {
+    public void shutdown() throws Exception {
       _streamLevelConsumer.shutdown();
     }
   }
-
 
   public static class FlakyStreamFactory extends StreamConsumerFactory {
     @Override
     public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
       throw new UnsupportedOperationException();
     }
+
     @Override
-    public StreamLevelConsumer createStreamLevelConsumer(String clientId, Schema schema) {
-      return new FlakyStreamLevelConsumer(clientId, _streamConfig, schema);
+    public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
+        InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+      return new FlakyStreamLevelConsumer(clientId, tableName, _streamConfig, schema, instanceZKMetadata,
+          serverMetrics);
     }
+
     @Override
     public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
       throw new UnsupportedOperationException();
     }
+
     @Override
     public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
       throw new UnsupportedOperationException();

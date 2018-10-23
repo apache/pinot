@@ -16,7 +16,6 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -136,7 +135,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     addHybridTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME,
         TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(),
-        getTaskConfig());
+        getTaskConfig(), getStreamConsumerFactoryClassName());
 
     completeTableConfiguration();
   }

@@ -39,7 +39,9 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -1179,6 +1181,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String streamType = "kafka";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     String topic = "aTopic";
+    String consumerFactoryClass = SimpleConsumerFactory.class.getName();
+    String decoderClass = KafkaAvroMessageDecoder.class.getName();
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
     streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "100000");
@@ -1187,6 +1191,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
         "simple");
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), autoOffsetReset);
+    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigMap.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
 
     final String bootstrapHostConfigKey = KafkaStreamConfigProperties.constructStreamProperty(
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST);
@@ -1425,7 +1434,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected long getKafkaPartitionOffset(StreamConfig streamConfig, final String offsetCriteria, int partitionId) {
+    protected long getPartitionOffset(StreamConfig streamConfig, final String offsetCriteria,
+        int partitionId) {
       if (offsetCriteria.equals(KAFKA_LARGEST_OFFSET)) {
         return _kafkaLargestOffsetToReturn;
       } else {
@@ -1470,7 +1480,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected int getKafkaPartitionCount(StreamConfig metadata) {
+    protected int getPartitionCount(StreamConfig metadata) {
       return _tableConfigStore.getNKafkaPartitions(_currentTable);
     }
   }

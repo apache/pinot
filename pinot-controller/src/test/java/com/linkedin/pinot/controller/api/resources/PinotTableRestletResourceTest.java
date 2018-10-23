@@ -81,6 +81,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         StreamConfig.ConsumerType.HIGHLEVEL.toString());
     streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), "fakeTopic");
     streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS), "fakeClass");
+    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), "fakeClass");
     streamConfigs.put(KafkaStreamConfigProperties.constructStreamProperty(
         KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING), "fakeUrl");
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(1234));

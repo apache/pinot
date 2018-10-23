@@ -24,14 +24,14 @@ import com.linkedin.pinot.common.Utils;
 public abstract class StreamConsumerFactoryProvider {
 
   /**
-   * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig ::getConsumerFactoryName()} property and initializes it
+   * Constructs the {@link StreamConsumerFactory} using the {@link StreamConfig::getConsumerFactoryClassName()} property and initializes it
    * @param streamConfig
    * @return
    */
   public static StreamConsumerFactory create(StreamConfig streamConfig) {
     StreamConsumerFactory factory = null;
     try {
-      factory = (StreamConsumerFactory) Class.forName(streamConfig.getConsumerFactoryName()).newInstance();
+      factory = (StreamConsumerFactory) Class.forName(streamConfig.getConsumerFactoryClassName()).newInstance();
     } catch (Exception e) {
       Utils.rethrowException(e);
     }

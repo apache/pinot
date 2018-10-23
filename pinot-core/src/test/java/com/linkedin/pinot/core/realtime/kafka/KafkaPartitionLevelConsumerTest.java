@@ -215,13 +215,6 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
 
-    Map<String, String> streamConfigMap = new HashMap<>();
-    streamConfigMap.put("streamType", streamType);
-    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
-    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
-
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
         new int[] { 1234, 2345 },
@@ -230,6 +223,15 @@ public class KafkaPartitionLevelConsumerTest {
         new int[] { 0, 1 },
         streamKafkaTopicName
     );
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", mockKafkaSimpleConsumerFactory.getClass().getName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig, mockKafkaSimpleConsumerFactory);
@@ -244,13 +246,6 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
 
-    Map<String, String> streamConfigMap = new HashMap<>();
-    streamConfigMap.put("streamType", streamType);
-    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
-    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
-
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
         new int[] { 1234, 2345 },
@@ -259,6 +254,15 @@ public class KafkaPartitionLevelConsumerTest {
         new int[] { 0, 1 },
         streamKafkaTopicName
     );
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", mockKafkaSimpleConsumerFactory.getClass().getName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     int partition = 0;
     KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
@@ -274,13 +278,6 @@ public class KafkaPartitionLevelConsumerTest {
     String streamKafkaConsumerType = "simple";
     String clientId = "clientId";
 
-    Map<String, String> streamConfigMap = new HashMap<>();
-    streamConfigMap.put("streamType", streamType);
-    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
-    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
-    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
-    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
-
     MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
         new String[] { "abcd", "bcde" },
         new int[] { 1234, 2345 },
@@ -288,6 +285,15 @@ public class KafkaPartitionLevelConsumerTest {
         new long[] { 23456L, 34567L },
         new int[] { 0, 1 },
         streamKafkaTopicName);
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", mockKafkaSimpleConsumerFactory.getClass().getName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
 
     int partition = 0;
     KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
