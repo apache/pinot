@@ -50,7 +50,7 @@ module('Acceptance | create alert', function(hooks) {
 
     // Fields are now enabled with defaults and load correct options, graph is loaded
     assert.equal(
-      $granularityDropdown.find(selfServeConst.SELECTED_ITEM).get(0).innerText,
+      $granularityDropdown.find(selfServeConst.SELECTED_ITEM).get(0).innerText.trim(),
       '5_MINUTES',
       'granularity field (representative) is enabled after metric is selected'
     );
@@ -113,14 +113,14 @@ module('Acceptance | create alert', function(hooks) {
 
     await click(selfServeConst.SUBGROUP_SELECT);
     assert.equal(
-      $(selfServeConst.OPTION_ITEM).get(0).innerText,
+      $(selfServeConst.OPTION_ITEM).get(0).innerText.trim(),
       selectedConfigGroup,
       'The config group associated with the selected app is found in the group selection options.'
     );
 
     await selectChoose(selfServeConst.SUBGROUP_SELECT, selectedConfigGroup);
     assert.equal(
-      $(selfServeConst.CONFIG_GROUP_ALERTS).get(0).innerText,
+      $(selfServeConst.CONFIG_GROUP_ALERTS).get(0).innerText.trim(),
       `See all alerts monitored by: ${selectedConfigGroup}`,
       'Custom accordion block with alert table for selected group appears'
     );
@@ -133,7 +133,7 @@ module('Acceptance | create alert', function(hooks) {
     await fillIn(selfServeConst.CONFIG_RECIPIENTS_INPUT, toRecipients);
     await triggerKeyEvent(selfServeConst.CONFIG_RECIPIENTS_INPUT, 'keyup', '8');
     assert.equal(
-      $(selfServeConst.EMAIL_WARNING).get(0).innerText,
+      $(selfServeConst.EMAIL_WARNING).get(0).innerText.trim(),
       `Warning: ${toRecipients} is already included in this group.`,
       'Duplicate email warning appears correctly.'
     );
@@ -172,7 +172,7 @@ module('Acceptance | create alert', function(hooks) {
     );
 
     assert.equal(
-      $(selfServeConst.ALERT_ACTIVE_LABEL).get(0).innerText,
+      $(selfServeConst.ALERT_ACTIVE_LABEL).get(0).innerText.trim(),
       'ACTIVE',
       'Alert status label is set to active.'
     );
