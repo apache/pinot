@@ -193,9 +193,6 @@ public class SegmentDeletionManager {
           // Overwrites the file if it already exists in the target directory.
           pinotFS.move(fileToMoveURI, deletedSegmentDirURI);
           LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(), deletedSegmentDirURI.toString());
-          if (!pinotFS.delete(fileToMoveURI)) {
-            LOGGER.warn("Could not delete file", segmentId, fileToMoveURI.toString());
-          }
         } else {
           CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
           switch (tableType) {
