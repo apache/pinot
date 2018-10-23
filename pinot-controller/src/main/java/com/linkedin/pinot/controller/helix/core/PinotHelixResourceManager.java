@@ -116,7 +116,7 @@ public class PinotHelixResourceManager {
   private final String _helixZkURL;
   private final String _helixClusterName;
   private final String _instanceId;
-  private final String _localDiskDir;
+  private final String _dataDir;
   private final long _externalViewOnlineToOfflineTimeoutMillis;
   private final boolean _isSingleTenantCluster;
   private final boolean _isUpdateStateModel;
@@ -130,20 +130,20 @@ public class PinotHelixResourceManager {
   private TableRebalancer _tableRebalancer;
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
-      @Nonnull String controllerInstanceId, String localDiskDir, long externalViewOnlineToOfflineTimeoutMillis,
+      @Nonnull String controllerInstanceId, String dataDir, long externalViewOnlineToOfflineTimeoutMillis,
       boolean isSingleTenantCluster, boolean isUpdateStateModel) {
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(zkURL);
     _helixClusterName = helixClusterName;
     _instanceId = controllerInstanceId;
-    _localDiskDir = localDiskDir;
+    _dataDir = dataDir;
     _externalViewOnlineToOfflineTimeoutMillis = externalViewOnlineToOfflineTimeoutMillis;
     _isSingleTenantCluster = isSingleTenantCluster;
     _isUpdateStateModel = isUpdateStateModel;
   }
 
   public PinotHelixResourceManager(@Nonnull String zkURL, @Nonnull String helixClusterName,
-      @Nonnull String controllerInstanceId, @Nonnull String localDiskDir) {
-    this(zkURL, helixClusterName, controllerInstanceId, localDiskDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS,
+      @Nonnull String controllerInstanceId, @Nonnull String dataDir) {
+    this(zkURL, helixClusterName, controllerInstanceId, dataDir, DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS,
         false, false);
   }
 
@@ -164,7 +164,7 @@ public class PinotHelixResourceManager {
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     _keyBuilder = _helixDataAccessor.keyBuilder();
-    _segmentDeletionManager = new SegmentDeletionManager(_localDiskDir, _helixAdmin, _helixClusterName, _propertyStore);
+    _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
     _tableRebalancer = new TableRebalancer(_helixZkManager, _helixAdmin, _helixClusterName);
   }
