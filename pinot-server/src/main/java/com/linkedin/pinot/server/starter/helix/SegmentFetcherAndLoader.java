@@ -61,9 +61,11 @@ public class SegmentFetcherAndLoader {
     Configuration pinotFSConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
         config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    Configuration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
 
     PinotFSFactory.init(pinotFSConfig);
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+    PinotCrypterFactory.init(pinotCrypterConfig);
 
     _crypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
   }
