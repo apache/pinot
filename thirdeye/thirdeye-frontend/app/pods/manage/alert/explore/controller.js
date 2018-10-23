@@ -104,6 +104,7 @@ export default Controller.extend({
       checkReplayInterval: 2000, // 2 seconds
       selectedDimension: 'All Dimensions',
       selectedResolution: 'All Resolutions',
+      labelMap: anomalyUtil.anomalyResponseMap,
       currentPage: 1,
       pageSize: 10
     });
@@ -335,11 +336,12 @@ export default Controller.extend({
     'anomaliesLoaded',
     function() {
       const {
+        labelMap,
         anomalyData,
         anomaliesLoaded,
         selectedDimension: targetDimension,
         selectedResolution: targetResolution
-      } = this.getProperties('anomalyData', 'selectedDimension', 'selectedResolution', 'anomaliesLoaded');
+      } = this.getProperties('labelMap', 'anomalyData', 'selectedDimension', 'selectedResolution', 'anomaliesLoaded');
       let newAnomalies = [];
 
       if (anomaliesLoaded  && anomalyData) {
@@ -350,7 +352,7 @@ export default Controller.extend({
         }
         if (targetResolution !== 'All Resolutions') {
           // Filter for selected resolution
-          newAnomalies = newAnomalies.filter(data => targetResolution === data.anomalyFeedback);
+          newAnomalies = newAnomalies.filter(data => targetResolution === labelMap[data.anomalyFeedback]);
         }
         // Let page know whether anomalies viewed are filtered or not
         set(this, 'isAnomalyListFiltered', anomalyData.length !== newAnomalies.length);
@@ -411,9 +413,8 @@ export default Controller.extend({
 
     const {
       alertId,
-      replayStartTime,
-      checkReplayInterval
-    } = this.getProperties('alertId', 'replayStartTime', 'checkReplayInterval');
+      replayStartTime
+    } = this.getProperties('alertId', 'replayStartTime');
     const replayStatusList = ['completed', 'failed', 'timeout'];
     const checkStatusUrl = `/detection-onboard/get-status?jobId=${jobId}`;
     let isReplayTimeUp = Number(moment.duration(moment().diff(replayStartTime)).asSeconds().toFixed(0)) > 60;
@@ -546,7 +547,10 @@ export default Controller.extend({
      * @param {Object} selectedObj - the user-selected dimension to filter by
      */
     onSelectDimension(selectedObj) {
-      this.set('selectedDimension', selectedObj);
+      setProperties(this, {
+        currentPage: 1,
+        selectedDimension: selectedObj
+      });
       // Select graph dimensions based on filter
       this.get('topDimensions').forEach((dimension) => {
         const isAllSelected = selectedObj === 'All Dimensions';
@@ -561,7 +565,10 @@ export default Controller.extend({
      * @param {Object} selectedObj - the user-selected resolution to filter by
      */
     onSelectResolution(selectedObj) {
-      this.set('selectedResolution', selectedObj);
+      setProperties(this, {
+        currentPage: 1,
+        selectedResolution: selectedObj
+      });
     },
 
     /**
@@ -573,19 +580,29 @@ export default Controller.extend({
      */
      onChangeAnomalyResponse: async function(anomalyRecord, selectedResponse, inputObj) {
       const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
-      set(inputObj, 'selected', selectedResponse);
-      let res;
+      const labelMap = get(this, 'labelMap');
+      const loadedResponsesArr = [];
+      const newOptionsArr = [];
       try {
         // Save anomaly feedback
-        res = await anomalyUtil.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value)
+        await anomalyUtil.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
         // We make a call to ensure our new response got saved
-        res = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status)
-        const filterMap = getWithDefault(res, 'searchFilters.statusFilterMap', null);
+        const anomaly = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status);
+        const filterMap = getWithDefault(anomaly, 'searchFilters.statusFilterMap', null);
         if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
           setProperties(anomalyRecord, {
-            anomalyFeedback: selectedResponse,
+            anomalyFeedback: responseObj.status,
             showResponseSaved: true
           });
+          // Update select field
+          set(inputObj, 'selected', responseObj.status);
+          // Collect all available new labels
+          loadedResponsesArr.push(responseObj.status, ...get(this, 'anomalyData').mapBy('anomalyFeedback'));
+          loadedResponsesArr.forEach((response) => {
+            if (labelMap[response]) { newOptionsArr.push(labelMap[response]) }
+          });
+          // Update resolutionOptions array - we may have a new option now
+          set(this, 'resolutionOptions', [ ...new Set([ 'All Resolutions', ...newOptionsArr ])]);
         } else {
           return Promise.reject(new Error('Response not saved'));
         }

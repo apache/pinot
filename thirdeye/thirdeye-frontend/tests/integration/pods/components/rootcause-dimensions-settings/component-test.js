@@ -64,7 +64,7 @@ module('Integration | Component | rootcause-dimensions-settings', function(hooks
     );
 
     assert.equal(
-      $selectErrorField.innerText,
+      $selectErrorField.innerText.trim(),
       'false',
       'One-side-error default value is false'
     );

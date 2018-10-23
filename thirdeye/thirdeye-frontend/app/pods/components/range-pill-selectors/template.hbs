@@ -4,7 +4,6 @@
     <li class="range-pill-selectors__item {{if range.isActive "range-pill-selectors__item--active"}}" {{action "onRangeOptionClick" range}} data-value={{range.value}}>
       {{range.name}}
       {{#if (eq range.name "Custom")}}
-        {{log "uiDateFormat: " uiDateFormat}}
         : {{date-range-picker
             class=inputClassName
             timePicker=true

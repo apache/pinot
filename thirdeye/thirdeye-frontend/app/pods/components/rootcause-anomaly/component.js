@@ -27,9 +27,10 @@ const OFFSETS = ['current', 'predicted', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
  * @type {Object}
  */
 const ANOMALY_OPTIONS_MAPPING = {
-  ANOMALY: 'Yes (True Anomaly)',
-  ANOMALY_NEW_TREND: 'Yes (But New Trend)',
-  NOT_ANOMALY: 'No (False Alarm)',
+  ANOMALY: 'Yes, it\'s unexpected',
+  ANOMALY_EXPECTED: 'It\'s an expected temporary change (E.g. Holiday)',
+  ANOMALY_NEW_TREND: 'It\'s an expected permanent change',
+  NOT_ANOMALY: 'No significant change observed',
   NO_FEEDBACK: 'To Be Determined'
 };
 

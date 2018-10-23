@@ -53,19 +53,16 @@ export default Component.extend({
      */
      onChangeAnomalyResponse: async function(humanizedAnomaly, selectedResponse, inputObj) {
       const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
-
       set(inputObj, 'selected', selectedResponse);
-      let res;
       try {
         const id = humanizedAnomaly.get('id');
         // Save anomaly feedback
-        res = await anomalyUtil.updateAnomalyFeedback(id, responseObj.value);
+        await anomalyUtil.updateAnomalyFeedback(id, responseObj.value);
         // We make a call to ensure our new response got saved
-        res = await anomalyUtil.verifyAnomalyFeedback(id, responseObj.status);
+        const savedAnomaly = await anomalyUtil.verifyAnomalyFeedback(id);
         // TODO: right now we will update the union wrapper cached record for this anomaly
         humanizedAnomaly.set('anomaly.feedback', responseObj.value);
-
-        const filterMap = getWithDefault(res, 'searchFilters.statusFilterMap', null);
+        const filterMap = getWithDefault(savedAnomaly, 'searchFilters.statusFilterMap', null);
         if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
           humanizedAnomaly.set('anomalyFeedback', selectedResponse);
           set(this, 'showResponseSaved', true);
