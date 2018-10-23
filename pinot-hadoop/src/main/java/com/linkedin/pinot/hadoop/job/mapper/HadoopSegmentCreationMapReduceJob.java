@@ -26,13 +26,9 @@ import com.linkedin.pinot.core.data.readers.ThriftRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
@@ -51,302 +47,301 @@ import org.codehaus.jackson.map.ObjectMapper;
 public class HadoopSegmentCreationMapReduceJob {
 
   public static class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, LongWritable, Text> {
-    private static Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentCreationMapper.class);
+	private static Logger LOGGER = LoggerFactory.getLogger(HadoopSegmentCreationMapper.class);
 
-    private static final String PINOT_HADOOP_TMP = "pinot_hadoop_tmp";
-    private static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
-    private static final String SEGMENT_TAR = "/segmentTar";
+	private static final String PINOT_HADOOP_TMP = "pinot_hadoop_tmp";
+	private static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
+	private static final String SEGMENT_TAR = "/segmentTar";
 
-    private Configuration _properties;
+	private Configuration _properties;
 
-    private String _inputFilePath;
-    private String _outputPath;
-    private String _tableName;
-    private String _postfix;
-    private String _readerConfigFile;
+	private String _inputFilePath;
+	private String _outputPath;
+	private String _tableName;
+	private String _postfix;
+	private String _readerConfigFile;
 
-    // Temporary local disk path for current working directory
-    private String _currentDiskWorkDir;
+	// Temporary local disk path for current working directory
+	private String _currentDiskWorkDir;
 
-    // Temporary hdfs path for segment tar file
-    private String _localHdfsSegmentTarPath;
+	// Temporary hdfs path for segment tar file
+	private String _localHdfsSegmentTarPath;
 
-    // Temporary local disk path for segment tar file
-    private String _localDiskSegmentTarPath;
+	// Temporary local disk path for segment tar file
+	private String _localDiskSegmentTarPath;
 
-    // Temporary local disk path for output segment directory
-    private String _localDiskOutputSegmentDir;
+	// Temporary local disk path for output segment directory
+	private String _localDiskOutputSegmentDir;
 
-    private TableConfig _tableConfig = null;
+	private TableConfig _tableConfig = null;
 
-    private FileSystem fs = null;
+	private FileSystem _fileSystem = null;
 
-    @Override
-    public void setup(Context context) throws IOException, InterruptedException {
-      // Compute current working HDFS directory
-      Path currentHdfsWorkDir = FileOutputFormat.getWorkOutputPath(context);
-      _localHdfsSegmentTarPath = currentHdfsWorkDir + SEGMENT_TAR;
+	@Override
+	public void setup(Context context) throws IOException, InterruptedException {
+	  // Compute current working HDFS directory
+	  Path currentHdfsWorkDir = FileOutputFormat.getWorkOutputPath(context);
+	  _localHdfsSegmentTarPath = currentHdfsWorkDir + SEGMENT_TAR;
 
-      // Compute current working LOCAL DISK directory
-      _currentDiskWorkDir = PINOT_HADOOP_TMP;
-      _localDiskSegmentTarPath = _currentDiskWorkDir + SEGMENT_TAR;
+	  // Compute current working LOCAL DISK directory
+	  _currentDiskWorkDir = PINOT_HADOOP_TMP;
+	  _localDiskSegmentTarPath = _currentDiskWorkDir + SEGMENT_TAR;
 
-      fs = FileSystem.get(context.getConfiguration());
+      _fileSystem = FileSystem.get(context.getConfiguration());
 
-      // Create directory
-      new File(_localDiskSegmentTarPath).mkdirs();
+	  // Create directory
+	  new File(_localDiskSegmentTarPath).mkdirs();
 
-      LOGGER.info("*********************************************************************");
-      LOGGER.info("Configurations : {}", context.getConfiguration().toString());
-      LOGGER.info("*********************************************************************");
-      LOGGER.info("Current HDFS working dir(setup) : {}", currentHdfsWorkDir);
-      LOGGER.info("Current DISK working dir(setup) : {}", new File(_currentDiskWorkDir).getAbsolutePath());
-      LOGGER.info("*********************************************************************");
+	  LOGGER.info("*********************************************************************");
+	  LOGGER.info("Configurations : {}", context.getConfiguration().toString());
+	  LOGGER.info("*********************************************************************");
+	  LOGGER.info("Current HDFS working dir(setup) : {}", currentHdfsWorkDir);
+	  LOGGER.info("Current DISK working dir(setup) : {}", new File(_currentDiskWorkDir).getAbsolutePath());
+	  LOGGER.info("*********************************************************************");
 
-      _properties = context.getConfiguration();
-      _outputPath = _properties.get(JobConfigConstants.PATH_TO_OUTPUT);
-      _tableName = _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME);
-      _postfix = _properties.get(SEGMENT_NAME_POSTFIX, null);
-      _readerConfigFile = _properties.get(JobConfigConstants.PATH_TO_READER_CONFIG);
-      if (_outputPath == null || _tableName == null) {
-        throw new RuntimeException(
-                "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
-                        + "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
-      }
+	  _properties = context.getConfiguration();
+	  _outputPath = _properties.get(JobConfigConstants.PATH_TO_OUTPUT);
+	  _tableName = _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME);
+	  _postfix = _properties.get(SEGMENT_NAME_POSTFIX, null);
+	  _readerConfigFile = _properties.get(JobConfigConstants.PATH_TO_READER_CONFIG);
+	  if (_outputPath == null || _tableName == null) {
+		throw new RuntimeException(
+				"Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
+						+ "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
+	  }
 
-      String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
-      if (tableConfigString != null) {
-        try {
-          _tableConfig = TableConfig.init(tableConfigString);
-        } catch (JSONException e) {
-          // Though we get table config directly from the controller of hosts and port of push location are set,
-          // it is possible for the user to pass in a table config as a parameter
-          LOGGER.error("Exception when parsing table config: {}", tableConfigString);
-        }
-      }
-    }
+	  String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
+	  if (tableConfigString != null) {
+		try {
+		  _tableConfig = TableConfig.init(tableConfigString);
+		} catch (JSONException e) {
+		  // Though we get table config directly from the controller of hosts and port of push location are set,
+		  // it is possible for the user to pass in a table config as a parameter
+		  LOGGER.error("Exception when parsing table config: {}", tableConfigString);
+		}
+	  }
+	}
 
-    protected String getTableName() {
-      return _tableName;
-    }
+	protected String getTableName() {
+	  return _tableName;
+	}
 
-    @Override
-    public void cleanup(Context context) throws IOException, InterruptedException {
-      File currentDiskWorkDir = new File(_currentDiskWorkDir);
-      LOGGER.info("Clean up directory: {}", currentDiskWorkDir.getAbsolutePath());
-      FileUtils.deleteQuietly(currentDiskWorkDir);
-    }
+	@Override
+	public void cleanup(Context context) throws IOException, InterruptedException {
+	  File currentDiskWorkDir = new File(_currentDiskWorkDir);
+	  LOGGER.info("Clean up directory: {}", currentDiskWorkDir.getAbsolutePath());
+	  FileUtils.deleteQuietly(currentDiskWorkDir);
+	}
 
-    @Override
-    protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-      String line = value.toString();
-      String[] lineSplits = line.split(" ");
+	@Override
+	protected void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+	  String line = value.toString();
+	  String[] lineSplits = line.split(" ");
 
-      LOGGER.info("*********************************************************************");
-      LOGGER.info("mapper input : {}", value);
-      LOGGER.info("PATH_TO_OUTPUT : {}", _outputPath);
-      LOGGER.info("TABLE_NAME : {}", _tableName);
-      LOGGER.info("num lines : {}", lineSplits.length);
+	  LOGGER.info("*********************************************************************");
+	  LOGGER.info("mapper input : {}", value);
+	  LOGGER.info("PATH_TO_OUTPUT : {}", _outputPath);
+	  LOGGER.info("TABLE_NAME : {}", _tableName);
+	  LOGGER.info("num lines : {}", lineSplits.length);
 
-      for (String split : lineSplits) {
-        LOGGER.info("Command line : {}", split);
-      }
+	  for (String split : lineSplits) {
+		LOGGER.info("Command line : {}", split);
+	  }
 
-      LOGGER.info("Current DISK working dir(mapper): {}", new File(_currentDiskWorkDir).getAbsolutePath());
-      LOGGER.info("*********************************************************************");
+	  LOGGER.info("Current DISK working dir(mapper): {}", new File(_currentDiskWorkDir).getAbsolutePath());
+	  LOGGER.info("*********************************************************************");
 
-      if (lineSplits.length != 3) {
-        throw new RuntimeException("Input to the mapper is malformed, please contact the pinot team");
-      }
-      _inputFilePath = lineSplits[1].trim();
+	  if (lineSplits.length != 3) {
+		throw new RuntimeException("Input to the mapper is malformed, please contact the pinot team");
+	  }
+	  _inputFilePath = lineSplits[1].trim();
 
-      String segmentDirectoryName = _tableName + "_" + Integer.parseInt(lineSplits[2]);
-      _localDiskOutputSegmentDir = _currentDiskWorkDir + "/segments/" + segmentDirectoryName;
+	  String segmentDirectoryName = _tableName + "_" + Integer.parseInt(lineSplits[2]);
+	  _localDiskOutputSegmentDir = _currentDiskWorkDir + "/segments/" + segmentDirectoryName;
 
-      // To inherit from from the Hadoop Mapper class, you can't directly throw a general exception.
-      Schema schema;
-      Configuration conf = context.getConfiguration();
-      // conf.set("fs.defaultFS","adl://msteamsadlsg1.azuredatalakestore.net/HDI/pinot-dev");
-      final FileSystem fs = FileSystem.get(conf);
-      final Path hdfsInputFilePath = new Path(_inputFilePath);
+	  // To inherit from from the Hadoop Mapper class, you can't directly throw a general exception.
+	  Schema schema;
+	  Configuration conf = context.getConfiguration();
+	  final FileSystem fs = FileSystem.get(conf);
+	  final Path hdfsInputFilePath = new Path(_inputFilePath);
 
-      final File localInputDataDir = new File(_currentDiskWorkDir, "inputData");
-      try {
-        if (localInputDataDir.exists()) {
-          localInputDataDir.delete();
-        }
-        localInputDataDir.mkdir();
+	  final File localInputDataDir = new File(_currentDiskWorkDir, "inputData");
+	  try {
+		if (localInputDataDir.exists()) {
+		  localInputDataDir.delete();
+		}
+		localInputDataDir.mkdir();
 
-        final Path localInputFilePath =
-                new Path(localInputDataDir.getAbsolutePath() + "/" + hdfsInputFilePath.getName());
-        LOGGER.info("Copy from " + hdfsInputFilePath + " to " + localInputFilePath);
-        fs.copyToLocalFile(hdfsInputFilePath, localInputFilePath);
+		final Path localInputFilePath =
+				new Path(localInputDataDir.getAbsolutePath() + "/" + hdfsInputFilePath.getName());
+		LOGGER.info("Copy from " + hdfsInputFilePath + " to " + localInputFilePath);
+		fs.copyToLocalFile(hdfsInputFilePath, localInputFilePath);
 
-        String schemaString = context.getConfiguration().get("data.schema");
-        try {
-          schema = Schema.fromString(schemaString);
-        } catch (Exception e) {
-          LOGGER.error("Could not get schema from string for value: " + schemaString);
-          throw new RuntimeException(e);
-        }
-      } catch (Exception e) {
-        LOGGER.error("Could not get schema: " + e);
-        throw new RuntimeException(e);
-      }
+		String schemaString = context.getConfiguration().get("data.schema");
+		try {
+		  schema = Schema.fromString(schemaString);
+		} catch (Exception e) {
+		  LOGGER.error("Could not get schema from string for value: " + schemaString);
+		  throw new RuntimeException(e);
+		}
+	  } catch (Exception e) {
+		LOGGER.error("Could not get schema: " + e);
+		throw new RuntimeException(e);
+	  }
 
-      LOGGER.info("*********************************************************************");
-      LOGGER.info("input data file path : {}", _inputFilePath);
-      LOGGER.info("local hdfs segment tar path: {}", _localHdfsSegmentTarPath);
-      LOGGER.info("local disk output segment path: {}", _localDiskOutputSegmentDir);
-      LOGGER.info("local disk segment tar path: {}", _localDiskSegmentTarPath);
-      LOGGER.info("data schema: {}", schema);
-      LOGGER.info("*********************************************************************");
+	  LOGGER.info("*********************************************************************");
+	  LOGGER.info("input data file path : {}", _inputFilePath);
+	  LOGGER.info("local hdfs segment tar path: {}", _localHdfsSegmentTarPath);
+	  LOGGER.info("local disk output segment path: {}", _localDiskOutputSegmentDir);
+	  LOGGER.info("local disk segment tar path: {}", _localDiskSegmentTarPath);
+	  LOGGER.info("data schema: {}", schema);
+	  LOGGER.info("*********************************************************************");
 
-      try {
-        String segmentName =
-                createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsInputFilePath, localInputDataDir,
-                        fs);
-        LOGGER.info(segmentName);
-        LOGGER.info("Finished segment creation job successfully");
-      } catch (Exception e) {
-        LOGGER.error("Got exceptions during creating segments!", e);
-      }
+	  try {
+		String segmentName =
+				createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsInputFilePath, localInputDataDir,
+						fs);
+		LOGGER.info(segmentName);
+		LOGGER.info("Finished segment creation job successfully");
+	  } catch (Exception e) {
+		LOGGER.error("Got exceptions during creating segments!", e);
+	  }
 
-      context.write(new LongWritable(Long.parseLong(lineSplits[2])), new Text(
-              FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
-      LOGGER.info("Finished the job successfully");
-    }
+	  context.write(new LongWritable(Long.parseLong(lineSplits[2])), new Text(
+			  FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
+	  LOGGER.info("Finished the job successfully");
+	}
 
-    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
-                                           Path hdfsAvroPath, File dataPath) {
-      String timeFormatStr = segmentGeneratorConfig.getSchema().getTimeFieldSpec().getIncomingGranularitySpec().getTimeFormat();
-      String simpleDateTypeStr = timeFormatStr.split(":")[1];
+	protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
+										   Path hdfsAvroPath, File dataPath) {
+	  String timeFormatStr = segmentGeneratorConfig.getSchema().getTimeFieldSpec().getIncomingGranularitySpec().getTimeFormat();
+	  String simpleDateTypeStr = timeFormatStr.split(":")[1];
 
-      if (timeFormatStr.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-        return;
-      }
+	  if (timeFormatStr.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
+		return;
+	  }
 
 
-      // Throws illegal argument exception if invalid
-      try {
-        new SimpleDateFormat(simpleDateTypeStr);
-      }
-      catch (IllegalArgumentException e) {
-        throw new RuntimeException("Could not parse simple date format " + simpleDateTypeStr, e);
-      }
-      segmentGeneratorConfig.setSimpleDateFormat(simpleDateTypeStr);
-      segmentGeneratorConfig.setSegmentTimeUnit(TimeUnit.MILLISECONDS);
+	  // Throws illegal argument exception if invalid
+	  try {
+		new SimpleDateFormat(simpleDateTypeStr);
+	  }
+	  catch (IllegalArgumentException e) {
+		throw new RuntimeException("Could not parse simple date format " + simpleDateTypeStr, e);
+	  }
+	  segmentGeneratorConfig.setSimpleDateFormat(simpleDateTypeStr);
+	  segmentGeneratorConfig.setSegmentTimeUnit(TimeUnit.MILLISECONDS);
 
-    }
+	}
 
-    protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
-                                   File localInputDataDir, FileSystem fs) throws Exception {
-      SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
+	protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
+								   File localInputDataDir, FileSystem fs) throws Exception {
+	  SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
 
-      segmentGeneratorConfig.setTableName(_tableName);
-      setSegmentNameGenerator(segmentGeneratorConfig, seqId, hdfsInputFilePath, localInputDataDir);
+	  segmentGeneratorConfig.setTableName(_tableName);
+	  setSegmentNameGenerator(segmentGeneratorConfig, seqId, hdfsInputFilePath, localInputDataDir);
 
-      String inputFilePath = new File(localInputDataDir, hdfsInputFilePath.getName()).getAbsolutePath();
-      LOGGER.info("Create segment input path: {}", inputFilePath);
-      segmentGeneratorConfig.setInputFilePath(inputFilePath);
+	  String inputFilePath = new File(localInputDataDir, hdfsInputFilePath.getName()).getAbsolutePath();
+	  LOGGER.info("Create segment input path: {}", inputFilePath);
+	  segmentGeneratorConfig.setInputFilePath(inputFilePath);
 
-      FileFormat fileFormat = getFileFormat(dataFilePath);
-      segmentGeneratorConfig.setFormat(fileFormat);
-      segmentGeneratorConfig.setOnHeap(true);
+	  FileFormat fileFormat = getFileFormat(dataFilePath);
+	  segmentGeneratorConfig.setFormat(fileFormat);
+	  segmentGeneratorConfig.setOnHeap(true);
 
-      if (null != _postfix) {
-        segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
-      } else {
-        segmentGeneratorConfig.setSequenceId(seqId);
-      }
-      segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
+	  if (null != _postfix) {
+		segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
+	  } else {
+		segmentGeneratorConfig.setSequenceId(seqId);
+	  }
+	  segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
 
-      segmentGeneratorConfig.setOutDir(_localDiskOutputSegmentDir);
+	  segmentGeneratorConfig.setOutDir(_localDiskOutputSegmentDir);
 
-      // Add the current java package version to the segment metadata
-      // properties file.
-      Package objPackage = this.getClass().getPackage();
-      if (null != objPackage) {
-        String packageVersion = objPackage.getSpecificationVersion();
-        if (null != packageVersion) {
-          LOGGER.info("Pinot Hadoop Package version {}", packageVersion);
-          segmentGeneratorConfig.setCreatorVersion(packageVersion);
-        }
-      }
+	  // Add the current java package version to the segment metadata
+	  // properties file.
+	  Package objPackage = this.getClass().getPackage();
+	  if (null != objPackage) {
+		String packageVersion = objPackage.getSpecificationVersion();
+		if (null != packageVersion) {
+		  LOGGER.info("Pinot Hadoop Package version {}", packageVersion);
+		  segmentGeneratorConfig.setCreatorVersion(packageVersion);
+		}
+	  }
 
-      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(segmentGeneratorConfig);
-      driver.build();
+	  SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+	  driver.init(segmentGeneratorConfig);
+	  driver.build();
 
-      // Tar the segment directory into file.
-      String segmentName = driver.getSegmentName();
+	  // Tar the segment directory into file.
+	  String segmentName = driver.getSegmentName();
 
-      File localDiskOutputSegmentDir = new File(_localDiskOutputSegmentDir, segmentName);
-      String localDiskOutputSegmentDirAbsolutePath = localDiskOutputSegmentDir.getAbsolutePath();
-      String localDiskSegmentTarFileAbsolutePath =
-              new File(_localDiskSegmentTarPath).getAbsolutePath() + "/" + segmentName + JobConfigConstants.TARGZ;
+	  File localDiskOutputSegmentDir = new File(_localDiskOutputSegmentDir, segmentName);
+	  String localDiskOutputSegmentDirAbsolutePath = localDiskOutputSegmentDir.getAbsolutePath();
+	  String localDiskSegmentTarFileAbsolutePath =
+			  new File(_localDiskSegmentTarPath).getAbsolutePath() + "/" + segmentName + JobConfigConstants.TARGZ;
 
-      LOGGER.info("Trying to tar the segment to: {}", localDiskSegmentTarFileAbsolutePath);
-      TarGzCompressionUtils.createTarGzOfDirectory(localDiskOutputSegmentDirAbsolutePath,
-              localDiskSegmentTarFileAbsolutePath);
-      String hdfsSegmentTarFilePath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
+	  LOGGER.info("Trying to tar the segment to: {}", localDiskSegmentTarFileAbsolutePath);
+	  TarGzCompressionUtils.createTarGzOfDirectory(localDiskOutputSegmentDirAbsolutePath,
+			  localDiskSegmentTarFileAbsolutePath);
+	  String hdfsSegmentTarFilePath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
 
-      // Log segment size.
-      long uncompressedSegmentSize = FileUtils.sizeOfDirectory(localDiskOutputSegmentDir);
-      long compressedSegmentSize = new File(localDiskSegmentTarFileAbsolutePath).length();
-      LOGGER.info(String.format("Segment %s uncompressed size: %s, compressed size: %s", segmentName,
-              DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
+	  // Log segment size.
+	  long uncompressedSegmentSize = FileUtils.sizeOfDirectory(localDiskOutputSegmentDir);
+	  long compressedSegmentSize = new File(localDiskSegmentTarFileAbsolutePath).length();
+	  LOGGER.info(String.format("Segment %s uncompressed size: %s, compressed size: %s", segmentName,
+			  DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
 
-      LOGGER.info("*********************************************************************");
-      LOGGER.info("Copy from : {} to {}", localDiskSegmentTarFileAbsolutePath, hdfsSegmentTarFilePath);
-      LOGGER.info("*********************************************************************");
-      fs.copyFromLocalFile(true, true, new Path(localDiskSegmentTarFileAbsolutePath), new Path(hdfsSegmentTarFilePath));
-      return segmentName;
-    }
+	  LOGGER.info("*********************************************************************");
+	  LOGGER.info("Copy from : {} to {}", localDiskSegmentTarFileAbsolutePath, hdfsSegmentTarFilePath);
+	  LOGGER.info("*********************************************************************");
+	  fs.copyFromLocalFile(true, true, new Path(localDiskSegmentTarFileAbsolutePath), new Path(hdfsSegmentTarFilePath));
+	  return segmentName;
+	}
 
-    private RecordReaderConfig getReaderConfig(FileFormat fileFormat) throws IOException {
-      RecordReaderConfig readerConfig = null;
-      switch (fileFormat) {
-        case CSV:
-          if(_readerConfigFile == null) {
-            readerConfig = new CSVRecordReaderConfig();
-          }
-          else {
-            LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
-            // URL configURL = new URL(_readerConfigFile);
+	private RecordReaderConfig getReaderConfig(FileFormat fileFormat) throws IOException {
+	  RecordReaderConfig readerConfig = null;
+	  switch (fileFormat) {
+		case CSV:
+		  if(_readerConfigFile == null) {
+			readerConfig = new CSVRecordReaderConfig();
+		  }
+		  else {
+			LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
+			// URL configURL = new URL(_readerConfigFile);
 
-            Path p = new Path(_readerConfigFile);
-            // InputStream inconfig = configURL.openStream();
-            readerConfig = new ObjectMapper().readValue(fs.open(p), CSVRecordReaderConfig.class);
-            LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
-          }
-          break;
-        case AVRO:
-          break;
-        case JSON:
-          break;
-        case THRIFT:
-          readerConfig = new ThriftRecordReaderConfig();
-        default:
-          break;
-      }
-      return readerConfig;
-    }
+			Path p = new Path(_readerConfigFile);
+			// InputStream inconfig = configURL.openStream();
+			readerConfig = new ObjectMapper().readValue(_fileSystem.open(p), CSVRecordReaderConfig.class);
+			LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
+		  }
+		  break;
+		case AVRO:
+		  break;
+		case JSON:
+		  break;
+		case THRIFT:
+		  readerConfig = new ThriftRecordReaderConfig();
+		default:
+		  break;
+	  }
+	  return readerConfig;
+	}
 
-    private FileFormat getFileFormat(String dataFilePath) {
-      if (dataFilePath.endsWith(".json")) {
-        return FileFormat.JSON;
-      }
-      if (dataFilePath.endsWith(".csv")) {
-        return FileFormat.CSV;
-      }
-      if (dataFilePath.endsWith(".avro")) {
-        return FileFormat.AVRO;
-      }
-      if (dataFilePath.endsWith(".thrift")) {
-        return FileFormat.THRIFT;
-      }
-      throw new RuntimeException("Not support file format - " + dataFilePath);
-    }
+	private FileFormat getFileFormat(String dataFilePath) {
+	  if (dataFilePath.endsWith(".json")) {
+		return FileFormat.JSON;
+	  }
+	  if (dataFilePath.endsWith(".csv")) {
+		return FileFormat.CSV;
+	  }
+	  if (dataFilePath.endsWith(".avro")) {
+		return FileFormat.AVRO;
+	  }
+	  if (dataFilePath.endsWith(".thrift")) {
+		return FileFormat.THRIFT;
+	  }
+	  throw new RuntimeException("Not support file format - " + dataFilePath);
+	}
   }
 }
