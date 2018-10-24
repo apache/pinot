@@ -24,14 +24,12 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import com.linkedin.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,21 +41,19 @@ import org.slf4j.LoggerFactory;
  * <p><code>PinotTaskManager</code> is also responsible for checking the health status on each type of tasks, detect and
  * fix issues accordingly.
  */
-public class PinotTaskManager {
+public class PinotTaskManager extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskManager.class);
 
-  private final PinotHelixResourceManager _helixResourceManager;
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoProvider _clusterInfoProvider;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
   private final ControllerMetrics _controllerMetrics;
 
-  private ScheduledExecutorService _executorService;
-
   public PinotTaskManager(@Nonnull PinotHelixTaskResourceManager helixTaskResourceManager,
       @Nonnull PinotHelixResourceManager helixResourceManager, @Nonnull ControllerConf controllerConf,
       @Nonnull ControllerMetrics controllerMetrics) {
-    _helixResourceManager = helixResourceManager;
+    super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
+        Math.min(60, controllerConf.getTaskManagerFrequencyInSeconds()), helixResourceManager);
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);
@@ -86,39 +82,12 @@ public class PinotTaskManager {
   }
 
   /**
-   * Start the task scheduler with the given running frequency.
-   *
-   * @param runFrequencyInSeconds Scheduler running frequency in seconds
-   */
-  public void startScheduler(int runFrequencyInSeconds) {
-    _executorService = Executors.newSingleThreadScheduledExecutor();
-    _executorService.scheduleWithFixedDelay(() -> {
-      // Only schedule new tasks from leader controller
-      if (!_helixResourceManager.isLeader()) {
-        LOGGER.info("Skip scheduling new tasks on non-leader controller");
-        nonLeaderCleanUp();
-        return;
-      }
-      scheduleTasks();
-    }, Math.min(60, runFrequencyInSeconds), runFrequencyInSeconds, TimeUnit.SECONDS);
-  }
-
-  /**
-   * Stop the task scheduler.
-   */
-  public void stopScheduler() {
-    if (_executorService != null) {
-      _executorService.shutdown();
-    }
-  }
-
-  /**
    * Check the Pinot cluster status and schedule new tasks.
-   *
+   * @param allTableNames List of all the table names
    * @return Map from task type to task scheduled
    */
   @Nonnull
-  public Map<String, String> scheduleTasks() {
+  private Map<String, String> scheduleTasks(List<String> allTableNames) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -133,8 +102,8 @@ public class PinotTaskManager {
     }
 
     // Scan all table configs to get the tables with tasks enabled
-    for (String tableName : _helixResourceManager.getAllTables()) {
-      TableConfig tableConfig = _helixResourceManager.getTableConfig(tableName);
+    for (String tableName : allTableNames) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
       if (tableConfig != null) {
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
         if (taskConfig != null) {
@@ -167,11 +136,26 @@ public class PinotTaskManager {
   }
 
   /**
+   * Public API to schedule tasks. It doesn't matter whether current pinot controller is leader.
+   */
+  public Map<String, String> scheduleTasks() {
+    return scheduleTasks(_pinotHelixResourceManager.getAllTables());
+  }
+
+  /**
    * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
    */
-  private void nonLeaderCleanUp() {
+  @Override
+  public void onBecomeNotLeader() {
+    LOGGER.info("Perform task cleanups.");
+    // Performs necessary cleanups for each task type.
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
       _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
     }
+  }
+
+  @Override
+  public void process(List<String> allTableNames) {
+    scheduleTasks(allTableNames);
   }
 }

@@ -28,14 +28,12 @@ import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.joda.time.Duration;
@@ -48,66 +46,42 @@ import org.slf4j.LoggerFactory;
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
  */
-public class ValidationManager {
+public class ValidationManager extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ValidationManager.class);
 
-  private final long _validationIntervalSeconds;
   private final boolean _enableSegmentLevelValidation;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
-  private final ScheduledExecutorService _executorService;
 
   public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
-    _validationIntervalSeconds = config.getValidationControllerFrequencyInSeconds();
+    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(),
+        config.getValidationControllerFrequencyInSeconds() / 2, pinotHelixResourceManager);
     _enableSegmentLevelValidation = config.getEnableSegmentLevelValidation();
-    _pinotHelixResourceManager = pinotHelixResourceManager;
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
-    _executorService =
-        Executors.newSingleThreadScheduledExecutor(runnable -> new Thread(runnable, "ValidationManagerThread"));
   }
 
-  /**
-   * Starts the validation manager.
-   */
-  public void start() {
-    LOGGER.info("Starting validation manager");
-
-    // Set up an executor that executes validation tasks periodically
-    _executorService.scheduleWithFixedDelay(() -> {
-      try {
-        runValidation();
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while running validation", e);
-      }
-    }, 120, _validationIntervalSeconds, TimeUnit.SECONDS);
+  @Override
+  public void onBecomeNotLeader() {
+    LOGGER.info("Unregister all the validation metrics.");
+    _validationMetrics.unregisterAllMetrics();
   }
 
-  /**
-   * Stops the validation manager.
-   */
-  public void stop() {
-    // Shut down the executor
-    _executorService.shutdown();
+  @Override
+  public void process(List<String> allTableNames) {
+    runValidation(allTableNames);
   }
 
   /**
    * Runs a validation pass over the currently loaded tables.
+   * @param allTableNames List of all the table names
    */
-  public void runValidation() {
-    if (!_pinotHelixResourceManager.isLeader()) {
-      _validationMetrics.unregisterAllMetrics();
-      LOGGER.info("Skipping validation, not leader!");
-      return;
-    }
-
-    LOGGER.info("Starting validation");
+  private void runValidation(List<String> allTableNames) {
     // Cache instance configs to reduce ZK access
     List<InstanceConfig> instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
 
-    for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
+    for (String tableNameWithType : allTableNames) {
       try {
         TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
         if (tableConfig == null) {
@@ -136,7 +110,6 @@ public class ValidationManager {
         LOGGER.warn("Caught exception while validating table: {}", tableNameWithType, e);
       }
     }
-    LOGGER.info("Validation completed");
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics

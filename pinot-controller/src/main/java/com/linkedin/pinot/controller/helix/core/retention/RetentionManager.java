@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import java.util.ArrayList;
@@ -31,8 +32,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.slf4j.Logger;
@@ -43,53 +42,44 @@ import org.slf4j.LoggerFactory;
  * The <code>RetentionManager</code> class manages retention for all segments and delete expired segments.
  * <p>It is scheduled to run only on leader controller.
  */
-public class RetentionManager {
+public class RetentionManager extends ControllerPeriodicTask {
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private final ScheduledExecutorService _executorService;
-  private final int _runFrequencyInSeconds;
   private final int _deletedSegmentsRetentionInDays;
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
       int deletedSegmentsRetentionInDays) {
-    _pinotHelixResourceManager = pinotHelixResourceManager;
-    _runFrequencyInSeconds = runFrequencyInSeconds;
+    super("RetentionManager", runFrequencyInSeconds, Math.min(60, runFrequencyInSeconds),
+        pinotHelixResourceManager);
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
-    _executorService =
-        Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "PinotRetentionManagerExecutorService"));
   }
 
-  public void start() {
+  @Override
+  public void onBecomeLeader() {
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        _runFrequencyInSeconds, _deletedSegmentsRetentionInDays);
-    _executorService.scheduleWithFixedDelay(this::execute, Math.min(60, _runFrequencyInSeconds), _runFrequencyInSeconds,
-        TimeUnit.SECONDS);
-    LOGGER.info("RetentionManager started");
+        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
   }
 
-  public void execute() {
-    LOGGER.info("Start managing retention for all tables");
+  @Override
+  public void process(List<String> allTableNames) {
+    execute(allTableNames);
+  }
+
+  /**
+   * Manages retention for all tables.
+   * @param allTableNames List of all the table names
+   */
+  private void execute(List<String> allTableNames) {
     try {
-      if (_pinotHelixResourceManager.isLeader()) {
-        long startTime = System.currentTimeMillis();
-
-        for (String tableNameWithType : _pinotHelixResourceManager.getAllTables()) {
-          LOGGER.info("Start managing retention for table: {}", tableNameWithType);
-          manageRetentionForTable(tableNameWithType);
-        }
-
-        LOGGER.info("Removing aged (more than {} days) deleted segments for all tables",
-            _deletedSegmentsRetentionInDays);
-        _pinotHelixResourceManager.getSegmentDeletionManager()
-            .removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
-
-        LOGGER.info("Finished managing retention for all tables in {}ms", System.currentTimeMillis() - startTime);
-      } else {
-        LOGGER.info("Controller is not leader, skip");
+      for (String tableNameWithType : allTableNames) {
+        LOGGER.info("Start managing retention for table: {}", tableNameWithType);
+        manageRetentionForTable(tableNameWithType);
       }
+
+      LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
+      _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
     } catch (Exception e) {
       LOGGER.error("Caught exception while managing retention for all tables", e);
     }
@@ -197,11 +187,5 @@ public class RetentionManager {
       return states.size() == 1 && states.contains(
           CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
     }
-  }
-
-  public void stop() {
-    LOGGER.info("Stopping RetentionManager");
-    _executorService.shutdown();
-    LOGGER.info("RetentionManager stopped");
   }
 }

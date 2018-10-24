@@ -23,11 +23,9 @@ import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
@@ -42,24 +40,17 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manages the segment status metrics, regarding tables with fewer replicas than requested
- * and segments in error state
- *
- * May 15, 2016
-*/
-
-public class SegmentStatusChecker {
+ * and segments in error state.
+ */
+public class SegmentStatusChecker extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
-  private static final int SegmentCheckerDefaultIntervalSeconds = 120;
   private static final int MaxOfflineSegmentsToLog = 5;
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
   public static final String CONSUMING = "CONSUMING";
-  private ScheduledExecutorService _executorService;
   private final ControllerMetrics _metricsRegistry;
   private final ControllerConf _config;
-  private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final HelixAdmin _helixAdmin;
-  private final long _segmentStatusIntervalSeconds;
   private final int _waitForPushTimeSeconds;
 
   // log messages about disabled tables atmost once a day
@@ -71,98 +62,50 @@ public class SegmentStatusChecker {
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
    * @param config The controller configuration object
    */
-  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config, ControllerMetrics metricsRegistry) {
-    _pinotHelixResourceManager = pinotHelixResourceManager;
+  public SegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
+      ControllerMetrics metricsRegistry) {
+    super("SegmentStatusChecker", config.getStatusCheckerFrequencyInSeconds(), pinotHelixResourceManager);
     _helixAdmin = pinotHelixResourceManager.getHelixAdmin();
     _config = config;
-    _segmentStatusIntervalSeconds = config.getStatusCheckerFrequencyInSeconds();
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _metricsRegistry = metricsRegistry;
     HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
-
-    _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
-      @Override
-      public Thread newThread(Runnable runnable) {
-        Thread thread = new Thread(runnable);
-        thread.setName("Segment status checker");
-        return thread;
-      }
-    });
   }
 
-  /**
-   * Starts the segment status checker.
-   */
-  public void start() {
-    if (_segmentStatusIntervalSeconds == -1) {
-      LOGGER.warn("Segment status check interval is -1, status checks disabled.");
-      return;
-    }
-
+  @Override
+  public void init() {
+    LOGGER.info("Initializing table metrics for all the tables.");
     setStatusToDefault();
-
-    _executorService.scheduleWithFixedDelay(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          updateSegmentMetrics();
-        } catch (Throwable e) {
-          // catch all errors to prevent subsequent exeuctions from being silently suppressed
-          // Ref: https://docs.oracle.com/javase/8/docs/api/java/util/concurrent/ScheduledExecutorService.html#scheduleWithFixedDelay-java.lang.Runnable-long-long-java.util.concurrent.TimeUnit-
-          LOGGER.warn("Caught exception while running segment status checker", e);
-        }
-      }
-    }, SegmentCheckerDefaultIntervalSeconds, _segmentStatusIntervalSeconds, TimeUnit.SECONDS);
   }
 
+  @Override
+  public void onBecomeNotLeader() {
+    LOGGER.info("Resetting table metrics for all the tables.");
+    setStatusToDefault();
+  }
 
-  /**
-   * Stops the segment status checker.
-   */
-  public void stop() {
-    if (_executorService == null) {
-      return;
-    }
-
-    // Shut down the executor
-    _executorService.shutdown();
-
-    try {
-      _executorService.awaitTermination(SegmentCheckerDefaultIntervalSeconds, TimeUnit.SECONDS);
-    } catch (InterruptedException e) {
-      // Ignored
-    }
-
-    _executorService = null;
+  @Override
+  public void process(List<String> allTableNames) {
+    updateSegmentMetrics(allTableNames);
   }
 
   /**
    * Runs a segment status pass over the currently loaded tables.
+   * @param allTableNames List of all the table names
    */
-  void updateSegmentMetrics() {
-    if (!_pinotHelixResourceManager.isLeader()) {
-      LOGGER.info("Skipping Segment Status check, not leader!");
-      setStatusToDefault();
-      return;
-    }
-
-    long startTime = System.nanoTime();
-
-    LOGGER.info("Starting Segment Status check for metrics");
-
+  private void updateSegmentMetrics(List<String> allTableNames) {
     // Fetch the list of tables
-    List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     int realTimeTableCount = 0;
     int offlineTableCount = 0;
     int disabledTableCount = 0;
-    ZkHelixPropertyStore<ZNRecord> propertyStore= _pinotHelixResourceManager.getPropertyStore();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
     // check if we need to log disabled tables log messages
     boolean logDisabledTables = false;
     long now = System.currentTimeMillis();
-    if (now -_lastDisabledTableLogTimestamp >= DISABLED_TABLE_LOG_INTERVAL_MS) {
+    if (now - _lastDisabledTableLogTimestamp >= DISABLED_TABLE_LOG_INTERVAL_MS) {
       logDisabledTables = true;
       _lastDisabledTableLogTimestamp = now;
     } else {
@@ -201,8 +144,10 @@ public class SegmentStatusChecker {
           continue;
         }
 
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENT_COUNT, (long)(idealState.getPartitionSet().size()));
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE,
+            idealState.toString().length());
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENT_COUNT,
+            (long) (idealState.getPartitionSet().size()));
         ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
 
         int nReplicasIdealMax = 0; // Keeps track of maximum number of replicas in ideal state
@@ -228,7 +173,8 @@ public class SegmentStatusChecker {
             // No online segments in ideal state
             continue;
           }
-          nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax) ? idealState.getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
+          nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax)
+              ? idealState.getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
           if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
             // No replicas for this segment
             TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -266,7 +212,8 @@ public class SegmentStatusChecker {
             }
             nOffline++;
           }
-          nReplicasExternal = ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
+          nReplicasExternal =
+              ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
         }
         if (nReplicasExternal == -1) {
           nReplicasExternal = (nReplicasIdealMax == 0) ? 1 : 0;
@@ -296,9 +243,6 @@ public class SegmentStatusChecker {
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, realTimeTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, offlineTableCount);
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.DISABLED_TABLE_COUNT, disabledTableCount);
-    long totalNanos = System.nanoTime() - startTime;
-    LOGGER.info("Segment status metrics completed in {}ms",
-        TimeUnit.MILLISECONDS.convert(totalNanos, TimeUnit.NANOSECONDS));
   }
 
   private void setStatusToDefault() {
