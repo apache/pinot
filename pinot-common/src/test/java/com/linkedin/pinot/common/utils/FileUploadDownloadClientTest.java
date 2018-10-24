@@ -51,7 +51,7 @@ public class FileUploadDownloadClientTest {
   @BeforeClass
   public void setUp() throws Exception {
     TEST_SERVER = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
-    TEST_SERVER.createContext("/segments", new testSegmentUploadHandler());
+    TEST_SERVER.createContext("/v2/segments", new testSegmentUploadHandler());
     TEST_SERVER.setExecutor(null); // creates a default executor
     TEST_SERVER.start();
   }

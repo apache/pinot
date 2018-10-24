@@ -90,8 +90,8 @@ public class FileUploadDownloadClient implements Closeable {
   private static final String HTTP = "http";
   private static final String HTTPS = "https";
   private static final String SCHEMA_PATH = "/schemas";
-  private static final String SEGMENT_PATH = "/segments";
-  private static final String SEGMENT_PATH_V2 = "/v2/segments";
+  private static final String OLD_SEGMENT_PATH = "/segments";
+  private static final String SEGMENT_PATH = "/v2/segments";
   private static final String SEGMENT_METADATA_PATH = "/segmentmetadata";
   private static final String TABLES_PATH = "/tables";
   private static final String TYPE_DELIMITER = "?type=";
@@ -142,19 +142,24 @@ public class FileUploadDownloadClient implements Closeable {
    * getUploadSegmentHttpURI to construct your request.
    */
   @Deprecated
-  public static URI getUploadSegmentHttpURI(String host, int port) throws URISyntaxException {
-    return getUploadSegmentHttpURI(host, port, false);
+  public static URI getOldUploadSegmentHttpURI(String host, int port) throws URISyntaxException {
+    return getURI(HTTP, host, port, OLD_SEGMENT_PATH);
+  }
+
+  /**
+   * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
+   * getUploadSegmentHttpURI to construct your request.
+   */
+  @Deprecated
+  public static URI getOldUploadSegmentHttpsURI(String host, int port) throws URISyntaxException {
+    return getURI(HTTPS, host, port, OLD_SEGMENT_PATH);
   }
 
   /**
    * Preferred way to construct an upload segment request
    */
-  public static URI getUploadSegmentHttpURI(String host, int port, boolean useV2) throws URISyntaxException {
-    if (useV2) {
-      return getURI(HTTP, host, port, SEGMENT_PATH_V2);
-    } else {
-      return getURI(HTTP, host, port, SEGMENT_PATH);
-    }
+  public static URI getUploadSegmentHttpURI(String host, int port) throws URISyntaxException {
+    return getURI(HTTP, host, port, SEGMENT_PATH);
   }
 
   public static URI getUploadSegmentMetadataHttpURI(String host, int port) throws URISyntaxException {

@@ -166,7 +166,7 @@ public class BackfillSegmentUtils {
       LOGGER.info("Created tar of {} at {}", segmentDir.getAbsolutePath(), segmentTar.getAbsolutePath());
       try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
         SimpleHttpResponse response = fileUploadDownloadClient.uploadSegment(
-            FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, Integer.parseInt(_controllerPort), true),
+            FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
             segmentName, segmentTar);
         int statusCode = response.getStatusCode();
         if (statusCode != HttpStatus.SC_OK) {
