@@ -1505,8 +1505,8 @@ public class PinotHelixResourceManager {
           "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
     }
     LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
-    TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore,
-            offlineSegmentZKMetadata.getTableName());
+    final String rawTableName = offlineSegmentZKMetadata.getTableName();
+    TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
 
     if (shouldSendMessage(tableConfig)) {
       // Send a message to the servers to update the segment.
@@ -1514,7 +1514,7 @@ public class PinotHelixResourceManager {
       // For segment validation errors we would have returned earlier.
       sendSegmentRefreshMessage(offlineSegmentZKMetadata);
       // Send a message to the brokers to update the table's time boundary info if the segment push type is APPEND.
-      if (shouldSendTimeboundaryRefreshMsg(tableConfig)) {
+      if (shouldSendTimeboundaryRefreshMsg(rawTableName, tableConfig)) {
         sendTimeboundaryRefreshMessageToBrokers(offlineSegmentZKMetadata);
       }
     } else {
@@ -1547,17 +1547,17 @@ public class PinotHelixResourceManager {
     recipientCriteria.setPartition(offlineTableName);
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
-    LOGGER.info("Sending refresh message for segment {} of table {}:{} to recipients {}", segmentName, rawTableName,
-            refreshMessage, recipientCriteria);
+    LOGGER.info("Sending timeboundary refresh message for segment {} of table {}:{} to recipients {}", segmentName,
+            rawTableName, refreshMessage, recipientCriteria);
     // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
     int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, timeoutMs);
     if (nMsgsSent > 0) {
       // TODO Would be nice if we can get the name of the instances to which messages were sent.
-      LOGGER.info("Sent {} msgs to refresh segment {} of table {}", nMsgsSent, segmentName, rawTableName);
+      LOGGER.info("Sent {} timeboundary msgs to refresh segment {} of table {}", nMsgsSent, segmentName, rawTableName);
     } else {
       // May be the case when none of the brokers are up yet. That is OK, because when they come up they will get
       // the latest time boundary info.
-      LOGGER.warn("Unable to send time boundary refresh message for {} of table {}, nMsgs={}", segmentName,
+      LOGGER.warn("Unable to send timeboundary refresh message for {} of table {}, nMsgs={}", segmentName,
               offlineTableName, nMsgsSent);
     }
   }
@@ -1609,7 +1609,7 @@ public class PinotHelixResourceManager {
     return numMessagesSent;
   }
 
-  // Check to see if the table has been explicitly configured to NOT use messageBasedRefresh.
+  // Return false iff the table has been explicitly configured to NOT use messageBasedRefresh.
   private boolean shouldSendMessage(TableConfig tableConfig) {
     if (tableConfig == null) {
       return true;
@@ -1627,8 +1627,12 @@ public class PinotHelixResourceManager {
     return true;
   }
 
-  // Return true iff the segment push type is APPEND (i.e., there is time column info the segments).
-  private boolean shouldSendTimeboundaryRefreshMsg(TableConfig tableConfig) {
+  // Return true iff the table has both realtime and offline sub-tables AND the segment push type is APPEND (i.e.,
+  // there is time column info the segments).
+  private boolean shouldSendTimeboundaryRefreshMsg(String rawTableName, TableConfig tableConfig) {
+    if (!hasOfflineTable(rawTableName) || !hasRealtimeTable(rawTableName)) {
+      return false;
+    }
     if (tableConfig == null) {
       return false;
     }

@@ -21,22 +21,28 @@ import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.broker.routing.TimeBoundaryService;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
+
+import com.yammer.metrics.core.MetricsRegistry;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
@@ -89,14 +95,11 @@ public class HelixBrokerStarterTest {
       Thread.sleep(100);
     }
 
-    TableConfig tableConfig =
+    TableConfig offlineTableConfig =
         new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE)
                 .setTableName(RAW_DINING_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS").build();
-    _pinotResourceManager.addTable(tableConfig);
-    TableConfig realtimeTimeConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME)
-            .setTableName(RAW_DINING_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS").build();
-    _helixBrokerStarter.getHelixExternalViewBasedRouting().markDataResourceOnline(realtimeTimeConfig, null,
-            new ArrayList<InstanceConfig>());
+    _pinotResourceManager.addTable(offlineTableConfig);
+    setupRealtimeTable();
 
     for (int i = 0; i < 5; i++) {
       _pinotResourceManager.addNewSegment(SegmentMetadataMockUtils.mockSegmentMetadata(RAW_DINING_TABLE_NAME),
@@ -107,6 +110,30 @@ public class HelixBrokerStarterTest {
 
     ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, DINING_TABLE_NAME);
     Assert.assertEquals(externalView.getPartitionSet().size(), 5);
+  }
+
+  private void setupRealtimeTable() throws IOException {
+    // Set up the realtime table.
+    Map<String, String> streamConfigs = new HashMap<>();
+    streamConfigs.put("streamType", "kafka");
+    streamConfigs.put("stream.kafka.consumer.type", "highLevel");
+    streamConfigs.put("stream.kafka.topic.name", "kafkaTopic");
+    streamConfigs.put("stream.kafka.decoder.class.name",
+            "com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder");
+    streamConfigs.put("stream.kafka.hlc.zk.connect.string", "localhost:1111/zkConnect");
+    streamConfigs.put("stream.kafka.decoder.prop.schema.registry.rest.url", "http://localhost:2222/schemaRegistry");
+    TableConfig realtimeTimeConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME)
+            .setTableName(RAW_DINING_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS").
+                    setStreamConfigs(streamConfigs).build();
+    Schema schema = new Schema();
+    schema.setSchemaName(RAW_DINING_TABLE_NAME);
+    _pinotResourceManager.addOrUpdateSchema(schema);
+    // Fake an PinotLLCRealtimeSegmentManager instance: required for a realtime table creation.
+    PinotLLCRealtimeSegmentManager.create(_pinotResourceManager, new ControllerConf(),
+            new ControllerMetrics(new MetricsRegistry()));
+    _pinotResourceManager.addTable(realtimeTimeConfig);
+    _helixBrokerStarter.getHelixExternalViewBasedRouting().markDataResourceOnline(realtimeTimeConfig, null,
+            new ArrayList<InstanceConfig>());
   }
 
   @AfterTest
@@ -223,7 +250,7 @@ public class HelixBrokerStarterTest {
   public void testTimeBoundaryUpdate() throws Exception {
     // This test verifies that when the segments of an offline table are refreshed, the TimeBoundaryInfo is also updated
     // to a newer timestamp.
-    long currentTimeBoundary = 10;
+    final long currentTimeBoundary = 10;
     TimeBoundaryService.TimeBoundaryInfo tbi =
             _helixBrokerStarter.getHelixExternalViewBasedRouting().
                     getTimeBoundaryService().getTimeBoundaryInfoFor(DINING_TABLE_NAME);

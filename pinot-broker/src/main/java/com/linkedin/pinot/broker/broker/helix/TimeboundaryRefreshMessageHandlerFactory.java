@@ -39,6 +39,7 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
     // A map to store the unique requests (i.e., the table names) to refresh the TimeBoundaryInfo of a pinot table.
     // Ideally a Hashset will suffice but Java util currently does not have Hashset.
     private static ConcurrentHashMap<String, Boolean> _tablesToRefreshmap = new ConcurrentHashMap<>();
+    private boolean shuttingDown;
 
     /**
      *
@@ -51,17 +52,7 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
         // Start a background thread to execute the TimeboundaryInfo update requests.
         Thread tbiUpdateThread = new Thread(new TimeboundaryRefreshMessageExecutor(sleepTimeInMilliseconds));
         tbiUpdateThread.start();
-        // Shutting down the thread when the application quits.
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-            @Override
-            public void run() {
-                try {
-                    tbiUpdateThread.stop();
-                } catch (final Exception e) {
-                    LOGGER.error("Caught exception while running shutdown hook for tbi update", e);
-                }
-            }
-        });
+        shuttingDown = false;
     }
 
     @Override
@@ -84,6 +75,10 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
     @Override
     public void reset() {
         LOGGER.info("Reset called");
+    }
+
+    public void shutdown() {
+        shuttingDown = true;
     }
 
     private class TimeboundaryRefreshMessageHandler extends MessageHandler{
@@ -121,7 +116,7 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
         }
         @Override
         public void run() {
-            while(true) {
+            while(!shuttingDown) {
                 try {
                     ConcurrentHashMap.KeySetView<String, Boolean> tables = _tablesToRefreshmap.keySet();
                     Iterator<String> tableItr = tables.iterator();

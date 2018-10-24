@@ -68,6 +68,7 @@ public class HelixBrokerStarter {
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
   private final MetricsRegistry _metricsRegistry;
   private final TableQueryQuotaManager _tableQueryQuotaManager;
+  private final TimeboundaryRefreshMessageHandlerFactory _tbiMessageHandler;
 
   // Set after broker is started, which is actually in the constructor.
   private AccessControlFactory _accessControlFactory;
@@ -137,13 +138,13 @@ public class HelixBrokerStarter {
     stateMachineEngine.registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
-    TimeboundaryRefreshMessageHandlerFactory messageHandlerFactory = new TimeboundaryRefreshMessageHandlerFactory
+    _tbiMessageHandler = new TimeboundaryRefreshMessageHandlerFactory
             (_helixExternalViewBasedRouting,
                     _pinotHelixProperties.getLong(
                             CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL,
                             CommonConstants.Broker.DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS));
     _helixManager.getMessagingService().registerMessageHandlerFactory(
-            Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
+            Message.MessageType.USER_DEFINE_MSG.toString(), _tbiMessageHandler);
 
     addInstanceTagIfNeeded(helixClusterName, brokerId);
 
@@ -283,6 +284,10 @@ public class HelixBrokerStarter {
     if (_spectatorHelixManager != null) {
       LOGGER.info("Disconnecting spectator Helix manager");
       _spectatorHelixManager.disconnect();
+    }
+    if (_tbiMessageHandler != null) {
+      LOGGER.info("Shutting down timeboundary info refresh message handler");
+      _tbiMessageHandler.shutdown();
     }
   }
 
