@@ -17,7 +17,6 @@ package com.linkedin.pinot.controller.helix.core;
 
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
@@ -27,7 +26,6 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -178,42 +176,25 @@ public class SegmentDeletionManager {
       URI deletedSegmentDirURI;
       URI fileToMoveURI;
       PinotFS pinotFS;
-      try {
-        URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
-        fileToMoveURI = ControllerConf.constructSegmentLocation(_dataDir, rawTableName, segmentId);
-        pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
-        deletedSegmentDirURI = ControllerConf.getUriFromPath(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS, rawTableName));
-      } catch (URISyntaxException e) {
-        LOGGER.error("Could not create DELETED_SEGMENTS uri with dataDir {}, tableName {}", _dataDir, rawTableName);
-        throw new RuntimeException(e);
-      }
-
+      URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
+      fileToMoveURI = ControllerConf.constructSegmentLocation(_dataDir, rawTableName, segmentId);
+      pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
+      deletedSegmentDirURI =
+          ControllerConf.getUriFromPath(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS, rawTableName));
       try {
         if (pinotFS.exists(fileToMoveURI)) {
           // Overwrites the file if it already exists in the target directory.
           pinotFS.move(fileToMoveURI, deletedSegmentDirURI);
           LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(), deletedSegmentDirURI.toString());
         } else {
-          CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-          switch (tableType) {
-            case OFFLINE:
-              LOGGER.warn("Not found segment file for segment {}" + fileToMoveURI.toString());
-              break;
-            case REALTIME:
-              if (SegmentName.isLowLevelConsumerSegmentName(segmentId)) {
-                LOGGER.warn("Not found segment file for segment {}" + fileToMoveURI.toString());
-              }
-              break;
-            default:
-              LOGGER.warn("Unsupported table type {} when deleting segment {}", tableType, segmentId);
+          if (!SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
+            LOGGER.warn("Not found local segment file for segment {}" + fileToMoveURI.toString());
           }
         }
-
       } catch (IOException e) {
         LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
             deletedSegmentDirURI.toString(), e);
       }
-
     } else {
       LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
     }

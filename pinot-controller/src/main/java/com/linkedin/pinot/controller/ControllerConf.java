@@ -108,12 +108,17 @@ public class ControllerConf extends PropertiesConfiguration {
   /**
    * Returns the URI for the given path, appends the local (file) scheme to the URI if no scheme exists.
    */
-  public static URI getUriFromPath(String path) throws URISyntaxException {
-    URI uri = new URI(path);
-    if (uri.getScheme() != null) {
-      return uri;
-    } else {
-      return new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, path, null);
+  public static URI getUriFromPath(String path) {
+    try {
+      URI uri = new URI(path);
+      if (uri.getScheme() != null) {
+        return uri;
+      } else {
+        return new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, path, null);
+      }
+    } catch (URISyntaxException e) {
+      LOGGER.error("Could not construct uri from path {}", path);
+      throw new RuntimeException(e);
     }
   }
 
