@@ -15,249 +15,302 @@
  */
 package com.linkedin.pinot.core.realtime.stream;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.DataSize;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import com.google.common.base.Splitter;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka.ConsumerType;
-import com.linkedin.pinot.common.utils.StringUtil;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
-import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
 
-
-/*
- * TODO (Issue 2583)
- * Rename generic member variables from (and accessor methods) to be kafka-agnostic.
- * It is expected that an incoming partitioned stream has the following properties that can be configured in general:
- * - Topic name
- * - Decoder class
- * - Consumer factory name
- * - Connection timeout: (max time to establish a connection/session to the source)
- * - Fetch timeout (max time to wait to fetch messages once a connection is established)
- * - Decoder-specific properties
- * Add a derived class that is Kafka-specific that includes members like zk string and bootstrap hosts.
+/**
+ * Provides all the configs related to the stream as configured in the table config
  */
 public class StreamConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(StreamConfig.class);
 
-  private final String _kafkaTopicName;
-  private final List<ConsumerType> _consumerTypes = new ArrayList<>(2);
-  private final String _zkBrokerUrl;
-  private final String _bootstrapHosts;
-  private final String _decoderClass;
-  private String _consumerFactoryName;
-  private final long _kafkaConnectionTimeoutMillis;
-  private final int _kafkaFetchTimeoutMillis;
-  private final Map<String, String> _decoderProperties = new HashMap<String, String>();
-  private final Map<String, String> _kafkaConsumerProperties = new HashMap<String, String>();
-  private final Map<String, String> _streamConfigMap = new HashMap<String, String>();
+  /**
+   * The type of the stream consumer either HIGHLEVEL or LOWLEVEL. For backward compatibility, adding SIMPLE which is equivalent to LOWLEVEL
+   */
+  public enum ConsumerType {
+    HIGHLEVEL, LOWLEVEL
+  }
 
-  private static final long DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS = 30000L;
-  private static final int DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS = 5000;
+  private static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
+  private static final long DEFAULT_FLUSH_THRESHOLD_TIME = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
+  private static final long DEFAULT_DESIRED_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
+  protected static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
+  protected static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
+  protected static final String DEFAULT_OFFSET_CRITERIA = "largest";
+  protected static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
 
+  final private String _type;
+  final private String _topicName;
+  final private List<ConsumerType> _consumerTypes = new ArrayList<>();
+  final private String _consumerFactoryClassName;
+  final private String _offsetCriteria;
+  final private String _decoderClass;
+  final private Map<String, String> _decoderProperties = new HashMap<>();
+
+  final private long _connectionTimeoutMillis;
+  final private int _fetchTimeoutMillis;
+
+  final private int _flushThresholdRows;
+  final private long _flushThresholdTimeMillis;
+  final private long _flushSegmentDesiredSizeBytes;
+
+  final private Map<String, String> _streamConfigMap = new HashMap<>();
+
+  /**
+   * Initializes a StreamConfig using the map of stream configs from the table config
+   * @param streamConfigMap
+   */
   public StreamConfig(Map<String, String> streamConfigMap) {
-    _zkBrokerUrl =
-        streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-            Helix.DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING));
 
-    final String bootstrapHostConfigKey = Helix.DataSource.STREAM_PREFIX + "." + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST;
-    if (streamConfigMap.containsKey(bootstrapHostConfigKey)) {
-      _bootstrapHosts = streamConfigMap.get(bootstrapHostConfigKey);
-    } else {
-      _bootstrapHosts = null;
-    }
+    _type = streamConfigMap.get(StreamConfigProperties.STREAM_TYPE);
+    Preconditions.checkNotNull(_type, "Stream type cannot be null");
 
-    String consumerTypesCsv =streamConfigMap.get(StringUtil.join(".", Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE));
-    Iterable<String> parts = Splitter.on(',').trimResults().split(consumerTypesCsv);
-    for (String part : parts) {
-      _consumerTypes.add(ConsumerType.valueOf(part));
-    }
-    if (_consumerTypes.isEmpty()) {
-      throw new RuntimeException("Empty consumer types: Must have 'highLevel' or 'simple'");
-    }
-    Collections.sort(_consumerTypes);
+    String topicNameKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_TOPIC_NAME);
+    _topicName = streamConfigMap.get(topicNameKey);
+    Preconditions.checkNotNull(_topicName, "Stream topic name " + topicNameKey + " cannot be null");
 
-    _kafkaTopicName =
-        streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-            CommonConstants.Helix.DataSource.Realtime.Kafka.TOPIC_NAME));
-    _decoderClass =
-        streamConfigMap.get(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-            CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_CLASS));
-
-    _consumerFactoryName = streamConfigMap.get(StringUtil
-        .join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, Helix.DataSource.Realtime.Kafka.CONSUMER_FACTORY));
-    if (_consumerFactoryName == null) {
-      _consumerFactoryName = Helix.DataSource.Realtime.Kafka.ConsumerFactory.SIMPLE_CONSUMER_FACTORY_STRING;
-    }
-    LOGGER.info("Setting consumer factory to {}", _consumerFactoryName);
-
-    final String kafkaConnectionTimeoutPropertyKey = StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-        Helix.DataSource.Realtime.Kafka.KAFKA_CONNECTION_TIMEOUT_MILLIS);
-    long kafkaConnectionTimeoutMillis;
-    if (streamConfigMap.containsKey(kafkaConnectionTimeoutPropertyKey)) {
-      try {
-        kafkaConnectionTimeoutMillis = Long.parseLong(streamConfigMap.get(kafkaConnectionTimeoutPropertyKey));
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while parsing the Kafka connection timeout, defaulting to {} ms", e,
-            DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS);
-        kafkaConnectionTimeoutMillis = DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS;
+    String consumerTypesKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_TYPES);
+    String consumerTypes = streamConfigMap.get(consumerTypesKey);
+    Preconditions.checkNotNull(consumerTypes, "Must specify at least one consumer type " + consumerTypesKey);
+    for (String consumerType : consumerTypes.split(",")) {
+      if (consumerType.equals(SIMPLE_CONSUMER_TYPE_STRING)) { //For backward compatibility of stream configs which referred to lowlevel as simple
+        consumerType = ConsumerType.LOWLEVEL.toString();
       }
-    } else {
-      kafkaConnectionTimeoutMillis = DEFAULT_KAFKA_CONNECTION_TIMEOUT_MILLIS;
+      _consumerTypes.add(ConsumerType.valueOf(consumerType.toUpperCase()));
     }
-    _kafkaConnectionTimeoutMillis = kafkaConnectionTimeoutMillis;
 
-    final String kafkaFetchTimeoutPropertyKey = StringUtil.join(".", Helix.DataSource.STREAM_PREFIX,
-        Helix.DataSource.Realtime.Kafka.KAFKA_FETCH_TIMEOUT_MILLIS);
-    int kafkaFetchTimeoutMillis;
-    if (streamConfigMap.containsKey(kafkaFetchTimeoutPropertyKey)) {
-      try {
-        kafkaFetchTimeoutMillis = Integer.parseInt(streamConfigMap.get(kafkaFetchTimeoutPropertyKey));
-      } catch (Exception e) {
-        LOGGER.warn("Caughe exception while parsing the Kafka fetch timeout, defaulting to {} ms", e,
-            DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS);
-        kafkaFetchTimeoutMillis = DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS;
-      }
+    String consumerFactoryClassKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
+    _consumerFactoryClassName = streamConfigMap.get(consumerFactoryClassKey);
+    Preconditions.checkNotNull(_consumerFactoryClassName,
+        "Must specify consumer factory class name in property " + consumerFactoryClassKey);
+
+    LOGGER.info("Stream type: {}, name: {}, consumer types: {}, consumer factory: {}", _type, _topicName,
+        _consumerTypes, _consumerFactoryClassName);
+
+    String offsetCriteriaKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA);
+    String offsetCriteria = streamConfigMap.get(offsetCriteriaKey);
+    if (offsetCriteria != null) {
+      _offsetCriteria = offsetCriteria;
     } else {
-      kafkaFetchTimeoutMillis = DEFAULT_KAFKA_FETCH_TIMEOUT_MILLIS;
+      _offsetCriteria = DEFAULT_OFFSET_CRITERIA;
     }
-    _kafkaFetchTimeoutMillis = kafkaFetchTimeoutMillis;
 
+    String decoderClassKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_DECODER_CLASS);
+    _decoderClass = streamConfigMap.get(decoderClassKey);
+    Preconditions.checkNotNull(_decoderClass, "Must specify decoder class name " + decoderClassKey);
+
+    String streamDecoderPropPrefix =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.DECODER_PROPS_PREFIX);
     for (String key : streamConfigMap.keySet()) {
-      if (key.startsWith(CommonConstants.Helix.DataSource.STREAM_PREFIX + ".")) {
-        _streamConfigMap.put(key, streamConfigMap.get(key));
-      }
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-          CommonConstants.Helix.DataSource.Realtime.Kafka.DECODER_PROPS_PREFIX))) {
-        _decoderProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getDecoderPropertyKey(key),
-            streamConfigMap.get(key));
-      }
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-          Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX))) {
-        _kafkaConsumerProperties.put(CommonConstants.Helix.DataSource.Realtime.Kafka.getConsumerPropertyKey(key),
+      if (key.startsWith(streamDecoderPropPrefix)) {
+        _decoderProperties.put(StreamConfigProperties.getPropertySuffix(key, streamDecoderPropPrefix),
             streamConfigMap.get(key));
       }
     }
+
+    long connectionTimeoutMillis = DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS;
+    String connectionTimeoutKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONNECTION_TIMEOUT_MILLIS);
+    String connectionTimeoutValue = streamConfigMap.get(connectionTimeoutKey);
+    if (connectionTimeoutValue != null) {
+      try {
+        connectionTimeoutMillis = Long.parseLong(connectionTimeoutValue);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while parsing the connection timeout, defaulting to {} ms", e,
+            DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
+      }
+    }
+    _connectionTimeoutMillis = connectionTimeoutMillis;
+
+    int fetchTimeoutMillis = DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS;
+    String fetchTimeoutKey =
+        StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_FETCH_TIMEOUT_MILLIS);
+    String fetchTimeoutValue = streamConfigMap.get(fetchTimeoutKey);
+    if (fetchTimeoutValue != null) {
+      try {
+        fetchTimeoutMillis = Integer.parseInt(fetchTimeoutValue);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while parsing the fetch timeout, defaulting to {} ms",
+            DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS, e);
+      }
+    }
+    _fetchTimeoutMillis = fetchTimeoutMillis;
+
+    int flushThresholdRows = DEFAULT_FLUSH_THRESHOLD_ROWS;
+    String flushThresholdRowsValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS);
+    if (flushThresholdRowsValue != null) {
+      try {
+        flushThresholdRows = Integer.parseInt(flushThresholdRowsValue);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception when parsing flush threshold rows {}:{}, defaulting to {}",
+            StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, flushThresholdRowsValue, DEFAULT_FLUSH_THRESHOLD_ROWS,
+            e);
+      }
+    }
+    _flushThresholdRows = flushThresholdRows;
+
+    long flushThresholdTime = DEFAULT_FLUSH_THRESHOLD_TIME;
+    String flushThresholdTimeValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME);
+    if (flushThresholdTimeValue != null) {
+      try {
+        flushThresholdTime = TimeUtils.convertPeriodToMillis(flushThresholdTimeValue);
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception when converting flush threshold period to millis {}:{}, defaulting to {}",
+            StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTimeValue, DEFAULT_FLUSH_THRESHOLD_TIME,
+            e);
+      }
+    }
+    _flushThresholdTimeMillis = flushThresholdTime;
+
+    long flushDesiredSize = -1;
+    String flushSegmentDesiredSizeValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_DESIRED_SIZE);
+    if (flushSegmentDesiredSizeValue != null) {
+      flushDesiredSize = DataSize.toBytes(flushSegmentDesiredSizeValue);
+    }
+    if (flushDesiredSize > 0) {
+      _flushSegmentDesiredSizeBytes = flushDesiredSize;
+    } else {
+      _flushSegmentDesiredSizeBytes = DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
+    }
+
+    _streamConfigMap.putAll(streamConfigMap);
   }
 
-  public boolean hasHighLevelKafkaConsumerType() {
-    return _consumerTypes.contains(ConsumerType.highLevel);
+  public String getType() {
+    return _type;
   }
 
-  public boolean hasSimpleKafkaConsumerType() {
-    return _consumerTypes.contains(ConsumerType.simple);
-  }
-
-  public long getKafkaConnectionTimeoutMillis() {
-    return _kafkaConnectionTimeoutMillis;
-  }
-
-  public int getKafkaFetchTimeoutMillis() {
-    return _kafkaFetchTimeoutMillis;
-  }
-
-  public String getKafkaTopicName() {
-    return _kafkaTopicName;
+  public String getTopicName() {
+    return _topicName;
   }
 
   public List<ConsumerType> getConsumerTypes() {
     return _consumerTypes;
   }
 
-  public Map<String, String> getKafkaConfigs() {
-    return _streamConfigMap;
+  public boolean hasHighLevelConsumerType() {
+    return _consumerTypes.contains(ConsumerType.HIGHLEVEL);
   }
 
-  // TODO This is the only Kafka-specific method, used in HLC.
-  // Need to figure out a way to move this to a kafka-specific class
-  public String getZkBrokerUrl() {
-    return _zkBrokerUrl;
+  public boolean hasLowLevelConsumerType() {
+    return _consumerTypes.contains(ConsumerType.LOWLEVEL);
+  }
+
+  public String getConsumerFactoryClassName() {
+    return _consumerFactoryClassName;
+  }
+
+  public String getOffsetCriteria() {
+    return _offsetCriteria;
+  }
+
+  public long getConnectionTimeoutMillis() {
+    return _connectionTimeoutMillis;
+  }
+
+  public int getFetchTimeoutMillis() {
+    return _fetchTimeoutMillis;
+  }
+
+  public int getFlushThresholdRows() {
+    return _flushThresholdRows;
+  }
+
+  public static int getDefaultFlushThresholdRows() {
+    return DEFAULT_FLUSH_THRESHOLD_ROWS;
+  }
+
+  public long getFlushThresholdTimeMillis() {
+    return _flushThresholdTimeMillis;
+  }
+
+  public static long getDefaultFlushThresholdTimeMillis() {
+    return DEFAULT_FLUSH_THRESHOLD_TIME;
+  }
+
+  public long getFlushSegmentDesiredSizeBytes() {
+    return _flushSegmentDesiredSizeBytes;
+  }
+
+  public static long getDefaultDesiredSegmentSizeBytes() {
+    return DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
   }
 
   public String getDecoderClass() {
     return _decoderClass;
   }
 
-  public String getConsumerFactoryName() {
-    return _consumerFactoryName;
-  }
-
   public Map<String, String> getDecoderProperties() {
     return _decoderProperties;
   }
 
-  public Map<String, String> getKafkaConsumerProperties() {
-    return _kafkaConsumerProperties;
+  public Map<String, String> getStreamConfigsMap() {
+    return _streamConfigMap;
   }
 
   @Override
   public String toString() {
-    final StringBuilder result = new StringBuilder();
-    String newline = "\n";
-    result.append(this.getClass().getName());
-    result.append(" Object {");
-    result.append(newline);
-    String[] keys = _streamConfigMap.keySet().toArray(new String[0]);
-    Arrays.sort(keys);
-    for (final String key : keys) {
-      if (key.startsWith(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-          CommonConstants.Helix.DataSource.KAFKA))) {
-        result.append("  ");
-        result.append(key);
-        result.append(": ");
-        result.append(_streamConfigMap.get(key));
-        result.append(newline);
-      }
-    }
-    result.append("}");
-
-    return result.toString();
+    return "StreamConfig{" + "_type='" + _type + '\'' + ", _topicName='" + _topicName + '\'' + ", _consumerTypes="
+        + _consumerTypes + ", _consumerFactoryClassName='" + _consumerFactoryClassName + '\'' + ", _offsetCriteria='"
+        + _offsetCriteria + '\'' + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis="
+        + _fetchTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis="
+        + _flushThresholdTimeMillis + ", _flushSegmentDesiredSizeBytes=" + _flushSegmentDesiredSizeBytes
+        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties + '}';
   }
 
   @Override
   public boolean equals(Object o) {
-    if (isSameReference(this, o)) {
+    if (EqualityUtils.isSameReference(this, o)) {
       return true;
     }
 
-    if (isNullOrNotSameClass(this, o)) {
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
       return false;
     }
 
     StreamConfig that = (StreamConfig) o;
 
-    return isEqual(_kafkaTopicName, that._kafkaTopicName) &&
-        isEqual(_consumerTypes, that._consumerTypes) &&
-        isEqual(_zkBrokerUrl, that._zkBrokerUrl) &&
-        isEqual(_decoderClass, that._decoderClass) &&
-        isEqual(_decoderProperties, that._decoderProperties) &&
-        isEqual(_streamConfigMap, that._streamConfigMap) &&
-        isEqual(_consumerFactoryName, that._consumerFactoryName);
+    return EqualityUtils.isEqual(_connectionTimeoutMillis, that._connectionTimeoutMillis) && EqualityUtils.isEqual(
+        _fetchTimeoutMillis, that._fetchTimeoutMillis) && EqualityUtils.isEqual(_flushThresholdRows,
+        that._flushThresholdRows) && EqualityUtils.isEqual(_flushThresholdTimeMillis, that._flushThresholdTimeMillis)
+        && EqualityUtils.isEqual(_flushSegmentDesiredSizeBytes, that._flushSegmentDesiredSizeBytes)
+        && EqualityUtils.isEqual(_type, that._type) && EqualityUtils.isEqual(_topicName, that._topicName)
+        && EqualityUtils.isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils.isEqual(
+        _consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils.isEqual(_offsetCriteria,
+        that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass) && EqualityUtils.isEqual(
+        _decoderProperties, that._decoderProperties) && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
   }
 
   @Override
   public int hashCode() {
-    int result = hashCodeOf(_kafkaTopicName);
-    result = hashCodeOf(result, _consumerTypes);
-    result = hashCodeOf(result, _zkBrokerUrl);
-    result = hashCodeOf(result, _decoderClass);
-    result = hashCodeOf(result, _decoderProperties);
-    result = hashCodeOf(result, _streamConfigMap);
-    result = hashCodeOf(result, _consumerFactoryName);
+    int result = EqualityUtils.hashCodeOf(_type);
+    result = EqualityUtils.hashCodeOf(result, _topicName);
+    result = EqualityUtils.hashCodeOf(result, _consumerTypes);
+    result = EqualityUtils.hashCodeOf(result, _consumerFactoryClassName);
+    result = EqualityUtils.hashCodeOf(result, _offsetCriteria);
+    result = EqualityUtils.hashCodeOf(result, _connectionTimeoutMillis);
+    result = EqualityUtils.hashCodeOf(result, _fetchTimeoutMillis);
+    result = EqualityUtils.hashCodeOf(result, _flushThresholdRows);
+    result = EqualityUtils.hashCodeOf(result, _flushThresholdTimeMillis);
+    result = EqualityUtils.hashCodeOf(result, _flushSegmentDesiredSizeBytes);
+    result = EqualityUtils.hashCodeOf(result, _decoderClass);
+    result = EqualityUtils.hashCodeOf(result, _decoderProperties);
+    result = EqualityUtils.hashCodeOf(result, _streamConfigMap);
     return result;
-  }
-
-  public String getBootstrapHosts() {
-    return _bootstrapHosts;
   }
 }

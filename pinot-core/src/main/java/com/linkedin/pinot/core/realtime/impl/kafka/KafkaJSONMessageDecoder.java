@@ -69,7 +69,7 @@ public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
     if (message.has(columnName) && !message.isNull(columnName)) {
       Object entry;
       if (dimensionSpec.isSingleValueField()) {
-        entry = stringToDataType(dimensionSpec, message.getString(columnName));
+        entry = stringToDataType(dimensionSpec, message.get(columnName).toString());
       } else {
         JSONArray jsonArray = message.getJSONArray(columnName);
         Object[] array = new Object[jsonArray.length()];

@@ -30,13 +30,13 @@ module('Integration | Component | self serve alert details', function(hooks) {
     const renderedPropNames = optionsToString(this.$(propTitleSel));
 
     assert.equal(
-      this.$(headerSel).get(0).innerText,
+      this.$(headerSel).get(0).innerText.trim(),
       'ACTIVE',
       'correctly displays alert status'
     );
 
     assert.equal(
-      this.$(titleSel).get(0).innerText,
+      this.$(titleSel).get(0).innerText.trim(),
       'test_function_1',
       'correctly displays alert title'
     );

@@ -493,11 +493,12 @@ public class MovingWindowAlgorithm extends StaticDetectionPipeline {
       // NOTE: NEW_TREND not labeled as anomaly
       // NOTE: NO_FEEDBACK not labeled as anomaly
 
-      if (anomaly.getFeedback() != null && anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
+      if (anomaly.getFeedback() != null && anomaly.getFeedback().getFeedbackType().isAnomaly()
+          && !anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NEW_TREND)) {
         res.set(COL_ANOMALY, res.getLongs(COL_TIME).between(anomaly.getStartTime(), anomaly.getEndTime()).and(trainingRange), BooleanSeries.fillValues(df.size(), true));
       }
 
-      if (anomaly.getFeedback() != null && anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
+      if (anomaly.getFeedback() != null && anomaly.getFeedback().getFeedbackType().isNotAnomaly()) {
         res.set(COL_NOT_ANOMALY, res.getLongs(COL_TIME).between(anomaly.getStartTime(), anomaly.getEndTime()).and(trainingRange), BooleanSeries.fillValues(df.size(), true));
       }
     }

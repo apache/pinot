@@ -17,7 +17,6 @@ package com.linkedin.pinot.common.utils;
 
 import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import java.io.File;
-import org.apache.commons.lang.StringUtils;
 
 
 public class CommonConstants {
@@ -64,9 +63,6 @@ public class CommonConstants {
     }
 
     public static class DataSource {
-      public static final String SCHEMA = "schema";
-      public static final String KAFKA = "kafka";
-      public static final String STREAM_PREFIX = "stream";
       public enum SegmentAssignmentStrategyType {
         RandomAssignmentStrategy,
         BalanceNumSegmentAssignmentStrategy,
@@ -84,117 +80,9 @@ public class CommonConstants {
         PartitionAwareRealtime
       }
 
-      public static class Schema {
-        public static final String COLUMN_NAME = "columnName";
-        public static final String DATA_TYPE = "dataType";
-        public static final String DELIMETER = "delimeter";
-        public static final String IS_SINGLE_VALUE = "isSingleValue";
-        public static final String FIELD_TYPE = "fieldType";
-        public static final String TIME_UNIT = "timeUnit";
-      }
-
-      public static class Realtime {
-        public static final String STREAM_TYPE = "streamType";
-        // Time threshold that will keep the realtime segment open for before we convert it into an offline segment
-        public static final String REALTIME_SEGMENT_FLUSH_TIME = "realtime.segment.flush.threshold.time";
-        // Time threshold that controller will wait for the segment to be built by the server
-        public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
-        /**
-         * Row count flush threshold for realtime segments. This behaves in a similar way for HLC and LLC. For HLC,
-         * since there is only one consumer per server, this size is used as the size of the consumption buffer and
-         * determines after how many rows we flush to disk. For example, if this threshold is set to two million rows,
-         * then a high level consumer would have a buffer size of two million.
-         *
-         * For LLC, this size is divided across all the segments assigned to a given server and is set on a per segment
-         * basis. Assuming a low level consumer server is assigned four Kafka partitions to consume from and a flush
-         * size of two million, then each consuming segment would have a flush size of five hundred thousand rows, for a
-         * total of two million rows in memory.
-         *
-         * Keep in mind that this NOT a hard threshold, as other tables can also be assigned to this server, and that in
-         * certain conditions (eg. if the number of servers, replicas of Kafka partitions changes) where Kafka partition
-         * to server assignment changes, it's possible to end up with more (or less) than this number of rows in memory.
-         *
-         * If this value is set to 0, then the consumers adjust the number of rows consumed by a partition such that
-         * the size of the completed segment is the desired size (see REALTIME_DESIRED_SEGMENT_SIZE), unless
-         * REALTIME_SEGMENT_FLUSH_TIME is reached first)
-         */
-        public static final String REALTIME_SEGMENT_FLUSH_SIZE = "realtime.segment.flush.threshold.size";
-        /*
-         * The desired size of a completed realtime segment.
-         * This config is used only if REALTIME_SEGMENT_FLUSH_SIZE (or REALTIME_SEGMENT_FLUSH_SIZE  + ".llc") is set
-         * to 0. Default value of REALTIME_SEGMENT_FLUSH_SIZE is "200M". Values are parsed using DataSize class.
-         *
-         * The value for this configuration should be chosen based on the amount of memory available on consuming
-         * machines, the number of completed segments that are expected to be resident on the machine and the amount
-         * of memory used by consuming machines. In other words:
-         *
-         *    numPartitionsInMachine * (consumingPartitionMemory + numPartitionsRetained * REALTIME_DESIRED_SEGMENT_SIZE)
-         *
-         * must be less than or equal to the total memory available to store pinot data.
-         *
-         * Note that consumingPartitionMemory will vary depending on the rows that are consumed.
-         *
-         * Not included here is any heap memory used (currently inverted index uses heap memory for consuming partitions).
-         */
-        public static final String REALTIME_DESIRED_SEGMENT_SIZE = "realtime.segment.flush.desired.size";
-        public static final String LLC_PROPERTY_SUFFIX = ".llc";
-        public static final String LLC_REALTIME_SEGMENT_FLUSH_SIZE = REALTIME_SEGMENT_FLUSH_SIZE + LLC_PROPERTY_SUFFIX;
-        public static final String LLC_REALTIME_SEGMENT_FLUSH_TIME = REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX;
-
-        public static enum StreamType {
-          kafka
-        }
-
-        public static class Kafka {
-
-          public static enum ConsumerType {
-            simple,
-            highLevel
-          }
-
-          public static final String TOPIC_NAME = "kafka.topic.name";
-          public static final String CONSUMER_TYPE = "kafka.consumer.type";
-          public static final String DECODER_CLASS = "kafka.decoder.class.name";
-          public static final String DECODER_PROPS_PREFIX = "kafka.decoder.prop";
-          public static final String KAFKA_CONSUMER_PROPS_PREFIX = "kafka.consumer.prop";
-          public static final String KAFKA_CONNECTION_TIMEOUT_MILLIS = "kafka.connection.timeout.ms";
-          public static final String KAFKA_FETCH_TIMEOUT_MILLIS = "kafka.fetch.timeout.ms";
-          public static final String ZK_BROKER_URL = "kafka.zk.broker.url";
-          public static final String KAFKA_BROKER_LIST = "kafka.broker.list";
-          public static final String CONSUMER_FACTORY = "kafka.consumer.factory.class.name";
-
-          // Consumer properties
-          public static final String AUTO_OFFSET_RESET = "auto.offset.reset";
-
-          public static String getDecoderPropertyKeyFor(String key) {
-            return StringUtils.join(new String[] { DECODER_PROPS_PREFIX, key }, ".");
-          }
-
-          public static String getDecoderPropertyKey(String incoming) {
-            return incoming.split(DECODER_PROPS_PREFIX + ".")[1];
-          }
-
-          public static String getConsumerPropertyKey(String incoming) {
-            return incoming.split(KAFKA_CONSUMER_PROPS_PREFIX + ".")[1];
-          }
-
-          public static class HighLevelConsumer {
-            public static final String ZK_CONNECTION_STRING = "kafka.hlc.zk.connect.string";
-            public static final String GROUP_ID = "kafka.hlc.group.id";
-          }
-
-          public static class ConsumerFactory {
-            public static final String SIMPLE_CONSUMER_FACTORY_STRING = "com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory";
-          }
-        }
-      }
-
     }
 
     public static class Instance {
-      public static final String INSTANCE_NAME = "instance.name";
-      public static final String GROUP_ID_SUFFIX = "kafka.hlc.groupId";
-      public static final String PARTITION_SUFFIX = "kafka.hlc.partition";
       public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String DATA_DIR_KEY = "dataDir";
       public static final String ADMIN_PORT_KEY = "adminPort";

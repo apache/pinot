@@ -40,7 +40,7 @@ public class F1ScoreFunction implements ScoreFunction {
     for (MergedAnomalyResultDTO testAnomaly : anomalies) {
       if (testAnomaly.getAnomalyFeedbackId() != null) {
         labeledAnomalies++;
-        if (testAnomaly.getFeedback().getFeedbackType() == AnomalyFeedbackType.ANOMALY) {
+        if (testAnomaly.getFeedback().getFeedbackType().isAnomaly()) {
           trueTestAnomalies.add(testAnomaly);
         }
       }
@@ -49,7 +49,7 @@ public class F1ScoreFunction implements ScoreFunction {
     int truePositives = 0;
     for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
       for (MergedAnomalyResultDTO testAnomaly : trueTestAnomalies) {
-        if (testAnomaly.getFeedback().getFeedbackType() == AnomalyFeedbackType.ANOMALY && isOverlap(anomaly,
+        if (testAnomaly.getFeedback().getFeedbackType().isAnomaly() && isOverlap(anomaly,
             testAnomaly)) {
           truePositives += 1;
           break;

@@ -15,16 +15,10 @@
  */
 package com.linkedin.pinot.core.realtime.stream;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 
 
 public interface StreamLevelConsumer {
-  /**
-   *
-   */
-  void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics) throws Exception;
 
   /**
    *

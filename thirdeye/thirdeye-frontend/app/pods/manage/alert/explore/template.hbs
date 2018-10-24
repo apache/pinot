@@ -69,28 +69,28 @@
       </h4>
       <a class="te-self-serve__side-link te-self-serve__side-link--high" {{action "onClickReportAnomaly" this}}>Report missing anomaly</a>
 
-      {{#if filteredAnomalies}}
-        {{!-- Dimension selector --}}
-        {{#if alertHasDimensions}}
-          <div class="te-form__select te-form__select--wider col-md-3">
-            {{#power-select
-              triggerId="select-dimension"
-              triggerClass="te-form__select"
-              options=dimensionOptions
-              searchEnabled=true
-              searchPlaceholder="Type to filter..."
-              matchTriggerWidth=true
-              matchContentWidth=true
-              selected=selectedDimension
-              onchange=(action "onSelectDimension")
-              as |dimension|
-            }}
-              {{dimension}}
-            {{/power-select}}
-          </div>
-        {{/if}}
-        {{!-- Resolution selector --}}
-        <div class="col-md-3">
+      {{!-- Dimension selector --}}
+      {{#if alertHasDimensions}}
+        <div class="te-form__select te-form__select--wider col-md-3">
+          {{#power-select
+            triggerId="select-dimension"
+            triggerClass="te-form__select"
+            options=dimensionOptions
+            searchEnabled=true
+            searchPlaceholder="Type to filter..."
+            matchTriggerWidth=true
+            matchContentWidth=true
+            selected=selectedDimension
+            onchange=(action "onSelectDimension")
+            as |dimension|
+          }}
+            {{dimension}}
+          {{/power-select}}
+        </div>
+      {{/if}}
+      {{!-- Resolution selector --}}
+      {{#if totalAnomalies}}
+        <div class="col-md-3 {{if (not alertHasDimensions) "te-form__select--left"}}">
           {{#power-select
             triggerId="select-resolution"
             triggerClass="te-form__select"
@@ -274,7 +274,7 @@
                         triggerClass="te-anomaly-table__select"
                         options=responseOptions
                         searchEnabled=false
-                        selected=anomaly.anomalyFeedback
+                        selected=(get labelMap anomaly.anomalyFeedback)
                         onchange=(action "onChangeAnomalyResponse" anomaly)
                         as |response|
                       }}
@@ -282,7 +282,7 @@
                       {{/power-select}}
                     {{/if}}
                  </td>
-                 <td class="te-anomaly-table__cell">
+                 <td class="te-anomaly-table__cell te-anomaly-table__cell--feedback">
                     <div class="te-anomaly-table__link-wrapper">
                       {{#link-to 'rootcause' (query-params anomalyId=anomaly.anomalyId) target="_blank" class="te-anomaly-table__link"}}
                         Investigate

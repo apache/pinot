@@ -41,7 +41,7 @@
       color: app-shade(black, 4);
     }
 
-    &:last-child {
+    &--feedback {
       max-width: 90px;
       text-align: center;
       padding: 4px 0 0 0;
@@ -140,7 +140,7 @@
 
   &__select {
     display: inline-block;
-    width: 180px;
+    width: 200px;
 
     &--margin-right {
       margin-right: 30px;

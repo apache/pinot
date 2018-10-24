@@ -161,6 +161,10 @@ body {
       display: inline-block;
       color: app-shade(black, 7);
     }
+
+    &--left {
+      margin-left: -15px;
+    }
   }
 
   &__new-sub {

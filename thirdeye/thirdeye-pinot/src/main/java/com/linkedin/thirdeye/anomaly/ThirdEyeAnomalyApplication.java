@@ -72,9 +72,12 @@ public class ThirdEyeAnomalyApplication
   private DetectionAlertScheduler detectionAlertScheduler = null;
 
   public static void main(final String[] args) throws Exception {
-
     List<String> argList = new ArrayList<>(Arrays.asList(args));
-    if (argList.size() == 1) {
+    if (argList.isEmpty()) {
+      argList.add("./config");
+    }
+
+    if (argList.size() <= 1) {
       argList.add(0, "server");
     }
 

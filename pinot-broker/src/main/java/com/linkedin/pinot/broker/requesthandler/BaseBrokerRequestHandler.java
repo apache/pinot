@@ -172,7 +172,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Validate QPS quota
     if (!_tableQueryQuotaManager.acquire(tableName)) {
-      String errorMessage = String.format("Request %d exceeds query quota for table: %s", requestId, tableName);
+      String errorMessage =
+          String.format("Request %d exceeds query quota for table:%s, query:%s", requestId, tableName, query);
       LOGGER.info(errorMessage);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));

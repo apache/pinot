@@ -368,8 +368,8 @@ public class PinotTableRestletResource {
         String errorMsg = String.format("Invalid tableIndexConfig or streamConfig: %s", e.getMessage());
         throw new PinotHelixResourceManager.InvalidTableConfigException(errorMsg, e);
       }
-      verifyReplicasPerPartition = streamConfig.hasSimpleKafkaConsumerType();
-      verifyReplication = streamConfig.hasHighLevelKafkaConsumerType();
+      verifyReplicasPerPartition = streamConfig.hasLowLevelConsumerType();
+      verifyReplication = streamConfig.hasHighLevelConsumerType();
     }
 
     if (verifyReplication) {

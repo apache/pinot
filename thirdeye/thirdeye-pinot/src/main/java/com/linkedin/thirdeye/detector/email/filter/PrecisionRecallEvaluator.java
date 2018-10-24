@@ -205,6 +205,8 @@ public class PrecisionRecallEvaluator {
         isLabeledTrueAnomaly = true;
       }
 
+      // TODO handle AnomalyFeedbackType.ANOMALY_EXPECTED
+
       // handle user report anomaly
       if (anomaly.getAnomalyResultSource().equals(AnomalyResultSource.USER_LABELED_ANOMALY)) {
         if (!isProjected) {

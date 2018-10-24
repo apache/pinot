@@ -16,63 +16,65 @@
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamDecoderProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.yammer.metrics.core.Meter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.javaapi.consumer.ConsumerConnector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * An implementation of a {@link StreamLevelConsumer} which consumes from the kafka stream
  */
 public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
-  private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaStreamLevelConsumer.class);
 
-  private KafkaHighLevelStreamProviderConfig streamProviderConfig;
   private StreamMessageDecoder _messageDecoder;
+  private Logger INSTANCE_LOGGER;
+
+  private String _clientId;
+  private String _tableAndStreamName;
+
+  private StreamConfig _streamConfig;
+  private KafkaHighLevelStreamConfig _kafkaHighLevelStreamConfig;
 
   private ConsumerConnector consumer;
   private ConsumerIterator<byte[], byte[]> kafkaIterator;
+  private ConsumerAndIterator consumerAndIterator;
   private long lastLogTime = 0;
   private long lastCount = 0;
-  private ConsumerAndIterator consumerAndIterator;
-
-  private Logger INSTANCE_LOGGER = STATIC_LOGGER;
-
-  private ServerMetrics serverMetrics;
-  private String tableAndStreamName;
   private long currentCount = 0L;
 
+  private ServerMetrics _serverMetrics;
   private Meter tableAndStreamRowsConsumed = null;
   private Meter tableRowsConsumed = null;
 
-  public KafkaStreamLevelConsumer(String clientId, StreamConfig streamConfig, Schema schema) {
+  public KafkaStreamLevelConsumer(String clientId, String tableName, StreamConfig streamConfig, Schema schema,
+      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+    _clientId = clientId;
+    _streamConfig = streamConfig;
+    _kafkaHighLevelStreamConfig = new KafkaHighLevelStreamConfig(streamConfig, tableName, instanceZKMetadata);
+    _serverMetrics = serverMetrics;
+
     _messageDecoder = StreamDecoderProvider.create(streamConfig, schema);
+
+    _tableAndStreamName = tableName + "-" + streamConfig.getTopicName();
+    INSTANCE_LOGGER = LoggerFactory.getLogger(
+        KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamConfig.getTopicName());
   }
 
-  @Override
-  public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
-      throws Exception {
-    this.streamProviderConfig = (KafkaHighLevelStreamProviderConfig) streamProviderConfig;
-    tableAndStreamName = tableName + "-" + streamProviderConfig.getStreamName();
-    INSTANCE_LOGGER = LoggerFactory.getLogger(
-        KafkaStreamLevelConsumer.class.getName() + "_" + tableName + "_" + streamProviderConfig
-            .getStreamName());
-    this.serverMetrics = serverMetrics;
-  }
+
 
   @Override
   public void start() throws Exception {
-    consumerAndIterator = KafkaConsumerManager.acquireConsumerAndIteratorForConfig(streamProviderConfig);
+    consumerAndIterator = KafkaConsumerManager.acquireConsumerAndIteratorForConfig(_kafkaHighLevelStreamConfig);
     kafkaIterator = consumerAndIterator.getIterator();
     consumer = consumerAndIterator.getConsumer();
   }
@@ -87,19 +89,22 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
     if (kafkaIterator.hasNext()) {
       try {
         destination = _messageDecoder.decode(kafkaIterator.next().message(), destination);
-        tableAndStreamRowsConsumed = serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableAndStreamRowsConsumed);
-        tableRowsConsumed = serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableRowsConsumed);
+        tableAndStreamRowsConsumed =
+            _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L,
+                tableAndStreamRowsConsumed);
+        tableRowsConsumed =
+            _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableRowsConsumed);
+
         ++currentCount;
 
         final long now = System.currentTimeMillis();
         // Log every minute or 100k events
         if (now - lastLogTime > 60000 || currentCount - lastCount >= 100000) {
           if (lastCount == 0) {
-            INSTANCE_LOGGER.info("Consumed {} events from kafka stream {}", currentCount,
-                this.streamProviderConfig.getStreamName());
+            INSTANCE_LOGGER.info("Consumed {} events from kafka stream {}", currentCount, _streamConfig.getTopicName());
           } else {
             INSTANCE_LOGGER.info("Consumed {} events from kafka stream {} (rate:{}/s)", currentCount - lastCount,
-                this.streamProviderConfig.getStreamName(),
+                _streamConfig.getTopicName(),
                 (float) (currentCount - lastCount) * 1000 / (now - lastLogTime));
           }
           lastCount = currentCount;
@@ -108,8 +113,8 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
         return destination;
       } catch (Exception e) {
         INSTANCE_LOGGER.warn("Caught exception while consuming events", e);
-        serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
-        serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+        _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
+        _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);
         throw e;
       }
     }
@@ -129,8 +134,8 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   @Override
   public void commit() {
     consumer.commitOffsets();
-    serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
-    serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
+    _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
+    _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
   }
 
   @Override

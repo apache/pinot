@@ -16,12 +16,7 @@
 package com.linkedin.pinot.client;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.Properties;
-
-import org.I0Itec.zkclient.ZkClient;
-import org.I0Itec.zkclient.serialize.BytesPushThroughSerializer;
-
 
 /**
  * Creates connections to Pinot, given various initialization methods.

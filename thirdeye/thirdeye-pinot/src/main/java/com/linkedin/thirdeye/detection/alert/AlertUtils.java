@@ -41,7 +41,7 @@ public class AlertUtils {
    */
   public static boolean hasFeedback(MergedAnomalyResultDTO anomaly) {
     return anomaly.getFeedback() != null
-        && !AnomalyFeedbackType.NO_FEEDBACK.equals(anomaly.getFeedback().getFeedbackType());
+        && !anomaly.getFeedback().getFeedbackType().isUnresolved();
   }
 
   /**

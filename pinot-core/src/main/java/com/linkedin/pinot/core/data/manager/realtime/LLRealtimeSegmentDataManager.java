@@ -31,7 +31,6 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -44,11 +43,10 @@ import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.MessageBatch;
-import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.PartitionLevelStreamConfig;
+import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
 import com.linkedin.pinot.core.realtime.stream.StreamDecoderProvider;
@@ -174,7 +172,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class);
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
@@ -228,7 +225,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final List<String> _noDictionaryColumns;
   private final StarTreeIndexSpec _starTreeIndexSpec;
   private final String _sortedColumn;
-  private Logger segmentLogger = LOGGER;
+  private Logger segmentLogger;
   private final String _tableStreamName;
   private final PinotDataBufferMemoryManager _memoryManager;
   private AtomicLong _lastUpdatedRowsIndexed = new AtomicLong(0);
@@ -236,8 +233,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final long _consumeStartTime;
   private final long _startOffset;
-  private final StreamConfig _streamConfig;
-  private final String _streamBootstrapNodes;
+  private final PartitionLevelStreamConfig _partitionLevelStreamConfig;
 
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
@@ -326,7 +322,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   protected boolean consumeLoop() throws Exception {
     _fieldExtractor.resetCounters();
     final long idlePipeSleepTimeMillis = 100;
-    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/(idlePipeSleepTimeMillis + _streamConfig.getKafkaFetchTimeoutMillis());  // 3 minute count
+    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/(idlePipeSleepTimeMillis + _partitionLevelStreamConfig.getFetchTimeoutMillis());  // 3 minute count
     long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
     long idleCount = 0;
     // At this point, we know that we can potentially move the offset, so the old saved segment file is not valid
@@ -340,8 +336,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
       try {
-        messageBatch =
-            _partitionLevelConsumer.fetchMessages(_currentOffset, _endOffset, _streamConfig.getKafkaFetchTimeoutMillis());
+        messageBatch = _partitionLevelConsumer.fetchMessages(_currentOffset, _endOffset,
+            _partitionLevelStreamConfig.getFetchTimeoutMillis());
         consecutiveErrorCount = 0;
       } catch (TimeoutException e) {
         handleTransientStreamErrors(e);
@@ -804,11 +800,11 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
-        LOGGER.info("Got response {}", response.toJsonString());
+        segmentLogger.info("Got response {}", response.toJsonString());
         break;
       }
       Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
-      LOGGER.info("Retrying after response {}", response.toJsonString());
+      segmentLogger.info("Retrying after response {}", response.toJsonString());
     } while (!_shouldStop);
   }
 
@@ -965,11 +961,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
   }
 
-  // TODO Make this a factory class.
-  protected KafkaLowLevelStreamProviderConfig createStreamProviderConfig() {
-    return new KafkaLowLevelStreamProviderConfig();
-  }
-
   // Assume that this is called only on OFFLINE to CONSUMING transition.
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
@@ -991,14 +982,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _streamConfig = new StreamConfig(indexingConfig.getStreamConfigs());
-    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
-    KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
-    kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
-    _streamBootstrapNodes = indexingConfig.getStreamConfigs()
-        .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "."
-            + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
-    _streamTopic = kafkaStreamProviderConfig.getTopicName();
+    _partitionLevelStreamConfig = new PartitionLevelStreamConfig(indexingConfig.getStreamConfigs());
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_partitionLevelStreamConfig);
+    _streamTopic = _partitionLevelStreamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _streamPartitionId = _segmentName.getPartitionId();
@@ -1007,7 +993,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _metricKeyName = _tableName + "-" + _streamTopic + "-" + _streamPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
-    _tableStreamName = _tableName + "_" + kafkaStreamProviderConfig.getStreamName();
+    _tableStreamName = _tableName + "_" + _streamTopic;
     _memoryManager = getMemoryManager(realtimeTableDataManager.getConsumerDir(), _segmentNameStr,
         indexLoadingConfig.isRealtimeOffheapAllocation(), indexLoadingConfig.isDirectRealtimeOffheapAllocation(),
         serverMetrics);
@@ -1048,7 +1034,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
 
     // Read the max number of rows
-    int segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
+    int segmentMaxRowCount = _partitionLevelStreamConfig.getFlushThresholdRows();
     if (0 < segmentZKMetadata.getSizeThresholdToFlushSegment()) {
       segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
     }
@@ -1072,7 +1058,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setAggregateMetrics(indexingConfig.getAggregateMetrics());
 
     // Create message decoder
-    _messageDecoder = StreamDecoderProvider.create(_streamConfig, _schema);
+    _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
@@ -1103,9 +1089,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     long now = now();
     _consumeStartTime = now;
-    _consumeEndTime = now + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+    _consumeEndTime = now + _partitionLevelStreamConfig.getFlushThresholdTimeMillis();
 
-    LOGGER.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
+    segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
         _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();
   }

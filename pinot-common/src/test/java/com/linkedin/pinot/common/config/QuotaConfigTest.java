@@ -65,11 +65,21 @@ public class QuotaConfigTest {
 
       Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
       Assert.assertEquals(quotaConfig.getMaxQueriesPerSecond(), "100.00");
+      Assert.assertTrue(quotaConfig.isMaxQueriesPerSecondValid());
+    }
+    {
+      String quotaConfigStr = "{\"maxQueriesPerSecond\" : \"0.5\"}";
+      QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+
+      Assert.assertNotNull(quotaConfig.getMaxQueriesPerSecond());
+      Assert.assertEquals(quotaConfig.getMaxQueriesPerSecond(), "0.5");
+      Assert.assertTrue(quotaConfig.isMaxQueriesPerSecondValid());
     }
     {
       String quotaConfigStr = "{}";
       QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
       Assert.assertNull(quotaConfig.getMaxQueriesPerSecond());
+      Assert.assertTrue(quotaConfig.isMaxQueriesPerSecondValid());
     }
   }
 

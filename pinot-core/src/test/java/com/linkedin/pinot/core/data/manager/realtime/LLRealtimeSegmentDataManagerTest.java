@@ -22,14 +22,13 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.stream.PermanentConsumerException;
+import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -44,7 +43,6 @@ import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.common.protocol.Errors;
 import org.json.JSONObject;
-import org.mockito.Mockito;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -80,11 +78,12 @@ public class LLRealtimeSegmentDataManagerTest {
       + "  \"tableIndexConfig\": {\n" + "    \"invertedIndexColumns\": ["
       + "    ], \n" + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
       + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n"
-      + "    \"streamConfigs\": {\n" + "      \"realtime.segment.flush.threshold.size\": \"" + String.valueOf(maxRowsInSegment) + "\", \n"
-      + "      \"" + CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
+      + "    \"streamConfigs\": {\n" + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS+ "\": \"" + String.valueOf(maxRowsInSegment) + "\", \n"
+      + "      \"" + StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
       + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
       + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
       + "      \"stream.kafka.consumer.type\": \"simple\", \n"
+      + "      \"stream.kafka.consumer.factory.class.name\": \"com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory\", \n"
       + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
       + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
       + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
@@ -176,43 +175,6 @@ public class LLRealtimeSegmentDataManagerTest {
   @AfterClass
   public void tearDown() {
     FileUtils.deleteQuietly(_segmentDirFile);
-  }
-
-  @Test
-  public void testTimeString() throws Exception {
-    JSONObject tableConfigJson = new JSONObject(_tableConfigJson);
-    JSONObject tableIndexConfig = (JSONObject)tableConfigJson.get("tableIndexConfig");
-    JSONObject streamConfigs = (JSONObject)tableIndexConfig.get("streamConfigs");
-    {
-      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h");
-      TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
-      InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
-      Schema schema = Schema.fromString(makeSchema());
-      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
-      config.init(tableConfig, instanceZKMetadata, schema);
-      Assert.assertEquals(3 * 3600 * 1000L, config.getTimeThresholdToFlushSegment());
-    }
-
-    {
-      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h30m");
-      TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
-      InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
-      Schema schema = Schema.fromString(makeSchema());
-      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
-      config.init(tableConfig, instanceZKMetadata, schema);
-      Assert.assertEquals((3 * 3600  + 30 * 60) * 1000L, config.getTimeThresholdToFlushSegment());
-    }
-
-    {
-      final long segTime = 898789748357L;
-      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, String.valueOf(segTime));
-      TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
-      InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
-      Schema schema = Schema.fromString(makeSchema());
-      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
-      config.init(tableConfig, instanceZKMetadata, schema);
-      Assert.assertEquals(segTime, config.getTimeThresholdToFlushSegment());
-    }
   }
 
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.
@@ -764,22 +726,6 @@ public class LLRealtimeSegmentDataManagerTest {
     @Override
     protected void postStopConsumedMsg(String reason) {
       _postConsumeStoppedCalled = true;
-    }
-
-    @Override
-    protected KafkaLowLevelStreamProviderConfig createStreamProviderConfig() {
-      KafkaLowLevelStreamProviderConfig config = mock(KafkaLowLevelStreamProviderConfig.class);
-      Mockito.doNothing().when(config).init(any(TableConfig.class), any(InstanceZKMetadata.class), any(Schema.class));
-      when(config.getTopicName()).thenReturn(_topicName);
-      when(config.getStreamName()).thenReturn(_topicName);
-      when(config.getSizeThresholdToFlushSegment()).thenReturn(maxRowsInSegment);
-      when(config.getTimeThresholdToFlushSegment()).thenReturn(maxTimeForSegmentCloseMs);
-      try {
-        when(config.getDecoder()).thenReturn(null);
-      } catch (Exception e) {
-        Assert.fail("Exception setting up streapProviderConfig");
-      }
-      return config;
     }
 
     @Override

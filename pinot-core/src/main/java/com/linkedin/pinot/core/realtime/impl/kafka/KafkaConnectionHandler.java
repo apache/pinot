@@ -100,16 +100,17 @@ public class KafkaConnectionHandler {
    */
   public KafkaConnectionHandler(String clientId, StreamConfig streamConfig,
       KafkaSimpleConsumerFactory simpleConsumerFactory) {
+    KafkaLowLevelStreamConfig kafkaLowLevelStreamConfig = new KafkaLowLevelStreamConfig(streamConfig);
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = streamConfig.getKafkaTopicName();
-    _connectTimeoutMillis = streamConfig.getKafkaConnectionTimeoutMillis();
+    _topic = kafkaLowLevelStreamConfig.getKafkaTopicName();
+    _connectTimeoutMillis = streamConfig.getConnectionTimeoutMillis();
     _simpleConsumer = null;
 
     isPartitionProvided = false;
     _partition = Integer.MIN_VALUE;
 
-    initializeBootstrapNodeList(streamConfig.getBootstrapHosts());
+    initializeBootstrapNodeList(kafkaLowLevelStreamConfig.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
@@ -121,16 +122,18 @@ public class KafkaConnectionHandler {
    */
   public KafkaConnectionHandler(String clientId, StreamConfig streamConfig, int partition,
       KafkaSimpleConsumerFactory simpleConsumerFactory) {
+
+    KafkaLowLevelStreamConfig kafkaLowLevelStreamConfig = new KafkaLowLevelStreamConfig(streamConfig);
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
-    _topic = streamConfig.getKafkaTopicName();
-    _connectTimeoutMillis = streamConfig.getKafkaConnectionTimeoutMillis();
+    _topic = kafkaLowLevelStreamConfig.getKafkaTopicName();
+    _connectTimeoutMillis = streamConfig.getConnectionTimeoutMillis();
     _simpleConsumer = null;
 
     isPartitionProvided = true;
     _partition = partition;
 
-    initializeBootstrapNodeList(streamConfig.getBootstrapHosts());
+    initializeBootstrapNodeList(kafkaLowLevelStreamConfig.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
 

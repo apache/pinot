@@ -4,12 +4,14 @@
  * @exports manage/alert/tune
  */
 import _ from 'lodash';
-import Controller from '@ember/controller';
 import moment from 'moment';
+import Controller from '@ember/controller';
+import { later } from '@ember/runloop';
 import { isPresent } from "@ember/utils";
 import { computed, set, get, getProperties, setProperties } from '@ember/object';
 import { inject as service } from '@ember/service';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
+import { anomalyResponseMap } from 'thirdeye-frontend/utils/anomaly';
 import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
@@ -268,6 +270,10 @@ export default Controller.extend({
       // Number the list
       filteredAnomalies.forEach((anomaly) => {
         set(anomaly, 'index', num);
+        setProperties(anomaly, {
+          index: num,
+          feedbackLabel: anomalyResponseMap[anomaly.anomalyFeedback] || anomaly.anomalyFeedback
+        });
         num++;
       });
 
@@ -431,6 +437,9 @@ export default Controller.extend({
         // When user wants to preview using "current" settings, our request does not contain custom params.
         this.send('triggerTuningSequence', defaultConfig);
       }
+
+      // Reset table filter
+      set(this, 'filterBy', 'All');
     }
   }
 

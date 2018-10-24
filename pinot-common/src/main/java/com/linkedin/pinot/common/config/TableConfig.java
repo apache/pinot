@@ -78,7 +78,11 @@ public class TableConfig {
   @NestedConfig
   private RoutingConfig _routingConfig;
 
-  public TableConfig() {}
+  public TableConfig() {
+    // TODO: currently these 2 fields are annotated as non-null. Revisit to see whether that's necessary
+    _tenantConfig = new TenantConfig();
+    _customConfig = new TableCustomConfig();
+  }
 
   private TableConfig(@Nonnull String tableName, @Nonnull TableType tableType,
       @Nonnull SegmentsValidationAndRetentionConfig validationConfig, @Nonnull TenantConfig tenantConfig,

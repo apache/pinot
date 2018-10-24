@@ -4,7 +4,6 @@ import { later } from '@ember/runloop';
 import Component from '@ember/component';
 import moment from 'moment';
 import d3 from 'd3';
-import { eventWeightMapping } from 'thirdeye-frontend/actions/constants';
 
 const COLOR_MAPPING = {
   blue: '#33AADA',
@@ -798,13 +797,9 @@ export default Component.extend({
         } else {
           // do not return values if data point is an event
 
-          const eventType = Object.keys(eventWeightMapping).find((key) => {
-            if (val == eventWeightMapping[key]) {
-              return key;
-            }
-          });
+          // NOTE: eventWeightMapping code removed on rca v1 deprecation
 
-          return eventType || '';
+          return '';
         }
       }
     }

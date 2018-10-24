@@ -19,13 +19,6 @@ package com.linkedin.pinot.core.query.aggregation.groupby;
  * Interface for ResultHolder to store results of GroupByAggregation.
  */
 public interface GroupByResultHolder {
-  int[] EMPTY_ARRAY = {};
-
-  // Array mode for size <= _maxCapacity, map mode otherwise.
-  enum StorageMode {
-    ARRAY_STORAGE,
-    MAP_STORAGE
-  }
 
   /**
    * Stores the given value (of type double) for the given groupKey.
@@ -72,10 +65,4 @@ public interface GroupByResultHolder {
    * @param capacity
    */
   void ensureCapacity(int capacity);
-
-  /**
-   * Trim the results to a pre-specified size.
-   * @return List of group keys that were removed.
-   */
-  int[] trimResults();
 }
