@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +50,7 @@ public class StreamConfig {
   protected static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
   protected static final String DEFAULT_OFFSET_CRITERIA = "largest";
   protected static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
+  protected static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING = SimpleConsumerFactory.class.getName();
 
   final private String _type;
   final private String _topicName;
@@ -93,10 +96,12 @@ public class StreamConfig {
 
     String consumerFactoryClassKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
-    _consumerFactoryClassName = streamConfigMap.get(consumerFactoryClassKey);
-    Preconditions.checkNotNull(_consumerFactoryClassName,
-        "Must specify consumer factory class name in property " + consumerFactoryClassKey);
-
+    if (streamConfigMap.containsKey(consumerFactoryClassKey)) {
+      _consumerFactoryClassName = streamConfigMap.get(consumerFactoryClassKey);
+    } else {
+      // For backward compatibility, default consumer factory is for Kafka.
+      _consumerFactoryClassName = DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING;
+    }
     LOGGER.info("Stream type: {}, name: {}, consumer types: {}, consumer factory: {}", _type, _topicName,
         _consumerTypes, _consumerFactoryClassName);
 
@@ -170,9 +175,14 @@ public class StreamConfig {
       try {
         flushThresholdTime = TimeUtils.convertPeriodToMillis(flushThresholdTimeValue);
       } catch (Exception e) {
-        LOGGER.warn("Caught exception when converting flush threshold period to millis {}:{}, defaulting to {}",
-            StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTimeValue, DEFAULT_FLUSH_THRESHOLD_TIME,
-            e);
+        try {
+          // For backward compatibility, default is using milliseconds value.
+          flushThresholdTime = Long.parseLong(flushThresholdTimeValue);
+        } catch (Exception e1) {
+          LOGGER.warn("Caught exception when converting flush threshold period to millis {}:{}, defaulting to {}",
+              StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTimeValue, DEFAULT_FLUSH_THRESHOLD_TIME,
+              e);
+        }
       }
     }
     _flushThresholdTimeMillis = flushThresholdTime;
