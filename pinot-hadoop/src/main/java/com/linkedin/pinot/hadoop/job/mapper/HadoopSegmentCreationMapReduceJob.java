@@ -214,13 +214,19 @@ public class HadoopSegmentCreationMapReduceJob {
 
     protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
                                            Path hdfsAvroPath, File dataPath) {
+      if(segmentGeneratorConfig.getSchema() == null ||
+              segmentGeneratorConfig.getSchema().getTimeFieldSpec() == null ||
+              segmentGeneratorConfig.getSchema().getTimeFieldSpec().getIncomingGranularitySpec() == null){
+        return;
+      }
+
       String timeFormatStr = segmentGeneratorConfig.getSchema().getTimeFieldSpec().getIncomingGranularitySpec().getTimeFormat();
-      String simpleDateTypeStr = timeFormatStr.split(":")[1];
 
       if (timeFormatStr.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
         return;
       }
 
+      String simpleDateTypeStr = timeFormatStr.split(":")[1];
 
       // Throws illegal argument exception if invalid
       try {
@@ -231,7 +237,6 @@ public class HadoopSegmentCreationMapReduceJob {
       }
       segmentGeneratorConfig.setSimpleDateFormat(simpleDateTypeStr);
       segmentGeneratorConfig.setSegmentTimeUnit(TimeUnit.MILLISECONDS);
-
     }
 
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
@@ -308,11 +313,9 @@ public class HadoopSegmentCreationMapReduceJob {
           }
           else {
             LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
-            // URL configURL = new URL(_readerConfigFile);
 
-            Path p = new Path(_readerConfigFile);
-            // InputStream inconfig = configURL.openStream();
-            readerConfig = new ObjectMapper().readValue(_fileSystem.open(p), CSVRecordReaderConfig.class);
+            Path readerConfigPath = new Path(_readerConfigFile);
+            readerConfig = new ObjectMapper().readValue(_fileSystem.open(readerConfigPath), CSVRecordReaderConfig.class);
             LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
           }
           break;
