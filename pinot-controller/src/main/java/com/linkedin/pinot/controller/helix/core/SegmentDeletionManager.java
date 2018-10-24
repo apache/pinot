@@ -173,19 +173,19 @@ public class SegmentDeletionManager {
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
     final String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (_dataDir != null) {
-      URI deletedSegmentDirURI;
       URI fileToMoveURI;
       PinotFS pinotFS;
       URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
       fileToMoveURI = ControllerConf.constructSegmentLocation(_dataDir, rawTableName, segmentId);
+      URI deletedSegmentDestURI = ControllerConf.constructSegmentLocation(
+          StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS), rawTableName, segmentId);
       pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
-      deletedSegmentDirURI =
-          ControllerConf.getUriFromPath(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS, rawTableName));
+
       try {
         if (pinotFS.exists(fileToMoveURI)) {
           // Overwrites the file if it already exists in the target directory.
-          pinotFS.move(fileToMoveURI, deletedSegmentDirURI);
-          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(), deletedSegmentDirURI.toString());
+          pinotFS.move(fileToMoveURI, deletedSegmentDestURI);
+          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(), deletedSegmentDestURI.toString());
         } else {
           if (!SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
             LOGGER.warn("Not found local segment file for segment {}" + fileToMoveURI.toString());
@@ -193,7 +193,7 @@ public class SegmentDeletionManager {
         }
       } catch (IOException e) {
         LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
-            deletedSegmentDirURI.toString(), e);
+            deletedSegmentDestURI.toString(), e);
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
