@@ -148,16 +148,13 @@ public class FileUploadDownloadClient implements Closeable {
 
   /**
    * This method calls the old segment upload endpoint. We will deprecate this behavior soon. Please call
-   * getUploadSegmentHttpURI to construct your request.
+   * getUploadSegmentHttpsURI to construct your request.
    */
   @Deprecated
   public static URI getOldUploadSegmentHttpsURI(String host, int port) throws URISyntaxException {
     return getURI(HTTPS, host, port, OLD_SEGMENT_PATH);
   }
-
-  /**
-   * Preferred way to construct an upload segment request
-   */
+  
   public static URI getUploadSegmentHttpURI(String host, int port) throws URISyntaxException {
     return getURI(HTTP, host, port, SEGMENT_PATH);
   }
