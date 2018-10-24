@@ -34,7 +34,7 @@ public interface ValueReader {
 
   String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
 
-  byte[] getBytes(int index, int numBytesPerValue, byte[] output);
+  byte[] getBytes(int index, int numBytesPerValue, byte[] buffer);
 
   void close() throws IOException;
 }

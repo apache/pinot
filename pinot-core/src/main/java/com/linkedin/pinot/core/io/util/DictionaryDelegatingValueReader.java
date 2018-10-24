@@ -61,12 +61,12 @@ public class DictionaryDelegatingValueReader implements ValueReader {
 
   @Override
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
-    throw new RuntimeException("Unimplemented");
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public byte[] getBytes(int index, int numBytesPerValue, byte[] output) {
-    throw new RuntimeException("Unimplemented");
+  public byte[] getBytes(int index, int numBytesPerValue, byte[] buffer) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
