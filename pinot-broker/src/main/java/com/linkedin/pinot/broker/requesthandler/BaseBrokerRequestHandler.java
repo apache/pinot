@@ -261,18 +261,25 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
 
+    // Track number of queries with number of groups limit reached
+    if (brokerResponse.isNumGroupsLimitReached()) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
+    }
+
     // Set total query processing time
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
+
     // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
     LOGGER.info(
-        "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, servers:{}/{}, exceptions:{}, serverStats:{}, query:{}",
+        "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}",
         requestId, brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
         brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
         brokerResponse.getNumEntriesScannedPostFilter(), brokerResponse.getNumServersResponded(),
-        brokerResponse.getNumServersQueried(), brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
+        brokerResponse.getNumServersQueried(), brokerResponse.isNumGroupsLimitReached(),
+        brokerResponse.getExceptionsSize(), serverStats.getServerStats(),
         StringUtils.substring(query, 0, _queryLogLength));
 
     return brokerResponse;

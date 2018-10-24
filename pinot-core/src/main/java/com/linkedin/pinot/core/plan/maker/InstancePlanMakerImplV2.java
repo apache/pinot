@@ -64,6 +64,12 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     _numGroupsLimit = DEFAULT_NUM_GROUPS_LIMIT;
   }
 
+  @VisibleForTesting
+  public InstancePlanMakerImplV2(int maxInitialResultHolderCapacity, int numGroupsLimit) {
+    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
+    _numGroupsLimit = numGroupsLimit;
+  }
+
   /**
    * Constructor for usage when client requires to pass {@link QueryExecutorConfig} to this class.
    * <ul>

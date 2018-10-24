@@ -92,6 +92,11 @@ public interface BrokerResponse {
   long getTotalDocs();
 
   /**
+   * Returns whether the number of groups limit has been reached.
+   */
+  boolean isNumGroupsLimitReached();
+
+  /**
    * Get number of exceptions recorded in the response.
    */
   int getExceptionsSize();

@@ -77,6 +77,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     long numEntriesScannedInFilter = 0L;
     long numEntriesScannedPostFilter = 0L;
     long numTotalRawDocs = 0L;
+    boolean numGroupsLimitReached = false;
 
     // Cache a data schema from data tables (try to cache one with data rows associated with it).
     DataSchema cachedDataSchema = null;
@@ -119,6 +120,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
       }
+      numGroupsLimitReached |= Boolean.valueOf(metadata.get(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY));
 
       // After processing the metadata, remove data tables without data rows inside.
       DataSchema dataSchema = dataTable.getDataSchema();
@@ -142,6 +144,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumEntriesScannedInFilter(numEntriesScannedInFilter);
     brokerResponseNative.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
+    brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
 
     // Update broker metrics.
     String tableName = brokerRequest.getQuerySource().getTableName();

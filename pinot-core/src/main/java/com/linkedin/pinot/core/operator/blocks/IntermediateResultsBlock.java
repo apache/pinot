@@ -53,6 +53,7 @@ public class IntermediateResultsBlock implements Block {
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
+  private boolean _numGroupsLimitReached;
 
   /**
    * Constructor for selection result.
@@ -176,6 +177,10 @@ public class IntermediateResultsBlock implements Block {
     _numTotalRawDocs = numTotalRawDocs;
   }
 
+  public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
+    _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
   @Nonnull
   public DataTable getDataTable()
       throws Exception {
@@ -275,6 +280,9 @@ public class IntermediateResultsBlock implements Block {
     dataTable.getMetadata()
         .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
     dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalRawDocs));
+    if (_numGroupsLimitReached) {
+      dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");
+    }
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
       for (ProcessingException exception : _processingExceptions) {
         dataTable.addException(exception);

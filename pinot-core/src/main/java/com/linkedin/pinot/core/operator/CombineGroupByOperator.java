@@ -193,6 +193,10 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
       mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
       mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+      // NOTE: numGroups might go slightly over numGroupsLimit because the comparison is not atomic
+      if (numGroups.get() >= _numGroupsLimit) {
+        mergedBlock.setNumGroupsLimitReached(true);
+      }
 
       return mergedBlock;
     } catch (Exception e) {
