@@ -36,6 +36,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
   private static final String PROP_METRIC_URN = "metricUrn";
 
   private final AnomalyDetectionStage anomalyDetectionStage;
+  private final String metricUrn;
 
   public AnomalyDetectionStageWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
       throws Exception {
@@ -46,8 +47,8 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
 
     this.anomalyDetectionStage = loadAnomalyDetectorStage(MapUtils.getString(properties, PROP_STAGE_CLASSNAME));
     Map<String, Object> specs = MapUtils.getMap(properties, PROP_SPECS);
-    String metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    if (metricUrn != null){
+    this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
+    if (this.metricUrn != null){
       specs.put(PROP_METRIC_URN, metricUrn);
     }
     this.anomalyDetectionStage.init(specs, config.getId(), startTime, endTime);
@@ -58,6 +59,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
     List<MergedAnomalyResultDTO> anomalies = this.anomalyDetectionStage.runDetection(this.provider);
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());
+      anomaly.setMetricUrn(this.metricUrn);
     }
     return new DetectionPipelineResult(anomalies);
   }

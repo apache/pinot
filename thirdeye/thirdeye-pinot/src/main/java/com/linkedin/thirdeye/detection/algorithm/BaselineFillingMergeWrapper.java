@@ -87,7 +87,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         metricSlicesToAnomaly.put(slice, anomaly);
       } catch (Exception e) {
         // ignore
-        LOG.warn("cannot get metric slice for anomaly {}", anomaly);
+        LOG.warn("cannot get metric slice for anomaly {}", anomaly, e);
       }
     }
 
