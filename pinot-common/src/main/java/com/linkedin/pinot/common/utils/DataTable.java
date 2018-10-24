@@ -30,6 +30,7 @@ public interface DataTable {
   String NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY = "numEntriesScannedInFilter";
   String NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY = "numEntriesScannedPostFilter";
   String TOTAL_DOCS_METADATA_KEY = "totalDocs";
+  String NUM_GROUPS_LIMIT_REACHED_KEY = "numGroupsLimitReached";
   String TIME_USED_MS_METADATA_KEY = "timeUsedMs";
   String TRACE_INFO_METADATA_KEY = "traceInfo";
   String REQUEST_ID_METADATA_KEY = "requestId";

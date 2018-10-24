@@ -72,18 +72,19 @@ public abstract class BaseQueriesTest {
   }
 
   /**
-   * Run query on multiple index segments.
+   * Run query on multiple index segments with custom plan maker.
    * <p>Use this to test the whole flow from server to broker.
    * <p>The result should be equivalent to querying 4 identical index segments.
    *
    * @param query PQL query.
+   * @param planMaker Plan maker.
    * @return broker response.
    */
-  protected BrokerResponseNative getBrokerResponseForQuery(String query) {
+  protected BrokerResponseNative getBrokerResponseForQuery(String query, PlanMaker planMaker) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
 
     // Server side.
-    Plan plan = PLAN_MAKER.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE, 10_000);
+    Plan plan = planMaker.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE, 10_000);
     DataTable instanceResponse = plan.execute();
 
     // Broker side.
@@ -92,6 +93,18 @@ public abstract class BaseQueriesTest {
     dataTableMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     dataTableMap.put(new ServerInstance("localhost:1111"), instanceResponse);
     return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
+  }
+
+  /**
+   * Run query on multiple index segments.
+   * <p>Use this to test the whole flow from server to broker.
+   * <p>The result should be equivalent to querying 4 identical index segments.
+   *
+   * @param query PQL query.
+   * @return broker response.
+   */
+  protected BrokerResponseNative getBrokerResponseForQuery(String query) {
+    return getBrokerResponseForQuery(query, PLAN_MAKER);
   }
 
   /**
