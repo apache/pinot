@@ -84,7 +84,10 @@ public class RetentionManagerTest {
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME)).thenReturn(metadataList);
 
-    new RetentionManager(pinotHelixResourceManager, 0, 0).execute();
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 0, 0);
+    retentionManager.init();
+    retentionManager.run();
+
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
@@ -199,7 +202,10 @@ public class RetentionManagerTest {
         setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
 
-    new RetentionManager(pinotHelixResourceManager, 0, 0).execute();
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 0, 0);
+    retentionManager.init();
+    retentionManager.run();
+
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
     // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
