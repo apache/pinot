@@ -32,6 +32,7 @@ import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegment
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -130,7 +131,11 @@ public class ValidationManager {
           if (_enableSegmentLevelValidation) {
             updateRealtimeDocumentCount(tableConfig);
           }
-          _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
+          Map<String, String> streamConfigMap =  tableConfig.getIndexingConfig().getStreamConfigs();
+          StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+          if (streamConfig.hasLowLevelConsumerType()) {
+            _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
+          }
         }
       } catch (Exception e) {
         LOGGER.warn("Caught exception while validating table: {}", tableNameWithType, e);
