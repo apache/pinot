@@ -46,11 +46,12 @@ public class StreamConfig {
   private static final int DEFAULT_FLUSH_THRESHOLD_ROWS = 5_000_000;
   private static final long DEFAULT_FLUSH_THRESHOLD_TIME = TimeUnit.MILLISECONDS.convert(6, TimeUnit.HOURS);
   private static final long DEFAULT_DESIRED_SEGMENT_SIZE_BYTES = 200 * 1024 * 1024; // 200M
+  private static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING = SimpleConsumerFactory.class.getName();
+
   protected static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   protected static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
   protected static final String DEFAULT_OFFSET_CRITERIA = "largest";
   protected static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
-  protected static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING = SimpleConsumerFactory.class.getName();
 
   final private String _type;
   final private String _topicName;
@@ -251,6 +252,10 @@ public class StreamConfig {
 
   public static long getDefaultFlushThresholdTimeMillis() {
     return DEFAULT_FLUSH_THRESHOLD_TIME;
+  }
+
+  public static String getDefaultConsumerFactoryClassName() {
+    return DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING;
   }
 
   public long getFlushSegmentDesiredSizeBytes() {

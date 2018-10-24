@@ -110,7 +110,8 @@ public class StreamConfigTest {
     } catch (NullPointerException e) {
       exception = true;
     }
-    Assert.assertTrue(exception);
+    Assert.assertFalse(exception);
+    Assert.assertEquals(streamConfig.getConsumerFactoryClassName(), StreamConfig.getDefaultConsumerFactoryClassName());
 
     // Missing decoder class
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
@@ -219,6 +220,16 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(),
         (long) TimeUtils.convertPeriodToMillis(flushThresholdTime));
     Assert.assertEquals(streamConfig.getFlushSegmentDesiredSizeBytes(), DataSize.toBytes(flushSegmentSize));
+
+    // Backward compatibility check for flushThresholdTime
+    flushThresholdTime = "18000000";
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTime);
+    streamConfig = new StreamConfig(streamConfigMap);
+    Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(), Long.parseLong(flushThresholdTime));
+    flushThresholdTime = "invalid input";
+    streamConfigMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, flushThresholdTime);
+    streamConfig = new StreamConfig(streamConfigMap);
+    Assert.assertEquals(streamConfig.getFlushThresholdTimeMillis(), StreamConfig.getDefaultFlushThresholdTimeMillis());
   }
 
   /**
