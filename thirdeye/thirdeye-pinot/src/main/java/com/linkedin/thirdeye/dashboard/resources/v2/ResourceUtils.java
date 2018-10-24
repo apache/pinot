@@ -358,6 +358,7 @@ public class ResourceUtils {
       case NO_FEEDBACK:
         return AnomalyClassificationType.NONE;
       case ANOMALY:
+      case ANOMALY_EXPECTED:
       case ANOMALY_NEW_TREND:
         return AnomalyClassificationType.TRUE_POSITIVE;
       case NOT_ANOMALY:
