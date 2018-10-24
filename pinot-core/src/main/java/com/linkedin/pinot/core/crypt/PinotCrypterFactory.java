@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.core.crypt;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,20 +28,57 @@ import org.slf4j.LoggerFactory;
  */
 public class PinotCrypterFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotCrypterFactory.class);
+  // Map of lower case simple class name to PinotCrypter object
+  private static Map<String, PinotCrypter> _crypterMap = new HashMap<>();
+  private static final String NOOP_PINOT_CRYPTER = "nooppinotcrypter";
+  private static final String CLASS = "class";
 
   // Prevent factory from being instantiated
   private PinotCrypterFactory() {
 
   }
 
-  public static PinotCrypter create(String crypterClassName) {
-    try {
-      LOGGER.info("Instantiating PinotCrypter class {}", crypterClassName);
-      PinotCrypter pinotCrypter =  (PinotCrypter) Class.forName(crypterClassName).newInstance();
-      return pinotCrypter;
-    } catch (Exception e) {
-      LOGGER.warn("Unable to instantiate {}, creating default crypter {}", crypterClassName, NoOpPinotCrypter.class.getName(), e);
-      return new NoOpPinotCrypter();
+  /**
+   * Initializes map of crypter classes at startup time. Will initialize map with lower case simple class names.
+   * @param config
+   * Sample configuration:
+   * class.nooppinotcrypter = com.linkedin.pinot.core.crypt.NoOpPinotCrypter
+   * nooppinotcrypter.keyMap = sample_key
+   */
+  public static void init(Configuration config) {
+    // Get schemes and their respective classes
+    Iterator<String> keys = config.subset(CLASS).getKeys();
+    if (!keys.hasNext()) {
+      LOGGER.info("Did not find any crypter classes in the configuration");
     }
+    while (keys.hasNext()) {
+      String key = keys.next();
+      String className = (String) config.getProperty(CLASS + "." + key);
+      LOGGER.info("Got crypter class name {}, full crypter path {}, starting to initialize", key, className);
+
+      try {
+        PinotCrypter pinotCrypter = (PinotCrypter) Class.forName(className).newInstance();
+        pinotCrypter.init(config.subset(key));
+
+        LOGGER.info("Initializing PinotCrypter for scheme {}, classname {}", key, className);
+        _crypterMap.put(key.toLowerCase(), pinotCrypter);
+      } catch (InstantiationException | IllegalAccessException | ClassNotFoundException e) {
+        LOGGER.error("Could not instantiate crypter for class {}", className, e);
+        throw new RuntimeException(e);
+      }
+    }
+
+    if (!_crypterMap.containsKey(NOOP_PINOT_CRYPTER)) {
+      LOGGER.info("NoOpPinotCrypter not configured, adding as default");
+      _crypterMap.put(NOOP_PINOT_CRYPTER, new NoOpPinotCrypter());
+    }
+  }
+
+  public static PinotCrypter create(String crypterClassName) {
+    PinotCrypter pinotCrypter = _crypterMap.get(crypterClassName.toLowerCase());
+    if (pinotCrypter == null) {
+      throw new RuntimeException("Pinot crypter not configured for class name: " + crypterClassName);
+    }
+    return pinotCrypter;
   }
 }

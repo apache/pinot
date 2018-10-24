@@ -40,6 +40,7 @@ import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.linkedin.pinot.core.periodictask.PeriodicTask;
 import com.linkedin.pinot.core.periodictask.PeriodicTaskScheduler;
+import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
@@ -131,6 +132,7 @@ public class ControllerStarter {
     Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
         _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    Configuration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
 
     // Start all components
     LOGGER.info("Initializing PinotFSFactory");
@@ -146,6 +148,13 @@ public class ControllerStarter {
           .init(segmentFetcherFactoryConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
+    }
+
+    LOGGER.info("Initializing PinotCrypterFactory");
+    try {
+      PinotCrypterFactory.init(pinotCrypterConfig);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while initializing PinotCrypterFactory", e);
     }
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
