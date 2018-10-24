@@ -29,6 +29,9 @@ import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.helix.ZNRecord;
@@ -45,6 +48,27 @@ public class ZKOperator {
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private ControllerConf _controllerConf;
   private ControllerMetrics _controllerMetrics;
+
+  class SegmentEntry {
+    SegmentMetadata _segmentMetadata;
+    OfflineSegmentZKMetadata _existingSegmentZKMetadata;
+    URI _finalSegmentLocationURI;
+    String _zkDownloadURI;
+    ZNRecord _znRecord;
+
+    SegmentEntry(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI, String zkDownloadURI, ZNRecord znRecord) {
+      this(segmentMetadata, null, finalSegmentLocationURI, zkDownloadURI, znRecord);
+    }
+
+    SegmentEntry(SegmentMetadata segmentMetadata, OfflineSegmentZKMetadata existingSegmentZKMetadata,
+        URI finalSegmentLocationURI, String zkDownloadURI, ZNRecord znRecord) {
+      _segmentMetadata = segmentMetadata;
+      _existingSegmentZKMetadata = existingSegmentZKMetadata;
+      _finalSegmentLocationURI = finalSegmentLocationURI;
+      _zkDownloadURI = zkDownloadURI;
+      _znRecord = znRecord;
+    }
+  }
 
   public ZKOperator(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -76,6 +100,191 @@ public class ZKOperator {
 
     processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
         enableParallelPushProtection, headers, zkDownloadURI, offlineTableName, segmentName, znRecord, moveSegmentToFinalLocation);
+  }
+
+  /**
+   * Batch upload segments.
+   */
+  public String completeSegmentOperations(String offlineTableName, List<SegmentMetadata> segmentMetadataList, List<URI> finalSegmentLocationURIList,
+      List<File> currentSegmentsLocation, boolean enableParallelPushProtection, HttpHeaders headers, List<String> zkDownloadUriList,
+      boolean moveSegmentToFinalLocation) throws Exception {
+    String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
+    List<SegmentEntry> newSegmentEntries = new ArrayList<>();
+    List<SegmentEntry> existingSegmentEntries = new ArrayList<>();
+    List<SegmentEntry> failedSegmentEntries = new ArrayList<>();
+    List<SegmentEntry> successfulSegmentEntries = new ArrayList<>();
+
+    for (int i = 0; i < segmentMetadataList.size(); i++) {
+      SegmentMetadata segmentMetadata  = segmentMetadataList.get(i);
+      String segmentName = segmentMetadata.getName();
+      ZNRecord znRecord = _pinotHelixResourceManager.getSegmentMetadataZnRecord(offlineTableName, segmentName);
+
+      if (znRecord == null) {
+        LOGGER.info("Adding new segment {} to table {}", segmentName, offlineTableName);
+        SegmentEntry segmentEntry = new SegmentEntry(segmentMetadata, finalSegmentLocationURIList.get(i), zkDownloadUriList.get(i), null);
+        newSegmentEntries.add(segmentEntry);
+
+        // For v1 segment uploads, we will not move the segment
+        if (moveSegmentToFinalLocation) {
+          try {
+            File currentSegmentLocation = currentSegmentsLocation.get(i);
+            URI finalSegmentLocationURI = finalSegmentLocationURIList.get(i);
+            moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURIList.get(i));
+            LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(),
+                finalSegmentLocationURI.getPath());
+          } catch (Exception e) {
+            LOGGER.error("Could not move segment {} from table {} to permanent directory", segmentName, offlineTableName, e);
+            newSegmentEntries.remove(segmentEntry);
+            failedSegmentEntries.add(segmentEntry);
+          }
+        } else {
+          LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, offlineTableName,
+              zkDownloadUriList.get(i));
+        }
+      } else {
+        LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, offlineTableName);
+        // Processing existing segments.
+        OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
+        long existingCrc = existingSegmentZKMetadata.getCrc();
+        SegmentEntry existingSegmentEntry = new SegmentEntry(segmentMetadata, existingSegmentZKMetadata,
+            finalSegmentLocationURIList.get(i), zkDownloadUriList.get(i), znRecord);
+        existingSegmentEntries.add(existingSegmentEntry);
+
+        // Set the download URL.
+        existingSegmentZKMetadata.setDownloadUrl(zkDownloadUriList.get(i));
+
+        // Set the crypter name (even if null, so it can be removed from metadata).
+        existingSegmentZKMetadata.setCrypterName(crypter);
+
+        // Check if CRC match when IF-MATCH header is set
+        checkCRC(headers, offlineTableName, segmentName, existingCrc);
+
+        // Check segment upload start time when parallel push protection enabled
+        if (enableParallelPushProtection) {
+          // When segment upload start time is larger than 0, that means another upload is in progress
+          long segmentUploadStartTime = existingSegmentZKMetadata.getSegmentUploadStartTime();
+          if (segmentUploadStartTime > 0) {
+            if (System.currentTimeMillis() - segmentUploadStartTime > _controllerConf.getSegmentUploadTimeoutInMillis()) {
+              // Last segment upload does not finish properly, replace the segment
+              LOGGER.error("Segment: {} of table: {} was not properly uploaded, replacing it", segmentName,
+                  offlineTableName);
+              _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED, 1L);
+            } else {
+              // Another segment upload is in progress
+              existingSegmentEntries.remove(existingSegmentEntry);
+              failedSegmentEntries.add(existingSegmentEntry);
+              LOGGER.error("Another segment upload is in progress for segment: " + segmentName + " of table: " + offlineTableName
+                  + ", retry later");
+              continue;
+            }
+          }
+
+          // Lock the segment by setting the upload start time in ZK
+          existingSegmentZKMetadata.setSegmentUploadStartTime(System.currentTimeMillis());
+          if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata, znRecord.getVersion())) {
+            existingSegmentEntries.remove(existingSegmentEntry);
+            failedSegmentEntries.add(existingSegmentEntry);
+            LOGGER.error("Failed to lock the segment: " + segmentName + " of table: " + offlineTableName + ", retry later");
+            continue;
+          }
+        }
+
+        // Reset segment upload start time to unlock the segment later
+        // NOTE: reset this value even if parallel push protection is not enabled so that segment can recover in case
+        // previous segment upload did not finish properly and the parallel push protection is turned off
+        existingSegmentZKMetadata.setSegmentUploadStartTime(-1);
+
+        // Modify the custom map in segment ZK metadata
+        String segmentZKMetadataCustomMapModifierStr =
+            headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER);
+        SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier;
+        if (segmentZKMetadataCustomMapModifierStr != null) {
+          segmentZKMetadataCustomMapModifier =
+              new SegmentZKMetadataCustomMapModifier(segmentZKMetadataCustomMapModifierStr);
+        } else {
+          // By default, use REPLACE modify mode
+          segmentZKMetadataCustomMapModifier =
+              new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.REPLACE, null);
+        }
+        existingSegmentZKMetadata.setCustomMap(
+            segmentZKMetadataCustomMapModifier.modifyMap(existingSegmentZKMetadata.getCustomMap()));
+
+        long newCrc = Long.valueOf(segmentMetadata.getCrc());
+        if (newCrc == existingCrc) {
+          LOGGER.info(
+              "New segment crc {} is same as existing segment crc {} for segment {}. Updating ZK metadata without refreshing the segment {}",
+              newCrc, existingCrc, segmentName);
+          if (!_pinotHelixResourceManager.updateZkMetadata(existingSegmentZKMetadata)) {
+            LOGGER.error("Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
+            failedSegmentEntries.add(existingSegmentEntry);
+          } else {
+            successfulSegmentEntries.add(existingSegmentEntry);
+          }
+          existingSegmentEntries.remove(existingSegmentEntry);
+        } else {
+          // New segment is different with the existing one, update ZK metadata and refresh the segment
+          LOGGER.info(
+              "New segment crc {} is different than the existing segment crc {}. Updating ZK metadata and refreshing segment {}",
+              newCrc, existingCrc, segmentName);
+          if (moveSegmentToFinalLocation) {
+            File currentSegmentLocation = currentSegmentsLocation.get(i);
+            URI finalSegmentLocationURI = finalSegmentLocationURIList.get(i);
+            moveSegmentToPermanentDirectory(currentSegmentLocation, finalSegmentLocationURI);
+            LOGGER.info("Moved segment {} from temp location {} to {}", segmentName, currentSegmentLocation.getAbsolutePath(), finalSegmentLocationURI.getPath());
+          } else {
+            LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, offlineTableName,
+                zkDownloadUriList.get(i));
+          }
+        }
+      }
+    }
+
+    // Update zk for new segments.
+    Iterator<SegmentEntry> iterator = newSegmentEntries.iterator();
+    while (iterator.hasNext()) {
+      SegmentEntry segmentEntry = iterator.next();
+      try {
+        _pinotHelixResourceManager.addNewSegment(segmentEntry._segmentMetadata, segmentEntry._zkDownloadURI, crypter);
+        successfulSegmentEntries.add(segmentEntry);
+      } catch (Exception e) {
+        failedSegmentEntries.add(segmentEntry);
+        LOGGER.error("Failed to update ZK metadata for new segment: {} of table: {}",
+            segmentEntry._segmentMetadata.getName(), offlineTableName);
+      } finally {
+        iterator.remove();
+      }
+    }
+
+    // Update zk for existing segments.
+    iterator = existingSegmentEntries.iterator();
+    while (iterator.hasNext()) {
+      SegmentEntry segmentEntry = iterator.next();
+      try {
+        _pinotHelixResourceManager.refreshSegment(segmentEntry._segmentMetadata, segmentEntry._existingSegmentZKMetadata);
+        successfulSegmentEntries.add(segmentEntry);
+      } catch (Exception e) {
+        if (!_pinotHelixResourceManager.updateZkMetadata(segmentEntry._existingSegmentZKMetadata)) {
+          failedSegmentEntries.add(segmentEntry);
+          LOGGER.error("Failed to update ZK metadata for segment: {} of table: {}", segmentEntry._segmentMetadata.getName(),
+              offlineTableName);
+        }
+      } finally {
+        iterator.remove();
+      }
+    }
+
+    String message = String.format("Successfully upload %d segments. %d segments failed.", successfulSegmentEntries.size(),
+        failedSegmentEntries.size());
+    StringBuilder stringBuilder = new StringBuilder(message);
+    if (!failedSegmentEntries.isEmpty()) {
+      stringBuilder.append(" Names of failed segments: ");
+      for (SegmentEntry segmentEntry : failedSegmentEntries) {
+        stringBuilder.append(segmentEntry._segmentMetadata.getName()).append(",");
+      }
+    }
+    message = stringBuilder.substring(0, stringBuilder.length() - 1);
+    LOGGER.info(message);
+    return message;
   }
 
   private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,

@@ -20,6 +20,9 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -27,14 +30,19 @@ import java.io.File;
  * By default, the metadata extractor we will use will assume that we are provided a .tar.gz pinot segment file.
  */
 public class DefaultMetadataExtractor implements MetadataExtractor {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultMetadataExtractor.class);
+
   @Override
   public SegmentMetadata extractMetadata(File tarredSegmentFile, File unzippedSegmentDir) throws Exception {
     // While there is TarGzCompressionUtils.unTarOneFile, we use unTar here to unpack all files
     // in the segment in order to ensure the segment is not corrupted
-    TarGzCompressionUtils.unTar(tarredSegmentFile, unzippedSegmentDir);
-    File[] files = unzippedSegmentDir.listFiles();
-    Preconditions.checkState(files != null && files.length == 1);
-    File indexDir = files[0];
+    List<File> files = TarGzCompressionUtils.unTar(tarredSegmentFile, unzippedSegmentDir);
+//    File[] files = unzippedSegmentDir.listFiles();
+    Preconditions.checkState(files != null && files.get(0).isDirectory());
+    System.out.println("File name: " + files.get(0).getName() + " Absolute path: " + files.get(0).getAbsolutePath());
+    LOGGER.info("File name: " + files.get(0).getName() + " Absolute path: " + files.get(0).getAbsolutePath());
+    File indexDir = files.get(0);
     return new SegmentMetadataImpl(indexDir);
   }
 
