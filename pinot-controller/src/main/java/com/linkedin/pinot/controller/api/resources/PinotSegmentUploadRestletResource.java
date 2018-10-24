@@ -47,7 +47,6 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.List;
@@ -284,17 +283,24 @@ public class PinotSegmentUploadRestletResource {
           segmentMetadata =
               getMetadataForURI(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile,
                   tempSegmentDir, metadataProviderClass);
-          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, provider, moveSegmentToFinalLocation);
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
           segmentMetadata = getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
               metadataProviderClass);
-          zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
-              provider.getVip());
           break;
         default:
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
+      }
+
+      zkDownloadUri = getZkDownloadURIForSegmentUpload(segmentMetadata, provider);
+
+      // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
+      // We will deprecate this behavior eventually.
+      if (!moveSegmentToFinalLocation) {
+        LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
+            segmentMetadata.getName(), segmentMetadata.getTableName());
+        zkDownloadUri = currentSegmentLocationURI;
       }
 
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
@@ -326,23 +332,17 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private String getZkDownloadURIForURIUpload(String currentSegmentLocationURI, SegmentMetadata segmentMetadata,
-      FileUploadPathProvider provider, boolean moveSegmentToFinalLocation) throws URISyntaxException, UnsupportedEncodingException {
-    String zkDownloadUri;
-    if (new URI(currentSegmentLocationURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
-      zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
+  private String getZkDownloadURIForSegmentUpload(SegmentMetadata segmentMetadata, FileUploadPathProvider provider) throws UnsupportedEncodingException {
+    if (provider.getBaseDataDirURI().getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+      return ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
           provider.getVip());
-    } else if (!moveSegmentToFinalLocation) {
-      LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
-          segmentMetadata.getName(), segmentMetadata.getTableName());
-      zkDownloadUri = currentSegmentLocationURI;
     } else {
+      // Receiving .tar.gz segment upload for pluggable storage
       LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(),
           segmentMetadata.getName(), segmentMetadata.getTableName());
-      zkDownloadUri = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+      return StringUtil.join(File.separator, provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
           URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
     }
-    return zkDownloadUri;
   }
 
   private SegmentMetadata getMetadataForURI(String crypterClassHeader, String currentSegmentLocationURI,
