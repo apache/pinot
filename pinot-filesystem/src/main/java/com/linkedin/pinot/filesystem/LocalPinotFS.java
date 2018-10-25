@@ -73,8 +73,7 @@ public class LocalPinotFS extends PinotFS {
     if (!srcFile.isDirectory()) {
       dstFile.getParentFile().mkdirs();
       FileUtils.moveFile(srcFile, dstFile);
-    }
-    if (srcFile.isDirectory()) {
+    } else {
       Files.move(srcFile.toPath(), dstFile.toPath());
     }
     return true;
