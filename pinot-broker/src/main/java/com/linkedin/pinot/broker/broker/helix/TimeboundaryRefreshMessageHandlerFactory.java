@@ -60,7 +60,7 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
         String msgSubType = message.getMsgSubType();
         switch (msgSubType) {
             case TimeboundaryRefreshMessage.REFRESH_TIME_BOUNDARY_MSG_SUB_TYPE:
-                LOGGER.info("time refresh msg received {}", message);
+                LOGGER.info("time refresh msg received {} for table {}", message.getPartitionName());
                 return new TimeboundaryRefreshMessageHandler(new TimeboundaryRefreshMessage(message), context);
             default:
                 throw new UnsupportedOperationException("Unsupported user defined message sub type: " + msgSubType);
@@ -134,6 +134,7 @@ public class TimeboundaryRefreshMessageHandlerFactory implements MessageHandlerF
                     break;
                 }
             }
+            _logger.info("TimeboundaryRefreshMessageExecutor thread has been shutdown.");
         }
 
     }

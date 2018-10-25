@@ -1507,6 +1507,7 @@ public class PinotHelixResourceManager {
     LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
     final String rawTableName = offlineSegmentZKMetadata.getTableName();
     TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
+    Preconditions.checkNotNull(tableConfig);
 
     if (shouldSendMessage(tableConfig)) {
       // Send a message to the servers to update the segment.
@@ -1610,10 +1611,7 @@ public class PinotHelixResourceManager {
   }
 
   // Return false iff the table has been explicitly configured to NOT use messageBasedRefresh.
-  private boolean shouldSendMessage(TableConfig tableConfig) {
-    if (tableConfig == null) {
-      return true;
-    }
+  private boolean shouldSendMessage(@Nonnull TableConfig tableConfig) {
     TableCustomConfig customConfig = tableConfig.getCustomConfig();
     if (customConfig != null) {
       Map<String, String> customConfigMap = customConfig.getCustomConfigs();
