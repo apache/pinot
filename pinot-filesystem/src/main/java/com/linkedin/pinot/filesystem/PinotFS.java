@@ -51,7 +51,7 @@ public abstract class PinotFS implements Closeable {
    * it will overwrite. Will work either for moving a directory or a file.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
-   * @param overwrite
+   * @param overwrite true if we want to overwrite the dstURI, false otherwise
    * @return true if move is successful
    * @throws IOException on failure
    */
