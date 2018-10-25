@@ -64,18 +64,26 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean move(URI srcUri, URI dstUri) throws IOException {
+  public boolean move(URI srcUri, URI dstUri, boolean overwrite) throws IOException {
     File srcFile = new File(decodeURI(srcUri.getRawPath()));
     File dstFile = new File(decodeURI(dstUri.getRawPath()));
     if (dstFile.exists()) {
-      FileUtils.deleteQuietly(dstFile);
+      if (overwrite) {
+        FileUtils.deleteQuietly(dstFile);
+      } else {
+        // dst file exists, returning
+        return false;
+      }
     }
+
+    // Makes all parent directories for dst file if they don't exist
     if (!srcFile.isDirectory()) {
       dstFile.getParentFile().mkdirs();
       FileUtils.moveFile(srcFile, dstFile);
     } else {
       Files.move(srcFile.toPath(), dstFile.toPath());
     }
+
     return true;
   }
 
@@ -133,11 +141,25 @@ public class LocalPinotFS extends PinotFS {
     return new File(uri).isDirectory();
   }
 
-  private String encodeURI(String uri) throws UnsupportedEncodingException {
-    return URLEncoder.encode(uri, DEFAULT_ENCODING);
+  private String encodeURI(String uri) {
+    String encodedStr;
+    try {
+      encodedStr = URLEncoder.encode(uri, DEFAULT_ENCODING);
+    } catch (UnsupportedEncodingException e) {
+      LOGGER.warn("Could not encode uri {}", uri);
+      throw new RuntimeException(e);
+    }
+    return encodedStr;
   }
 
-  private String decodeURI(String uri) throws UnsupportedEncodingException {
-    return URLDecoder.decode(uri, DEFAULT_ENCODING);
+  private String decodeURI(String uri) {
+    String decodedStr;
+    try {
+      decodedStr = URLDecoder.decode(uri, DEFAULT_ENCODING);
+    } catch (UnsupportedEncodingException e) {
+      LOGGER.warn("Could not decode uri {}", uri);
+      throw new RuntimeException(e);
+    }
+    return decodedStr;
   }
 }

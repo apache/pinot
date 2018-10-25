@@ -51,10 +51,11 @@ public abstract class PinotFS implements Closeable {
    * it will overwrite. Will work either for moving a directory or a file.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
+   * @param overwrite
    * @return true if move is successful
    * @throws IOException on failure
    */
-  public abstract boolean move(URI srcUri, URI dstUri) throws IOException;
+  public abstract boolean move(URI srcUri, URI dstUri, boolean overwrite) throws IOException;
 
   /**
    * Copies a file from src to dst. Keeps the original file. If the dst has parent directories that haven't

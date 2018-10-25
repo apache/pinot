@@ -92,7 +92,11 @@ public class LocalPinotFSTest {
 
     // Check that method deletes dst directory during move and is successful by overwriting dir
     Assert.assertTrue(_newTmpDir.exists());
-    localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI());
+
+    // Expected that a move without overwrite will not succeed
+    Assert.assertEquals(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), false), false);
+
+    localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), true);
     Assert.assertEquals(_absoluteTmpDirPath.length(), 0);
 
     localPinotFS.delete(secondTestFileUri);
