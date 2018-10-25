@@ -293,14 +293,14 @@ public class PinotSegmentUploadRestletResource {
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
       }
 
-      zkDownloadUri = getZkDownloadURIForSegmentUpload(segmentMetadata, provider);
-
       // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
       // We will deprecate this behavior eventually.
       if (!moveSegmentToFinalLocation) {
         LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
             segmentMetadata.getName(), segmentMetadata.getTableName());
         zkDownloadUri = currentSegmentLocationURI;
+      } else {
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(segmentMetadata, provider);
       }
 
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
@@ -340,7 +340,7 @@ public class PinotSegmentUploadRestletResource {
       // Receiving .tar.gz segment upload for pluggable storage
       LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(),
           segmentMetadata.getName(), segmentMetadata.getTableName());
-      return StringUtil.join(File.separator, provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+      return StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
           URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
     }
   }
