@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detection.alert;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -62,8 +63,8 @@ public class DetectionAlertTaskFactory {
 
   }
 
-  public Set<DetectionAlertScheme> loadAlertSchemes(DetectionAlertConfigDTO alertConfig, TaskContext taskContext,
-      DetectionAlertFilterResult result) throws Exception {
+  public Set<DetectionAlertScheme> loadAlertSchemes(DetectionAlertConfigDTO alertConfig,
+      ThirdEyeAnomalyConfiguration thirdeyeConfig, DetectionAlertFilterResult result) throws Exception {
     Preconditions.checkNotNull(alertConfig);
     List<String> alertSchemes = alertConfig.getAlertSchemes();
     if (alertSchemes == null || alertSchemes.isEmpty()) {
@@ -73,8 +74,9 @@ public class DetectionAlertTaskFactory {
     for (String alertSchemeClass : alertSchemes) {
       LOG.debug("Loading Alert Scheme : {}", alertSchemeClass);
       Constructor<?> constructor = Class.forName(alertSchemeClass.trim())
-          .getConstructor(DetectionAlertConfigDTO.class, TaskContext.class, DetectionAlertFilterResult.class);
-      detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(alertConfig, taskContext, result));
+          .getConstructor(DetectionAlertConfigDTO.class, ThirdEyeAnomalyConfiguration.class, DetectionAlertFilterResult.class);
+      detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(alertConfig,
+          thirdeyeConfig, result));
     }
     return detectionAlertSchemeSet;
   }

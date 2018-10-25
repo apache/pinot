@@ -98,9 +98,12 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       DetectionAlertFilter alertFilter = detAlertTaskFactory.loadAlertFilter(alertConfig, System.currentTimeMillis());
       DetectionAlertFilterResult result = alertFilter.run();
 
+      // TODO: Cleanup currentAndBaselineLoader
+      // In the new design, we have decided to move this function back to the detection pipeline.
       this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(result.getAllAnomalies());
 
-      Set<DetectionAlertScheme> alertSchemes = detAlertTaskFactory.loadAlertSchemes(alertConfig, taskContext, result);
+      Set<DetectionAlertScheme> alertSchemes =
+          detAlertTaskFactory.loadAlertSchemes(alertConfig, taskContext.getThirdEyeAnomalyConfiguration(), result);
       for (DetectionAlertScheme alertScheme : alertSchemes) {
         alertScheme.run();
       }

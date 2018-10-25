@@ -84,7 +84,8 @@ public class DetectionAlertTaskFactoryTest {
     DetectionAlertConfigDTO alertConfig = createAlertConfig(alerters,
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
-    Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig, null, null);
+    Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig,
+        new ThirdEyeAnomalyConfiguration(), null);
 
     Assert.assertEquals(detectionAlertSchemes.size(), 2);
     Iterator<DetectionAlertScheme> alertSchemeIterator = detectionAlertSchemes.iterator();
@@ -98,7 +99,7 @@ public class DetectionAlertTaskFactoryTest {
   @Test(expectedExceptions = NullPointerException.class)
   public void testDefaultAlertSchemes() throws Exception {
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
-    detectionAlertTaskFactory.loadAlertSchemes(null, null, null);
+    detectionAlertTaskFactory.loadAlertSchemes(null, new ThirdEyeAnomalyConfiguration(), null);
   }
 
   /**
@@ -106,12 +107,11 @@ public class DetectionAlertTaskFactoryTest {
    */
   @Test
   public void testLoadDefaultAlertSchemes() throws Exception {
-    TaskContext context = new TaskContext();
-    context.setThirdEyeAnomalyConfiguration(new ThirdEyeAnomalyConfiguration());
     DetectionAlertConfigDTO alertConfig = createAlertConfig(Collections.<String>emptyList(),
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
-    Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig, context, null);
+    Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig,
+        new ThirdEyeAnomalyConfiguration(), null);
 
     Assert.assertEquals(detectionAlertSchemes.size(), 1);
     Assert.assertEquals(detectionAlertSchemes.iterator().next().getClass().getSimpleName(), "DetectionEmailAlerter");

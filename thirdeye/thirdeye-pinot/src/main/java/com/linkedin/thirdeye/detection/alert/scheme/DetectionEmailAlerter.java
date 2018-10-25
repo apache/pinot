@@ -23,7 +23,6 @@ import com.linkedin.thirdeye.alert.content.EmailContentFormatterConfiguration;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatterContext;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
@@ -55,11 +54,11 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
 
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
-  public DetectionEmailAlerter(DetectionAlertConfigDTO config, TaskContext taskContext,
+  public DetectionEmailAlerter(DetectionAlertConfigDTO config, ThirdEyeAnomalyConfiguration thirdeyeConfig,
       DetectionAlertFilterResult result) throws Exception {
     super(config, result);
 
-    this.thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
+    this.thirdeyeConfig = thirdeyeConfig;
   }
 
   /** Sends email according to the provided config. */
