@@ -106,20 +106,20 @@ public class HadoopSegmentCreationMapReduceJob {
       _readerConfigFile = _properties.get(JobConfigConstants.PATH_TO_READER_CONFIG);
       if (_outputPath == null || _tableName == null) {
         throw new RuntimeException(
-          "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
-            + "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
+            "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
+                + "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
       }
 
-      String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
-      if (tableConfigString != null) {
-        try {
-          _tableConfig = TableConfig.init(tableConfigString);
-        } catch (JSONException e) {
-          // Though we get table config directly from the controller of hosts and port of push location are set,
-          // it is possible for the user to pass in a table config as a parameter
-          LOGGER.error("Exception when parsing table config: {}", tableConfigString);
+        String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
+        if (tableConfigString != null) {
+          try {
+            _tableConfig = TableConfig.init(tableConfigString);
+          } catch (JSONException e) {
+            // Though we get table config directly from the controller of hosts and port of push location are set,
+            // it is possible for the user to pass in a table config as a parameter
+            LOGGER.error("Exception when parsing table config: {}", tableConfigString);
+          }
         }
-      }
     }
 
     protected String getTableName() {
@@ -173,7 +173,7 @@ public class HadoopSegmentCreationMapReduceJob {
         localInputDataDir.mkdir();
 
         final Path localInputFilePath =
-          new Path(localInputDataDir.getAbsolutePath() + "/" + hdfsInputFilePath.getName());
+            new Path(localInputDataDir.getAbsolutePath() + "/" + hdfsInputFilePath.getName());
         LOGGER.info("Copy from " + hdfsInputFilePath + " to " + localInputFilePath);
         fs.copyToLocalFile(hdfsInputFilePath, localInputFilePath);
 
@@ -208,7 +208,7 @@ public class HadoopSegmentCreationMapReduceJob {
       }
 
       context.write(new LongWritable(Long.parseLong(lineSplits[2])), new Text(
-        FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
+          FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
       LOGGER.info("Finished the job successfully");
     }
 
@@ -242,7 +242,7 @@ public class HadoopSegmentCreationMapReduceJob {
     }
 
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
-                                   File localInputDataDir, FileSystem fs) throws Exception {
+        File localInputDataDir, FileSystem fs) throws Exception {
       SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
 
       segmentGeneratorConfig.setTableName(_tableName);
@@ -286,18 +286,18 @@ public class HadoopSegmentCreationMapReduceJob {
       File localDiskOutputSegmentDir = new File(_localDiskOutputSegmentDir, segmentName);
       String localDiskOutputSegmentDirAbsolutePath = localDiskOutputSegmentDir.getAbsolutePath();
       String localDiskSegmentTarFileAbsolutePath =
-        new File(_localDiskSegmentTarPath).getAbsolutePath() + "/" + segmentName + JobConfigConstants.TARGZ;
+          new File(_localDiskSegmentTarPath).getAbsolutePath() + "/" + segmentName + JobConfigConstants.TARGZ;
 
       LOGGER.info("Trying to tar the segment to: {}", localDiskSegmentTarFileAbsolutePath);
       TarGzCompressionUtils.createTarGzOfDirectory(localDiskOutputSegmentDirAbsolutePath,
-        localDiskSegmentTarFileAbsolutePath);
+          localDiskSegmentTarFileAbsolutePath);
       String hdfsSegmentTarFilePath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
 
       // Log segment size.
       long uncompressedSegmentSize = FileUtils.sizeOfDirectory(localDiskOutputSegmentDir);
       long compressedSegmentSize = new File(localDiskSegmentTarFileAbsolutePath).length();
       LOGGER.info(String.format("Segment %s uncompressed size: %s, compressed size: %s", segmentName,
-        DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
+          DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("Copy from : {} to {}", localDiskSegmentTarFileAbsolutePath, hdfsSegmentTarFilePath);
