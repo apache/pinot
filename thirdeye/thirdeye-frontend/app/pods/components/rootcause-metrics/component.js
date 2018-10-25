@@ -70,12 +70,6 @@ export default Component.extend({
   //
 
   /**
-   * loading status for component
-   * @type {boolean}
-   */
-  isLoading: false,
-
-  /**
    * A mapping of each metric and its url(s)
    * @type {Object} - key is metric urn, and value is an array of objects, each object has a key of the url label,
    * and value as the url
