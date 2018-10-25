@@ -49,7 +49,7 @@ public class DetectionAlertTaskFactoryTest {
     testDAOProvider.cleanup();
   }
 
-  private long createAlertConfig(List<String> schemes, String filter) {
+  private DetectionAlertConfigDTO createAlertConfig(List<String> schemes, String filter) {
     Map<String, Object> properties = new HashMap<>();
     properties.put("className", filter);
     properties.put("detectionConfigIds", Collections.singletonList(1000));
@@ -61,29 +61,31 @@ public class DetectionAlertTaskFactoryTest {
     this.alertConfigDTO.setFrom("te@linkedin.com");
     this.alertConfigDTO.setName("factory_alert");
     this.alertConfigDTO.setVectorClocks(vectorClocks);
+    this.alertConfigDAO.save(this.alertConfigDTO);
 
-    return this.alertConfigDAO.save(this.alertConfigDTO);
+    return this.alertConfigDTO;
   }
 
   @Test
   public void testLoadAlertFilter() throws Exception {
-    long alertConfigId = createAlertConfig(alerters,
+    DetectionAlertConfigDTO alertConfig = createAlertConfig(alerters,
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     long endTime = 9999l;
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
-    DetectionAlertFilter detectionAlertFilter = detectionAlertTaskFactory.loadAlertFilter(alertConfigId, endTime);
+    DetectionAlertFilter detectionAlertFilter = detectionAlertTaskFactory.loadAlertFilter(alertConfig, endTime);
 
-    Assert.assertEquals(detectionAlertFilter.config.getId().longValue(), alertConfigId);
+    Assert.assertEquals(detectionAlertFilter.config.getId().longValue(), alertConfig.getId().longValue());
     Assert.assertEquals(detectionAlertFilter.endTime, endTime);
     Assert.assertEquals(detectionAlertFilter.getClass().getSimpleName(), "ToAllRecipientsDetectionAlertFilter");
   }
 
   @Test
   public void testLoadAlertSchemes() throws Exception {
-    long alertConfigId = createAlertConfig(alerters,
+    DetectionAlertConfigDTO alertConfig = createAlertConfig(alerters,
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
-    Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfigId, null, null);
+    Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig,
+        new ThirdEyeAnomalyConfiguration(), null);
 
     Assert.assertEquals(detectionAlertSchemes.size(), 2);
     Iterator<DetectionAlertScheme> alertSchemeIterator = detectionAlertSchemes.iterator();
@@ -94,10 +96,10 @@ public class DetectionAlertTaskFactoryTest {
   /**
    * Check if an exception is thrown when the detection config id cannot be found
    */
-  @Test(expectedExceptions = RuntimeException.class)
+  @Test(expectedExceptions = NullPointerException.class)
   public void testDefaultAlertSchemes() throws Exception {
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
-    detectionAlertTaskFactory.loadAlertSchemes(9, null, null);
+    detectionAlertTaskFactory.loadAlertSchemes(null, new ThirdEyeAnomalyConfiguration(), null);
   }
 
   /**
@@ -105,12 +107,11 @@ public class DetectionAlertTaskFactoryTest {
    */
   @Test
   public void testLoadDefaultAlertSchemes() throws Exception {
-    TaskContext context = new TaskContext();
-    context.setThirdEyeAnomalyConfiguration(new ThirdEyeAnomalyConfiguration());
-    long alertConfigId = createAlertConfig(Collections.<String>emptyList(),
+    DetectionAlertConfigDTO alertConfig = createAlertConfig(Collections.<String>emptyList(),
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
-    Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfigId, context, null);
+    Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig,
+        new ThirdEyeAnomalyConfiguration(), null);
 
     Assert.assertEquals(detectionAlertSchemes.size(), 1);
     Assert.assertEquals(detectionAlertSchemes.iterator().next().getClass().getSimpleName(), "DetectionEmailAlerter");
