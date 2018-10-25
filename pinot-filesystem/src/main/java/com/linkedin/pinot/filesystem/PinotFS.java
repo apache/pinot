@@ -90,10 +90,11 @@ public abstract class PinotFS implements Closeable {
    * Throws exception if this abstract pathname is not valid, or if
    * an I/O error occurs.
    * @param fileUri location of file
+   * @param recursive if we want to list files recursively
    * @return an array of strings that contains file paths
    * @throws IOException see specific implementation
    */
-  public abstract String[] listFiles(URI fileUri) throws IOException;
+  public abstract String[] listFiles(URI fileUri, boolean recursive) throws IOException;
 
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.
@@ -117,7 +118,15 @@ public abstract class PinotFS implements Closeable {
    * @param uri location of file or directory
    * @return true if uri is a directory, false otherwise.
    */
-  public abstract boolean isDirectory(URI uri) throws IOException;
+  public abstract boolean isDirectory(URI uri);
+
+  /**
+   * Returns the age of the file
+   * @param uri
+   * @return A long value representing the time the file was last modified, measured in milliseconds since epoch
+   * (00:00:00 GMT, January 1, 1970) or 0L if the file does not exist or if an I/O error occurs
+   */
+  public abstract long lastModified(URI uri);
 
   /**
    * For certain filesystems, we may need to close the filesystem and do relevant operations to prevent leaks.

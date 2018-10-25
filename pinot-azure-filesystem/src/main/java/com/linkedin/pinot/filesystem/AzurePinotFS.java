@@ -135,13 +135,22 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public String[] listFiles(URI fileUri) throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
     if (rootDir == null) {
       return EMPTY_ARR;
     }
-    List<DirectoryEntry> directoryEntries = listFiles(rootDir);
 
+    if (!recursive) {
+      List<String> shallowDirPaths = new ArrayList<>();
+      List<DirectoryEntry> shallowDirectoryEntries = _adlStoreClient.enumerateDirectory(rootDir.fullName);
+      for (DirectoryEntry directoryEntry : shallowDirectoryEntries) {
+        shallowDirPaths.add(directoryEntry.fullName);
+      }
+      return shallowDirPaths.toArray(new String[shallowDirPaths.size()]);
+    }
+
+    List<DirectoryEntry> directoryEntries = listFiles(rootDir);
     List<String> fullFilePaths = new ArrayList<>();
     for (DirectoryEntry directoryEntry : directoryEntries) {
       fullFilePaths.add(directoryEntry.fullName);
@@ -152,7 +161,6 @@ public class AzurePinotFS extends PinotFS {
   private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry) throws IOException {
     List<DirectoryEntry> fileList = new ArrayList<>();
     if (origDirEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
-      fileList.add(origDirEntry);
       for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
         fileList.add(directoryEntry);
         fileList.addAll(listFiles(directoryEntry));
@@ -196,9 +204,23 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri) throws IOException {
-    DirectoryEntry dirEntry = _adlStoreClient.getDirectoryEntry(uri.getPath());
+  public boolean isDirectory(URI uri) {
+    DirectoryEntry dirEntry;
+    try {
+      dirEntry = _adlStoreClient.getDirectoryEntry(uri.getPath());
+    } catch (IOException e) {
+      return false;
+    }
 
     return dirEntry.type.equals(DirectoryEntryType.DIRECTORY);
+  }
+
+  @Override
+  public long lastModified(URI uri) {
+    try {
+      return _adlStoreClient.getDirectoryEntry(uri.getPath()).lastModifiedTime.getTime();
+    } catch (IOException e) {
+      return 0L;
+    }
   }
 }

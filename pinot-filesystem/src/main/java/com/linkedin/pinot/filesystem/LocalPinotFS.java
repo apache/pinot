@@ -22,7 +22,7 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.file.Files;
-import java.util.Collection;
+import java.util.Arrays;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -114,10 +114,17 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public String[] listFiles(URI fileUri) throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     File file = new File(decodeURI(fileUri.getRawPath()));
-    Collection<File> files = FileUtils.listFiles(file, null, true);
-    return files.stream().map(File::getPath).toArray(String[]::new);
+    if (!recursive) {
+      return file.list();
+    } else {
+      File[] files = file.listFiles();
+      if (files == null) {
+        return new String[0];
+      }
+      return Arrays.stream(files).map(File::getPath).toArray(String[]::new);
+    }
   }
 
   @Override
@@ -131,15 +138,36 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri) throws IOException {
-    return new File(uri).isDirectory();
+  public boolean isDirectory(URI uri) {
+    File file = new File(decodeURI(uri.getRawPath()));
+    return file.isDirectory();
   }
 
-  private String encodeURI(String uri) throws UnsupportedEncodingException {
-    return URLEncoder.encode(uri, DEFAULT_ENCODING);
+  @Override
+  public long lastModified(URI uri) {
+    File file = new File(decodeURI(uri.getRawPath()));
+    return file.lastModified();
   }
 
-  private String decodeURI(String uri) throws UnsupportedEncodingException {
-    return URLDecoder.decode(uri, DEFAULT_ENCODING);
+  private String encodeURI(String uri) {
+    String encodedStr;
+    try {
+      encodedStr = URLEncoder.encode(uri, DEFAULT_ENCODING);
+    } catch (UnsupportedEncodingException e) {
+      LOGGER.warn("Could not encode uri {}", uri);
+      throw new RuntimeException(e);
+    }
+    return encodedStr;
+  }
+
+  private String decodeURI(String uri) {
+    String decodedStr;
+    try {
+      decodedStr = URLDecoder.decode(uri, DEFAULT_ENCODING);
+    } catch (UnsupportedEncodingException e) {
+      LOGGER.warn("Could not decode uri {}", uri);
+      throw new RuntimeException(e);
+    }
+    return decodedStr;
   }
 }

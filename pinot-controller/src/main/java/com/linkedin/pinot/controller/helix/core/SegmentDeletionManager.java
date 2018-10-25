@@ -23,11 +23,11 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
-import java.io.FileFilter;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,9 +36,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.filefilter.AgeFileFilter;
-import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
@@ -213,32 +210,54 @@ public class SegmentDeletionManager {
         return;
       }
 
-      AgeFileFilter fileFilter = new AgeFileFilter(DateTime.now().minusDays(retentionInDays).toDate());
-      File[] directories = deletedDir.listFiles((FileFilter) DirectoryFileFilter.DIRECTORY);
-      // Check that the directory for deleted segments is empty
-      if (directories == null) {
-        LOGGER.warn("Deleted segment directory {} does not exist or it caused an I/O error.", deletedDir);
+      URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
+      URI deletedDirURI = ControllerConf.getUriFromPath(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS));
+      PinotFS pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
+
+      // Check that the directory for deleted segments exists
+      if (!pinotFS.isDirectory(deletedDirURI)) {
+        LOGGER.warn("Deleted segment directory {} does not exist or it is not directory.", deletedDirURI.toString());
         return;
       }
 
-      for (File currentDir : directories) {
+    try {
+      String[] deletedDirFiles = pinotFS.listFiles(deletedDirURI, false);
+      if (deletedDirFiles == null) {
+        LOGGER.warn("Deleted segment directory {} does not exist.", deletedDirURI.toString());
+        return;
+      }
+
+      for (String currentDir : deletedDirFiles) {
+        URI currentURI = ControllerConf.getUriFromPath(currentDir);
         // Get files that are aged
-        Collection<File> targetFiles = FileUtils.listFiles(currentDir, fileFilter, null);
+        String[] targetFiles = pinotFS.listFiles(currentURI, false);
+        List<URI> filesToDelete = new ArrayList<>();
+        for (String targetFile : targetFiles) {
+          URI targetURI = ControllerConf.getUriFromPath(targetFile);
+          Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
+          if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
+            filesToDelete.add(targetURI);
+          }
+        }
         // Delete aged files
-        for (File f : targetFiles) {
-          if (!f.delete()) {
-            LOGGER.warn("Cannot remove file {} from deleted directory.", f.getAbsolutePath());
+        for (URI f : filesToDelete) {
+          if (!pinotFS.delete(f)) {
+            LOGGER.warn("Cannot remove file {} from deleted directory.", f.toString());
           }
         }
         // Delete directory if it's empty
-        if (currentDir.list() != null && currentDir.list().length == 0) {
-          if (!currentDir.delete()) {
-            LOGGER.warn("The directory {} cannot be removed. The directory may not be empty.", currentDir.getAbsolutePath());
+        String[] fileList = pinotFS.listFiles(currentURI, true);
+        if (fileList.length == 0) {
+          if (!pinotFS.delete(currentURI)) {
+            LOGGER.warn("The directory {} cannot be removed.", currentDir);
           }
         }
       }
+    } catch (IOException e){
+      LOGGER.error("Had trouble deleting directories", deletedDirURI.toString());
+    }
     } else {
-      LOGGER.info("localDiskDir is not configured, won't delete any expired segments from deleted directory.");
+      LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
     }
   }
 }

@@ -113,14 +113,22 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public String[] listFiles(URI fileUri) throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(fileUri);
     if (_hadoopFS.exists(path)) {
-      RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, true);
-      while (fileListItr != null && fileListItr.hasNext()) {
-        LocatedFileStatus file = fileListItr.next();
-        filePathStrings.add(file.getPath().toUri().toString());
+      if (recursive) {
+        RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, true);
+        while (fileListItr != null && fileListItr.hasNext()) {
+          LocatedFileStatus file = fileListItr.next();
+          filePathStrings.add(file.getPath().toUri().toString());
+        }
+      } else {
+        RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, false);
+        while (fileListItr != null && fileListItr.hasNext()) {
+          LocatedFileStatus file = fileListItr.next();
+          filePathStrings.add(file.getPath().toUri().toString());
+        }
       }
     } else {
       throw new IllegalArgumentException("segmentUri is not valid");
@@ -166,10 +174,19 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri) throws IOException {
+  public boolean isDirectory(URI uri) {
     FileStatus fileStatus = new FileStatus();
     fileStatus.setPath(new Path(uri));
     return fileStatus.isDirectory();
+  }
+
+  @Override
+  public long lastModified(URI uri) {
+    try {
+      return _hadoopFS.getFileStatus(new Path(uri)).getModificationTime();
+    } catch (IOException e) {
+      return 0L;
+    }
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {
