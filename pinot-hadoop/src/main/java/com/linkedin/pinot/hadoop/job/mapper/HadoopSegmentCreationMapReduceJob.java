@@ -19,13 +19,13 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.DataSize;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.ThriftRecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.hadoop.job.JobConfigConstants;
 import java.io.File;
 import java.io.IOException;
@@ -106,8 +106,8 @@ public class HadoopSegmentCreationMapReduceJob {
       _readerConfigFile = _properties.get(JobConfigConstants.PATH_TO_READER_CONFIG);
       if (_outputPath == null || _tableName == null) {
         throw new RuntimeException(
-                "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
-                        + "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
+          "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
+            + "\n\ttableName: " + _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME));
       }
 
       String tableConfigString = _properties.get(JobConfigConstants.TABLE_CONFIG);
@@ -173,7 +173,7 @@ public class HadoopSegmentCreationMapReduceJob {
         localInputDataDir.mkdir();
 
         final Path localInputFilePath =
-                new Path(localInputDataDir.getAbsolutePath() + "/" + hdfsInputFilePath.getName());
+          new Path(localInputDataDir.getAbsolutePath() + "/" + hdfsInputFilePath.getName());
         LOGGER.info("Copy from " + hdfsInputFilePath + " to " + localInputFilePath);
         fs.copyToLocalFile(hdfsInputFilePath, localInputFilePath);
 
@@ -199,8 +199,8 @@ public class HadoopSegmentCreationMapReduceJob {
 
       try {
         String segmentName =
-                createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsInputFilePath, localInputDataDir,
-                        fs);
+          createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsInputFilePath, localInputDataDir,
+            fs);
         LOGGER.info(segmentName);
         LOGGER.info("Finished segment creation job successfully");
       } catch (Exception e) {
@@ -208,19 +208,21 @@ public class HadoopSegmentCreationMapReduceJob {
       }
 
       context.write(new LongWritable(Long.parseLong(lineSplits[2])), new Text(
-              FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
+        FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
       LOGGER.info("Finished the job successfully");
     }
 
     protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
                                            Path hdfsAvroPath, File dataPath) {
-      if(segmentGeneratorConfig.getSchema() == null ||
-              segmentGeneratorConfig.getSchema().getTimeFieldSpec() == null ||
-              segmentGeneratorConfig.getSchema().getTimeFieldSpec().getIncomingGranularitySpec() == null){
+      Schema schema = segmentGeneratorConfig.getSchema();
+
+      if(schema == null ||
+        schema.getTimeFieldSpec() == null ||
+        schema.getTimeFieldSpec().getIncomingGranularitySpec() == null){
         return;
       }
 
-      String timeFormatStr = segmentGeneratorConfig.getSchema().getTimeFieldSpec().getIncomingGranularitySpec().getTimeFormat();
+      String timeFormatStr = schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeFormat();
 
       if (timeFormatStr.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
         return;
@@ -229,7 +231,7 @@ public class HadoopSegmentCreationMapReduceJob {
       String simpleDateTypeStr = timeFormatStr.split(":")[1];
 
       // Throws illegal argument exception if invalid
-      try {
+      try{
         new SimpleDateFormat(simpleDateTypeStr);
       }
       catch (IllegalArgumentException e) {
@@ -284,18 +286,18 @@ public class HadoopSegmentCreationMapReduceJob {
       File localDiskOutputSegmentDir = new File(_localDiskOutputSegmentDir, segmentName);
       String localDiskOutputSegmentDirAbsolutePath = localDiskOutputSegmentDir.getAbsolutePath();
       String localDiskSegmentTarFileAbsolutePath =
-              new File(_localDiskSegmentTarPath).getAbsolutePath() + "/" + segmentName + JobConfigConstants.TARGZ;
+        new File(_localDiskSegmentTarPath).getAbsolutePath() + "/" + segmentName + JobConfigConstants.TARGZ;
 
       LOGGER.info("Trying to tar the segment to: {}", localDiskSegmentTarFileAbsolutePath);
       TarGzCompressionUtils.createTarGzOfDirectory(localDiskOutputSegmentDirAbsolutePath,
-              localDiskSegmentTarFileAbsolutePath);
+        localDiskSegmentTarFileAbsolutePath);
       String hdfsSegmentTarFilePath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
 
       // Log segment size.
       long uncompressedSegmentSize = FileUtils.sizeOfDirectory(localDiskOutputSegmentDir);
       long compressedSegmentSize = new File(localDiskSegmentTarFileAbsolutePath).length();
       LOGGER.info(String.format("Segment %s uncompressed size: %s, compressed size: %s", segmentName,
-              DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
+        DataSize.fromBytes(uncompressedSegmentSize), DataSize.fromBytes(compressedSegmentSize)));
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("Copy from : {} to {}", localDiskSegmentTarFileAbsolutePath, hdfsSegmentTarFilePath);
@@ -313,7 +315,6 @@ public class HadoopSegmentCreationMapReduceJob {
           }
           else {
             LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
-
             Path readerConfigPath = new Path(_readerConfigFile);
             readerConfig = new ObjectMapper().readValue(_fileSystem.open(readerConfigPath), CSVRecordReaderConfig.class);
             LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
