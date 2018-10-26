@@ -91,7 +91,7 @@
           </span>
         </div>
         {{#each options as |option|}}
-          <div class="col-xs-2 rootcause-anomaly__radio-button-item">
+          <div class="rootcause-anomaly__radio-button-item">
             {{#radio-button value=option groupValue=status changed=(action "onFeedback")}}
               <span class="te-radio__option">{{get optionsMapping option}}</span>
             {{/radio-button}}

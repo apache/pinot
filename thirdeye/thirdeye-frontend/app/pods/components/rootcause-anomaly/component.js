@@ -27,11 +27,11 @@ const OFFSETS = ['current', 'predicted', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
  * @type {Object}
  */
 const ANOMALY_OPTIONS_MAPPING = {
-  ANOMALY: 'Yes, it\'s unexpected',
-  ANOMALY_EXPECTED: 'It\'s an expected temporary change (E.g. Holiday)',
-  ANOMALY_NEW_TREND: 'It\'s an expected permanent change',
-  NOT_ANOMALY: 'No significant change observed',
-  NO_FEEDBACK: 'To Be Determined'
+  ANOMALY: 'Yes - unexpected',
+  ANOMALY_EXPECTED: 'Expected temporary change',
+  ANOMALY_NEW_TREND: 'Expected permanent change',
+  NOT_ANOMALY: 'No change observed',
+  NO_FEEDBACK: 'Not reviewed yet'
 };
 
 export default Component.extend({
