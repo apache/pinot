@@ -33,7 +33,6 @@ import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import javax.ws.rs.core.Response;
@@ -60,6 +59,7 @@ import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.validation.constraints.NotNull;
 
+import static com.linkedin.thirdeye.anomaly.onboard.tasks.FunctionCreationOnboardingTask.*;
 import static com.linkedin.thirdeye.dashboard.resources.EntityManagerResource.*;
 
 
@@ -78,7 +78,6 @@ public class OnboardResource {
   private static final String DEFAULT_FUNCTION_PREFIX = "thirdEyeAutoOnboard_";
   private static final String DEFAULT_ALERT_GROUP = "te_bulk_onboard_alerts";
   private static final String DEFAULT_ALERT_GROUP_APPLICATION = "others";
-  private static final String DEFAULT_ALERT_GROUP_CRON = "0 0/5 * 1/1 * ? *"; // Every 5 min
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(OnboardResource.class);
 
@@ -254,7 +253,7 @@ public class OnboardResource {
 
   private Long createAlertConfig(String alertGroupName, String application, String cron, Set<String> recipients) {
     if (StringUtils.isEmpty(cron)) {
-      cron = DEFAULT_ALERT_GROUP_CRON;
+      cron = DEFAULT_ALERT_CRON;
     } else {
       if (!CronExpression.isValidExpression(cron)) {
         throw new IllegalArgumentException("Invalid cron expression : " + cron);

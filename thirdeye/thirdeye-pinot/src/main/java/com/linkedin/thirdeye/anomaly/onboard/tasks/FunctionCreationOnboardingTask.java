@@ -101,7 +101,7 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
 
   public static final Boolean DEFAULT_IS_ACTIVE = true;
   public static final Integer DEFAULT_WINDOW_DELAY = 0;
-  public static final String DEFAULT_ALERT_CRON = "0 0/5 * 1/1 * ? *"; // Every 5 min
+  public static final String DEFAULT_ALERT_CRON = "0 0/5 * * * ? *"; // Every 5 min
   public static final String DEFAULT_ALERT_FILTER_PATTERN = AlertFilterAutoTuneOnboardingTask.DEFAULT_AUTOTUNE_PATTERN;
   public static final String DEFAULT_ALERT_FILTER_TYPE = "AUTOTUNE";
   public static final String DEFAULT_URL_DECODER = "UTF-8";
