@@ -37,7 +37,7 @@ module('Acceptance | tune alert settings', function(hooks) {
     // Click into Alert Page for first listed alert
     await click($targetAlertLink.get(0));
     const alertPropsElementArray = Object.values($(selfServeConst.ALERT_PROPS_ITEM)).filter(el => el.nodeName ==='DIV');
-    const alertPropLabelsArray = alertPropsElementArray.map(el => el.innerText);
+    const alertPropLabelsArray = alertPropsElementArray.map(el => el.innerText.trim());
 
     // Verify transition to Alert Page
     assert.ok(

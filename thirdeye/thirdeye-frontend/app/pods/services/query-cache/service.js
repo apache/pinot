@@ -55,6 +55,29 @@ export default Service.extend({
   },
 
   /**
+   * @summary  This queryRecord method is a wrapper of the ember store `queryRecord`. It will add the dictionary caching that we need.
+   * @method query
+   * @param {String} type - modelName
+   * @param {Object} query - query object used to generate the
+   * @param {Object} adapterOptions - adapter options object (reload: true will enforces getting fresh data)
+   * @example
+       const query = { application: appName, start };
+       const anomalies = await queryCache.queryRecord(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
+   * @return {Object}
+   */
+  async queryRecord(type, query, adapterOptions) {
+    const cacheKey = adapterOptions.cacheKey;
+    assert('you must pass adapterOptions to queryCache.query', adapterOptions);
+    assert('you must include adapterOptions.cacheKey', cacheKey);
+
+    let cached = this._cache[cacheKey];
+    if (!cached || adapterOptions.reload) {// TODO: Add `EXPIRATION` here to purge when possible - lohuynh
+       cached = this._cache[cacheKey] = await this.get('store').queryRecord(type, query, adapterOptions);
+    }
+    return cached;
+  },
+
+  /**
    * @summary  We can use the request query object as the `cacheKey` in the `query` hook.
      The cacheKey should be uniqued, which would be different with each change in query request params (Note: this is not the url query).
    * @method urlForQueryKey

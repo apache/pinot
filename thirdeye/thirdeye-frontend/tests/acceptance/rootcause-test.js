@@ -63,7 +63,7 @@ module('Acceptance | rootcause', async function(hooks) {
         'My Session',
         'session name is correct');
       assert.ok(
-        $(rcEl.LAST_SAVED).get(0).innerText.includes('Last saved by rootcauseuser'),
+        $(rcEl.LAST_SAVED).get(0).innerText.trim().includes('Last saved by rootcauseuser'),
         'last saved information is correct');
       assert.equal(
         $(rcEl.COMMENT_TEXT).get(1).value,
