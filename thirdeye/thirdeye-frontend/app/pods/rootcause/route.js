@@ -95,6 +95,19 @@ const toAnalysisOffset = (granularity) => {
 };
 
 /**
+ * Returns a Set of urns augmented for virtual frontend metrics.
+ * @example ([thirdeye:metric:1, thirdeye:event:holiday:2]) =>
+ * [thirdeye:metric:1, frontend:metric:current:1, frontend:metric:baseline:1, thirdeye:event:holiday:2]
+ */
+const augmentFrontendMetrics = (urns) => {
+  return [...urns]
+    .filter(urn => urn.startsWith('thirdeye:metric:'))
+    .map(urn => [urn, toCurrentUrn(urn), toBaselineUrn(urn)])
+    .reduce((agg, urns) => agg.concat(urns), [])
+    .concat([...urns].filter(urn => !urn.startsWith('thirdeye:metric:')));
+};
+
+/**
  * Returns the array for start/end dates of the analysis range
  */
 const toAnalysisRangeArray = (anomalyStart, anomalyEnd, metricGranularity) => {
@@ -124,7 +137,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
   },
 
   model(params) {
-    const { metricId, sessionId, anomalyId } = params;
+    const { metricId, sessionId, anomalyId, anomalyRange, analysisRange, granularity, compareMode } = params;
+    let { contextUrnsInit, selectedUrnsInit, anomalyUrnsInit } = params;
     const isDevEnv = config.environment === 'development';
 
     let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions;
@@ -144,6 +158,31 @@ export default Route.extend(AuthenticatedRouteMixin, {
       session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => {});
     }
 
+    let anomalyRangeStart, anomalyRangeEnd;
+    if (anomalyRange) {
+      [anomalyRangeStart, anomalyRangeEnd] = anomalyRange.split(',').map(r => parseInt(r, 10));
+    }
+
+    let analysisRangeStart, analysisRangeEnd;
+    if (analysisRange) {
+      [analysisRangeStart, analysisRangeEnd] = analysisRange.split(',').map(r => parseInt(r, 10));
+    }
+
+    let contextUrnsPredefined;
+    if (contextUrnsInit) {
+      contextUrnsPredefined = new Set(contextUrnsInit.split(','));
+    }
+
+    let selectedUrnsPredefined;
+    if (selectedUrnsInit) {
+      selectedUrnsPredefined = new Set(augmentFrontendMetrics(selectedUrnsInit.split(',')));
+    }
+
+    let anomalyUrnsPredefined;
+    if (anomalyUrnsInit) {
+      anomalyUrnsPredefined = new Set(anomalyUrnsInit.split(','));
+    }
+
     return RSVP.hash({
       isDevEnv,
       metricId,
@@ -154,7 +193,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomalyId,
       anomalyUrn,
       anomalyEntity,
-      anomalySessions
+      anomalySessions,
+      contextUrnsPredefined,
+      selectedUrnsPredefined,
+      anomalyUrnsPredefined,
+      anomalyRangeStart,
+      anomalyRangeEnd,
+      analysisRangeStart,
+      analysisRangeEnd,
+      granularity,
+      compareMode
     });
   },
 
@@ -212,10 +260,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const {
       analysisRangeStart,
       analysisRangeEnd,
-      granularity,
-      compareMode,
       anomalyRangeStart,
       anomalyRangeEnd,
+      granularity,
+      compareMode,
       metricId,
       metricUrn,
       metricEntity,
@@ -223,7 +271,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
       session,
       anomalyId,
       anomalyUrn,
-      anomalyEntity
+      anomalyEntity,
+      contextUrnsPredefined,
+      selectedUrnsPredefined,
+      anomalyUrnsPredefined
     } = model;
 
     const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
@@ -351,6 +402,22 @@ export default Route.extend(AuthenticatedRouteMixin, {
       }
     }
 
+    // overrides
+    if (!_.isEmpty(contextUrnsPredefined)) {
+      context.urns = contextUrnsPredefined;
+      setupMode = ROOTCAUSE_SETUP_MODE_NONE;
+    }
+
+    if (!_.isEmpty(selectedUrnsPredefined)) {
+      selectedUrns = selectedUrnsPredefined;
+      setupMode = ROOTCAUSE_SETUP_MODE_NONE;
+    }
+
+    if (!_.isEmpty(anomalyUrnsPredefined)) {
+      context.anomalyUrns = anomalyUrnsPredefined;
+      setupMode = ROOTCAUSE_SETUP_MODE_NONE;
+    }
+
     // update secondary metrics
     const sizeMetricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
 
@@ -369,7 +436,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
       selectedUrns,
       sizeMetricUrns,
       setupMode,
-      context
+      context,
+
+      // reset overrides
+      contextUrnsInit: undefined,
+      selectedUrnsInit: undefined,
+      anomalyUrnsInit: undefined,
+      anomalyRange: undefined,
+      analysisRange: undefined,
+      granularity: undefined,
+      compareMode: undefined
     });
   },
 
