@@ -57,6 +57,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   private static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
 
+  private static final int DEFAULT_STRING_LENGTH_LIMIT = 512;
+
   @ConfigKey("name")
   protected String _name;
 
@@ -70,6 +72,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
   @ConfigKey("defaultNullValue")
   private transient String _stringDefaultNullValue;
+
+  @ConfigKey("stringLengthLimit")
+  private int _stringLengthLimit = DEFAULT_STRING_LENGTH_LIMIT;
 
   // Transform function to generate this column, can be based on other columns
   protected String _transformFunction;
@@ -235,6 +240,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     }
   }
 
+  public int getStringLengthLimit() {
+    return _stringLengthLimit;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setStringLengthLimit(int stringLengthLimit) {
+    _stringLengthLimit = stringLengthLimit;
+  }
+
   /**
    * Transform function if defined else null.
    * @return
@@ -260,6 +274,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     jsonObject.addProperty("dataType", _dataType.name());
     if (!_isSingleValueField) {
       jsonObject.addProperty("singleValueField", false);
+    }
+    if (_dataType == DataType.STRING && _stringLengthLimit != DEFAULT_STRING_LENGTH_LIMIT) {
+      jsonObject.addProperty("stringLengthLimit", _stringLengthLimit);
     }
     appendDefaultNullValue(jsonObject);
     return jsonObject;
@@ -326,7 +343,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     FieldSpec that = (FieldSpec) o;
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(
-        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue));
+        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils.isEqual(
+        _stringLengthLimit, that._stringLengthLimit);
   }
 
   @Override
@@ -335,6 +353,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     result = EqualityUtils.hashCodeOf(result, _dataType);
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
+    result = EqualityUtils.hashCodeOf(result, _stringLengthLimit);
     return result;
   }
 

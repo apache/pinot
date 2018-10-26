@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
+import com.linkedin.pinot.core.data.readers.LimitStringLengthRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -99,7 +100,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(RecordReaderFactory.getRecordReader(config)));
+    init(config, new RecordReaderSegmentCreationDataSource(
+        new LimitStringLengthRecordReader(RecordReaderFactory.getRecordReader(config))));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) throws Exception {
