@@ -78,7 +78,7 @@ public class OnboardResource {
   private static final String DEFAULT_FUNCTION_PREFIX = "thirdEyeAutoOnboard_";
   private static final String DEFAULT_ALERT_GROUP = "te_bulk_onboard_alerts";
   private static final String DEFAULT_ALERT_GROUP_APPLICATION = "others";
-  private static final String DEFAULT_ALERT_GROUP_CRON = "0 0 12 ? * FRI *"; // Weekly - Friday Noon
+  private static final String DEFAULT_ALERT_GROUP_CRON = "0 0/5 * 1/1 * ? *"; // Every 5 min
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(OnboardResource.class);
 
