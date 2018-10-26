@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Arrays;
 
 
 public final class FixedByteValueReaderWriter implements Closeable, ValueReader {
@@ -101,12 +102,10 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
     assert value.length <= numBytesPerValue;
 
     long startIndex = (long) index * numBytesPerValue;
-    _dataBuffer.readFrom(startIndex, value);
-
-    int length = value.length;
-    if (length < numBytesPerValue) {
-      _dataBuffer.readFrom(startIndex + length, new byte[numBytesPerValue - length]);
+    if (value.length < numBytesPerValue) {
+      value = Arrays.copyOf(value, numBytesPerValue);
     }
+    _dataBuffer.readFrom(startIndex, value);
   }
 
   @Override
