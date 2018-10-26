@@ -21,7 +21,10 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import org.apache.commons.lang.math.IntRange;
+import org.joda.time.Interval;
 import org.mockito.Mockito;
 
 import static org.mockito.Mockito.*;
@@ -40,6 +43,9 @@ public class SegmentMetadataMockUtils {
     Mockito.when(segmentMetadata.getCrc()).thenReturn(crc);
     Mockito.when(segmentMetadata.getPushTime()).thenReturn(Long.MIN_VALUE);
     Mockito.when(segmentMetadata.getRefreshTime()).thenReturn(Long.MIN_VALUE);
+    Mockito.when(segmentMetadata.getEndTime()).thenReturn(10L);
+    Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(new Interval(0, 20));
+    Mockito.when(segmentMetadata.getTimeUnit()).thenReturn(TimeUnit.DAYS);
     return segmentMetadata;
   }
 
@@ -76,6 +82,21 @@ public class SegmentMetadataMockUtils {
     when(segmentMetadata.getTableName()).thenReturn(tableName);
     when(segmentMetadata.getName()).thenReturn(segmentName);
     when(segmentMetadata.getCrc()).thenReturn("0");
+    return segmentMetadata;
+  }
+
+  public static SegmentMetadata mockSegmentMetadataWithEndTimeInfo(String tableName, String segmentName, long endTime) {
+    SegmentMetadata segmentMetadata = Mockito.mock(SegmentMetadata.class);
+    Mockito.when(segmentMetadata.getTableName()).thenReturn(tableName);
+    Mockito.when(segmentMetadata.getName()).thenReturn(segmentName);
+    Mockito.when(segmentMetadata.getTotalDocs()).thenReturn(0);
+    Mockito.when(segmentMetadata.getTotalRawDocs()).thenReturn(0);
+    Mockito.when(segmentMetadata.getCrc()).thenReturn(Long.toString(System.nanoTime()));
+    Mockito.when(segmentMetadata.getPushTime()).thenReturn(Long.MIN_VALUE);
+    Mockito.when(segmentMetadata.getRefreshTime()).thenReturn(Long.MIN_VALUE);
+    Mockito.when(segmentMetadata.getEndTime()).thenReturn(endTime);
+    Mockito.when(segmentMetadata.getTimeInterval()).thenReturn(new Interval(endTime - 10, endTime + 10));
+    Mockito.when(segmentMetadata.getTimeUnit()).thenReturn(TimeUnit.DAYS);
     return segmentMetadata;
   }
 }

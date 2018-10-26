@@ -38,6 +38,7 @@ import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.exception.TableNotFoundException;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
+import com.linkedin.pinot.common.messages.TimeboundaryRefreshMessage;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -109,6 +110,7 @@ public class PinotHelixResourceManager {
   private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final long DEFAULT_EXTERNAL_VIEW_UPDATE_RETRY_INTERVAL_MILLIS = 500L;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
+  public static final String APPEND = "APPEND";
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
@@ -1478,18 +1480,61 @@ public class PinotHelixResourceManager {
           "Failed to update ZK metadata for segment: " + segmentName + " of table: " + offlineTableName);
     }
     LOGGER.info("Updated segment: {} of table: {} to property store", segmentName, offlineTableName);
+    final String rawTableName = offlineSegmentZKMetadata.getTableName();
+    TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
+    Preconditions.checkNotNull(tableConfig);
 
-    if (shouldSendMessage(offlineSegmentZKMetadata)) {
+    if (shouldSendMessage(tableConfig)) {
       // Send a message to the servers to update the segment.
       // We return success even if we are not able to send messages (which can happen if no servers are alive).
       // For segment validation errors we would have returned earlier.
       sendSegmentRefreshMessage(offlineSegmentZKMetadata);
+      // Send a message to the brokers to update the table's time boundary info if the segment push type is APPEND.
+      if (shouldSendTimeboundaryRefreshMsg(rawTableName, tableConfig)) {
+        sendTimeboundaryRefreshMessageToBrokers(offlineSegmentZKMetadata);
+      }
     } else {
       // Go through the ONLINE->OFFLINE->ONLINE state transition to update the segment
       if (!updateExistedSegment(offlineSegmentZKMetadata)) {
         LOGGER.error("Failed to refresh segment: {} of table: {} by the ONLINE->OFFLINE->ONLINE state transition",
             segmentName, offlineTableName);
       }
+    }
+  }
+
+  // Send a message to the pinot brokers to notify them to update its Timeboundary Info.
+  private void sendTimeboundaryRefreshMessageToBrokers(OfflineSegmentZKMetadata segmentZKMetadata) {
+    final String segmentName = segmentZKMetadata.getSegmentName();
+    final String rawTableName = segmentZKMetadata.getTableName();
+    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    final int timeoutMs = -1; // Infinite timeout on the recipient.
+
+    TimeboundaryRefreshMessage refreshMessage = new TimeboundaryRefreshMessage(offlineTableName, segmentName);
+
+    Criteria recipientCriteria = new Criteria();
+    // Currently Helix does not support send message to a Spectator. So we walk around the problem by sending the
+    // message to participants. Note that brokers are also participants.
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setSessionSpecific(true);
+    recipientCriteria.setResource(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    recipientCriteria.setDataSource(Criteria.DataSource.EXTERNALVIEW);
+    // The brokerResource field in the EXTERNALVIEW stores the offline table name in the Partition subfield.
+    recipientCriteria.setPartition(offlineTableName);
+
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+    LOGGER.info("Sending timeboundary refresh message for segment {} of table {}:{} to recipients {}", segmentName,
+            rawTableName, refreshMessage, recipientCriteria);
+    // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
+    int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, timeoutMs);
+    if (nMsgsSent > 0) {
+      // TODO Would be nice if we can get the name of the instances to which messages were sent.
+      LOGGER.info("Sent {} timeboundary msgs to refresh segment {} of table {}", nMsgsSent, segmentName, rawTableName);
+    } else {
+      // May be the case when none of the brokers are up yet. That is OK, because when they come up they will get
+      // the latest time boundary info.
+      LOGGER.warn("Unable to send timeboundary refresh message for {} of table {}, nMsgs={}", segmentName,
+              offlineTableName, nMsgsSent);
     }
   }
 
@@ -1540,10 +1585,8 @@ public class PinotHelixResourceManager {
     return numMessagesSent;
   }
 
-  // Check to see if the table has been explicitly configured to NOT use messageBasedRefresh.
-  private boolean shouldSendMessage(OfflineSegmentZKMetadata segmentZKMetadata) {
-    final String rawTableName = segmentZKMetadata.getTableName();
-    TableConfig tableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, rawTableName);
+  // Return false iff the table has been explicitly configured to NOT use messageBasedRefresh.
+  private boolean shouldSendMessage(@Nonnull TableConfig tableConfig) {
     TableCustomConfig customConfig = tableConfig.getCustomConfig();
     if (customConfig != null) {
       Map<String, String> customConfigMap = customConfig.getCustomConfigs();
@@ -1555,6 +1598,19 @@ public class PinotHelixResourceManager {
       }
     }
     return true;
+  }
+
+  // Return true iff the table has both realtime and offline sub-tables AND the segment push type is APPEND (i.e.,
+  // there is time column info the segments).
+  private boolean shouldSendTimeboundaryRefreshMsg(String rawTableName, TableConfig tableConfig) {
+    if (!hasOfflineTable(rawTableName) || !hasRealtimeTable(rawTableName)) {
+      return false;
+    }
+    if (tableConfig == null) {
+      return false;
+    }
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    return validationConfig != null && APPEND.equals(validationConfig.getSegmentPushType());
   }
 
   /**

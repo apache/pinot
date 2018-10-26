@@ -124,6 +124,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
     public static final BrokerResponseFactory.ResponseType DEFAULT_BROKER_RESPONSE_TYPE =
         BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+    // The sleep interval time of the thread used by the Brokers to refresh TimeboundaryInfo upon segment refreshing
+    // events.
+    public static final String CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL =
+            "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
+    public static final long DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS = 10000L;
     public static class Request {
       public static final String PQL = "pql";
       public static final String TRACE = "trace";
