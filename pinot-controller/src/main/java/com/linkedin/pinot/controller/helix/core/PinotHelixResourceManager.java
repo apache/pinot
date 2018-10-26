@@ -1428,10 +1428,10 @@ public class PinotHelixResourceManager {
   }
 
   public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl) {
-    addNewSegment(segmentMetadata, downloadUrl, null);
+    addNewSegment(segmentMetadata, downloadUrl, null, null);
   }
 
-  public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl, String crypter) {
+  public void addNewSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull String downloadUrl, String crypter, String batchId) {
     String segmentName = segmentMetadata.getName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 
@@ -1442,6 +1442,11 @@ public class PinotHelixResourceManager {
     offlineSegmentZKMetadata.setDownloadUrl(downloadUrl);
     offlineSegmentZKMetadata.setCrypterName(crypter);
     offlineSegmentZKMetadata.setPushTime(System.currentTimeMillis());
+    if (batchId != null) {
+      int numSegmentsInBatch = Integer.valueOf(batchId.substring(batchId.lastIndexOf("-") + 1));
+      offlineSegmentZKMetadata.setBatchId(batchId);
+      offlineSegmentZKMetadata.setNumSegmentsInBatch(numSegmentsInBatch);
+    }
     if (!ZKMetadataProvider.setOfflineSegmentZKMetadata(_propertyStore, offlineSegmentZKMetadata)) {
       throw new RuntimeException(
           "Failed to set segment ZK metadata for table: " + offlineTableName + ", segment: " + segmentName);

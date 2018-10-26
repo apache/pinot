@@ -60,29 +60,32 @@ public class SegmentValidator {
 
   }
 
-  public void validateSegment(SegmentMetadata segmentMetadata, File tempSegmentDir) {
+  public void validateSegment(SegmentMetadata segmentMetadata, File tempSegmentDir, boolean skipQuotaCheck) {
     String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
     String segmentName = segmentMetadata.getName();
-    TableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
 
-    if (offlineTableConfig == null) {
-      throw new ControllerApplicationException(LOGGER, "Failed to find table config for table: " + offlineTableName,
-          Response.Status.NOT_FOUND);
-    }
+    if (!skipQuotaCheck) {
+      TableConfig offlineTableConfig =
+          ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
 
-    StorageQuotaChecker.QuotaCheckerResponse quotaResponse;
-    try {
-      quotaResponse = checkStorageQuota(tempSegmentDir, segmentMetadata, offlineTableConfig);
-    } catch (InvalidConfigException e) {
-      // Admin port is missing, return response with 500 status code.
-      throw new ControllerApplicationException(LOGGER,
-          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
-    }
-    if (!quotaResponse.isSegmentWithinQuota) {
-      throw new ControllerApplicationException(LOGGER,
-          "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + quotaResponse.reason, Response.Status.FORBIDDEN);
+      if (offlineTableConfig == null) {
+        throw new ControllerApplicationException(LOGGER, "Failed to find table config for table: " + offlineTableName,
+            Response.Status.NOT_FOUND);
+      }
+
+      StorageQuotaChecker.QuotaCheckerResponse quotaResponse;
+      try {
+        quotaResponse = checkStorageQuota(tempSegmentDir, segmentMetadata, offlineTableConfig);
+      } catch (InvalidConfigException e) {
+        // Admin port is missing, return response with 500 status code.
+        throw new ControllerApplicationException(LOGGER,
+            "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+      }
+      if (!quotaResponse.isSegmentWithinQuota) {
+        throw new ControllerApplicationException(LOGGER,
+            "Quota check failed for segment: " + segmentName + " of table: " + offlineTableName + ", reason: " + quotaResponse.reason, Response.Status.FORBIDDEN);
+      }
     }
 
     // Check time range

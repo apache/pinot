@@ -123,6 +123,8 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
     record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
+    record.setSimpleField(CommonConstants.Segment.BATCH_ID, null);
+    record.setIntField(CommonConstants.Segment.NUMBER_OF_SEGMENTS_IN_BATCH, 0);
     return record;
   }
 
@@ -160,6 +162,8 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 1000);
     record.setIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, 1234);
     record.setSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_TIME, "6h");
+    record.setSimpleField(CommonConstants.Segment.BATCH_ID, null);
+    record.setIntField(CommonConstants.Segment.NUMBER_OF_SEGMENTS_IN_BATCH, 0);
     return record;
   }
 
@@ -195,6 +199,8 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.TOTAL_DOCS, 50000);
     record.setLongField(CommonConstants.Segment.CRC, 54321);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 1000);
+    record.setSimpleField(CommonConstants.Segment.BATCH_ID, null);
+    record.setIntField(CommonConstants.Segment.NUMBER_OF_SEGMENTS_IN_BATCH, 0);
     record.setSimpleField(CommonConstants.Segment.Offline.DOWNLOAD_URL, "http://localhost:8000/testTable_O_3000_4000");
     record.setLongField(CommonConstants.Segment.Offline.PUSH_TIME, 4000);
     record.setLongField(CommonConstants.Segment.Offline.REFRESH_TIME, 8000);

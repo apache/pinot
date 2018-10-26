@@ -55,7 +55,7 @@ public class ZKOperator {
 
   public void completeSegmentOperations(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
       File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI,
-      boolean moveSegmentToFinalLocation)
+      boolean moveSegmentToFinalLocation, String batchId)
       throws Exception {
     String rawTableName = segmentMetadata.getTableName();
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
@@ -68,31 +68,25 @@ public class ZKOperator {
       LOGGER.info("Adding new segment {} from table {}", segmentName, rawTableName);
       String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
       processNewSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation, zkDownloadURI, crypter,
-          rawTableName, segmentName, moveSegmentToFinalLocation);
+          rawTableName, segmentName, moveSegmentToFinalLocation, batchId);
       return;
     }
 
     LOGGER.info("Segment {} from table {} already exists, refreshing if necessary", segmentName, rawTableName);
 
     processExistingSegment(segmentMetadata, finalSegmentLocationURI, currentSegmentLocation,
-        enableParallelPushProtection, headers, zkDownloadURI, offlineTableName, segmentName, znRecord, moveSegmentToFinalLocation);
+        enableParallelPushProtection, headers, zkDownloadURI, offlineTableName, segmentName, znRecord, moveSegmentToFinalLocation, batchId);
   }
 
   private void processExistingSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
       File currentSegmentLocation, boolean enableParallelPushProtection, HttpHeaders headers, String zkDownloadURI,
-      String offlineTableName, String segmentName, ZNRecord znRecord, boolean moveSegmentToFinalLocation) throws Exception {
+      String offlineTableName, String segmentName, ZNRecord znRecord, boolean moveSegmentToFinalLocation,
+      String batchId) throws Exception {
 
     OfflineSegmentZKMetadata existingSegmentZKMetadata = new OfflineSegmentZKMetadata(znRecord);
-    long existingCrc = existingSegmentZKMetadata.getCrc();
-
-    // Set the download URL.
-    existingSegmentZKMetadata.setDownloadUrl(zkDownloadURI);
-
-    // Set the crypter name (even if null, so it can be removed from metadata).
-    String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
-    existingSegmentZKMetadata.setCrypterName(crypter);
 
     // Check if CRC match when IF-MATCH header is set
+    long existingCrc = existingSegmentZKMetadata.getCrc();
     checkCRC(headers, offlineTableName, segmentName, existingCrc);
 
     // Check segment upload start time when parallel push protection enabled
@@ -126,6 +120,22 @@ public class ZKOperator {
     // NOTE: reset this value even if parallel push protection is not enabled so that segment can recover in case
     // previous segment upload did not finish properly and the parallel push protection is turned off
     existingSegmentZKMetadata.setSegmentUploadStartTime(-1);
+
+    // We shouldn't set any variables other than upload start time unless fully getting the right to update existing metadata.
+    // Otherwise the unused update would be left in the zk cluster.
+    // All the real update should happen starting at this point.
+
+    // Set the crypter name (even if null, so it can be removed from metadata).
+    String crypter = headers.getHeaderString(FileUploadDownloadClient.CustomHeaders.CRYPTER);
+    existingSegmentZKMetadata.setCrypterName(crypter);
+
+    // Set the download URL.
+    existingSegmentZKMetadata.setDownloadUrl(zkDownloadURI);
+    if (batchId != null) {
+      int numSegmentsInBatch = Integer.valueOf(batchId.substring(batchId.lastIndexOf("-") + 1));
+      existingSegmentZKMetadata.setBatchId(batchId);
+      existingSegmentZKMetadata.setNumSegmentsInBatch(numSegmentsInBatch);
+    }
 
     try {
       // Modify the custom map in segment ZK metadata
@@ -196,7 +206,7 @@ public class ZKOperator {
 
   private void processNewSegment(SegmentMetadata segmentMetadata, URI finalSegmentLocationURI,
       File currentSegmentLocation, String zkDownloadURI, String crypter, String rawTableName, String segmentName,
-      boolean moveSegmentToFinalLocation) {
+      boolean moveSegmentToFinalLocation, String batchId) {
     // For v1 segment uploads, we will not move the segment
     if (moveSegmentToFinalLocation) {
       try {
@@ -210,7 +220,7 @@ public class ZKOperator {
     } else {
       LOGGER.info("Skipping segment move, keeping segment {} from table {} at {}", segmentName, rawTableName, zkDownloadURI);
     }
-    _pinotHelixResourceManager.addNewSegment(segmentMetadata, zkDownloadURI, crypter);
+    _pinotHelixResourceManager.addNewSegment(segmentMetadata, zkDownloadURI, crypter, batchId);
   }
 
   private void moveSegmentToPermanentDirectory(File currentSegmentLocation, URI finalSegmentLocationURI)

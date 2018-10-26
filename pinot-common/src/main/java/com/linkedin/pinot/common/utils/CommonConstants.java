@@ -248,6 +248,8 @@ public class CommonConstants {
     public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
     public static final String FLUSH_THRESHOLD_TIME = "segment.flush.threshold.time";
     public static final String PARTITION_METADATA = "segment.partition.metadata";
+    public static final String BATCH_ID = "segment.batchId";
+    public static final String NUMBER_OF_SEGMENTS_IN_BATCH = "segment.numSegmentsInBatch";
     /**
      * This field is used for parallel push protection to lock the segment globally.
      * We put the segment upload start timestamp so that if the previous push failed without unlock the segment, the

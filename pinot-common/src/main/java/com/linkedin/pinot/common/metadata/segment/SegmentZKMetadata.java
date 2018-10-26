@@ -54,6 +54,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private long _segmentUploadStartTime = -1;
   private Map<String, String> _customMap;
   private String _crypterName;
+  private String _batchId;
+  private int _numSegmentsInBatch;
 
   public SegmentZKMetadata() {
   }
@@ -86,6 +88,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     }
     _segmentUploadStartTime = znRecord.getLongField(CommonConstants.Segment.SEGMENT_UPLOAD_START_TIME, -1);
     _customMap = znRecord.getMapField(CommonConstants.Segment.CUSTOM_MAP);
+    _batchId = znRecord.getSimpleField(CommonConstants.Segment.BATCH_ID);
+    _numSegmentsInBatch = znRecord.getIntField(CommonConstants.Segment.NUMBER_OF_SEGMENTS_IN_BATCH, -1);
   }
 
   public String getSegmentName() {
@@ -216,6 +220,22 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _customMap = customMap;
   }
 
+  public String getBatchId() {
+    return _batchId;
+  }
+
+  public void setBatchId(String batchId) {
+    _batchId = batchId;
+  }
+
+  public int getNumSegmentsInBatch() {
+    return _numSegmentsInBatch;
+  }
+
+  public void setNumSegmentsInBatch(int numSegmentsInBatch) {
+    _numSegmentsInBatch = numSegmentsInBatch;
+  }
+
   @Override
   public boolean equals(Object segmentMetadata) {
     if (isSameReference(this, segmentMetadata)) {
@@ -232,7 +252,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
         && isEqual(_startTime, metadata._startTime) && isEqual(_endTime, metadata._endTime) && isEqual(_segmentType,
         metadata._segmentType) && isEqual(_totalRawDocs, metadata._totalRawDocs) && isEqual(_crc, metadata._crc)
         && isEqual(_creationTime, metadata._creationTime) && isEqual(_partitionMetadata, metadata._partitionMetadata)
-        && isEqual(_segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(_customMap, metadata._customMap);
+        && isEqual(_segmentUploadStartTime, metadata._segmentUploadStartTime) && isEqual(_customMap, metadata._customMap)
+        && isEqual(_batchId, metadata._batchId) && isEqual(_numSegmentsInBatch, metadata._numSegmentsInBatch);
   }
 
   @Override
@@ -251,6 +272,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     result = hashCodeOf(result, _partitionMetadata);
     result = hashCodeOf(result, _segmentUploadStartTime);
     result = hashCodeOf(result, _customMap);
+    result = hashCodeOf(result, _batchId);
+    result = hashCodeOf(result, _numSegmentsInBatch);
     return result;
   }
 
@@ -277,6 +300,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     znRecord.setLongField(CommonConstants.Segment.TOTAL_DOCS, _totalRawDocs);
     znRecord.setLongField(CommonConstants.Segment.CRC, _crc);
     znRecord.setLongField(CommonConstants.Segment.CREATION_TIME, _creationTime);
+    znRecord.setSimpleField(CommonConstants.Segment.BATCH_ID, _batchId);
+    znRecord.setIntField(CommonConstants.Segment.NUMBER_OF_SEGMENTS_IN_BATCH, _numSegmentsInBatch);
 
     if (_partitionMetadata != null) {
       try {
@@ -314,6 +339,8 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     configMap.put(CommonConstants.Segment.TOTAL_DOCS, Long.toString(_totalRawDocs));
     configMap.put(CommonConstants.Segment.CRC, Long.toString(_crc));
     configMap.put(CommonConstants.Segment.CREATION_TIME, Long.toString(_creationTime));
+    configMap.put(CommonConstants.Segment.BATCH_ID, _batchId);
+    configMap.put(CommonConstants.Segment.NUMBER_OF_SEGMENTS_IN_BATCH, Integer.toString(_numSegmentsInBatch));
 
     if (_partitionMetadata != null) {
       try {
