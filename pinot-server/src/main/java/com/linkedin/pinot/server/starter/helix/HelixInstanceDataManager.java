@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.TableDataManager;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
+import com.linkedin.pinot.core.data.manager.realtime.RealtimeSegmentBuildSemaphoreFactory;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -86,6 +87,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     if (!instanceSegmentTarDir.exists()) {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs());
     }
+
+    // Create the segment build semaphore factory
+    RealtimeSegmentBuildSemaphoreFactory.init(_instanceDataManagerConfig);
 
     LOGGER.info("Initialized Helix instance data manager");
   }

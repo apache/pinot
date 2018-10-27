@@ -61,7 +61,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
-  private Semaphore _segmentBuildSemaphore;
 
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String CONSUMERS_DIR = "consumers";
@@ -82,10 +81,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.create(_instanceId, _serverMetrics);
-    int maxParallelBuilds = _tableDataManagerConfig.getMaxParallelSegmentBuilds();
-    if (maxParallelBuilds > 0) {
-      _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);
-    }
 
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
@@ -152,7 +147,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public Semaphore getSegmentBuildSemaphore() {
-    return _segmentBuildSemaphore;
+    return RealtimeSegmentBuildSemaphoreFactory.getSemaphore();
   }
 
   public String getConsumerDir() {
