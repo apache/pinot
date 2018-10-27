@@ -108,7 +108,7 @@ const metricDimensions = metricId => `/data/autocomplete/dimensions/metric/${met
  * GET | Validates whether the entered dashboard name exists in inGraphs
  * @param {String} dashboardName
  */
-const dashboardByName = dashboardName => `/autometrics/isIngraphDashboard/${dashboardName}`;
+const dashboardByName = (dashboardName, fabricGroup) => `/autometrics/isIngraphDashboard/${dashboardName}?fabricGroup=${fabricGroup}`;
 
 /**
  * GET all metrics that belong to a dataset
