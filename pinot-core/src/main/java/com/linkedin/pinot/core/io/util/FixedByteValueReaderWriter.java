@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Arrays;
 
 
 public final class FixedByteValueReaderWriter implements Closeable, ValueReader {
@@ -30,27 +31,29 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
 
   @Override
   public int getInt(int index) {
-    return _dataBuffer.getInt(index * Integer.BYTES);
+    return _dataBuffer.getInt((long) index * Integer.BYTES);
   }
 
   @Override
   public long getLong(int index) {
-    return _dataBuffer.getLong(index * Long.BYTES);
+    return _dataBuffer.getLong((long) index * Long.BYTES);
   }
 
   @Override
   public float getFloat(int index) {
-    return _dataBuffer.getFloat(index * Float.BYTES);
+    return _dataBuffer.getFloat((long) index * Float.BYTES);
   }
 
   @Override
   public double getDouble(int index) {
-    return _dataBuffer.getDouble(index * Double.BYTES);
+    return _dataBuffer.getDouble((long) index * Double.BYTES);
   }
 
   @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
-    int startOffset = index * numBytesPerValue;
+    assert buffer.length >= numBytesPerValue;
+
+    long startOffset = (long) index * numBytesPerValue;
     for (int i = 0; i < numBytesPerValue; i++) {
       byte currentByte = _dataBuffer.getByte(startOffset + i);
       if (currentByte == paddingByte) {
@@ -58,55 +61,51 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
       }
       buffer[i] = currentByte;
     }
-    return StringUtil.decodeUtf8(buffer);
+    return StringUtil.decodeUtf8(buffer, 0, numBytesPerValue);
   }
 
   @Override
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
-    int startOffset = index * numBytesPerValue;
-    for (int i = 0; i < numBytesPerValue; i++) {
-      buffer[i] = _dataBuffer.getByte(startOffset + i);
-    }
-    return StringUtil.decodeUtf8(buffer);
+    assert buffer.length >= numBytesPerValue;
+
+    long startOffset = (long) index * numBytesPerValue;
+    _dataBuffer.copyTo(startOffset, buffer, 0, numBytesPerValue);
+    return StringUtil.decodeUtf8(buffer, 0, numBytesPerValue);
   }
 
   @Override
-  public byte[] getBytes(int index, int numBytesPerValue, byte[] output) {
-    assert output.length == numBytesPerValue;
-    int startOffset = index * numBytesPerValue;
-    for (int i = 0; i < numBytesPerValue; i++) {
-      output[i] = _dataBuffer.getByte(startOffset + i);
-    }
-    return output;
+  public byte[] getBytes(int index, int numBytesPerValue, byte[] buffer) {
+    assert buffer.length >= numBytesPerValue;
+
+    long startOffset = (long) index * numBytesPerValue;
+    _dataBuffer.copyTo(startOffset, buffer, 0, numBytesPerValue);
+    return buffer;
   }
 
   public void writeInt(int index, int value) {
-    _dataBuffer.putInt(index * Integer.BYTES, value);
+    _dataBuffer.putInt((long) index * Integer.BYTES, value);
   }
 
   public void writeLong(int index, long value) {
-    _dataBuffer.putLong(index * Long.BYTES, value);
+    _dataBuffer.putLong((long) index * Long.BYTES, value);
   }
 
   public void writeFloat(int index, float value) {
-    _dataBuffer.putFloat(index * Float.BYTES, value);
+    _dataBuffer.putFloat((long) index * Float.BYTES, value);
   }
 
   public void writeDouble(int index, double value) {
-    _dataBuffer.putDouble(index * Double.BYTES, value);
+    _dataBuffer.putDouble((long) index * Double.BYTES, value);
   }
 
   public void writeUnpaddedString(int index, int numBytesPerValue, byte[] value) {
-    int startIndex = index * numBytesPerValue;
-    int endIndex = startIndex + numBytesPerValue;
+    assert value.length <= numBytesPerValue;
 
-    int i = startIndex;
-    for (byte b : value) {
-      _dataBuffer.putByte(i++, b);
+    long startIndex = (long) index * numBytesPerValue;
+    if (value.length < numBytesPerValue) {
+      value = Arrays.copyOf(value, numBytesPerValue);
     }
-    while (i < endIndex) {
-      _dataBuffer.putByte(i++, (byte) 0);
-    }
+    _dataBuffer.readFrom(startIndex, value);
   }
 
   @Override

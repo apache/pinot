@@ -19,13 +19,21 @@ package com.linkedin.thirdeye.detection.alert;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.mysql.jdbc.StringUtils;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import javax.mail.internet.InternetAddress;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 
 
 public class AlertUtils {
@@ -72,6 +80,51 @@ public class AlertUtils {
             return internetAddress != null;
           }
         });
+  }
+
+  public static long getHighWaterMark(Collection<MergedAnomalyResultDTO> anomalies) {
+    if (anomalies.isEmpty()) {
+      return -1;
+    }
+    return Collections.max(Collections2.transform(anomalies, mergedAnomalyResultDTO -> mergedAnomalyResultDTO.getId()));
+  }
+
+  private static long getLastTimeStamp(Collection<MergedAnomalyResultDTO> anomalies, long startTime) {
+    long lastTimeStamp = startTime;
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      lastTimeStamp = Math.max(anomaly.getEndTime(), lastTimeStamp);
+    }
+    return lastTimeStamp;
+  }
+
+  public static Map<Long, Long> makeVectorClock(Collection<MergedAnomalyResultDTO> anomalies) {
+    Multimap<Long, MergedAnomalyResultDTO> grouped = Multimaps.index(anomalies, new Function<MergedAnomalyResultDTO, Long>() {
+      @Nullable
+      @Override
+      public Long apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
+        return mergedAnomalyResultDTO.getDetectionConfigId();
+      }
+    });
+    Map<Long, Long> detection2max = new HashMap<>();
+    for (Map.Entry<Long, Collection<MergedAnomalyResultDTO>> entry : grouped.asMap().entrySet()) {
+      detection2max.put(entry.getKey(), getLastTimeStamp(entry.getValue(), -1));
+    }
+    return detection2max;
+  }
+
+  public static Map<Long, Long> mergeVectorClock(Map<Long, Long> a, Map<Long, Long> b) {
+    Set<Long> keySet = new HashSet<>();
+    keySet.addAll(a.keySet());
+    keySet.addAll(b.keySet());
+
+    Map<Long, Long> result = new HashMap<>();
+    for (Long detectionId : keySet) {
+      long valA = MapUtils.getLongValue(a, detectionId, -1);
+      long valB = MapUtils.getLongValue(b, detectionId, -1);
+      result.put(detectionId, Math.max(valA, valB));
+    }
+
+    return result;
   }
 
 }

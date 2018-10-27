@@ -124,6 +124,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.id";
     public static final BrokerResponseFactory.ResponseType DEFAULT_BROKER_RESPONSE_TYPE =
         BrokerResponseFactory.ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+    // The sleep interval time of the thread used by the Brokers to refresh TimeboundaryInfo upon segment refreshing
+    // events.
+    public static final String CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL =
+            "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
+    public static final long DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS = 10000L;
     public static class Request {
       public static final String PQL = "pql";
       public static final String TRACE = "trace";
@@ -193,6 +198,7 @@ public class CommonConstants {
     public static final String VERSION_HTTP_HEADER = "Pinot-Controller-Version";
     public static final String SEGMENT_NAME_HTTP_HEADER = "Pinot-Segment-Name";
     public static final String TABLE_NAME_HTTP_HEADER = "Pinot-Table-Name";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
   }
 
   public static class Minion {
@@ -213,6 +219,7 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "segment.fetcher";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "segment.uploader";
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "crypter";
   }
 
   public static class Metric {
@@ -264,7 +271,6 @@ public class CommonConstants {
     public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
     public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
 
-    public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.controller.crypter";
     public static final String LOCAL_SEGMENT_SCHEME = "file";
 
     public enum SegmentType {

@@ -16,7 +16,10 @@
 package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
+import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
@@ -362,5 +365,16 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     brokerResponse = getBrokerResponseForQueryWithFilter(query + GROUP_BY);
     QueriesTestUtils.testInterSegmentAggregationResult(brokerResponse, 24516L, 336536L, 73548L, 120000L,
         new String[]{"2146232405", "999309554"});
+  }
+
+  @Test
+  public void testNumGroupsLimit() {
+    String query = "SELECT COUNT(*) FROM testTable GROUP BY column1";
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForQuery(query);
+    assertFalse(brokerResponse.isNumGroupsLimitReached());
+
+    brokerResponse = getBrokerResponseForQuery(query, new InstancePlanMakerImplV2(1000, 1000));
+    assertTrue(brokerResponse.isNumGroupsLimitReached());
   }
 }

@@ -16,7 +16,10 @@
 package com.linkedin.pinot.controller.helix.core.util;
 
 import com.google.common.io.Files;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
+import com.linkedin.pinot.filesystem.LocalPinotFS;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import junit.framework.Assert;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -137,9 +141,9 @@ public class SegmentDeletionManagerTest {
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
     Collection<String> segments;
     if (useSet) {
-      segments = new HashSet<String>();
+      segments = new HashSet<>();
     } else {
-      segments = new ArrayList<String>();
+      segments = new ArrayList<>();
     }
 
     segments.addAll(segmentsThatShouldBeDeleted());
@@ -153,7 +157,7 @@ public class SegmentDeletionManagerTest {
   }
 
   @Test
-  public void testAllFailed() throws Exception {
+  public void testAllFailed() {
     testAllFailed(segmentsFailingPropStore());
     testAllFailed(segmentsInIdealStateOrExtView());
     List<String> segments = segmentsFailingPropStore();
@@ -162,7 +166,7 @@ public class SegmentDeletionManagerTest {
   }
 
   @Test
-  public void allPassed() throws Exception {
+  public void allPassed() {
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
@@ -175,7 +179,7 @@ public class SegmentDeletionManagerTest {
     Assert.assertTrue(deletionManager.segmentsRemovedFromStore.containsAll(segments));
   }
 
-  private void testAllFailed(List<String> segments) throws Exception {
+  private void testAllFailed(List<String> segments) {
     HelixAdmin helixAdmin =  makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
@@ -188,6 +192,11 @@ public class SegmentDeletionManagerTest {
 
   @Test
   public void testRemoveDeletedSegments() throws Exception {
+    PropertiesConfiguration pinotFSConfig = new PropertiesConfiguration();
+    pinotFSConfig.addProperty(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(pinotFSConfig);
+
     HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     File tempDir = Files.createTempDir();

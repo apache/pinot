@@ -1,12 +1,3 @@
-{{#if isLoading}}
-  <div class="row">
-    <div class="col-xs-12 rootcause-metric__spinner-text">
-      Loading additional metric data ...
-      {{ember-spinner scale=0.5}}
-    </div>
-  </div>
-{{/if}}
-
 {{update-table
   data=metricsTableData
   columns=metricsTableColumns

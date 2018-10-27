@@ -47,7 +47,6 @@ import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.List;
@@ -270,7 +269,7 @@ public class PinotSegmentUploadRestletResource {
       // In this case, the noop crypter will not do any operations, so the encrypted and decrypted file will have the same
       // file path.
       if (crypterClassHeader == null) {
-        crypterClassHeader = NoOpPinotCrypter.class.getName();
+        crypterClassHeader = NoOpPinotCrypter.class.getSimpleName();
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName);
       } else {
         tempEncryptedFile = new File(provider.getFileUploadTmpDir(), tempFileName + ENCRYPTED_SUFFIX);
@@ -284,17 +283,24 @@ public class PinotSegmentUploadRestletResource {
           segmentMetadata =
               getMetadataForURI(crypterClassHeader, currentSegmentLocationURI, tempEncryptedFile, tempDecryptedFile,
                   tempSegmentDir, metadataProviderClass);
-          zkDownloadUri = getZkDownloadURIForURIUpload(currentSegmentLocationURI, segmentMetadata, provider, moveSegmentToFinalLocation);
           break;
         case SEGMENT:
           getFileFromMultipart(multiPart, tempDecryptedFile);
           segmentMetadata = getSegmentMetadata(crypterClassHeader, tempEncryptedFile, tempDecryptedFile, tempSegmentDir,
               metadataProviderClass);
-          zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
-              provider.getVip());
           break;
         default:
           throw new UnsupportedOperationException("Unsupported upload type: " + uploadType);
+      }
+
+      // This boolean is here for V1 segment upload, where we keep the segment in the downloadURI sent in the header.
+      // We will deprecate this behavior eventually.
+      if (!moveSegmentToFinalLocation) {
+        LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
+            segmentMetadata.getName(), segmentMetadata.getTableName());
+        zkDownloadUri = currentSegmentLocationURI;
+      } else {
+        zkDownloadUri = getZkDownloadURIForSegmentUpload(segmentMetadata, provider);
       }
 
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
@@ -326,23 +332,17 @@ public class PinotSegmentUploadRestletResource {
     }
   }
 
-  private String getZkDownloadURIForURIUpload(String currentSegmentLocationURI, SegmentMetadata segmentMetadata,
-      FileUploadPathProvider provider, boolean moveSegmentToFinalLocation) throws URISyntaxException, UnsupportedEncodingException {
-    String zkDownloadUri;
-    if (new URI(currentSegmentLocationURI).getScheme().equals(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
-      zkDownloadUri = ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
+  private String getZkDownloadURIForSegmentUpload(SegmentMetadata segmentMetadata, FileUploadPathProvider provider) throws UnsupportedEncodingException {
+    if (provider.getBaseDataDirURI().getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
+      return ControllerConf.constructDownloadUrl(segmentMetadata.getTableName(), segmentMetadata.getName(),
           provider.getVip());
-    } else if (!moveSegmentToFinalLocation) {
-      LOGGER.info("Setting zkDownloadUri to {} for segment {} of table {}, skipping move", currentSegmentLocationURI,
-          segmentMetadata.getName(), segmentMetadata.getTableName());
-      zkDownloadUri = currentSegmentLocationURI;
     } else {
+      // Receiving .tar.gz segment upload for pluggable storage
       LOGGER.info("Using configured data dir {} for segment {} of table {}", _controllerConf.getDataDir(),
           segmentMetadata.getName(), segmentMetadata.getTableName());
-      zkDownloadUri = StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
+      return StringUtil.join("/", provider.getBaseDataDirURI().toString(), segmentMetadata.getTableName(),
           URLEncoder.encode(segmentMetadata.getName(), "UTF-8"));
     }
-    return zkDownloadUri;
   }
 
   private SegmentMetadata getMetadataForURI(String crypterClassHeader, String currentSegmentLocationURI,
@@ -387,7 +387,6 @@ public class PinotSegmentUploadRestletResource {
   private void decryptFile(String crypterClassHeader, File tempEncryptedFile, File tempDecryptedFile) {
     PinotCrypter pinotCrypter = PinotCrypterFactory.create(crypterClassHeader);
     LOGGER.info("Using crypter class {}", pinotCrypter.getClass().getName());
-    pinotCrypter.init(_controllerConf.subset(CommonConstants.Segment.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER));
     pinotCrypter.decrypt(tempEncryptedFile, tempDecryptedFile);
   }
 
