@@ -125,7 +125,7 @@ module('Acceptance | create alert', function(hooks) {
       'Custom accordion block with alert table for selected group appears'
     );
     assert.equal(
-      $(selfServeConst.CONFIG_BLOCK).find('.control-label').get(0).innerText.replace(/\r?\n?/g, ''),
+      $(selfServeConst.CONFIG_BLOCK).find('.control-label').get(0).innerText.trim().replace(/\r?\n?/g, ''),
       `Recipients in subscription group ${selectedConfigGroup}:To: ${toRecipients}Cc: ${ccRecipients}`,
       'Label and email for recipients is correctly rendered'
     );

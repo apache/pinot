@@ -56,22 +56,45 @@ export default Controller.extend({
 
   init() {
     this._super(...arguments);
-    //Add one more option
-    get(this, 'anomalyResponseFilterTypes').push({
+    // Add ALL option to copy of global anomaly response object
+    const anomalyResponseFilterTypes = _.cloneDeep(anomalyUtil.anomalyResponseObj);
+    anomalyResponseFilterTypes.push({
       name: 'All Resolutions',
       value: 'ALL',
       status: 'All Resolutions'
     });
+    set(this, 'anomalyResponseFilterTypes', anomalyResponseFilterTypes);
 
-    //Add the options for compare
+    // Add the options for compare
     set(this, 'options_two', set(this, 'options', CUSTOMIZE_OPTIONS));
   },
 
+  /**
+   * @summary Returns the
+   * @return {Array}
+   */
   _getAnomalyByOffsetsMapping: task (function * () {
     const applicationAnomalies = get(this, 'model.anomalyMapping');
     const offsetsMapping = yield get(this, '_fetchOffsets').perform(applicationAnomalies);
     return offsetsMapping;
   }).drop(),
+
+  /**
+   * @summary Returns the config object for the custom share template header.
+   * @return {object} The object of metrics, with array of alerts and array anomalies
+   * @example
+
+   */
+  shareConfig: computed(
+    'shareTemplateConfig',
+    function() {
+      let shareTemplateConfig = get(this, 'shareTemplateConfig');
+      if(_.isEmpty(shareTemplateConfig)) {
+        shareTemplateConfig = false;
+      }
+      return shareTemplateConfig;
+    }
+  ),
 
   /**
    * @summary Returns the anomalies filtered from the filter options on the dashboard

@@ -74,8 +74,10 @@ export default DS.RESTAdapter.extend({
         return `${this.get('namespace')}/${query.key}`;
       }
       case 'share': {
-        const shareId = query.shareId;
-        return `${this.get('namespace')}/${shareId}`;
+        return `${this.get('namespace')}/${query.shareId}`;
+      }
+      case 'share-config': {
+        return `${this.get('namespace')}/${query.appName}`;
       }
       default: {
         return this._super(...arguments);
@@ -102,6 +104,10 @@ export default DS.RESTAdapter.extend({
     }
   },
 
+/**
+ * @summary Defining buildURL depending on what properties have changed
+ * In this method, you need to examine the snapshot and adjust the URL accordingly.
+ */
   urlForUpdateRecord: function(id, modelName/*, snapshot*/) {
     return this._buildURL(modelName, id);
   }

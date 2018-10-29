@@ -90,7 +90,7 @@ module('Acceptance | import metric', function(hooks) {
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.ok(
-      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.includes(importSuccessMsgText1),
+      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.trim().includes(importSuccessMsgText1),
       'Import dashboard successful - success text displays)'
     );
     assert.ok(
@@ -162,7 +162,7 @@ module('Acceptance | import metric', function(hooks) {
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.ok(
-      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.includes(importSuccessMsgText2),
+      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.trim().includes(importSuccessMsgText2),
       'Import dashboard successful - success text displays)'
     );
     assert.ok(

@@ -1,6 +1,11 @@
 import DS from 'ember-data';
+import Ember from 'ember';
 
 export default DS.JSONAPISerializer.extend({
+  typeClassToEntityName(typeClass) {
+    return typeClass && typeClass.modelName ? typeClass.modelName : typeClass;
+  },
+
   /*
    * @summary normalizing the payload from api response with array type ([{},{}..]) to correct json-api format spec. See  http://jsonapi.org/
    */
