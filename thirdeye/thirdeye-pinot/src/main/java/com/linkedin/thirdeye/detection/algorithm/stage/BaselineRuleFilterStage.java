@@ -57,11 +57,9 @@ public class BaselineRuleFilterStage implements AnomalyFilterStage {
   private static final double PROP_DIFFERENCE_DEFAULT = Double.NaN;
 
   private static final String PROP_TIMEZONE_DEFAULT = "UTC";
-  @DetectionParam(name = "timezone", description = "timezone.", defaultValue = PROP_TIMEZONE_DEFAULT)
   private static final String PROP_TIMEZONE = "timezone";
 
   private static final String PROP_SITEWIDE_METRIC = "siteWideMetricUrn";
-  @DetectionParam(name = "site wide impact threshold", description = "site wide impact threshold.")
   private static final String PROP_SITEWIDE_THRESHOLD = "siteWideImpactThreshold";
   private static final double PROP_SITEWIDE_THRESHOLD_DEFAULT = Double.NaN;
 

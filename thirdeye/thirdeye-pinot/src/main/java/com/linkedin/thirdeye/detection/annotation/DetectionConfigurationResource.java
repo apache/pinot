@@ -17,18 +17,7 @@
 package com.linkedin.thirdeye.detection.annotation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.reflect.ClassPath;
-import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStage;
-import com.linkedin.thirdeye.detection.yaml.DetectionRegistry;
 import com.wordnik.swagger.annotations.ApiParam;
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;

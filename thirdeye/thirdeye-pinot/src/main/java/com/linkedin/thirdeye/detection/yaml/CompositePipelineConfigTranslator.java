@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.detection.algorithm.ChildKeepingMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStageWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStageWrapper;
+import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
