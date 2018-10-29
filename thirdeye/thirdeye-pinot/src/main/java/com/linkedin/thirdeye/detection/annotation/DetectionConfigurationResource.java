@@ -19,6 +19,7 @@ package com.linkedin.thirdeye.detection.annotation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.reflect.ClassPath;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStage;
+import com.linkedin.thirdeye.detection.yaml.DetectionRegistry;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -36,39 +37,12 @@ import javax.ws.rs.core.Response;
 @Path("/detection/annotation")
 public class DetectionConfigurationResource {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static DetectionRegistry detectionRegistry = DetectionRegistry.getInstance();
 
   @GET
-  public Response getConfigurations(@ApiParam("tag") String tag) throws IOException, ClassNotFoundException {
-    Set<ClassPath.ClassInfo> classInfos = ClassPath.from(Thread.currentThread().getContextClassLoader())
-        .getTopLevelClasses(AnomalyDetectionStage.class.getPackage().getName());
-    List<Map> annotations = new ArrayList<>();
-    for (ClassPath.ClassInfo classInfo : classInfos) {
-      // stage annotations
-      Class clazz = Class.forName(classInfo.getName());
-      Map<String, Object> stageAnnotation = new HashMap<>();
-      for (Annotation annotation : clazz.getAnnotations()) {
-        if (annotation instanceof Detection) {
-          stageAnnotation.put("stage", annotation);
-        }
-      }
-
-      //parameter annotations
-      List<Annotation> parameterAnnotations = new ArrayList<>();
-      for (Field field : clazz.getDeclaredFields()) {
-        for (Annotation annotation : field.getAnnotations()) {
-          if (annotation instanceof DetectionParam) {
-            parameterAnnotations.add(annotation);
-          }
-        }
-      }
-      if (!parameterAnnotations.isEmpty()) {
-        stageAnnotation.put("params", parameterAnnotations);
-      }
-
-      if (!stageAnnotation.isEmpty()) {
-        annotations.add(stageAnnotation);
-      }
-    }
-    return Response.ok(OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(annotations)).build();
+  public Response getConfigurations(@ApiParam("tag") String tag) throws Exception {
+    return Response.ok(
+        OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(detectionRegistry.getAllAnnotation()))
+        .build();
   }
 }

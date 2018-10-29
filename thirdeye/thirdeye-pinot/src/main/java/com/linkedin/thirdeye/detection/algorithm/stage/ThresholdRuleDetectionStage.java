@@ -38,7 +38,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.
  */
 @Detection(name = "Threshold",
-    type = "THRESHOLD_DETECTION",
+    type = "THRESHOLD",
     tags = { DetectionTags.RULE_DETECTION },
     description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.",
     template = "When metric is lower than ${1} or higher than ${2}",

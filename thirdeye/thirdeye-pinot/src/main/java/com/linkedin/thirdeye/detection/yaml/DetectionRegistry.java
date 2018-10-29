@@ -1,53 +1,29 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.anomalydetection.function.MinMaxThresholdFunction;
-import com.linkedin.thirdeye.anomalydetection.function.WeekOverWeekRuleFunction;
-import com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
-import com.linkedin.thirdeye.detection.algorithm.BaselineAlgorithm;
-import com.linkedin.thirdeye.detection.algorithm.MovingWindowAlgorithm;
-import com.linkedin.thirdeye.detection.algorithm.stage.BaselineRuleDetectionStage;
-import com.linkedin.thirdeye.detection.algorithm.stage.BaselineRuleFilterStage;
-import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.AverageChangeThresholdAlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.WeightThresholdAlertFilter;
+import com.google.common.reflect.ClassPath;
+import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStage;
+import com.linkedin.thirdeye.detection.annotation.Detection;
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.commons.collections.MapUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * The detection registry.
  */
 public class DetectionRegistry {
-  private static final Map<String, String> REGISTRY_MAP = ImmutableMap.<String, String>builder()
-      // rule filter
-      .put("BUSINESS_RULE_FILTER", BaselineRuleFilterStage.class.getName())
-      // rule detection
-      .put("BASELINE", BaselineRuleDetectionStage.class.getName())
-      // alerter
-      .put("TO_ALL_RECIPIENTS", ToAllRecipientsDetectionAlertFilter.class.getName())
-      // algorithm detection
-      .put("REGRESSION_GAUSSIAN_SCAN", "com.linkedin.anomalydetection.function.RegressionGaussianScanFunction")
-      .put("SPLINE_REGRESSION_VANILLA", "com.linkedin.anomalydetection.function.SplineRegressionFunction")
-      .put("KALMAN_FILTER", "com.linkedin.thirdeye.controller.mp.function.KalmanThirdEyeFunction")
-      .put("SCAN_STATISTICS", "com.linkedin.thirdeye.controller.mp.function.ScanStatisticsThirdEyeFunction")
-      .put("SIGN_TEST", "com.linkedin.thirdeye.controller.mp.function.SignTestThirdEyeFunction")
-      .put("SPLINE_REGRESSION", "com.linkedin.thirdeye.controller.mp.function.SplineRegressionThirdEyeFunction")
-      .put("WEEK_OVER_WEEK_RULE", WeekOverWeekRuleFunction.class.getName())
-      .put("MIN_MAX_THRESHOLD", MinMaxThresholdFunction.class.getName())
-      .put("SIGN_TEST_VANILLA", "com.linkedin.anomalydetection.function.SignTestFunction")
-      .put("CONFIDENCE_INTERVAL_SIGN_TEST", "com.linkedin.anomalydetection.function.ConfidenceIntervalSignTestFunction")
-      .put("MOVING_AVERAGE_SIGN_TEST", "com.linkedin.anomalydetection.function.MovingAverageSignTestFunction")
 
-      // algorithm alert filter
-      .put("ALPHA_BETA_LOGISTIC_TWO_SIDE", "com.linkedin.filter.AlphaBetaLogisticAlertFilterTwoSide")
-      .put("ALPHA_BETA_LOGISTIC", "com.linkedin.filter.AlphaBetaLogisticAlertFilter")
-      .put("THRESHOLD_BASED", "com.linkedin.filter.ThresholdBasedAlertFilter")
-      .put("WEIGHT_THRESHOLD", WeightThresholdAlertFilter.class.getName())
-      .put("ALPHA_BETA", AlphaBetaAlertFilter.class.getName())
-      .put("AVERAGE_CHANGE_THRESHOLD", AverageChangeThresholdAlertFilter.class.getName())
-      .put("DUMMY", DummyAlertFilter.class.getName())
-      .build();
+  private static final Map<String, Map> REGISTRY_MAP = new HashMap<>();
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionRegistry.class);
+  private static final String KEY_CLASS_NAME = "className";
+  private static final String KEY_ANNOTATION = "annotation";
 
   /**
    * Singleton
@@ -57,19 +33,45 @@ public class DetectionRegistry {
   }
 
   /**
-   * Internal constructor.
+   * Internal constructor. Read the Detection annotation from each class implementation.
    */
   private DetectionRegistry() {
+    try {
+      Set<ClassPath.ClassInfo> classInfos = ClassPath.from(Thread.currentThread().getContextClassLoader())
+          .getTopLevelClasses(AnomalyDetectionStage.class.getPackage().getName());
+      for (ClassPath.ClassInfo classInfo : classInfos) {
+        Class clazz = Class.forName(classInfo.getName());
+        for (Annotation annotation : clazz.getAnnotations()) {
+          if (annotation instanceof Detection) {
+            Detection detectionAnnotation = (Detection) annotation;
+            REGISTRY_MAP.put(detectionAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, classInfo.getName(), KEY_ANNOTATION, detectionAnnotation));
+          }
+        }
+      }
+    } catch (Exception e) {
+      LOG.warn("Build detection registry error", e);
+    }
   }
 
   private static final DetectionRegistry INSTANCE = new DetectionRegistry();
 
   /**
    * Look up the class name for a given algorithm
-   * @param type
+   * @param type the type used in the YAML configs
    * @return algorithm class name
    */
   public String lookup(String type) {
-    return REGISTRY_MAP.get(type.toUpperCase());
+    return MapUtils.getString(REGISTRY_MAP.get(type.toUpperCase()), KEY_CLASS_NAME);
+  }
+
+  public List<Detection> getAllAnnotation() {
+    List<Detection> annotations = new ArrayList<>();
+    for (Map.Entry<String, Map> entry : REGISTRY_MAP.entrySet()){
+      Map infoMap = entry.getValue();
+      if (infoMap.containsKey(KEY_ANNOTATION)){
+        annotations.add((Detection) infoMap.get(KEY_ANNOTATION));
+      }
+    }
+    return annotations;
   }
 }

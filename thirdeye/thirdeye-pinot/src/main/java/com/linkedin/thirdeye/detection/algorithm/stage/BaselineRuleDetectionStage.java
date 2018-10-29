@@ -44,9 +44,10 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * the current value based on relative change or absolute difference.
  */
 @Detection(name = "Baseline rule detection",
-    type = "BASELINE_RULE_FILTER",
+    type = "BASELINE",
     tags = {DetectionTags.RULE_FILTER},
-    description = "Baseline rule filter. Filters the anomalies if percentage change, absolute difference or site wide impact is below certain threshold.")
+    description = "Simple baseline algorithm. Computes a multi-week aggregate baseline and compares the current value "
+        + "based on relative change or absolute difference.")
 public class BaselineRuleDetectionStage extends StaticAnomalyDetectionStage {
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";

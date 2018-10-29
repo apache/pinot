@@ -43,7 +43,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * This filter stage filters the anomalies if either the absolute changeThreshold, percentage changeThreshold or site wide impact does not pass the threshold.
  */
 @Detection(name = "Baseline Filter",
-    type = "BASELINE_RULE_FILTER",
+    type = "BUSINESS_RULE_FILTER",
     tags = {DetectionTags.RULE_FILTER},
     description = "Baseline rule filter. Filters the anomalies if percentage change, absolute difference or site wide impact is below certain threshold.")
 public class BaselineRuleFilterStage implements AnomalyFilterStage {
