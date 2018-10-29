@@ -33,7 +33,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
@@ -109,9 +108,16 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
       anomalyDetectionStage.init(specs, config.getId(), window.getStartMillis(), window.getEndMillis());
       anomalies.addAll(anomalyDetectionStage.runDetection(this.provider));
     }
+
+    MetricEntity me = MetricEntity.fromURN(this.metricUrn);
+    MetricConfigDTO metric = provider.fetchMetrics(Collections.singleton(me.getId())).get(me.getId());
+
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());
       anomaly.setMetricUrn(this.metricUrn);
+      anomaly.setMetric(metric.getName());
+      anomaly.setCollection(metric.getDataset());
+      anomaly.setDimensions(StageUtils.toFilterMap(me.getFilters()));
     }
     return new DetectionPipelineResult(anomalies);
   }

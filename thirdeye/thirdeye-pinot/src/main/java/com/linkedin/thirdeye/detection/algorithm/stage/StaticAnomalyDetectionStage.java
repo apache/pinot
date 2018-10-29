@@ -16,8 +16,6 @@
 
 package com.linkedin.thirdeye.detection.algorithm.stage;
 
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
@@ -28,10 +26,8 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.joda.time.DateTime;
@@ -75,35 +71,10 @@ public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionSta
    * @param slice metric slice
    * @return anomaly template
    */
-  protected final MergedAnomalyResultDTO makeAnomaly(MetricSlice slice, long configId) {
-    Map<Long, MetricConfigDTO> metrics = this.provider.fetchMetrics(Collections.singleton(slice.getMetricId()));
-    if (!metrics.containsKey(slice.getMetricId())) {
-      throw new IllegalArgumentException(String.format("Could not resolve metric id %d", slice.getMetricId()));
-    }
-
-    MetricConfigDTO metric = metrics.get(slice.getMetricId());
-
-    return makeAnomaly(slice, metric, configId);
-  }
-
-  /**
-   * Helper for creating an anomaly for a given metric slice. Injects properties such as
-   * metric name, filter dimensions, etc.
-   *
-   * @param slice metric slice
-   * @param metric metric config dto related to slice
-   * @return anomaly template
-   */
-  protected final MergedAnomalyResultDTO makeAnomaly(MetricSlice slice, MetricConfigDTO metric, Long configId) {
+  protected final MergedAnomalyResultDTO makeAnomaly(MetricSlice slice) {
     MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
     anomaly.setStartTime(slice.getStart());
     anomaly.setEndTime(slice.getEnd());
-    anomaly.setMetric(metric.getName());
-    anomaly.setCollection(metric.getDataset());
-    anomaly.setMetricUrn(MetricEntity.fromSlice(slice, 1.0).getUrn());
-    anomaly.setDimensions(toFilterMap(slice.getFilters()));
-    anomaly.setDetectionConfigId(configId);
-    anomaly.setChildren(new HashSet<MergedAnomalyResultDTO>());
 
     return anomaly;
   }
@@ -111,8 +82,6 @@ public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionSta
   /**
    * Helper for creating a list of anomalies from a boolean series. Injects properties via
    * {@code makeAnomaly(MetricSlice, MetricConfigDTO, Long)}.
-   *
-   * @see StaticAnomalyDetectionStage#makeAnomaly(MetricSlice, MetricConfigDTO, Long)
    *
    * @param slice metric slice
    * @param df time series with COL_TIME and at least one boolean value series
@@ -150,7 +119,7 @@ public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionSta
         if (lastStart >= 0) {
           long start = sTime.get(lastStart);
           long end = sTime.get(i);
-          anomalies.add(makeAnomaly(slice.withStart(start).withEnd(end), metric, configId));
+          anomalies.add(makeAnomaly(slice.withStart(start).withEnd(end)));
         }
         lastStart = -1;
 
@@ -181,18 +150,9 @@ public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionSta
       // truncate at analysis end time
       end = Math.min(end, endTime);
 
-      anomalies.add(makeAnomaly(slice.withStart(start).withEnd(end), metric, configId));
+      anomalies.add(makeAnomaly(slice.withStart(start).withEnd(end)));
     }
 
     return anomalies;
-  }
-
-  // TODO anomaly should support multimap
-  private DimensionMap toFilterMap(Multimap<String, String> filters) {
-    DimensionMap map = new DimensionMap();
-    for (Map.Entry<String, String> entry : filters.entries()) {
-      map.put(entry.getKey(), entry.getValue());
-    }
-    return map;
   }
 }

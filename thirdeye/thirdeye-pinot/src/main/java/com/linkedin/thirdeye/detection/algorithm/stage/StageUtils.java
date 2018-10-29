@@ -17,6 +17,7 @@
 package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
@@ -47,4 +48,14 @@ public class StageUtils {
 
     return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events);
   }
+
+  // TODO anomaly should support multimap
+  public static DimensionMap toFilterMap(Multimap<String, String> filters) {
+    DimensionMap map = new DimensionMap();
+    for (Map.Entry<String, String> entry : filters.entries()) {
+      map.put(entry.getKey(), entry.getValue());
+    }
+    return map;
+  }
+
 }
