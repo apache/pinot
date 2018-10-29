@@ -23,6 +23,7 @@ export default Controller.extend({
   consolidateOptions: ['Aggregate', 'Average'],
   selectedConsolidateOption: 'Average',
   failureMessage: 'Metrics not onboarded. Please check your dashboard name or RRD.',
+  importExistingDashboardFabricGroup: 'prod',
 
   /**
    * Enables the submit button when all required fields are filled
@@ -92,8 +93,8 @@ export default Controller.extend({
    * @param {String} dashboardName - name of dashboard to import
    * @return {Promise}
    */
-  validateDashboardName(isRrdImport, dashboardName) {
-    const url = selfServeApiOnboard.dashboardByName(dashboardName);
+  validateDashboardName(isRrdImport, dashboardName, fabricGroup) {
+    const url = selfServeApiOnboard.dashboardByName(dashboardName, fabricGroup);
     // Only make the call if we are importing an existing inGraphs dashboard (isRrdImport = false)
     if (isRrdImport) {
       return Promise.resolve(true);
@@ -215,6 +216,7 @@ export default Controller.extend({
         isDashboardExistError: false,
         isSubmitDone: false,
         importExistingDashboardName: '',
+        importExistingDashboardFabricGroup: 'prod',
         importCustomNewDataset: '',
         importCustomNewMetric: '',
         importCustomNewRrd: '',
@@ -242,22 +244,31 @@ export default Controller.extend({
     onSubmit() {
       const isRrdImport = this.get('isExistingDashFieldDisabled');
       const datasetName = isRrdImport ? this.get('importCustomNewDataset') : this.get('importExistingDashboardName');
-      const importObj = { datasetName: datasetName, dataSource: 'AutometricsThirdeyeDataSource' };
+      const fabricGroup = this.get('importExistingDashboardFabricGroup') || 'prod';
+
+      const importObj = {
+        datasetName,
+        dataSource: 'AutometricsThirdeyeDataSource',
+        properties: {
+          FABRIC_GROUP: fabricGroup
+        }
+      };
 
       // Enhance request payload for custom metrics
       if (isRrdImport) {
         importObj.metricName = this.get('importCustomNewMetric');
-        importObj.properties = {
+        importObj.properties = Object.assign(importObj.properties, {
           RRD: this.get('importCustomNewRrd'),
-          CONSOLIDATE: this.get('selectedConsolidateOption') || ''
-        };
+          CONSOLIDATE: this.get('selectedConsolidateOption')
+          // TODO support separate FABRIC_GROUP
+        });
       }
 
       // Reset error state for existing field validation
       this.set('isDashboardExistError', false);
 
       // Check whether provided dashboard name exists before sending onboard requests.
-      this.validateDashboardName(isRrdImport, datasetName)
+      this.validateDashboardName(isRrdImport, datasetName, fabricGroup)
         .then((isValid) => {
           if (typeof isValid === 'boolean' && isValid) {
             // Begin onboard sequence
