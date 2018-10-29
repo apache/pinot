@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
+import org.apache.commons.collections.MapUtils;
+
 
 public class SmtpConfiguration {
 
@@ -89,13 +91,13 @@ public class SmtpConfiguration {
         .add(SMTP_USER_KEY, smtpUser).toString();
   }
 
-  public static SmtpConfiguration createFromProperties(Map<String,String> smtpConfiguration) {
+  public static SmtpConfiguration createFromProperties(Map<String,Object> smtpConfiguration) {
     SmtpConfiguration conf = new SmtpConfiguration();
     try {
-      conf.setSmtpHost(smtpConfiguration.get(SMTP_HOST_KEY));
-      conf.setSmtpPort(Integer.parseInt(smtpConfiguration.get(SMTP_PORT_KEY)));
-      conf.setSmtpUser(smtpConfiguration.get(SMTP_USER_KEY));
-      conf.setSmtpPassword(smtpConfiguration.get(SMTP_PASSWD_KEY));
+      conf.setSmtpHost(MapUtils.getString(smtpConfiguration, SMTP_HOST_KEY));
+      conf.setSmtpPort(MapUtils.getIntValue(smtpConfiguration, SMTP_PORT_KEY));
+      conf.setSmtpUser(MapUtils.getString(smtpConfiguration, SMTP_USER_KEY));
+      conf.setSmtpPassword(MapUtils.getString(smtpConfiguration, SMTP_PASSWD_KEY));
     } catch (Exception e) {
       throw new RuntimeException("Error occurred while parsing smtp configuration into object.", e);
     }

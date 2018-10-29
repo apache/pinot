@@ -41,7 +41,7 @@ public class ThirdEyeConfiguration extends Configuration {
   @JsonProperty("swagger")
   public SwaggerBundleConfiguration swaggerBundleConfiguration;
 
-  private Map<String, Map<String, String>> alerterConfigurations;
+  private Map<String, Map<String, Object>> alerterConfigurations;
 
   private String phantomJsPath = "";
   private String failureFromAddress;
@@ -168,11 +168,11 @@ public class ThirdEyeConfiguration extends Configuration {
     this.dataSources = dataSources;
   }
 
-  public Map<String, Map<String, String>> getAlerterConfiguration() {
+  public Map<String, Map<String, Object>> getAlerterConfiguration() {
     return alerterConfigurations;
   }
 
-  public void setAlerterConfiguration(Map<String, Map<String, String>> alerterConfigurations) {
+  public void setAlerterConfiguration(Map<String, Map<String, Object>> alerterConfigurations) {
     this.alerterConfigurations = alerterConfigurations;
   }
 }

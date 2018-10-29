@@ -90,8 +90,8 @@ public class TestOnboardingNotificationContentFormatter {
     taskDriverConfiguration.setMaxParallelTasks(2);
     thirdeyeAnomalyConfig.setTaskDriverConfiguration(taskDriverConfiguration);
     thirdeyeAnomalyConfig.setRootDir(System.getProperty("dw.rootDir", "NOT_SET(dw.rootDir)"));
-    Map<String, Map<String, String>> alerters = new HashMap<>();
-    Map<String, String> smtpProps = new HashMap<>();
+    Map<String, Map<String, Object>> alerters = new HashMap<>();
+    Map<String, Object> smtpProps = new HashMap<>();
     smtpProps.put(SMTP_HOST_KEY, "host");
     smtpProps.put(SMTP_PORT_KEY, "9000");
     alerters.put("smtpConfiguration", smtpProps);

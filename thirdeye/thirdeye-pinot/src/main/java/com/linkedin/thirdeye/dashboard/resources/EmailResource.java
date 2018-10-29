@@ -298,9 +298,9 @@ public class EmailResource {
     return smtpConfiguration;
   }
 
-  private Map<String, Map<String, String>> getSmtpAlerterConfig(String smtpHost, Integer smtpPort) {
-    Map<String, Map<String, String>> alerterConf = new HashMap<String, Map<String, String>>();
-    Map<String, String> smtpProp = new HashMap<>();
+  private Map<String, Map<String, Object>> getSmtpAlerterConfig(String smtpHost, Integer smtpPort) {
+    Map<String, Map<String, Object>> alerterConf = new HashMap<>();
+    Map<String, Object> smtpProp = new HashMap<>();
 
     smtpProp.put(SMTP_HOST_KEY, smtpHost);
     smtpProp.put(SMTP_PORT_KEY, smtpPort.toString());
