@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.core.data.function;
 
+import com.linkedin.pinot.core.data.GenericRow;
 import java.lang.reflect.Method;
-
 import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.joda.time.MutableDateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.core.data.GenericRow;
-
 import scala.collection.mutable.StringBuilder;
+
 
 public class FunctionExpressionEvaluatorTest {
 
@@ -38,7 +36,7 @@ public class FunctionExpressionEvaluatorTest {
     System.out.println(functionInfo);
     String expression = "reverseString(testColumn)";
 
-    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator("testColumn", expression);
+    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator(expression);
     GenericRow row = new GenericRow();
     for (int i = 0; i < 5; i++) {
       String value = "testValue" + i;
@@ -46,46 +44,48 @@ public class FunctionExpressionEvaluatorTest {
       Object result = evaluator.evaluate(row);
       Assert.assertEquals(result, new StringBuilder(value).reverse().toString());
     }
-
   }
 
   @Test
   public void testExpressionWithConstant() throws Exception {
-    FunctionRegistry.registerStaticFunction(MyFunc.class.getDeclaredMethod("daysSinceEpoch", String.class, String.class));
-    String input= "1980-01-01";
+    FunctionRegistry.registerStaticFunction(
+        MyFunc.class.getDeclaredMethod("daysSinceEpoch", String.class, String.class));
+    String input = "1980-01-01";
     String format = "yyyy-MM-dd";
-    String expression = String.format("daysSinceEpoch('%s', '%s')",input, format);
-    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator("testColumn", expression);
+    String expression = String.format("daysSinceEpoch('%s', '%s')", input, format);
+    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator(expression);
     GenericRow row = new GenericRow();
     Object result = evaluator.evaluate(row);
     Assert.assertEquals(result, MyFunc.daysSinceEpoch(input, format));
   }
+
   @Test
   public void testMultiFunctionExpression() throws Exception {
     FunctionRegistry.registerStaticFunction(MyFunc.class.getDeclaredMethod("reverseString", String.class));
-    FunctionRegistry.registerStaticFunction(MyFunc.class.getDeclaredMethod("daysSinceEpoch", String.class, String.class));
+    FunctionRegistry.registerStaticFunction(
+        MyFunc.class.getDeclaredMethod("daysSinceEpoch", String.class, String.class));
     String input = "1980-01-01";
     String reversedInput = MyFunc.reverseString(input);
     String format = "yyyy-MM-dd";
-    String expression = String.format("daysSinceEpoch(reverseString('%s'), '%s')",reversedInput, format);
-    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator("testColumn", expression);
+    String expression = String.format("daysSinceEpoch(reverseString('%s'), '%s')", reversedInput, format);
+    FunctionExpressionEvaluator evaluator = new FunctionExpressionEvaluator(expression);
     GenericRow row = new GenericRow();
     Object result = evaluator.evaluate(row);
     Assert.assertEquals(result, MyFunc.daysSinceEpoch(input, format));
   }
 
-  static class MyFunc {
-
-    public static String reverseString(String input) {
+  private static class MyFunc {
+    static String reverseString(String input) {
       return new StringBuilder(input).reverse().toString();
     }
 
     static MutableDateTime EPOCH_START = new MutableDateTime();
+
     static {
       EPOCH_START.setDate(0L); // Set to Epoch time
     }
 
-    public static int daysSinceEpoch(String input, String format) {
+    static int daysSinceEpoch(String input, String format) {
       DateTime dateTime = DateTimeFormat.forPattern(format).parseDateTime(input);
       return Days.daysBetween(EPOCH_START, dateTime).getDays();
     }
