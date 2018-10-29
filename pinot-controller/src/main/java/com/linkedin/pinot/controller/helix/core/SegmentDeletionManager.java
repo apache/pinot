@@ -231,23 +231,21 @@ public class SegmentDeletionManager {
         URI currentURI = ControllerConf.getUriFromPath(currentDir);
         // Get files that are aged
         String[] targetFiles = pinotFS.listFiles(currentURI, false);
-        List<URI> filesToDelete = new ArrayList<>();
+        int numFilesDeleted = 0;
         for (String targetFile : targetFiles) {
           URI targetURI = ControllerConf.getUriFromPath(targetFile);
           Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
           if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
-            filesToDelete.add(targetURI);
+            if (!pinotFS.delete(targetURI)) {
+              LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
+            } else {
+              numFilesDeleted ++;
+            }
           }
         }
-        // Delete aged files
-        for (URI f : filesToDelete) {
-          if (!pinotFS.delete(f)) {
-            LOGGER.warn("Cannot remove file {} from deleted directory.", f.toString());
-          }
-        }
-        // Delete directory if it's empty
-        String[] fileList = pinotFS.listFiles(currentURI, true);
-        if (fileList.length == 0) {
+
+        if (numFilesDeleted == targetFiles.length) {
+          // Delete directory if it's empty
           if (!pinotFS.delete(currentURI)) {
             LOGGER.warn("The directory {} cannot be removed.", currentDir);
           }

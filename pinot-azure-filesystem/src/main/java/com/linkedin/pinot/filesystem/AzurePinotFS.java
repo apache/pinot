@@ -142,8 +142,8 @@ public class AzurePinotFS extends PinotFS {
     }
 
     if (!recursive) {
-      List<String> shallowDirPaths = new ArrayList<>();
       List<DirectoryEntry> shallowDirectoryEntries = _adlStoreClient.enumerateDirectory(rootDir.fullName);
+      List<String> shallowDirPaths = new ArrayList<>(shallowDirectoryEntries.size());
       for (DirectoryEntry directoryEntry : shallowDirectoryEntries) {
         shallowDirPaths.add(directoryEntry.fullName);
       }
@@ -209,7 +209,8 @@ public class AzurePinotFS extends PinotFS {
     try {
       dirEntry = _adlStoreClient.getDirectoryEntry(uri.getPath());
     } catch (IOException e) {
-      return false;
+      LOGGER.error("Could not get directory entry for {}", uri);
+      throw new RuntimeException(e);
     }
 
     return dirEntry.type.equals(DirectoryEntryType.DIRECTORY);
@@ -220,7 +221,8 @@ public class AzurePinotFS extends PinotFS {
     try {
       return _adlStoreClient.getDirectoryEntry(uri.getPath()).lastModifiedTime.getTime();
     } catch (IOException e) {
-      return 0L;
+      LOGGER.error("Could not get directory entry for {}", uri);
+      throw new RuntimeException(e);
     }
   }
 }

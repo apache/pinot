@@ -185,7 +185,8 @@ public class HadoopPinotFS extends PinotFS {
     try {
       return _hadoopFS.getFileStatus(new Path(uri)).getModificationTime();
     } catch (IOException e) {
-      return 0L;
+      LOGGER.error("Could not get file status for {}", uri);
+      throw new RuntimeException(e);
     }
   }
 

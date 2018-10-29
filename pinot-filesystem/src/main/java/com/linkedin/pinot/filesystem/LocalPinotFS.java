@@ -117,13 +117,13 @@ public class LocalPinotFS extends PinotFS {
   public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     File file = new File(decodeURI(fileUri.getRawPath()));
     if (!recursive) {
-      return file.list();
+      return Arrays.stream(file.list()).map(s -> new File(file, s)).map(File::getAbsolutePath).toArray(String[]::new);
     } else {
       File[] files = file.listFiles();
       if (files == null) {
         return new String[0];
       }
-      return Arrays.stream(files).map(File::getPath).toArray(String[]::new);
+      return Arrays.stream(files).map(File::getAbsolutePath).toArray(String[]::new);
     }
   }
 
