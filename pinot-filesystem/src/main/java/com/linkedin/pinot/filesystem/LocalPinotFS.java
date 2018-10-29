@@ -79,10 +79,9 @@ public class LocalPinotFS extends PinotFS {
     // Makes all parent directories for dst file if they don't exist
     if (!srcFile.isDirectory()) {
       dstFile.getParentFile().mkdirs();
-      FileUtils.moveFile(srcFile, dstFile);
-    } else {
-      Files.move(srcFile.toPath(), dstFile.toPath());
     }
+
+    Files.move(srcFile.toPath(), dstFile.toPath());
 
     return true;
   }
@@ -141,25 +140,11 @@ public class LocalPinotFS extends PinotFS {
     return new File(uri).isDirectory();
   }
 
-  private String encodeURI(String uri) {
-    String encodedStr;
-    try {
-      encodedStr = URLEncoder.encode(uri, DEFAULT_ENCODING);
-    } catch (UnsupportedEncodingException e) {
-      LOGGER.warn("Could not encode uri {}", uri);
-      throw new RuntimeException(e);
-    }
-    return encodedStr;
+  private String encodeURI(String uri) throws UnsupportedEncodingException {
+    return URLEncoder.encode(uri, DEFAULT_ENCODING);
   }
 
-  private String decodeURI(String uri) {
-    String decodedStr;
-    try {
-      decodedStr = URLDecoder.decode(uri, DEFAULT_ENCODING);
-    } catch (UnsupportedEncodingException e) {
-      LOGGER.warn("Could not decode uri {}", uri);
-      throw new RuntimeException(e);
-    }
-    return decodedStr;
+  private String decodeURI(String uri) throws UnsupportedEncodingException {
+    return URLDecoder.decode(uri, DEFAULT_ENCODING);
   }
 }
