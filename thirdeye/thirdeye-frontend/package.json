@@ -14,7 +14,8 @@
     "build": "ember build",
     "lint:js": "eslint ./*.js app config lib server tests",
     "start": "ember server --proxy http://localhost:1426",
-    "test": "node_modules/.bin/ember test",
+    "kill-phantom": "ps -ef | grep phantomjs | awk '{print $2}' | xargs kill -9 || true",
+    "test": "npm run kill-phantom ; node_modules/.bin/ember test",
     "eslint": "node_modules/.bin/eslint",
     "eslint-app": "npm run eslint app/",
     "eslint-tests": "npm run eslint tests/"
@@ -54,7 +55,7 @@
     "ember-d3": "^0.2.0",
     "ember-data": "~2.18.0",
     "ember-export-application-global": "^2.0.0",
-    "ember-fetch": "^2.1.0",
+    "ember-fetch": "3.4.3",
     "ember-load-initializers": "^1.0.0",
     "ember-lodash-shim": "^2.0.2",
     "ember-modal-dialog": "^2.4.0",

@@ -1,8 +1,10 @@
 module.exports = {
+  framework: 'qunit',
   test_page: 'tests/index.html?hidepassed',
   disable_watching: true,
+  browser_disconnect_timeout: 500,
   launch_in_ci: [
-    'Firefox'
+    'Chrome'
   ],
   launch_in_dev: [
     'Chrome'
@@ -18,13 +20,6 @@ module.exports = {
         '--remote-debugging-port=0',
         '--window-size=1440,900'
       ].filter(Boolean)
-    },
-    Firefox: {
-      mode: 'ci',
-      args: [
-        '-headless',
-        '--window-size=1440,900'
-      ]
     }
   }
 };

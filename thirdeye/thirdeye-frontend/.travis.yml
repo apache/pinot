@@ -9,8 +9,8 @@ dist: trusty
 addons:
   chrome: stable
 
-cache:
-  yarn: true
+# See https://docs.travis-ci.com/user/languages/javascript-with-nodejs/
+cache: yarn
 
 env:
   global:
