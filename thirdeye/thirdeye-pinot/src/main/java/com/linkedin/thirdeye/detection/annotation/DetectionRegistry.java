@@ -79,6 +79,10 @@ public class DetectionRegistry {
     return MapUtils.getString(REGISTRY_MAP.get(type.toUpperCase()), KEY_CLASS_NAME);
   }
 
+  /**
+   * Return all stage implementation annotations
+   * @return List of detection annotation
+   */
   public List<Detection> getAllAnnotation() {
     List<Detection> annotations = new ArrayList<>();
     for (Map.Entry<String, Map> entry : REGISTRY_MAP.entrySet()){

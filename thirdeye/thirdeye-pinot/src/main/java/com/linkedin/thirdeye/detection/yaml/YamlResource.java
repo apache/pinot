@@ -105,8 +105,7 @@ public class YamlResource {
 
     if (existingAlertConfigDTOs.isEmpty()) {
       // if alert does not exist, create a new alerter
-      return this.alertConfigTranslator.generateDetectionAlertConfig(alertYaml,
-          Collections.singletonList(detectionConfigId), new HashMap<Long, Long>());
+      return this.alertConfigTranslator.generateDetectionAlertConfig(alertYaml, Collections.singletonList(detectionConfigId), new HashMap<>());
     } else {
       // get existing detection alerter
       DetectionAlertConfigDTO existingAlertConfigDTO = existingAlertConfigDTOs.get(0);

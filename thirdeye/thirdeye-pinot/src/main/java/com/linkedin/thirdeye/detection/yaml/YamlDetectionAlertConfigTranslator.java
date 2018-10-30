@@ -15,6 +15,7 @@ import org.apache.commons.collections.MapUtils;
 
 /**
  * The translator converts the alert yaml config into a detection alert config
+ * TODO Refactor this to support alert schemes
  */
 public class YamlDetectionAlertConfigTranslator {
   private static final String PROP_NAME = "name";
