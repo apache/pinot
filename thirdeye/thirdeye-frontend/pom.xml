@@ -55,7 +55,10 @@
               <goal>yarn</goal>
             </goals>
             <configuration>
-              <arguments>run build -- --prod --output-path=../thirdeye-pinot/src/main/resources/app</arguments>
+              <environmentalVariables>
+                <JOBS>1</JOBS>
+              </environmentalVariables>
+              <arguments>run build --prod --output-path=../thirdeye-pinot/src/main/resources/app</arguments>
             </configuration>
           </execution>
           <execution>
@@ -65,6 +68,9 @@
               <goal>yarn</goal>
             </goals>
             <configuration>
+              <environmentalVariables>
+                <JOBS>1</JOBS>
+              </environmentalVariables>
               <arguments>run test</arguments>
             </configuration>
           </execution>
