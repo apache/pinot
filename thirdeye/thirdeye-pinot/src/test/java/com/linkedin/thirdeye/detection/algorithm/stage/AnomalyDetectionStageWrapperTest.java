@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
 
 public class AnomalyDetectionStageWrapperTest {
   private static final String PROP_METRIC_URN = "metricUrn";
-  private static final String PROP_MOVING_WINDOW_DETECTION = "movingWindowDetection";
+  private static final String PROP_MOVING_WINDOW_DETECTION = "isMovingWindowDetection";
 
   private MockDataProvider provider;
   private Map<String, Object> properties;

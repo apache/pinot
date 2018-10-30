@@ -54,7 +54,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
   private static final String PROP_METRIC_URN = "metricUrn";
 
   // moving window detection properties
-  private static final String PROP_MOVING_WINDOW_DETECTION = "movingWindowDetection";
+  private static final String PROP_MOVING_WINDOW_DETECTION = "isMovingWindowDetection";
   private static final String PROP_WINDOW_DELAY = "windowDelay";
   private static final String PROP_WINDOW_DELAY_UNIT = "windowDelayUnit";
   private static final String PROP_WINDOW_SIZE = "windowSize";
@@ -71,7 +71,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
   private final TimeUnit windowDelayUnit;
   private final int windowSize;
   private final TimeUnit windowUnit;
-  private final boolean movingWindowDetection;
+  private final boolean isMovingWindowDetection;
   private DatasetConfigDTO dataset;
   private DateTimeZone dateTimeZone;
   // need to specify run frequency for minute level detection. Used for moving monitoring window alignment, default to be 15 minutes.
@@ -90,9 +90,11 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
       this.specs.put(PROP_METRIC_URN, metricUrn);
     }
 
-    this.movingWindowDetection = MapUtils.getBooleanValue(this.specs, PROP_MOVING_WINDOW_DETECTION, false);
+    this.isMovingWindowDetection = MapUtils.getBooleanValue(this.specs, PROP_MOVING_WINDOW_DETECTION, false);
+    // delays to wait for data becomes available
     this.windowDelay = MapUtils.getIntValue(this.specs, PROP_WINDOW_DELAY, 0);
     this.windowDelayUnit = TimeUnit.valueOf(MapUtils.getString(this.specs, PROP_WINDOW_DELAY_UNIT, "DAYS"));
+    // detection window size
     this.windowSize = MapUtils.getIntValue(this.specs, PROP_WINDOW_SIZE, 1);
     this.windowUnit = TimeUnit.valueOf(MapUtils.getString(this.specs, PROP_WINDOW_UNIT, "DAYS"));
     Map<String, Object> frequency = MapUtils.getMap(this.specs, PROP_FREQUENCY, Collections.emptyMap());
@@ -127,7 +129,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
   }
 
   List<Interval> getMonitoringWindows() {
-    if (this.movingWindowDetection) {
+    if (this.isMovingWindowDetection) {
       try{
         List<Interval> monitoringWindows = new ArrayList<>();
         MetricEntity me = MetricEntity.fromURN(this.metricUrn);
