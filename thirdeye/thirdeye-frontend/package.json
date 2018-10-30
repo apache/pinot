@@ -82,12 +82,11 @@
     "toastr": "^2.1.4"
   },
   "engines": {
-    "node": "^4.5 || 6.* || >= 7.*"
+    "node": "6.*"
   },
   "dependencies": {
     "bower": "^1.8.0",
     "ember-cryptojs-shim": "^4.3.0",
-    "ember-radio-button": "^1.1.1",
     "ember-simple-tree": "^0.4.2",
     "ion-rangeslider": "^2.2.0",
     "moment": "^2.18.1"
