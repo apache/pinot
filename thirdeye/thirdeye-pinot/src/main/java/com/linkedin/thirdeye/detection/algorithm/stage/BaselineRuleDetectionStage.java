@@ -25,7 +25,9 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.detection.annotation.Detection;
+import com.linkedin.thirdeye.detection.annotation.DetectionParam;
 import com.linkedin.thirdeye.detection.annotation.DetectionTags;
+import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
@@ -47,7 +49,16 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
     type = "BASELINE",
     tags = {DetectionTags.RULE_FILTER},
     description = "Simple baseline algorithm. Computes a multi-week aggregate baseline and compares the current value "
-        + "based on relative change or absolute difference.")
+        + "based on relative change or absolute difference.",
+    presentation = {
+      @PresentationOption(name = "absolute value", template = "comparing ${offset} is more than ${difference}"),
+      @PresentationOption(name = "percentage change", template = "comparing ${offset} is more than ${change}")
+    },
+    params = {
+        @DetectionParam(name = "offset", defaultValue = "wo1w"),
+        @DetectionParam(name = "change", placeholder = "value"),
+        @DetectionParam(name = "difference", placeholder = "value")
+    })
 public class BaselineRuleDetectionStage extends StaticAnomalyDetectionStage {
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";

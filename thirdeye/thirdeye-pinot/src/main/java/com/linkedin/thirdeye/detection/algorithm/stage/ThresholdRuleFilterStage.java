@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.annotation.Detection;
 import com.linkedin.thirdeye.detection.annotation.DetectionParam;
 import com.linkedin.thirdeye.detection.annotation.DetectionTags;
+import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.Map;
@@ -38,8 +39,13 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
     type = "THRESHOLD_RULE_FILTER",
     tags = {DetectionTags.RULE_FILTER},
     description = "Threshold rule filter. filters the anomalies if either the min or max thresholds do not satisfied.",
-    template = "When aggregate value of a time range is higher than ${1} and smaller than ${2}",
-    params = {@DetectionParam(name = "min"), @DetectionParam(name = "max")}
+    presentation = {
+        @PresentationOption(
+            name = "absolute value",
+            description = "aggregated absolute value within a time period",
+            template = "is between ${min} and ${max}"
+        )},
+    params = {@DetectionParam(name = "min", placeholder = "value"), @DetectionParam(name = "max", placeholder = "value")}
 )
 public class ThresholdRuleFilterStage implements AnomalyFilterStage {
     private static final String PROP_MIN = "min";

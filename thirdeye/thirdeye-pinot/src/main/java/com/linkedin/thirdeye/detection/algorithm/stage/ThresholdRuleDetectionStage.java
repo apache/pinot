@@ -25,6 +25,7 @@ import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.detection.annotation.Detection;
 import com.linkedin.thirdeye.detection.annotation.DetectionParam;
 import com.linkedin.thirdeye.detection.annotation.DetectionTags;
+import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.List;
@@ -41,9 +42,13 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
     type = "THRESHOLD",
     tags = { DetectionTags.RULE_DETECTION },
     description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.",
-    template = "When metric is lower than ${1} or higher than ${2}",
-    params = {@DetectionParam(name = "min"), @DetectionParam(name = "max")}
-    )
+    presentation = {@PresentationOption(
+        name = "absolute value",
+        description = "aggregated absolute value within a time period",
+        template = "is lower than ${min} or higher than ${max}"
+    )},
+    params = {@DetectionParam(name = "min", placeholder = "value"), @DetectionParam(name = "max", placeholder = "value")}
+)
 public class ThresholdRuleDetectionStage extends StaticAnomalyDetectionStage {
   private final String COL_TOO_HIGH = "tooHigh";
   private final String COL_TOO_LOW = "tooLow";
