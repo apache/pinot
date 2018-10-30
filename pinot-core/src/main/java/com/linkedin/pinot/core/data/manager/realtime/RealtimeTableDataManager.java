@@ -61,7 +61,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
-  private Semaphore _segmentBuildSemaphore;
+  private final Semaphore _segmentBuildSemaphore;
 
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String CONSUMERS_DIR = "consumers";
@@ -79,13 +79,13 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
+    _segmentBuildSemaphore = segmentBuildSemaphore;
+  }
+
   @Override
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.create(_instanceId, _serverMetrics);
-    int maxParallelBuilds = _tableDataManagerConfig.getMaxParallelSegmentBuilds();
-    if (maxParallelBuilds > 0) {
-      _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);
-    }
 
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {

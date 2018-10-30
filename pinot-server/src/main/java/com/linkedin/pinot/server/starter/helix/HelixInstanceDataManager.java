@@ -87,6 +87,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Preconditions.checkState(instanceSegmentTarDir.mkdirs());
     }
 
+    // Initialize the table data manager provider
+    TableDataManagerProvider.init(_instanceDataManagerConfig);
+
     LOGGER.info("Initialized Helix instance data manager");
   }
 
