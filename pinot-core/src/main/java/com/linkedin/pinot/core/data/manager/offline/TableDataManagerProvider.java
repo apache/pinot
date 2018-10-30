@@ -18,8 +18,10 @@ package com.linkedin.pinot.core.data.manager.offline;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.data.manager.TableDataManager;
+import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import java.util.concurrent.Semaphore;
 import javax.annotation.Nonnull;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -29,7 +31,16 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
  * Factory for {@link TableDataManager}.
  */
 public class TableDataManagerProvider {
+  private static Semaphore _segmentBuildSemaphore;
+
   private TableDataManagerProvider() {
+  }
+
+  public static void init(InstanceDataManagerConfig instanceDataManagerConfig) {
+    int maxParallelBuilds = instanceDataManagerConfig.getMaxParallelSegmentBuilds();
+    if (maxParallelBuilds > 0) {
+      _segmentBuildSemaphore = new Semaphore(maxParallelBuilds, true);
+    }
   }
 
   public static TableDataManager getTableDataManager(@Nonnull TableDataManagerConfig tableDataManagerConfig,
@@ -41,7 +52,7 @@ public class TableDataManagerProvider {
         tableDataManager = new OfflineTableDataManager();
         break;
       case REALTIME:
-        tableDataManager = new RealtimeTableDataManager();
+        tableDataManager = new RealtimeTableDataManager(_segmentBuildSemaphore);
         break;
       default:
         throw new IllegalStateException();

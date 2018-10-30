@@ -61,6 +61,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Executors.newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private SegmentBuildTimeLeaseExtender _leaseExtender;
   private RealtimeSegmentStatsHistory _statsHistory;
+  private final Semaphore _segmentBuildSemaphore;
 
   private static final String STATS_FILE_NAME = "stats.ser";
   private static final String CONSUMERS_DIR = "consumers";
@@ -77,6 +78,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   // the minimum interval between updates to RealtimeSegmentStatsHistory as 30 minutes. This way it is
   // likely that we get fresh data each time instead of multiple copies of roughly same data.
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
+
+  public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
+    _segmentBuildSemaphore = segmentBuildSemaphore;
+  }
 
   @Override
   protected void doInit() {
@@ -147,7 +152,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public Semaphore getSegmentBuildSemaphore() {
-    return RealtimeSegmentBuildSemaphoreFactory.getSemaphore();
+    return _segmentBuildSemaphore;
   }
 
   public String getConsumerDir() {
