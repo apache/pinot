@@ -227,8 +227,8 @@ public abstract class QueryExecutor {
         String prop = PINOT_TOOLS_RESOURCES+QUERY_CONFIG_PATH+getConfigFile();
         //String prop = getConfigFile();
         String config;
-        //String propDir = System.getenv("PINOT_HOME");
-        String propDir = "/Users/robinmanhas/Desktop/StonyBrook/SecondSem/CSE523/pinot";
+        String propDir = System.getenv("PINOT_HOME");
+        //String propDir = "/Users/robinmanhas/Desktop/StonyBrook/SecondSem/CSE523/pinot";
         if(propDir==null){
             //TODO We can load config from class loader also as default config to handle null pointer exception
             System.out.println("Environment variable is null. Check PINOT_HOME environment variable");
