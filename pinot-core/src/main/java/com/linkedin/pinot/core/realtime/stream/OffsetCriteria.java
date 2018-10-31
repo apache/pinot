@@ -25,6 +25,9 @@ import com.linkedin.pinot.common.utils.time.TimeUtils;
  */
 public class OffsetCriteria {
 
+  public static final OffsetCriteria SMALLEST_OFFSET_CRITERIA =
+      new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest();
+
   /**
    * Enumerates the supported offset types
    */
