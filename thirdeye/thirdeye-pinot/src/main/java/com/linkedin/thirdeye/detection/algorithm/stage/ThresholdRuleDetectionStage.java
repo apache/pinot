@@ -24,7 +24,7 @@ import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.detection.annotation.Detection;
 import com.linkedin.thirdeye.detection.annotation.DetectionParam;
-import com.linkedin.thirdeye.detection.annotation.DetectionTags;
+import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
@@ -40,7 +40,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 @Detection(name = "Threshold",
     type = "THRESHOLD",
-    tags = { DetectionTags.RULE_DETECTION },
+    tags = { DetectionTag.RULE_DETECTION },
     description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.",
     presentation = {@PresentationOption(
         name = "absolute value",

@@ -22,7 +22,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.annotation.Detection;
 import com.linkedin.thirdeye.detection.annotation.DetectionParam;
-import com.linkedin.thirdeye.detection.annotation.DetectionTags;
+import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
@@ -37,7 +37,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 @Detection(name = "Aggregate Threshold Filter",
     type = "THRESHOLD_RULE_FILTER",
-    tags = {DetectionTags.RULE_FILTER},
+    tags = {DetectionTag.RULE_FILTER},
     description = "Threshold rule filter. filters the anomalies if either the min or max thresholds do not satisfied.",
     presentation = {
         @PresentationOption(

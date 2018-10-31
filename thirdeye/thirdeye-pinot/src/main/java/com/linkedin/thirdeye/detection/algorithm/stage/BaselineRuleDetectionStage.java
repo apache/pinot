@@ -26,17 +26,14 @@ import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.detection.annotation.Detection;
 import com.linkedin.thirdeye.detection.annotation.DetectionParam;
-import com.linkedin.thirdeye.detection.annotation.DetectionTags;
+import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
-import org.joda.time.DateTimeZone;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -47,7 +44,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 @Detection(name = "Baseline rule detection",
     type = "BASELINE",
-    tags = {DetectionTags.RULE_FILTER},
+    tags = {DetectionTag.RULE_FILTER},
     description = "Simple baseline algorithm. Computes a multi-week aggregate baseline and compares the current value "
         + "based on relative change or absolute difference.",
     presentation = {

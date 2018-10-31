@@ -30,7 +30,7 @@ import java.lang.annotation.Target;
 public @interface Detection {
   @JsonProperty String name() default "";
 
-  @JsonProperty String[] tags() default {};
+  @JsonProperty DetectionTag[] tags() default {};
 
   @JsonProperty String type() default "";
 
