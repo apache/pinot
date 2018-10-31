@@ -84,6 +84,17 @@ public class LocalPinotFSTest {
     File thirdTestFile = new File(_absoluteTmpDirPath, "thirdTestFile");
     Assert.assertTrue(thirdTestFile.createNewFile(), "Could not create file " + thirdTestFile.getPath());
 
+    // Tests recursive move works
+    File testDir = new File(_absoluteTmpDirPath, "testDir");
+    Assert.assertTrue(testDir.mkdir(), "Could not make directory " + testDir.getAbsolutePath());
+    File testDirFile = new File(testDir, "testFile");
+    Assert.assertTrue(testDirFile.createNewFile(), "Could not create file " + testDir.getAbsolutePath());
+    File testDir2 = new File(_absoluteTmpDirPath, "testDir2");
+    File testDirFile2 = new File(testDir2, "testFile");
+    Assert.assertFalse(localPinotFS.exists(testDirFile2.toURI()));
+    localPinotFS.move(testDir.toURI(), testDir2.toURI(), true);
+    Assert.assertTrue(localPinotFS.exists(testDirFile2.toURI()));
+
     // Check file copy to location where something already exists still works
     localPinotFS.copy(testFileUri, thirdTestFile.toURI());
     // Check length of file
@@ -94,9 +105,9 @@ public class LocalPinotFSTest {
     Assert.assertTrue(_newTmpDir.exists());
 
     // Expected that a move without overwrite will not succeed
-    Assert.assertEquals(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), false), false);
+    Assert.assertFalse(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), false));
 
-    localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), true);
+    Assert.assertTrue(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), true));
     Assert.assertEquals(_absoluteTmpDirPath.length(), 0);
 
     localPinotFS.delete(secondTestFileUri);

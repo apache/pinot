@@ -76,11 +76,6 @@ public class LocalPinotFS extends PinotFS {
       }
     }
 
-    // Makes all parent directories for dst file if they don't exist
-    if (!srcFile.isDirectory()) {
-      dstFile.getParentFile().mkdirs();
-    }
-
     Files.move(srcFile.toPath(), dstFile.toPath());
 
     return true;
