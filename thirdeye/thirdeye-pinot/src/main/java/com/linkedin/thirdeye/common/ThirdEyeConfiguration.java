@@ -17,7 +17,6 @@
 package com.linkedin.thirdeye.common;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import io.federecio.dropwizard.swagger.SwaggerBundleConfiguration;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -25,6 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.dropwizard.Configuration;
+import java.util.Map;
+
 
 public class ThirdEyeConfiguration extends Configuration {
   /**
@@ -36,10 +37,11 @@ public class ThirdEyeConfiguration extends Configuration {
   private List<String> whitelistDatasets = new ArrayList<>();
 
   private String dashboardHost;
-  private SmtpConfiguration smtpConfiguration;
 
   @JsonProperty("swagger")
   public SwaggerBundleConfiguration swaggerBundleConfiguration;
+
+  private Map<String, Map<String, Object>> alerterConfigurations;
 
   private String phantomJsPath = "";
   private String failureFromAddress;
@@ -130,14 +132,6 @@ public class ThirdEyeConfiguration extends Configuration {
     return getRootDir() + "/holiday-loader-key.json";
   }
 
-  public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
-    this.smtpConfiguration = smtpConfiguration;
-  }
-
-  public SmtpConfiguration getSmtpConfiguration(){
-    return this.smtpConfiguration;
-  }
-
   public String getPhantomJsPath() {
     return phantomJsPath;
   }
@@ -174,4 +168,11 @@ public class ThirdEyeConfiguration extends Configuration {
     this.dataSources = dataSources;
   }
 
+  public Map<String, Map<String, Object>> getAlerterConfiguration() {
+    return alerterConfigurations;
+  }
+
+  public void setAlerterConfiguration(Map<String, Map<String, Object>> alerterConfigurations) {
+    this.alerterConfigurations = alerterConfigurations;
+  }
 }

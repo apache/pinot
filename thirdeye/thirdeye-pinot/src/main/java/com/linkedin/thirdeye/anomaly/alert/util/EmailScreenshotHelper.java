@@ -34,6 +34,9 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
+
 public class EmailScreenshotHelper {
 
   private static final String TEMP_PATH = "/tmp/graph";
@@ -50,8 +53,9 @@ public class EmailScreenshotHelper {
 
   public static String takeGraphScreenShot(final String anomalyId, final ThirdEyeConfiguration configuration) throws JobExecutionException {
     return takeGraphScreenShot(anomalyId, configuration.getDashboardHost(), configuration.getRootDir(),
-        configuration.getPhantomJsPath(), configuration.getSmtpConfiguration(), configuration.getFailureFromAddress(),
-        configuration.getFailureToAddress());
+        configuration.getPhantomJsPath(),
+        SmtpConfiguration.createFromProperties(configuration.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+        configuration.getFailureFromAddress(), configuration.getFailureToAddress());
   }
 
   public static String takeGraphScreenShot(final String anomalyId, final String dashboardHost, final String rootDir,

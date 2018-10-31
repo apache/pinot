@@ -58,6 +58,9 @@ import javax.validation.Validation;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
+
 public class GenerateAnomalyReport {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
   private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
@@ -249,7 +252,8 @@ public class GenerateAnomalyReport {
         new GenerateAnomalyReport(df.parse(config.getStartTimeIso()),
             df.parse(config.getEndTimeIso()), persistenceFile,
             Arrays.asList(config.getDatasets().split(",")), config.getTeBaseUrl(),
-            detectorConfig.getSmtpConfiguration(), config.getEmailRecipients());
+            SmtpConfiguration.createFromProperties(detectorConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+            config.getEmailRecipients());
 
     reportGenerator.buildReport();
     //    reportGenerator.listMetric();

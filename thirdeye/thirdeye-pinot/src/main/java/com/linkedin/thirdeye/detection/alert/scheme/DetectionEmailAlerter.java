@@ -45,6 +45,8 @@ import org.apache.commons.mail.HtmlEmail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
 
 public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionEmailAlerter.class);
@@ -65,7 +67,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   /** Sends email according to the provided config. */
   private void sendEmail(EmailEntity entity) throws EmailException {
     HtmlEmail email = entity.getContent();
-    SmtpConfiguration config = this.thirdeyeConfig.getSmtpConfiguration();
+    SmtpConfiguration config = SmtpConfiguration.createFromProperties(this.thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY));
 
     if (config == null) {
       LOG.error("No email configuration available. Skipping.");

@@ -18,6 +18,7 @@ package com.linkedin.thirdeye.tools.anomaly.report;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
@@ -30,6 +31,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.validation.Validation;
 import org.quartz.CronExpression;
+
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
 
 public class AnomalyReportDriver {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
@@ -104,7 +108,8 @@ public class AnomalyReportDriver {
     GenerateAnomalyReport reportGenerator =
         new GenerateAnomalyReport(startDate, endDate, persistenceFile,
             Arrays.asList(config.getDatasets().split(",")), config.getTeBaseUrl(),
-            detectorConfig.getSmtpConfiguration(), config.getEmailRecipients());
+            SmtpConfiguration.createFromProperties(detectorConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+            config.getEmailRecipients());
 
     reportGenerator.buildReport();
   }

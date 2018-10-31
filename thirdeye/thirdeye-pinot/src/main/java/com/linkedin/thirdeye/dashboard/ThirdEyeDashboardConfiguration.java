@@ -17,6 +17,7 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
+import com.linkedin.thirdeye.dashboard.RootCauseConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.AuthConfiguration;
 import com.linkedin.thirdeye.dashboard.configs.ResourceConfiguration;
 import java.util.List;

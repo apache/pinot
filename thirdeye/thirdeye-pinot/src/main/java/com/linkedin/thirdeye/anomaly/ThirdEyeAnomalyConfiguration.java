@@ -40,7 +40,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   private long id;
   private String dashboardHost;
-  private SmtpConfiguration smtpConfiguration;
   private HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration = new HolidayEventsLoaderConfiguration();
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
   private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
@@ -153,10 +152,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.alert = alert;
   }
 
-  public SmtpConfiguration getSmtpConfiguration() {
-    return smtpConfiguration;
-  }
-
   public boolean isAutoload() {
     return autoload;
   }
@@ -187,10 +182,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setPinotProxy(boolean pinotProxy) {
     this.pinotProxy = pinotProxy;
-  }
-
-  public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
-    this.smtpConfiguration = smtpConfiguration;
   }
 
   public String getFailureFromAddress() {

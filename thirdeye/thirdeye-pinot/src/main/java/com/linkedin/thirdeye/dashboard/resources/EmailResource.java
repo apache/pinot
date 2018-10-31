@@ -50,6 +50,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.*;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.*;
+
 
 @Path("thirdeye/email")
 @Produces(MediaType.APPLICATION_JSON)
@@ -69,7 +71,8 @@ public class EmailResource {
   private SmtpConfiguration smtpConfiguration;
 
   public EmailResource(ThirdEyeConfiguration thirdEyeConfig) {
-    this(thirdEyeConfig.getSmtpConfiguration(), new AlertFilterFactory(thirdEyeConfig.getAlertFilterConfigPath()),
+    this(SmtpConfiguration.createFromProperties(thirdEyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+        new AlertFilterFactory(thirdEyeConfig.getAlertFilterConfigPath()),
         thirdEyeConfig.getFailureFromAddress(), thirdEyeConfig.getFailureToAddress(), thirdEyeConfig.getDashboardHost(),
         thirdEyeConfig.getPhantomJsPath(), thirdEyeConfig.getRootDir());
   }
@@ -295,6 +298,17 @@ public class EmailResource {
     return smtpConfiguration;
   }
 
+  private Map<String, Map<String, Object>> getSmtpAlerterConfig(String smtpHost, Integer smtpPort) {
+    Map<String, Map<String, Object>> alerterConf = new HashMap<>();
+    Map<String, Object> smtpProp = new HashMap<>();
+
+    smtpProp.put(SMTP_HOST_KEY, smtpHost);
+    smtpProp.put(SMTP_PORT_KEY, smtpPort.toString());
+    alerterConf.put(SMTP_CONFIG_KEY, smtpProp);
+
+    return alerterConf;
+  }
+
   private Response generateAnomalyReportForAnomalies(AnomalyReportGenerator anomalyReportGenerator,
       List<MergedAnomalyResultDTO> anomalies, boolean applyFilter, long startTime, long endTime, Long groupId,
       String groupName, String subject, boolean includeSentAnomaliesOnly, DetectionAlertFilterRecipients recipients,
@@ -307,7 +321,7 @@ public class EmailResource {
     }
 
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
-    configuration.setSmtpConfiguration(getSmtpConfiguration(smtpHost, smtpPort));
+    configuration.setAlerterConfiguration(getSmtpAlerterConfig(smtpHost, smtpPort));
     configuration.setDashboardHost(teHost);
     configuration.setPhantomJsPath(phantonJsPath);
     configuration.setRootDir(rootDir);
