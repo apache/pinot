@@ -52,8 +52,15 @@ const ROOTCAUSE_SESSION_PERMISSIONS_READ_WRITE = 'READ_WRITE';
 export default Controller.extend({
   queryParams: [
     'metricId',
+    'sessionId',
     'anomalyId',
-    'sessionId'
+    'contextUrnsInit',
+    'selectedUrnsInit',
+    'anomalyUrnsInit',
+    'anomalyRange',
+    'analysisRange',
+    'granularity',
+    'compareMode'
   ],
 
   //
