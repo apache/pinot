@@ -1,87 +1,42 @@
 <aside class="manage-alert-filters col-md-3">
   <div class="manage-alert-filters__wrapper">
-    <h1 class="manage-alert-filters__row manage-alert-filters__row--title">Manage Alerts</h1>
-    {{!--  TODO: enable this filter component when ready
-      {{entity-filter
-        title="Refine results by"
-        maxStrLen=25
-        filterBlocks=filterBlocks
-        onSelectFilter=(action "userDidSelectFilter")
-      }}
-    --}}
+    {{entity-filter
+      title="Quick Filters"
+      maxStrLen=25
+      resetFilters=resetFiltersGlobal
+      filterBlocks=filterBlocksGlobal
+      onSelectFilter=(action "userDidSelectFilter")
+    }}
+    {{entity-filter
+      title="Filters"
+      maxStrLen=25
+      selectDisabled=isSelectDisabled
+      resetFilters=resetFiltersLocal
+      filterBlocks=filterBlocksLocal
+      onSelectFilter=(action "userDidSelectFilter")
+    }}
   </div>
 </aside>
 
 <main class="manage-alert-container card-container card-container--padded col-md-9">
-  <div class="manage-alert-container__title">Search for an existing alert</div>
   <div class="manage-alert-search">
-    <div class="manage-alert-search__filter">
-      <div class="manage-alert-search__label">Search By:</div>
+    <div class="manage-alert-search__input">
       {{#power-select
-        selected=selectedSearchMode
-        options=searchModes
-        searchEnabled=false
-        onchange=(action "onSearchModeChange")
-        as |name|
+        triggerId="select-alert-by-name"
+        placeholder="Search by alert name"
+        options=originalAlerts
+        selected=selectedAlert
+        searchEnabled=true
+        searchField="functionName"
+        allowClear=true
+        onchange=(action "onSelectAlertByName")
+        as |alert|
       }}
-        {{name}}
+        {{alert.functionName}}
       {{/power-select}}
     </div>
 
-    <div class="manage-alert-search__input">
-      <div class="manage-alert-search__label">Search for Alert:</div>
-      {{#if (eq selectedSearchMode 'All Alerts')}}
-        {{#power-select
-          selected=selectedAll
-          onchange=(action "onAlertChange")
-          placeholder="Show All Alerts"
-          disabled=true
-          as |alert|
-        }}
-          {{alert.functionName}}
-        {{/power-select}}
-      {{else if (eq selectedSearchMode 'Alerts')}}
-        {{#power-select
-          selected=primaryMetric
-          onchange=(action "onAlertChange")
-          search=(perform searchByFunctionName)
-          searchPlaceholder="Search for an Alert"
-          placeholder="Search by Alert Name"
-          allowClear=true
-          as |alert|
-        }}
-          {{alert.functionName}}
-        {{/power-select}}
-
-      {{else if (eq selectedSearchMode 'Applications')}}
-        {{#power-select
-          selected=selectedApplicationName
-          onchange=(perform searchByApplicationName)
-          options=applicationNames
-          searchPlaceholder="Search for an Application Name"
-          placeholder="Search by Application Name"
-          allowClear=true
-          as |applicationName|
-        }}
-          {{applicationName}}
-        {{/power-select}}
-
-      {{else if (eq selectedSearchMode 'Subscriber Groups')}}
-        {{#power-select
-          onchange=(perform searchByConfigGroup)
-          selected=selectedsubscriberGroupNames
-          options=subscriberGroupNames
-          searchPlaceholder="Search for a dataset"
-          placeholder="Search by Subscriber Group Name"
-          allowClear=true
-          as |groupName|
-        }}
-          {{groupName}}
-        {{/power-select}}
-      {{/if}}
-    </div>
-
-    {{#if (eq selectedSearchMode "All Alerts")}}
+    {{#if (gt paginatedSelectedAlerts.length 1)}}
       <div class="manage-alert-search__sort">
         <div class="manage-alert-search__label">Sort By:</div>
         {{#power-select
@@ -101,7 +56,7 @@
     {{#if paginatedSelectedAlerts}}
       <section class="te-search-header">
         <span class="te-search-title">
-          Alerts Found({{totalFilteredAlerts}})
+          Alerts ({{totalFilteredAlerts}})
         </span>
         <span class="pull-right">
           Showing {{paginatedSelectedAlerts.length}} of

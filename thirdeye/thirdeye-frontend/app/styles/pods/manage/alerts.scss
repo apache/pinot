@@ -2,9 +2,7 @@
   margin: $te-default-element-spacing 10px 0 -30px;
 
   &__wrapper {
-    background-color: white;
-    margin-right: $te-content-container-margin;
-    border: 1px solid $te-grey;
+    margin-right: 5px;
   }
 
   &__row {
@@ -44,7 +42,9 @@
 
 .manage-alert-search {
   @include group-clearfix;
-  margin: $te-default-element-spacing 0;
+  float: right;
+  width: 100%;
+  margin-bottom: 10px;
 
   &__filter {
     float: left;
@@ -54,18 +54,21 @@
 
   &__sort {
     float: right;
+    width: 20%;
     min-width: 100px;
     margin-left: $te-default-element-spacing;
   }
 
   &__input {
-    float: left;
-    width: 59%;
+    width: 75%;
     min-width: 300px;
+    display: inline-block;
   }
 
   &__label {
-    line-height: $te-default-element-spacing;
+    line-height: 40px;
+    float: left;
+    margin-right: 10px;
     text-transform: uppercase;
     font-size: 13px;
   }
@@ -76,5 +79,5 @@
 }
 
 .manage-alert-results {
-  clear: left;
+  clear: both;
 }
