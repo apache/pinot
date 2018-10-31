@@ -224,8 +224,10 @@ public class HadoopSegmentCreationMapReduceJob {
       segmentGeneratorConfig.setFormat(fileFormat);
       segmentGeneratorConfig.setOnHeap(true);
 
+//      If the time column name exists, _segmentNamePostfix = "postfix", and _sequenceId = 1, the segment name would be
+//      tableName_minDate_maxDate_postfix_1
       if (null != _postfix) {
-        segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
+        segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s_%s", _postfix, seqId));
       } else {
         segmentGeneratorConfig.setSequenceId(seqId);
       }
