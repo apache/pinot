@@ -1,0 +1,27 @@
+{
+  "tableName": "meetupRsvp",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "mtime",
+    "timeType": "MILLISECONDS",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "meetupRsvp",
+    "replication": "1"
+  },
+  "tenants": {},
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "streamConfigs": {
+      "streamType": "kafka",
+      "stream.kafka.consumer.type": "highLevel",
+      "stream.kafka.topic.name": "meetupRSVPEvents",
+      "stream.kafka.decoder.class.name": "com.linkedin.pinot.core.realtime.impl.kafka.KafkaJSONMessageDecoder",
+      "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
+      "stream.kafka.zk.broker.url": "localhost:2191/kafka"
+    }
+  },
+  "metadata": {
+    "customConfigs": {}
+  }
+}

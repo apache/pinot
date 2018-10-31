@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
@@ -158,10 +158,15 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     return intermediateResult1;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return false;
+  }
+
   @Nonnull
   @Override
-  public FieldSpec.DataType getIntermediateResultDataType() {
-    return FieldSpec.DataType.OBJECT;
+  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
+    return DataSchema.ColumnDataType.OBJECT;
   }
 
   @Nonnull
@@ -172,7 +177,7 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
       return DEFAULT_FINAL_RESULT;
     } else {
       Collections.sort(intermediateResult);
-      return intermediateResult.get(intermediateResult.size() * _percentile / 100);
+      return intermediateResult.get((int) ((long) intermediateResult.size() * _percentile / 100));
     }
   }
 }

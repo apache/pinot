@@ -15,74 +15,43 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention.strategy;
 
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import java.util.concurrent.TimeUnit;
-
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.utils.time.TimeUtils;
-
 
 /**
- * This strategy is default and will check the segment Interval from segmentMetadata and
- * purge segment passed the retention duration.
- *
- *
+ * The <code>TimeRetentionStrategy</code> class uses segment end time to manage the retention for segments.
  */
 public class TimeRetentionStrategy implements RetentionStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeRetentionStrategy.class);
-  private Duration _retentionDuration;
 
-  public TimeRetentionStrategy(String timeUnit, String timeValue) {
-    long retentionMillis = TimeUtils.toMillis(timeUnit, timeValue);
-    if (retentionMillis == Long.MIN_VALUE) {
-      LOGGER.error("Failed to set retention duration, timeUnit: {}, timeValue: {}", timeUnit, timeValue);
-      _retentionDuration = null;
-    } else {
-      _retentionDuration = new Duration(TimeUtils.toMillis(timeUnit, timeValue));
-    }
-  }
+  private final long _retentionMs;
 
-  public TimeRetentionStrategy(TimeUnit retentionTimeUnit, int retentionTimeValue) {
-    if (retentionTimeUnit != null && retentionTimeValue > 0) {
-      _retentionDuration = new Duration(retentionTimeUnit.toMillis(retentionTimeValue));
-    } else {
-      _retentionDuration = null;
-    }
+  public TimeRetentionStrategy(TimeUnit timeUnit, long timeValue) {
+    _retentionMs = timeUnit.toMillis(timeValue);
   }
 
   @Override
   public boolean isPurgeable(SegmentZKMetadata segmentZKMetadata) {
-    if (_retentionDuration == null || _retentionDuration.getMillis() <= 0) {
+    TimeUnit timeUnit = segmentZKMetadata.getTimeUnit();
+    if (timeUnit == null) {
+      LOGGER.warn("Time unit is not set for {} segment: {} of table: {}", segmentZKMetadata.getSegmentType(),
+          segmentZKMetadata.getSegmentName(), segmentZKMetadata.getTableName());
       return false;
     }
-    try {
-      TimeUnit segmentTimeUnit = segmentZKMetadata.getTimeUnit();
-      if (segmentTimeUnit == null) {
-        return false;
-      }
+    long endTime = segmentZKMetadata.getEndTime();
+    long endTimeMs = timeUnit.toMillis(endTime);
 
-      long endsMillis = segmentTimeUnit.toMillis(segmentZKMetadata.getEndTime());
-
-      // Check that the date in the segment is between 1971 and 2071, as a sanity check for misconfigured time units.
-      if (!TimeUtils.timeValueInValidRange(endsMillis)) {
-        LOGGER.warn("Skipping purge check for segment {}, timestamp {} {} fails sanity check.",
-            segmentZKMetadata.getSegmentName(), segmentZKMetadata.getEndTime(), segmentZKMetadata.getTimeUnit());
-        return false;
-      }
-
-      Duration segmentTimeUntilNow = new Duration(endsMillis, System.currentTimeMillis());
-      if (_retentionDuration.isShorterThan(segmentTimeUntilNow)) {
-        return true;
-      }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while checking if a segment is purgeable", e);
+    // Check that the end time is between 1971 and 2071
+    if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
+      LOGGER.warn("{} segment: {} of table: {} has invalid end time: {} {}", segmentZKMetadata.getSegmentType(),
+          segmentZKMetadata.getSegmentName(), segmentZKMetadata.getTableName(), endTime, timeUnit);
       return false;
     }
-    return false;
+
+    return System.currentTimeMillis() - endTimeMs > _retentionMs;
   }
 }

@@ -15,12 +15,10 @@ Handlebars.registerHelper('formatPercent', function (percentValue) {
 });
 
 Handlebars.registerHelper('formatDouble', function (doubleValue) {
-  if(doubleValue >= 0){
-    return "" + doubleValue.toFixed(1);
-  } else {
-    return "" + doubleValue.toFixed(1);
-  }
+  var value = Number(doubleValue);
+  return Number.isNaN(value) ? '' : d3.format('.3r')(doubleValue);
 });
+
 Handlebars.registerHelper('formatDelta', function (a, b) {
   delta = a - b;
   if(delta >= 0){
@@ -29,6 +27,26 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
     return "" + delta.toFixed(1);
   }
 });
+
+/**
+ * Displays human readable number
+ * @param {number} num A number
+ * @return {string} human readable number
+ */
+Handlebars.registerHelper('formatNumber', function(num) {
+  return num.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
+});
+
+/**
+ * Template helper that assigns the correct css class based on the delta
+ * @param  {string} value string value of delta ('2.4%')
+ * @return [string] css class positive/negative
+ */
+Handlebars.registerHelper('colorDelta', function(value) {
+    if (value ===  'N/A') { return; }
+    return parseInt(value) >= 0 ? 'positive' : 'negative';
+});
+
 Handlebars.registerHelper('displayHour', function (date) {
   var tz = getTimeZone();
   return moment(date).tz(tz).format('h a');
@@ -36,7 +54,24 @@ Handlebars.registerHelper('displayHour', function (date) {
 
 Handlebars.registerHelper('displayMonthDayHour', function (date) {
   var tz = getTimeZone();
-  return moment(date).tz(tz).format('M-D H');
+  return moment(date).tz(tz).format('M/D hA');
+});
+
+/**
+ * Displays human readable date
+ * @param {string} granularity granularity of the metric
+ * @param {string} date A date
+ * @return {string} human readable date
+ */
+Handlebars.registerHelper('formatDate', function (granularity, date) {
+  var tz = getTimeZone();
+  const dateFormat = {
+    'DAYS': 'M/D',
+    'HOURS': 'M/D ha',
+    '5_MINUTES': 'M/D hh:mm a'
+  }[granularity];
+
+  return moment(date).tz(tz).format(dateFormat);
 });
 
 Handlebars.registerHelper('if_eq', function(a, b, opts) {
@@ -44,6 +79,14 @@ Handlebars.registerHelper('if_eq', function(a, b, opts) {
       return opts.fn(this);
   } else {
       return opts.inverse(this);
+  }
+});
+
+Handlebars.registerHelper('truncate', function(str, maxlen) {
+  if (str.length > maxlen) {
+    return str.substr(0, maxlen-3) + "...";
+  } else {
+    return str
   }
 });
 
@@ -56,18 +99,18 @@ Handlebars.registerHelper('if_no_anomalies', function(info, opts) {
 
 });
 
-Handlebars.registerHelper('computeColor', function(value) {
- var opacity = Math.abs(value / 25);
- if(value > 0){
+Handlebars.registerHelper('computeColor', function(value, inverseMetric) {
+ const opacity = Math.abs(value / 25);
+ if((value > 0 && !inverseMetric) || (value < 0 && inverseMetric)) {
    return "rgba(0,0,234," + opacity + ")";
- } else{
-   return "rgba(234,0,0,"  + opacity + ")" ;
+ } else {
+   return "rgba(234,0,0,"  + opacity + ")";
  }
 });
 
 //compute the text color so that its visible based on background
 Handlebars.registerHelper('computeTextColor', function(value) {
-  opacity = Math.abs(value/25);
+  const opacity = Math.abs(value/25);
   if(opacity < 0.5){
     return "#000000";
   } else{
@@ -111,4 +154,36 @@ Handlebars.registerHelper('abbreviateNumber', function(value, digits) {
   }
   return num.toFixed(digits).replace(rx, "$1");
 });
+
+/**
+ * Helper determining if passed param is an object
+ * @param  {Object|Array}  item
+ * @return {Boolean}
+ */
+Handlebars.registerHelper('isObject', function(item) {
+  return typeof item === 'object' && !Array.isArray(item);
+});
+
+/**
+ * Display Human Readable filterNames
+ * @param  {String} filter
+ * @return {String} Sanizited Filter Name
+ */
+Handlebars.registerHelper('displayFilterName', function(filter) {
+  return filter.split('FilterMap')[0];
+});
+
+/**
+ * Display Human Readable filters
+ * @param  {String} filters
+ * @return {String} Sanizited Filter
+ */
+Handlebars.registerHelper('parseFilters', function(filters) {
+  filters = JSON.parse(filters);
+  const uiFilters = Object.keys(filters).map((filter) => {
+    return `${filter}: ${filters[filter].join(', ')}</br>`
+  }).join('');
+  return new Handlebars.SafeString(uiFilters);
+});
+
 

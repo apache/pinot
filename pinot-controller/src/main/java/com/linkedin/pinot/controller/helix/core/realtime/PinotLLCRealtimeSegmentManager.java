@@ -16,23 +16,77 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.MinMaxPriorityQueue;
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.config.ColumnPartitionConfig;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.exception.InvalidConfigException;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.ColumnPartitionMetadata;
+import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.SegmentPartitionMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.partition.PartitionAssignment;
+import com.linkedin.pinot.common.partition.PartitionAssignmentGenerator;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
+import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdaterFactory;
+import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
+import com.linkedin.pinot.core.realtime.segment.RealtimeSegmentAssignmentStrategy;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.math.IntRange;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ControllerChangeListener;
 import org.apache.helix.HelixAdmin;
@@ -41,35 +95,9 @@ import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Function;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
 
 
 public class PinotLLCRealtimeSegmentManager {
@@ -77,6 +105,19 @@ public class PinotLLCRealtimeSegmentManager {
   private static final int KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
+  private static final int NUM_LOCKS = 4;
+
+  private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
+  private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
+  // TODO: make this configurable with default set to 10
+  /**
+   * After step 1 of segment completion is done,
+   * this is the max time until which step 3 is allowed to complete.
+   * See {@link PinotLLCRealtimeSegmentManager#commitSegmentMetadata(String, String, long, long)} for explanation of steps 1 2 3
+   * This includes any backoffs and retries for the steps 2 and 3
+   * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
+   */
+  private static int MAX_SEGMENT_COMPLETION_TIME_MINS = 10;
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -88,6 +129,17 @@ public class PinotLLCRealtimeSegmentManager {
   private boolean _amILeader = false;
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
+  private final Lock[] _idealstateUpdateLocks;
+  private final TableConfigCache _tableConfigCache;
+  private final PartitionAssignmentGenerator _partitionAssignmentGenerator;
+
+  public boolean getIsSplitCommitEnabled() {
+    return _controllerConf.getAcceptSplitCommit();
+  }
+
+  public String getControllerVipUrl() {
+    return _controllerConf.generateVipUrl();
+  }
 
   public static synchronized void create(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -126,6 +178,12 @@ public class PinotLLCRealtimeSegmentManager {
     _clusterName = clusterName;
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
+    _idealstateUpdateLocks = new Lock[NUM_LOCKS];
+    for (int i = 0; i < NUM_LOCKS; i++) {
+      _idealstateUpdateLocks[i] = new ReentrantLock();
+    }
+    _tableConfigCache = new TableConfigCache(_propertyStore);
+    _partitionAssignmentGenerator = new PartitionAssignmentGenerator(_helixManager);
   }
 
   public static PinotLLCRealtimeSegmentManager getInstance() {
@@ -141,12 +199,6 @@ public class PinotLLCRealtimeSegmentManager {
         // We were not leader before, now we are.
         _amILeader = true;
         LOGGER.info("Became leader");
-        // Scanning tables to check for incomplete table additions is optional if we make table addtition operations
-        // idempotent.The user can retry the failed operation and it will work.
-        //
-        // Go through all partitions of all tables that have LL configured, and check that they have as many
-        // segments in CONSUMING state in Idealstate as there are kafka partitions.
-        completeCommittingSegments();
       } else {
         // We already had leadership, nothing to do.
         LOGGER.info("Already leader. Duplicate notification");
@@ -157,55 +209,42 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private boolean isLeader() {
+  protected boolean isLeader() {
     return _helixManager.isLeader();
   }
 
-  /*
-   * Use helix balancer to balance the kafka partitions amongst the realtime nodes (for a table).
-   * The topic name is being used as a dummy helix resource name. We do not read or write to zk in this
-   * method.
+  protected boolean isConnected() {
+    return _helixManager.isConnected();
+  }
+
+  /**
+   *
+   * @param tableConfig
+   * @param emptyIdealState may contain HLC segments if both HLC and LLC are configured
    */
-  public void setupHelixEntries(final String topicName, final String realtimeTableName, int nPartitions,
-      final List<String> instanceNames, int nReplicas, String initialOffset, String bootstrapHosts, IdealState
-      idealState, boolean create, int flushSize) {
-    if (nReplicas > instanceNames.size()) {
-      throw new RuntimeException("Replicas requested(" + nReplicas + ") cannot fit within number of instances(" +
-          instanceNames.size() + ") for table " + realtimeTableName + " topic " + topicName);
-    }
-    /*
-     Due to a bug in auto-rebalance (https://issues.apache.org/jira/browse/HELIX-631)
-     we do the kafka partition allocation with local code in this class.
-    {
-      final String resourceName = topicName;
-
-      List<String> partitions = new ArrayList<>(nPartitions);
-      for (int i = 0; i < nPartitions; i++) {
-        partitions.add(Integer.toString(i));
+  public void setupNewTable(TableConfig tableConfig, IdealState emptyIdealState) throws InvalidConfigException {
+    final StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    int partitionCount = getKafkaPartitionCount(streamMetadata);
+    List<String> currentSegments = getExistingSegments(tableConfig.getTableName());
+    // Make sure that there are no low-level segments existing.
+    if (currentSegments != null) {
+      for (String segment : currentSegments) {
+        if (!SegmentName.isHighLevelConsumerSegmentName(segment)) {
+          // For now, we don't support changing of kafka partitions, or otherwise re-creating the low-level
+          // realtime segments for any other reason.
+          throw new RuntimeException("Low-level segments already exist for table " + tableConfig.getTableType());
+        }
       }
-
-      LinkedHashMap<String, Integer> states = new LinkedHashMap<>(2);
-      states.put("OFFLINE", 0);
-      states.put("ONLINE", nReplicas);
-
-      AutoRebalanceStrategy strategy = new AutoRebalanceStrategy(resourceName, partitions, states);
-      znRecord = strategy.computePartitionAssignment(instanceNames, new HashMap<String, Map<String, String>>(0), instanceNames);
-      znRecord.setMapFields(new HashMap<String, Map<String, String>>(0));
     }
-    */
-
-    // Allocate kafka partitions across server instances.
-    ZNRecord znRecord = generatePartitionAssignment(topicName, nPartitions, instanceNames, nReplicas);
-    writeKafkaPartitionAssignemnt(realtimeTableName, znRecord);
-    setupInitialSegments(realtimeTableName, znRecord, topicName, initialOffset, bootstrapHosts, idealState, create,
-        nReplicas, flushSize);
+    IdealState idealState = setupTable(tableConfig, emptyIdealState, partitionCount);
+    setTableIdealState(tableConfig.getTableName(), idealState);
   }
 
   // Remove all trace of LLC for this table.
   public void cleanupLLC(final String realtimeTableName) {
     // Start by removing the kafka partition assigment znode. This will prevent any new segments being created.
     ZKMetadataProvider.removeKafkaPartitionAssignmentFromPropertyStore(_propertyStore, realtimeTableName);
-    LOGGER.info("Removed Kafka partition assignemnt (if any) record for {}", realtimeTableName);
+    LOGGER.info("Removed Kafka partition assignment (if any) record for {}", realtimeTableName);
     // If there are any completions in the pipeline we let them commit.
     Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
 
@@ -224,186 +263,6 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager.deleteSegments(realtimeTableName, segmentsToRemove);
   }
 
-  protected void writeKafkaPartitionAssignemnt(final String realtimeTableName, ZNRecord znRecord) {
-    final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
-    _propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
-  }
-
-  public ZNRecord getKafkaPartitionAssignment(final String realtimeTableName) {
-    final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
-    return _propertyStore.get(path, null, AccessOption.PERSISTENT);
-  }
-
-  protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, String topicName, String
-      initialOffset, String bootstrapHosts, IdealState idealState, boolean create, int nReplicas, int flushSize) {
-    List<String> currentSegments = getExistingSegments(realtimeTableName);
-    // Make sure that there are no low-level segments existing.
-    if (currentSegments != null) {
-      for (String segment : currentSegments) {
-        if (!SegmentName.isHighLevelConsumerSegmentName(segment)) {
-          // For now, we don't support changing of kafka partitions, or otherwise re-creating the low-level
-          // realtime segments for any other reason.
-          throw new RuntimeException("Low-level segments already exist for table " + realtimeTableName);
-        }
-      }
-    }
-    // Map of segment names to the server-instances that hold the segment.
-    final Map<String, List<String>> idealStateEntries = new HashMap<String, List<String>>(4);
-    final Map<String, List<String>> partitionToServersMap = partitionAssignment.getListFields();
-    final int nPartitions = partitionToServersMap.size();
-
-    // Create one segment entry in PROPERTYSTORE for each kafka partition.
-    // Any of these may already be there, so bail out clean if they are already present.
-    final long now = System.currentTimeMillis();
-    final int seqNum = STARTING_SEQUENCE_NUMBER;
-
-    List<LLCRealtimeSegmentZKMetadata> segmentZKMetadatas = new ArrayList<>();
-
-    // Create metadata for each segment
-    for (int i = 0; i < nPartitions; i++) {
-      final List<String> instances = partitionToServersMap.get(Integer.toString(i));
-      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-      final String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-      LLCSegmentName llcSegmentName = new LLCSegmentName(rawTableName, i, seqNum, now);
-      final String segName = llcSegmentName.getSegmentName();
-
-      metadata.setCreationTime(now);
-
-      final long startOffset = getPartitionOffset(topicName, bootstrapHosts, initialOffset, i);
-      LOGGER.info("Setting start offset for segment {} to {}", segName, startOffset);
-      metadata.setStartOffset(startOffset);
-      metadata.setEndOffset(END_OFFSET_FOR_CONSUMING_SEGMENTS);
-
-      metadata.setNumReplicas(instances.size());
-      metadata.setTableName(rawTableName);
-      metadata.setSegmentName(segName);
-      metadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
-
-      segmentZKMetadatas.add(metadata);
-      idealStateEntries.put(segName, instances);
-    }
-
-    // Compute the number of rows for each segment
-    for (LLCRealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadatas) {
-      updateFlushThresholdForSegmentMetadata(segmentZKMetadata, partitionAssignment, flushSize);
-    }
-
-    // Write metadata for each segment to the Helix property store
-    List<String> paths = new ArrayList<>(nPartitions);
-    List<ZNRecord> records = new ArrayList<>(nPartitions);
-    for (LLCRealtimeSegmentZKMetadata segmentZKMetadata : segmentZKMetadatas) {
-      ZNRecord record = segmentZKMetadata.toZNRecord();
-      final String znodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName,
-          segmentZKMetadata.getSegmentName());
-      paths.add(znodePath);
-      records.add(record);
-    }
-
-    writeSegmentsToPropertyStore(paths, records, realtimeTableName);
-    LOGGER.info("Added {} segments to propertyStore for table {}", paths.size(), realtimeTableName);
-
-    updateHelixIdealState(idealState, realtimeTableName, idealStateEntries, create, nReplicas);
-  }
-
-  void updateFlushThresholdForSegmentMetadata(LLCRealtimeSegmentZKMetadata segmentZKMetadata,
-      ZNRecord partitionAssignment, int tableFlushSize) {
-    // Only update the flush threshold if there is a valid table flush size
-    if (tableFlushSize < 1) {
-      return;
-    }
-
-    // Gather list of instances for this partition
-    Object2IntMap<String> partitionCountForInstance = new Object2IntLinkedOpenHashMap<>();
-    String segmentPartitionId = new LLCSegmentName(segmentZKMetadata.getSegmentName()).getPartitionRange();
-    for (String instanceName : partitionAssignment.getListField(segmentPartitionId)) {
-      partitionCountForInstance.put(instanceName, 0);
-    }
-
-    // Find the maximum number of partitions served for each instance that is serving this segment
-    int maxPartitionCountPerInstance = 1;
-    for (Map.Entry<String, List<String>> partitionAndInstanceList : partitionAssignment.getListFields().entrySet()) {
-      for (String instance : partitionAndInstanceList.getValue()) {
-        if (partitionCountForInstance.containsKey(instance)) {
-          int partitionCountForThisInstance = partitionCountForInstance.getInt(instance);
-          partitionCountForThisInstance++;
-          partitionCountForInstance.put(instance, partitionCountForThisInstance);
-
-          if (maxPartitionCountPerInstance < partitionCountForThisInstance) {
-            maxPartitionCountPerInstance = partitionCountForThisInstance;
-          }
-        }
-      }
-    }
-
-    // Configure the segment size flush limit based on the maximum number of partitions allocated to a replica
-    int segmentFlushSize = (int) (((float) tableFlushSize) / maxPartitionCountPerInstance);
-    segmentZKMetadata.setSizeThresholdToFlushSegment(segmentFlushSize);
-  }
-
-  // Update the helix idealstate when a new table is added.
-  protected void updateHelixIdealState(final IdealState idealState, String realtimeTableName, final Map<String, List<String>> idealStateEntries,
-      boolean create, final int nReplicas) {
-    if (create) {
-      addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
-      _helixAdmin.addResource(_clusterName, realtimeTableName, idealState);
-    } else {
-      try {
-        HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
-          @Override
-          public IdealState apply(IdealState idealState) {
-            idealState.setReplicas(Integer.toString(nReplicas));
-            return addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
-          }
-        }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
-      } catch (Exception e) {
-        LOGGER.error("Failed to update idealstate for table {} entries {}", realtimeTableName, idealStateEntries, e);
-        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
-        throw e;
-      }
-    }
-  }
-
-  // Update the helix state when an old segment commits and a new one is to be started.
-  protected void updateHelixIdealState(final String realtimeTableName, final List<String> newInstances,
-      final String oldSegmentNameStr, final String newSegmentNameStr) {
-    try {
-      HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
-        @Override
-        public IdealState apply(IdealState idealState) {
-          return updateForNewRealtimeSegment(idealState, newInstances, oldSegmentNameStr, newSegmentNameStr);
-        }
-      }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
-    } catch (Exception e) {
-      LOGGER.error("Failed to update idealstate for table {}, old segment {}, new segment {}, newInstances {}",
-          realtimeTableName, oldSegmentNameStr, newSegmentNameStr, newInstances, e);
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
-      throw e;
-    }
-  }
-
-  protected static IdealState updateForNewRealtimeSegment(IdealState idealState,
-      final List<String> newInstances, final String oldSegmentNameStr, final String newSegmentNameStr) {
-    if (oldSegmentNameStr != null) {
-      // Update the old ones to be ONLINE
-      Set<String>  oldInstances = idealState.getInstanceSet(oldSegmentNameStr);
-      for (String instance : oldInstances) {
-        idealState.setPartitionState(oldSegmentNameStr, instance, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
-      }
-    }
-
-    // We may have (for whatever reason) a different instance list in the idealstate for the new segment.
-    // If so, clear it, and then set the instance state for the set of instances that we know should be there.
-    Map<String, String> stateMap = idealState.getInstanceStateMap(newSegmentNameStr);
-    if (stateMap != null) {
-      stateMap.clear();
-    }
-    for (String instance : newInstances) {
-      idealState.setPartitionState(newSegmentNameStr, instance, PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
-    }
-
-    return idealState;
-  }
-
   private IdealState addLLCRealtimeSegmentsInIdealState(final IdealState idealState, Map<String, List<String>> idealStateEntries) {
     for (Map.Entry<String, List<String>> entry : idealStateEntries.entrySet()) {
       final String segmentId = entry.getKey();
@@ -419,15 +278,71 @@ public class PinotLLCRealtimeSegmentManager {
     return idealState;
   }
 
+  private SegmentPartitionMetadata getPartitionMetadataFromTableConfig(String tableName, int numPartitions, int partitionId) {
+    Map<String, ColumnPartitionMetadata> partitionMetadataMap = new HashMap<>();
+    if (_propertyStore == null) {
+      return null;
+    }
+    TableConfig tableConfig = getRealtimeTableConfig(tableName);
+    SegmentPartitionMetadata partitionMetadata = null;
+    SegmentPartitionConfig partitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    if (partitionConfig != null && partitionConfig.getColumnPartitionMap() != null
+        && partitionConfig.getColumnPartitionMap().size() > 0) {
+      Map<String, ColumnPartitionConfig> columnPartitionMap = partitionConfig.getColumnPartitionMap();
+      for (Map.Entry<String, ColumnPartitionConfig> entry : columnPartitionMap.entrySet()) {
+        String column = entry.getKey();
+        ColumnPartitionConfig columnPartitionConfig = entry.getValue();
+        partitionMetadataMap.put(column, new ColumnPartitionMetadata(columnPartitionConfig.getFunctionName(),
+            numPartitions, Collections.singletonList(new IntRange(partitionId))));
+      }
+      partitionMetadata = new SegmentPartitionMetadata(partitionMetadataMap);
+    }
+    return partitionMetadata;
+  }
+
+  /**
+   * Given a segment metadata, build the finalized version of segment partition metadata. This partition metadata will
+   * be written as a part of SegmentZKMetadata.
+   * @param segmentMetadata Segment metadata
+   * @return
+   */
+  private SegmentPartitionMetadata getPartitionMetadataFromSegmentMetadata(SegmentMetadataImpl segmentMetadata) {
+    Map<String, ColumnPartitionMetadata> partitionMetadataMap = new HashMap<>();
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String columnName = entry.getKey();
+      ColumnMetadata columnMetadata = entry.getValue();
+      // Check if the column metadata contains the partition information
+      if (columnMetadata.getPartitionFunction() != null && columnMetadata.getPartitionRanges() != null) {
+        partitionMetadataMap.put(columnName,
+            new ColumnPartitionMetadata(columnMetadata.getPartitionFunction().toString(),
+                columnMetadata.getNumPartitions(), columnMetadata.getPartitionRanges()));
+      }
+    }
+    return new SegmentPartitionMetadata(partitionMetadataMap);
+  }
+
   protected List<String> getExistingSegments(String realtimeTableName) {
     String propStorePath = ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName);
     return  _propertyStore.getChildNames(propStorePath, AccessOption.PERSISTENT);
   }
 
-  protected List<ZNRecord> getExistingSegmentMetadata(String realtimeTableName) {
-    String propStorePath = ZKMetadataProvider.constructPropertyStorePathForResource(realtimeTableName);
-    return _propertyStore.getChildren(propStorePath, null, 0);
+  protected boolean writeSegmentToPropertyStore(String znodePath, ZNRecord znRecord, final String realtimeTableName,
+      int expectedVersion) {
+    boolean success = _propertyStore.set(znodePath, znRecord, expectedVersion, AccessOption.PERSISTENT);
+    if (!success) {
+      LOGGER.error("Failed to write segment to property store at {} for table {}. Expected zookeeper version number: {}",
+          znodePath, realtimeTableName, expectedVersion);
+      return false;
+    }
+    return success;
+  }
 
+  protected boolean writeSegmentToPropertyStore(String znodePath, ZNRecord znRecord, final String realtimeTableName) {
+    boolean success = _propertyStore.set(znodePath, znRecord, AccessOption.PERSISTENT);
+    if (!success) {
+      LOGGER.error("Failed to write segment to property store at {} for table {}.", znodePath, realtimeTableName);
+    }
+    return success;
   }
 
   protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records, final String realtimeTableName) {
@@ -435,17 +350,56 @@ public class PinotLLCRealtimeSegmentManager {
       _propertyStore.setChildren(paths, records, AccessOption.PERSISTENT);
     } catch (Exception e) {
       LOGGER.error("Failed to update idealstate for table {} for paths {}", realtimeTableName, paths, e);
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1);
       throw e;
     }
   }
 
-  protected List<String> getAllRealtimeTables() {
-    return _helixResourceManager.getAllRealtimeTables();
-  }
-
   protected IdealState getTableIdealState(String realtimeTableName) {
     return HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
+  }
+
+  protected void setTableIdealState(String realtimeTableName, IdealState idealState) {
+    _helixAdmin.setResourceIdealState(_clusterName, realtimeTableName, idealState);
+  }
+
+  public boolean commitSegmentFile(String tableName, String segmentLocation, String segmentName) {
+    File segmentFile = convertURIToSegmentLocation(segmentLocation);
+
+    File baseDir = new File(_controllerConf.getDataDir());
+    File tableDir = new File(baseDir, tableName);
+    File fileToMoveTo = new File(tableDir, segmentName);
+
+    if (!isConnected() || !isLeader()) {
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing segment file {}, {} for table {}: isLeader={}, isConnected={}",
+          segmentName, segmentLocation, tableName, isLeader(), isConnected());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
+      return false;
+    }
+
+    try {
+      com.linkedin.pinot.common.utils.FileUtils.moveFileWithOverwrite(segmentFile, fileToMoveTo);
+    } catch (Exception e) {
+      LOGGER.error("Could not move {} to {}", segmentFile, segmentName, e);
+      return false;
+    }
+    for (File file : tableDir.listFiles()) {
+      if (file.getName().startsWith(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
+        LOGGER.warn("Deleting " + file);
+        FileUtils.deleteQuietly(file);
+      }
+    }
+    return true;
+  }
+
+  private static File convertURIToSegmentLocation(String segmentLocation) {
+    try {
+      URI uri = new URI(segmentLocation);
+      return new File(uri.getPath());
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("Could not convert URI " + segmentLocation + " to segment location", e);
+    }
   }
 
   /**
@@ -456,19 +410,114 @@ public class PinotLLCRealtimeSegmentManager {
    * @param rawTableName Raw table name
    * @param committingSegmentNameStr Committing segment name
    * @param nextOffset The offset with which the next segment should start.
+   * @param memoryUsedBytes The memory used by committing segment
+   * @return boolean
+   */
+  public boolean commitSegmentMetadata(String rawTableName, final String committingSegmentNameStr, long nextOffset,
+      long memoryUsedBytes) {
+    final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+    TableConfig tableConfig = getRealtimeTableConfig(realtimeTableName);
+    if (tableConfig == null) {
+      LOGGER.warn("Did not find table config for table {}", realtimeTableName);
+      return false;
+    }
+
+    /*
+     * Update zookeeper in 3 steps.
+     *
+     * Step 1: Update PROPERTYSTORE to change the old segment metadata status to DONE
+     * Step 2: Update PROPERTYSTORE to create the new segment metadata with status IN_PROGRESS
+     * Step 3: Update IDEALSTATES to include new segment in CONSUMING state, and change old segment to ONLINE state.
+     */
+
+    final LLCSegmentName committingLLCSegmentName = new LLCSegmentName(committingSegmentNameStr);
+    final int partitionId = committingLLCSegmentName.getPartitionId();
+    final int newSeqNum = committingLLCSegmentName.getSequenceNumber() + 1;
+    final long now = System.currentTimeMillis();
+    LLCSegmentName newLLCSegmentName = new LLCSegmentName(committingLLCSegmentName.getTableName(), partitionId, newSeqNum, now);
+    String newSegmentNameStr = newLLCSegmentName.getSegmentName();
+
+    IdealState idealState = getTableIdealState(realtimeTableName);
+    Preconditions.checkState(idealState.getInstanceStateMap(committingSegmentNameStr)
+        .containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE));
+    int numPartitions = _partitionAssignmentGenerator.getNumPartitionsFromIdealState(idealState);
+
+    PartitionAssignment partitionAssignment;
+    try {
+      partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, numPartitions);
+    } catch (InvalidConfigException e) {
+      LOGGER.error("Exception when generating partition assignment for table {} and numPartitions {}",
+          realtimeTableName, numPartitions, e);
+      return false;
+    }
+
+    // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be creating a new segment
+    if (partitionAssignment == null) {
+      LOGGER.warn("Kafka partition assignment not found for {}", realtimeTableName);
+      throw new RuntimeException("Kafka partition assignment not found. Not committing segment");
+    }
+
+    // Step-1
+    boolean success = updateOldSegmentMetadataZNRecord(realtimeTableName, committingLLCSegmentName, nextOffset);
+    if (!success) {
+      return false;
+    }
+
+    // Step-2
+    success = createNewSegmentMetadataZNRecord(tableConfig, newLLCSegmentName, nextOffset, partitionAssignment);
+    if (!success) {
+      return false;
+    }
+
+    // Step-3
+    // TODO Introduce a controller failure here for integration testing
+
+    // When multiple segments of the same table complete around the same time it is possible that
+    // the idealstate udpate fails due to contention. We serialize the updates to the idealstate
+    // to reduce this contention. We may still contend with RetentionManager, or other updates
+    // to idealstate from other controllers, but then we have the retry mechanism to get around that.
+    // hash code can be negative, so make sure we are getting a positive lock index
+    int lockIndex = (realtimeTableName.hashCode() & Integer.MAX_VALUE) % NUM_LOCKS;
+    Lock lock = _idealstateUpdateLocks[lockIndex];
+    try {
+      lock.lock();
+      updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentNameStr, newSegmentNameStr, partitionAssignment);
+      LOGGER.info("Changed {} to ONLINE and created {} in CONSUMING", committingSegmentNameStr, newSegmentNameStr);
+    } finally {
+      lock.unlock();
+    }
+
+    // Trigger the metadata event notifier
+    notifyOnSegmentFlush(realtimeTableName);
+
+    return true;
+  }
+
+  /**
+   * Update segment metadata of committing segment
+   * @param realtimeTableName - table name for which segment is being committed
+   * @param committingLLCSegmentName - name of the segment being committed
+   * @param nextOffset - the end offset for this committing segment
    * @return
    */
-  public boolean commitSegment(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
-    final long now = System.currentTimeMillis();
-    final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(rawTableName);
+  protected boolean updateOldSegmentMetadataZNRecord(String realtimeTableName, LLCSegmentName committingLLCSegmentName,
+      long nextOffset) {
 
+    Stat stat = new Stat();
+    String committingSegmentNameStr = committingLLCSegmentName.getSegmentName();
     final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
-        committingSegmentNameStr);
-    final LLCSegmentName oldSegmentName = new LLCSegmentName(committingSegmentNameStr);
-    final int partitionId = oldSegmentName.getPartitionId();
-    final int oldSeqNum = oldSegmentName.getSequenceNumber();
+        committingSegmentNameStr, stat);
+
+    if (oldSegMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+      LOGGER.warn("Status of segment metadata {} has already been changed by other controller for table {}: Status={}",
+          committingSegmentNameStr, realtimeTableName, oldSegMetadata.getStatus());
+      return false;
+    }
+
+    // TODO: set number of rows to end consumption in new segment metadata, based on memory used and number of rows from old segment
     oldSegMetadata.setEndOffset(nextOffset);
     oldSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     oldSegMetadata.setDownloadUrl(
         ControllerConf.constructDownloadUrl(rawTableName, committingSegmentNameStr, _controllerConf.generateVipUrl()));
     // Pull segment metadata from incoming segment and set it in zk segment metadata
@@ -479,285 +528,195 @@ public class PinotLLCRealtimeSegmentManager {
     oldSegMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
     oldSegMetadata.setIndexVersion(segmentMetadata.getVersion());
     oldSegMetadata.setTotalRawDocs(segmentMetadata.getTotalRawDocs());
+    oldSegMetadata.setPartitionMetadata(getPartitionMetadataFromSegmentMetadata(segmentMetadata));
 
     final ZNRecord oldZnRecord = oldSegMetadata.toZNRecord();
     final String oldZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, committingSegmentNameStr);
 
-    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
-    // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be
-    // creating a new segment
-    if (partitionAssignment == null) {
-      LOGGER.warn("Kafka partition assignment not found for {}", realtimeTableName);
-      throw new RuntimeException("Kafka partition assigment not found. Not committing segment");
+    if (!isConnected() || !isLeader()) {
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing segment metadata for {} for table {}: isLeader={}, isConnected={}",
+          committingSegmentNameStr, realtimeTableName, isLeader(), isConnected());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
+      return false;
     }
-    List<String> newInstances = partitionAssignment.getListField(Integer.toString(partitionId));
-
-    // Construct segment metadata and idealstate for the new segment
-    final int newSeqNum = oldSeqNum + 1;
-    final long newStartOffset = nextOffset;
-    LLCSegmentName newHolder = new LLCSegmentName(oldSegmentName.getTableName(), partitionId, newSeqNum, now);
-    final String newSegmentNameStr = newHolder.getSegmentName();
-
-    ZNRecord newZnRecord =
-        makeZnRecordForNewSegment(rawTableName, newInstances.size(), newStartOffset, newSegmentNameStr);
-    final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
-    updateFlushThresholdForSegmentMetadata(newSegmentZKMetadata, partitionAssignment,
-        getRealtimeTableFlushSizeForTable(rawTableName));
-    newZnRecord = newSegmentZKMetadata.toZNRecord();
-
-    final String newZnodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
-
-    List<String> paths = new ArrayList<>(2);
-    paths.add(oldZnodePath);
-    paths.add(newZnodePath);
-    List<ZNRecord> records = new ArrayList<>(2);
-    records.add(oldZnRecord);
-    records.add(newZnRecord);
-    /*
-     * Update zookeeper in two steps.
-     *
-     * Step 1: Update PROPERTYSTORE to change the segment metadata for old segment and add a new one for new segment
-     * Step 2: Update IDEALSTATES to include the new segment in the idealstate for the table in CONSUMING state, and change
-     *         the old segment to ONLINE state.
-     *
-     * The controller may fail between these two steps, so when a new controller takes over as leader, it needs to
-     * check whether there are any recent segments in PROPERTYSTORE that are not accounted for in idealState. If so,
-     * it should create the new segments in idealState.
-     *
-     * If the controller fails after step-2, we are fine because the idealState has the new segments.
-     * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
-     */
-    writeSegmentsToPropertyStore(paths, records, realtimeTableName);
-
-    // TODO Introduce a controller failure here for integration testing
-
-    updateHelixIdealState(realtimeTableName, newInstances, committingSegmentNameStr, newSegmentNameStr);
-    return true;
-  }
-
-  protected int getRealtimeTableFlushSizeForTable(String tableName) {
-    AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
-    return getRealtimeTableFlushSize(tableConfig);
-  }
-
-  public static int getRealtimeTableFlushSize(AbstractTableConfig tableConfig) {
-    final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
-    if (streamConfigs != null && streamConfigs.containsKey(
-        CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE)) {
-      final String flushSizeStr =
-          streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE);
-      try {
-        return Integer.parseInt(flushSizeStr);
-      } catch (Exception e) {
-        LOGGER.warn("Failed to parse flush size of {}", flushSizeStr, e);
-        return -1;
-      }
+    boolean success = writeSegmentToPropertyStore(oldZnodePath, oldZnRecord, realtimeTableName, stat.getVersion());
+    if (!success) {
+      LOGGER.warn("Fail to write old segment to property store for {} for table {}: isLeader={}, isConnected={}",
+          committingSegmentNameStr, realtimeTableName, isLeader(), isConnected());
     }
-
-    return -1;
+    return success;
   }
 
   /**
-   * Extract the segment metadata file from the tar-zipped segment file that is expected to be in the
-   * directory for the table.
-   * Segment tar-zipped file path: DATADIR/rawTableName/segmentName
-   * We extract the metadata into a file into a file in the same level,as in: DATADIR/rawTableName/segmentName.metadata
+   * Creates segment metadata for next sequence number from the segment just committed
+   * @param realtimeTableConfig - table config of the segment for which new metadata is being created
+   * @param newLLCSegmentName - new segment name
+   * @param nextOffset - start offset for new segment
+   * @param partitionAssignment - stream partition assignment for this table
+   * @return
+   */
+  protected boolean createNewSegmentMetadataZNRecord(TableConfig realtimeTableConfig, LLCSegmentName newLLCSegmentName,
+      long nextOffset, PartitionAssignment partitionAssignment) {
+
+    String realtimeTableName = realtimeTableConfig.getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+    int partitionId = newLLCSegmentName.getPartitionId();
+    int numReplicas = partitionAssignment.getInstancesListForPartition(String.valueOf(partitionId)).size();
+    ZNRecord newZnRecord = makeZnRecordForNewSegment(rawTableName, numReplicas, nextOffset, newLLCSegmentName,
+        partitionAssignment.getNumPartitions());
+    final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
+
+    FlushThresholdUpdater flushThresholdUpdater = getFlushThresholdUpdater(realtimeTableConfig);
+    flushThresholdUpdater.updateFlushThreshold(newSegmentZKMetadata, partitionAssignment);
+
+    newZnRecord = newSegmentZKMetadata.toZNRecord();
+
+    final String newSegmentNameStr = newLLCSegmentName.getSegmentName();
+    final String newZnodePath =
+        ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
+
+    if (!isConnected() || !isLeader()) {
+      // We can potentially log a different value than what we saw ....
+      LOGGER.warn("Lost leadership while committing new segment metadata for {} for table {}: isLeader={}, isConnected={}",
+          newSegmentNameStr, rawTableName, isLeader(), isConnected());
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
+      return false;
+    }
+
+    boolean success = writeSegmentToPropertyStore(newZnodePath, newZnRecord, realtimeTableName);
+    if (!success) {
+      LOGGER.warn("Fail to write new segment to property store for {} for table {}: isLeader={}, isConnected={}",
+          newSegmentNameStr, rawTableName, isLeader(), isConnected());
+    }
+    return success;
+  }
+
+  protected FlushThresholdUpdater getFlushThresholdUpdater(TableConfig realtimeTableConfig) {
+    return FlushThresholdUpdaterFactory.getFlushThresholdUpdater(realtimeTableConfig);
+  }
+
+  /**
+   * Helper function to return cached table config.
+   *
+   * @param tableName name of the table
+   * @return table configuration that reflects the most recent version
+   */
+  protected TableConfig getRealtimeTableConfig(String tableName) {
+    TableConfig tableConfig;
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    try {
+      tableConfig = _tableConfigCache.getTableConfig(tableNameWithType);
+    } catch (ExecutionException e) {
+      LOGGER.warn("Exception happened while loading the table config ({}) from the property store to the cache.",
+          tableNameWithType, e);
+      return null;
+    }
+    return tableConfig;
+  }
+
+
+  public long getCommitTimeoutMS(String tableName) {
+    long commitTimeoutMS = SegmentCompletionProtocol.getMaxSegmentCommitTimeMs();
+    if (_propertyStore == null) {
+      return commitTimeoutMS;
+    }
+    TableConfig tableConfig = getRealtimeTableConfig(tableName);
+    final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
+    if (streamConfigs != null && streamConfigs.containsKey(
+        CommonConstants.Helix.DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
+      final String commitTimeoutSecondsStr =
+          streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS);
+      try {
+        return TimeUnit.MILLISECONDS.convert(Integer.parseInt(commitTimeoutSecondsStr), TimeUnit.SECONDS);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to parse flush size of {}", commitTimeoutSecondsStr, e);
+        return commitTimeoutMS;
+      }
+    }
+    return commitTimeoutMS;
+  }
+
+  /**
+   * Extract the segment metadata files from the tar-zipped segment file that is expected to be in the directory for the
+   * table.
+   * <p>Segment tar-zipped file path: DATADIR/rawTableName/segmentName.
+   * <p>We extract the metadata.properties and creation.meta into a temporary metadata directory:
+   * DATADIR/rawTableName/segmentName.metadata.tmp, and load metadata from there.
+   *
    * @param rawTableName Name of the table (not including the REALTIME extension)
    * @param segmentNameStr Name of the segment
    * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
    */
   protected SegmentMetadataImpl extractSegmentMetadata(final String rawTableName, final String segmentNameStr) {
-    final String baseDir = StringUtil.join("/", _controllerConf.getDataDir(), rawTableName);
-    final String segFileName = StringUtil.join("/", baseDir, segmentNameStr);
-    final File segFile = new File(segFileName);
-    SegmentMetadataImpl segmentMetadata;
-    Path metadataPath = null;
+    String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), rawTableName);
+    String segFileStr = StringUtil.join("/", baseDirStr, segmentNameStr);
+    String tempMetadataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
+    File tempMetadataDir = new File(tempMetadataDirStr);
+
     try {
-      InputStream is = TarGzCompressionUtils
-          .unTarOneFile(new FileInputStream(segFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      metadataPath = FileSystems.getDefault().getPath(baseDir, segmentNameStr + ".metadata");
-      Files.copy(is, metadataPath);
-      segmentMetadata = new SegmentMetadataImpl(new File(metadataPath.toString()));
+      Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
+
+      // Extract metadata.properties
+      InputStream metadataPropertiesInputStream =
+          TarGzCompressionUtils.unTarOneFile(new FileInputStream(new File(segFileStr)),
+              V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
+          V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      Path metadataPropertiesPath =
+          FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
+
+      // Extract creation.meta
+      InputStream creationMetaInputStream =
+          TarGzCompressionUtils.unTarOneFile(new FileInputStream(new File(segFileStr)),
+              V1Constants.SEGMENT_CREATION_META);
+      Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
+      Path creationMetaPath = FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META);
+      Files.copy(creationMetaInputStream, creationMetaPath);
+
+      // Load segment metadata
+      return new SegmentMetadataImpl(tempMetadataDir);
     } catch (Exception e) {
-      throw new RuntimeException("Exception extacting and reading segment metadata for " + segmentNameStr, e);
+      throw new RuntimeException("Exception extracting and reading segment metadata for " + segmentNameStr, e);
     } finally {
-      if (metadataPath != null) {
-        FileUtils.deleteQuietly(new File(metadataPath.toString()));
-      }
-    }
-    return segmentMetadata;
-  }
-
-  public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
-    return new LLCRealtimeSegmentZKMetadata(_propertyStore.get(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName), null, AccessOption.PERSISTENT));
-  }
-
-  private void completeCommittingSegments() {
-    for (String realtimeTableName : getAllRealtimeTables()) {
-      completeCommittingSegments(realtimeTableName);
+      FileUtils.deleteQuietly(tempMetadataDir);
     }
   }
 
-  protected void completeCommittingSegments(String realtimeTableName) {
-    IdealState idealState = getTableIdealState(realtimeTableName);
-    Set<String> segmentNamesIS = idealState.getPartitionSet();
-    List<ZNRecord> segmentMetadataList = getExistingSegmentMetadata(realtimeTableName);
-    if (segmentMetadataList == null || segmentMetadataList.isEmpty()) {
-      return;
+  public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName, Stat stat) {
+    ZNRecord znRecord = _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName), stat, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      LOGGER.error("Segment metadata not found for table {}, segment {}. (can happen during table drop)", realtimeTableName, segmentName);
+      throw new RuntimeException("Segment metadata not found for table " + realtimeTableName + " segment " + segmentName);
     }
-    final List<LLCSegmentName> segmentNames = new ArrayList<>(segmentMetadataList.size());
-
-    for (ZNRecord segment : segmentMetadataList) {
-      if (SegmentName.isLowLevelConsumerSegmentName(segment.getId())) {
-        segmentNames.add(new LLCSegmentName(segment.getId()));
-      }
-    }
-
-    if (segmentNames.isEmpty()) {
-      return;
-    }
-
-    Collections.sort(segmentNames, Collections.reverseOrder());
-
-    int curPartition = segmentNames.get(0).getPartitionId();  // Current kafka partition we are working on.
-    final int nSegments = segmentNames.size();
-
-    /*
-     * We only need to look at the most recent segment in the kafka partition. If that segment is also present
-     * in the idealstate, we are good.
-     * Otherwise, we need to add that segment to the idealstate:
-     * - We find the current instance assignment for that partition and update idealstate accordingly.
-     * NOTE: It may be that the kafka assignment of instances has changed for this partition. In that case,
-     * we need to also modify the numPartitions field in the segment metadata.
-     * TODO Modify numPartitions field in segment metadata and re-write it in propertystore.
-     * The numPartitions field in the metadata is used by SegmentCompletionManager
-     */
-    for (int i = 0; i < nSegments; i++) {
-      final LLCSegmentName segmentName = segmentNames.get(i);
-      if (segmentName.getPartitionId() == curPartition) {
-        final String curSegmentNameStr = segmentName.getSegmentName();
-        if (!segmentNamesIS.contains(curSegmentNameStr)) {
-          LOGGER.info("{}:Repairing segment for partition {}. Segment {} not found in idealstate", realtimeTableName, curPartition,
-              curSegmentNameStr);
-
-          final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
-          List<String> newInstances = partitionAssignment.getListField(Integer.toString(curPartition));
-          LOGGER.info("{}: Assigning segment {} to {}", realtimeTableName, curSegmentNameStr, newInstances);
-          // TODO Re-write num-partitions in metadata if needed.
-
-          String prevSegmentNameStr = null;
-          // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
-          if (i < nSegments-1) {
-            LLCSegmentName prevSegmentName = segmentNames.get(i+1);
-            if (prevSegmentName.getPartitionId() == segmentName.getPartitionId()) {
-              prevSegmentNameStr = prevSegmentName.getSegmentName();
-            }
-          }
-          updateHelixIdealState(realtimeTableName, newInstances, prevSegmentNameStr, curSegmentNameStr);
-          // Skip all other segments in this partition.
-        }
-        curPartition--;
-      }
-      if (curPartition < 0) {
-        break;
-      }
-    }
+    return new LLCRealtimeSegmentZKMetadata(znRecord);
   }
 
-  protected long getKafkaPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria,
+  protected long getKafkaPartitionOffset(StreamMetadata streamMetadata, final String offsetCriteria,
       int partitionId) {
-    final String topicName = kafkaStreamMetadata.getKafkaTopicName();
-    final String bootstrapHosts = kafkaStreamMetadata.getBootstrapHosts();
-
-    return getPartitionOffset(topicName, bootstrapHosts, offsetCriteria, partitionId);
+    return getPartitionOffset(offsetCriteria, partitionId, streamMetadata);
   }
 
-  private long getPartitionOffset(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
-    SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(
-        new KafkaSimpleConsumerFactoryImpl(), bootstrapHosts, "dummyClientId", topicName, partitionId,
-        KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
-    final long startOffset;
+  private long getPartitionOffset(final String offsetCriteria, int partitionId,
+      StreamMetadata streamMetadata) {
+    KafkaOffsetFetcher kafkaOffsetFetcher = new KafkaOffsetFetcher(offsetCriteria, partitionId, streamMetadata);
     try {
-      startOffset = kafkaConsumer.fetchPartitionOffset(offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
-    } catch (TimeoutException e) {
-      LOGGER.warn("Timed out when fetching partition offsets for topic {} partition {}", topicName, partitionId);
-      throw new RuntimeException(e);
-    } finally {
-      IOUtils.closeQuietly(kafkaConsumer);
-    }
-    return startOffset;
-  }
-
-  /**
-   * Create a consuming segment for the kafka partitions that are missing one.
-   *
-   * @param realtimeTableName is the name of the realtime table (e.g. "table_REALTIME")
-   * @param nonConsumingPartitions is a set of integers (kafka partitions that do not have a consuming segment)
-   * @param llcSegments is a list of segment names in the ideal state as was observed last.
-   */
-  public void createConsumingSegment(final String realtimeTableName, final Set<Integer> nonConsumingPartitions,
-      final List<String> llcSegments, final AbstractTableConfig tableConfig) {
-    final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
-    final HashMap<Integer, LLCSegmentName> ncPartitionToLatestSegment = new HashMap<>(nonConsumingPartitions.size());
-    final int nReplicas = partitionAssignment.getListField("0").size(); // Number of replicas (should be same for all partitions)
-
-    // For each non-consuming partition, find the latest segment (i.e. segment with highest seq number) for that partition.
-    // (null if there is none).
-    for (String segmentId : llcSegments) {
-      LLCSegmentName segmentName = new LLCSegmentName(segmentId);
-      int partitionId = segmentName.getPartitionId();
-      if (nonConsumingPartitions.contains(partitionId)) {
-        LLCSegmentName hashedSegName = ncPartitionToLatestSegment.get(partitionId);
-        if (hashedSegName == null || hashedSegName.getSequenceNumber() < segmentName.getSequenceNumber()) {
-          ncPartitionToLatestSegment.put(partitionId, segmentName);
-        }
-      }
-    }
-
-    // For each non-consuming partition, create a segment with a sequence number one higher than the latest segment.
-    // If there are no segments, then this is the first segment, so create the new segment with sequence number
-    // STARTING_SEQUENCE_NUMBER.
-    // Pick the starting offset of the new segment depending on the end offset of the prev segment (if available
-    // and completed), or the table configuration (smallest/largest).
-    for (int partition : nonConsumingPartitions) {
-      try {
-        LLCSegmentName latestSegment = ncPartitionToLatestSegment.get(partition);
-        long startOffset;
-        int nextSeqNum;
-        List<String> instances = partitionAssignment.getListField(Integer.toString(partition));
-        if (latestSegment == null) {
-          // No segment yet in partition, Create a new one with a starting offset as per table config specification.
-          nextSeqNum = STARTING_SEQUENCE_NUMBER;
-          LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, partition,
-              nextSeqNum);
-          String consumerStartOffsetSpec = kafkaStreamMetadata.getKafkaConsumerProperties()
-              .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
-          startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, consumerStartOffsetSpec, partition);
-          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, partition);
-        } else {
-          nextSeqNum = latestSegment.getSequenceNumber() + 1;
-          LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, partition,
-              nextSeqNum);
-          // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
-          // depending on what the prev segment had.
-          startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, "smallest", partition);
-          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, partition);
-          startOffset = getBetterStartOffsetIfNeeded(realtimeTableName, partition, latestSegment, startOffset,
-              nextSeqNum);
-        }
-        createSegment(realtimeTableName, nReplicas, partition, nextSeqNum, instances, startOffset, partitionAssignment);
-      } catch (Exception e) {
-        LOGGER.error("Exception creating CONSUMING segment for {} partition {}", realtimeTableName, partition, e);
-      }
+      RetryPolicies.fixedDelayRetryPolicy(3, 1000L).attempt(kafkaOffsetFetcher);
+      return kafkaOffsetFetcher.getOffset();
+    } catch (Exception e) {
+      Exception fetcherException = kafkaOffsetFetcher.getException();
+      LOGGER.error("Could not get offset for topic {} partition {}, criteria {}",
+          streamMetadata.getKafkaTopicName(), partitionId, offsetCriteria, fetcherException);
+      throw new RuntimeException(fetcherException);
     }
   }
+
 
   private long getBetterStartOffsetIfNeeded(final String realtimeTableName, final int partition,
       final LLCSegmentName latestSegment, final long oldestOffsetInKafka, final int nextSeqNum) {
     final LLCRealtimeSegmentZKMetadata oldSegMetadata =
-        getRealtimeSegmentZKMetadata(realtimeTableName, latestSegment.getSegmentName());
+        getRealtimeSegmentZKMetadata(realtimeTableName, latestSegment.getSegmentName(), null);
     CommonConstants.Segment.Realtime.Status status = oldSegMetadata.getStatus();
     long segmentStartOffset = oldestOffsetInKafka;
     final long prevSegStartOffset = oldSegMetadata.getStartOffset();  // Offset at which the prev segment intended to start consuming
@@ -797,46 +756,24 @@ public class PinotLLCRealtimeSegmentManager {
     return segmentStartOffset;
   }
 
-  private void createSegment(String realtimeTableName, int numReplicas, int partitionId, int seqNum,
-      List<String> serverInstances, long startOffset, ZNRecord partitionAssignment) {
-    LOGGER.info("Attempting to auto-create a segment for partition {} of table {}", partitionId, realtimeTableName);
-    final List<String> propStorePaths = new ArrayList<>(1);
-    final List<ZNRecord> propStoreEntries = new ArrayList<>(1);
-    long now = System.currentTimeMillis();
-    final String tableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-    LLCSegmentName newSegmentName = new LLCSegmentName(tableName, partitionId, seqNum, now);
-    final String newSegmentNameStr = newSegmentName.getSegmentName();
-    ZNRecord newZnRecord = makeZnRecordForNewSegment(realtimeTableName, numReplicas, startOffset,
-        newSegmentNameStr);
-
-    final LLCRealtimeSegmentZKMetadata newSegmentZKMetadata = new LLCRealtimeSegmentZKMetadata(newZnRecord);
-    updateFlushThresholdForSegmentMetadata(newSegmentZKMetadata, partitionAssignment,
-        getRealtimeTableFlushSizeForTable(realtimeTableName));
-    newZnRecord = newSegmentZKMetadata.toZNRecord();
-
-    final String newZnodePath = ZKMetadataProvider
-        .constructPropertyStorePathForSegment(realtimeTableName, newSegmentNameStr);
-    propStorePaths.add(newZnodePath);
-    propStoreEntries.add(newZnRecord);
-
-    writeSegmentsToPropertyStore(propStorePaths, propStoreEntries, realtimeTableName);
-
-    updateHelixIdealState(realtimeTableName, serverInstances, null, newSegmentNameStr);
-
-    LOGGER.info("Successful auto-create of CONSUMING segment {}", newSegmentNameStr);
-    _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_AUTO_CREATED_PARTITIONS, 1);
-  }
-
   private ZNRecord makeZnRecordForNewSegment(String realtimeTableName, int numReplicas, long startOffset,
-      String newSegmentNameStr) {
+      LLCSegmentName newSegmentName, int numPartitions) {
     final LLCRealtimeSegmentZKMetadata newSegMetadata = new LLCRealtimeSegmentZKMetadata();
     newSegMetadata.setCreationTime(System.currentTimeMillis());
     newSegMetadata.setStartOffset(startOffset);
     newSegMetadata.setEndOffset(END_OFFSET_FOR_CONSUMING_SEGMENTS);
     newSegMetadata.setNumReplicas(numReplicas);
     newSegMetadata.setTableName(realtimeTableName);
-    newSegMetadata.setSegmentName(newSegmentNameStr);
+    newSegMetadata.setSegmentName(newSegmentName.getSegmentName());
     newSegMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+
+    // Add the partition metadata if available.
+    SegmentPartitionMetadata partitionMetadata = getPartitionMetadataFromTableConfig(realtimeTableName,
+        numPartitions, newSegmentName.getPartitionId());
+    if (partitionMetadata != null) {
+      newSegMetadata.setPartitionMetadata(partitionMetadata);
+    }
+
     return newSegMetadata.toZNRecord();
   }
 
@@ -845,11 +782,10 @@ public class PinotLLCRealtimeSegmentManager {
    * Mark the state of the segment to be OFFLINE in idealstate.
    * When all replicas of this segment are marked offline, the ValidationManager, in its next
    * run, will auto-create a new segment with the appropriate offset.
-   * See {@link #createConsumingSegment(String, Set, List, AbstractTableConfig)}
-  */
+   */
   public void segmentStoppedConsuming(final LLCSegmentName segmentName, final String instance) {
     String rawTableName = segmentName.getTableName();
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(rawTableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     final String segmentNameStr = segmentName.getSegmentName();
     try {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
@@ -861,126 +797,548 @@ public class PinotLLCRealtimeSegmentManager {
           LOGGER.info("Attempting to mark {} offline. Current map:{}", segmentNameStr, instanceStateMap.toString());
           return idealState;
         }
-      }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
+      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f));
     } catch (Exception e) {
-      LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance, segmentNameStr, e);
-      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+      LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance,
+          segmentNameStr, e);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1);
       throw e;
     }
     LOGGER.info("Successfully marked {} offline for instance {} since it stopped consuming", segmentNameStr, instance);
   }
 
   /**
-   * Update the kafka partitions as necessary to accommodate changes in number of replicas, number of tenants or
-   * number of kafka partitions. As new segments are assigned, they will obey the new kafka partition assignment.
-   *
-   * @param realtimeTableName name of the realtime table
-   * @param tableConfig tableConfig from propertystore
+   * Helper method to trigger metadata event notifier
+   * @param tableName a table name
    */
-  public void updateKafkaPartitionsIfNecessary(String realtimeTableName, AbstractTableConfig tableConfig) {
-    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
-    final Map<String, List<String>> partitionToServersMap = partitionAssignment.getListFields();
-    final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+  private void notifyOnSegmentFlush(String tableName) {
+    final MetadataEventNotifierFactory metadataEventNotifierFactory =
+        MetadataEventNotifierFactory.loadFactory(_controllerConf.subset(METADATA_EVENT_NOTIFIER_PREFIX));
+    final TableConfig tableConfig = getRealtimeTableConfig(tableName);
+    metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
+  }
 
-    final String realtimeServerTenantName =
-        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tableConfig.getTenantConfig().getServer());
-    final List<String> currentInstances = getInstances(realtimeServerTenantName);
+  protected int getKafkaPartitionCount(StreamMetadata streamMetadata) {
+    return PinotTableIdealStateBuilder.getPartitionCount(streamMetadata);
+  }
 
-    // Previous partition count is what we find in the Kafka partition assignment znode.
-    // Get the current partition count from Kafka.
-    final int prevPartitionCount = partitionToServersMap.size();
-    int currentPartitionCount = -1;
-    try {
-      currentPartitionCount = getKafkaPartitionCount(kafkaStreamMetadata);
-    } catch (Exception e) {
-      LOGGER.warn("Could not get partition count for {}. Leaving kafka partition count at {}", realtimeTableName, currentPartitionCount);
-      return;
+  /**
+   * Given a table name, returns a list of metadata for all segments of that table from the property store
+   * @param tableNameWithType
+   * @return
+   */
+  @VisibleForTesting
+  protected List<LLCRealtimeSegmentZKMetadata> getAllSegmentMetadata(String tableNameWithType) {
+    return ZKMetadataProvider.getLLCRealtimeSegmentZKMetadataListForTable(_helixManager.getHelixPropertyStore(),
+        tableNameWithType);
+  }
+
+  /**
+   * Gets latest 2 metadata. We need only the 2 latest metadata for each partition in order to perform repairs
+    * @param tableNameWithType
+   * @return
+   */
+  @VisibleForTesting
+  protected Map<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> getLatestMetadata(String tableNameWithType) {
+    List<LLCRealtimeSegmentZKMetadata> metadatas = getAllSegmentMetadata(tableNameWithType);
+
+    Comparator<LLCRealtimeSegmentZKMetadata> comparator = (o1, o2) -> {
+      LLCSegmentName s1 = new LLCSegmentName(o1.getSegmentName());
+      LLCSegmentName s2 = new LLCSegmentName(o2.getSegmentName());
+      return s2.compareTo(s1);
+    };
+
+    Map<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> partitionToLatestSegments = new HashMap<>();
+
+    for (LLCRealtimeSegmentZKMetadata metadata : metadatas) {
+      LLCSegmentName segmentName = new LLCSegmentName(metadata.getSegmentName());
+      final int partitionId = segmentName.getPartitionId();
+      MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata> latestSegments = partitionToLatestSegments.get(partitionId);
+      if (latestSegments == null) {
+        latestSegments = MinMaxPriorityQueue.orderedBy(comparator).maximumSize(2).create();
+        partitionToLatestSegments.put(partitionId, latestSegments);
+      }
+      latestSegments.offer(metadata);
     }
 
-    // Previous instance set is what we find in the Kafka partition assignment znode (values of the map entries)
-    final Set<String> prevInstances = new HashSet<>(currentInstances.size());
-    for (List<String> servers : partitionToServersMap.values()) {
-      prevInstances.addAll(servers);
+    return partitionToLatestSegments;
+  }
+
+  /**
+   * Validates llc segments in ideal state and repairs them if necessary
+   *
+   * During segment commit, we update zookeeper in 3 steps
+   * Step 1: Update PROPERTYSTORE to change the old segment metadata status to DONE
+   * Step 2: Update PROPERTYSTORE to create the new segment metadata with status IN_PROGRESS
+   * Step 3: Update IDEALSTATES to include new segment in CONSUMING state, and change old segment to ONLINE state.
+   *
+   * The controller may fail between these three steps.
+   * So when validation manager runs, it needs to check the following:
+   *
+   * If it fails between step-1 and step-2:
+   * Check whether there are any segments in the PROPERTYSTORE with status DONE, but no new segment in status IN_PROGRESS,
+   * and hence the status of the segment in the IDEALSTATE is still CONSUMING
+   *
+   * If it fails between step-2 and-3:
+   * Check whether there are any segments in PROPERTYSTORE with status IN_PROGRESS, that are not accounted for in idealState.
+   * If so, it should create the new segments in idealState.
+   *
+   * If the controller fails after step-3, we are fine because the idealState has the new segments.
+   * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
+   * @param tableConfig
+   *
+   * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and reset it to 0 at the end of validateLLC
+   */
+  public void validateLLCSegments(final TableConfig tableConfig) {
+    final String tableNameWithType = tableConfig.getTableName();
+    final StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    final int partitionCount = getKafkaPartitionCount(streamMetadata);
+    HelixHelper.updateIdealState(_helixManager, tableNameWithType, new Function<IdealState, IdealState>() {
+      @Nullable
+      @Override
+      public IdealState apply(@Nullable IdealState idealState) {
+        return validateLLCSegments(tableConfig, idealState, partitionCount);
+      }
+    }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
+  }
+
+  /**
+   * Updates ideal state after completion of a realtime segment
+   * @param tableNameWithType
+   * @param currentSegmentId
+   * @param newSegmentId
+   * @param partitionAssignment
+   */
+  @VisibleForTesting
+  protected void updateIdealStateOnSegmentCompletion(@Nonnull final String tableNameWithType,
+      @Nonnull final String currentSegmentId, @Nonnull final String newSegmentId,
+      @Nonnull final PartitionAssignment partitionAssignment) {
+
+    HelixHelper.updateIdealState(_helixManager, tableNameWithType, new Function<IdealState, IdealState>() {
+      @Nullable
+      @Override
+      public IdealState apply(@Nullable IdealState idealState) {
+        return updateIdealStateOnSegmentCompletion(idealState, currentSegmentId, newSegmentId, partitionAssignment);
+      }
+    }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
+  }
+
+  /**
+   * Sets up a new table's segments metadata and returns the ideal state setup with initial segments
+   * @param tableConfig
+   * @param idealState
+   * @param partitionCount
+   * @return
+   */
+  private IdealState setupTable(TableConfig tableConfig, IdealState idealState, int partitionCount)
+      throws InvalidConfigException {
+    final String tableNameWithType = tableConfig.getTableName();
+    if (!idealState.isEnabled()) {
+      LOGGER.info("Skipping validation for disabled table {}", tableNameWithType);
+      return idealState;
+    }
+    final StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    final long now = getCurrentTimeMs();
+
+    PartitionAssignment partitionAssignment =
+        _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, partitionCount);
+
+    Set<Integer> newPartitions = new HashSet<>(partitionCount);
+    for (int partition = 0; partition < partitionCount; partition++) {
+      newPartitions.add(partition);
     }
 
-    final int prevReplicaCount = partitionToServersMap.entrySet().iterator().next().getValue().size();
-    final int currentReplicaCount = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
+    Set<String> consumingSegments =
+        setupNewPartitions(tableConfig, streamMetadata, partitionAssignment, newPartitions, now);
 
-    boolean updateKafkaAssignment = false;
+    RealtimeSegmentAssignmentStrategy segmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
+    Map<String, List<String>> assignments = segmentAssignmentStrategy.assign(consumingSegments, partitionAssignment);
 
-    if (!prevInstances.equals(new HashSet<String>(currentInstances))) {
-      LOGGER.info("Detected change in instances for table {}", realtimeTableName);
-      updateKafkaAssignment = true;
-    }
-
-    if (prevPartitionCount != currentPartitionCount) {
-      LOGGER.info("Detected change in Kafka partition count for table {} from {} to {}", realtimeTableName, prevPartitionCount, currentPartitionCount);
-      updateKafkaAssignment = true;
-    }
-
-    if (prevReplicaCount != currentReplicaCount) {
-      LOGGER.info("Detected change in per-partition replica count for table {} from {} to {}", realtimeTableName, prevReplicaCount, currentReplicaCount);
-      updateKafkaAssignment = true;
-    }
-
-    if (!updateKafkaAssignment) {
-      LOGGER.info("Not updating Kafka partition assignment for table {}");
-      return;
-    }
-
-    // Generate new kafka partition assignment and update the znode
-    if (currentInstances.size() < currentReplicaCount) {
-      LOGGER.error("Cannot have {} replicas in {} instances for {}.Not updating partition assignment", currentReplicaCount, currentInstances.size(), realtimeTableName);
-      return;
-    }
-    ZNRecord newPartitionAssignment = generatePartitionAssignment(kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances, currentReplicaCount);
-    writeKafkaPartitionAssignemnt(realtimeTableName, newPartitionAssignment);
-    LOGGER.info("Successfully updated Kafka partition assignment for table {}");
+    updateIdealState(idealState, null, consumingSegments, assignments);
+    return idealState;
   }
 
   /*
-   * Generate partition assignment. An example znode for 8 kafka partitions and and 6 realtime servers looks as below
-   * in zookeeper.
-   * {
-     "id":"KafkaTopicName"
-     ,"simpleFields":{
-     }
-     ,"listFields":{
-       "0":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-       ,"1":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-       ,"2":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-       ,"3":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-       ,"4":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-       ,"5":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-       ,"6":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
-       ,"7":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
-     }
-     ,"mapFields":{
-     }
-   }
+   *  A segment commit takes 3 modifications to zookeeper:
+   *  - Change old segment metadata (mark it DONE, and then other things)
+   *  - Add new metadata
+   *  - Update idealstate to change oldsegment to ONLINE and new segment to CONSUMING
+   *
+   * A controller failure before/during the first step, or after the last step, does not bother us.
+   * However, a controller failure after the first step (but before the successful completion of last step)
+   * will result in leaving zookeeper in an inconsistent state. We have logic to trigger a periodic scan
+   * of the segments, and repair those in this intermediate stage of segment completion.
+   *
+   * Now that there are two threads that may try to create new segments, we need to be careful.
+   *
+   * It may happen that the segment completion thread has just done step-1, but meanwhile the periodic
+   * validator triggers, and mistakes this segment to be in incomplete state.
+   *
+   * We check the segment's metadata to see if that is old enough for repair. If it is fairly new, we
+   * leave it as it is, to be fixed the next time repair job triggers.
    */
-  private ZNRecord generatePartitionAssignment(String topicName, int nPartitions, List<String> instanceNames,
-      int nReplicas) {
-    ZNRecord znRecord = new ZNRecord(topicName);
-    int serverId = 0;
-    for (int p = 0; p < nPartitions; p++) {
-      List<String> instances = new ArrayList<>(nReplicas);
-      for (int r = 0; r < nReplicas; r++) {
-        instances.add(instanceNames.get(serverId++));
-        if (serverId == instanceNames.size()) {
-          serverId = 0;
+  @VisibleForTesting
+  protected boolean isTooSoonToCorrect(String tableNameWithType, String segmentId, long now) {
+    Stat stat = new Stat();
+    LLCRealtimeSegmentZKMetadata metadata = getRealtimeSegmentZKMetadata(tableNameWithType, segmentId, stat);
+    long metadataUpdateTime = stat.getMtime();
+    if (now < metadataUpdateTime + TimeUnit.MILLISECONDS.convert(MAX_SEGMENT_COMPLETION_TIME_MINS, TimeUnit.MINUTES)) {
+      // too soon to correct
+      return true;
+    }
+    return false;
+  }
+
+
+  private boolean isAllInstancesOffline(Map<String, String> instanceStateMap) {
+    for (String state : instanceStateMap.values()) {
+      if (!state.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /*
+   * Validate LLC segments of a table.
+   *
+   * Iterates over latest metadata for each partition and checks for following scenarios and repairs them:
+   * 1) Segment present in ideal state
+   * a) metadata status is IN_PROGRESS, segment state is CONSUMING - happy path
+   * b) metadata status is IN_PROGRESS, segment state is OFFLINE - create new metadata and new CONSUMING segment
+   * c) metadata status is DONE, segment state is OFFLINE - create new metadata and new CONSUMING segment
+   * d) metadata status is DONE, segment state is CONSUMING - create new metadata and new CONSUMINg segment
+   * 2) Segment is absent from ideal state - add new segment to ideal state
+   *
+   * Also checks if it is too soon to correct (could be in the process of committing segment)
+   * If new partitions are detected, gets them started
+   * If new instances are detected, uses them for new assignments
+   *
+   * So, the method may:
+   * - Add or modify one or more segment metadata znodes
+   * - Update the idealstate, which may fail if some other process updated the idealstate.
+   *
+   * In case idealstate update fails, then we need to start over.
+   * TODO: split this method into multiple smaller methods
+   */
+  @VisibleForTesting
+  protected IdealState validateLLCSegments(final TableConfig tableConfig, IdealState idealState,
+      final int partitionCount)  {
+    final String tableNameWithType = tableConfig.getTableName();
+    final StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    if (!idealState.isEnabled()) {
+      LOGGER.info("Skipping validation for disabled table {}", tableNameWithType);
+      return idealState;
+    }
+    final long now = getCurrentTimeMs();
+
+    // Get the metadata for the latest 2 segments of each partition
+    Map<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> latestMetadata =
+        getLatestMetadata(tableNameWithType);
+
+    // Find partitions for which there is no metadata at all. These are new partitions that we need to start consuming.
+    Set<Integer> newPartitions = new HashSet<>(partitionCount);
+    for (int partition = 0; partition < partitionCount; partition++) {
+      if (!latestMetadata.containsKey(partition)) {
+        LOGGER.info("Found partition {} with no segments", partition);
+        newPartitions.add(partition);
+      }
+    }
+
+    PartitionAssignment partitionAssignment;
+    boolean skipNewPartitions = false;
+    try {
+      partitionAssignment = _partitionAssignmentGenerator.generatePartitionAssignment(tableConfig, partitionCount);
+    } catch (InvalidConfigException e) {
+      _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.PARTITION_ASSIGNMENT_GENERATION_ERROR,
+          1L);
+      LOGGER.warn(
+          "Could not generate partition assignment. Fetching partition assignment from ideal state for repair of table {}",
+          tableNameWithType);
+      partitionAssignment = _partitionAssignmentGenerator.getPartitionAssignmentFromIdealState(tableConfig, idealState);
+      skipNewPartitions = true;
+    }
+
+    Set<String> onlineSegments = new HashSet<>(); // collect all segment names which should be updated to ONLINE state
+    Set<String> consumingSegments = new HashSet<>(); // collect all segment names which should be created in CONSUMING state
+
+    // Walk over all partitions that we have metadata for, and repair any partitions necessary.
+    // Possible things to repair:
+    // 1. The latest metadata is in DONE state, but the idealstate says segment is CONSUMING:
+    //    a. Create metadata for next segment and find hosts to assign it to.
+    //    b. update current segment in idealstate to ONLINE
+    //    c. add new segment in idealstate to CONSUMING on the hosts.
+    // 2. The latest metadata is IN_PROGRESS, but segment is not there in idealstate.
+    //    a. change prev segment to ONLINE in idealstate
+    //    b. add latest segment to CONSUMING in idealstate.
+    // 3. All instances of a segment are in OFFLINE state.
+    //    a. Create a new segment (with the next seq number)
+    //       and restart consumption from the same offset (if possible) or a newer offset (if realtime stream does not have the same offset).
+    //       In latter case, report data loss.
+    for (Map.Entry<Integer, MinMaxPriorityQueue<LLCRealtimeSegmentZKMetadata>> entry : latestMetadata.entrySet()) {
+      int partition = entry.getKey();
+      LLCRealtimeSegmentZKMetadata metadata = entry.getValue().pollFirst();
+      final String segmentId = metadata.getSegmentName();
+      final LLCSegmentName segmentName = new LLCSegmentName(segmentId);
+
+      Map<String, Map<String, String>> mapFields = idealState.getRecord().getMapFields();
+      if (mapFields.containsKey(segmentId)) {
+        // Latest segment of metadata is in idealstate.
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
+        if (instanceStateMap.values().contains(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
+          if (metadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
+
+            // step-1 of commmitSegmentMetadata is done (i.e. marking old segment as DONE)
+            // but step-2 is not done (i.e. adding new metadata for the next segment)
+            // and ideal state update (i.e. marking old segment as ONLINE and new segment as CONSUMING) is not done either.
+            if (isTooSoonToCorrect(tableNameWithType, segmentId, now)) {
+              LOGGER.info("Skipping correction of segment {} (too soon to correct)", segmentId);
+              continue;
+            }
+            LOGGER.info("{}:Repairing segment for partition {}. "
+                    + "Old segment metadata {} has status DONE, but segments are still in CONSUMING state in ideal STATE",
+                tableNameWithType, partition, segmentId);
+
+            final int newSeqNum = segmentName.getSequenceNumber() + 1;
+            LLCSegmentName newLLCSegmentName =
+                new LLCSegmentName(segmentName.getTableName(), partition, newSeqNum, now);
+
+            LOGGER.info("{}: Creating new segment metadata for {}", tableNameWithType,
+                newLLCSegmentName.getSegmentName());
+
+            createNewSegmentMetadataZNRecord(tableConfig, newLLCSegmentName, metadata.getEndOffset(),
+                partitionAssignment);
+
+            onlineSegments.add(segmentId);
+            consumingSegments.add(newLLCSegmentName.getSegmentName());
+          }
+          // else, the metadata should be IN_PROGRESS, which is the right state for a consuming segment.
+        } else if (isAllInstancesOffline(instanceStateMap)) {
+          // An in-progress segment marked itself offline for some reason the server could not consume.
+          // No instances are consuming, so create a new consuming segment.
+          int nextSeqNum = segmentName.getSequenceNumber() + 1;
+          LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableNameWithType, partition,
+              nextSeqNum);
+          // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
+          // depending on what the prev segment had.
+          long startOffset = getKafkaPartitionOffset(streamMetadata, "smallest", partition);
+          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType, partition);
+          startOffset =
+              getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset, nextSeqNum);
+          LLCSegmentName newLLCSegmentName =
+              new LLCSegmentName(segmentName.getTableName(), partition, nextSeqNum, now);
+
+          createNewSegmentMetadataZNRecord(tableConfig, newLLCSegmentName, startOffset, partitionAssignment);
+
+          consumingSegments.add(newLLCSegmentName.getSegmentName());
+        }
+        // else It can be in ONLINE state, in which case there is no need to repair the segment.
+      } else {
+        // idealstate does not have an entry for the segment (but metadata is present)
+        // controller has failed between step-2 and step-3 of commitSegmentMetadata.
+        // i.e. after updating old segment metadata (old segment metadata state = DONE)
+        // and creating new segment metadata (new segment metadata state = IN_PROGRESS),
+        // but before updating ideal state (new segment ideal missing from ideal state)
+        if (isTooSoonToCorrect(tableNameWithType, segmentId, now)) {
+          LOGGER.info("Skipping correction of segment {} (too soon to correct)", segmentId);
+          continue;
+        }
+
+        Preconditions.checkArgument(metadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS));
+        LOGGER.info("{}:Repairing segment for partition {}. Segment {} not found in idealstate", tableNameWithType,
+            partition, segmentId);
+
+        // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
+        LLCRealtimeSegmentZKMetadata prevMetadata = entry.getValue().pollLast();
+
+        if (prevMetadata == null && skipNewPartitions) {
+          continue;
+        }
+        if (prevMetadata != null) {
+          onlineSegments.add(prevMetadata.getSegmentName());
+        }
+        consumingSegments.add(segmentId);
+      }
+    }
+
+    if (!skipNewPartitions) {
+      Set<String> newPartitionSegments =
+          setupNewPartitions(tableConfig, streamMetadata, partitionAssignment, newPartitions, now);
+      consumingSegments.addAll(newPartitionSegments);
+    }
+
+    RealtimeSegmentAssignmentStrategy segmentAssignmentStrategy = new ConsumingSegmentAssignmentStrategy();
+    Map<String, List<String>> assignments;
+    try {
+      assignments =
+          segmentAssignmentStrategy.assign(consumingSegments, partitionAssignment);
+    } catch (InvalidConfigException e) {
+      throw new IllegalStateException(
+          "Caught exception when assigning segments using partition assignment for table " + tableNameWithType);
+    }
+
+    updateIdealState(idealState, onlineSegments, consumingSegments, assignments);
+    return idealState;
+  }
+
+  /**
+   * Updates the ideal state object
+   * Adds the segments in consumingSegments to CONSUMING state using instances from assignments
+   * Sets the segments in onlineSegments to ONLINE state
+   * @param idealState
+   * @param consumingSegments
+   * @param onlineSegments
+   * @param assignments
+   */
+  private void updateIdealState(IdealState idealState, Set<String> onlineSegments, Set<String> consumingSegments,
+      Map<String, List<String>> assignments) {
+    if (onlineSegments != null) {
+      for (String segment : onlineSegments) {
+        Set<String> oldInstances = idealState.getInstanceSet(segment);
+        Preconditions.checkArgument(CollectionUtils.isNotEmpty(oldInstances));
+        for (String instance : oldInstances) {
+          idealState.setPartitionState(segment, instance,
+              PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
         }
       }
-      znRecord.setListField(Integer.toString(p), instances);
     }
-    return znRecord;
+
+    if (consumingSegments != null) {
+      for (String segment : consumingSegments) {
+        List<String> newInstances = assignments.get(segment);
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segment);
+        if (instanceStateMap != null) {
+          instanceStateMap.clear();
+        }
+        for (String instance : newInstances) {
+          idealState.setPartitionState(segment, instance,
+              PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+        }
+      }
+    }
   }
 
-  protected int getKafkaPartitionCount(KafkaStreamMetadata kafkaStreamMetadata) {
-    return PinotTableIdealStateBuilder.getPartitionCount(kafkaStreamMetadata);
+  /**
+   * Create metadata for new partitions
+   * @param tableConfig
+   * @param streamMetadata
+   * @param partitionAssignment
+   * @param newPartitions
+   * @param now
+   * @return set of newly created segment names
+   */
+  private Set<String> setupNewPartitions(TableConfig tableConfig, StreamMetadata streamMetadata,
+      PartitionAssignment partitionAssignment, Set<Integer> newPartitions, long now) {
+
+    String tableName = tableConfig.getTableName();
+    Set<String> newSegmentNames = new HashSet<>(newPartitions.size());
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    int nextSeqNum = STARTING_SEQUENCE_NUMBER;
+    String consumerStartOffsetSpec = streamMetadata.getKafkaConsumerProperties()
+        .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+    for (int partition : newPartitions) {
+      LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", tableName, partition,
+          nextSeqNum);
+      long startOffset = getKafkaPartitionOffset(streamMetadata, consumerStartOffsetSpec, partition);
+      LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableName, partition);
+
+      LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
+      createNewSegmentMetadataZNRecord(tableConfig, newLLCSegmentName, startOffset, partitionAssignment);
+
+      newSegmentNames.add(newLLCSegmentName.getSegmentName());
+    }
+    return newSegmentNames;
   }
 
-  protected List<String> getInstances(String tenantName) {
-    return _helixAdmin.getInstancesInClusterWithTag(_clusterName, tenantName);
+
+  @VisibleForTesting
+  protected long getCurrentTimeMs() {
+    return System.currentTimeMillis();
+  }
+
+  protected IdealState updateIdealStateOnSegmentCompletion(@Nonnull IdealState idealState, @Nonnull String currentSegmentId,
+      @Nonnull String newSegmentId, @Nonnull  PartitionAssignment partitionAssignment) {
+
+    Map<String, List<String>> instanceAssignments = null;
+
+    RealtimeSegmentAssignmentStrategy strategy = new ConsumingSegmentAssignmentStrategy();
+    try {
+      instanceAssignments = strategy.assign(Lists.newArrayList(newSegmentId), partitionAssignment);
+    } catch (InvalidConfigException e) {
+      _controllerMetrics.addMeteredTableValue(idealState.getResourceName(),
+          ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
+      throw new IllegalStateException("Caught exception when updating ideal state on segment completion", e);
+    }
+
+    List<String> newSegmentInstances = instanceAssignments.get(newSegmentId);
+    Set<String> currentSegmentInstances = idealState.getInstanceSet(currentSegmentId);
+    for (String instance : currentSegmentInstances) {
+      idealState.setPartitionState(currentSegmentId, instance,
+          PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
+    }
+
+    // We may have (for whatever reason) a different instance list in the idealstate for the new segment.
+    // If so, clear it, and then set the instance state for the set of instances that we know should be there.
+    Map<String, String> stateMap = idealState.getInstanceStateMap(newSegmentId);
+    if (stateMap != null) {
+      stateMap.clear();
+    }
+    for (String instance : newSegmentInstances) {
+      idealState.setPartitionState(newSegmentId, instance,
+          PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+    }
+
+    return idealState;
+  }
+
+  private static class KafkaOffsetFetcher implements Callable<Boolean> {
+    private final String _topicName;
+    private final String _offsetCriteria;
+    private final int _partitionId;
+
+    private Exception _exception = null;
+    private long _offset = -1;
+    private PinotStreamConsumerFactory _pinotStreamConsumerFactory;
+    StreamMetadata _streamMetadata;
+
+
+    private KafkaOffsetFetcher(final String offsetCriteria, int partitionId, StreamMetadata streamMetadata) {
+      _offsetCriteria = offsetCriteria;
+      _partitionId = partitionId;
+      _pinotStreamConsumerFactory = PinotStreamConsumerFactory.create(streamMetadata);
+      _streamMetadata = streamMetadata;
+      _topicName = streamMetadata.getKafkaTopicName();
+    }
+
+    private long getOffset() {
+      return _offset;
+    }
+
+    private Exception getException() {
+      return _exception;
+    }
+
+    @Override
+    public Boolean call() throws Exception {
+
+      PinotStreamConsumer
+          kafkaConsumer = _pinotStreamConsumerFactory.buildConsumer("dummyClientId", _partitionId, _streamMetadata);
+      try {
+        _offset = kafkaConsumer.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+        if (_exception != null) {
+          LOGGER.info("Successfully retrieved offset({}) for kafka topic {} partition {}", _offset, _topicName, _partitionId);
+        }
+        return Boolean.TRUE;
+      } catch (SimpleConsumerWrapper.TransientConsumerException e) {
+        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId, e.getMessage());
+        _exception = e;
+        return Boolean.FALSE;
+      } catch (Exception e) {
+        _exception = e;
+        throw e;
+      } finally {
+        IOUtils.closeQuietly(kafkaConsumer);
+      }
+    }
   }
 }

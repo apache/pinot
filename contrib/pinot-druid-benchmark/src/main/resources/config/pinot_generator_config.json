@@ -1,0 +1,12 @@
+{
+  "dataDir": "<RAW DATA DIR>",
+  "format": "CSV",
+  "outDir": "<OUTPUT DIR>",
+  "overwrite": true,
+  "tableName": "tpch_lineitem",
+  "segmentName": "tpch_lineitem",
+  "schemaFile": "config/pinot_schema.json",
+  "readerConfigFile": "config/pinot_csv_config.json",
+  "enableStarTreeIndex": true,
+  "starTreeIndexSpecFile": "config/pinot_startree_spec.json"
+}

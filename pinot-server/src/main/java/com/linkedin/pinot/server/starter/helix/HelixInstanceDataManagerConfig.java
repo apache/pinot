@@ -15,12 +15,11 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,11 +32,15 @@ import org.slf4j.LoggerFactory;
 public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManagerConfig.class);
 
-  private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
+  // Average number of values in multi-valued columns in any table in this instance.
+  // This value is used to allocate initial memory for multi-valued columns in realtime segments in consuming state.
+  private static final String AVERAGE_MV_COUNT = "realtime.averageMultiValueEntriesPerRow";
   // Key of instance id
   public static final String INSTANCE_ID = "id";
   // Key of instance data directory
   public static final String INSTANCE_DATA_DIR = "dataDir";
+  // Key of consumer directory
+  public static final String CONSUMER_DIR = "consumerDir";
   // Key of instance segment tar directory
   public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
   // Key of segment directory
@@ -53,6 +56,36 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   // Key of whether to enable default columns
   private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
+
+  // Key of how many parallel realtime segments can be built.
+  // A value of <= 0 indicates unlimited.
+  // Unlimited parallel builds can cause high GC pauses during segment builds, causing
+  // response times to suffer.
+  private static final String MAX_PARALLEL_SEGMENT_BUILDS = "realtime.max.parallel.segment.builds";
+
+  // Key of whether to enable split commit
+  private static final String ENABLE_SPLIT_COMMIT = "enable.split.commit";
+
+  // Whether memory for realtime consuming segments should be allocated off-heap.
+  private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
+  // And whether the allocation should be direct (default is to allocate via mmap)
+  // Direct memory allocation may mean setting heap size appropriately when starting JVM.
+  // The metric ServerGauge.REALTIME_OFFHEAP_MEMORY_USED should indicate how much memory is needed.
+  private static final String DIRECT_REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap.direct";
+
+  // Number of simultaneous segments that can be refreshed on one server.
+  // Segment refresh works by loading the old as well as new versions of segments in memory, assigning
+  // new incoming queries to use the new version. The old version is dropped when all the queries that
+  // use the old version have completed. A server-wide semaphore is acquired before refreshing a segment so
+  // that we exceed the memory in some limited fashion. If there are multiple
+  // refresh requests, then they are queued on the semaphore (FIFO).
+  // In some multi-tenant use cases, it may be fine to over-allocate memory.
+  // Setting this config variable to a value greater than 1 will cause as many refresh threads to run simultaneously.
+  //
+  // NOTE: While segment load can be faster, multiple threads will be taken up loading segments, so
+  //       it is possible that the query latencies increase during that period.
+  //
+  private static final String MAX_PARALLEL_REFRESH_THREADS = "max.parallel.refresh.threads";
 
   private final static String[] REQUIRED_KEYS = { INSTANCE_ID, INSTANCE_DATA_DIR, READ_MODE };
   private Configuration _instanceDataManagerConfiguration = null;
@@ -92,6 +125,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public String getConsumerDir() {
+    return _instanceDataManagerConfiguration.getString(CONSUMER_DIR);
+  }
+
+  @Override
   public String getInstanceSegmentTarDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_TAR_DIR);
   }
@@ -99,11 +137,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getInstanceBootstrapSegmentDir() {
     return _instanceDataManagerConfiguration.getString(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
-  }
-
-  @Override
-  public String getSegmentMetadataLoaderClass() {
-    return _instanceDataManagerConfiguration.getString(INSTANCE_SEGMENT_METADATA_LOADER_CLASS);
   }
 
   @Override
@@ -122,13 +155,40 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public boolean isEnableSplitCommit() {
+    return _instanceDataManagerConfiguration.getBoolean(ENABLE_SPLIT_COMMIT, false);
+  }
+
+  @Override
+  public boolean isRealtimeOffHeapAllocation() {
+    return _instanceDataManagerConfiguration.getBoolean(REALTIME_OFFHEAP_ALLOCATION, false);
+  }
+
+  @Override
+  public boolean isDirectRealtimeOffheapAllocation() {
+    return _instanceDataManagerConfiguration.getBoolean(DIRECT_REALTIME_OFFHEAP_ALLOCATION, false);
+  }
+
+  @Override
+  public String getAvgMultiValueCount() {
+    return _instanceDataManagerConfiguration.getString(AVERAGE_MV_COUNT, null);
+  }
+
+  public int getMaxParallelRefreshThreads() {
+    return _instanceDataManagerConfiguration.getInt(MAX_PARALLEL_REFRESH_THREADS, 1);
+  }
+
+  public int getMaxParallelSegmentBuilds() {
+    return _instanceDataManagerConfiguration.getInt(MAX_PARALLEL_SEGMENT_BUILDS, 0);
+  }
+
+  @Override
   public String toString() {
     String configString = "";
     configString += "Instance Id: " + getInstanceId();
     configString += "\n\tInstance Data Dir: " + getInstanceDataDir();
     configString += "\n\tInstance Segment Tar Dir: " + getInstanceSegmentTarDir();
     configString += "\n\tBootstrap Segment Dir: " + getInstanceBootstrapSegmentDir();
-    configString += "\n\tSegment Metadata Loader Clas: " + getSegmentMetadataLoaderClass();
     configString += "\n\tRead Mode: " + getReadMode();
     configString += "\n\tSegment format version: " + getSegmentFormatVersion();
     return configString;

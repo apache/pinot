@@ -15,15 +15,12 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import java.util.List;
-
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.OrBlockDocIdSet;
+import java.util.List;
 
 
 public class OrBlock extends BaseFilterBlock {
@@ -33,16 +30,6 @@ public class OrBlock extends BaseFilterBlock {
 
   public OrBlock(List<FilterBlockDocIdSet> blockDocIdSets) {
     this.blockDocIdSets = blockDocIdSets;
-  }
-
-  @Override
-  public BlockId getId() {
-    return new BlockId(0);
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException("Cannot apply predicate on a AND Block");
   }
 
   @Override

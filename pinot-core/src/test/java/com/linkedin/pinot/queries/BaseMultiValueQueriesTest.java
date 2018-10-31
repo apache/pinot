@@ -18,11 +18,12 @@ package com.linkedin.pinot.queries;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
@@ -57,25 +58,21 @@ import org.testng.annotations.BeforeTest;
  * </ul>
  */
 public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
-  private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static final String SEGMENT_NAME = "testTable_1756015683_1756015683_";
+  private static final String AVRO_DATA = "data" + File.separator + "test_data-mv.avro";
+  private static final String SEGMENT_NAME = "testTable_1756015683_1756015683";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "MultiValueQueriesTest");
 
   // Hard-coded query filter.
   private static final String QUERY_FILTER =
-      " WHERE column1 > 100000000"
-          + " AND column2 BETWEEN 20000000 AND 1000000000"
-          + " AND column3 <> 'w'"
-          + " AND (column6 < 500000 OR column7 NOT IN (225, 407))"
-          + " AND daysSinceEpoch = 1756015683";
+      " WHERE column1 > 100000000" + " AND column2 BETWEEN 20000000 AND 1000000000" + " AND column3 <> 'w'"
+          + " AND (column6 < 500000 OR column7 NOT IN (225, 407))" + " AND daysSinceEpoch = 1756015683";
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
   private List<SegmentDataManager> _segmentDataManagers;
 
   @BeforeTest
-  public void buildSegment()
-      throws Exception {
+  public void buildSegment() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Get resource file path.
@@ -111,12 +108,11 @@ public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void loadSegment()
-      throws Exception {
-    File indexSegmentDir = new File(INDEX_DIR, SEGMENT_NAME);
-    _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
-    _segmentDataManagers = Arrays.<SegmentDataManager>asList(new OfflineSegmentDataManager(_indexSegment),
-        new OfflineSegmentDataManager(_indexSegment));
+  public void loadSegment() throws Exception {
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    _indexSegment = immutableSegment;
+    _segmentDataManagers =
+        Arrays.asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
   }
 
   @AfterClass

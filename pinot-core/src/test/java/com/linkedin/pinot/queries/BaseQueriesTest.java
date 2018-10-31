@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -84,15 +84,14 @@ public abstract class BaseQueriesTest {
 
     // Server side.
     Plan plan = PLAN_MAKER.makeInterSegmentPlan(getSegmentDataManagers(), brokerRequest, EXECUTOR_SERVICE, 10_000);
-    plan.execute();
-    DataTable instanceResponse = plan.getInstanceResponse();
+    DataTable instanceResponse = plan.execute();
 
     // Broker side.
     BrokerReduceService brokerReduceService = new BrokerReduceService();
     Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
     dataTableMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     dataTableMap.put(new ServerInstance("localhost:1111"), instanceResponse);
-    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap);
+    return brokerReduceService.reduceOnDataTable(brokerRequest, dataTableMap, null);
   }
 
   /**

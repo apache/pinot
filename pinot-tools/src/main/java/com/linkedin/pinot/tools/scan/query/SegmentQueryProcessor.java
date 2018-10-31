@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.tools.scan.query;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
@@ -34,12 +24,21 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class SegmentQueryProcessor {
@@ -50,17 +49,16 @@ class SegmentQueryProcessor {
   private Map<String, int[]> _mvColumnArrayMap;
 
   private final SegmentMetadataImpl _metadata;
-  private final IndexSegmentImpl _indexSegment;
+  private final ImmutableSegment _immutableSegment;
 
   private final String _tableName;
   private final String _segmentName;
   private final int _totalDocs;
 
-  SegmentQueryProcessor(File segmentDir)
-      throws Exception {
+  SegmentQueryProcessor(File segmentDir) throws Exception {
     _segmentDir = segmentDir;
 
-    _indexSegment = (IndexSegmentImpl) Loaders.IndexSegment.load(_segmentDir, ReadMode.mmap);
+    _immutableSegment = ImmutableSegmentLoader.load(_segmentDir, ReadMode.mmap);
     _metadata = new SegmentMetadataImpl(_segmentDir);
     _tableName = _metadata.getTableName();
     _segmentName = _metadata.getName();
@@ -82,11 +80,10 @@ class SegmentQueryProcessor {
 
   public void close() {
     _metadata.close();
-    _indexSegment.destroy();
+    _immutableSegment.destroy();
   }
 
-  public ResultTable process(BrokerRequest brokerRequest)
-      throws Exception {
+  public ResultTable process(BrokerRequest brokerRequest) throws Exception {
     if (pruneSegment(brokerRequest)) {
       return null;
     }
@@ -100,12 +97,12 @@ class SegmentQueryProcessor {
       // Aggregation only
       if (!brokerRequest.isSetGroupBy()) {
         Aggregation aggregation =
-            new Aggregation(_indexSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(), null, 10);
+            new Aggregation(_immutableSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(), null, 10);
         result = aggregation.run();
       } else { // Aggregation GroupBy
         GroupBy groupBy = brokerRequest.getGroupBy();
         Aggregation aggregation =
-            new Aggregation(_indexSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(),
+            new Aggregation(_immutableSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(),
                 groupBy.getColumns(), groupBy.getTopN());
         result = aggregation.run();
       }
@@ -113,7 +110,7 @@ class SegmentQueryProcessor {
       if (brokerRequest.isSetSelections()) {
         List<String> columns = brokerRequest.getSelections().getSelectionColumns();
         if (columns.contains("*")) {
-          columns = Arrays.asList(_indexSegment.getColumnNames());
+          columns = new ArrayList<>(_immutableSegment.getColumnNames());
         }
         List<Pair> selectionColumns = new ArrayList<>();
         Set<String> columSet = new HashSet<>();
@@ -125,7 +122,7 @@ class SegmentQueryProcessor {
             columSet.add(column);
           }
         }
-        Selection selection = new Selection(_indexSegment, _metadata, filteredDocIds, selectionColumns);
+        Selection selection = new Selection(_immutableSegment, _metadata, filteredDocIds, selectionColumns);
         result = selection.run();
       }
     }
@@ -238,7 +235,7 @@ class SegmentQueryProcessor {
 
   List<Integer> getMatchingDocIds(List<Integer> inputDocIds, FilterOperator filterType, String column,
       List<String> value) {
-    Dictionary dictionaryReader = _indexSegment.getDictionaryFor(column);
+    Dictionary dictionaryReader = _immutableSegment.getDictionary(column);
     PredicateFilter predicateFilter;
 
     switch (filterType) {
@@ -262,7 +259,7 @@ class SegmentQueryProcessor {
         predicateFilter = new RangePredicateFilter(dictionaryReader, value);
         break;
 
-      case REGEX:
+      case REGEXP_LIKE:
       default:
         throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
     }
@@ -274,7 +271,7 @@ class SegmentQueryProcessor {
     List<Integer> result = new ArrayList<>();
     if (!_mvColumns.contains(column)) {
       BlockSingleValIterator bvIter =
-          (BlockSingleValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
+          (BlockSingleValIterator) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
 
       int i = 0;
       while (bvIter.hasNext() && (inputDocIds == null || i < inputDocIds.size())) {
@@ -286,7 +283,7 @@ class SegmentQueryProcessor {
       }
     } else {
       BlockMultiValIterator bvIter =
-          (BlockMultiValIterator) _indexSegment.getDataSource(column).getNextBlock().getBlockValueSet().iterator();
+          (BlockMultiValIterator) _immutableSegment.getDataSource(column).nextBlock().getBlockValueSet().iterator();
 
       int i = 0;
       while (bvIter.hasNext() && (inputDocIds == null || i < inputDocIds.size())) {

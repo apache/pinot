@@ -16,114 +16,65 @@
 package com.linkedin.pinot.core.operator.docidsets;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
-import java.util.Arrays;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public class BitmapDocIdSet implements FilterBlockDocIdSet {
+  private final ImmutableRoaringBitmap _bitmap;
+  private int _startDocId;
+  // Inclusive
+  private int _endDocId;
 
-  final private ImmutableRoaringBitmap[] bitmaps;
-
-  BitmapDocIdIterator bitmapBasedBlockIdIterator;
-
-  private int startDocId;
-
-  private int endDocId;
-
-  private ImmutableRoaringBitmap answer;
-
-  /**
-   *
-   * @param datasourceName
-   * @param blockMetadata
-   * @param startDocId inclusive
-   * @param endDocId inclusive
-   * @param bitmaps
-   */
-  public BitmapDocIdSet(String datasourceName, BlockMetadata blockMetadata, int startDocId, int endDocId,
-      ImmutableRoaringBitmap... bitmaps) {
-    this(datasourceName, blockMetadata, startDocId, endDocId, bitmaps, false);
-  }
-
-  /**
-   *
-   * @param datasourceName
-   * @param blockMetadata
-   * @param startDocId inclusive
-   * @param endDocId inclusive
-   * @param bitmaps
-   * @param exclusion
-   */
-  public BitmapDocIdSet(String datasourceName, BlockMetadata blockMetadata, int startDocId, int endDocId,
-      ImmutableRoaringBitmap[] bitmaps, boolean exclusion) {
-    this.bitmaps = bitmaps;
-    setStartDocId(startDocId);
-    setEndDocId(endDocId);
-    // or() operation below can be expensive for large segment sizes
-    // We avoid that for simple '=' queries
-    if (bitmaps.length > 1 || exclusion) {
+  public BitmapDocIdSet(ImmutableRoaringBitmap[] bitmaps, int startDocId, int endDocId, boolean exclusive) {
+    int numBitmaps = bitmaps.length;
+    if (numBitmaps > 1) {
       MutableRoaringBitmap orBitmap = MutableRoaringBitmap.or(bitmaps);
-      if (exclusion) {
-        orBitmap.flip(startDocId, endDocId + 1); // end is exclusive
+      if (exclusive) {
+        orBitmap.flip(startDocId, endDocId + 1);
       }
-      answer = orBitmap;
-
-    } else if (bitmaps.length == 1){
-      answer = bitmaps[0];
+      _bitmap = orBitmap;
+    } else if (numBitmaps == 1) {
+      if (exclusive) {
+        // NOTE: cannot use ImmutableRoaringBitmap.flip() because the library has a bug in that method
+        // TODO: the bug has been fixed in the latest version of ImmutableRoaringBitmap, update the version
+        MutableRoaringBitmap bitmap = bitmaps[0].toMutableRoaringBitmap();
+        bitmap.flip(startDocId, endDocId + 1);
+        _bitmap = bitmap;
+      } else {
+        _bitmap = bitmaps[0];
+      }
     } else {
-      answer = new MutableRoaringBitmap().toMutableRoaringBitmap();
+      MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
+      if (exclusive) {
+        bitmap.add(startDocId, endDocId + 1);
+      }
+      _bitmap = bitmap;
     }
 
-    //by default bitmap is created for the all documents (raw docs + agg docs of star tree).
-    //we need to consider only bits between start/end docId
-    //startDocId/endDocId is decided by the filter plan node based on starTree vs raw data
-    //TODO:check the performance penalty of removing this at runtime v/s <br/>
-    //changing the bitmap index creation (i.e create two separate bitmaps for raw docs and materialized docs)
-    //this should be a no-op when we don't have star tree
-    if (blockMetadata.getStartDocId() != startDocId) {
-      int start = Math.min(startDocId, blockMetadata.getStartDocId());
-      int end = Math.max(startDocId, blockMetadata.getStartDocId());
-      // TODO/atumbde: Removed to address [PINOT-2806]
-      //answer.remove(start, end + 1);//end is exclusive
-    }
-    if (blockMetadata.getEndDocId() != endDocId) {
-      int start = Math.min(endDocId, blockMetadata.getEndDocId());
-      int end = Math.max(endDocId, blockMetadata.getEndDocId());
-      // TODO/atumbde: Removed to address [PINOT-2806]
-      //answer.remove(start, end + 1);//end is exclusive
-    }
+    _startDocId = startDocId;
+    _endDocId = endDocId;
   }
 
   @Override
   public int getMinDocId() {
-    return startDocId;
+    return _startDocId;
   }
 
   @Override
   public int getMaxDocId() {
-    return endDocId;
+    return _endDocId;
   }
 
-  /**
-   * After setting the startDocId, next calls will always return from &gt;=startDocId
-   * @param startDocId
-   */
   @Override
   public void setStartDocId(int startDocId) {
-    this.startDocId = startDocId;
+    _startDocId = startDocId;
   }
 
-  /**
-   * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds
-   * endDocId
-   * @param endDocId
-   */
   @Override
   public void setEndDocId(int endDocId) {
-    this.endDocId = endDocId;
+    _endDocId = endDocId;
   }
 
   @Override
@@ -133,20 +84,15 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
-    bitmapBasedBlockIdIterator = new BitmapDocIdIterator(answer.getIntIterator());
-    bitmapBasedBlockIdIterator.setStartDocId(startDocId);
-    bitmapBasedBlockIdIterator.setEndDocId(endDocId);
-    return bitmapBasedBlockIdIterator;
+    BitmapDocIdIterator bitmapDocIdIterator = new BitmapDocIdIterator(_bitmap.getIntIterator());
+    bitmapDocIdIterator.setStartDocId(_startDocId);
+    bitmapDocIdIterator.setEndDocId(_endDocId);
+    return bitmapDocIdIterator;
   }
 
   @SuppressWarnings("unchecked")
   @Override
-  public <T extends Object> T getRaw() {
-    return (T) answer;
-  }
-
-  @Override
-  public String toString() {
-    return Arrays.toString(bitmaps);
+  public <T> T getRaw() {
+    return (T) _bitmap;
   }
 }

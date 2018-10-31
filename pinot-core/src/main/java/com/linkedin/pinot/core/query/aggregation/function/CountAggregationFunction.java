@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
@@ -100,10 +100,15 @@ public class CountAggregationFunction implements AggregationFunction<Long, Long>
     return intermediateResult1 + intermediateResult2;
   }
 
+  @Override
+  public boolean isIntermediateResultComparable() {
+    return true;
+  }
+
   @Nonnull
   @Override
-  public FieldSpec.DataType getIntermediateResultDataType() {
-    return FieldSpec.DataType.LONG;
+  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
+    return DataSchema.ColumnDataType.LONG;
   }
 
   @Nonnull

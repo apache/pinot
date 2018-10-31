@@ -15,589 +15,293 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import io.netty.channel.ChannelHandlerContext;
-import java.lang.reflect.Field;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.Cancellable;
-import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.common.LinkedDequeue;
 import com.linkedin.pinot.transport.common.NoneType;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.pool.AsyncPool;
 import com.linkedin.pinot.transport.pool.AsyncPoolImpl;
 import com.linkedin.pinot.transport.pool.AsyncPoolResourceManagerAdapter;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.yammer.metrics.core.MetricsRegistry;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
-import io.netty.util.Timer;
+import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang.RandomStringUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 
 public class NettySingleConnectionIntegrationTest {
+  private static final int NUM_SMALL_TESTS = 1000;
+  private static final int NUM_LARGE_TESTS = 10;
+  private static final int NUM_LARGE_PAYLOAD_CHARACTERS = 2 * 1000 * 1000;
 
-  protected static Logger LOGGER = LoggerFactory.getLogger(NettySingleConnectionIntegrationTest.class);
+  private NettyTestUtils.LatchControlledRequestHandler _requestHandler;
+  private NettyTCPServer _nettyTCPServer;
+  private ServerInstance _clientServer;
+  private NettyTCPClientConnection _nettyTCPClientConnection;
+
+  @BeforeMethod
+  public void setUp()
+      throws Exception {
+    _requestHandler = new NettyTestUtils.LatchControlledRequestHandler(null);
+    _requestHandler.setResponse(NettyTestUtils.DUMMY_RESPONSE);
+    NettyTestUtils.LatchControlledRequestHandlerFactory handlerFactory =
+        new NettyTestUtils.LatchControlledRequestHandlerFactory(_requestHandler);
+    _nettyTCPServer = new NettyTCPServer(NettyTestUtils.DEFAULT_PORT, handlerFactory, null);
+    Thread serverThread = new Thread(_nettyTCPServer, "NettyTCPServer");
+    serverThread.start();
+    // Wait for at most 10 seconds for server to start
+    NettyTestUtils.waitForServerStarted(_nettyTCPServer, 10 * 1000L);
+
+    _clientServer = new ServerInstance("localhost", NettyTestUtils.DEFAULT_PORT);
+    _nettyTCPClientConnection =
+        new NettyTCPClientConnection(_clientServer, new NioEventLoopGroup(), new HashedWheelTimer(),
+            new NettyClientMetrics(null, "abc"));
+  }
 
   @Test
-  /**
-   * Test Single small request response
-   * @throws Exception
-   */
-  public void testSingleSmallRequestResponse() throws Exception {
-    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    Timer timer = new HashedWheelTimer();
-
-    MyServer server = new MyServer();
-    Thread.sleep(1000);
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn = new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, timer, metric);
-    try {
-      LOGGER.info("About to connect the client !!");
-      boolean connected = clientConn.connect();
-      LOGGER.info("Client connected !!");
-      Assert.assertTrue(connected, "connected");
-      Thread.sleep(1000);
-      String request = "dummy request";
-      LOGGER.info("Sending the request !!");
-      ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-      LOGGER.info("Request  sent !!");
-      ByteBuf serverResp = serverRespFuture.getOne();
-      byte[] b2 = new byte[serverResp.readableBytes()];
-      serverResp.readBytes(b2);
-      String gotResponse = new String(b2);
-      Assert.assertEquals(gotResponse, server.getResponseStr(), "Response Check at client");
-      Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
-//      System.out.println(metric);
-    } finally {
-      if (null != clientConn) {
-        clientConn.close();
-      }
-
-      server.shutdown();
+  public void testSmallRequestResponses()
+      throws Exception {
+    Assert.assertTrue(_nettyTCPClientConnection.connect());
+    for (int i = 0; i < NUM_SMALL_TESTS; i++) {
+      String request = NettyTestUtils.DUMMY_REQUEST + i;
+      String response = NettyTestUtils.DUMMY_RESPONSE + i;
+      _requestHandler.setResponse(response);
+      ResponseFuture responseFuture =
+          _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
+      byte[] bytes = responseFuture.getOne();
+      Assert.assertEquals(new String(bytes), response);
+      Assert.assertEquals(_requestHandler.getRequest(), request);
     }
   }
 
-  /*
-   * WARNING: This test has potential failures due to timing.
-   */
   @Test
-  public void testValidatePool() throws Exception {
-    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    Timer timer = new HashedWheelTimer();
+  public void testLargeRequestResponses()
+      throws Exception {
+    String payload = RandomStringUtils.random(NUM_LARGE_PAYLOAD_CHARACTERS);
+    String requestPayload = NettyTestUtils.DUMMY_REQUEST + payload;
+    String responsePayload = NettyTestUtils.DUMMY_RESPONSE + payload;
 
-    MyServer server = new MyServer();
-    Thread.sleep(1000);
-    final String serverName = "SomeServer"; // used as a key to pool. Can be anything.
-    ServerInstance serverInstance = server.getServerInstance();
-    MetricsRegistry metricsRegistry = new MetricsRegistry();
+    Assert.assertTrue(_nettyTCPClientConnection.connect());
+    for (int i = 0; i < NUM_LARGE_TESTS; i++) {
+      String request = requestPayload + i;
+      String response = responsePayload + i;
+      _requestHandler.setResponse(response);
+      ResponseFuture responseFuture =
+          _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
+      byte[] bytes = responseFuture.getOne();
+      Assert.assertEquals(new String(bytes), response);
+      Assert.assertEquals(_requestHandler.getRequest(), request);
+    }
+  }
 
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    PooledNettyClientResourceManager resourceManager = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), metric);
+  @Test
+  public void testCancelOutstandingRequest()
+      throws Exception {
+    Assert.assertTrue(_nettyTCPClientConnection.connect());
+    ResponseFuture responseFuture =
+        _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
+            5000L);
+    responseFuture.cancel(false);
+    // Wait for cancel taking effect
+    Uninterruptibles.sleepUninterruptibly(1L, TimeUnit.SECONDS);
+    Assert.assertNull(responseFuture.getOne());
+    Assert.assertTrue(responseFuture.isCancelled());
+  }
+
+  @Test
+  public void testConcurrentRequestDispatchError()
+      throws Exception {
+    Assert.assertTrue(_nettyTCPClientConnection.connect());
+    ResponseFuture responseFuture =
+        _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
+            5000L);
+    try {
+      _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L, 5000L);
+      Assert.fail("Concurrent request should throw IllegalStateException");
+    } catch (IllegalStateException e) {
+      // Pass
+    }
+    byte[] bytes = responseFuture.getOne();
+    Assert.assertEquals(new String(bytes), NettyTestUtils.DUMMY_RESPONSE);
+    Assert.assertEquals(_requestHandler.getRequest(), NettyTestUtils.DUMMY_REQUEST);
+  }
+
+  @Test
+  public void testValidatePool()
+      throws Exception {
+    PooledNettyClientResourceManager resourceManager =
+        new PooledNettyClientResourceManager(new NioEventLoopGroup(), new HashedWheelTimer(),
+            new NettyClientMetrics(null, "abc"));
     ExecutorService executorService = Executors.newCachedThreadPool();
     ScheduledExecutorService timeoutExecutor = new ScheduledThreadPoolExecutor(5);
-    AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection> rmAdapter =
-        new AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection>(serverInstance, resourceManager, executorService, metricsRegistry);
-    AsyncPool pool = new AsyncPoolImpl<NettyClientConnection>(serverName, rmAdapter,
-     /*maxSize=*/5, /*idleTimeoutMs=*/100000, timeoutExecutor,
-        executorService, /*maxWaiters=*/10, AsyncPoolImpl.Strategy.LRU, /*minSize=*/2, metricsRegistry);
-    pool.start();
 
-    Callback<NoneType> callback;
+    String serverName = "server";
+    MetricsRegistry metricsRegistry = new MetricsRegistry();
+    AsyncPoolResourceManagerAdapter<PooledNettyClientResourceManager.PooledClientConnection> rmAdapter =
+        new AsyncPoolResourceManagerAdapter<>(_clientServer, resourceManager, executorService, metricsRegistry);
+    AsyncPool<PooledNettyClientResourceManager.PooledClientConnection> pool = new AsyncPoolImpl<>(serverName, rmAdapter,
+     /*maxSize=*/5, /*idleTimeoutMs=*/100000L, timeoutExecutor, executorService, /*maxWaiters=*/10,
+        AsyncPoolImpl.Strategy.LRU, /*minSize=*/2, metricsRegistry);
 
-    callback = new Callback<NoneType>() {
-      @Override
-      public void onSuccess(NoneType arg0) {
-      }
-
-      @Override
-      public void onError(Throwable arg0) {
-        Assert.fail("Shutdown error");
-      }
-    };
-
-
-    boolean serverShutdown = false;
     try {
-      PoolStats stats;
-      /* Validate with no connection in pool */
-      Thread.sleep(3000);   // Give the pool enough time to create connections (in this case, 2 connections minSize)
-//      System.out.println("Validating with no used objects in the pool");
-      pool.validate(false);
-      stats = pool.getStats(); // System.out.println(stats);
-      Assert.assertEquals(2, stats.getPoolSize());
-      Assert.assertEquals(0, stats.getTotalBadDestroyed());
-      /* checkout one connection, it should not destroy anything */
-      AsyncResponseFuture<ServerInstance, NettyClientConnection> future = new AsyncResponseFuture<ServerInstance, NettyClientConnection>(serverInstance, "Future for " + serverName);
-      Cancellable cancellable = pool.get(future);
-      future.setCancellable(cancellable);
-      NettyClientConnection conn = future.getOne();
-      stats = pool.getStats(); // System.out.println(stats);
-//      System.out.println("Validating with one used object in the pool");
-      pool.validate(false);
-      Assert.assertEquals(2, stats.getPoolSize());
-      Assert.assertEquals(0, stats.getTotalBadDestroyed());
-      Assert.assertEquals(1, stats.getCheckedOut());
+      pool.start();
+      Uninterruptibles.sleepUninterruptibly(1L, TimeUnit.SECONDS);
 
-      // Now stop the server, so that the checked out connection is invalidated.
-      server.shutdown();
-      serverShutdown = true;;
-      Thread.sleep(2000); // Wait for the client channel to be closed.
-      pool.validate(false);
-      Thread.sleep(5000); // Wait for the callback into AsyncPoolImpl after the destroy thread completes destroying the connection
-//      System.out.println("Validating with one used object in the pool, after server shutdown");
-      stats = pool.getStats(); // System.out.println(stats);
-      Assert.assertEquals(2, stats.getPoolSize());
-      Assert.assertEquals(1, stats.getTotalBadDestroyed());
-      Assert.assertEquals(1, stats.getCheckedOut());
+      // Test no connection in pool
+      Assert.assertTrue(pool.validate(false));
+      PoolStats stats = pool.getStats();
+      Assert.assertEquals(stats.getPoolSize(), 2);
+      Assert.assertEquals(stats.getTotalBadDestroyed(), 0);
+      Assert.assertEquals(stats.getCheckedOut(), 0);
 
+      // Test one connection, it should not destroy anything
+      AsyncResponseFuture<PooledNettyClientResourceManager.PooledClientConnection> responseFuture =
+          new AsyncResponseFuture<>(_clientServer, null);
+      pool.get(responseFuture);
+      Assert.assertNotNull(responseFuture.getOne());
+      Assert.assertTrue(pool.validate(false));
+      stats = pool.getStats();
+      Assert.assertEquals(stats.getPoolSize(), 2);
+      Assert.assertEquals(stats.getTotalBadDestroyed(), 0);
+      Assert.assertEquals(stats.getCheckedOut(), 1);
 
+      // Now stop the server, so that the checked out connection is invalidated
+      NettyTestUtils.closeServerConnection(_nettyTCPServer);
+      Assert.assertTrue(pool.validate(false));
+      stats = pool.getStats();
+      Assert.assertEquals(stats.getPoolSize(), 2);
+      Assert.assertEquals(stats.getTotalBadDestroyed(), 1);
+      Assert.assertEquals(stats.getCheckedOut(), 1);
     } finally {
-      server.shutdown();
-      pool.shutdown(callback);
+      pool.shutdown(new Callback<NoneType>() {
+        @Override
+        public void onSuccess(NoneType arg0) {
+        }
+
+        @Override
+        public void onError(Throwable arg0) {
+          Assert.fail("Shutdown error");
+        }
+      });
       executorService.shutdown();
       timeoutExecutor.shutdown();
     }
   }
 
-  @Test
-  public void testCancelOutstandingRequest() throws Exception {
-    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    CountDownLatch latch = new CountDownLatch(1);
-    MyServer server = new MyServer();
-    Thread.sleep(1000);
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
-    LOGGER.info("About to connect the client !!");
-    boolean connected = clientConn.connect();
-    LOGGER.info("Client connected !!");
-    Assert.assertTrue(connected, "connected");
-    Thread.sleep(1000);
-    String request = "dummy request";
-    LOGGER.info("Sending the request !!");
-    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-    serverRespFuture.cancel(false);
-    latch.countDown();
-    ByteBuf serverResp = serverRespFuture.getOne();
-    Assert.assertNull(serverResp);
-    Assert.assertTrue(serverRespFuture.isCancelled(), "Is Cancelled");
-    clientConn.close();
-    server.shutdown();
-  }
-
-  @Test
-  public void testConcurrentRequestDispatchError() throws Exception {
-    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    CountDownLatch latch = new CountDownLatch(1);
-    MyServer server = new MyServer();
-    Thread.sleep(1000);
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
-    LOGGER.info("About to connect the client !!");
-    boolean connected = clientConn.connect();
-    LOGGER.info("Client connected !!");
-    Assert.assertTrue(connected, "connected");
-    Thread.sleep(1000);
-    String request = "dummy request";
-    LOGGER.info("Sending the request !!");
-    ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-    boolean gotException = false;
-    try {
-      clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-    } catch (IllegalStateException ex) {
-      gotException = true;
-      // Second request should have failed.
-      LOGGER.info("got exception ", ex);
-    }
-    latch.countDown();
-    ByteBuf serverResp = serverRespFuture.getOne();
-    byte[] b2 = new byte[serverResp.readableBytes()];
-    serverResp.readBytes(b2);
-    String gotResponse = new String(b2);
-    Assert.assertEquals(gotResponse, server.getResponseStr(), "Response Check at client");
-    Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
-    clientConn.close();
-    server.shutdown();
-    Assert.assertTrue(gotException, "GotException ");
-  }
-
-  private String generatePayload(String prefix, int numBytes) {
-    StringBuilder b = new StringBuilder(prefix.length() + numBytes);
-    b.append(prefix);
-    for (int i = 0; i < numBytes; i++) {
-      b.append('i');
-    }
-    return b.toString();
-  }
-
-  @Test
   /**
-   * Test Single Large  ( 2 MB) request response
-   * @throws Exception
-   */
-  public void testSingleLargeRequestResponse() throws Exception {
-    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    final String response_prefix = "response_";
-    final String response = generatePayload(response_prefix, 1024 * 1024 * 2);
-    MyServer server = new MyServer(response);
-    Thread.sleep(1000);
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
-    try {
-      LOGGER.info("About to connect the client !!");
-      boolean connected = clientConn.connect();
-      LOGGER.info("Client connected !!");
-      Assert.assertTrue(connected, "connected");
-      Thread.sleep(1000);
-      String request_prefix = "request_";
-      String request = generatePayload(request_prefix, 1024 * 1024 * 2);
-      LOGGER.info("Sending the request !!");
-      ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-      LOGGER.info("Request  sent !!");
-      ByteBuf serverResp = serverRespFuture.getOne();
-      byte[] b2 = new byte[serverResp.readableBytes()];
-      serverResp.readBytes(b2);
-      String gotResponse = new String(b2);
-      Assert.assertTrue(gotResponse.equals(response), "Response Check at client");
-      Assert.assertTrue(server.getHandler().getRequest().equals(request), "Request Check at server");
-    } finally {
-      if (null != clientConn) {
-        clientConn.close();
-      }
-      server.shutdown();
-    }
-  }
-
-  @Test
-  /**
-   * Send 10K small sized request in sequence. Verify each request and response.
-   * @throws Exception
-   */
-  public void test10KSmallRequestResponses() throws Exception {
-    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    MyServer server = new MyServer(null);
-    Thread.sleep(1000);
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
-    try {
-      LOGGER.info("About to connect the client !!");
-      boolean connected = clientConn.connect();
-      LOGGER.info("Client connected !!");
-      Assert.assertTrue(connected, "connected");
-      Thread.sleep(1000);
-      for (int i = 0; i < 10000; i++) {
-        String request = "dummy request :" + i;
-        String response = "dummy response :" + i;
-        server.getHandler().setResponse(response);
-        LOGGER.info("Sending the request (" + request + ")");
-        ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-        LOGGER.info("Request  sent !!");
-        ByteBuf serverResp = serverRespFuture.getOne();
-        if (null == serverResp) {
-          LOGGER.error("Got unexpected error while trying to get response.", serverRespFuture.getError());
-        }
-
-        byte[] b2 = new byte[serverResp.readableBytes()];
-        serverResp.readBytes(b2);
-        String gotResponse = new String(b2);
-        Assert.assertEquals(gotResponse, response, "Response Check at client");
-        Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
-      }
-    } finally {
-      if (null != clientConn) {
-        clientConn.close();
-      }
-
-      server.shutdown();
-    }
-  }
-
-  //@Test
-  //@Ignore
-  /**
-   * Send 100 large ( 2MB) sized request in sequence. Verify each request and response.
-   * @throws Exception
-   */
-  //@Test
-  public void test100LargeRequestResponses() throws Exception {
-    NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    MyServer server = new MyServer(null);
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    NettyTCPClientConnection clientConn =
-        new NettyTCPClientConnection(server.getServerInstance(), eventLoopGroup, new HashedWheelTimer(), metric);
-    LOGGER.info("About to connect the client !!");
-    boolean connected = clientConn.connect();
-    LOGGER.info("Client connected !!");
-    Assert.assertTrue(connected, "connected");
-    Thread.sleep(1000);
-    try {
-      for (int i = 0; i < 100; i++) {
-        String request_prefix = "request_";
-        String request = generatePayload(request_prefix, 1024 * 1024 * 20);
-        String response_prefix = "response_";
-        String response = generatePayload(response_prefix, 1024 * 1024 * 20);
-        server.getHandler().setResponse(response);
-        //LOG.info("Sending the request (" + request + ")");
-        ResponseFuture serverRespFuture = clientConn.sendRequest(Unpooled.wrappedBuffer(request.getBytes()), 1L, 5000L);
-        //LOG.info("Request  sent !!");
-        ByteBuf serverResp = serverRespFuture.getOne();
-        byte[] b2 = new byte[serverResp.readableBytes()];
-        serverResp.readBytes(b2);
-        String gotResponse = new String(b2);
-        Assert.assertEquals(gotResponse, response, "Response Check at client");
-        Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
-      }
-    } finally {
-      if (null != clientConn) {
-        clientConn.close();
-      }
-
-      server.shutdown();
-    }
-  }
-
-  /*
    * This test attempts to use the connection mechanism the same way as ScatterGatherImpl.SingleRequestHandler does.
-   *
-   * WARNING: This test has potential failures due to timing.
    */
+  @SuppressWarnings("unchecked")
   @Test
-  public void testServerShutdownLeak() throws Exception {
-    final NettyClientMetrics metric = new NettyClientMetrics(null, "abc");
-    final Timer timer = new HashedWheelTimer();
-    final int minConns = 2;
-    final int maxConns = 3;
-    final int maxIdleTimeoutMs = 10000000; // 10M ms.
-    final int maxBacklogPerServer = 1;
-
-    MyServer server = new MyServer();
-    Thread.sleep(1000);
-    final String serverName = "SomeServer"; // used as a key to pool. Can be anything.
-    final ServerInstance serverInstance = server.getServerInstance();
-    final MetricsRegistry metricsRegistry = new MetricsRegistry();
-
-    EventLoopGroup eventLoopGroup = new NioEventLoopGroup();
-    PooledNettyClientResourceManager resourceManager = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), metric);
+  public void testServerShutdownLeak()
+      throws Exception {
+    PooledNettyClientResourceManager resourceManager =
+        new PooledNettyClientResourceManager(new NioEventLoopGroup(), new HashedWheelTimer(),
+            new NettyClientMetrics(null, "abc"));
     ExecutorService executorService = Executors.newCachedThreadPool();
     ScheduledExecutorService timeoutExecutor = new ScheduledThreadPoolExecutor(5);
 
-    AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection> rmAdapter =
-        new AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection>(serverInstance, resourceManager, executorService, metricsRegistry);
-    KeyedPool<ServerInstance, NettyClientConnection> keyedPool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(minConns,
-        maxConns, maxIdleTimeoutMs, maxBacklogPerServer,
-        resourceManager, timeoutExecutor, executorService, metricsRegistry);
+    KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> keyedPool =
+        new KeyedPoolImpl<>(/*minSize=*/2, /*maxSize=*/3, /*idleTimeoutMs=*/100000L, /*maxPending=*/1, resourceManager,
+            timeoutExecutor, executorService, new MetricsRegistry());
     resourceManager.setPool(keyedPool);
 
-    keyedPool.start();
+    try {
+      keyedPool.start();
 
-    Field keyedPoolMap = KeyedPoolImpl.class.getDeclaredField("_keyedPool");
-    keyedPoolMap.setAccessible(true);
+      // The act of calling checkoutObject() creates a new AsyncPool and places a request for a new connection
+      // NOTE: since no connections are available in the beginning, and the min connections are still being filled, we
+      // always end up creating one more connection than the min connections
+      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer, "none").getOne());
 
-    KeyedFuture<ServerInstance, NettyClientConnection> keyedFuture = keyedPool.checkoutObject(serverInstance);
-    // The connection pool for this server is created on demand, so we can now get a reference to the _keyedPool.
-    // The act of calling checkoutObject() creates a new AsyncPoolImpl and places a request for a new connection.
-    // Since no new connections are available in the beginning, we always end up creating one more than the min.
+      // Use reflection to get the pool and the waiters queue
+      Field keyedPoolField = KeyedPoolImpl.class.getDeclaredField("_keyedPool");
+      keyedPoolField.setAccessible(true);
+      Map<ServerInstance, AsyncPool<NettyClientConnection>> poolMap =
+          (Map<ServerInstance, AsyncPool<NettyClientConnection>>) keyedPoolField.get(keyedPool);
+      AsyncPool<NettyClientConnection> pool = poolMap.get(_clientServer);
+      Field waitersField = AsyncPoolImpl.class.getDeclaredField("_waiters");
+      waitersField.setAccessible(true);
+      LinkedDequeue waitersQueue = (LinkedDequeue) waitersField.get(pool);
 
-    Map<ServerInstance, AsyncPool<NettyClientConnection>> poolMap = (Map<ServerInstance, AsyncPool<NettyClientConnection>>)keyedPoolMap.get(
-        keyedPool);
-    AsyncPool<NettyClientConnection> asyncPool = poolMap.get(serverInstance);
-    Field waiterList = AsyncPoolImpl.class.getDeclaredField("_waiters");
-    waiterList.setAccessible(true);
-    LinkedDequeue queue = (LinkedDequeue) waiterList.get(asyncPool);
+      // Make sure the min pool size is filled out
+      Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
 
-    PoolStats stats;
+      PoolStats stats = pool.getStats();
+      Assert.assertEquals(stats.getPoolSize(), 3);
+      Assert.assertEquals(stats.getIdleCount(), 2);
+      Assert.assertEquals(stats.getCheckedOut(), 1);
+      Assert.assertEquals(waitersQueue.size(), 0);
 
-    // If the number of waiters is = 0, then we will error out because the min connections may not have completed
-    // by the time we check one out. If maxWaiters is > 0, then we may end up initiating a fresh connection while the
-    // min is still being filled. So, best to sleep a little to make sure that the min pool size is filled out, so that
-    // the stats are correct.
-    Thread.sleep(2000L);
+      // Get two more connections to the server and leak them
+      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer, "none").getOne());
+      Assert.assertNotNull(keyedPool.checkoutObject(_clientServer, "none").getOne());
+      stats = pool.getStats();
+      Assert.assertEquals(stats.getPoolSize(), 3);
+      Assert.assertEquals(stats.getIdleCount(), 0);
+      Assert.assertEquals(stats.getCheckedOut(), 3);
+      Assert.assertEquals(waitersQueue.size(), 0);
 
-    stats =  asyncPool.getStats();
-    Assert.assertEquals(stats.getIdleCount(), minConns);
-    Assert.assertEquals(stats.getPoolSize(), minConns+1);
-
-    NettyClientConnection conn = keyedFuture.getOne();
-    LOGGER.debug("Got connection ID " + conn.getConnId());
-    Assert.assertEquals(stats.getIdleCount(), minConns);
-    Assert.assertEquals(stats.getPoolSize(), minConns+1);
-
-    // Now get two more connections to the server, since we have 2 idle, we should get those.
-    // And leak them.
-    keyedFuture = keyedPool.checkoutObject(serverInstance);
-    conn = keyedFuture.getOne();
-    LOGGER.debug("Got connection ID " + conn.getConnId());
-    keyedFuture = keyedPool.checkoutObject(serverInstance);
-    conn = keyedFuture.getOne();
-    LOGGER.debug("Got connection ID " + conn.getConnId());
-
-    // Now we should have 0 idle, and a pool size of 3 with no waiters.
-    stats =  asyncPool.getStats();
-    Assert.assertEquals(stats.getIdleCount(), 0);
-    Assert.assertEquals(stats.getPoolSize(), minConns+1);
-    Assert.assertEquals(queue.size(), 0);
-
-    // Now, we will always get an exception because we don't have a free connection to the server.
-    {
-      keyedFuture = keyedPool.checkoutObject(serverInstance);
-      boolean caughtException = false;
-      LOGGER.debug("Will never get a connection here.");
+      // Try to get one more connection
+      // We should get an exception because we don't have a free connection to the server
+      ServerResponseFuture<PooledNettyClientResourceManager.PooledClientConnection> serverResponseFuture =
+          keyedPool.checkoutObject(_clientServer, "none");
       try {
-        conn = keyedFuture.getOne(3, TimeUnit.SECONDS);
+        serverResponseFuture.getOne(1, TimeUnit.SECONDS);
+        Assert.fail("Get connection even no connections available");
       } catch (TimeoutException e) {
-        caughtException = true;
+        // PASS
       }
-      Assert.assertTrue(caughtException);
-      keyedFuture.cancel(true);
-    }
-    // Now if the server goes down, we should release all three connections and be able to get a successful new connection
-    LOGGER.info("Shutting down server instance");
-    server.shutdown();
-    Thread.sleep(2000L);  // Give it time to clean up on the client side.
-    stats =  asyncPool.getStats();
-    LOGGER.debug(stats.toString());
-    // There will be a couple in idleCount in error state.
-    Assert.assertEquals(stats.getIdleCount(), minConns);
-    Assert.assertEquals(stats.getPoolSize(), minConns);
-    LOGGER.debug("Restarting server instance");
-    server.restart();
-    Thread.sleep(3000);
-    LOGGER.debug("Server restart successful\n" + asyncPool.getStats());
-    // Now get 3 connections successfully
-    for (int i = 0; i < 3; i++) {
-      keyedFuture = keyedPool.checkoutObject(serverInstance);
-      conn = keyedFuture.getOne();
-      Assert.assertNotNull(conn);
-    }
-    server.shutdown();
-  }
+      stats = pool.getStats();
+      Assert.assertEquals(stats.getPoolSize(), 3);
+      Assert.assertEquals(stats.getIdleCount(), 0);
+      Assert.assertEquals(stats.getCheckedOut(), 3);
+      Assert.assertEquals(waitersQueue.size(), 1);
+      serverResponseFuture.cancel(true);
+      Assert.assertEquals(waitersQueue.size(), 0);
 
-  private static class MyRequestHandlerFactory implements RequestHandlerFactory {
-    private final MyRequestHandler _requestHandler;
+      // If the server goes down, we should release all 3 connections and be able to get new connections
+      NettyTestUtils.closeServerConnection(_nettyTCPServer);
+      setUp();
+      stats = pool.getStats();
+      Assert.assertEquals(stats.getPoolSize(), 2);
+      Assert.assertEquals(stats.getIdleCount(), 2);
 
-    public MyRequestHandlerFactory(MyRequestHandler requestHandler) {
-      _requestHandler = requestHandler;
-    }
-
-    @Override
-    public RequestHandler createNewRequestHandler() {
-      return _requestHandler;
-    }
-
-  }
-
-  private static class MyRequestHandler implements RequestHandler {
-    private String _response;
-    private String _request;
-    private final CountDownLatch _responseHandlingLatch;
-
-    public MyRequestHandler(String response, CountDownLatch responseHandlingLatch) {
-      _response = response;
-      _responseHandlingLatch = responseHandlingLatch;
-    }
-
-    @Override
-    public ListenableFuture<byte[]> processRequest(ChannelHandlerContext channelHandlerContext, ByteBuf request) {
-      byte[] b = new byte[request.readableBytes()];
-      request.readBytes(b);
-      if (null != _responseHandlingLatch) {
-        try {
-          _responseHandlingLatch.await();
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
+      // Try to get 3 new connections
+      for (int i = 0; i < 3; i++) {
+        Assert.assertNotNull(keyedPool.checkoutObject(_clientServer, "none").getOne());
       }
-      _request = new String(b);
-
-      //LOG.info("Server got the request (" + _request + ")");
-      return Futures.immediateFuture(_response.getBytes());
-    }
-
-    public String getRequest() {
-      return _request;
-    }
-
-    public String getResponse() {
-      return _response;
-    }
-
-    public void setResponse(String response) {
-      _response = response;
+    } finally {
+      keyedPool.shutdown();
+      executorService.shutdown();
+      timeoutExecutor.shutdown();
     }
   }
 
-  private static class MyServer {
-    private final int _port = 9089;
-    private final String _responseStr;
-    private MyRequestHandler _handler;
-    private NettyTCPServer _serverConn;
-    private ServerInstance _serverInstance;
-    private boolean _hasShutDown = false;
-
-    public MyServer(String responseStr) {
-      _responseStr = responseStr;
-      _handler = new MyRequestHandler(_responseStr, null);
-      MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(_handler);
-      _serverConn = new NettyTCPServer(_port, handlerFactory, null);
-      Thread serverThread = new Thread(_serverConn, "ServerMain");
-      serverThread.start();
-      _serverInstance = new ServerInstance("localhost", _port);
-    }
-    public MyServer() {
-      this("dummy response");
-    }
-
-    public MyRequestHandler getHandler() {
-      return _handler;
-    }
-    public NettyTCPServer getServerConn() {
-      return _serverConn;
-    }
-    public ServerInstance getServerInstance() {
-      return _serverInstance;
-    }
-    public final String getResponseStr() {
-      return _responseStr;
-    }
-    public void shutdown() {
-      if (!_hasShutDown && _serverConn != null) {
-        _serverConn.shutdownGracefully();
-        _hasShutDown = true;
-      }
-    }
-    public void restart() {
-      _handler = new MyRequestHandler(_responseStr, null);
-      MyRequestHandlerFactory handlerFactory = new MyRequestHandlerFactory(_handler);
-      _serverConn = new NettyTCPServer(_port, handlerFactory, null);
-      Thread serverThread = new Thread(_serverConn, "ServerMain");
-      serverThread.start();
-      _hasShutDown = false;
-    }
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
+    NettyTestUtils.closeServerConnection(_nettyTCPServer);
   }
 }

@@ -18,11 +18,9 @@ package com.linkedin.pinot.core.operator.blocks;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataBlockCache;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import java.util.Map;
 
@@ -32,7 +30,6 @@ import java.util.Map;
  * It provides DocIdSetBlock for a given column.
  */
 public class ProjectionBlock implements Block {
-
   private final Map<String, Block> _blockMap;
   private final DocIdSetBlock _docIdSetBlock;
   private final DataBlockCache _dataBlockCache;
@@ -41,17 +38,6 @@ public class ProjectionBlock implements Block {
     _blockMap = blockMap;
     _docIdSetBlock = docIdSetBlock;
     _dataBlockCache = dataBlockCache;
-    _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), 0, docIdSetBlock.getSearchableLength());
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockId getId() {
-    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -74,16 +60,13 @@ public class ProjectionBlock implements Block {
     throw new UnsupportedOperationException();
   }
 
+  // TODO: let selection operator use DataBlockCache as well
   public Block getBlock(String column) {
     return _blockMap.get(column);
   }
 
   public BlockValSet getBlockValueSet(String column) {
-    return new ProjectionBlockValSet(_dataBlockCache, column);
-  }
-
-  public BlockMetadata getMetadata(String column) {
-    return _blockMap.get(column).getMetadata();
+    return new ProjectionBlockValSet(_dataBlockCache, column, _blockMap.get(column).getMetadata().getDataType());
   }
 
   public DocIdSetBlock getDocIdSetBlock() {

@@ -22,12 +22,14 @@ import java.util.concurrent.Callable;
  * Retry policy, encapsulating the logic needed to retry an operation until it succeeds.
  */
 public interface RetryPolicy {
+
   /**
-   * Attempts to do the operation until it succeeds, aborting if an exception is thrown by the operation.
+   * Attempts to do the operation until it succeeds, aborting if an exception is thrown by the operation or number of
+   * attempts exhausted.
    *
    * @param operation The operation to attempt, which returns true on success and false on failure.
-   * @return true if the operation succeeded or false if the operation did not succeed within the retries specified by
-   * this retry policy
+   * @throws AttemptsExceededException
+   * @throws RetriableOperationException
    */
-  boolean attempt(Callable<Boolean> operation);
+  void attempt(Callable<Boolean> operation) throws AttemptsExceededException, RetriableOperationException;
 }

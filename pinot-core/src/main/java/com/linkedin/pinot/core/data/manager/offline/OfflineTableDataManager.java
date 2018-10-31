@@ -15,48 +15,37 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.core.data.manager.BaseTableDataManager;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.LoggerFactory;
+import javax.annotation.Nonnull;
+import javax.annotation.concurrent.ThreadSafe;
 
 
 /**
- * An implementation of offline TableDataManager.
- * Provide add and remove segment functionality.
+ * Table data manager for OFFLINE table.
  */
-public class OfflineTableDataManager extends AbstractTableDataManager {
+@ThreadSafe
+public class OfflineTableDataManager extends BaseTableDataManager {
 
-  public OfflineTableDataManager() {
-    super();
+  @Override
+  protected void doInit() {
   }
 
+  @Override
+  protected void doStart() {
+  }
+
+  @Override
   protected void doShutdown() {
   }
 
-  protected void doInit() {
-    LOGGER = LoggerFactory.getLogger(_tableName + "-OfflineTableDataManager");
-  }
-
   @Override
-  public void addSegment(SegmentMetadata segmentMetadata, Schema schema)
-      throws Exception {
-    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(new File(segmentMetadata.getIndexDir()), _readMode,
-        _indexLoadingConfigMetadata, schema);
-    addSegment(indexSegment);
-  }
-
-  @Override
-  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata)
-      throws Exception {
-    throw new UnsupportedOperationException("Not supported for Offline segments");
+  public void addSegment(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig) throws Exception {
+    Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, _tableNameWithType);
+    addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, schema));
   }
 }

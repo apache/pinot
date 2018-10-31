@@ -5,7 +5,9 @@ public class JobConstants {
   public enum JobStatus {
     SCHEDULED,
     COMPLETED,
-    FAILED
+    FAILED,
+    TIMEOUT,
+    UNKNOWN
   };
 
 

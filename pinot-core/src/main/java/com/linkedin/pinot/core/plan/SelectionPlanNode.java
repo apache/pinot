@@ -19,8 +19,9 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
-import com.linkedin.pinot.core.operator.query.MSelectionOrderByOperator;
+import com.linkedin.pinot.core.operator.query.EmptySelectionOperator;
+import com.linkedin.pinot.core.operator.query.SelectionOnlyOperator;
+import com.linkedin.pinot.core.operator.query.SelectionOrderByOperator;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,40 +40,53 @@ public class SelectionPlanNode implements PlanNode {
   public SelectionPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _selection = brokerRequest.getSelections();
-    int maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
 
-    if ((_selection.getSelectionSortSequence() == null) || _selection.getSelectionSortSequence().isEmpty()) {
-      //since no ordering is required, we can just get the minimum number of docs that matches the filter criteria
-      maxDocPerNextCall = Math.min(_selection.getOffset() + _selection.getSize(), maxDocPerNextCall);
+    if (_selection.getSize() > 0) {
+      int maxDocPerNextCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
+
+      // No ordering required, select minimum number of documents
+      if (!_selection.isSetSelectionSortSequence()) {
+        maxDocPerNextCall = Math.min(_selection.getOffset() + _selection.getSize(), maxDocPerNextCall);
+      }
+
+      DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, brokerRequest, maxDocPerNextCall);
+      _projectionPlanNode = new ProjectionPlanNode(_indexSegment,
+          SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment), docIdSetPlanNode);
+    } else {
+      _projectionPlanNode = null;
     }
-
-    DocIdSetPlanNode docIdSetPlanNode = new DocIdSetPlanNode(_indexSegment, brokerRequest, maxDocPerNextCall);
-    _projectionPlanNode = new ProjectionPlanNode(_indexSegment,
-        SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, indexSegment), docIdSetPlanNode);
   }
 
   @Override
   public Operator run() {
-    // Use selection order-by operator only if there are sorting columns and selection size is not 0.
-    if (_selection.isSetSelectionSortSequence() && (_selection.getSize() != 0)) {
-      return new MSelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
+    if (_selection.getSize() > 0) {
+      if (_selection.isSetSelectionSortSequence()) {
+        return new SelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
+      } else {
+        return new SelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
+      }
     } else {
-      return new MSelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());
+      return new EmptySelectionOperator(_indexSegment, _selection);
     }
   }
 
   @Override
   public void showTree(String prefix) {
     LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
-    if (_selection.isSetSelectionSortSequence()) {
-      LOGGER.debug(prefix + "Operator: MSelectionOrderByOperator");
+    if (_selection.getSize() > 0) {
+      if (_selection.isSetSelectionSortSequence()) {
+        LOGGER.debug(prefix + "Operator: SelectionOrderByOperator");
+      } else {
+        LOGGER.debug(prefix + "Operator: SelectionOnlyOperator");
+      }
     } else {
-      LOGGER.debug(prefix + "Operator: MSelectionOnlyOperator");
+      LOGGER.debug(prefix + "Operator: LimitZeroSelectionOperator");
     }
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     LOGGER.debug(prefix + "Argument 1: Selections - " + _selection);
-    LOGGER.debug(prefix + "Argument 2: Projection -");
-    _projectionPlanNode.showTree(prefix + "    ");
-
+    if (_selection.getSize() > 0) {
+      LOGGER.debug(prefix + "Argument 2: Projection -");
+      _projectionPlanNode.showTree(prefix + "    ");
+    }
   }
 }

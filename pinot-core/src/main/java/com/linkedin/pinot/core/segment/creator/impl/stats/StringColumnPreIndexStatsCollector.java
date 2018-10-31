@@ -15,34 +15,30 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
-
-/**
- * Nov 7, 2014
- */
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private String min = V1Constants.Str.NULL_STRING;
   private String max = V1Constants.Str.NULL_STRING;
+
+  private int smallestStringLength = Integer.MAX_VALUE;
   private int longestStringLength = 0;
   private final ObjectSet<String> rawStringSet;
   private final ObjectSet<String> aggregatedStringSet;
   private String[] sortedStringList;
-  private boolean hasNull = false;
   private boolean sealed = false;
 
-  public StringColumnPreIndexStatsCollector(FieldSpec spec) {
-    super(spec);
+  public StringColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
+    super(column, statsCollectorConfig);
     rawStringSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
     aggregatedStringSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
   }
@@ -62,7 +58,10 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       for (final Object e : (Object[]) entry) {
         String value = e.toString();
         set.add(value);
-        longestStringLength = Math.max(longestStringLength, value.getBytes(UTF_8).length);
+
+        int valueLength = value.getBytes(UTF_8).length;
+        smallestStringLength = Math.min(smallestStringLength, valueLength);
+        longestStringLength = Math.max(longestStringLength, valueLength);
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -77,8 +76,12 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         value = fieldSpec.getDefaultNullValue().toString();
       }
       addressSorted(value);
+      updatePartition(value);
       set.add(value);
-      longestStringLength = Math.max(longestStringLength, value.getBytes(UTF_8).length);
+
+      int valueLength = value.getBytes(UTF_8).length;
+      smallestStringLength = Math.min(smallestStringLength, valueLength);
+      longestStringLength = Math.max(longestStringLength, valueLength);
       totalNumberOfEntries++;
     }
   }
@@ -108,43 +111,43 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
 
   @Override
-  public String getMinValue() throws Exception {
+  public String getMinValue() {
     if (sealed) {
       return min;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public String getMaxValue() throws Exception {
+  public String getMaxValue() {
     if (sealed) {
       return max;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for max value");
+    throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
   @Override
-  public Object[] getUniqueValuesSet() throws Exception {
+  public Object[] getUniqueValuesSet() {
     if (sealed) {
       return sortedStringList;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for unique values set");
+    throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
 
   @Override
-  public int getLengthOfLargestElement() throws Exception {
+  public int getLengthOfLargestElement() {
     if (sealed) {
       return longestStringLength;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for longest value");
+    throw new IllegalStateException("you must seal the collector first before asking for longest value");
   }
 
   @Override
-  public int getCardinality() throws Exception {
+  public int getCardinality() {
     if (sealed) {
       return sortedStringList.length;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for cardinality");
+    throw new IllegalStateException("you must seal the collector first before asking for cardinality");
   }
 
   @Override

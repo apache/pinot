@@ -15,11 +15,12 @@
  */
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.core.common.BlockMetadata;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
@@ -36,243 +37,145 @@ import javax.annotation.Nonnull;
  * - Single/Multi valued columns.
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
-  public static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
+  // Thread local (reusable) array for single-valued group keys
+  private static final ThreadLocal<int[]> THREAD_LOCAL_SV_GROUP_KEYS = new ThreadLocal<int[]>() {
+    @Override
+    protected int[] initialValue() {
+      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+  };
 
-  private static final double GROUP_BY_TRIM_FACTOR = 0.9;
-  private final int _numAggrFunc;
-  private final int _numGroupsLimit;
-  private final AggregationFunctionContext[] _aggrFunctionContexts;
-  private final AggregationFunction[] _aggregationFunctions;
+  // Thread local (reusable) array for multi-valued group keys
+  private static final ThreadLocal<int[][]> THREAD_LOCAL_MV_GROUP_KEYS = new ThreadLocal<int[][]>() {
+    @Override
+    protected int[][] initialValue() {
+      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+  };
 
-  private  GroupKeyGenerator _groupKeyGenerator;
-  private GroupByResultHolder[] _resultHolderArray;
-  private final String[] _groupByColumns;
-
-  private int[] _docIdToSVGroupKey;
-  private int[][] _docIdToMVGroupKey;
-
-  private boolean _hasMVGroupByColumns = false;
-  private boolean _inited = false; // boolean to ensure init() has been called.
-  private boolean _finished = false; // boolean to ensure that finish() has been called.
-  private boolean _groupByInited = false; // boolean for lazy creation of group-key generator etc.
-  private boolean _hasColumnsWithoutDictionary = false;
+  private final int _numFunctions;
+  private final AggregationFunction[] _functions;
+  private final TransformExpressionTree[] _aggregationExpressions;
+  private final GroupKeyGenerator _groupKeyGenerator;
+  private final GroupByResultHolder[] _resultHolders;
+  private final boolean _hasMVGroupByExpression;
+  private final boolean _hasNoDictionaryGroupByExpression;
+  private final int[] _svGroupKeys;
+  private final int[][] _mvGroupKeys;
 
   /**
    * Constructor for the class.
-   * @param aggrFunctionContexts Array of aggregation functions
-   * @param groupBy Group by from broker request
-   * @param numGroupsLimit Limit on number of aggregation groups returned in the result
-   */
-  public DefaultGroupByExecutor(@Nonnull AggregationFunctionContext[] aggrFunctionContexts, GroupBy groupBy,
-      int numGroupsLimit) {
-    Preconditions.checkNotNull(aggrFunctionContexts.length > 0);
-    Preconditions.checkNotNull(groupBy);
-
-    List<String> groupByColumns = groupBy.getColumns();
-    List<String> groupByExpressions = groupBy.getExpressions();
-
-    // Expressions contain simple group by columns (ie without any transform) as well.
-    if (groupByExpressions != null && !groupByExpressions.isEmpty()) {
-      _groupByColumns = groupByExpressions.toArray(new String[groupByExpressions.size()]);
-    } else {
-      _groupByColumns = groupByColumns.toArray(new String[groupByColumns.size()]);
-    }
-
-    _numAggrFunc = aggrFunctionContexts.length;
-
-    // TODO: revisit the trim factor. Usually the factor should be 5-10, and based on the 'TOP' limit.
-    // When results are trimmed, drop bottom 10% of groups.
-    _numGroupsLimit = (int) (GROUP_BY_TRIM_FACTOR * numGroupsLimit);
-
-    _aggrFunctionContexts = aggrFunctionContexts;
-    _aggregationFunctions = new AggregationFunction[_numAggrFunc];
-    for (int i = 0; i < _numAggrFunc; i++) {
-      _aggregationFunctions[i] = aggrFunctionContexts[i].getAggregationFunction();
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   * No-op for this implementation of GroupKeyGenerator. Most initialization happens lazily
-   * in process(), as a transform is required to initialize group key generator, etc.
-   */
-  @Override
-  public void init() {
-    // Returned if already initialized.
-    if (_inited) {
-      return;
-    }
-
-    _inited = true;
-  }
-
-  /**
-   * Process the provided set of docId's to perform the requested aggregation-group-by-operation.
    *
-   * @param transformBlock Transform block to process
+   * @param functionContexts Array of aggregation functions
+   * @param groupBy Group by from broker request
+   * @param maxInitialResultHolderCapacity Maximum initial capacity for the result holder
+   * @param numGroupsLimit Limit on number of aggregation groups returned in the result
+   * @param transformOperator Transform operator
    */
+  public DefaultGroupByExecutor(@Nonnull AggregationFunctionContext[] functionContexts, @Nonnull GroupBy groupBy,
+      int maxInitialResultHolderCapacity, int numGroupsLimit, @Nonnull TransformOperator transformOperator) {
+    // Initialize aggregation functions and expressions
+    _numFunctions = functionContexts.length;
+    _functions = new AggregationFunction[_numFunctions];
+    _aggregationExpressions = new TransformExpressionTree[_numFunctions];
+    for (int i = 0; i < _numFunctions; i++) {
+      AggregationFunction function = functionContexts[i].getAggregationFunction();
+      _functions[i] = function;
+      // TODO: currently only support single argument aggregation
+      if (!function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        _aggregationExpressions[i] =
+            TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
+      }
+    }
+
+    // Initialize group-by expressions
+    List<String> groupByExpressionStrings = groupBy.getExpressions();
+    int numGroupByExpressions = groupByExpressionStrings.size();
+    boolean hasMVGroupByExpression = false;
+    boolean hasNoDictionaryGroupByExpression = false;
+    TransformExpressionTree[] groupByExpressions = new TransformExpressionTree[numGroupByExpressions];
+    for (int i = 0; i < numGroupByExpressions; i++) {
+      groupByExpressions[i] = TransformExpressionTree.compileToExpressionTree(groupByExpressionStrings.get(i));
+      TransformResultMetadata transformResultMetadata = transformOperator.getResultMetadata(groupByExpressions[i]);
+      hasMVGroupByExpression |= !transformResultMetadata.isSingleValue();
+      hasNoDictionaryGroupByExpression |= !transformResultMetadata.hasDictionary();
+    }
+    _hasMVGroupByExpression = hasMVGroupByExpression;
+    _hasNoDictionaryGroupByExpression = hasNoDictionaryGroupByExpression;
+
+    // Initialize group key generator
+    if (_hasNoDictionaryGroupByExpression) {
+      if (numGroupByExpressions == 1) {
+        _groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(transformOperator, groupByExpressions[0]);
+      } else {
+        _groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(transformOperator, groupByExpressions);
+      }
+    } else {
+      _groupKeyGenerator =
+          new DictionaryBasedGroupKeyGenerator(transformOperator, groupByExpressions, maxInitialResultHolderCapacity);
+    }
+
+    // Initialize result holders
+    int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
+    int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
+    _resultHolders = new GroupByResultHolder[_numFunctions];
+    for (int i = 0; i < _numFunctions; i++) {
+      _resultHolders[i] = _functions[i].createGroupByResultHolder(initialCapacity, maxNumResults, numGroupsLimit);
+    }
+
+    // Initialize map from document Id to group key
+    if (_hasMVGroupByExpression) {
+      _svGroupKeys = null;
+      _mvGroupKeys = THREAD_LOCAL_MV_GROUP_KEYS.get();
+    } else {
+      _svGroupKeys = THREAD_LOCAL_SV_GROUP_KEYS.get();
+      _mvGroupKeys = null;
+    }
+  }
+
   @Override
-  public void process(TransformBlock transformBlock) {
-    Preconditions
-        .checkState(_inited, "Method 'process' cannot be called before 'init' for class " + getClass().getName());
+  public void process(@Nonnull TransformBlock transformBlock) {
+    // Generate group keys
+    if (_hasMVGroupByExpression) {
+      _groupKeyGenerator.generateKeysForBlock(transformBlock, _mvGroupKeys);
+    } else {
+      _groupKeyGenerator.generateKeysForBlock(transformBlock, _svGroupKeys);
+    }
 
-    initGroupBy(transformBlock);
-    generateGroupKeysForBlock(transformBlock);
+    int length = transformBlock.getNumDocs();
     int capacityNeeded = _groupKeyGenerator.getCurrentGroupKeyUpperBound();
+    for (int i = 0; i < _numFunctions; i++) {
+      AggregationFunction function = _functions[i];
+      GroupByResultHolder resultHolder = _resultHolders[i];
 
-    for (int i = 0; i < _numAggrFunc; i++) {
-      _resultHolderArray[i].ensureCapacity(capacityNeeded);
-      aggregateColumn(transformBlock, _aggrFunctionContexts[i], _resultHolderArray[i]);
+      resultHolder.ensureCapacity(capacityNeeded);
+      if (function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        if (_hasMVGroupByExpression) {
+          function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder);
+        } else {
+          function.aggregateGroupBySV(length, _svGroupKeys, resultHolder);
+        }
+      } else {
+        BlockValSet blockValueSet = transformBlock.getBlockValueSet(_aggregationExpressions[i]);
+        if (_hasMVGroupByExpression) {
+          function.aggregateGroupByMV(length, _mvGroupKeys, resultHolder, blockValueSet);
+        } else {
+          function.aggregateGroupBySV(length, _svGroupKeys, resultHolder, blockValueSet);
+        }
+      }
 
       // Result holder limits the max number of group keys (default 100k), if the number of groups
       // exceeds beyond that limit, groups with lower values (as per sort order) are trimmed.
       // Once result holder trims those groups, the group key generator needs to purge them.
-      if (!_hasColumnsWithoutDictionary) {
-        int[] trimmedKeys = _resultHolderArray[i].trimResults();
+      if (!_hasNoDictionaryGroupByExpression) {
+        int[] trimmedKeys = resultHolder.trimResults();
         _groupKeyGenerator.purgeKeys(trimmedKeys);
       }
     }
   }
 
-  /**
-   * Helper method to perform aggregation for a given column.
-   *
-   * @param transformBlock Transform block to aggregate
-   * @param aggrFuncContext Aggregation function context
-   * @param resultHolder Holder for results of aggregation
-   */
-  @SuppressWarnings("ConstantConditions")
-  private void aggregateColumn(TransformBlock transformBlock, AggregationFunctionContext aggrFuncContext,
-      GroupByResultHolder resultHolder) {
-    AggregationFunction aggregationFunction = aggrFuncContext.getAggregationFunction();
-    String[] aggregationColumns = aggrFuncContext.getAggregationColumns();
-    Preconditions.checkState(aggregationColumns.length == 1);
-    int length = transformBlock.getNumDocs();
-
-    if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-      BlockValSet blockValueSet = transformBlock.getBlockValueSet(aggregationColumns[0]);
-      if (_hasMVGroupByColumns) {
-        aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, blockValueSet);
-      } else {
-        aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, blockValueSet);
-      }
-    } else {
-      if (_hasMVGroupByColumns) {
-        aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
-      } else {
-        aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public void finish() {
-    Preconditions
-        .checkState(_inited, "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
-
-    _finished = true;
-  }
-
-  /**
-   * Return the final result of the aggregation-group-by operation.
-   * This method should be called after all docIdSets have been 'processed'.
-   *
-   * @return Results of aggregation group by.
-   */
   @Override
   public AggregationGroupByResult getResult() {
-    Preconditions
-        .checkState(_finished, "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
-
-    // If group by was not initialized (in case of no transform blocks), return null.
-    if (!_groupByInited) {
-      return null;
-    }
-
-    return new AggregationGroupByResult(_groupKeyGenerator, _aggregationFunctions, _resultHolderArray);
-  }
-
-  /**
-   * Generate group keys for the given docIdSet. For single valued columns, each docId has one group key,
-   * but for multi-valued columns, each docId could have more than one group key.
-   *
-   * For SV keys: _docIdToSVGroupKey mapping is updated.
-   * For MV keys: _docIdToMVGroupKey mapping is updated.
-   *
-   * @param transformBlock Transform block for which to generate group keys
-   */
-  private void generateGroupKeysForBlock(TransformBlock transformBlock) {
-    if (_hasMVGroupByColumns) {
-      _groupKeyGenerator.generateKeysForBlock(transformBlock, _docIdToMVGroupKey);
-    } else {
-      _groupKeyGenerator.generateKeysForBlock(transformBlock, _docIdToSVGroupKey);
-    }
-  }
-
-  /**
-   * Helper method to initialize result holder array.
-   *
-   * @param trimSize Trim size for group by keys
-   * @param maxNumResults Maximum number of groups possible
-   */
-  private void initResultHolderArray(int trimSize, int maxNumResults) {
-    _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
-    int initialCapacity = Math.min(maxNumResults, MAX_INITIAL_RESULT_HOLDER_CAPACITY);
-    for (int i = 0; i < _numAggrFunc; i++) {
-      _resultHolderArray[i] = _aggrFunctionContexts[i].getAggregationFunction()
-          .createGroupByResultHolder(initialCapacity, maxNumResults, trimSize);
-    }
-  }
-
-  /**
-   * Allocate storage for docId to group keys mapping.
-   */
-  private void initDocIdToGroupKeyMap() {
-    if (_hasMVGroupByColumns) {
-      // TODO: Revisit block fetching of multi-valued columns
-      _docIdToMVGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    } else {
-      _docIdToSVGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-  }
-
-  /**
-   * Initializes the following:
-   * <p> - Group key generator. </p>
-   * <p> - Result holders </p>
-   * <p> - Re-usable storage (eg docId to group key mapping) </p>
-   *
-   * This is separate from init(), as this can only happen within process as transform block is
-   * required to create group key generator.
-   *
-   * @param transformBlock Transform block to group by.
-   */
-  private void initGroupBy(TransformBlock transformBlock) {
-    if (_groupByInited) {
-      return;
-    }
-
-    for (String groupByColumn : _groupByColumns) {
-      BlockMetadata metadata = transformBlock.getBlockMetadata(groupByColumn);
-
-      if (!metadata.isSingleValue()) {
-        _hasMVGroupByColumns = true;
-      }
-
-      if (!metadata.hasDictionary()) {
-        _hasColumnsWithoutDictionary = true;
-      }
-    }
-
-    _groupKeyGenerator = (_hasColumnsWithoutDictionary) ? new NoDictionaryGroupKeyGenerator(_groupByColumns)
-        : new DefaultGroupKeyGenerator(transformBlock, _groupByColumns);
-
-    int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
-    initResultHolderArray(_numGroupsLimit, maxNumResults);
-    initDocIdToGroupKeyMap();
-    _groupByInited = true;
+    return new AggregationGroupByResult(_groupKeyGenerator, _functions, _resultHolders);
   }
 }

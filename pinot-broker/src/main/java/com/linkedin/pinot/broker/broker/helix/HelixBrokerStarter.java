@@ -15,17 +15,18 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
-import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
+import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.RoutingTableSelector;
-import com.linkedin.pinot.routing.RoutingTableSelectorFactory;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -38,16 +39,12 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PreConnectCallback;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
-import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.utils.ServiceStatus;
 
 
 /**
@@ -59,80 +56,90 @@ public class HelixBrokerStarter {
 
   private static final String PROPERTY_STORE = "PROPERTYSTORE";
 
+  private final HelixManager _spectatorHelixManager;
   private final HelixManager _helixManager;
   private final HelixAdmin _helixAdmin;
-  private final ZkClient _zkClient;
   private final Configuration _pinotHelixProperties;
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
   private final BrokerServerBuilder _brokerServerBuilder;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
+  private final MetricsRegistry _metricsRegistry;
+
+  // Set after broker is started, which is actually in the constructor.
+  private AccessControlFactory _accessControlFactory;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarter.class);
-
-  private static final String ROUTING_TABLE_SELECTOR_SUBSET_KEY =
-      "pinot.broker.routing.table.selector";
 
   private static final String ROUTING_TABLE_PARAMS_SUBSET_KEY =
       "pinot.broker.routing.table";
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
+    this(null, helixClusterName, zkServer, pinotHelixProperties);
+  }
+
+  public HelixBrokerStarter(String brokerHost, String helixClusterName, String zkServer, Configuration pinotHelixProperties)
+      throws Exception {
     LOGGER.info("Starting Pinot broker");
 
     _liveInstancesListener = new LiveInstancesChangeListenerImpl(helixClusterName);
 
     _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
+
+    if (brokerHost == null) {
+      brokerHost = NetUtil.getHostAddress();
+    }
+
     final String brokerId =
         _pinotHelixProperties.getString(
-                "instanceId",
+                CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
                 CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE
-                        + NetUtil.getHostAddress()
+                        + brokerHost
                         + "_"
                         + _pinotHelixProperties.getInt(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT,
                     CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT));
 
-    _pinotHelixProperties.addProperty(BrokerRequestHandler.BROKER_ID_CONFIG_KEY, brokerId);
+    _pinotHelixProperties.addProperty(CommonConstants.Broker.CONFIG_OF_BROKER_ID, brokerId);
     setupHelixSystemProperties();
 
     // Remove all white-spaces from the list of zkServers (if any).
     String zkServers = zkServer.replaceAll("\\s+", "");
 
-    LOGGER.info("Starting Zookeeper client");
-    _zkClient =
-        new ZkClient(getZkAddressForBroker(zkServers, helixClusterName),
-            ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
-    _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
-    RoutingTableSelector selector = RoutingTableSelectorFactory.getRoutingTableSelector(
-        pinotHelixProperties.subset(ROUTING_TABLE_SELECTOR_SUBSET_KEY), _propertyStore);
-
     LOGGER.info("Connecting Helix components");
-    // _brokerServerBuilder = startBroker();
-    _helixManager =
-        HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
-    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector, _helixManager,
+    // Connect spectator Helix manager.
+    _spectatorHelixManager =
+        HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.SPECTATOR, zkServers);
+    _spectatorHelixManager.connect();
+    _helixAdmin = _spectatorHelixManager.getClusterManagmentTool();
+    _propertyStore = _spectatorHelixManager.getHelixPropertyStore();
+    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, _spectatorHelixManager,
         pinotHelixProperties.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
-    final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
-    final StateModelFactory<?> stateModelFactory =
-        new BrokerResourceOnlineOfflineStateModelFactory(_helixManager, _helixExternalViewBasedRouting);
+    _metricsRegistry = _brokerServerBuilder.getMetricsRegistry();
+    ClusterChangeMediator clusterChangeMediator =
+        new ClusterChangeMediator(_helixExternalViewBasedRouting, _brokerServerBuilder.getBrokerMetrics());
+    _spectatorHelixManager.addExternalViewChangeListener(clusterChangeMediator);
+    _spectatorHelixManager.addInstanceConfigChangeListener(clusterChangeMediator);
+    _spectatorHelixManager.addLiveInstanceChangeListener(_liveInstancesListener);
+
+    // Connect participant Helix manager.
+    _helixManager =
+        HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
+    StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
+    StateModelFactory<?> stateModelFactory =
+        new BrokerResourceOnlineOfflineStateModelFactory(_spectatorHelixManager, _propertyStore, _helixExternalViewBasedRouting);
     stateMachineEngine.registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
-    _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, brokerId);
-
 
     // Register the service status handler
     ServiceStatus.setServiceStatusCallback(
-        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixAdmin, helixClusterName, brokerId));
-
-    ClusterChangeMediator clusterChangeMediator = new ClusterChangeMediator(_helixExternalViewBasedRouting,
-        _brokerServerBuilder.getBrokerMetrics());
-    _helixManager.addExternalViewChangeListener(clusterChangeMediator);
-    _helixManager.addInstanceConfigChangeListener(clusterChangeMediator);
-
-    _helixManager.addLiveInstanceChangeListener(_liveInstancesListener);
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, helixClusterName, brokerId),
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, helixClusterName, brokerId)
+        )));
 
     _brokerServerBuilder.getBrokerMetrics().addCallbackGauge(
         "helix.connected", new Callable<Long>() {
@@ -163,7 +170,7 @@ public class HelixBrokerStarter {
     InstanceConfig instanceConfig = _helixAdmin.getInstanceConfig(clusterName, instanceName);
     List<String> instanceTags = instanceConfig.getTags();
     if (instanceTags == null || instanceTags.isEmpty()) {
-      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_helixManager.getHelixPropertyStore())) {
+      if (ZKMetadataProvider.getClusterTenantIsolationEnabled(_propertyStore)) {
         _helixAdmin.addInstanceTag(clusterName, instanceName,
             ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
       } else {
@@ -181,6 +188,7 @@ public class HelixBrokerStarter {
             _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener);
     brokerServerBuilder.buildNetwork();
     brokerServerBuilder.buildHTTP();
+    _accessControlFactory = brokerServerBuilder.getAccessControlFactory();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
     brokerServerBuilder.start();
 
@@ -198,6 +206,10 @@ public class HelixBrokerStarter {
       }
     });
     return brokerServerBuilder;
+  }
+
+  public AccessControlFactory getAccessControlFactory() {
+    return _accessControlFactory;
   }
 
   /**
@@ -226,6 +238,10 @@ public class HelixBrokerStarter {
     return StringUtils.join(tokens, ",");
   }
 
+  public HelixManager getSpectatorHelixManager() {
+    return _spectatorHelixManager;
+  }
+
   public HelixExternalViewBasedRouting getHelixExternalViewBasedRouting() {
     return _helixExternalViewBasedRouting;
   }
@@ -241,7 +257,7 @@ public class HelixBrokerStarter {
     configuration.addProperty("pinot.broker.timeoutMs", 500 * 1000L);
 
     final HelixBrokerStarter pinotHelixBrokerStarter =
-        new HelixBrokerStarter("quickstart", "localhost:2122", configuration);
+        new HelixBrokerStarter(null, "quickstart", "localhost:2122", configuration);
     return pinotHelixBrokerStarter;
   }
 
@@ -253,10 +269,14 @@ public class HelixBrokerStarter {
       _helixManager.disconnect();
     }
 
-    if (_zkClient != null) {
-      LOGGER.info("Closing Zookeeper client");
-      _zkClient.close();
+    if (_spectatorHelixManager != null) {
+      LOGGER.info("Disconnecting spectator Helix manager");
+      _spectatorHelixManager.disconnect();
     }
+  }
+
+  public MetricsRegistry getMetricsRegistry() {
+    return _metricsRegistry;
   }
 
   public static void main(String[] args) throws Exception {

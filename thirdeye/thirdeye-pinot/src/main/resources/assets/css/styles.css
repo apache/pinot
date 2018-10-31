@@ -1,7 +1,7 @@
 @font-face {
 	font-family: SourceSansPro;
 	src: url('fonts/source-sans-pro/SourceSansPro-Regular.otf');
-	font-weight:regular
+	font-weight: normal;
 }
 @font-face {
 	font-family: SourceSansPro;
@@ -11,7 +11,7 @@
 @font-face {
 	font-family: SourceSansPro;
 	src: url('fonts/source-sans-pro/SourceSansPro-Semibold.otf');
-	font-weight: semibold;
+	font-weight: 600;
 }
 
 @font-face {

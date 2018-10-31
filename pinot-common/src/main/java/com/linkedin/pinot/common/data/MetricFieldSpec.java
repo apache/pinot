@@ -16,9 +16,9 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.google.gson.JsonObject;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
@@ -30,6 +30,7 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
  * <p>{@link DerivedMetricType} is used when the metric field is derived from some other fields (e.g. HLL).
  * <p><code>fieldSize</code> is used to mark the size of the value when the size is not constant (e.g. STRING).
  */
+@SuppressWarnings("unused")
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MetricFieldSpec extends FieldSpec {
   private static final int UNDEFINED_FIELD_SIZE = -1;
@@ -45,62 +46,70 @@ public final class MetricFieldSpec extends FieldSpec {
 
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType) {
     super(name, dataType, true);
+    _fieldSize = _dataType.size();
   }
 
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, @Nonnull Object defaultNullValue) {
     super(name, dataType, true, defaultNullValue);
+    _fieldSize = _dataType.size();
   }
 
   // For derived metric fields.
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, int fieldSize,
       @Nonnull DerivedMetricType derivedMetricType) {
     super(name, dataType, true);
-    Preconditions.checkArgument(fieldSize > 0, "Field size must be a positive number.");
-    Preconditions.checkNotNull(derivedMetricType);
-
-    this._fieldSize = fieldSize;
-    this._derivedMetricType = derivedMetricType;
+    setFieldSize(fieldSize);
+    _derivedMetricType = derivedMetricType;
   }
 
   // For derived metric fields.
   public MetricFieldSpec(@Nonnull String name, @Nonnull DataType dataType, int fieldSize,
       @Nonnull DerivedMetricType derivedMetricType, @Nonnull Object defaultNullValue) {
     super(name, dataType, true, defaultNullValue);
-    Preconditions.checkArgument(fieldSize > 0, "Field size must be a positive number.");
-    Preconditions.checkNotNull(derivedMetricType);
-
-    this._fieldSize = fieldSize;
-    this._derivedMetricType = derivedMetricType;
+    setFieldSize(fieldSize);
+    _derivedMetricType = derivedMetricType;
   }
 
   public int getFieldSize() {
-    if (_fieldSize == UNDEFINED_FIELD_SIZE) {
-      return getDataType().size();
-    } else {
-      return _fieldSize;
-    }
+    return _fieldSize;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setFieldSize(int fieldSize) {
-    this._fieldSize = fieldSize;
+    Preconditions.checkArgument(fieldSize > 0, "Field size: " + fieldSize + " is not a positive number.");
+    if (_dataType != null && _dataType != DataType.STRING) {
+      Preconditions.checkArgument(fieldSize == _dataType.size(),
+          "Field size: " + fieldSize + " does not match data type: " + _dataType);
+    }
+    _fieldSize = fieldSize;
   }
 
-  public @Nullable DerivedMetricType getDerivedMetricType() {
+  public DerivedMetricType getDerivedMetricType() {
     return _derivedMetricType;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setDerivedMetricType(@Nonnull DerivedMetricType derivedMetricType) {
-    this._derivedMetricType = derivedMetricType;
+  public void setDerivedMetricType(DerivedMetricType derivedMetricType) {
+    _derivedMetricType = derivedMetricType;
   }
 
   @JsonIgnore
+  @Nonnull
   @Override
   public FieldType getFieldType() {
     return FieldType.METRIC;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  @Override
+  public void setDataType(@Nonnull DataType dataType) {
+    super.setDataType(dataType);
+    if (_dataType != DataType.STRING) {
+      _fieldSize = _dataType.size();
+    }
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
   @Override
   public void setSingleValueField(boolean isSingleValueField) {
     Preconditions.checkArgument(isSingleValueField, "Unsupported multi-value for metric field.");
@@ -124,36 +133,39 @@ public final class MetricFieldSpec extends FieldSpec {
     HLL
   }
 
+  @Nonnull
   @Override
-  public String toString() {
-    return "< field type: METRIC, field name: " + getName() + ", data type: " + getDataType() + ", default null value: "
-        + getDefaultNullValue() + ", field size: " + getFieldSize() + ", derived metric type: " + _derivedMetricType
-        + " >";
+  public JsonObject toJsonObject() {
+    JsonObject jsonObject = super.toJsonObject();
+    if (_dataType == DataType.STRING && _fieldSize != UNDEFINED_FIELD_SIZE) {
+      jsonObject.addProperty("fieldSize", _fieldSize);
+    }
+    if (_derivedMetricType != null) {
+      jsonObject.addProperty("derivedMetricType", _derivedMetricType.name());
+    }
+    return jsonObject;
   }
 
   @Override
-  public boolean equals(Object object) {
-    if (this == object) {
-      return true;
-    }
-    if (object instanceof MetricFieldSpec) {
-      MetricFieldSpec that = (MetricFieldSpec) object;
+  public String toString() {
+    return "< field type: METRIC, field name: " + _name + ", data type: " + _dataType + ", default null value: "
+        + _defaultNullValue + ", field size: " + _fieldSize + ", derived metric type: " + _derivedMetricType + " >";
+  }
 
-      return getName().equals(that.getName())
-          && getDataType() == that.getDataType()
-          && getDefaultNullValue().equals(that.getDefaultNullValue())
-          && getFieldSize() == that.getFieldSize()
-          && _derivedMetricType == that._derivedMetricType;
+  @Override
+  public boolean equals(Object o) {
+    if (!super.equals(o)) {
+      return false;
     }
-    return false;
+
+    MetricFieldSpec that = (MetricFieldSpec) o;
+    return EqualityUtils.isEqual(_fieldSize, that._fieldSize) && EqualityUtils.isEqual(_derivedMetricType,
+        that._derivedMetricType);
   }
 
   @Override
   public int hashCode() {
-    int result = getName().hashCode();
-    result = EqualityUtils.hashCodeOf(result, getDataType());
-    result = EqualityUtils.hashCodeOf(result, getDefaultNullValue());
-    result = EqualityUtils.hashCodeOf(result, getFieldSize());
+    int result = EqualityUtils.hashCodeOf(super.hashCode(), _fieldSize);
     result = EqualityUtils.hashCodeOf(result, _derivedMetricType);
     return result;
   }

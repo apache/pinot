@@ -17,18 +17,17 @@ package com.linkedin.pinot.tools.admin.command;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.tools.Command;
-import org.codehaus.jackson.map.ObjectMapper;
+import java.io.File;
+import java.io.FileWriter;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.PrintWriter;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Class for command to convert avro schema to pinot schema. Given that it is not always possible to
@@ -36,81 +35,73 @@ import java.util.concurrent.TimeUnit;
  * manual editing on top.
  */
 public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AddTenantCommand.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(AvroSchemaToPinotSchema.class);
 
-  @Option(name = "-avroSchemaFileName", required = false, forbids = {"-avroDataFileName"},
-      metaVar = "<String>", usage = "Path to avro schema file.")
-  String _avroSchemaFileName;
+  @Option(name = "-avroSchemaFile", forbids = {"-avroDataFile"}, metaVar = "<String>", usage = "Path to avro schema file.")
+  String _avroSchemaFile;
 
-  @Option(name = "-avroDataFileName", required = false, forbids = {"-avroSchemaFileName"},
-      metaVar = "<String>", usage = "Path to avro schema file.")
-  String _avroDataFileName;
+  @Option(name = "-avroDataFile", forbids = {"-avroSchemaFile"}, metaVar = "<String>", usage = "Path to avro data file.")
+  String _avroDataFile;
 
-  @Option(name = "-pinotSchemaFileName", required = false, metaVar = "<string>", usage = "Path to pinot schema file.")
-  String _pinotSchemaFileName;
+  @Option(name = "-outputDir", required = true, metaVar = "<string>", usage = "Path to output directory")
+  String _outputDir;
 
-  @Option(name = "-dimensions", required = false, metaVar = "<string>", usage = "Comma seperated dimension columns.")
+  @Option(name = "-pinotSchemaName", required = true, metaVar = "<string>", usage = "Pinot schema name")
+  String _pinotSchemaName;
+
+  @Option(name = "-dimensions", metaVar = "<string>", usage = "Comma separated dimension column names.")
   String _dimensions;
 
-  @Option(name = "-metrics", required = false, metaVar = "<string>", usage = "Comma seperated metric columns.")
+  @Option(name = "-metrics", metaVar = "<string>", usage = "Comma separated metric column names.")
   String _metrics;
 
-  @Option(name = "-timeColumnName", required = false, metaVar = "<string>", usage = "Name of Time Column.")
+  @Option(name = "-timeColumnName", metaVar = "<string>", usage = "Name of the time column.")
   String _timeColumnName;
 
-  @Option(name = "-timeUnit", required = false, metaVar = "<string>", usage = "Unit for time column.")
+  @Option(name = "-timeUnit", metaVar = "<string>", usage = "Unit of the time column (default DAYS).")
   TimeUnit _timeUnit = TimeUnit.DAYS;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @SuppressWarnings("FieldCanBeLocal")
+  @Option(name = "-help", help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
   public boolean execute() throws Exception {
-    Schema schema = null;
+    if (_dimensions == null && _metrics == null && _timeColumnName == null) {
+      LOGGER.error(
+          "Error: Missing required argument, please specify at least one of -dimensions, -metrics, -timeColumnName");
+      return false;
+    }
 
-    if (_avroSchemaFileName != null) {
-      schema = AvroUtils.getPinotSchemaFromAvroSchemaFile(_avroSchemaFileName, buildFieldTypesMap(), _timeUnit);
-    } else if (_avroDataFileName != null) {
-      schema = AvroUtils.extractSchemaFromAvro(new File(_avroDataFileName));
+    Schema schema;
+    if (_avroSchemaFile != null) {
+      schema = AvroUtils.getPinotSchemaFromAvroSchemaFile(new File(_avroSchemaFile), buildFieldTypesMap(), _timeUnit);
+    } else if (_avroDataFile != null) {
+      schema = AvroUtils.getPinotSchemaFromAvroDataFile(new File(_avroDataFile), buildFieldTypesMap(), _timeUnit);
     } else {
-      LOGGER.error("Error: Missing required argument, please specify either -avroSchemaFileName, or -avroDataFileName");
+      LOGGER.error("Error: Missing required argument, please specify either -avroSchemaFile, or -avroDataFile");
       return false;
     }
 
-    if (schema == null) {
-      LOGGER.error("Error: Could not read avro schema from file.");
-      return false;
+    schema.setSchemaName(_pinotSchemaName);
+
+    File outputDir = new File(_outputDir);
+    if (!outputDir.isDirectory()) {
+      LOGGER.error("ERROR: Output directory: %s does not exist or is not a directory", _outputDir);
     }
+    File outputFile = new File(outputDir, _pinotSchemaName + ".json");
+    LOGGER.info("Store Pinot schema to file: {}", outputFile.getAbsolutePath());
 
-    String avroFileName = _avroSchemaFileName;
-    if (avroFileName == null) {
-      avroFileName = _avroDataFileName;
+    try (FileWriter writer = new FileWriter(outputFile)) {
+      writer.write(schema.toString());
     }
-
-    // Remove extension
-    String schemaName = avroFileName.replaceAll("\\..*", "");
-    schema.setSchemaName(schemaName);
-
-    if (_pinotSchemaFileName == null) {
-      _pinotSchemaFileName = schemaName + ".json";
-
-      LOGGER.info("Using {} as the Pinot schema file name", _pinotSchemaFileName);
-    }
-
-    ObjectMapper objectMapper = new ObjectMapper();
-    String schemaString = objectMapper.defaultPrettyPrintingWriter().writeValueAsString(schema);
-
-    PrintWriter printWriter = new PrintWriter(_pinotSchemaFileName);
-    printWriter.println(schemaString);
-    printWriter.close();
 
     return true;
   }
 
   @Override
   public String description() {
-    return "Converting Avro schema to Pinot schema.";
+    return "Extracting Pinot schema file from Avro schema or data file.";
   }
 
   @Override
@@ -120,9 +111,9 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
 
   @Override
   public String toString() {
-    return "AvroSchemaToPinotSchema -avroSchemaFileName " + _avroSchemaFileName + " -pinotSchemaFileName " +
-        _pinotSchemaFileName + " -dimensions " + _dimensions + " -metrics " + _metrics + " -timeColumnName " +
-        _timeColumnName + " -timeUnit " + _timeUnit;
+    return "AvroSchemaToPinotSchema -avroSchemaFile " + _avroSchemaFile + " -avroDataFile " + _avroDataFile
+        + " -outputDir " + _outputDir + " -pinotSchemaName " + _pinotSchemaName + " -dimensions " + _dimensions
+        + " -metrics " + _metrics + " -timeColumnName " + _timeColumnName + " -timeUnit " + _timeUnit;
   }
 
   /**
@@ -132,19 +123,17 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
    * @return The column <-> fieldType map.
    */
   private Map<String, FieldSpec.FieldType> buildFieldTypesMap() {
-    Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<String, FieldSpec.FieldType>();
+    Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
     if (_dimensions != null) {
       for (String column : _dimensions.split("\\s*,\\s*")) {
         fieldTypes.put(column, FieldSpec.FieldType.DIMENSION);
       }
     }
-
     if (_metrics != null) {
       for (String column : _metrics.split("\\s*,\\s*")) {
         fieldTypes.put(column, FieldSpec.FieldType.METRIC);
       }
     }
-
     if (_timeColumnName != null) {
       fieldTypes.put(_timeColumnName, FieldSpec.FieldType.TIME);
     }

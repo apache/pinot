@@ -1,8 +1,13 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -46,6 +51,95 @@ public class AnomalyUtils {
       }
       LOG.warn("{} merged anomalies overlap with this window {} -- {}. Anomalies: {}", overlappedAnomalies.size(),
           windowStart, windowEnd, sb.toString());
+    }
+  }
+
+  /**
+   * This function checks if the input list of merged anomalies has at least one positive label.
+   * It is a helper for alert filter auto tuning
+   * @param mergedAnomalyResultDTOS
+   * @return true if the list of merged anomalies has at least one positive label, false otherwise
+   */
+  public static Boolean checkHasLabels(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS){
+    for(MergedAnomalyResultDTO anomaly: mergedAnomalyResultDTOS){
+      AnomalyFeedback feedback = anomaly.getFeedback();
+      if (feedback != null){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Safely and quietly shutdown executor service. This method waits until all threads are complete,
+   * or timeout occurs (5-minutes), or the current thread is interrupted, whichever happens first.
+   *
+   * @param executorService the executor service to be shutdown.
+   * @param ownerClass the class that owns the executor service; it could be null.
+   */
+  public static void safelyShutdownExecutionService(ExecutorService executorService, Class ownerClass) {
+    safelyShutdownExecutionService(executorService, 300, ownerClass);
+  }
+
+  /**
+   * Safely and quietly shutdown executor service. This method waits until all threads are complete,
+   * or number of retries is reached, or the current thread is interrupted, whichever happens first.
+   *
+   * @param executorService the executor service to be shutdown.
+   * @param maxWaitTimeInSeconds max wait time for threads that are still running.
+   * @param ownerClass the class that owns the executor service; it could be null.
+   */
+  public static void safelyShutdownExecutionService(ExecutorService executorService, int maxWaitTimeInSeconds,
+      Class ownerClass) {
+    if (executorService == null) {
+      return;
+    }
+    executorService.shutdown(); // Prevent new tasks from being submitted
+    try {
+      // If not all threads are complete, then a retry loop waits until all threads are complete, or timeout occurs,
+      // or the current thread is interrupted, whichever happens first.
+      for (int retryCount = 0; retryCount < maxWaitTimeInSeconds; ++retryCount) {
+        // Wait a while for existing tasks to terminate
+        if (!executorService.awaitTermination(1, TimeUnit.SECONDS)) {
+          // Force terminate all currently executing tasks if they support such operation
+          executorService.shutdownNow();
+          if (retryCount % 10 == 0) {
+            if (ownerClass != null) {
+              LOG.info("Trying to terminate thread pool for class {}", ownerClass.getSimpleName());
+            } else {
+              LOG.info("Trying to terminate thread pool: {}.", executorService);
+            }
+          }
+        } else {
+          break; // break out retry loop if all threads are complete
+        }
+      }
+    } catch (InterruptedException e) { // If current thread is interrupted
+      executorService.shutdownNow(); // Interrupt all currently executing tasks for the last time
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  /**
+   * This is a subclass describing anomalies features as training data for alert filter
+   */
+  public static class MetaDataNode {
+    public double windowSize;
+    public double severity;
+    public String startTimeISO;
+    public String endTimeISO;
+    public String functionName;
+    public String feedback;
+    public long anomalyId;
+
+    public MetaDataNode(MergedAnomalyResultDTO anomaly){
+      this.windowSize = 1. * (anomaly.getEndTime() - anomaly.getStartTime()) / 3600000L;
+      this.severity = anomaly.getWeight();
+      this.startTimeISO = new Timestamp(anomaly.getStartTime()).toString();
+      this.endTimeISO = new Timestamp(anomaly.getEndTime()).toString();
+      this.functionName = anomaly.getFunction().getFunctionName();
+      this.feedback = (anomaly.getFeedback() == null)? "null" : String.valueOf(anomaly.getFeedback().getFeedbackType());
+      this.anomalyId = anomaly.getId();
     }
   }
 }

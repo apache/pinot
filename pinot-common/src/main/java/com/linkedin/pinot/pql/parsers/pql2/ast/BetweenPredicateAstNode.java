@@ -17,6 +17,7 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.HavingQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 import java.util.Collections;
 
@@ -25,38 +26,75 @@ import java.util.Collections;
  * AST for the BETWEEN PQL clause.
  */
 public class BetweenPredicateAstNode extends PredicateAstNode {
-  private String _identifier;
-
   @Override
   public void addChild(AstNode childNode) {
     if (childNode instanceof IdentifierAstNode) {
       IdentifierAstNode node = (IdentifierAstNode) childNode;
       _identifier = node.getName();
+    } else if (childNode instanceof FunctionCallAstNode) {
+      _function = (FunctionCallAstNode) childNode;
     } else {
       super.addChild(childNode);
     }
   }
 
-  public String getIdentifier() {
-    return _identifier;
+  public String getLeftValue() {
+    return ((LiteralAstNode) getChildren().get(0)).getValueAsString();
+  }
+
+  public String getRightValue() {
+    return ((LiteralAstNode) getChildren().get(1)).getValueAsString();
   }
 
   @Override
   public String toString() {
-    return "BetweenPredicateAstNode{" + "_identifier='" + _identifier + '\'' + '}';
+    if (_identifier != null) {
+      return "BetweenPredicateAstNode{" + "_identifier='" + _identifier + '\'' + '}';
+    } else if (_function != null) {
+      return "BetweenPredicateAstNode{" + "_function='" + _function.toString() + '\'' + '}';
+    } else {
+      return "BetweenPredicateAstNode{_identifier/_function= null}";
+    }
   }
 
   @Override
   public FilterQueryTree buildFilterQueryTree() {
+    if (_identifier == null) {
+      throw new Pql2CompilationException("Between predicate has no identifier");
+    }
     if (getChildren().size() == 2) {
       try {
         LiteralAstNode left = (LiteralAstNode) getChildren().get(0);
         LiteralAstNode right = (LiteralAstNode) getChildren().get(1);
-        return new FilterQueryTree(_identifier, Collections.singletonList("[" + left.getValueAsString() + "\t\t" + right.getValueAsString() + "]"),
+        return new FilterQueryTree(_identifier,
+            Collections.singletonList("[" + left.getValueAsString() + "\t\t" + right.getValueAsString() + "]"),
             FilterOperator.RANGE, null);
       } catch (ClassCastException e) {
-        throw new Pql2CompilationException("BETWEEN clause was expecting two literal AST nodes, got " +
-            getChildren().get(0) + " and " + getChildren().get(1));
+        throw new Pql2CompilationException(
+            "BETWEEN clause was expecting two literal AST nodes, got " + getChildren().get(0) + " and "
+                + getChildren().get(1));
+      }
+    } else {
+      throw new Pql2CompilationException("BETWEEN clause does not have two children nodes");
+    }
+  }
+
+  @Override
+  public HavingQueryTree buildHavingQueryTree() {
+    if (_function == null) {
+      throw new Pql2CompilationException("Between predicate has no function call specified");
+    }
+    if (getChildren().size() == 2) {
+      try {
+        LiteralAstNode left = (LiteralAstNode) getChildren().get(0);
+        LiteralAstNode right = (LiteralAstNode) getChildren().get(1);
+        return new HavingQueryTree(_function.buildAggregationInfo(),
+            Collections.singletonList("[" + left.getValueAsString() + "\t\t" + right.getValueAsString() + "]"),
+            FilterOperator.RANGE, null);
+      } catch (ClassCastException e) {
+        throw new Pql2CompilationException(
+            "BETWEEN clause was expecting two literal AST nodes, got " + getChildren().get(0) + " and "
+                + getChildren().get(1));
       }
     } else {
       throw new Pql2CompilationException("BETWEEN clause does not have two children nodes");

@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-
-
 /**
  * Jun 30, 2014
  *
@@ -55,42 +52,16 @@ public class V1Constants {
     public static final String NULL_BOOLEAN = Boolean.toString(false);
   }
 
-  public static class Idx {
-    public static final int[] SORTED_INDEX_COLUMN_SIZE = new int[] { 4, 4 };
-  }
-
   public static class Dict {
-    public static final int[] INT_DICTIONARY_COL_SIZE = new int[] { 4 };
-    public static final int[] LONG_DICTIONARY_COL_SIZE = new int[] { 8 };
-    public static final int[] FLOAT_DICTIONARY_COL_SIZE = new int[] { 4 };
-    public static final int[] DOUBLE_DICTIONARY_COL_SIZE = new int[] { 8 };
-    public static final String FILE_EXTENTION = ".dict";
-
-    public static int[] getSingleValueColumnSizeFor(FieldSpec spec) {
-      switch (spec.getDataType()) {
-        case INT:
-          return INT_DICTIONARY_COL_SIZE;
-        case FLOAT:
-          return FLOAT_DICTIONARY_COL_SIZE;
-        case DOUBLE:
-          return DOUBLE_DICTIONARY_COL_SIZE;
-        case LONG:
-          return LONG_DICTIONARY_COL_SIZE;
-        default:
-          return new int[] {};
-      }
-    }
-
+    public static final String FILE_EXTENSION = ".dict";
   }
 
   public static class Indexes {
-    public static final String UN_SORTED_SV_FWD_IDX_FILE_EXTENTION = ".sv.unsorted.fwd";
-    public static final String RAW_SV_FWD_IDX_FILE_EXTENTION = ".sv.raw.fwd";
-    public static final String SORTED_FWD_IDX_FILE_EXTENTION = ".sv.sorted.fwd";
-    public static final String UN_SORTED_MV_FWD_IDX_FILE_EXTENTION = ".mv.fwd";
+    public static final String UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION = ".sv.unsorted.fwd";
+    public static final String SORTED_SV_FORWARD_INDEX_FILE_EXTENSION = ".sv.sorted.fwd";
+    public static final String RAW_SV_FORWARD_INDEX_FILE_EXTENSION = ".sv.raw.fwd";
+    public static final String UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION = ".mv.fwd";
     public static final String BITMAP_INVERTED_INDEX_FILE_EXTENSION = ".bitmap.inv";
-    public static final String SORTED_INVERTED_INDEX_FILE_EXTENSION = ".sorted.inv";
-    public static final String INTARRAY_INVERTED_INDEX_FILE_EXTENSION = ".intArray.inv";
   }
 
   public static class MetadataKeys {
@@ -119,6 +90,7 @@ public class V1Constants {
       public static final String TIME_COLUMN_NAME = "segment.time.column.name";
       public static final String TIME_UNIT = "segment.time.unit";
       public static final String TIME_INTERVAL = "segment.time.interval";
+      public static final String DATETIME_COLUMNS = "segment.datetime.column.names";
       public static final String CUSTOM_PROPERTIES_PREFIX = "segment.custom";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
       public static final String SEGMENT_TOTAL_RAW_DOCS = "segment.total.raw.docs";
@@ -159,6 +131,14 @@ public class V1Constants {
       public static final String DEFAULT_NULL_VALUE = "defaultNullValue";
       public static final String DERIVED_METRIC_TYPE = "derivedMetricType";
       public static final String ORIGIN_COLUMN = "originColumn";
+      public static final String MIN_VALUE = "minValue";
+      public static final String MAX_VALUE = "maxValue";
+      public static final String PARTITION_FUNCTION = "partitionFunction";
+      public static final String NUM_PARTITIONS = "numPartitions";
+      public static final String PARTITION_VALUES = "partitionValues";
+      public static final String DATETIME_FORMAT = "datetimeFormat";
+      public static final String DATETIME_GRANULARITY = "datetimeGranularity";
+
 
       private static final String COLUMN_PROPS_KEY_PREFIX = "column.";
       public static String getKeyFor(String column, String key) {

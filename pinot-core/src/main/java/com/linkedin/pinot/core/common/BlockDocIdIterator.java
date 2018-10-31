@@ -15,29 +15,32 @@
  */
 package com.linkedin.pinot.core.common;
 
+/**
+ * The interface <code>BlockDocIdIterator</code> represents the iterator for <code>BlockDocIdSet</code>. The document
+ * ids returned from the iterator should be in ascending order.
+ */
 public interface BlockDocIdIterator {
-  /**
-   * returns the currentDocId the iterator is currently pointing to, -1 if
-   * next/advance is not yet called, EOF if the iteration has exhausted
-   *
-   * @return
-   */
-  int currentDocId();
 
   /**
-   * advances to next document in the set and returns the nextDocId, EOF if
-   * there are no more docs
+   * Get the next document id.
    *
-   * @return
+   * @return Next document id or EOF if there is no more documents
    */
   int next();
 
   /**
-   * Moves to first entry beyond current docId whose docId is equal or greater
-   * than targetDocId
-   * @param targetDocId
-   * @return docId that is beyond current docId or EOF if no documents exists that is &gt;= targetDocId
+   * Advance to the first document whose id is equal or greater than the given target document id.
+   * <p>If the given target document id is smaller or equal to the current document id, then return the current one.
+   *
+   * @param targetDocId The target document id
+   * @return First document id that is equal or greater than target or EOF if no document matches
    */
   int advance(int targetDocId);
 
+  /**
+   * Get the current document id that was returned by the previous call to next() or advance().
+   *
+   * @return The current document id, -1 if next/advance is not called yet, EOF if the iteration has exhausted
+   */
+  int currentDocId();
 }

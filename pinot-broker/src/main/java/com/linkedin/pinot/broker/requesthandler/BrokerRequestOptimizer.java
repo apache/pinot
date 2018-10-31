@@ -26,18 +26,20 @@ import java.util.List;
 public class BrokerRequestOptimizer {
   private static final List<? extends FilterQueryTreeOptimizer> FILTER_QUERY_TREE_OPTIMIZERS = Arrays.asList(
       new FlattenNestedPredicatesFilterQueryTreeOptimizer(),
-      new MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer()
+      new MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer(),
+      new RangeMergeOptimizer()
   );
 
   /**
    * Optimizes the given broker request.
    *
    * @param brokerRequest BrokerRequest that is to be optimized
+   * @param timeColumn Time column for the table
    * @return An optimized request
    */
-  public BrokerRequest optimize(BrokerRequest brokerRequest) {
+  public BrokerRequest optimize(BrokerRequest brokerRequest, String timeColumn) {
     OptimizationFlags optimizationFlags = OptimizationFlags.getOptimizationFlags(brokerRequest);
-    optimizeFilterQueryTree(brokerRequest, optimizationFlags);
+    optimizeFilterQueryTree(brokerRequest, timeColumn, optimizationFlags);
 
     return brokerRequest;
   }
@@ -45,8 +47,10 @@ public class BrokerRequestOptimizer {
   /**
    * Optimizes the filter query tree of a broker request in place.
    * @param brokerRequest The broker request to optimize
+   * @param timeColumn time column
    */
-  private void optimizeFilterQueryTree(BrokerRequest brokerRequest, OptimizationFlags optimizationFlags) {
+  private void optimizeFilterQueryTree(BrokerRequest brokerRequest, String timeColumn,
+      OptimizationFlags optimizationFlags) {
     FilterQueryTree filterQueryTree = null;
     FilterQuery q = brokerRequest.getFilterQuery();
 
@@ -55,16 +59,21 @@ public class BrokerRequestOptimizer {
     }
 
     filterQueryTree = RequestUtils.buildFilterQuery(q.getId(), brokerRequest.getFilterSubQueryMap().getFilterQueryMap());
+    FilterQueryOptimizerRequest.FilterQueryOptimizerRequestBuilder builder =
+        new FilterQueryOptimizerRequest.FilterQueryOptimizerRequestBuilder();
 
+    FilterQueryOptimizerRequest request = builder.setFilterQueryTree(filterQueryTree).setTimeColumn(timeColumn).build();
     if (optimizationFlags == null) {
       for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
-        filterQueryTree = filterQueryTreeOptimizer.optimize(filterQueryTree);
+        filterQueryTree = filterQueryTreeOptimizer.optimize(request);
+        request.setFilterQueryTree(filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
       }
     } else {
       if (optimizationFlags.isOptimizationEnabled("filterQueryTree")) {
         for (FilterQueryTreeOptimizer filterQueryTreeOptimizer : FILTER_QUERY_TREE_OPTIMIZERS) {
           if (optimizationFlags.isOptimizationEnabled(filterQueryTreeOptimizer.getOptimizationName())) {
-            filterQueryTree = filterQueryTreeOptimizer.optimize(filterQueryTree);
+            filterQueryTree = filterQueryTreeOptimizer.optimize(request);
+            request.setFilterQueryTree(filterQueryTree); // Optimizers may return a new tree instead of in-place optimization
           }
         }
       }

@@ -15,30 +15,32 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import com.linkedin.pinot.core.realtime.StreamProviderConfig;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import kafka.consumer.ConsumerConfig;
 import org.joda.time.Duration;
 import org.joda.time.Period;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
+
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-import kafka.consumer.ConsumerConfig;
 
 
 public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig {
   private static final Map<String, String> defaultProps;
 
-  public static final int FIVE_MILLION = 5000000;
+  private static final int DEFAULT_MAX_REALTIME_ROWS_COUNT = 5000000;
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
   public static final long ONE_HOUR = ONE_MINUTE_IN_MILLSEC * 60;
 
@@ -68,16 +70,20 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
         .toFormatter();
   }
 
+  public static int getDefaultMaxRealtimeRowsCount() {
+    return DEFAULT_MAX_REALTIME_ROWS_COUNT;
+  }
+
   private String kafkaTopicName;
   private String zkString;
   private String groupId;
-  private KafkaMessageDecoder decoder;
+  private StreamMessageDecoder decoder;
   private String decodeKlass;
   private Schema indexingSchema;
   private Map<String, String> decoderProps;
   private Map<String, String> kafkaConsumerProps;
   private long segmentTimeInMillis = ONE_HOUR;
-  private int realtimeRecordsThreshold = FIVE_MILLION;
+  private int realtimeRecordsThreshold = DEFAULT_MAX_REALTIME_ROWS_COUNT;
 
   public KafkaHighLevelStreamProviderConfig() {
 
@@ -169,8 +175,12 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     return new ConsumerConfig(props);
   }
 
-  public KafkaMessageDecoder getDecoder() throws Exception {
-    KafkaMessageDecoder ret = (KafkaMessageDecoder) Class.forName(decodeKlass).newInstance();
+  public StreamMessageDecoder getDecoder() throws Exception {
+    return getDecoder(decodeKlass);
+  }
+
+  public StreamMessageDecoder getDecoder(String decodeClass) throws Exception {
+    StreamMessageDecoder ret = (StreamMessageDecoder) Class.forName(decodeClass).newInstance();
     ret.init(decoderProps, indexingSchema, kafkaTopicName);
     return ret;
   }
@@ -181,13 +191,13 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   }
 
   @Override
-  public void init(AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
+  public void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
     this.indexingSchema = schema;
     if (instanceMetadata != null) {
       // For LL segments, instanceZkMetadata will be null
       this.groupId = instanceMetadata.getGroupId(tableConfig.getTableName());
     }
-    KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    StreamMetadata kafkaMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     this.kafkaTopicName = kafkaMetadata.getKafkaTopicName();
     this.decodeKlass = kafkaMetadata.getDecoderClass();
     this.decoderProps = kafkaMetadata.getDecoderProperties();

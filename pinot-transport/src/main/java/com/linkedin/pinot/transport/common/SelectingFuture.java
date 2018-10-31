@@ -26,6 +26,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.response.ServerInstance;
 
 
 /**
@@ -38,19 +39,18 @@ import org.slf4j.LoggerFactory;
  *
  * This future holds the first successfully completed future that notified (if any present) or
  * the last error (if all underlying futures failed)
- * @param <K> Key type used in underlying response futures
  * @param <T> Response object.
  */
-public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, T> {
+public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
   protected static Logger LOGGER = LoggerFactory.getLogger(SelectingFuture.class);
 
-  private final List<KeyedFuture<K, T>> _futuresList;
+  private final List<ServerResponseFuture<T>> _futuresList;
 
   // First successful Response
-  private volatile Map<K, T> _delayedResponse;
+  private volatile Map<ServerInstance, T> _delayedResponse;
 
   // Last Exception in case of error
-  private volatile Map<K, Throwable> _error;
+  private volatile Map<ServerInstance, Throwable> _error;
 
   private final String _name;
 
@@ -58,7 +58,7 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
 
   public SelectingFuture(String name) {
     _name = name;
-    _futuresList = new ArrayList<KeyedFuture<K, T>>();
+    _futuresList = new ArrayList<ServerResponseFuture<T>>();
     _delayedResponse = null;
     _error = null;
   }
@@ -67,7 +67,7 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
    * Start the future. This will add listener to the underlying futures. This method needs to be called
    * as soon the composite future is constructed and before any other method is invoked.
    */
-  public void start(Collection<KeyedFuture<K, T>> futuresList) {
+  public void start(Collection<ServerResponseFuture<T>> futuresList) {
     boolean started = super.start();
 
     if (!started) {
@@ -78,7 +78,7 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
 
     _futuresList.addAll(futuresList);
     _latch = new CountDownLatch(futuresList.size());
-    for (KeyedFuture<K, T> entry : _futuresList) {
+    for (ServerResponseFuture<T> entry : _futuresList) {
       if (null != entry) {
         addResponseFutureListener(entry);
       }
@@ -91,24 +91,24 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
    */
   @Override
   protected void cancelUnderlyingFutures() {
-    for (KeyedFuture<K, T> entry : _futuresList) {
+    for (ServerResponseFuture<T> entry : _futuresList) {
       entry.cancel(true);
     }
   }
 
   @Override
-  public Map<K, T> get() throws InterruptedException, ExecutionException {
+  public Map<ServerInstance, T> get() throws InterruptedException, ExecutionException {
     _latch.await();
     return _delayedResponse;
   }
 
   @Override
-  public Map<K, Throwable> getError() {
+  public Map<ServerInstance, Throwable> getError() {
     return _error;
   }
 
   @Override
-  public Map<K, T> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+  public Map<ServerInstance, T> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
     _latch.await(timeout, unit);
     return _delayedResponse;
   }
@@ -142,21 +142,26 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
-  protected boolean processFutureResult(String name, Map<K, T> response, Map<K, Throwable> error, long durationMillis) {
+  protected boolean processFutureResult(ServerInstance server, Map<ServerInstance, T> response, Map<ServerInstance, Throwable> error, long durationMillis) {
     // Add an argument here to get the time of completion of the future.
     boolean done = false;
     if ((null != response)) {
-      LOGGER.debug("Error got from {} is : {}", name, response);
+      LOGGER.debug("Error got from {} is : {}", server, response);
 
       _delayedResponse = response;
       _error = null;
       done = true;
     } else if (null != error) {
-      LOGGER.debug("Error got from {} is : {}", name, error);
+      LOGGER.debug("Error got from {} is : {}", server, error);
       _error = error;
     }
     _durationMillis = durationMillis;
     return done;
+  }
+
+  @Override
+  public ServerInstance getServerInstance() {
+    throw new RuntimeException("Invalid API call on selecting future");
   }
 
   @Override

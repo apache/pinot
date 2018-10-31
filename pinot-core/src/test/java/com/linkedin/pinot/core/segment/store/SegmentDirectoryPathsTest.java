@@ -18,8 +18,6 @@ package com.linkedin.pinot.core.segment.store;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -28,7 +26,7 @@ import org.testng.annotations.Test;
 public class SegmentDirectoryPathsTest {
 
   @Test
-  public void testSegmentPathFor() {
+  public void testSegmentDirectoryFor() {
     File f = new File("f");
     File v1Dir = SegmentDirectoryPaths.segmentDirectoryFor(f, SegmentVersion.v1);
     File v2Dir = SegmentDirectoryPaths.segmentDirectoryFor(f, SegmentVersion.v2);
@@ -40,49 +38,28 @@ public class SegmentDirectoryPathsTest {
   }
 
   @Test
-  public void testFindMetadataFile()
-      throws IOException {
-    File tempDirectory = null;
+  public void testFindMetadataFile() throws Exception {
+    File indexDir = new File(SegmentDirectoryPaths.class.toString());
+    FileUtils.deleteQuietly(indexDir);
     try {
-      // setup temp dir, v3 subdir and create metadata.properties in both
-      tempDirectory = new File(SegmentDirectoryPaths.class.toString());
-      tempDirectory.deleteOnExit();
-      FileUtils.forceMkdir(tempDirectory);
-      File v3Dir = new File(tempDirectory, "v3");
-      FileUtils.forceMkdir(v3Dir);
-      File metaFile = new File(tempDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      try(FileOutputStream outputStream = new FileOutputStream(metaFile)) {
-        outputStream.write(10);
-      }
-      File v3MetaFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      FileUtils.copyFile(metaFile, v3MetaFile);
+      Assert.assertTrue(indexDir.mkdirs());
+      File v3Dir = new File(indexDir, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      Assert.assertTrue(v3Dir.mkdir());
+      String fileName = V1Constants.MetadataKeys.METADATA_FILE_NAME;
+      File v1File = new File(indexDir, fileName);
+      FileUtils.touch(v1File);
+      File v3File = new File(v3Dir, fileName);
+      FileUtils.touch(v3File);
 
-      {
-        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
-        Assert.assertNotNull(testMetaFile);
-        Assert.assertEquals(testMetaFile.toString(), metaFile.toString());
-      }
-      {
-        // pass metadata file path directly
-        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(metaFile);
-        Assert.assertEquals(testMetaFile.toString(), metaFile.toString());
-      }
-      {
-        // drop v1 metadata file
-        FileUtils.forceDelete(metaFile);
-        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
-        Assert.assertEquals(testMetaFile.toString(), v3MetaFile.toString());
-      }
-      {
-        FileUtils.forceDelete(v3MetaFile);
-        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
-        Assert.assertNull(testMetaFile);
-      }
+      Assert.assertEquals(SegmentDirectoryPaths.findMetadataFile(indexDir), v3File);
+
+      FileUtils.forceDelete(v3File);
+      Assert.assertEquals(SegmentDirectoryPaths.findMetadataFile(indexDir), v1File);
+
+      FileUtils.forceDelete(v1File);
+      Assert.assertNull(SegmentDirectoryPaths.findMetadataFile(indexDir));
     } finally {
-      if (tempDirectory != null) {
-        FileUtils.deleteQuietly(tempDirectory);
-      }
+      FileUtils.deleteQuietly(indexDir);
     }
   }
-
 }

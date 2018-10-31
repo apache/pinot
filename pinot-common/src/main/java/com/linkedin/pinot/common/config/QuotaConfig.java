@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.config;
 
 import com.linkedin.pinot.common.utils.DataSize;
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationRuntimeException;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -24,24 +25,26 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 /**
  * Class representing table quota configuration
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class QuotaConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuotaConfig.class);
+  private static final String STORAGE_FIELD_NAME = "storage";
 
-  private String storage;
+  @ConfigKey("storage")
+  @ConfigDoc(value = "Storage allocated for this table", exampleValue = "10 GiB")
+  private String _storage;
 
-  static final String STORAGE_FIELD_NAME = "storage";
-  static final String QUOTA_SECTION_NAME = "quota";
-
-  public @Nullable String getStorage() {
-    return storage;
+  @Nullable
+  public String getStorage() {
+    return _storage;
   }
 
   public void setStorage(@Nullable String storage) {
-    this.storage = storage;
+    _storage = storage;
   }
 
   /**
@@ -50,13 +53,13 @@ public class QuotaConfig {
    *    unparseable
    */
   public long storageSizeBytes() {
-    return DataSize.toBytes(this.storage);
+    return DataSize.toBytes(_storage);
   }
 
   public JSONObject toJson() {
     JSONObject quotaObject = new JSONObject();
     try {
-      quotaObject.put(STORAGE_FIELD_NAME, storage);
+      quotaObject.put(STORAGE_FIELD_NAME, _storage);
     } catch (JSONException e) {
       LOGGER.error("Failed to convert to json", e);
     }
@@ -65,15 +68,33 @@ public class QuotaConfig {
 
   public String toString() {
     return toJson().toString();
-
   }
 
   public void validate() {
-    if (storage != null && DataSize.toBytes(storage) < 0) {
-      LOGGER.error("Failed to convert storage quota config: {} to bytes", storage);
-      throw new ConfigurationRuntimeException("Failed to convert storage quota config: "
-       + storage + " to bytes");
+    if (_storage != null && DataSize.toBytes(_storage) < 0) {
+      LOGGER.error("Failed to convert storage quota config: {} to bytes", _storage);
+      throw new ConfigurationRuntimeException("Failed to convert storage quota config: " + _storage + " to bytes");
     }
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    QuotaConfig that = (QuotaConfig) o;
+
+    return EqualityUtils.isEqual(_storage, that._storage);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_storage);
+    return result;
+  }
 }

@@ -15,38 +15,25 @@
  */
 package com.linkedin.pinot.common.utils.request;
 
-import com.google.common.base.Objects;
-import java.util.List;
-
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.utils.StringUtil;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 
 public class FilterQueryTree {
-  private final int id;
   private final String column;
   private final List<String> value;
   private final FilterOperator operator;
   private final List<FilterQueryTree> children;
 
   public FilterQueryTree(String column, List<String> value, FilterOperator operator, List<FilterQueryTree> children) {
-    this.id = System.identityHashCode(this);
     this.column = column;
     this.value = value;
     this.operator = operator;
     this.children = children;
-  }
-
-  public FilterQueryTree(int id, String column, List<String> value, FilterOperator operator,
-      List<FilterQueryTree> children) {
-    this.id = id;
-    this.column = column;
-    this.value = value;
-    this.operator = operator;
-    this.children = children;
-  }
-
-  public int getId() {
-    return id;
   }
 
   public String getColumn() {
@@ -76,10 +63,23 @@ public class FilterQueryTree {
       stringBuffer.append(' ');
     }
     if (operator == FilterOperator.OR || operator == FilterOperator.AND) {
-      stringBuffer.append(operator).append(" (").append(id).append(")");
+      stringBuffer.append(operator);
     } else {
-      stringBuffer.append(column).append(" ").append(operator).append(" ").append(value).append(" (").append(id).append(")");
+      List<String> sortedValues = new ArrayList<>(value);
+
+      // Old style double-tab separated list
+      if (sortedValues.size() == 1) {
+        String firstItem = sortedValues.get(0);
+        List<String> firstItemValues = Lists.newArrayList(firstItem.split("\t\t"));
+        Collections.sort(firstItemValues);
+        sortedValues.set(0, StringUtil.join("\t\t", firstItemValues.toArray(new String[firstItemValues.size()])));
+      }
+
+      Collections.sort(sortedValues);
+
+      stringBuffer.append(column).append(" ").append(operator).append(" ").append(sortedValues);
     }
+
     if (children != null) {
       for (FilterQueryTree child : children) {
         stringBuffer.append('\n');

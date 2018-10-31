@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 
 public class MetricTransfer {
   private static final Logger LOG = LoggerFactory.getLogger(MetricTransfer.class);
+  private static final Double NULL_DOUBLE = Double.NaN;
   private static final boolean DEBUG = true;
 
   public static final String SEASONAL_SIZE = "seasonalSize";
@@ -66,19 +67,27 @@ public class MetricTransfer {
     for (long ts : timeWindowSet) {
       for (ScalingFactor sf: scalingFactorList) {
         if (sf.isInTimeWindow(ts)) {
-          if (ts < windowStartTime) { // the timestamp belongs to a baseline time series
+          if (ts < windowStartTime) { // the timestamp belongs to a baseline time series and will be removed.
             if (DEBUG) {
-              double originalValue = metricsToModify.get(ts, metricName).doubleValue();
-              scaledValues.add(new ScaledValue(ts, originalValue, 0.0));
+              double originalValue = metricsToModify.getOrDefault(ts, metricName, NULL_DOUBLE).doubleValue();
+              scaledValues.add(new ScaledValue(ts, originalValue, NULL_DOUBLE));
             }
-            metricsToModify.set(ts, metricName, 0.0); // zero will be removed in analyze function
+            metricsToModify.set(ts, metricName, NULL_DOUBLE);
           } else { // the timestamp belongs to the current time series
             for (int i = 1; i <= baselineSeasonalPeriod; ++i) {
               long baseTs = ts - i * seasonalMillis;
               if (timeWindowSet.contains(baseTs)) {
-                double originalValue = metricsToModify.get(baseTs, metricName).doubleValue();
-                double scaledValue = originalValue * sf.getScalingFactor();
+                double originalValue = metricsToModify.getOrDefault(baseTs, metricName, NULL_DOUBLE).doubleValue();
+                double scaledValue;
+                // If original or scaled value is an empty value, then remove the timestamp from
+                if (Double.compare(originalValue, NULL_DOUBLE) == 0
+                    || Double.compare(sf.getScalingFactor(), NULL_DOUBLE) == 0) {
+                  scaledValue = NULL_DOUBLE;
+                } else {
+                  scaledValue = originalValue * sf.getScalingFactor();
+                }
                 metricsToModify.set(baseTs, metricName, scaledValue);
+
                 if (DEBUG) {
                   scaledValues.add(new ScaledValue(baseTs, originalValue, scaledValue));
                 }

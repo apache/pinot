@@ -17,8 +17,7 @@ package com.linkedin.pinot.common.segment;
 
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import java.util.Map;
-import javax.annotation.Nullable;
+import java.util.concurrent.TimeUnit;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -30,7 +29,13 @@ public interface SegmentMetadata {
 
   String getTableName();
 
-  String getIndexType();
+  String getTimeColumn();
+
+  long getStartTime();
+
+  long getEndTime();
+
+  TimeUnit getTimeUnit();
 
   Duration getTimeGranularity();
 
@@ -68,37 +73,14 @@ public interface SegmentMetadata {
 
   boolean hasStarTree();
 
-  @Nullable
   StarTreeMetadata getStarTreeMetadata();
 
-  /**
-   * Get the forward index file name with appropriate extension for a given version.
-   *
-   * @param column column name.
-   * @param segmentVersion segment version.
-   * @return forward index file name.
-   */
-  String getForwardIndexFileName(String column, String segmentVersion);
+  String getForwardIndexFileName(String column);
 
-  /**
-   * Get the dictionary file name with appropriate extension for a given version.
-   *
-   * @param column column name.
-   * @param segmentVersion segment version.
-   * @return dictionary file name.
-   */
-  String getDictionaryFileName(String column, String segmentVersion);
+  String getDictionaryFileName(String column);
 
-  /**
-   * Get the bitmap inverted index file name with appropriate extension for a given version.
-   *
-   * @param column column name.
-   * @param segmentVersion segment version.
-   * @return bitmap inverted index file name.
-   */
-  String getBitmapInvertedIndexFileName(String column, String segmentVersion);
+  String getBitmapInvertedIndexFileName(String column);
 
-  @Nullable
   String getCreatorName();
 
   char getPaddingCharacter();
@@ -113,10 +95,7 @@ public interface SegmentMetadata {
    * @return derived column name if exists.
    *         null if not.
    */
-  @Nullable
   String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType);
-
-  Map<String, String> toMap();
 
   boolean close();
 }

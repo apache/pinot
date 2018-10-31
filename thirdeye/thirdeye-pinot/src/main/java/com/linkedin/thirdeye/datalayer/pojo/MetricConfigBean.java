@@ -1,11 +1,11 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.linkedin.thirdeye.api.MetricType;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+
 import java.util.Map;
 import java.util.Objects;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.api.MetricType;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class MetricConfigBean extends AbstractBean {
@@ -15,6 +15,55 @@ public class MetricConfigBean extends AbstractBean {
   public static final String ALIAS_JOINER = "::";
   public static final String URL_TEMPLATE_START_TIME = "startTime";
   public static final String URL_TEMPLATE_END_TIME = "endTime";
+  public static final MetricAggFunction DEFAULT_AGG_FUNCTION = MetricAggFunction.SUM;
+  public static final String METRIC_PROPERTIES_SEPARATOR = ",";
+
+  /**
+   * Properties to set in metricProperties, in order to express a metric as a metricAsDimension case.
+   *
+   * eg: If a dataset has columns as follows:
+   * counter_name - a column which stores the name of the metric being expressed in that row
+   * counter_value - a column which stores the metric value corresponding to the counter_name in that row
+   * If we are interested in a metric called records_processed,
+   * it means we are interested in counter_value from rows which have counter_name=records_processed
+   * Thus the metric definition would be
+   * {
+   *   name : "RecordsProcessed",
+   *   dataset : "myDataset",
+   *   dimensionAsMetric : true,
+   *   metricProperties : {
+   *     "METRIC_NAMES" : "records_processed",
+   *     "METRIC_NAMES_COLUMNS" : "counter_name",
+   *     "METRIC_VALUES_COLUMN" : "counter_value"
+   *   }
+   * }
+   *
+   * eg: If a dataset has columns as follows:
+   * counter_name_primary - a column which stores the name of the metric being expressed in that row
+   * counter_name_secondary - another column which stores the name of the metric being expressed in that row
+   * counter_value - a column which stores the metric value corresponding to the counter_name_primary and counter_name_secondary in that row
+   * If we are interested in a metric called primary=records_processed secondary=internal,
+   * it means we are interested in counter_value from rows which have counter_name_primary=records_processed and counter_name_secondary=internal
+   * Thus the metric definition would be
+   * {
+   *   name : "RecordsProcessedInternal",
+   *   dataset : "myDataset",
+   *   dimensionAsMetric : true,
+   *   metricProperties : {
+   *     "METRIC_NAMES" : "records_processed,internal",
+   *     "METRIC_NAMES_COLUMNS" : "counter_name_primary,counter_name_secondary",
+   *     "METRIC_VALUES_COLUMN" : "counter_value"
+   *   }
+   * }
+   */
+  public enum DimensionAsMetricProperties {
+    /** The actual names of the metrics, comma separated */
+    METRIC_NAMES,
+    /** The columns in which to look for the metric names, comma separated */
+    METRIC_NAMES_COLUMNS,
+    /** The column from which to get the metric value */
+    METRIC_VALUES_COLUMN
+  }
 
   private String name;
 
@@ -28,6 +77,8 @@ public class MetricConfigBean extends AbstractBean {
 
   private String derivedMetricExpression;
 
+  private MetricAggFunction defaultAggFunction = DEFAULT_AGG_FUNCTION;
+
   private Double rollupThreshold = DEFAULT_THRESHOLD;
 
   private boolean inverseMetric = false;
@@ -38,6 +89,11 @@ public class MetricConfigBean extends AbstractBean {
 
   private Map<String, String> extSourceLinkInfo;
 
+  private Map<String, String> extSourceLinkTimeGranularity;
+
+  private Map<String, String> metricProperties = null;
+
+  private boolean dimensionAsMetric = false;
 
   public String getName() {
     return name;
@@ -87,6 +143,22 @@ public class MetricConfigBean extends AbstractBean {
     this.derivedMetricExpression = derivedMetricExpression;
   }
 
+  public MetricAggFunction getDefaultAggFunction() {
+    return defaultAggFunction;
+  }
+
+  public void setDefaultAggFunction(MetricAggFunction defaultAggFunction) {
+    this.defaultAggFunction = defaultAggFunction;
+  }
+
+  public boolean isDimensionAsMetric() {
+    return dimensionAsMetric;
+  }
+
+  public void setDimensionAsMetric(boolean dimensionAsMetric) {
+    this.dimensionAsMetric = dimensionAsMetric;
+  }
+
   public Double getRollupThreshold() {
     return rollupThreshold;
   }
@@ -127,6 +199,22 @@ public class MetricConfigBean extends AbstractBean {
     this.extSourceLinkInfo = extSourceLinkInfo;
   }
 
+  public Map<String, String> getExtSourceLinkTimeGranularity() {
+    return extSourceLinkTimeGranularity;
+  }
+
+  public void setExtSourceLinkTimeGranularity(Map<String, String> extSourceLinkTimeGranularity) {
+    this.extSourceLinkTimeGranularity = extSourceLinkTimeGranularity;
+  }
+
+  public Map<String, String> getMetricProperties() {
+    return metricProperties;
+  }
+
+  public void setMetricProperties(Map<String, String> metricProperties) {
+    this.metricProperties = metricProperties;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof MetricConfigBean)) {
@@ -139,24 +227,19 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(alias, mc.getAlias())
         && Objects.equals(derived, mc.isDerived())
         && Objects.equals(derivedMetricExpression, mc.getDerivedMetricExpression())
+        && Objects.equals(defaultAggFunction, mc.getDefaultAggFunction())
+        && Objects.equals(dimensionAsMetric, mc.isDimensionAsMetric())
         && Objects.equals(rollupThreshold, mc.getRollupThreshold())
         && Objects.equals(inverseMetric, mc.isInverseMetric())
         && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
         && Objects.equals(active, mc.isActive())
-        && Objects.equals(extSourceLinkInfo, mc.getExtSourceLinkInfo());
+        && Objects.equals(extSourceLinkInfo, mc.getExtSourceLinkInfo())
+        && Objects.equals(metricProperties, mc.getMetricProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
-        inverseMetric, cellSizeExpression, active, extSourceLinkInfo);
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name).add("dataset", dataset)
-        .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
-        .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression).add("active", active)
-        .add("extSourceLinkInfo", extSourceLinkInfo).toString();
+    return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, defaultAggFunction, rollupThreshold,
+        inverseMetric, cellSizeExpression, active, extSourceLinkInfo, metricProperties);
   }
 }

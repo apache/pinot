@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.io.reader.impl;
 
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 /**
@@ -41,26 +41,21 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(FixedByteSingleValueMultiColReader.class);
 
   private final int rows;
-  private final int cols;
   private final int[] colOffSets;
   private int rowSize;
   private PinotDataBuffer indexDataBuffer;
   private final int[] columnSizes;
-  private final long totalSize;
 
   /**
    *
    * @param pinotDataBuffer
    * @param rows
-   * @param cols
    * @param columnSizes
    *            in bytes
    * @throws IOException
    */
-  public FixedByteSingleValueMultiColReader(PinotDataBuffer pinotDataBuffer, int rows,
-      int cols, int[] columnSizes) {
+  public FixedByteSingleValueMultiColReader(PinotDataBuffer pinotDataBuffer, int rows, int[] columnSizes) {
     this.rows = rows;
-    this.cols = cols;
     this.columnSizes = columnSizes;
     colOffSets = new int[columnSizes.length];
     rowSize = 0;
@@ -68,7 +63,6 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
       colOffSets[i] = rowSize;
       rowSize += columnSizes[i];
     }
-    totalSize = rowSize * rows;
     this.indexDataBuffer = pinotDataBuffer;
   }
 
@@ -187,16 +181,12 @@ public class FixedByteSingleValueMultiColReader implements Closeable {
     return rows;
   }
 
-  public int getNumberOfCols() {
-    return rows;
-  }
-
   public int[] getColumnSizes() {
     return columnSizes;
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     indexDataBuffer.close();
     indexDataBuffer = null;
   }

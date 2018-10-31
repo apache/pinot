@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
@@ -14,11 +13,10 @@ import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionMod
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
+import com.linkedin.thirdeye.anomalydetection.model.transform.TotalCountThresholdRemovalFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -28,14 +26,7 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
   public static final String BASELINE = "baseline";
   public static final String ENABLE_SMOOTHING = "enableSmoothing";
 
-  private DataModel dataModel = new NoopDataModel();
-  private List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
-  private List<TransformationFunction> baselineTimeSeriesTransformationChain = new ArrayList<>();
-  private PredictionModel predictionModel = new NoopPredictionModel();
-  private DetectionModel detectionModel = new NoopDetectionModel();
-  private MergeModel mergeModel = new NoopMergeModel();
-
-  public static String[] getPropertyKeys() {
+  public String[] getPropertyKeys() {
     return new String[] { BASELINE, ENABLE_SMOOTHING,
         MovingAverageSmoothingFunction.MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE,
         SimpleThresholdDetectionModel.AVERAGE_VOLUME_THRESHOLD,
@@ -64,6 +55,14 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
     currentTimeSeriesTransformationChain.add(zeroRemover);
     baselineTimeSeriesTransformationChain.add(zeroRemover);
 
+    // Add total count threshold transformation
+    if (this.properties.containsKey(TotalCountThresholdRemovalFunction.TOTAL_COUNT_METRIC_NAME)) {
+      TransformationFunction totalCountThresholdFunction = new TotalCountThresholdRemovalFunction();
+      totalCountThresholdFunction.init(this.properties);
+      currentTimeSeriesTransformationChain.add(totalCountThresholdFunction);
+    }
+
+    // Add moving average smoothing transformation
     if (this.properties.containsKey(ENABLE_SMOOTHING)) {
       TransformationFunction movingAverageSoothingFunction = new MovingAverageSmoothingFunction();
       movingAverageSoothingFunction.init(this.properties);
@@ -151,27 +150,8 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
     return wowString.substring(head, tail);
   }
 
-  @Override public DataModel getDataModel() {
-    return dataModel;
-  }
-
-  @Override public List<TransformationFunction> getCurrentTimeSeriesTransformationChain() {
-    return currentTimeSeriesTransformationChain;
-  }
-
-  @Override public List<TransformationFunction> getBaselineTimeSeriesTransformationChain() {
-    return baselineTimeSeriesTransformationChain;
-  }
-
-  @Override public PredictionModel getPredictionModel() {
-    return predictionModel;
-  }
-
-  @Override public DetectionModel getDetectionModel() {
-    return detectionModel;
-  }
-
-  @Override public MergeModel getMergeModel() {
-    return mergeModel;
+  @Override
+  public boolean useHistoryAnomaly() {
+    return false;
   }
 }

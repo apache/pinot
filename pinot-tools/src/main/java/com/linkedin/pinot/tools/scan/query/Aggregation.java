@@ -16,8 +16,8 @@
 package com.linkedin.pinot.tools.scan.query;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.query.utils.Pair;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.ArrayList;
@@ -29,7 +29,7 @@ import java.util.Map;
 
 public class Aggregation {
   private boolean _addCountStar;
-  private IndexSegmentImpl _indexSegment;
+  private ImmutableSegment _immutableSegment;
   private SegmentMetadataImpl _metadata;
   private List<Integer> _filteredDocIds;
   private List<AggregationInfo> _aggregationsInfo;
@@ -93,9 +93,9 @@ public class Aggregation {
     init(groupByColumns);
   }
 
-  public Aggregation(IndexSegmentImpl indexSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
+  public Aggregation(ImmutableSegment immutableSegment, SegmentMetadataImpl metadata, List<Integer> filteredDocIds,
       List<AggregationInfo> aggregationsInfo, List<String> groupByColumns, long topN) {
-    _indexSegment = indexSegment;
+    _immutableSegment = immutableSegment;
     _metadata = metadata;
     _dictionaryMap = new HashMap<>();
 
@@ -106,12 +106,12 @@ public class Aggregation {
 
     for (Pair pair : _projectionColumns) {
       String column = (String) pair.getFirst();
-      _dictionaryMap.put(column, _indexSegment.getDictionaryFor(column));
+      _dictionaryMap.put(column, _immutableSegment.getDictionary(column));
     }
   }
 
   public ResultTable run() {
-    Projection projection = new Projection(_indexSegment, _metadata, _filteredDocIds, _projectionColumns,
+    Projection projection = new Projection(_immutableSegment, _metadata, _filteredDocIds, _projectionColumns,
         _dictionaryMap, _addCountStar);
     return aggregate(projection.run());
   }

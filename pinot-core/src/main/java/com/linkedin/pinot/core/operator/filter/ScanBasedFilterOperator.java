@@ -15,84 +15,60 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedMultiValueDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.ScanBasedSingleValueDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedFilterOperator.class);
   private static final String OPERATOR_NAME = "ScanBasedFilterOperator";
 
-  private DataSource dataSource;
-  private Integer startDocId;
-  private Integer endDocId;
-  private String name;
+  private final PredicateEvaluator _predicateEvaluator;
+  private final DataSource _dataSource;
+  private final int _startDocId;
+  // TODO: change it to exclusive
+  // Inclusive
+  private final int _endDocId;
 
-  /**
-   * @param dataSource
-   * @param startDocId inclusive
-   * @param endDocId inclusive
-   */
-  public ScanBasedFilterOperator(DataSource dataSource, Integer startDocId, Integer endDocId) {
-    this.dataSource = dataSource;
-    this.startDocId = startDocId;
-    this.endDocId = endDocId;
-    this.name = ScanBasedFilterOperator.class.getName() + "[" + dataSource.getOperatorName() + "]";
+  public ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,
+      int endDocId) {
+    _predicateEvaluator = predicateEvaluator;
+    _dataSource = dataSource;
+    _startDocId = startDocId;
+    _endDocId = endDocId;
   }
 
   @Override
-  public boolean open() {
-    dataSource.open();
-    return true;
-  }
-
-  @Override
-  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
-    Predicate predicate = getPredicate();
-    Dictionary dictionary = dataSource.getDictionary();
-    DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+  protected BaseFilterBlock getNextBlock() {
+    DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     FilterBlockDocIdSet docIdSet;
-    Block nextBlock = dataSource.nextBlock();
+    Block nextBlock = _dataSource.nextBlock();
     BlockValSet blockValueSet = nextBlock.getBlockValueSet();
     BlockMetadata blockMetadata = nextBlock.getMetadata();
-    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     if (dataSourceMetadata.isSingleValue()) {
-      docIdSet =
-          new ScanBasedSingleValueDocIdSet(dataSource.getOperatorName(), blockValueSet, blockMetadata, evaluator);
+      docIdSet = new ScanBasedSingleValueDocIdSet(_dataSource.getOperatorName(), blockValueSet, blockMetadata,
+          _predicateEvaluator);
     } else {
-      docIdSet = new ScanBasedMultiValueDocIdSet(dataSource.getOperatorName(), blockValueSet, blockMetadata, evaluator);
+      docIdSet = new ScanBasedMultiValueDocIdSet(_dataSource.getOperatorName(), blockValueSet, blockMetadata,
+          _predicateEvaluator);
     }
 
-    if (startDocId != null) {
-      docIdSet.setStartDocId(startDocId);
-    }
-
-    if (endDocId != null) {
-      docIdSet.setEndDocId(endDocId);
-    }
+    docIdSet.setStartDocId(_startDocId);
+    docIdSet.setEndDocId(_endDocId);
     return new ScanBlock(docIdSet);
   }
 
   @Override
-  public boolean close() {
-    dataSource.close();
-    return true;
+  public boolean isResultEmpty() {
+    return _predicateEvaluator.isAlwaysFalse();
   }
 
   @Override
@@ -106,16 +82,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
 
     public ScanBlock(FilterBlockDocIdSet docIdSet) {
       this.docIdSet = docIdSet;
-    }
-
-    @Override
-    public BlockId getId() {
-      return new BlockId(0);
-    }
-
-    @Override
-    public boolean applyPredicate(Predicate predicate) {
-      throw new UnsupportedOperationException("applypredicate not supported in " + this.getClass());
     }
 
     @Override
@@ -137,11 +103,5 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
       return docIdSet;
     }
-
-  }
-
-  @Override
-  public String toString() {
-    return ScanBasedFilterOperator.class.getName() + "-" + name;
   }
 }

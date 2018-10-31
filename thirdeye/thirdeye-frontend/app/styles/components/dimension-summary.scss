@@ -1,0 +1,30 @@
+// Copy paste from old Thirdeye UI
+.dimension-summary {
+  display: flex;
+  justify-content: space-between;
+}
+.dimension-summary__label {
+  text-transform: uppercase;
+  color: rgba(0,0,0,.55);
+  font-weight: normal;
+}
+
+.dimension-summary__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dimension-summary__data {
+  font-size: 18px;
+  color: rgba(0,0,0,.70);
+  margin-top: 0;
+
+  &--positive {
+  color: #398b18;
+  }
+
+  &--negative {
+  color: #ee1620;
+  }
+}

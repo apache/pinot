@@ -16,6 +16,9 @@
 
 package com.linkedin.pinot.controller.helix.core.util;
 
+import com.google.common.io.Files;
+import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -23,21 +26,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import junit.framework.Assert;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.DateTime;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
-import junit.framework.Assert;
+
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyList;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class SegmentDeletionManagerTest {
@@ -143,7 +146,7 @@ public class SegmentDeletionManagerTest {
     segments.addAll(segmentsThatShouldBeDeleted());
     segments.addAll(segmentsInIdealStateOrExtView());
     segments.addAll(segmentsFailingPropStore());
-    deletionManager.deleteSegmenetsFromPropertyStoreAndLocal(tableName, segments);
+    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(tableName, segments);
 
     Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segmentsFailingPropStore()));
     Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segmentsInIdealStateOrExtView()));
@@ -161,12 +164,12 @@ public class SegmentDeletionManagerTest {
 
   @Test
   public void allPassed() throws Exception {
-    HelixAdmin helixAdmin =  makeHelixAdmin();
+    HelixAdmin helixAdmin = makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
     Set<String> segments = new HashSet<>();
     segments.addAll(segmentsThatShouldBeDeleted());
-    deletionManager.deleteSegmenetsFromPropertyStoreAndLocal(tableName, segments);
+    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(tableName, segments);
 
     Assert.assertEquals(deletionManager.segmentsToRetry.size(), 0);
     Assert.assertEquals(deletionManager.segmentsRemovedFromStore.size(), segments.size());
@@ -177,11 +180,76 @@ public class SegmentDeletionManagerTest {
     HelixAdmin helixAdmin =  makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
-    deletionManager.deleteSegmenetsFromPropertyStoreAndLocal(tableName, segments);
+    deletionManager.deleteSegmentsFromPropertyStoreAndLocal(tableName, segments);
 
     Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segments));
     Assert.assertEquals(deletionManager.segmentsToRetry.size(), segments.size());
     Assert.assertEquals(deletionManager.segmentsRemovedFromStore.size(), 0);
+  }
+
+  @Test
+  public void testRemoveDeletedSegments() throws Exception {
+    HelixAdmin helixAdmin = makeHelixAdmin();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    File tempDir = Files.createTempDir();
+    tempDir.deleteOnExit();
+    FakeDeletionManager deletionManager = new FakeDeletionManager(tempDir.getAbsolutePath(), helixAdmin, propertyStore);
+
+    // Test delete when deleted segments directory does not exists
+    deletionManager.removeAgedDeletedSegments(1);
+
+    // Create deleted directory
+    String deletedDirectoryPath = tempDir + File.separator + "Deleted_Segments";
+    File deletedDirectory = new File(deletedDirectoryPath);
+    deletedDirectory.mkdir();
+
+    // Test delete when deleted segments directory is empty
+    deletionManager.removeAgedDeletedSegments(1);
+
+    // Create dummy directories and files
+    File dummyDir1 = new File(deletedDirectoryPath + File.separator + "dummy1");
+    dummyDir1.mkdir();
+    File dummyDir2 = new File(deletedDirectoryPath + File.separator + "dummy2");
+    dummyDir2.mkdir();
+
+    // Test delete when there is no files but some directories exist
+    deletionManager.removeAgedDeletedSegments(1);
+    Assert.assertEquals(dummyDir1.exists(), false);
+    Assert.assertEquals(dummyDir2.exists(), false);
+
+    // Create dummy directories and files
+    dummyDir1.mkdir();
+    dummyDir2.mkdir();
+
+    // Create dummy files
+    for (int i = 0; i < 3; i++) {
+      createTestFileWithAge(dummyDir1.getAbsolutePath() + File.separator + "file" + i, i);
+    }
+    for (int i = 2; i < 5; i++) {
+      createTestFileWithAge(dummyDir2.getAbsolutePath() + File.separator +"file" + i, i);
+    }
+
+    // Check that dummy directories and files are successfully created.
+    Assert.assertEquals(dummyDir1.list().length, 3);
+    Assert.assertEquals(dummyDir2.list().length, 3);
+
+    // Try to remove files with the retention of 3 days.
+    deletionManager.removeAgedDeletedSegments(3);
+    Assert.assertEquals(dummyDir1.list().length, 3);
+    Assert.assertEquals(dummyDir2.list().length, 1);
+
+    // Try to further remove files with the retention of 1 days.
+    deletionManager.removeAgedDeletedSegments(1);
+    Assert.assertEquals(dummyDir1.list().length, 1);
+
+    // Check that empty directory has successfully been removed.
+    Assert.assertEquals(dummyDir2.exists(), false);
+  }
+
+  public void createTestFileWithAge(String path, int age) throws Exception {
+    File testFile = new File(path);
+    testFile.createNewFile();
+    testFile.setLastModified(DateTime.now().minusDays(age).getMillis());
   }
 
   public static class FakeDeletionManager extends SegmentDeletionManager {
@@ -193,7 +261,11 @@ public class SegmentDeletionManagerTest {
       super(null, helixAdmin, clusterName, propertyStore);
     }
 
-    public void deleteSegmenetsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
+    FakeDeletionManager(String localDiskDir, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+      super(localDiskDir, helixAdmin, clusterName, propertyStore);
+    }
+
+    public void deleteSegmentsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
       super.deleteSegmentFromPropertyStoreAndLocal(tableName, segments, 0L);
     }
 

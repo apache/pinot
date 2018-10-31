@@ -16,20 +16,16 @@
 package com.linkedin.pinot.index.reader;
 
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.nio.channels.FileChannel;
 import java.util.Random;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
-import com.linkedin.pinot.core.io.reader.impl.SortedForwardIndexReader;
-import com.linkedin.pinot.core.io.reader.impl.SortedValueReaderContext;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 
 @Test
 public class SortedForwardIndexReaderTest {
@@ -62,10 +58,9 @@ public class SortedForwardIndexReaderTest {
       totalDocs += length;
     }
     writer.close();
-    PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(file, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
-    FixedByteSingleValueMultiColReader rawFileReader = new FixedByteSingleValueMultiColReader(heapBuffer,
-        cardinality, columnSizes.length, columnSizes);
-    SortedForwardIndexReader reader = new SortedForwardIndexReader(rawFileReader, totalDocs);
+    PinotDataBuffer heapBuffer =
+        PinotDataBuffer.fromFile(file, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
+    SortedIndexReader reader = new SortedIndexReader(heapBuffer, cardinality);
     // without using context
     long start, end;
     start = System.currentTimeMillis();
@@ -78,7 +73,7 @@ public class SortedForwardIndexReaderTest {
     System.out
         .println("Took " + (end - start) + " to scan " + totalDocs + " docs without using context");
     // with context
-    SortedValueReaderContext context = reader.createContext();
+    SortedIndexReader.Context context = reader.createContext();
     start = System.currentTimeMillis();
     for (int i = 0; i < cardinality; i++) {
       for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {

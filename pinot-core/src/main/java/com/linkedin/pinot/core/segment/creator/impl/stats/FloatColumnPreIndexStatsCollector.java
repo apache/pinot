@@ -15,30 +15,22 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatSet;
 import java.util.Arrays;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
-
-
-/**
- * Nov 7, 2014
- */
 
 public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-
   private Float min = Float.MAX_VALUE;
   private Float max = Float.MIN_VALUE;
   private final FloatSet rawFloatSet;
   private final FloatSet aggregatedFloatSet;
   private float[] sortedFloatList;
-  private boolean hasNull = false;
   private boolean sealed = false;
 
-  public FloatColumnPreIndexStatsCollector(FieldSpec spec) {
-    super(spec);
+  public FloatColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
+    super(column, statsCollectorConfig);
     rawFloatSet = new FloatOpenHashSet(INITIAL_HASH_SET_SIZE);
     aggregatedFloatSet = new FloatOpenHashSet(INITIAL_HASH_SET_SIZE);
   }
@@ -64,6 +56,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     } else {
       float value = ((Number) entry).floatValue();
       addressSorted(value);
+      updatePartition(value);
       set.add(value);
       totalNumberOfEntries++;
     }
@@ -93,35 +86,35 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
   }
 
   @Override
-  public Float getMinValue() throws Exception {
+  public Float getMinValue() {
     if (sealed) {
       return min;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public Float getMaxValue() throws Exception {
+  public Float getMaxValue() {
     if (sealed) {
       return max;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public Object getUniqueValuesSet() throws Exception {
+  public Object getUniqueValuesSet() {
     if (sealed) {
       return sortedFloatList;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public int getCardinality() throws Exception {
+  public int getCardinality() {
     if (sealed) {
       return sortedFloatList.length;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override

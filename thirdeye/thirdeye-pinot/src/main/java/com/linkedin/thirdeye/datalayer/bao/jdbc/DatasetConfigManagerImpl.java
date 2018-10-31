@@ -1,15 +1,14 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.commons.collections.CollectionUtils;
-
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import java.util.List;
+import org.apache.commons.collections.CollectionUtils;
 
+@Singleton
 public class DatasetConfigManagerImpl extends AbstractManagerImpl<DatasetConfigDTO>
     implements DatasetConfigManager {
 
@@ -32,13 +31,14 @@ public class DatasetConfigManagerImpl extends AbstractManagerImpl<DatasetConfigD
   @Override
   public List<DatasetConfigDTO> findActive() {
     Predicate activePredicate = Predicate.EQ("active", true);
-    List<DatasetConfigBean> list = genericPojoDao.get(activePredicate, DatasetConfigBean.class);
-    List<DatasetConfigDTO> results = new ArrayList<>();
-    for (DatasetConfigBean abstractBean : list) {
-      DatasetConfigDTO result = MODEL_MAPPER.map(abstractBean, DatasetConfigDTO.class);
-      results.add(result);
-    }
-    return results;
+    return findByPredicate(activePredicate);
   }
 
+  @Override
+  public List<DatasetConfigDTO> findActiveRequiresCompletenessCheck() {
+    Predicate activePredicate = Predicate.EQ("active", true);
+    Predicate completenessPredicate = Predicate.EQ("requiresCompletenessCheck", true);
+    Predicate predicate = Predicate.AND(activePredicate, completenessPredicate);
+    return findByPredicate(predicate);
+  }
 }

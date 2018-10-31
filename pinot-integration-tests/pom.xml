@@ -49,7 +49,7 @@
         <configuration>
           <programs>
             <program>
-              <mainClass>com.linkedin.pinot.integration.tests.HybridScanBasedCommandLineTestRunner</mainClass>
+              <mainClass>com.linkedin.pinot.integration.tests.HybridClusterIntegrationTestCommandLineRunner</mainClass>
               <name>pinot-hybrid-cluster-test</name>
               <jvmSettings>
                 <initialMemorySize>4G</initialMemorySize>
@@ -60,6 +60,8 @@
               </jvmSettings>
             </program>
           </programs>
+          <repositoryLayout>flat</repositoryLayout>
+          <repositoryName>lib</repositoryName>
         </configuration>
       </plugin>
     </plugins>
@@ -78,9 +80,10 @@
             <configuration>
               <skipTests>false</skipTests>
               <excludes>
-                <!-- jfim: Those two tests are covered by the HybridClusterIntegrationTest -->
-                <exclude>**/OfflineClusterIntegrationTest.java</exclude>
+                <!-- Covered by FlakyConsumerRealtimeClusterIntegrationTest -->
                 <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
+                <!-- Covered by ConvertToRawIndexMinionClusterIntegrationTest -->
+                <exclude>**/HybridClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
           </plugin>
@@ -121,6 +124,12 @@
     <dependency>
       <groupId>com.101tec</groupId>
       <artifactId>zkclient</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>io.netty</groupId>
+          <artifactId>netty</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
@@ -161,6 +170,16 @@
       <artifactId>pinot-broker</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-minion</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-minion</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
     </dependency>
@@ -179,12 +198,54 @@
     <dependency>
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
-      <version>1.4.186</version>
     </dependency>
     <dependency>
       <groupId>com.github.jnr</groupId>
       <artifactId>jnr-posix</artifactId>
-      <version>3.0.12</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-lang</groupId>
+          <artifactId>commons-lang</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-math3</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-math3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-lang</groupId>
+          <artifactId>commons-lang</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>commons-lang</groupId>
+      <artifactId>commons-lang</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-logging</groupId>
+      <artifactId>commons-logging</artifactId>
     </dependency>
   </dependencies>
 </project>

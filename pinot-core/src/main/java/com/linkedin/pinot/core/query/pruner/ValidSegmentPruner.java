@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import org.apache.commons.configuration.Configuration;
@@ -37,11 +37,11 @@ public class ValidSegmentPruner implements SegmentPruner {
    * - Empty segment.
    *
    * @param segment
-   * @param brokerRequest
+   * @param queryRequest
    * @return
    */
   @Override
-  public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
+  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
     SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
 
     // Check for empty segment.

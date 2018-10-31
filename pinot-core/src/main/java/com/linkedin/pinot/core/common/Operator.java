@@ -18,32 +18,16 @@ package com.linkedin.pinot.core.common;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 
 
-public interface Operator {
-  /*
-   * allows the operator to set up/initialize processing
-   */
-  boolean open();
+public interface Operator<T extends Block> {
 
   /**
-   * Get the next non empty block, if there are additional predicates the
-   * operator is responsible to apply the predicate and return the block that
-   * has atleast one doc that satisfies the predicate
-   *
-   * @return
+   * Get the next {@link Block}.
+   * <p>For filter operator and operators above projection phase (aggregation, selection, combine etc.), method should
+   * only be called once, and will return a non-null block.
+   * <p>For operators in projection phase (docIdSet, projection, transformExpression), method can be called multiple
+   * times, and will return non-empty block or null if no more documents available</p>
    */
-  Block nextBlock();
-
-  /**
-   * Same as nextBlock but the caller specifies the BlockId to start from
-   * TODO: Better to specify the docId and let the operator decide the block
-   * to return. This may not be a problem now but when we add join, blockId
-   * may not mean anything across different tables
-   * @param blockId
-   * @return
-   */
-  Block nextBlock(BlockId blockId);
-
-  boolean close();
+  T nextBlock();
 
   ExecutionStatistics getExecutionStatistics();
 }

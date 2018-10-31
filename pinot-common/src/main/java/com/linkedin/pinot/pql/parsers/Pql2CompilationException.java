@@ -15,11 +15,19 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import org.antlr.v4.runtime.RecognitionException;
+
+
 /**
  * Exceptions that occur while compiling PQL.
  */
 public class Pql2CompilationException extends RuntimeException {
   public Pql2CompilationException(String message) {
     super(message);
+  }
+
+  public Pql2CompilationException(String msg, Object offendingSymbol, int line, int charPositionInLine,
+      RecognitionException e) {
+    super(line + ":" + charPositionInLine + ": '" + offendingSymbol + "' " + msg, e);
   }
 }

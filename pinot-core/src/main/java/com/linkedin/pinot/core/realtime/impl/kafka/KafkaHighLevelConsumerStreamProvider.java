@@ -17,6 +17,8 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
+import com.yammer.metrics.core.Meter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -33,7 +35,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private static final Logger STATIC_LOGGER = LoggerFactory.getLogger(KafkaHighLevelConsumerStreamProvider.class);
 
   private KafkaHighLevelStreamProviderConfig streamProviderConfig;
-  private KafkaMessageDecoder decoder;
+  private StreamMessageDecoder decoder;
 
   private ConsumerConnector consumer;
   private ConsumerIterator<byte[], byte[]> kafkaIterator;
@@ -46,6 +48,9 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   private ServerMetrics serverMetrics;
   private String tableAndStreamName;
   private long currentCount = 0L;
+
+  private Meter tableAndStreamRowsConsumed = null;
+  private Meter tableRowsConsumed = null;
 
   @Override
   public void init(StreamProviderConfig streamProviderConfig, String tableName, ServerMetrics serverMetrics)
@@ -76,8 +81,8 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
     if (kafkaIterator.hasNext()) {
       try {
         destination = decoder.decode(kafkaIterator.next().message(), destination);
-        serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
-        serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
+        tableAndStreamRowsConsumed = serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableAndStreamRowsConsumed);
+        tableRowsConsumed = serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L, tableRowsConsumed);
         ++currentCount;
 
         final long now = System.currentTimeMillis();

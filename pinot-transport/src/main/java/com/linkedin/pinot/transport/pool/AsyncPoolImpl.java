@@ -15,17 +15,6 @@
  */
 package com.linkedin.pinot.transport.pool;
 
-import com.linkedin.pinot.common.metrics.LatencyMetric;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.Cancellable;
-import com.linkedin.pinot.transport.common.LinkedDequeue;
-import com.linkedin.pinot.transport.common.NoneType;
-import com.linkedin.pinot.transport.metrics.AsyncPoolStats;
-import com.linkedin.pinot.transport.metrics.PoolStats;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -40,6 +29,17 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.metrics.LatencyMetric;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.transport.common.Callback;
+import com.linkedin.pinot.transport.common.Cancellable;
+import com.linkedin.pinot.transport.common.LinkedDequeue;
+import com.linkedin.pinot.transport.common.NoneType;
+import com.linkedin.pinot.transport.metrics.AsyncPoolStats;
+import com.linkedin.pinot.transport.metrics.PoolStats;
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -220,8 +220,6 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       _state = State.RUNNING;
 
       if (_idleTimeout > 0) {
-        System.out.println(_poolName + " :Setting up timeout job to run every "+ _idleTimeout);
-
         LOGGER.info("{} Setting up timeout job to run every {} ms", _poolName, _idleTimeout);
         long freq = Math.min(_idleTimeout / 10, 1000);
         _objectTimeoutFuture = _timeoutExecutor.scheduleAtFixedRate(new Runnable() {
@@ -243,6 +241,7 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
 
   @Override
   public void shutdown(Callback<NoneType> callback) {
+    _lifecycle.shutdown();
     final State state;
     synchronized (_lock) {
       state = _state;

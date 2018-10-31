@@ -32,10 +32,11 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // These metrics track the exceptions caught during query execution in broker side.
   // PQL compile phase.
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
+  // Get resource phase.
+  RESOURCE_MISSING_EXCEPTIONS("exceptions", true),
   // Query validation phase.
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
   // Scatter phase.
-  RESOURCE_MISSING_EXCEPTIONS("exceptions", false),
   NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
   // Gather phase.
   RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
@@ -71,11 +72,16 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // basis.
   REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR("requestDropped", false),
 
+  REQUEST_DROPPED_DUE_TO_ACCESS_ERROR("requestsDropped", false),
+
   // Number of queries served by LLC and HLC routing tables
   LLC_QUERY_COUNT("queries", false),
   HLC_QUERY_COUNT("queries", false),
 
-  ROUTING_TABLE_REBUILD_FAILURES("failures", false);
+  ROUTING_TABLE_REBUILD_FAILURES("failures", false),
+
+  GROUP_BY_SIZE("queries", false),
+  TOTAL_SERVER_RESPONSE_SIZE("queries", false);
 
   private final String brokerMeterName;
   private final String unit;

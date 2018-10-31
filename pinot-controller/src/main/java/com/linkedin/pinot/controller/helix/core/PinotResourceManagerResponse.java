@@ -74,4 +74,8 @@ public class PinotResourceManagerResponse {
       return "status : " + status + ",\terrorMessage : " + message;
     }
   }
+
+  public String getMessage() {
+    return message;
+  }
 }

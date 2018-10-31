@@ -15,101 +15,98 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
-import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.google.common.collect.HashBiMap;
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexType;
 import com.linkedin.pinot.core.segment.creator.InvertedIndexType;
+import com.linkedin.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
+import com.linkedin.pinot.core.segment.creator.SegmentCreationDataSource;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationInfo;
-import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsContainer;
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
+import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
+import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
-import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
-import com.linkedin.pinot.core.startree.StarTreeIndexNode;
-import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
-import com.linkedin.pinot.core.startree.StarTreeSerDe;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import com.linkedin.pinot.core.util.CrcUtils;
+import com.linkedin.pinot.startree.hll.HllConfig;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import org.apache.commons.io.FileUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Implementation of an index segment creator.
  */
-
+// TODO: Check resource leaks
 public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDriver {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentIndexCreationDriverImpl.class);
 
-  SegmentGeneratorConfig config;
-  RecordReader recordReader;
-  SegmentPreIndexStatsCollector statsCollector;
-  Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
-  SegmentCreator indexCreator;
-  SegmentIndexCreationInfo segmentIndexCreationInfo;
-  Schema dataSchema;
-  PlainFieldExtractor extractor;
-  int totalDocs = 0;
-  int totalRawDocs = 0;
-  int totalAggDocs = 0;
-  File tempIndexDir;
-  String segmentName;
-  long totalRecordReadTime = 0;
-  long totalIndexTime = 0;
-  long totalStatsCollectorTime = 0;
-  boolean createStarTree = false;
+  private SegmentGeneratorConfig config;
+  private RecordReader recordReader;
+  private SegmentPreIndexStatsContainer segmentStats;
+  private Map<String, ColumnIndexCreationInfo> indexCreationInfoMap;
+  private SegmentCreator indexCreator;
+  private SegmentIndexCreationInfo segmentIndexCreationInfo;
+  private Schema dataSchema;
+  private PlainFieldExtractor extractor;
+  private int totalDocs = 0;
+  private int totalRawDocs = 0;
+  private int totalAggDocs = 0;
+  private File tempIndexDir;
+  private String segmentName;
+  private long totalRecordReadTime = 0;
+  private long totalIndexTime = 0;
+  private long totalStatsCollectorTime = 0;
+  private boolean createStarTree = false;
   // flag indicates if the this segment generator code
   // will create the HLL index for the given columns.
   // This will be false if HLL column is provided to us
-  boolean createHllIndex = false;
+  private boolean createHllIndex = false;
 
   private File starTreeTempDir;
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
-    init(config, RecordReaderFactory.get(config));
+    init(config, new RecordReaderSegmentCreationDataSource(RecordReaderFactory.getRecordReader(config)));
   }
 
-  public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
+  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) throws Exception {
     this.config = config;
     this.createStarTree = config.isEnableStarTreeIndex();
-    // Initialize the record reader
-    recordReader = reader;
-    recordReader.init();
+    recordReader = dataSource.getRecordReader();
+    Preconditions.checkState(recordReader.hasNext(), "No record in data source");
     dataSchema = recordReader.getSchema();
 
     if (config.getHllConfig() != null) {
@@ -123,20 +120,24 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           createHllIndex = true;
         }
       } // else columnsToDeriveHllFields is null...don't do anything in this case
-        // segment seal() will write the log2m value to the metadata
+      // segment seal() will write the log2m value to the metadata
     }
 
     addDerivedFieldsInSchema();
 
-    extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(dataSchema);
+    extractor = FieldExtractorFactory.getPlainFieldExtractor(dataSchema);
 
     // Initialize stats collection
-    statsCollector = new SegmentPreIndexStatsCollectorImpl(recordReader.getSchema());
-    statsCollector.init();
+    if (!createStarTree) { // For star tree, the stats are gathered in buildStarTree()
+      segmentStats = dataSource.gatherStats(new StatsCollectorConfig(dataSchema, config.getSegmentPartitionConfig()));
+      totalDocs = segmentStats.getTotalDocCount();
+      totalRawDocs = segmentStats.getRawDocCount();
+      totalAggDocs = segmentStats.getAggregatedDocCount();
+    }
 
     // Initialize index creation
     segmentIndexCreationInfo = new SegmentIndexCreationInfo();
-    indexCreationInfoMap = new HashMap<String, ColumnIndexCreationInfo>();
+    indexCreationInfoMap = new HashMap<>();
 
     // Check if has star tree
     indexCreator = new SegmentColumnarIndexCreator();
@@ -146,11 +147,16 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (!indexDir.exists()) {
       indexDir.mkdirs();
     }
+
     // Create a temporary directory used in segment creation
     tempIndexDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
     starTreeTempDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
     LOGGER.debug("tempIndexDir:{}", tempIndexDir);
     LOGGER.debug("starTreeTempDir:{}", starTreeTempDir);
+  }
+
+  public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
+    init(config, new RecordReaderSegmentCreationDataSource(reader));
   }
 
   private void addDerivedFieldsInSchema() {
@@ -170,8 +176,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
   }
 
-  private void populateDefaultDerivedColumnValues(GenericRow row)
-      throws IOException {
+  private void populateDefaultDerivedColumnValues(GenericRow row) throws IOException {
     //add default hll value in each row
     if (createHllIndex) {
       HllConfig hllConfig = config.getHllConfig();
@@ -187,207 +192,150 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public void build() throws Exception {
     if (createStarTree) {
+      // TODO: add on-heap star-tree builder
       buildStarTree();
     } else {
       buildRaw();
     }
   }
 
-  public void buildStarTree() throws Exception {
+  private void buildStarTree() throws Exception {
+    // Create stats collector
+    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(dataSchema, config.getSegmentPartitionConfig());
+    SegmentPreIndexStatsCollectorImpl statsCollector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
+    statsCollector.init();
+    segmentStats = statsCollector;
+
     long start = System.currentTimeMillis();
     //construct star tree builder config
     StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();
     if (starTreeIndexSpec == null) {
       starTreeIndexSpec = new StarTreeIndexSpec();
       starTreeIndexSpec.setMaxLeafRecords(StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS);
-      config.setStarTreeIndexSpec(starTreeIndexSpec);
-    }
-    List<String> dimensionsSplitOrder = starTreeIndexSpec.getDimensionsSplitOrder();
-    if (dimensionsSplitOrder != null && !dimensionsSplitOrder.isEmpty()) {
-      String timeColumnName = config.getTimeColumnName();
-      if (timeColumnName != null) {
-        dimensionsSplitOrder.remove(timeColumnName);
-      }
+
+      // Overwrite the null index spec with default one.
+      config.enableStarTreeIndex(starTreeIndexSpec);
     }
     //create star builder config from startreeindexspec. Merge these two in one later.
     StarTreeBuilderConfig starTreeBuilderConfig = new StarTreeBuilderConfig();
-    starTreeBuilderConfig.setSchema(dataSchema);
-    starTreeBuilderConfig.setDimensionsSplitOrder(dimensionsSplitOrder);
-    starTreeBuilderConfig.setMaxLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
-    starTreeBuilderConfig.setSkipStarNodeCreationForDimensions(starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
-    Set<String> skipMaterializationForDimensions = starTreeIndexSpec.getskipMaterializationForDimensions();
-    starTreeBuilderConfig.setSkipMaterializationForDimensions(skipMaterializationForDimensions);
-    starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(starTreeIndexSpec.getskipMaterializationCardinalityThreshold());
     starTreeBuilderConfig.setOutDir(starTreeTempDir);
-
-    boolean enableOffHeapFormat = starTreeIndexSpec.isEnableOffHeapFormat();
-    starTreeBuilderConfig.setEnableOffHealpFormat(enableOffHeapFormat);
+    starTreeBuilderConfig.setSchema(dataSchema);
+    starTreeBuilderConfig.setDimensionsSplitOrder(starTreeIndexSpec.getDimensionsSplitOrder());
+    starTreeBuilderConfig.setSkipStarNodeCreationDimensions(
+        starTreeIndexSpec.getSkipStarNodeCreationForDimensions());
+    starTreeBuilderConfig.setSkipMaterializationDimensions(starTreeIndexSpec.getSkipMaterializationForDimensions());
+    starTreeBuilderConfig.setSkipMaterializationCardinalityThreshold(
+        starTreeIndexSpec.getSkipMaterializationCardinalityThreshold());
+    starTreeBuilderConfig.setMaxNumLeafRecords(starTreeIndexSpec.getMaxLeafRecords());
+    starTreeBuilderConfig.setExcludeSkipMaterializationDimensionsForStarTreeIndex(
+        starTreeIndexSpec.isExcludeSkipMaterializationDimensionsForStarTreeIndex());
 
     //initialize star tree builder
-    StarTreeBuilder starTreeBuilder = new OffHeapStarTreeBuilder();
-    starTreeBuilder.init(starTreeBuilderConfig);
-    //build star tree along with collecting stats
-    recordReader.rewind();
-    LOGGER.info("Start append raw data to star tree builder!");
-    totalDocs = 0;
-    GenericRow readRow = new GenericRow();
-    GenericRow transformedRow = new GenericRow();
-    while (recordReader.hasNext()) {
-      //PlainFieldExtractor conducts necessary type conversions
-      transformedRow = readNextRowSanitized(readRow, transformedRow);
-      //must be called after previous step since type conversion for derived values is unnecessary
-      populateDefaultDerivedColumnValues(transformedRow);
-      starTreeBuilder.append(transformedRow);
-      statsCollector.collectRow(transformedRow);
-      totalRawDocs++;
-      totalDocs++;
-    }
-    recordReader.close();
-    LOGGER.info("Start building star tree!");
-    starTreeBuilder.build();
-    LOGGER.info("Finished building star tree!");
-    long starTreeBuildFinishTime = System.currentTimeMillis();
-    //build stats
-    // Count the number of documents and gather per-column statistics
-    LOGGER.info("Start building StatsCollector!");
-    Iterator<GenericRow> aggregatedRowsIterator = starTreeBuilder.iterator(starTreeBuilder.getTotalRawDocumentCount(),
-        starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
-    while (aggregatedRowsIterator.hasNext()) {
-      GenericRow genericRow = aggregatedRowsIterator.next();
-      statsCollector.collectRow(genericRow, true /* isAggregated */);
-      totalAggDocs++;
-      totalDocs++;
-    }
-    buildIndexCreationInfo();
-    LOGGER.info("Collected stats for {} raw documents, {} aggregated documents", totalRawDocs, totalAggDocs);
-    long statCollectionFinishTime = System.currentTimeMillis();
-    // Initialize the index creation using the per-column statistics information
-    indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
-
-    //iterate over the data again,
-    Iterator<GenericRow> allRowsIterator = starTreeBuilder.iterator(0,
-        starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
-
-    while (allRowsIterator.hasNext()) {
-      GenericRow genericRow = allRowsIterator.next();
-      indexCreator.indexRow(genericRow);
-    }
-
-    // If no dimensionsSplitOrder was specified in starTreeIndexSpec, set the order used by the starTreeBuilder.
-    // This is required so the dimensionsSplitOrder used by the builder can be written into the segment metadata.
-    if (dimensionsSplitOrder == null || dimensionsSplitOrder.isEmpty()) {
-      starTreeIndexSpec.setDimensionsSplitOrder(starTreeBuilder.getDimensionsSplitOrder());
-    }
-
-    if (skipMaterializationForDimensions == null || skipMaterializationForDimensions.isEmpty()) {
-      starTreeIndexSpec.setSkipMaterializationForDimensions(starTreeBuilder.getSkipMaterializationForDimensions());
-    }
-
-    serializeTree(starTreeBuilder, enableOffHeapFormat);
-    //post creation
-    handlePostCreation();
-    starTreeBuilder.cleanup();
-    long end = System.currentTimeMillis();
-    LOGGER.info("Total time:{} \n star tree build time:{} \n stat collection time:{} \n column index build time:{}",
-        (end - start), (starTreeBuildFinishTime - start), statCollectionFinishTime - starTreeBuildFinishTime,
-        end - statCollectionFinishTime);
-  }
-
-  private void serializeTree(StarTreeBuilder starTreeBuilder, boolean enableOffHeapFormat) throws Exception {
-    //star tree was built using its own dictionary, we need to re-map dimension value id
-    Map<String, HashBiMap<Object, Integer>> dictionaryMap = starTreeBuilder.getDictionaryMap();
-    StarTree tree = starTreeBuilder.getTree();
-    HashBiMap<String, Integer> dimensionNameToIndexMap = starTreeBuilder.getDimensionNameToIndexMap();
-    StarTreeIndexNode node = (StarTreeIndexNode) tree.getRoot();
-    updateTree(node, dictionaryMap, dimensionNameToIndexMap);
-
-    File starTreeFile = new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE);
-    if (enableOffHeapFormat) {
-      StarTreeSerDe.writeTreeOffHeapFormat(tree, starTreeFile);
-    } else {
-      StarTreeSerDe.writeTreeOnHeapFormat(tree, starTreeFile);
-    }
-  }
-
-  /**
-   * Startree built its only dictionary that is different from the columnar segment dictionary.
-   * This method updates the tree with new mapping
-   * @param node
-   * @param dictionaryMap
-   * @param dimensionNameToIndexMap
-   */
-  private void updateTree(StarTreeIndexNode node, Map<String, HashBiMap<Object, Integer>> dictionaryMap,
-      HashBiMap<String, Integer> dimensionNameToIndexMap) {
-    //current node needs to update only if its not star
-    if (node.getDimensionName() != StarTreeIndexNodeInterf.ALL) {
-      String dimName = dimensionNameToIndexMap.inverse().get(node.getDimensionName());
-      int dimensionValue = node.getDimensionValue();
-      if (dimensionValue != StarTreeIndexNodeInterf.ALL) {
-        Object sortedValuesForDim = indexCreationInfoMap.get(dimName).getSortedUniqueElementsArray();
-        int indexForDimValue =
-            searchValueInArray(sortedValuesForDim, dictionaryMap.get(dimName).inverse().get(dimensionValue));
-        node.setDimensionValue(indexForDimValue);
+    try (StarTreeBuilder starTreeBuilder = new OffHeapStarTreeBuilder()) {
+      starTreeBuilder.init(starTreeBuilderConfig);
+      //build star tree along with collecting stats
+      recordReader.rewind();
+      LOGGER.info("Start append raw data to star tree builder!");
+      totalDocs = 0;
+      GenericRow readRow = new GenericRow();
+      GenericRow transformedRow = new GenericRow();
+      while (recordReader.hasNext()) {
+        //PlainFieldExtractor conducts necessary type conversions
+        transformedRow = readNextRowSanitized(readRow, transformedRow);
+        //must be called after previous step since type conversion for derived values is unnecessary
+        populateDefaultDerivedColumnValues(transformedRow);
+        starTreeBuilder.append(transformedRow);
+        statsCollector.collectRow(transformedRow);
+        totalRawDocs++;
+        totalDocs++;
       }
-    }
-    //update children map
-    Iterator<StarTreeIndexNode> childrenIterator = node.getChildrenIterator();
-    if (childrenIterator.hasNext()) {
-      Map<Integer, StarTreeIndexNode> newChildren = new HashMap<>();
-      String childDimName = dimensionNameToIndexMap.inverse().get(node.getChildDimensionName());
-      Object sortedValuesForDim = indexCreationInfoMap.get(childDimName).getSortedUniqueElementsArray();
+      recordReader.close();
+      LOGGER.info("Start building star tree!");
+      starTreeBuilder.build();
+      LOGGER.info("Finished building star tree!");
+      long starTreeBuildFinishTime = System.currentTimeMillis();
+      //build stats
+      // Count the number of documents and gather per-column statistics
+      LOGGER.info("Start building StatsCollector!");
+      Iterator<GenericRow> aggregatedRowsIterator = starTreeBuilder.iterator(starTreeBuilder.getTotalRawDocumentCount(),
+          starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
+      while (aggregatedRowsIterator.hasNext()) {
+        GenericRow genericRow = aggregatedRowsIterator.next();
+        statsCollector.collectRow(genericRow, true /* isAggregated */);
+        totalAggDocs++;
+        totalDocs++;
+      }
+      statsCollector.build();
+      buildIndexCreationInfo();
+      LOGGER.info("Collected stats for {} raw documents, {} aggregated documents", totalRawDocs, totalAggDocs);
+      long statCollectionFinishTime = System.currentTimeMillis();
 
-      while (childrenIterator.hasNext()) {
-        StarTreeIndexNode child = childrenIterator.next();
-        int childDimValue = child.getDimensionValue();
-        int childMappedDimValue = StarTreeIndexNodeInterf.ALL;
-        if (childDimValue != StarTreeIndexNodeInterf.ALL) {
-          childMappedDimValue = searchValueInArray(sortedValuesForDim,
-              dictionaryMap.get(childDimName).inverse().get(childDimValue));
+      try {
+        // Initialize the index creation using the per-column statistics information
+        indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
+
+        //iterate over the data again,
+        Iterator<GenericRow> allRowsIterator = starTreeBuilder.iterator(0,
+            starTreeBuilder.getTotalRawDocumentCount() + starTreeBuilder.getTotalAggregateDocumentCount());
+
+        while (allRowsIterator.hasNext()) {
+          GenericRow genericRow = allRowsIterator.next();
+          indexCreator.indexRow(genericRow);
         }
-        newChildren.put(childMappedDimValue, child);
-        updateTree(child, dictionaryMap, dimensionNameToIndexMap);
+      } catch (Exception e) {
+        indexCreator.close();
+        throw e;
       }
-      node.setChildren(newChildren);
+
+      // Serialize the star tree into a file
+      starTreeBuilder.serializeTree(new File(tempIndexDir, V1Constants.STAR_TREE_INDEX_FILE), indexCreationInfoMap);
+
+      // Update the dimensions split order and skip materialization dimensions spec so that then can be written into
+      // the segment metadata
+      starTreeIndexSpec.setDimensionsSplitOrder(starTreeBuilder.getDimensionsSplitOrder());
+      starTreeIndexSpec.setSkipMaterializationForDimensions(starTreeBuilder.getSkipMaterializationDimensions());
+
+      //post creation
+      handlePostCreation();
+      long end = System.currentTimeMillis();
+      LOGGER.info("Total time:{} \n star tree build time:{} \n stat collection time:{} \n column index build time:{}",
+          (end - start), (starTreeBuildFinishTime - start), statCollectionFinishTime - starTreeBuildFinishTime,
+          end - statCollectionFinishTime);
     }
   }
 
-  public void buildRaw() throws Exception {
+  private void buildRaw()
+      throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
-    totalDocs = 0;
-    GenericRow readRow = new GenericRow();
-    GenericRow transformedRow = new GenericRow();
-    while (recordReader.hasNext()) {
-      totalDocs++;
-      totalRawDocs++;
-      long start = System.currentTimeMillis();
-      transformedRow = readNextRowSanitized(readRow, transformedRow);
-      long stop = System.currentTimeMillis();
-      statsCollector.collectRow(transformedRow);
-      long stop1 = System.currentTimeMillis();
-      totalRecordReadTime += (stop - start);
-      totalStatsCollectorTime += (stop1 - stop);
-    }
     buildIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", totalDocs);
 
-    // Initialize the index creation using the per-column statistics information
-    indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
+    try {
+      // Initialize the index creation using the per-column statistics information
+      indexCreator.init(config, segmentIndexCreationInfo, indexCreationInfoMap, dataSchema, tempIndexDir);
 
-    // Build the index
-    recordReader.rewind();
-    LOGGER.info("Start building IndexCreator!");
-    while (recordReader.hasNext()) {
-      long start = System.currentTimeMillis();
-      transformedRow = readNextRowSanitized(readRow, transformedRow);
-      long stop = System.currentTimeMillis();
-      indexCreator.indexRow(transformedRow);
-      long stop1 = System.currentTimeMillis();
-      totalRecordReadTime += (stop - start);
-      totalIndexTime += (stop1 - stop);
+      // Build the index
+      recordReader.rewind();
+      LOGGER.info("Start building IndexCreator!");
+      GenericRow readRow = new GenericRow();
+      GenericRow transformedRow = new GenericRow();
+      while (recordReader.hasNext()) {
+        long start = System.currentTimeMillis();
+        transformedRow = readNextRowSanitized(readRow, transformedRow);
+        long stop = System.currentTimeMillis();
+        indexCreator.indexRow(transformedRow);
+        long stop1 = System.currentTimeMillis();
+        totalRecordReadTime += (stop - start);
+        totalIndexTime += (stop1 - stop);
+      }
+    } catch (Exception e) {
+      indexCreator.close();
+      throw e;
+    } finally {
+      recordReader.close();
     }
-    recordReader.close();
     LOGGER.info("Finished records indexing in IndexCreator!");
     int numErrors, numConversions, numNulls, numNullCols;
     if ((numErrors = extractor.getTotalErrors()) > 0) {
@@ -413,26 +361,19 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     handlePostCreation();
   }
 
-  private void handlePostCreation() throws Exception {
-    // Build the segment name, if necessary
+  private void handlePostCreation()
+      throws Exception {
     final String timeColumn = config.getTimeColumnName();
+    segmentName = config.getSegmentNameGenerator().generateSegmentName(segmentStats.getColumnProfileFor(timeColumn));
+    updateSegmentStartEndTimeIfNecessary(segmentStats.getColumnProfileFor(timeColumn));
 
-    if (config.getSegmentName() != null) {
-      segmentName = config.getSegmentName();
-    } else {
-      if (timeColumn != null && timeColumn.length() > 0) {
-        final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
-        final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
-        segmentName = SegmentNameBuilder
-            .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
-      } else {
-        segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
-      }
+    try {
+      // Write the index files to disk
+      indexCreator.setSegmentName(segmentName);
+      indexCreator.seal();
+    } finally {
+      indexCreator.close();
     }
-
-    // Write the index files to disk
-    indexCreator.setSegmentName(segmentName);
-    indexCreator.seal();
     LOGGER.info("Finished segment seal!");
 
     // Delete the directory named after the segment name, if it exists
@@ -448,24 +389,60 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Delete the temporary directory
     FileUtils.deleteQuietly(tempIndexDir);
 
-    // Compute CRC
-    final long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
+    // Convert segment format if necessary
+    convertFormatIfNeeded(segmentOutputDir);
 
-    // Persist creation metadata to disk
-    persistCreationMeta(segmentOutputDir, crc);
-    Map<String, MutableLong> nullCountMap = recordReader.getNullCountMap();
-    if (nullCountMap != null) {
-      for (Map.Entry<String, MutableLong> entry : nullCountMap.entrySet()) {
-        AbstractColumnStatisticsCollector columnStatisticsCollector =
-            statsCollector.getColumnProfileFor(entry.getKey());
-        columnStatisticsCollector.setNumInputNullValues(entry.getValue().intValue());
+    // Compute CRC and creation time
+    long crc = CrcUtils.forAllFilesInFolder(segmentOutputDir).computeCrc();
+    long creationTime;
+    String creationTimeInConfig = config.getCreationTime();
+    if (creationTimeInConfig != null) {
+      try {
+        creationTime = Long.parseLong(creationTimeInConfig);
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while parsing creation time in config, use current time as creation time");
+        creationTime = System.currentTimeMillis();
       }
+    } else {
+      creationTime = System.currentTimeMillis();
     }
 
-    convertFormatIfNeeded(segmentOutputDir);
+    // Persist creation metadata to disk
+    persistCreationMeta(segmentOutputDir, crc, creationTime);
+
     LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
     LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", totalIndexTime);
+  }
+
+  private void updateSegmentStartEndTimeIfNecessary(ColumnStatistics timeColumnStats) {
+    switch (config.getTimeColumnType()) {
+      case EPOCH:
+        break;
+      case SIMPLE_DATE:
+        long startTime = convertStartTimeSDFToMillis(timeColumnStats);
+        config.getCustomProperties().put(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, String.valueOf(startTime));
+        long endTime = convertEndTimeSDFToMillis(timeColumnStats);
+        config.getCustomProperties().put(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, String.valueOf(endTime));
+        break;
+    }
+  }
+
+  public long convertStartTimeSDFToMillis(ColumnStatistics timeColumnStats) {
+    final String minTimeStr = timeColumnStats.getMinValue().toString();
+    return convertSDFToMillis(minTimeStr);
+  }
+
+  public long convertEndTimeSDFToMillis(ColumnStatistics timeColumnStats) {
+    final String maxTimeStr = timeColumnStats.getMaxValue().toString();
+    return convertSDFToMillis(maxTimeStr);
+  }
+
+  private long convertSDFToMillis(final String colValue) {
+    final String sdfFormatStr = config.getSimpleDateFormat();
+    DateTimeFormatter sdfFormatter = DateTimeFormat.forPattern(sdfFormatStr);
+    DateTime dateTime = DateTime.parse(colValue, sdfFormatter);
+    return dateTime.getMillis();
   }
 
   // Explanation of why we are using format converter:
@@ -493,36 +470,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     converter.convert(segmentDirectory);
   }
 
-  public ColumnStatistics getColumnStatisticsCollector(final String columnName) throws Exception {
-    return statsCollector.getColumnProfileFor(columnName);
+  public ColumnStatistics getColumnStatisticsCollector(final String columnName)
+      throws Exception {
+    return segmentStats.getColumnProfileFor(columnName);
   }
 
-  public void overWriteSegmentName(String segmentName) {
-    this.segmentName = segmentName;
-  }
-
-  /**
-   * Writes segment creation metadata to disk.
-   */
-  void persistCreationMeta(File outputDir, long crc) throws IOException {
-    final File crcFile = new File(outputDir, V1Constants.SEGMENT_CREATION_META);
-    final DataOutputStream out = new DataOutputStream(new FileOutputStream(crcFile));
-    out.writeLong(crc);
-
-    long creationTime = System.currentTimeMillis();
-
-    // Use the creation time from the configuration if it exists and is not -1
-    try {
-      long configCreationTime = Long.parseLong(config.getCreationTime());
-      if (0L < configCreationTime) {
-        creationTime = configCreationTime;
-      }
-    } catch (Exception nfe) {
-      // Ignore NPE and NFE, use the current time.
+  public static void persistCreationMeta(File indexDir, long crc, long creationTime) throws IOException {
+    File segmentDir = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
+    File creationMetaFile = new File(segmentDir, V1Constants.SEGMENT_CREATION_META);
+    try (DataOutputStream output = new DataOutputStream(new FileOutputStream(creationMetaFile))) {
+      output.writeLong(crc);
+      output.writeLong(creationTime);
     }
-
-    out.writeLong(creationTime);
-    out.close();
   }
 
   /**
@@ -530,19 +489,24 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    */
   void buildIndexCreationInfo()
       throws Exception {
-    statsCollector.build();
     for (FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       String column = spec.getName();
-      indexCreationInfoMap.put(column, new ColumnIndexCreationInfo(true/*createDictionary*/,
-          statsCollector.getColumnProfileFor(column).getMinValue(),
-          statsCollector.getColumnProfileFor(column).getMaxValue(),
-          statsCollector.getColumnProfileFor(column).getUniqueValuesSet(), ForwardIndexType.FIXED_BIT_COMPRESSED,
-          InvertedIndexType.ROARING_BITMAPS, statsCollector.getColumnProfileFor(column).isSorted(),
-          statsCollector.getColumnProfileFor(column).hasNull(),
-          statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
-          statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues(),
-          statsCollector.getColumnProfileFor(column).getLengthOfLargestElement(), false/*isAutoGenerated*/,
-          dataSchema.getFieldSpecFor(column).getDefaultNullValue()));
+      ColumnStatistics columnProfile = segmentStats.getColumnProfileFor(column);
+      indexCreationInfoMap.put(column,
+          new ColumnIndexCreationInfo(true/*createDictionary*/, columnProfile.getMinValue(),
+              columnProfile.getMaxValue(),
+              columnProfile.getUniqueValuesSet(), ForwardIndexType.FIXED_BIT_COMPRESSED,
+              InvertedIndexType.ROARING_BITMAPS, columnProfile.isSorted(),
+              columnProfile.hasNull(),
+              columnProfile.getTotalNumberOfEntries(),
+              columnProfile.getMaxNumberOfMultiValues(),
+              columnProfile.getLengthOfShortestElement(),
+              columnProfile.getLengthOfLargestElement(),
+              false/*isAutoGenerated*/,
+              columnProfile.getPartitionFunction(),
+              columnProfile.getNumPartitions(),
+              columnProfile.getPartitionRanges(),
+              dataSchema.getFieldSpecFor(column).getDefaultNullValue()));
     }
     segmentIndexCreationInfo.setTotalDocs(totalDocs);
     segmentIndexCreationInfo.setTotalRawDocs(totalRawDocs);
@@ -554,56 +518,27 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     segmentIndexCreationInfo.setTotalNulls(extractor.getTotalNulls());
   }
 
-  @Override
   /**
    * Returns the name of the segment associated with this index creation driver.
    */
+  @Override
   public String getSegmentName() {
     return segmentName;
   }
 
-  @Override
   /**
    * Returns the path of the output directory
    */
+  @Override
   public File getOutputDirectory() {
     return new File(new File(config.getOutDir()), segmentName);
   }
 
-  private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow) {
-    readRow = GenericRow.createOrReuseRow(readRow);
-    readRow = recordReader.next(readRow);
-    transformedRow = GenericRow.createOrReuseRow(transformedRow);
-    return extractor.transform(readRow, transformedRow);
+  private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow) throws IOException {
+    return extractor.transform(recordReader.next(readRow), transformedRow);
   }
 
-  /**
-   * Helper method to binary-search a given key in an input array.
-   * Both input array and the key to search are passed in as 'Object'.
-   *
-   * - Supported data types are int, long, float, double & String.
-   * - Throws an exception for any other data type.
-   *
-   * @param inputArray Input array to search
-   * @param key Key to search for
-   * @return
-   */
-  private int searchValueInArray(Object inputArray, Object key) {
-    if (inputArray instanceof int[]) {
-      return Arrays.binarySearch((int[]) inputArray, (Integer) key);
-    } else if (inputArray instanceof long[]) {
-      return Arrays.binarySearch((long[]) inputArray, (Long) key);
-    } else if (inputArray instanceof float[]) {
-      return Arrays.binarySearch((float[]) inputArray, (Float) key);
-    } else if (inputArray instanceof double[]) {
-      return Arrays.binarySearch((double[]) inputArray, (Double) key);
-    } else if (inputArray instanceof String[]) {
-      return Arrays.binarySearch((String[]) inputArray, key);
-    } else if (inputArray instanceof Object[]) {
-      return Arrays.binarySearch((Object[]) inputArray, key);
-    } else {
-      throw new RuntimeException(
-          "Unexpected data type encountered while updating StarTree node" + inputArray.getClass().getName());
-    }
+  public SegmentPreIndexStatsContainer getSegmentStats() {
+    return segmentStats;
   }
 }

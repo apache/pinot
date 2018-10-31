@@ -15,20 +15,20 @@
  */
 package com.linkedin.pinot.common.metrics;
 
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
-import java.util.concurrent.atomic.AtomicLong;
-import org.antlr.v4.runtime.misc.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+import javax.annotation.Nullable;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -48,10 +48,18 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   private final Map<String, AtomicLong> _gaugeValues = new ConcurrentHashMap<String, AtomicLong>();
 
+  protected final boolean _global;
+
   public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz) {
+    this(metricPrefix, metricsRegistry, clazz, false);
+  }
+
+  public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz, boolean global) {
     _metricPrefix = metricPrefix;
     _metricsRegistry = metricsRegistry;
     _clazz = clazz;
+    _global = global;
+
   }
 
   public interface QueryPhase {
@@ -93,7 +101,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public void addPhaseTiming(String tableName, QP phase, long nanos) {
-    String fullTimerName = _metricPrefix + tableName + "." + phase.getQueryPhaseName();
+    String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
     addValueToTimer(fullTimerName, nanos, TimeUnit.NANOSECONDS);
   }
 
@@ -106,7 +114,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param timeUnit The log time duration time unit
    */
   public void addTimedTableValue(final String tableName, T timer, final long duration, final TimeUnit timeUnit) {
-    final String fullTimerName = _metricPrefix + tableName + "." + timer.getTimerName();
+    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 
@@ -127,6 +135,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
     final MetricName metricName = new MetricName(_clazz, fullTimerName);
+    com.yammer.metrics.core.Timer timer =
+        MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     MetricsHelper.newTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS).update(duration,
         timeUnit);
   }
@@ -140,7 +150,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private String buildMetricName(@Nullable BrokerRequest request, String metricName) {
     if (request != null && request.getQuerySource() != null && request.getQuerySource().getTableName() != null) {
-      return _metricPrefix + request.getQuerySource().getTableName() + "." + metricName;
+      return _metricPrefix + getTableName(request.getQuerySource().getTableName()) + "." + metricName;
     } else {
       return _metricPrefix + "unknown." + metricName;
     }
@@ -173,12 +183,31 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    */
   public void addMeteredGlobalValue(final M meter, final long unitCount) {
-    final String fullMeterName;
-    String meterName = meter.getMeterName();
-    fullMeterName = _metricPrefix + meterName;
-    final MetricName metricName = new MetricName(_clazz, fullMeterName);
+    addMeteredGlobalValue(meter, unitCount, null);
+  }
 
-    MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS).mark(unitCount);
+  /**
+   * Logs a value to a meter.
+   *
+   * @param meter The meter to use
+   * @param unitCount The number of units to add to the meter
+   * @param reusedMeter The meter to reuse
+   */
+  public com.yammer.metrics.core.Meter addMeteredGlobalValue(final M meter, final long unitCount, com.yammer.metrics.core.Meter reusedMeter) {
+    if (reusedMeter != null) {
+      reusedMeter.mark(unitCount);
+      return reusedMeter;
+    } else {
+      final String fullMeterName;
+      String meterName = meter.getMeterName();
+      fullMeterName = _metricPrefix + meterName;
+      final MetricName metricName = new MetricName(_clazz, fullMeterName);
+
+      final com.yammer.metrics.core.Meter newMeter =
+          MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+      newMeter.mark(unitCount);
+      return newMeter;
+    }
   }
 
   /**
@@ -189,12 +218,40 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    */
   public void addMeteredTableValue(final String tableName, final M meter, final long unitCount) {
+    addMeteredTableValue(tableName, meter, unitCount, null);
+  }
+
+  /**
+   * Logs a value to a table-level meter.
+   * @param tableName The table name
+   * @param meter The meter to use
+   * @param unitCount The number of units to add to the meter
+   * @param reusedMeter The meter to reuse
+   */
+  public com.yammer.metrics.core.Meter addMeteredTableValue(final String tableName, final M meter, final long unitCount, com.yammer.metrics.core.Meter reusedMeter) {
+    if (reusedMeter != null) {
+      reusedMeter.mark(unitCount);
+      return reusedMeter;
+    } else {
+      final String fullMeterName;
+      String meterName = meter.getMeterName();
+      fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
+      final MetricName metricName = new MetricName(_clazz, fullMeterName);
+
+      final com.yammer.metrics.core.Meter newMeter =
+          MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+      newMeter.mark(unitCount);
+      return newMeter;
+    }
+  }
+
+  public com.yammer.metrics.core.Meter getMeteredTableValue(final String tableName, final M meter) {
     final String fullMeterName;
     String meterName = meter.getMeterName();
-    fullMeterName = _metricPrefix + tableName + "." + meterName;
+    fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
     final MetricName metricName = new MetricName(_clazz, fullMeterName);
 
-    MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS).mark(unitCount);
+    return MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
   }
 
   /**
@@ -213,7 +270,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       fullMeterName = _metricPrefix + meterName;
     }
     final MetricName metricName = new MetricName(_clazz, fullMeterName);
-
     MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS).mark(unitCount);
   }
 
@@ -227,7 +283,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void addValueToTableGauge(final String tableName, final G gauge, final long unitCount) {
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + tableName;
+    fullGaugeName = gaugeName + "." + getTableName(tableName);
 
     if (!_gaugeValues.containsKey(fullGaugeName)) {
       synchronized (_gaugeValues) {
@@ -258,7 +314,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setValueOfTableGauge(final String tableName, final G gauge, final long value) {
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + tableName;
+    fullGaugeName = gaugeName + "." + getTableName(tableName);
 
     if (!_gaugeValues.containsKey(fullGaugeName)) {
       synchronized (_gaugeValues) {
@@ -317,7 +373,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public long getValueOfTableGauge(final String tableName, final G gauge) {
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + tableName;
+    fullGaugeName = gaugeName + "." + getTableName(tableName);
 
     if (!_gaugeValues.containsKey(fullGaugeName)) {
       return 0;
@@ -373,4 +429,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract M[] getMeters();
 
   protected abstract G[] getGauges();
+
+  protected String getTableName(String tableName){
+     return (_global ? "allTables" : tableName);
+  }
 }

@@ -26,6 +26,8 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.startree.hll.HllConfig;
+import com.linkedin.pinot.startree.hll.HllConstants;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.io.IOException;
@@ -103,10 +105,9 @@ public class SegmentWithHllIndexCreateHelper {
 
   private void setupStarTreeConfig(SegmentGeneratorConfig segmentGenConfig) {
     // StarTree related
-    segmentGenConfig.setEnableStarTreeIndex(true);
     StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
     starTreeIndexSpec.setMaxLeafRecords(StarTreeIndexSpec.DEFAULT_MAX_LEAF_RECORDS);
-    segmentGenConfig.setStarTreeIndexSpec(starTreeIndexSpec);
+    segmentGenConfig.enableStarTreeIndex(starTreeIndexSpec);
     LOGGER.info("segmentGenConfig Schema (w/o derived fields): ");
     printSchema(segmentGenConfig.getSchema());
   }

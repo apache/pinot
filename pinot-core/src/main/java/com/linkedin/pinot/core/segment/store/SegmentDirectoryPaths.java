@@ -21,66 +21,80 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class SegmentDirectoryPaths {
+  private SegmentDirectoryPaths() {
+  }
+
   public static final String V3_SUBDIRECTORY_NAME = "v3";
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentDirectoryPaths.class);
 
-
-  public static File segmentDirectoryFor(File segmentIndexDirectory, SegmentVersion version) {
-    switch(version) {
+  @Nonnull
+  public static File segmentDirectoryFor(@Nonnull File indexDir, @Nonnull SegmentVersion segmentVersion) {
+    switch (segmentVersion) {
       case v1:
       case v2:
-        return segmentIndexDirectory;
+        return indexDir;
       case v3:
-        return new File(segmentIndexDirectory, V3_SUBDIRECTORY_NAME);
+        return new File(indexDir, V3_SUBDIRECTORY_NAME);
       default:
-        throw new UnsupportedOperationException("Segment path for version: " + version +
-            " and segmentIndexDirectory: " + segmentIndexDirectory + " can not be determined ");
+        throw new UnsupportedOperationException(
+            "Unsupported segment version: " + segmentVersion + " while trying to get segment directory from: "
+                + indexDir);
     }
   }
 
-  public static boolean isV3Directory(File path) {
+  @Nonnull
+  public static File findSegmentDirectory(@Nonnull File indexDir) {
+    Preconditions.checkArgument(indexDir.isDirectory(), "Path: %s is not a directory", indexDir);
+
+    File v3SegmentDir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
+    if (v3SegmentDir.isDirectory()) {
+      return v3SegmentDir;
+    } else {
+      return indexDir;
+    }
+  }
+
+  public static boolean isV3Directory(@Nonnull File path) {
     return path.toString().endsWith(V3_SUBDIRECTORY_NAME);
   }
 
-  public static @Nullable File findMetadataFile(@Nonnull File indexDir) {
+  @Nullable
+  public static File findMetadataFile(@Nonnull File indexDir) {
     return findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
   }
 
-  /**
-   * Find the creation metadata file in the segment directory path to
-   * handle different segment formats
-   * @param indexDir index directory to look for file
-   * @return creation metadata file or null if the file is not found
-   */
-  public static @Nullable File findCreationMetaFile(@Nonnull File indexDir) {
+  @Nullable
+  public static File findCreationMetaFile(@Nonnull File indexDir) {
     return findFormatFile(indexDir, V1Constants.SEGMENT_CREATION_META);
   }
 
-  public static @Nullable File findStarTreeFile(@Nonnull File indexDir) {
+  @Nullable
+  public static File findStarTreeFile(@Nonnull File indexDir) {
     return findFormatFile(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
   }
-  private static @Nullable File findFormatFile(@Nonnull File indexDir, String fileName) {
-    Preconditions.checkNotNull(indexDir);
-    Preconditions.checkArgument(indexDir.exists(), "Path %s does not exist", indexDir);
 
-    if (! indexDir.isDirectory()) {
-      return indexDir;
-    }
+  /**
+   * Find a file in any segment version.
+   * <p>Index directory passed in should be top level segment directory.
+   * <p>If file exists in multiple segment version, return the one in highest segment version.
+   */
+  @Nullable
+  private static File findFormatFile(@Nonnull File indexDir, @Nonnull String fileName) {
+    Preconditions.checkArgument(indexDir.isDirectory(), "Path: %s is not a directory", indexDir);
 
-    File v1File = new File(indexDir, fileName);
-    if (v1File.exists()) {
-      return v1File;
-    }
-
+    // Try to find v3 file first
     File v3Dir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
     File v3File = new File(v3Dir, fileName);
     if (v3File.exists()) {
       return v3File;
+    }
+
+    // If cannot find v3 file, try to find v1 file instead
+    File v1File = new File(indexDir, fileName);
+    if (v1File.exists()) {
+      return v1File;
     }
 
     return null;

@@ -49,6 +49,11 @@ public class EmptySegmentOnlineOfflineStateModelFactory extends StateModelFactor
       LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
     }
 
+    @Transition(from = "OFFLINE", to = "CONSUMING")
+    public void onBecomeConsumingFromOffline(Message message, NotificationContext context) {
+      LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeConsumingFromOffline() : " + message);
+    }
+
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
       LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
@@ -62,6 +67,11 @@ public class EmptySegmentOnlineOfflineStateModelFactory extends StateModelFactor
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
       LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
+    }
+
+    @Transition(from = "CONSUMING", to = "DROPPED")
+    public void onBecomeDroppedFromConsuming(Message message, NotificationContext context) {
+      LOGGER.info("EmptySegmentOnlineOfflineStateModel.onBecomeDroppedFromConsuming() : " + message);
     }
   }
 

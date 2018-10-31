@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.response;
 
+import com.linkedin.pinot.common.response.broker.QueryProcessingException;
 import java.util.List;
 import org.json.JSONObject;
 
@@ -84,4 +85,9 @@ public interface BrokerResponse {
    * Get number of exceptions recorded in the response.
    */
   int getExceptionsSize();
+
+  /**
+   * Get the list of exceptions
+   */
+  List<QueryProcessingException> getProcessingExceptions();
 }

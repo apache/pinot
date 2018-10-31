@@ -1,16 +1,20 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
-import com.linkedin.thirdeye.datalayer.util.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyResultDTO>
-    implements RawAnomalyResultManager {
+
+@Singleton
+public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyResultDTO> implements RawAnomalyResultManager {
+  private static final Logger LOG = LoggerFactory.getLogger(RawAnomalyResultManagerImpl.class);
 
   public RawAnomalyResultManagerImpl() {
     super(RawAnomalyResultDTO.class, RawAnomalyResultBean.class);
@@ -70,43 +74,24 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     }
   }
 
-  public List<RawAnomalyResultDTO> findAllByTimeAndFunctionId(long startTime, long endTime,
-      long functionId) {
-    Predicate startTimePredicate;
-    startTimePredicate =
-        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LE("startTime", endTime));
-    Predicate endTimeTimePredicate;
-    endTimeTimePredicate =
-        Predicate.AND(Predicate.GE("endTime", startTime), Predicate.LE("endTime", endTime));;
-    Predicate functionIdPredicate = Predicate.EQ("functionId", functionId);
-    Predicate finalPredicate =
-        Predicate.AND(functionIdPredicate, Predicate.OR(endTimeTimePredicate, startTimePredicate));
-    return findByPredicate(finalPredicate);
-  }
-
-  public List<RawAnomalyResultDTO> findUnmergedByFunctionId(Long functionId) {
-    //    "select r from RawAnomalyResultDTO r where r.function.id = :functionId and r.merged=false "
-    //        + "and r.dataMissing=:dataMissing";
-
-    Predicate predicate = Predicate.AND(//
-        Predicate.EQ("functionId", functionId), //
-        Predicate.EQ("merged", false), //
-        Predicate.EQ("dataMissing", false) //
-    );
-    return findByPredicate(predicate);
-  }
-
-  public List<RawAnomalyResultDTO> findByFunctionId(Long functionId) {
-    Predicate predicate = Predicate.EQ("functionId", functionId);
-    return findByPredicate(predicate);
-  }
-
-  private List<RawAnomalyResultDTO> findByPredicate(Predicate predicate) {
-    List<RawAnomalyResultBean> list = genericPojoDao.get(predicate, RawAnomalyResultBean.class);
-    List<RawAnomalyResultDTO> result = new ArrayList<>();
-    for (RawAnomalyResultBean bean : list) {
-      result.add(createRawAnomalyDTOFromBean(bean));
+  private RawAnomalyResultDTO createRawAnomalyDTOFromBean(RawAnomalyResultBean rawAnomalyResultBean) {
+    RawAnomalyResultDTO rawAnomalyResultDTO;
+    rawAnomalyResultDTO = MODEL_MAPPER.map(rawAnomalyResultBean, RawAnomalyResultDTO.class);
+    if (rawAnomalyResultBean.getFunctionId() != null) {
+      AnomalyFunctionBean anomalyFunctionBean =
+          genericPojoDao.get(rawAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
+      if (anomalyFunctionBean == null) {
+        LOG.error("this anomaly function bean should not be null");
+      }
+      AnomalyFunctionDTO anomalyFunctionDTO = MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
+      rawAnomalyResultDTO.setFunction(anomalyFunctionDTO);
     }
-    return result;
+    if (rawAnomalyResultBean.getAnomalyFeedbackId() != null) {
+      AnomalyFeedbackBean anomalyFeedbackBean =
+          genericPojoDao.get(rawAnomalyResultBean.getAnomalyFeedbackId(), AnomalyFeedbackBean.class);
+      AnomalyFeedbackDTO anomalyFeedbackDTO = MODEL_MAPPER.map(anomalyFeedbackBean, AnomalyFeedbackDTO.class);
+      rawAnomalyResultDTO.setFeedback(anomalyFeedbackDTO);
+    }
+    return rawAnomalyResultDTO;
   }
 }

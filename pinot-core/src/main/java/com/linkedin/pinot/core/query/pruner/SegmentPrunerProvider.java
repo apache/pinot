@@ -15,9 +15,8 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.apache.commons.configuration.Configuration;
 
 
@@ -27,21 +26,23 @@ import org.apache.commons.configuration.Configuration;
  *
  */
 public class SegmentPrunerProvider {
+  private SegmentPrunerProvider() {
+  }
 
-  private static Map<String, Class<? extends SegmentPruner>> keyToFunction =
-      new ConcurrentHashMap<String, Class<? extends SegmentPruner>>();
+  private static final Map<String, Class<? extends SegmentPruner>> PRUNER_MAP = new HashMap<>();
 
   static {
-    keyToFunction.put("timesegmentpruner", TimeSegmentPruner.class);
-    keyToFunction.put("dataschemasegmentpruner", DataSchemaSegmentPruner.class);
-    keyToFunction.put("validsegmentpruner", ValidSegmentPruner.class);
+    PRUNER_MAP.put("columnvaluesegmentpruner", ColumnValueSegmentPruner.class);
+    PRUNER_MAP.put("dataschemasegmentpruner", DataSchemaSegmentPruner.class);
+    PRUNER_MAP.put("validsegmentpruner", ValidSegmentPruner.class);
+    PRUNER_MAP.put("partitionsegmentpruner", PartitionSegmentPruner.class);
   }
 
   public static SegmentPruner getSegmentPruner(String prunerClassName, Configuration segmentPrunerConfig) {
     try {
-      Class<? extends SegmentPruner> cls = keyToFunction.get(prunerClassName.toLowerCase());
+      Class<? extends SegmentPruner> cls = PRUNER_MAP.get(prunerClassName.toLowerCase());
       if (cls != null) {
-        SegmentPruner segmentPruner = (SegmentPruner) cls.newInstance();
+        SegmentPruner segmentPruner = cls.newInstance();
         segmentPruner.init(segmentPrunerConfig);
         return segmentPruner;
       }

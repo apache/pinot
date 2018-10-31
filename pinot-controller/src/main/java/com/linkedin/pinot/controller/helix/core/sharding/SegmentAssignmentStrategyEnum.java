@@ -23,6 +23,6 @@ package com.linkedin.pinot.controller.helix.core.sharding;
 public enum SegmentAssignmentStrategyEnum {
   RandomAssignmentStrategy,
   BalanceNumSegmentAssignmentStrategy,
-  BucketizedSegmentAssignmentStrategy;
-
+  BucketizedSegmentAssignmentStrategy,
+  ReplicaGroupSegmentAssignmentStrategy;
 }

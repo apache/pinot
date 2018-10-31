@@ -1,7 +1,11 @@
 /** HEADER related eventlisteners **/
 
-$("#main-view").on("click", ".header-tab", function () {
-    switchHeaderTab(this)
+$("#main-view").on("click", ".header-tab", function (event) {
+    if (event.currentTarget.id === 'new-ui-tab') {
+        window.location.href = 'thirdeye';
+    } else {
+        switchHeaderTab(this)
+    }
 });
 
 function switchHeaderTab(target) {

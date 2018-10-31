@@ -15,12 +15,24 @@
  */
 package com.linkedin.pinot.tools;
 
-import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
-import com.linkedin.pinot.core.startree.StarTreeInterf;
-import com.linkedin.pinot.core.startree.StarTreeSerDe;
+import com.google.common.collect.MinMaxPriorityQueue;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
+import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.StarTreeNode;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -29,85 +41,90 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.annotate.JsonSerialize.Inclusion;
-import org.restlet.Application;
-import org.restlet.Component;
-import org.restlet.Restlet;
-import org.restlet.data.Protocol;
-import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Directory;
-import org.restlet.resource.Get;
-import org.restlet.resource.ServerResource;
-import org.restlet.routing.Router;
-import org.restlet.routing.VirtualHost;
+import org.glassfish.grizzly.http.server.HttpServer;
+import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.HashBiMap;
-import com.google.common.collect.MinMaxPriorityQueue;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class StarTreeIndexViewer {
+  private static class StarTreeJsonNode {
+    String _name;
+    List<StarTreeJsonNode> _children;
+
+    StarTreeJsonNode(String name) {
+      _name = name;
+    }
+
+    public void addChild(StarTreeJsonNode child) {
+      if (_children == null) {
+        _children = new ArrayList<>();
+      }
+      _children.add(child);
+    }
+
+    public String getName() {
+      return _name;
+    }
+
+    public List<StarTreeJsonNode> getChildren() {
+      return _children;
+    }
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexViewer.class);
 
   /*
    * MAX num children to show in the UI
    */
   static int MAX_CHILDREN = 100;
-  private HashBiMap<String, Integer> dimensionNameToIndexMap;
+  private List<String> _dimensionNames;
   private Map<String, Dictionary> dictionaries;
   private Map<String, BlockSingleValIterator> valueIterators;
 
   public StarTreeIndexViewer(File segmentDir) throws Exception {
-    IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDir, ReadMode.heap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.heap);
 
-    dictionaries = new HashMap<String, Dictionary>();
-    valueIterators = new HashMap<String, BlockSingleValIterator>();
+    dictionaries = new HashMap<>();
+    valueIterators = new HashMap<>();
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
 
     for (String columnName : metadata.getAllColumns()) {
       DataSource dataSource = indexSegment.getDataSource(columnName);
-      dataSource.open();
       Block block = dataSource.nextBlock();
       BlockValSet blockValSet = block.getBlockValueSet();
       BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
       valueIterators.put(columnName, itr);
       dictionaries.put(columnName, dataSource.getDictionary());
     }
-    File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-    StarTreeInterf tree = StarTreeSerDe.fromFile(starTreeFile, ReadMode.mmap);
-    dimensionNameToIndexMap = tree.getDimensionNameToIndexMap();
+    File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(segmentDir);
+    StarTree tree = new OffHeapStarTree(starTreeFile, ReadMode.mmap);
+    _dimensionNames = tree.getDimensionNames();
     StarTreeJsonNode jsonRoot = new StarTreeJsonNode("ROOT");
     build(tree.getRoot(), jsonRoot);
     ObjectMapper objectMapper = new ObjectMapper();
-    objectMapper.getSerializationConfig().setSerializationInclusion(Inclusion.NON_NULL);
-    String writeValueAsString =
-        objectMapper.defaultPrettyPrintingWriter().writeValueAsString(jsonRoot);
+    objectMapper.getSerializationConfig().withSerializationInclusion(Inclusion.NON_NULL);
+    String writeValueAsString = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonRoot);
     LOGGER.info(writeValueAsString);
     startServer(segmentDir, writeValueAsString);
   }
 
-  private int build(StarTreeIndexNodeInterf indexNode, StarTreeJsonNode json) {
-    Iterator<? extends StarTreeIndexNodeInterf> childrenIterator = indexNode.getChildrenIterator();
+  private int build(StarTreeNode indexNode, StarTreeJsonNode json) {
+    Iterator<? extends StarTreeNode> childrenIterator = indexNode.getChildrenIterator();
     if (!childrenIterator.hasNext()) {
       return 0;
     }
-    int childDimensionId = indexNode.getChildDimensionName();
-    String childDimensionName = dimensionNameToIndexMap.inverse().get(childDimensionId);
+    int childDimensionId = indexNode.getChildDimensionId();
+    String childDimensionName = _dimensionNames.get(childDimensionId);
     Dictionary dictionary = dictionaries.get(childDimensionName);
     int totalChildNodes = indexNode.getNumChildren();
 
@@ -123,15 +140,15 @@ public class StarTreeIndexViewer {
     StarTreeJsonNode allNode = null;
 
     while (childrenIterator.hasNext()) {
-      StarTreeIndexNodeInterf childIndexNode = childrenIterator.next();
+      StarTreeNode childIndexNode = childrenIterator.next();
       int childDimensionValueId = childIndexNode.getDimensionValue();
       String childDimensionValue = "ALL";
-      if (childDimensionValueId != StarTreeIndexNodeInterf.ALL) {
+      if (childDimensionValueId != StarTreeNode.ALL) {
         childDimensionValue = dictionary.get(childDimensionValueId).toString();
       }
       StarTreeJsonNode childJson = new StarTreeJsonNode(childDimensionValue);
       totalChildNodes += build(childIndexNode, childJson);
-      if (childDimensionValueId != StarTreeIndexNodeInterf.ALL) {
+      if (childDimensionValueId != StarTreeNode.ALL) {
         json.addChild(childJson);
         queue.add(ImmutablePair.of(childDimensionValue, totalChildNodes));
       } else {
@@ -172,87 +189,38 @@ public class StarTreeIndexViewer {
     new StarTreeIndexViewer(new File(segmentDir));
   }
 
-  private void startServer(final File segmentDirectory, final String json) throws Exception {
-
-    Component component = new Component();
-    int port = 8090;
-    component.getServers().add(Protocol.HTTP, port);
-    component.getClients().add(Protocol.FILE);
-    Application application = new Application() {
-      @Override
-      public Restlet createInboundRoot() {
-        Router router = new Router(getContext());
-        StarTreeViewRestResource.json = json;
-        router.attach("/data", StarTreeViewRestResource.class);
-        Directory directory = new Directory(getContext(),
-            getClass().getClassLoader().getResource("star-tree.html").toString());
-        router.attach(directory);
-        return router;
-      }
-    };
-    VirtualHost defaultHost = component.getDefaultHost();
-    defaultHost.attach(application);
-    component.start();
-    LOGGER.info("Go to http://{}:{}/  to view the star tree", VirtualHost.getLocalHostName(), port );
+  private static class StarTreeResource extends ResourceConfig {
+    StarTreeResource(String json) {
+      StarTreeViewRestResource resource = new StarTreeViewRestResource();
+      StarTreeViewRestResource.json = json;
+      register(resource.getClass());
+    }
   }
 
-  public static final class StarTreeViewRestResource extends ServerResource {
+  private void startServer(final File segmentDirectory, final String json) throws Exception {
+    int httpPort = 8090;
+    URI baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
+    HttpServer httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, new StarTreeResource(json));
+
+    LOGGER.info("Go to http://{}:{}/  to view the star tree", "localhost", httpPort);
+  }
+
+  @Path("/")
+  public static final class StarTreeViewRestResource {
     public static String json;
 
-    @Get
-    @Override
-    public Representation get() {
-      return new StringRepresentation(json);
+    @GET
+    @Path("/data")
+    @Produces(MediaType.TEXT_PLAIN)
+    public String getStarTree() {
+      return json;
     }
-  }
-}
 
-class StarTreeJsonNode {
-
-  public StarTreeJsonNode(String name) {
-    this.name = name;
-  }
-
-  String name;
-  String parent;
-  int size = 0;
-  List<StarTreeJsonNode> children;
-
-  public void addChild(StarTreeJsonNode childJsonNode) {
-    if (children == null) {
-      children = new ArrayList<>();
+    @GET
+    @Path("/")
+    @Produces(MediaType.TEXT_HTML)
+    public InputStream getStarTreeHtml() {
+      return getClass().getClassLoader().getResourceAsStream("star-tree.html");
     }
-    children.add(childJsonNode);
-  }
-
-  public String getParent() {
-    return parent;
-  }
-
-  public void setParent(String parent) {
-    this.parent = parent;
-  }
-
-  public void addChild(String name) {
-    if (children == null) {
-      children = new ArrayList<>();
-    }
-    children.add(new StarTreeJsonNode(name));
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public List<StarTreeJsonNode> getChildren() {
-    return children;
-  }
-
-  public void setChildren(List<StarTreeJsonNode> children) {
-    this.children = children;
   }
 }

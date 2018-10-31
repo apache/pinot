@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +18,7 @@ import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Singleton
 public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements TaskManager {
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC =
@@ -45,13 +48,8 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   public List<TaskDTO> findByJobIdStatusNotIn(Long jobId, TaskStatus status) {
     Predicate jobIdPredicate = Predicate.EQ("jobId", jobId);
     Predicate statusPredicate = Predicate.NEQ("status", status.toString());
-    List<TaskBean> list =
-        genericPojoDao.get(Predicate.AND(statusPredicate, jobIdPredicate), TaskBean.class);
-    List<TaskDTO> result = new ArrayList<>();
-    for (TaskBean bean : list) {
-      result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
-    }
-    return result;
+    Predicate predicate = Predicate.AND(statusPredicate, jobIdPredicate);
+    return findByPredicate(predicate);
   }
 
   @Override
@@ -63,7 +61,7 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
     List<TaskDTO> result = new ArrayList<>();
     for (TaskBean bean : list) {
-      result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
+      result.add(MODEL_MAPPER.map(bean, TaskDTO.class));
     }
     return result;
   }
@@ -71,7 +69,6 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   @Override
   public boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> permittedOldStatus,
       TaskStatus newStatus, int expectedVersion) {
-    // TODO: add proper transaction here
     TaskDTO task = findById(id);
     if (permittedOldStatus.contains(task.getStatus())) {
       task.setStatus(newStatus);
@@ -90,11 +87,12 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
   @Override
   public void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus,
-      Long taskEndTime) {
+      Long taskEndTime, String message) {
     TaskDTO task = findById(id);
     if (task.getStatus().equals(oldStatus)) {
       task.setStatus(newStatus);
       task.setEndTime(taskEndTime);
+      task.setMessage(message);
       save(task);
     }
   }
@@ -107,23 +105,34 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
 
     Predicate timestampPredicate = Predicate.LT("createTime", expireTimestamp);
     Predicate statusPredicate = Predicate.EQ("status", status.toString());
-    List<TaskBean> list =
-        genericPojoDao.get(Predicate.AND(statusPredicate, timestampPredicate), TaskBean.class);
-    for (TaskBean bean : list) {
-      deleteById(bean.getId());
-    }
-    return list.size();
+    return deleteByPredicate(Predicate.AND(statusPredicate, timestampPredicate));
   }
 
   @Override
   @Transactional
   public List<TaskDTO> findByStatusNotIn(TaskStatus status) {
     Predicate statusPredicate = Predicate.NEQ("status", status.toString());
-    List<TaskBean> list = genericPojoDao.get(statusPredicate, TaskBean.class);
-    List<TaskDTO> result = new ArrayList<>();
-    for (TaskBean bean : list) {
-      result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
-    }
-    return result;
+    return findByPredicate(statusPredicate);
+  }
+
+  @Override
+  public List<TaskDTO> findByStatusWithinDays(TaskStatus status, int days) {
+    DateTime activeDate = new DateTime().minusDays(days);
+    Timestamp activeTimestamp = new Timestamp(activeDate.getMillis());
+    Predicate statusPredicate = Predicate.EQ("status", status.toString());
+    Predicate timestampPredicate = Predicate.GE("createTime", activeTimestamp);
+    return findByPredicate(Predicate.AND(statusPredicate, timestampPredicate));
+  }
+
+  @Override
+  public List<TaskDTO> findTimeoutTasksWithinDays(int days, long maxTaskTime) {
+    DateTime activeDate = new DateTime().minusDays(days);
+    Timestamp activeTimestamp = new Timestamp(activeDate.getMillis());
+    DateTime timeoutDate = new DateTime().minus(maxTaskTime);
+    Timestamp timeoutTimestamp = new Timestamp(timeoutDate.getMillis());
+    Predicate statusPredicate = Predicate.EQ("status", TaskStatus.RUNNING.toString());
+    Predicate daysTimestampPredicate = Predicate.GE("createTime", activeTimestamp);
+    Predicate timeoutTimestampPredicate = Predicate.LT("updateTime", timeoutTimestamp);
+    return findByPredicate(Predicate.AND(statusPredicate, daysTimestampPredicate, timeoutTimestampPredicate));
   }
 }

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
@@ -26,6 +24,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.Timer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -121,7 +121,7 @@ public abstract class NettyClientConnection {
    * Future Handle provided to the request sender to asynchronously wait for response.
    * We use guava API for implementing Futures.
    */
-  public static class ResponseFuture extends AsyncResponseFuture<ServerInstance, ByteBuf> {
+  public static class ResponseFuture extends AsyncResponseFuture<byte[]> {
 
     public ResponseFuture(ServerInstance key, String ctxt) {
       super(key, ctxt);

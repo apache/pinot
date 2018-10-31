@@ -7,16 +7,18 @@ import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+
 import org.joda.time.DateTime;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -26,8 +28,7 @@ import org.slf4j.LoggerFactory;
 
 public class AlertJobRunnerV2 implements Job {
 
-  private static final Logger
-      LOG = LoggerFactory.getLogger(com.linkedin.thirdeye.anomaly.alert.AlertJobRunner.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AlertJobRunnerV2.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String ALERT_JOB_CONTEXT_V2 = "ALERT_JOB_CONTEXT_V2";
@@ -89,10 +90,12 @@ public class AlertJobRunnerV2 implements Job {
     try {
       JobDTO jobSpec = new JobDTO();
       jobSpec.setJobName(alertJobContext.getJobName());
+      jobSpec.setConfigId(alertJobContext.getAlertConfigId());
       jobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
       jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
+      jobSpec.setTaskType(TaskConstants.TaskType.ALERT2);
       jobExecutionId = jobDAO.save(jobSpec);
       LOG.info("Created alert job {} with jobExecutionId {}", jobSpec, jobExecutionId);
     } catch (Exception e) {
@@ -110,6 +113,7 @@ public class AlertJobRunnerV2 implements Job {
           .createAlertTasksV2(alertJobContext, monitoringWindowStartTime, monitoringWindowEndTime);
 
       for (AlertTaskInfo taskInfo : tasks) {
+
         String taskInfoJson = null;
         try {
           taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);

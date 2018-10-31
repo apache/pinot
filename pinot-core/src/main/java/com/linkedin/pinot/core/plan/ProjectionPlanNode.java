@@ -15,71 +15,51 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 import java.util.HashMap;
 import java.util.Map;
-
+import java.util.Set;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
-
 
 /**
- * ProjectionPlanNode takes care of a map from column name to its corresponding
- * data source.
+ * The <code>ProjectionPlanNode</code> class provides the execution plan for fetching projection columns' data source
+ * on a single segment.
  */
 public class ProjectionPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProjectionPlanNode.class);
 
-  private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap =
-      new HashMap<String, ColumnarDataSourcePlanNode>();
+  private final IndexSegment _indexSegment;
+  private final Set<String> _projectionColumns;
   private final DocIdSetPlanNode _docIdSetPlanNode;
-  private MProjectionOperator _projectionOperator = null;
 
-  public ProjectionPlanNode(IndexSegment indexSegment, String[] columns, DocIdSetPlanNode docIdSetPlanNode) {
+  public ProjectionPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull Set<String> projectionColumns,
+      @Nonnull DocIdSetPlanNode docIdSetPlanNode) {
+    _indexSegment = indexSegment;
+    _projectionColumns = projectionColumns;
     _docIdSetPlanNode = docIdSetPlanNode;
-    for (String column : columns) {
-      _dataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(indexSegment, column, docIdSetPlanNode));
-    }
   }
 
   @Override
-  public Operator run() {
-    long start = System.currentTimeMillis();
-    if (_projectionOperator == null) {
-      Map<String, BaseOperator> dataSourceMap = new HashMap<String, BaseOperator>();
-      BReusableFilteredDocIdSetOperator docIdSetOperator = (BReusableFilteredDocIdSetOperator) _docIdSetPlanNode.run();
-      for (String column : _dataSourcePlanNodeMap.keySet()) {
-        ColumnarDataSourcePlanNode columnarDataSourcePlanNode = _dataSourcePlanNodeMap.get(column);
-        BaseOperator operator = columnarDataSourcePlanNode.run();
-        dataSourceMap.put(column, operator);
-      }
-      _projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+  public ProjectionOperator run() {
+    Map<String, DataSource> dataSourceMap = new HashMap<>(_projectionColumns.size());
+    for (String column : _projectionColumns) {
+      dataSourceMap.put(column, _indexSegment.getDataSource(column));
     }
-    long end = System.currentTimeMillis();
-    LOGGER.debug("Time take in ProjectionPlanNode: " + (end - start));
-    return _projectionOperator;
+    return new ProjectionOperator(dataSourceMap, _docIdSetPlanNode.run());
   }
 
   @Override
   public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Operator: MProjectionOperator");
-    LOGGER.debug(prefix + "Argument 0: DocIdSet - ");
+    LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
+    LOGGER.debug(prefix + "Operator: ProjectionOperator");
+    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    LOGGER.debug(prefix + "Argument 1: Projection Columns - " + _projectionColumns);
+    LOGGER.debug(prefix + "Argument 2: DocIdSet - ");
     _docIdSetPlanNode.showTree(prefix + "    ");
-    int i = 0;
-    for (String column : _dataSourcePlanNodeMap.keySet()) {
-      LOGGER.debug(prefix + "Argument " + (i + 1) + ": DataSourceOperator");
-      _dataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
-      i++;
-    }
-  }
-
-  public ColumnarDataSourcePlanNode getDataSourcePlanNode(String column) {
-    return _dataSourcePlanNodeMap.get(column);
   }
 }

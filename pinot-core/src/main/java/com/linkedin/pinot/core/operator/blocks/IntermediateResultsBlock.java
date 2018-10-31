@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataSchema;
@@ -23,14 +22,11 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
@@ -87,7 +83,7 @@ public class IntermediateResultsBlock implements Block {
    * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
    */
   public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull AggregationGroupByResult aggregationGroupByResults) {
+      @Nullable AggregationGroupByResult aggregationGroupByResults) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
     _aggregationGroupByResult = aggregationGroupByResults;
   }
@@ -215,19 +211,18 @@ public class IntermediateResultsBlock implements Block {
     // Extract each aggregation column name and type from aggregation function context.
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     String[] columnNames = new String[numAggregationFunctions];
-    FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[numAggregationFunctions];
+    DataSchema.ColumnDataType[] columnDataTypes = new DataSchema.ColumnDataType[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
-      AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
-      columnNames[i] = aggregationFunction.getColumnName(aggregationFunctionContext.getAggregationColumns());
-      columnTypes[i] = aggregationFunction.getIntermediateResultDataType();
+      columnNames[i] = aggregationFunctionContext.getAggregationColumnName();
+      columnDataTypes[i] = aggregationFunctionContext.getAggregationFunction().getIntermediateResultColumnType();
     }
 
     // Build the data table.
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     dataTableBuilder.startRow();
     for (int i = 0; i < numAggregationFunctions; i++) {
-      switch (columnTypes[i]) {
+      switch (columnDataTypes[i]) {
         case LONG:
           dataTableBuilder.setColumn(i, ((Number) _aggregationResult.get(i)).longValue());
           break;
@@ -239,7 +234,7 @@ public class IntermediateResultsBlock implements Block {
           break;
         default:
           throw new UnsupportedOperationException(
-              "Unsupported aggregation column data type: " + columnTypes[i] + " for column: " + columnNames[i]);
+              "Unsupported aggregation column data type: " + columnDataTypes[i] + " for column: " + columnNames[i]);
       }
     }
     dataTableBuilder.finishRow();
@@ -249,19 +244,18 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nonnull
-  private DataTable getAggregationGroupByResultDataTable()
-      throws Exception {
+  private DataTable getAggregationGroupByResultDataTable() throws Exception {
     String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
-    FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.OBJECT};
+    DataSchema.ColumnDataType[] columnDataTypes =
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.OBJECT};
 
     // Build the data table.
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnDataTypes));
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     for (int i = 0; i < numAggregationFunctions; i++) {
       dataTableBuilder.startRow();
       AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
-      dataTableBuilder.setColumn(0, aggregationFunctionContext.getAggregationFunction()
-          .getColumnName(aggregationFunctionContext.getAggregationColumns()));
+      dataTableBuilder.setColumn(0, aggregationFunctionContext.getAggregationColumnName());
       dataTableBuilder.setColumn(1, _combinedAggregationGroupByResult.get(i));
       dataTableBuilder.finishRow();
     }
@@ -287,16 +281,6 @@ public class IntermediateResultsBlock implements Block {
       }
     }
     return dataTable;
-  }
-
-  @Override
-  public BlockId getId() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

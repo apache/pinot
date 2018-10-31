@@ -1,0 +1,80 @@
+.manage-alert-filters {
+  margin: $te-default-element-spacing 10px 0 -30px;
+
+  &__wrapper {
+    background-color: white;
+    margin-right: $te-content-container-margin;
+    border: 1px solid $te-grey;
+  }
+
+  &__row {
+    margin: 0;
+    padding: 12px $te-default-element-spacing;
+    font-size: 16px;
+    border-top: 1px solid $te-grey;
+    background-color: $te-alerts-row-color;
+
+    &--title {
+      border: none;
+      font-size: 19px;
+      line-height: 30px;
+      background-color: white;
+    }
+  }
+
+  &__options {
+    margin: 0;
+    padding: 12px $te-default-element-spacing;
+    background-color: white;
+  }
+}
+
+.manage-alert-container {
+  min-height: 200px;
+  letter-spacing: 0.5px;
+
+  &__title {
+    @include app-sub-title-mixin;
+  }
+
+  &__reset {
+    float: right;
+  }
+}
+
+.manage-alert-search {
+  @include group-clearfix;
+  margin: $te-default-element-spacing 0;
+
+  &__filter {
+    float: left;
+    min-width: 180px;
+    margin-right: $te-default-element-spacing;
+  }
+
+  &__sort {
+    float: right;
+    min-width: 100px;
+    margin-left: $te-default-element-spacing;
+  }
+
+  &__input {
+    float: left;
+    width: 59%;
+    min-width: 300px;
+  }
+
+  &__label {
+    line-height: $te-default-element-spacing;
+    text-transform: uppercase;
+    font-size: 13px;
+  }
+
+  &__button-remove {
+    display: none;
+  }
+}
+
+.manage-alert-results {
+  clear: left;
+}

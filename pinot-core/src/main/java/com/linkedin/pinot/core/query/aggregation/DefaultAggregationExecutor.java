@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -29,95 +29,49 @@ import java.util.List;
  * aggregations.
  */
 public class DefaultAggregationExecutor implements AggregationExecutor {
-  private final int _numAggrFunc;
-  private final AggregationFunctionContext[] _aggrFuncContextArray;
+  private final int _numFunctions;
+  private final AggregationFunction[] _functions;
+  private final AggregationResultHolder[] _resultHolders;
+  private final TransformExpressionTree[] _expressions;
 
-  // Array of result holders, one for each aggregation.
-  private final AggregationResultHolder[] _resultHolderArray;
-
-  boolean _inited = false;
-  boolean _finished = false;
-
-  public DefaultAggregationExecutor(AggregationFunctionContext[] aggrFuncContextArray) {
-    Preconditions.checkNotNull(aggrFuncContextArray);
-    Preconditions.checkArgument(aggrFuncContextArray.length > 0);
-
-    _numAggrFunc = aggrFuncContextArray.length;
-    _aggrFuncContextArray = aggrFuncContextArray;
-    _resultHolderArray = new AggregationResultHolder[_numAggrFunc];
+  public DefaultAggregationExecutor(@Nonnull AggregationFunctionContext[] functionContexts) {
+    _numFunctions = functionContexts.length;
+    _functions = new AggregationFunction[_numFunctions];
+    _resultHolders = new AggregationResultHolder[_numFunctions];
+    _expressions = new TransformExpressionTree[_numFunctions];
+    for (int i = 0; i < _numFunctions; i++) {
+      AggregationFunction function = functionContexts[i].getAggregationFunction();
+      _functions[i] = function;
+      _resultHolders[i] = _functions[i].createAggregationResultHolder();
+      // TODO: currently only support single argument aggregation
+      if (!function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        _expressions[i] =
+            TransformExpressionTree.compileToExpressionTree(functionContexts[i].getAggregationColumns()[0]);
+      }
+    }
   }
 
   @Override
-  public void init() {
-    if (_inited) {
-      return;
-    }
-
-    for (int i = 0; i < _numAggrFunc; i++) {
-      _resultHolderArray[i] = _aggrFuncContextArray[i].getAggregationFunction().createAggregationResultHolder();
-    }
-    _inited = true;
-  }
-
-  /**
-   * {@inheritDoc}
-   * Perform aggregation on a given docIdSet.
-   * Asserts that 'init' has be called before calling this method.
-   *
-   * @param transformBlock Block upon which to perform aggregation.
-   */
-  @Override
-  public void aggregate(TransformBlock transformBlock) {
-    Preconditions.checkState(_inited,
-        "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
-
-    for (int i = 0; i < _numAggrFunc; i++) {
-      aggregateColumn(transformBlock, _aggrFuncContextArray[i], _resultHolderArray[i]);
-    }
-  }
-
-  /**
-   * Helper method to perform aggregation for a given column.
-   *
-   * @param aggrFuncContext aggregation function context.
-   * @param resultHolder result holder.
-   */
-  @SuppressWarnings("ConstantConditions")
-  private void aggregateColumn(TransformBlock transformBlock, AggregationFunctionContext aggrFuncContext,
-      AggregationResultHolder resultHolder) {
-    AggregationFunction aggregationFunction = aggrFuncContext.getAggregationFunction();
-    String[] aggregationColumns = aggrFuncContext.getAggregationColumns();
-    Preconditions.checkState(aggregationColumns.length == 1);
+  public void aggregate(@Nonnull TransformBlock transformBlock) {
     int length = transformBlock.getNumDocs();
+    for (int i = 0; i < _numFunctions; i++) {
+      AggregationFunction function = _functions[i];
+      AggregationResultHolder resultHolder = _resultHolders[i];
 
-    if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-      BlockValSet blockValSet = transformBlock.getBlockValueSet(aggregationColumns[0]);
-      aggregationFunction.aggregate(length, resultHolder, blockValSet);
-    } else {
-      aggregationFunction.aggregate(length, resultHolder);
+      if (function.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+        function.aggregate(length, resultHolder);
+      } else {
+        function.aggregate(length, resultHolder, transformBlock.getBlockValueSet(_expressions[i]));
+      }
     }
-  }
-
-  @Override
-  public void finish() {
-    Preconditions.checkState(_inited,
-        "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
-
-    _finished = true;
   }
 
   @Override
   public List<Object> getResult() {
-    Preconditions.checkState(_finished,
-        "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
-
-    List<Object> aggregationResults = new ArrayList<>(_numAggrFunc);
-
-    for (int i = 0; i < _numAggrFunc; i++) {
-      AggregationFunction aggregationFunction = _aggrFuncContextArray[i].getAggregationFunction();
-      aggregationResults.add(aggregationFunction.extractAggregationResult(_resultHolderArray[i]));
+    List<Object> aggregationResults = new ArrayList<>(_numFunctions);
+    for (int i = 0; i < _numFunctions; i++) {
+      aggregationResults.add(_functions[i].extractAggregationResult(_resultHolders[i]));
     }
-
     return aggregationResults;
   }
 }

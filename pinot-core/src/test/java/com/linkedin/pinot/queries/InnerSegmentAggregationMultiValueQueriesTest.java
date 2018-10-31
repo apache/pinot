@@ -15,15 +15,9 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.query.AggregationOperator;
-import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import java.util.List;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -35,10 +29,12 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
   // ARRAY_BASED
   private static final String SMALL_GROUP_BY = " GROUP BY column7";
-  // LONG_MAP_BASED
+  // INT_MAP_BASED
   private static final String MEDIUM_GROUP_BY = " GROUP BY column3, column6, column7";
+  // LONG_MAP_BASED
+  private static final String LARGE_GROUP_BY = " GROUP BY column1, column3, column6, column7";
   // ARRAY_MAP_BASED
-  private static final String LARGE_GROUP_BY =
+  private static final String VERY_LARGE_GROUP_BY =
       " GROUP BY column1, column2, column6, column7, column8, column9, column10";
 
   @Test
@@ -47,37 +43,19 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     // Test query without filter.
     AggregationOperator aggregationOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
-    ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 400000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), 100000L);
-    Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), 100991525475000L);
-    Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), 2147434110);
-    Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), 1182655);
-    AvgPair avgResult = (AvgPair) aggregationResult.get(4);
-    Assert.assertEquals((long) avgResult.getSum(), 83439903673981L);
-    Assert.assertEquals(avgResult.getCount(), 100000L);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 100000L, 0L,
+        400000L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 100000L, 100991525475000L,
+        2147434110, 1182655, 83439903673981L, 100000L);
 
     // Test query with filter.
     aggregationOperator = getOperatorForQueryWithFilter(query);
-    resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
-    executionStatistics = aggregationOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 282430L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 62480L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), 15620L);
-    Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), 17287754700747L);
-    Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), 999943053);
-    Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), 1182655);
-    avgResult = (AvgPair) aggregationResult.get(4);
-    Assert.assertEquals((long) avgResult.getSum(), 11017594448983L);
-    Assert.assertEquals(avgResult.getCount(), 15620L);
+    resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 15620L, 282430L,
+        62480L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 15620L, 17287754700747L,
+        999943053, 1182655, 11017594448983L, 15620L);
   }
 
   @Test
@@ -86,174 +64,104 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
 
     // Test query without filter.
     AggregationOperator aggregationOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
-    ExecutionStatistics executionStatistics = aggregationOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 200000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    List<Object> aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), 106688L);
-    Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), 107243218420671L);
-    Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), 2147483647);
-    Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), 201);
-    AvgPair avgResult = (AvgPair) aggregationResult.get(4);
-    Assert.assertEquals((long) avgResult.getSum(), 121081150452570L);
-    Assert.assertEquals(avgResult.getCount(), 106688L);
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 100000L, 0L,
+        200000L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 106688L, 107243218420671L,
+        2147483647, 201, 121081150452570L, 106688L);
 
     // Test query with filter.
     aggregationOperator = getOperatorForQueryWithFilter(query);
-    resultsBlock = (IntermediateResultsBlock) aggregationOperator.nextBlock();
-    executionStatistics = aggregationOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 282430L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 31240L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), 15620L);
-    Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), 28567975886777L);
-    Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), 2147483647);
-    Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), 203);
-    avgResult = (AvgPair) aggregationResult.get(4);
-    Assert.assertEquals((long) avgResult.getSum(), 28663153397978L);
-    Assert.assertEquals(avgResult.getCount(), 15620L);
+    resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 15620L, 282430L,
+        31240L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 15620L, 28567975886777L,
+        2147483647, 203, 28663153397978L, 15620L);
   }
 
   @Test
   public void testSmallAggregationGroupBy() {
     String query = "SELECT" + AGGREGATION + " FROM testTable" + SMALL_GROUP_BY;
 
-    // NOTE: here we assume the first group key returned from the iterator is constant.
-
     // Test query without filter.
     AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
-    ExecutionStatistics executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 500000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey.getStringKey(), "201");
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 26L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(),
-        32555949195L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 2100941020);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 117939666);
-    AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals((long) avgResult.getSum(), 23061775005L);
-    Assert.assertEquals(avgResult.getCount(), 26L);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 100000L,
+        0L, 500000L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "201", 26L,
+        32555949195L, 2100941020, 117939666, 23061775005L, 26L);
 
     // Test query with filter.
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
-    resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
-    executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 282430L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 78100L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey.getStringKey(), "203");
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 1L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 185436225L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 987549258);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 674022574);
-    avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals((long) avgResult.getSum(), 674022574L);
-    Assert.assertEquals(avgResult.getCount(), 1L);
+    resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 15620L,
+        282430L, 78100L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "203", 1L,
+        185436225L, 987549258, 674022574, 674022574L, 1L);
   }
 
   @Test
   public void testMediumAggregationGroupBy() {
     String query = "SELECT" + AGGREGATION + " FROM testTable" + MEDIUM_GROUP_BY;
 
-    // NOTE: here we assume the first group key returned from the iterator is constant.
-
     // Test query without filter.
     AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
-    ExecutionStatistics executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 700000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey.getStringKey(), "w\t3836469\t204");
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 1L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1415527660L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 1747635671);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 1298457813);
-    AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals((long) avgResult.getSum(), 1235208236L);
-    Assert.assertEquals(avgResult.getCount(), 1L);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 100000L,
+        0L, 700000L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "w\t3818\t369", 1L, 1095214422L, 1547156787, 528554902, 52058876L, 1L);
 
     // Test query with filter.
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
-    resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
-    executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 282430L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 109340L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey.getStringKey(), "L\t1483645\t2147483647");
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 1L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 650650103L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 108417107);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 674022574);
-    avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals((long) avgResult.getSum(), 674022574L);
-    Assert.assertEquals(avgResult.getCount(), 1L);
+    resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 15620L,
+        282430L, 109340L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "L\t306633\t2147483647", 1L, 131154783L, 952002176, 674022574, 674022574L, 1L);
   }
 
   @Test
   public void testLargeAggregationGroupBy() {
     String query = "SELECT" + AGGREGATION + " FROM testTable" + LARGE_GROUP_BY;
 
-    // NOTE: here we assume the first group key returned from the iterator is constant.
-
     // Test query without filter.
     AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(query);
-    IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
-    ExecutionStatistics executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 700000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey.getStringKey(),
-        "1118965780\t1848116124\t8599\t504\t1597666851\t675163196\t607034543");
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 1L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1118965780L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 1848116124);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 1597666851);
-    AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals((long) avgResult.getSum(), 675163196L);
-    Assert.assertEquals(avgResult.getCount(), 1L);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 100000L,
+        0L, 700000L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "240129976\tL\t2147483647\t2147483647", 1L, 240129976L, 1649812746, 2077178039, 1952924139L, 1L);
 
     // Test query with filter.
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
-    resultsBlock = (IntermediateResultsBlock) aggregationGroupByOperator.nextBlock();
-    executionStatistics = aggregationGroupByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 282430L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 109340L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
-    Assert.assertEquals(firstGroupKey.getStringKey(),
-        "949960647\t238753654\t2147483647\t2147483647\t674022574\t674022574\t674022574");
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 2L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1899921294L);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 238753654);
-    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 674022574);
-    avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals((long) avgResult.getSum(), 1348045148L);
-    Assert.assertEquals(avgResult.getCount(), 2L);
+    resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 15620L,
+        282430L, 109340L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "903461357\tL\t2147483647\t388", 2L, 1806922714L, 652024397, 674022574, 870535054L, 2L);
+  }
+
+  @Test
+  public void testVeryLargeAggregationGroupBy() {
+    String query = "SELECT" + AGGREGATION + " FROM testTable" + VERY_LARGE_GROUP_BY;
+
+    // Test query without filter.
+    AggregationGroupByOperator aggregationGroupByOperator = getOperatorForQuery(query);
+    IntermediateResultsBlock resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 100000L,
+        0L, 700000L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "1118965780\t1848116124\t8599\t504\t1597666851\t675163196\t607034543", 1L, 1118965780L, 1848116124, 1597666851,
+        675163196L, 1L);
+
+    // Test query with filter.
+    aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
+    resultsBlock = aggregationGroupByOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 15620L,
+        282430L, 109340L, 100000L);
+    QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
+        "949960647\t238753654\t2147483647\t2147483647\t674022574\t674022574\t674022574", 2L, 1899921294L, 238753654,
+        674022574, 1348045148L, 2L);
   }
 }

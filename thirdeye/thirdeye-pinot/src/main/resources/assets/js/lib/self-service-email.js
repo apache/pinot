@@ -14,7 +14,7 @@ function fetchEmailIfPresent() {
               $("#to-address").val(recipients);
               $("#email-id").val(emailId);
               // get all functions for this metric/dataset
-              getDataCustomCallback("/dashboard/anomaly-function/view?dataset=" + dataset + "&metric=" + metric, tab)
+              getDataCustomCallback("/dashboard/anomaly-function?dataset=" + dataset + "&metric=" + metric, tab)
               .done(function (functionData) {
 
               var linkedFunctionMap = new Object();

@@ -18,11 +18,12 @@ package com.linkedin.pinot.queries;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import java.io.File;
@@ -58,8 +59,8 @@ import org.testng.annotations.BeforeTest;
  * </ul>
  */
 public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
-  private static final String AVRO_DATA = "data/test_data-sv.avro";
-  private static final String SEGMENT_NAME = "testTable_126164076_167572854_";
+  private static final String AVRO_DATA = "data" + File.separator + "test_data-sv.avro";
+  private static final String SEGMENT_NAME = "testTable_126164076_167572854";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
 
   // Hard-coded query filter.
@@ -75,8 +76,7 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private List<SegmentDataManager> _segmentDataManagers;
 
   @BeforeTest
-  public void buildSegment()
-      throws Exception {
+  public void buildSegment() throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
     // Get resource file path.
@@ -114,11 +114,11 @@ public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   }
 
   @BeforeClass
-  public void loadSegment()
-      throws Exception {
-    _indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
-    _segmentDataManagers = Arrays.<SegmentDataManager>asList(new OfflineSegmentDataManager(_indexSegment),
-        new OfflineSegmentDataManager(_indexSegment));
+  public void loadSegment() throws Exception {
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    _indexSegment = immutableSegment;
+    _segmentDataManagers =
+        Arrays.asList(new ImmutableSegmentDataManager(immutableSegment), new ImmutableSegmentDataManager(immutableSegment));
   }
 
   @AfterClass

@@ -1,15 +1,17 @@
 function DimensionTreeMapModel() {
   this.metricId;
   this.metricName;
-  this.heatmapFilters;
+  this.heatMapFilters;
   this.currentStart;
   this.currentEnd;
   this.baselineStart;
   this.baselineEnd;
+  this.inverseMetric = false;
 
   this.heatmapData;
 
-  this.heatmapMode = "percentChange";
+  this.heatmapMode = 'percentChange';
+  this.compareMode = constants.DEFAULT_COMPARE_MODE;
 
   this.currentTotal = 0;
   this.baselineTotal = 0;
@@ -22,49 +24,39 @@ function DimensionTreeMapModel() {
 DimensionTreeMapModel.prototype = {
   init: function (params) {
     if (params) {
-      if (params.metric) {
-        this.metricId = params.metric.id;
-        this.metricName = params.metric.name;
-      }
-      if (params.currentStart) {
-        this.currentStart = params.currentStart;
-      }
-      if (params.currentEnd) {
-        this.currentEnd = params.currentEnd;
-      }
-      if (params.baselineStart) {
-        this.baselineStart = params.baselineStart;
-      }
-      if (params.baselineEnd) {
-        this.baselineEnd = params.baselineEnd;
-      }
-      if (params.granularity) {
-        this.granularity = params.granularity;
-      }
-
-      if (params.heatmapFilters) {
-        this.heatmapFilters = params.heatmapFilters;
-      } else if (params.filters) {
-        this.heatmapFilters = params.filters;
-      }
-
-      if (params.heatmapMode) {
-        this.heatmapMode = params.heatmapMode;
-      }
+      this.metricId = params.metricId;
+      this.metricName = params.metricName;
+      this.currentStart = params.heatMapCurrentStart || this.currentStart;
+      this.currentEnd = params.heatMapCurrentEnd || this.currentEnd;
+      this.baselineStart = params.heatMapBaselineStart || this.baselineStart;
+      this.baselineEnd = params.heatMapBaselineEnd || this.baselineEnd;
+      this.granularity = params.granularity || this.granularity;
+      this.heatmapMode = params.heatmapMode || this.heatmapMode;
+      this.heatMapFilters = Object.assign({}, params.heatMapFilters);
+      this.compareMode = params.compareMode || this.compareMode;
     }
   },
 
-  update: function () {
+  update() {
     if (this.metricId) {
-      var heatMapData = dataService.fetchHeatmapData(this.metricId, this.currentStart,
-          this.currentEnd, this.baselineStart, this.baselineEnd, this.heatmapFilters);
-      this.heatmapData = heatMapData;
-      this.transformResponseData(heatMapData);
+      return dataService.fetchHeatmapData(
+        this.metricId,
+        this.currentStart,
+        this.currentEnd,
+        this.baselineStart,
+        this.baselineEnd,
+        this.heatMapFilters
+      ).then((heatMapData) => {
+        this.heatmapData = heatMapData;
+        this.transformResponseData(heatMapData);
+        return heatMapData;
+      });
     }
   },
 
   transformResponseData: function (heatMapData) {
     if (heatMapData) {
+      this.inverseMetric = heatMapData.inverseMetric;
       if (heatMapData.dimensions) {
         this.dimensions = heatMapData.dimensions;
         var treeMapData = [];
@@ -73,19 +65,28 @@ DimensionTreeMapModel.prototype = {
           var dataKey = this.metricName + "." + dimension;
           var row = {"t": "0", "children": []};
           if (heatMapData.data && heatMapData.data[dataKey]) {
-            var dimensionValueIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['dimensionValue'];
-            var percentageChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['percentageChange'];
-            var currentValueIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['currentValue'];
-            var contributionToOverallChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['contributionToOverallChange'];
-            var contributionChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['contributionDifference'];
+            const {
+              dimensionValue: dimensionValueIndex,
+              percentageChange: percentageChangeIndex,
+              currentValue: currentValueIndex,
+              baselineValue: baselineValueIndex,
+              baselineContribution: baselineContributionIndex,
+              contributionToOverallChange: contributionToOverallChangeIndex,
+              currentContribution: currentContributionIndex,
+              contributionDifference: contributionChangeIndex
+            } = heatMapData.data[dataKey].schema.columnsToIndexMapping;
+
             for (var j in heatMapData.data[dataKey].responseData) {
               var record = heatMapData.data[dataKey].responseData[j];
               var item = {
-                "t": record[dimensionValueIndex],
-                "value": record[currentValueIndex],
-                "percentageChange": record[percentageChangeIndex],
-                "contributionChange": record[contributionChangeIndex],
-                "contributionToOverallChange": record[contributionToOverallChangeIndex]
+                t: record[dimensionValueIndex],
+                value: record[currentValueIndex],
+                baselineValue: record[baselineValueIndex],
+                currentContribution: record[currentContributionIndex],
+                baselineContribution: record[baselineContributionIndex],
+                percentageChange: record[percentageChangeIndex],
+                contributionChange: record[contributionChangeIndex],
+                contributionToOverallChange: record[contributionToOverallChangeIndex]
               };
               row.children.push(item);
             }
@@ -100,4 +101,5 @@ DimensionTreeMapModel.prototype = {
       this.absoluteChange = heatMapData.summary.simpleFields.deltaChange;
     }
   }
-}
+};
+

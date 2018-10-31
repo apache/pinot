@@ -1,7 +1,7 @@
 function getExistingAnomalyFunctions(dataset) {
     //removing the query until it returns other than 500 error
     if (dataset) {
-        var url = "/dashboard/anomaly-function/view?dataset=" + dataset;
+        var url = "/dashboard/anomaly-function?dataset=" + dataset;
         var tab = "self-service";
         var result_existing_anomaly_functions_template;
 
@@ -738,7 +738,7 @@ function addSelfServiceListeners() {
 
             //Submit data
             var urlParams = urlOfAnomalyFn(formData);
-            submitData("/dashboard/anomaly-function/create?" + urlParams).done(function(id){
+            submitData("/dashboard/anomaly-function?" + urlParams).done(function(id){
                //Enable submit btn
                enableButton($("#create-anomaly-function"))
                enableButton($("#create-run-anomaly-function"))
@@ -801,7 +801,7 @@ function addSelfServiceListeners() {
         disableButton($("#confirm-delete-anomaly-function"));
 
         var functionId = $(target).attr("data-function-id");
-        var url = "/dashboard/anomaly-function/delete?id=" + functionId;
+        var url = "/dashboard/anomaly-function?id=" + functionId;
 
 
         deleteData(url, "").done(function () {
@@ -831,7 +831,7 @@ function addSelfServiceListeners() {
         //encode filters
         anomalyFunctionObj.filters = encodeURIComponent(JSON.stringify(anomalyFunctionObj.filters));
 
-        var url = "/dashboard/anomaly-function/update?dataset=" + hash.dataset;
+        var url = "/dashboard/anomaly-function/" + anomalyFunctionObj["id"] + "/?dataset=" + hash.dataset;
         for (key in anomalyFunctionObj){
 
             var value = (anomalyFunctionObj[key] + "" == "null") ? "" : anomalyFunctionObj[key];
@@ -957,7 +957,7 @@ function addSelfServiceListeners() {
 
             var urlParams = urlOfAnomalyFn(formData)
 
-            submitData("/dashboard/anomaly-function/update?" + urlParams).done(function () {
+            updateData("/dashboard/anomaly-function/" + formData.functionId + "?" + urlParams).done(function () {
                 //existingAnomalyFunctionsData[rowId] = {formData}
                 getExistingAnomalyFunctions(formData.dataset);
 

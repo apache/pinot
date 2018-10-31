@@ -1,0 +1,64 @@
+.rootcause-wrapper {
+  display: flex;
+  position: relative;
+
+  &__chart {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    flex-grow: 1;
+    border: 1px solid app-shade(black, 0.15);
+    border-radius: 2px;
+    margin-left: 16px;
+    padding: 12px;
+    min-width: 0;
+  }
+}
+
+.rootcause-compare {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.rootcause-chart-container-fluid {
+  padding: 0px;
+}
+
+.rootcause-message {
+  margin-top: 12px;
+  padding-left: 8px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: bold;
+
+  &__error {
+    background-color: lighten($te-red, 40%);
+  }
+
+  &__warning {
+    background-color: lighten($te-orange, 40%);
+  }
+
+  &__info {
+    background-color: lighten($te-blue, 40%);
+  }
+}
+
+.rootcause-label {
+  &__list {
+    padding-left: 8px;
+    margin-left: 8px;
+  }
+}
+
+.rootcause-alert {
+  margin: 0 $te-spacing--lg 10px $te-spacing--lg;
+}
+
+.rootcause-tabs {
+  background-color: app-shade($te-main-background, 0.8);
+
+  .pull-right {
+    margin-right: 5px;
+  }
+}

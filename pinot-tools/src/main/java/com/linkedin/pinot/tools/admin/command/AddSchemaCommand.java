@@ -15,18 +15,15 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.NetUtil;
 
 
 public class AddSchemaCommand extends AbstractBaseAdminCommand implements Command {
@@ -44,8 +41,7 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
   @Option(name = "-exec", required = false, metaVar = "<boolean>", usage = "Execute the command.")
   private boolean _exec;
 
-  @Option(name = "-help", required = false, help = true, aliases = { "-h", "--h", "--help" },
-      usage = "Print this message.")
+  @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"}, usage = "Print this message.")
   private boolean _help = false;
 
   @Override
@@ -65,8 +61,9 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
 
   @Override
   public String toString() {
-    String retString = ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort
-        + " -schemaFilePath " + _schemaFile);
+    String retString =
+        ("AddSchema -controllerHost " + _controllerHost + " -controllerPort " + _controllerPort + " -schemaFilePath "
+            + _schemaFile);
 
     return ((_exec) ? (retString + " -exec") : retString);
   }
@@ -114,10 +111,12 @@ public class AddSchemaCommand extends AbstractBaseAdminCommand implements Comman
       throw new FileNotFoundException("file does not exist, + " + _schemaFile);
     }
 
-    Schema s = Schema.fromFile(schemaFile);
-
-    FileUploadUtils.sendFile(_controllerHost, _controllerPort, "schemas", s.getSchemaName(), new FileInputStream(
-        schemaFile), schemaFile.length(), FileUploadUtils.SendFileMethod.POST);
+    Schema schema = Schema.fromFile(schemaFile);
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      fileUploadDownloadClient.addSchema(
+          FileUploadDownloadClient.getUploadSchemaHttpURI(_controllerHost, Integer.parseInt(_controllerPort)),
+          schema.getSchemaName(), schemaFile);
+    }
 
     return true;
   }

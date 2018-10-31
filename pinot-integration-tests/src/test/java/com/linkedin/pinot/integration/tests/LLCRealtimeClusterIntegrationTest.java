@@ -15,57 +15,81 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ZkStarter;
 import java.io.File;
-import java.util.Collections;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.util.List;
+import java.util.Random;
+import org.apache.avro.reflect.Nullable;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkClient;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 /**
- * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
- *
+ * Integration test that extends RealtimeClusterIntegrationTest but uses low-level Kafka consumer.
  */
 public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegrationTest {
-  private static int KAFKA_PARTITION_COUNT = 2;
+  public static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
+  public static final long RANDOM_SEED = System.currentTimeMillis();
+  public static final Random RANDOM = new Random(RANDOM_SEED);
 
-  protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaTopic, File schemaFile, File avroFile) throws Exception {
-    Schema schema = Schema.fromFile(schemaFile);
-    addSchema(schemaFile, schema.getSchemaName());
-    addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", KafkaStarterUtils.DEFAULT_KAFKA_BROKER, kafkaTopic, schema.getSchemaName(),
-        null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier", Collections.<String>emptyList(), "mmap");
-  }
+  public final boolean _isDirectAlloc = RANDOM.nextBoolean();
+  public final boolean _isConsumerDirConfigured = RANDOM.nextBoolean();
 
-  protected void createKafkaTopic(String kafkaTopic, String zkStr) {
-    KafkaStarterUtils.createTopic(kafkaTopic, zkStr, KAFKA_PARTITION_COUNT);
-  }
-
-  @Test
-  public void testSegmentFlushSize() {
-    ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR, 10000);
-    zkClient.setZkSerializer(new ZNRecordSerializer());
-    String zkPath = "/LLCRealtimeClusterIntegrationTest/PROPERTYSTORE/SEGMENTS/mytable_REALTIME";
-    List<String> segmentNames =
-        zkClient.getChildren(zkPath);
-    for (String segmentName : segmentNames) {
-      ZNRecord znRecord = zkClient.<ZNRecord>readData(zkPath + "/" + segmentName);
-      Assert.assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
-          Integer.toString(ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH / KAFKA_PARTITION_COUNT), "Segment " + segmentName +
-              " does not have the expected flush size");
+  @BeforeClass
+  @Override
+  public void setUp() throws Exception {
+    // TODO Avoid printing to stdout. Instead, we need to add the seed to every assert in this (and super-classes)
+    System.out.println("========== Using random seed value " + RANDOM_SEED);
+    // Remove the consumer directory
+    File consumerDirectory = new File(CONSUMER_DIRECTORY);
+    if (consumerDirectory.exists()) {
+      FileUtils.deleteDirectory(consumerDirectory);
     }
-    zkClient.close();
+
+    super.setUp();
   }
 
   @Override
-  protected int getKafkaBrokerCount() {
-    return 2;
+  protected boolean useLlc() {
+    return true;
+  }
+
+  @Nullable
+  @Override
+  protected String getLoadMode() {
+    return "MMAP";
+  }
+
+  @Override
+  protected void overrideServerConf(Configuration configuration) {
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION, true);
+    configuration.setProperty(CommonConstants.Server.CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION, _isDirectAlloc);
+    if (_isConsumerDirConfigured) {
+      configuration.setProperty(CommonConstants.Server.CONFIG_OF_CONSUMER_DIR, CONSUMER_DIRECTORY);
+    }
+  }
+
+  @Test
+  public void testConsumerDirectoryExists() {
+    File consumerDirectory = new File(CONSUMER_DIRECTORY, "mytable_REALTIME");
+    Assert.assertEquals(consumerDirectory.exists(), _isConsumerDirConfigured,
+        "The off heap consumer directory does not exist");
+  }
+
+  @Test
+  public void testSegmentFlushSize() throws Exception {
+    String zkSegmentsPath = "/SEGMENTS/" + TableNameBuilder.REALTIME.tableNameWithType(getTableName());
+    List<String> segmentNames = _propertyStore.getChildNames(zkSegmentsPath, 0);
+    for (String segmentName : segmentNames) {
+      ZNRecord znRecord = _propertyStore.get(zkSegmentsPath + "/" + segmentName, null, 0);
+      Assert.assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
+          Integer.toString(getRealtimeSegmentFlushSize() / getNumKafkaPartitions()),
+          "Segment: " + segmentName + " does not have the expected flush size");
+    }
   }
 }

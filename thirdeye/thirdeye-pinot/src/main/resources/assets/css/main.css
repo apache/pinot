@@ -1104,6 +1104,30 @@ path {
     color: #ffffff;
 }
 
+.newui-button {
+  color: white;
+  background-color: transparent;
+  border: 1px solid rgb(157, 157, 157);
+  border-radius: 2px;
+  height: 40px;
+  font-size: 15px;
+  padding: 0 16px;
+}
 
+.newui-button:hover,
+.newui-button:focus {
+  background-color: rgba(255,255,255,.1);
+  border-color: white;
+}
+
+.newui-button:active {
+  background-color: rgba(255,255,255,.3);
+  border-color: white;
+}
+
+.header-tab--secondary {
+  padding-left: 24px;
+  border-left: 1px solid rgb(157, 157, 157);
+}
 
 

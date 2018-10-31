@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.query.AggregationOperator;
-import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -48,7 +48,7 @@ public class AggregationPlanNode implements PlanNode {
 
   @Override
   public Operator run() {
-    TransformExpressionOperator transformOperator = (TransformExpressionOperator) _transformPlanNode.run();
+    TransformOperator transformOperator = _transformPlanNode.run();
     SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
     return new AggregationOperator(
         AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata), transformOperator,

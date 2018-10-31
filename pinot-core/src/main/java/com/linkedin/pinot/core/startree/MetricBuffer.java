@@ -20,7 +20,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec.DerivedMetricType;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
-
+import com.linkedin.pinot.startree.hll.HllSizeUtils;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -50,7 +50,7 @@ public class MetricBuffer {
       if (copyValue instanceof HyperLogLog) {
         // deep copy of hll field
         this.values[i] = HllUtil.clone((HyperLogLog)copyValue,
-            HllUtil.getLog2mFromHllFieldSize(copy.metricFieldSpecs.get(i).getFieldSize()));
+            HllSizeUtils.getLog2mFromHllFieldSize(copy.metricFieldSpecs.get(i).getFieldSize()));
       } else if (copyValue instanceof Number) {
         // number field is immutable
         this.values[i] = copyValue;
@@ -73,9 +73,6 @@ public class MetricBuffer {
         values[i] = HllUtil.buildHllFromBytes(hllBytes);
       } else {
         switch (metric.getDataType()) {
-          case SHORT:
-            values[i] = buffer.getShort();
-            break;
           case INT:
             values[i] = buffer.getInt();
             break;
@@ -106,9 +103,6 @@ public class MetricBuffer {
         buffer.put(((HyperLogLog)values[i]).getBytes());
       } else {
         switch (metric.getDataType()) {
-          case SHORT:
-            buffer.putShort(((Number) values[i]).shortValue());
-            break;
           case INT:
             buffer.putInt(((Number) values[i]).intValue());
             break;
@@ -140,9 +134,6 @@ public class MetricBuffer {
         }
       } else {
         switch (metric.getDataType()) {
-          case SHORT:
-            values[i] = ((Number) values[i]).shortValue() + ((Number) metrics.values[i]).shortValue();
-            break;
           case INT:
             values[i] = ((Number) values[i]).intValue() + ((Number) metrics.values[i]).intValue();
             break;

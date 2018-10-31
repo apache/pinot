@@ -51,7 +51,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
 
   @Option(name = "-segmentFormatVersion", required = false, metaVar = "<String>",
       usage = "Segment format version to be loaded (v1|v3).")
-  private String _segmentFormatVersion = "v1";
+  private String _segmentFormatVersion;
 
   @Option(name = "-batchLoad", required = false, metaVar = "<boolean>", usage = "Batch load multiple tables.")
   private boolean _isBatchLoad;

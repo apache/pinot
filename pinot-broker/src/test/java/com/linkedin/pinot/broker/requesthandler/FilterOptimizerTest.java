@@ -33,12 +33,13 @@ public class FilterOptimizerTest {
 
     Pql2Compiler pql2Compiler = new Pql2Compiler();
     BrokerRequest req;
+    String timeColumn = null;
     FilterQueryTree tree;
     int numLeaves;
     int numOps;
 
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE (A = 4 AND B = 5) AND (C=7)");
-    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
+    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 3);
     Assert.assertEquals(tree.getOperator(), FilterOperator.AND);
     for (FilterQueryTree node: tree.getChildren()) {
@@ -47,7 +48,7 @@ public class FilterOptimizerTest {
     }
 
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE ((A = 4 AND B = 5) AND (C=7)) AND D=8");
-    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
+    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 4);
     Assert.assertEquals(tree.getOperator(), FilterOperator.AND);
     for (FilterQueryTree node: tree.getChildren()) {
@@ -56,7 +57,7 @@ public class FilterOptimizerTest {
     }
 
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE (A = 4 OR B = 5) OR (C=7)");
-    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
+    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 3);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
     for (FilterQueryTree node: tree.getChildren()) {
@@ -65,7 +66,7 @@ public class FilterOptimizerTest {
     }
 
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE ((A = 4 OR B = 5) OR (C=7)) OR D=8");
-    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
+    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 4);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
     for (FilterQueryTree node: tree.getChildren()) {
@@ -75,7 +76,7 @@ public class FilterOptimizerTest {
 
     // 3-level test case
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE ((A = 4 OR (B = 5 OR D = 9)) OR (C=7)) OR E=8");
-    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
+    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 5);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
     for (FilterQueryTree node: tree.getChildren()) {
@@ -85,7 +86,7 @@ public class FilterOptimizerTest {
 
     // Mixed case.
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE ((A = 4 OR (B = 5 AND D = 9)) OR (C=7)) OR E=8");
-    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
+    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), 4);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
     numLeaves = 0;
@@ -106,7 +107,7 @@ public class FilterOptimizerTest {
     final int maxNodesAtTopLevel = FlattenNestedPredicatesFilterQueryTreeOptimizer.MAX_OPTIMIZING_DEPTH;
     String whereClause = constructWhereClause(FilterOperator.OR, maxNodesAtTopLevel + 50);
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE " + whereClause);
-    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
+    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, timeColumn));
     Assert.assertEquals(tree.getChildren().size(), maxNodesAtTopLevel+1);
     Assert.assertEquals(tree.getOperator(), FilterOperator.OR);
     numLeaves = 0;
@@ -134,7 +135,7 @@ public class FilterOptimizerTest {
     int numOps;
 
     req = pql2Compiler.compileToBrokerRequest("SELECT * FROM T WHERE (A = 4 AND (B = 5 OR D = 9))");
-    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req));
+    tree = RequestUtils.generateFilterQueryTree(_optimizer.optimize(req, null /* timeColumn */));
     Assert.assertEquals(tree.getChildren().size(), 2);
     Assert.assertEquals(tree.getOperator(), FilterOperator.AND);
     numOps = 0;

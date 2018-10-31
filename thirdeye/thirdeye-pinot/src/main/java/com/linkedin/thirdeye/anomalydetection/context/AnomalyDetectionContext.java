@@ -2,7 +2,12 @@ package com.linkedin.thirdeye.anomalydetection.context;
 
 import com.linkedin.thirdeye.anomalydetection.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The context for performing an anomaly detection on the sets of time series from the same
@@ -16,16 +21,17 @@ public class AnomalyDetectionContext {
   private TimeSeriesKey timeSeriesKey;
   private long bucketSizeInMS; // the bucket size, gap between timestamps, in millisecond
 
-  private TimeSeries current;
-  private List<TimeSeries> baselines;
+  private Map<String, TimeSeries> current = new HashMap<>();
+  private Map<String, List<TimeSeries>> baselines = new HashMap<>();
 
   //TODO: Add DAO for accessing historical anomalies or scaling factor
+  private List<MergedAnomalyResultDTO> historicalAnomalies = new ArrayList<>();
 
   // The followings are intermediate results and are appended during anomaly detection
-  private TimeSeries transformedCurrent;
-  private List<TimeSeries> transformedBaselines;
+  private Map<String, TimeSeries> transformedCurrent = new HashMap<>();
+  private Map<String, List<TimeSeries>> transformedBaselines = new HashMap<>();
 
-  private PredictionModel trainedPredictionModel;
+  private Map<String, PredictionModel> trainedPredictionModel = new HashMap<>();
 
   /**
    * Returns the key of the time series, which contains metric name and dimension map.
@@ -44,29 +50,43 @@ public class AnomalyDetectionContext {
   /**
    * Returns the current (observed) time series, which is not transformed.
    */
-  public TimeSeries getCurrent() {
-    return current;
+  public TimeSeries getCurrent(String metricName) {
+    return current.get(metricName);
   }
 
   /**
    * Set the current (observed) time series.
    */
-  public void setCurrent(TimeSeries current) {
-    this.current = current;
+  public void setCurrent(String metricName, TimeSeries current) {
+    this.current.put(metricName, current);
   }
 
   /**
    * Returns the set of baseline time series for training the prediction model.
    */
-  public List<TimeSeries> getBaselines() {
-    return baselines;
+  public List<TimeSeries> getBaselines(String metricName) {
+    return baselines.get(metricName);
   }
 
   /**
    * Sets the set of baseline time series for training the prediction model.
    */
-  public void setBaselines(List<TimeSeries> baselines) {
-    this.baselines = baselines;
+  public void setBaselines(String metricName, List<TimeSeries> baselines) {
+    this.baselines.put(metricName, baselines);
+  }
+
+  /**
+   * Returns the list of historicalAnomalies.
+   */
+  public List<MergedAnomalyResultDTO> getHistoricalAnomalies() {
+    return this.historicalAnomalies;
+  }
+
+  /**
+   * Sets the set of baseline time series for training the prediction model.
+   */
+  public void setHistoricalAnomalies(List<MergedAnomalyResultDTO> anomalies) {
+    this.historicalAnomalies = anomalies;
   }
 
   /**
@@ -103,45 +123,45 @@ public class AnomalyDetectionContext {
    * Returns the transformed current (observed) time series. If no transformation function is setup
    * in the context, then the original current time series is returned.
    */
-  public TimeSeries getTransformedCurrent() {
-    return transformedCurrent;
+  public TimeSeries getTransformedCurrent(String metricName) {
+    return transformedCurrent.get(metricName);
   }
 
   /**
    * Sets the transformed current (observed) time series. This method is supposed to be used by
    * transformation functions.
    */
-  public void setTransformedCurrent(TimeSeries transformedCurrent) {
-    this.transformedCurrent = transformedCurrent;
+  public void setTransformedCurrent(String metricName, TimeSeries transformedCurrent) {
+    this.transformedCurrent.put(metricName, transformedCurrent);
   }
 
   /**
    * Returns the set of transformed baseline time series. If no transformation function is setup
    * in the context, then the original set of baseline time series is returned.
    */
-  public List<TimeSeries> getTransformedBaselines() {
-    return transformedBaselines;
+  public List<TimeSeries> getTransformedBaselines(String metricName) {
+    return transformedBaselines.get(metricName);
   }
 
   /**
    * Sets the set of transformed baseline time series. This method is supposed to be used by
    * transformation functions.
    */
-  public void setTransformedBaselines(List<TimeSeries> transformedBaselines) {
-    this.transformedBaselines = transformedBaselines;
+  public void setTransformedBaselines(String metricName, List<TimeSeries> transformedBaselines) {
+    this.transformedBaselines.put(metricName, transformedBaselines);
   }
 
   /**
    * Returns the trained prediction model.
    */
-  public PredictionModel getTrainedPredictionModel() {
-    return trainedPredictionModel;
+  public PredictionModel getTrainedPredictionModel(String metricName) {
+    return trainedPredictionModel.get(metricName);
   }
 
   /**
    * Sets the trained prediction model, which is supposed to be set by the anomaly function.
    */
-  public void setTrainedPredictionModel(PredictionModel trainedPredictionModel) {
-    this.trainedPredictionModel = trainedPredictionModel;
+  public void setTrainedPredictionModel(String metricName, PredictionModel trainedPredictionModel) {
+    this.trainedPredictionModel.put(metricName, trainedPredictionModel);
   }
 }

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,12 +29,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.AgeFileFilter;
+import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -142,9 +146,7 @@ public class SegmentDeletionManager {
       }
       segmentsToDelete.removeAll(propStoreFailedSegs);
 
-      for (String segmentId : segmentsToDelete) {
-        removeSegmentFromStore(tableName, segmentId);
-      }
+      removeSegmentsFromStore(tableName, segmentsToDelete);
     }
 
     LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
@@ -158,15 +160,21 @@ public class SegmentDeletionManager {
     }
   }
 
-  protected void removeSegmentFromStore(String tableName, String segmentId) {
-    final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
+    for (String segment : segments) {
+      removeSegmentFromStore(tableNameWithType, segment);
+    }
+  }
+
+  protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
+    final String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     if (_localDiskDir != null) {
       File fileToMove = new File(new File(_localDiskDir, rawTableName), segmentId);
       if (fileToMove.exists()) {
         File targetDir = new File(new File(_localDiskDir, DELETED_SEGMENTS), rawTableName);
         try {
           // Overwrites the file if it already exists in the target directory.
-          FileUtils.copyFileToDirectory(fileToMove, targetDir, true);
+          FileUtils.copyFileToDirectory(fileToMove, targetDir, false);
           LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(), targetDir.getAbsolutePath());
           if (!fileToMove.delete()) {
             LOGGER.warn("Could not delete file", segmentId, fileToMove.getAbsolutePath());
@@ -175,7 +183,7 @@ public class SegmentDeletionManager {
           LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(), targetDir.getAbsolutePath(), e);
         }
       } else {
-        CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+        CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
         switch (tableType) {
           case OFFLINE:
             LOGGER.warn("Not found local segment file for segment {}" + fileToMove.getAbsolutePath());
@@ -191,6 +199,48 @@ public class SegmentDeletionManager {
       }
     } else {
       LOGGER.info("localDiskDir is not configured, won't delete segment {} from disk", segmentId);
+    }
+  }
+
+  /**
+   * Removes aged deleted segments from the deleted directory
+   * @param retentionInDays: retention for deleted segments in days
+   */
+  public void removeAgedDeletedSegments(int retentionInDays) {
+    if (_localDiskDir != null) {
+      File deletedDir = new File(_localDiskDir, DELETED_SEGMENTS);
+      // Check that the directory for deleted segments exists
+      if (!deletedDir.isDirectory()) {
+        LOGGER.warn("Deleted segment directory {} does not exist or it is not directory.", deletedDir.getAbsolutePath());
+        return;
+      }
+
+      AgeFileFilter fileFilter = new AgeFileFilter(DateTime.now().minusDays(retentionInDays).toDate());
+      File[] directories = deletedDir.listFiles((FileFilter) DirectoryFileFilter.DIRECTORY);
+      // Check that the directory for deleted segments is empty
+      if (directories == null) {
+        LOGGER.warn("Deleted segment directory {} does not exist or it caused an I/O error.", deletedDir);
+        return;
+      }
+
+      for (File currentDir : directories) {
+        // Get files that are aged
+        Collection<File> targetFiles = FileUtils.listFiles(currentDir, fileFilter, null);
+        // Delete aged files
+        for (File f : targetFiles) {
+          if (!f.delete()) {
+            LOGGER.warn("Cannot remove file {} from deleted directory.", f.getAbsolutePath());
+          }
+        }
+        // Delete directory if it's empty
+        if (currentDir.list() != null && currentDir.list().length == 0) {
+          if (!currentDir.delete()) {
+            LOGGER.warn("The directory {} cannot be removed. The directory may not be empty.", currentDir.getAbsolutePath());
+          }
+        }
+      }
+    } else {
+      LOGGER.info("localDiskDir is not configured, won't delete any expired segments from deleted directory.");
     }
   }
 }

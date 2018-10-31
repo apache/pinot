@@ -1,11 +1,13 @@
-<div class="col-md-12">
-  <div class="table-responsive">
-    <table class="table table-bordered analysis-table">
+<div class="col-xs-12">
+  <div class="table-responsive analysis-table-wrapper ">
+    <table class="table table-bordered analysis-table tree-map__table">
       <thead>
       <tr>
-        <th style="width: 10%;"></th>
+        <th class="analysis-table__anchor"></th>
         {{#each this.subDimensionContributionDetails.timeBucketsCurrent as |timestamp timeIndex|}}
-        <th>{{displayMonthDayHour timestamp}}</th>
+        <th class="analysis-table__header">
+          {{formatDate ../granularity timestamp}}
+        </th>
         {{/each}}
       </tr>
       </thead>
@@ -13,17 +15,17 @@
       <tbody>
       {{#if this.showDetailsChecked}}
       <tr>
-        <td></td>
+        <td class="analysis-table__anchor analysis-table__anchor--low"></td>
         {{#each this.subDimensionContributionDetails.timeBucketsCurrent}}
-        <td>
-          <div class="row">
-            <div class="col-md-4">
+        <td class="analysis-table__subheader">
+          <div class="analysis-table__cell">
+            <div class="analysis-table__item">
               Current
             </div>
-            <div class="col-md-4">
+            <div class="analysis-table__item">
               Baseline
             </div>
-            <div class="col-md-4">
+            <div class="analysis-table__item analysis-table__item--small">
               Ratio
             </div>
           </div>
@@ -36,22 +38,24 @@
       {{#each this.subDimensionContributionDetails.cumulativePercentageChange as
       |cumulativePercentageChangeArr cKeyIndex|}}
       <tr>
-        <td><div style="overflow:auto">{{cKeyIndex}}</div></td>
+        <td class="analysis-table__dimension">
+          <div class="analysis-table__cell">{{cKeyIndex}}</div>
+        </td>
         {{#each cumulativePercentageChangeArr as |cPercentageChange cidx|}}
-        <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};">
-          <div class="row">
+        <td style="background-color: {{computeColor cPercentageChange @root.inverseMetric}};color: {{computeTextColor cPercentageChange}};">
+          <div class="analysis-table__cell">
             {{#if @root.showDetailsChecked}}
-            <div class="col-md-4">
-              {{lookup (lookup @root.subDimensionContributionDetails.cumulativeCurrentValues
-              cKeyIndex) cidx}}
+            <div class="analysis-table__item">
+              {{formatNumber (lookup (lookup @root.subDimensionContributionDetails.cumulativeCurrentValues
+              cKeyIndex) cidx)}}
             </div>
-            <div class="col-md-4">
-              {{lookup (lookup @root.subDimensionContributionDetails.cumulativeBaselineValues
-              cKeyIndex) cidx}}
+            <div class="analysis-table__item">
+              {{formatNumber (lookup (lookup @root.subDimensionContributionDetails.cumulativeBaselineValues
+              cKeyIndex) cidx)}}
             </div>
-            <div class="col-md-4">
+            <div class="analysis-table__item analysis-table__item--small">
             {{else}}
-            <div class="col-md-12">
+            <div class="analysis-table__item  analysis-table__item--large">
             {{/if}}
               <a id="{{lookup @root.subDimensionsIndex cKeyIndex}}-{{cidx}}"
                  style="color:{{computeTextColor cPercentageChange}}">
@@ -70,20 +74,22 @@
       {{#each this.subDimensionContributionDetails.percentageChange as |percentageChangeArr
       keyIndex|}}
       <tr>
-        <td><div style="overflow:auto">{{keyIndex}}</div></td>
+        <td class="analysis-table__dimension">
+          <div class="analysis-table__cell">{{keyIndex}}</div>
+        </td>
         {{#each percentageChangeArr as |percentageChange idx|}}
-        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};">
-          <div class="row">
+        <td style="background-color: {{computeColor percentageChange @root.inverseMetric}};color: {{computeTextColor percentageChange}};">
+          <div class="analysis-table__cell">
             {{#if @root.showDetailsChecked}}
-            <div class="col-md-4">
-              {{lookup (lookup @root.subDimensionContributionDetails.currentValues keyIndex) idx}}
+            <div class="analysis-table__item">
+              {{formatNumber (lookup (lookup @root.subDimensionContributionDetails.currentValues keyIndex) idx)}}
             </div>
-            <div class="col-md-4">
-              {{lookup (lookup @root.subDimensionContributionDetails.baselineValues keyIndex) idx}}
+            <div class="analysis-table__item">
+              {{formatNumber (lookup (lookup @root.subDimensionContributionDetails.baselineValues keyIndex) idx)}}
             </div>
-            <div class="col-md-4">
+            <div class="analysis-table__item analysis-table__item--small">
             {{else}}
-            <div class="col-md-12">
+            <div class="analysis-table__item  analysis-table__item--large">
             {{/if}}
               <a id="{{lookup @root.subDimensionsIndex keyIndex}}-{{idx}}"
                  style="color:{{computeTextColor percentageChange}}">

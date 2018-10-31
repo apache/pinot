@@ -15,70 +15,26 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import java.util.List;
-
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-
-import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 public class BitmapBlock extends BaseFilterBlock {
+  private final ImmutableRoaringBitmap[] _bitmaps;
+  private final int _startDocId;
+  // Inclusive
+  private final int _endDocId;
+  private final boolean _exclusive;
 
-  private final ImmutableRoaringBitmap[] bitmaps;
-  BitmapDocIdSet bitmapDocIdSet;
-  private BlockMetadata blockMetadata;
-  private boolean exclusion;
-  private String datasourceName;
-  private int startDocId;
-  private int endDocId;
-
-  public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, int startDocId, int endDocId, ImmutableRoaringBitmap[] bitmaps) {
-    this(datasourceName, blockMetadata, startDocId, endDocId, bitmaps, false);
-  }
-
-  public BitmapBlock(String datasourceName, BlockMetadata blockMetadata, int startDocId, int endDocId, ImmutableRoaringBitmap[] bitmaps, boolean exclusion) {
-    this.datasourceName = datasourceName;
-    this.blockMetadata = blockMetadata;
-    this.startDocId = startDocId;
-    this.endDocId = endDocId;
-    this.bitmaps = bitmaps;
-    this.exclusion = exclusion;
-  }
-
-  @Override
-  public BlockId getId() {
-    return new BlockId(0);
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException("applypredicate not supported in " + this.getClass());
+  public BitmapBlock(ImmutableRoaringBitmap[] bitmaps, int startDocId, int endDocId, boolean exclusive) {
+    _bitmaps = bitmaps;
+    _startDocId = startDocId;
+    _endDocId = endDocId;
+    _exclusive = exclusive;
   }
 
   @Override
   public FilterBlockDocIdSet getFilteredBlockDocIdSet() {
-    bitmapDocIdSet = new BitmapDocIdSet(datasourceName, blockMetadata, startDocId, endDocId, bitmaps, exclusion);
-    return bitmapDocIdSet;
+    return new BitmapDocIdSet(_bitmaps, _startDocId, _endDocId, _exclusive);
   }
-
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException("getBlockValueSet not supported in " + this.getClass());
-  }
-
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException("getBlockDocIdValueSet not supported in " + this.getClass());
-  }
-
-  @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException("getMetadata not supported in " + this.getClass());
-  }
-
 }

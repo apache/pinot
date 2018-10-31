@@ -19,10 +19,9 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import java.util.List;
 import javax.annotation.Nonnull;
@@ -41,24 +40,26 @@ public class AggregationGroupByPlanNode implements PlanNode {
   private final List<AggregationInfo> _aggregationInfos;
   private final GroupBy _groupBy;
   private final TransformPlanNode _transformPlanNode;
+  private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
 
   public AggregationGroupByPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest,
-      int numGroupsLimit) {
+      int maxInitialResultHolderCapacity, int numGroupsLimit) {
     _indexSegment = indexSegment;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
     _groupBy = brokerRequest.getGroupBy();
+    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
   }
 
   @Override
-  public Operator run() {
-    TransformExpressionOperator transformOperator = (TransformExpressionOperator) _transformPlanNode.run();
+  public AggregationGroupByOperator run() {
+    TransformOperator transformOperator = _transformPlanNode.run();
     SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
     return new AggregationGroupByOperator(
         AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata), _groupBy,
-        _numGroupsLimit, transformOperator, segmentMetadata.getTotalRawDocs());
+        _maxInitialResultHolderCapacity, _numGroupsLimit, transformOperator, segmentMetadata.getTotalRawDocs());
   }
 
   @Override

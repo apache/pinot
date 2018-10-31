@@ -15,27 +15,23 @@
  */
 package com.linkedin.pinot.index.persist;
 
-import com.linkedin.pinot.util.TestUtils;
-
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.commons.io.FileUtils;
-import org.json.JSONObject;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.util.AvroUtils;
+import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.json.JSONObject;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class AvroDataPublisherTest {
@@ -60,7 +56,7 @@ public class AvroDataPublisherTest {
 
     config.setSegmentVersion(SegmentVersion.v1);
 
-    AvroRecordReader avroDataPublisher = (AvroRecordReader) RecordReaderFactory.get(config);
+    AvroRecordReader avroDataPublisher = (AvroRecordReader) RecordReaderFactory.getRecordReader(config);
 
     int cnt = 0;
     for (String line : FileUtils.readLines(new File(jsonPath))) {
@@ -101,9 +97,8 @@ public class AvroDataPublisherTest {
 
     config.setSegmentVersion(SegmentVersion.v1);
 
-    final AvroRecordReader avroDataPublisher =
-        new AvroRecordReader(FieldExtractorFactory.getPlainFieldExtractor(config), config.getInputFilePath());
-    avroDataPublisher.next();
+    AvroRecordReader avroDataPublisher = (AvroRecordReader) RecordReaderFactory.getRecordReader(config);
+
     int cnt = 0;
     for (final String line : FileUtils.readLines(new File(jsonPath))) {
 
@@ -131,13 +126,13 @@ public class AvroDataPublisherTest {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_MULTI_DATA));
 
     final SegmentGeneratorConfig config =
-        new SegmentGeneratorConfig(AvroUtils.extractSchemaFromAvro(new File(filePath)));
+        new SegmentGeneratorConfig(AvroUtils.getPinotSchemaFromAvroDataFile(new File(filePath)));
     config.setFormat(FileFormat.AVRO);
     config.setInputFilePath(filePath);
 
     config.setSegmentVersion(SegmentVersion.v1);
 
-    AvroRecordReader avroDataPublisher = (AvroRecordReader) RecordReaderFactory.get(config);
+    AvroRecordReader avroDataPublisher = (AvroRecordReader) RecordReaderFactory.getRecordReader(config);
 
     int cnt = 0;
 

@@ -15,10 +15,22 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.io.reader.DataFileReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.util.AvroUtils;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.avro.Schema.Field;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericRecord;
@@ -28,25 +40,11 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.io.reader.DataFileReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.util.TestUtils;
-
 
 public class IntArraysTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static File INDEX_DIR = new File(FileUtils.getTempDirectory() + File.separator
-      + IntArraysTest.class.getName());
+  private static File INDEX_DIR =
+      new File(FileUtils.getTempDirectory() + File.separator + IntArraysTest.class.getName());
 
   @AfterClass
   public static void cleanup() {
@@ -65,8 +63,8 @@ public class IntArraysTest {
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
 
     final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "weeksSinceEpochSunday",
-            TimeUnit.DAYS, "test");
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,
+            "weeksSinceEpochSunday", TimeUnit.DAYS, "test");
     config.setTimeColumnName("weeksSinceEpochSunday");
     driver.init(config);
     driver.build();
@@ -83,17 +81,14 @@ public class IntArraysTest {
 
   @Test
   public void test1() throws Exception {
-    final IndexSegmentImpl heapSegment =
-        (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.heap);
-    final IndexSegmentImpl mmapSegment =
-        (IndexSegmentImpl) ColumnarSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
-    final Map<String, ColumnMetadata> metadataMap =
+    ImmutableSegment heapSegment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.heap);
+    ImmutableSegment mmapSegment = ImmutableSegmentLoader.load(INDEX_DIR.listFiles()[0], ReadMode.mmap);
+    Map<String, ColumnMetadata> metadataMap =
         ((SegmentMetadataImpl) heapSegment.getSegmentMetadata()).getColumnMetadataMap();
 
-    for (final String column : metadataMap.keySet()) {
-
-      final DataFileReader heapArray = heapSegment.getForwardIndexReaderFor(column);
-      final DataFileReader mmapArray = mmapSegment.getForwardIndexReaderFor(column);
+    for (String column : metadataMap.keySet()) {
+      DataFileReader heapArray = heapSegment.getForwardIndex(column);
+      DataFileReader mmapArray = mmapSegment.getForwardIndex(column);
 
       if (metadataMap.get(column).isSingleValue()) {
         final SingleColumnSingleValueReader svHeapReader = (SingleColumnSingleValueReader) heapArray;
@@ -108,7 +103,6 @@ public class IntArraysTest {
           final int[] i_1 = new int[1000];
           final int[] j_i = new int[1000];
           Assert.assertEquals(mvMmapReader.getIntArray(i, j_i), svHeapReader.getIntArray(i, i_1));
-
         }
       }
     }

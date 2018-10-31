@@ -15,68 +15,41 @@
  */
 package com.linkedin.pinot.core.operator.docvaliterators;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.MultiValueReaderContext;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+
 
 public final class MultiValueIterator extends BlockMultiValIterator {
+  private final SingleColumnMultiValueReader<? super ReaderContext> _reader;
+  private final int _numDocs;
+  private final ReaderContext _context;
+  private int _nextDocId;
 
-  private int counter = 0;
-  private ColumnMetadata columnMetadata;
-  private SingleColumnMultiValueReader mVReader;
-  MultiValueReaderContext context;
-
-  public MultiValueIterator(SingleColumnMultiValueReader mVReader, ColumnMetadata columnMetadata) {
-    super();
-    this.mVReader = mVReader;
-    this.columnMetadata = columnMetadata;
-    this.context = (MultiValueReaderContext) mVReader.createContext();
+  public MultiValueIterator(SingleColumnMultiValueReader<? super ReaderContext> reader, int numDocs) {
+    _reader = reader;
+    _numDocs = numDocs;
+    _context = _reader.createContext();
+    _nextDocId = 0;
   }
 
   @Override
   public int nextIntVal(int[] intArray) {
-    return mVReader.getIntArray(counter++, intArray, context);
-  }
-
-  @Override
-  public boolean skipTo(int docId) {
-    if (docId >= columnMetadata.getTotalDocs()) {
-      return false;
-    }
-    counter = docId;
-    return true;
-  }
-
-  @Override
-  public int size() {
-    return columnMetadata.getTotalDocs();
-  }
-
-  @Override
-  public boolean reset() {
-    counter = 0;
-    return true;
-  }
-
-  @Override
-  public boolean next() {
-    return false;
+    return _reader.getIntArray(_nextDocId++, intArray, _context);
   }
 
   @Override
   public boolean hasNext() {
-    return (counter < columnMetadata.getTotalDocs());
+    return _nextDocId < _numDocs;
   }
 
   @Override
-  public DataType getValueType() {
-    return columnMetadata.getDataType();
+  public void skipTo(int docId) {
+    _nextDocId = docId;
   }
 
   @Override
-  public int currentDocId() {
-    return counter;
+  public void reset() {
+    _nextDocId = 0;
   }
 }

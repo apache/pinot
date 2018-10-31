@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
+import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 
 /**
  * This class serves as the input for the call to the endpoint which determines percent completeness
@@ -23,7 +23,7 @@ public class PercentCompletenessFunctionInput {
 
   private List<Long> baselineCounts = new ArrayList<>();
   private Long currentCount = 0L;
-  private DataCompletenessAlgorithmName algorithm = DataCompletenessAlgorithmName.WO4W_AVERAGE;
+  private String algorithmClass = DatasetConfigBean.DEFAULT_COMPLETENESS_ALGORITHM;
 
   public List<Long> getBaselineCounts() {
     return baselineCounts;
@@ -37,11 +37,11 @@ public class PercentCompletenessFunctionInput {
   public void setCurrentCount(Long currentCount) {
     this.currentCount = currentCount;
   }
-  public DataCompletenessAlgorithmName getAlgorithm() {
-    return algorithm;
+  public String getAlgorithmClass() {
+    return algorithmClass;
   }
-  public void setAlgorithm(DataCompletenessAlgorithmName algorithm) {
-    this.algorithm = algorithm;
+  public void setAlgorithmClass(String algorithmClass) {
+    this.algorithmClass = algorithmClass;
   }
 
   public static String toJson(PercentCompletenessFunctionInput input) {

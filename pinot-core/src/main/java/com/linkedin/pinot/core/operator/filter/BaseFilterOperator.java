@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 
@@ -27,33 +23,10 @@ import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
  * Base Operator for all filter operators. ResultBlock is initialized in the planning phase
  *
  */
-public abstract class BaseFilterOperator extends BaseOperator {
+public abstract class BaseFilterOperator extends BaseOperator<BaseFilterBlock> {
 
-  private Predicate predicate;
-  private int nextBlockCallCounter = 0;
-
-  public void setPredicate(Predicate predicate) {
-    this.predicate = predicate;
-  }
-
-  public Predicate getPredicate() {
-    return predicate;
-  }
-
-  @Override
-  public final BaseFilterBlock getNextBlock() {
-    return getNextBlock(new BlockId(0));
-  }
-
-  @Override
-  public final BaseFilterBlock getNextBlock(BlockId blockId) {
-    if (nextBlockCallCounter > 0) {
-      return null;
-    }
-    Block nextBlock = nextFilterBlock(new BlockId(0));
-    nextBlockCallCounter = nextBlockCallCounter + 1;
-    return (BaseFilterBlock) nextBlock;
-  }
-
-  public abstract BaseFilterBlock nextFilterBlock(BlockId blockId);
+  /**
+   * Return whether the result is empty.
+   */
+  public abstract boolean isResultEmpty();
 }

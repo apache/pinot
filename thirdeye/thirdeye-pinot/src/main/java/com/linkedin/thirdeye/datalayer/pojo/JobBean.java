@@ -1,10 +1,9 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import java.sql.Timestamp;
 import java.util.Objects;
-
-import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 
 /**
  * This class corresponds to an anomaly job. An anomaly job is created for every execution of an
@@ -14,11 +13,16 @@ public class JobBean extends AbstractBean {
 
   private String jobName;
   private JobStatus status;
+  private TaskType taskType;
   private long scheduleStartTime;
   private long scheduleEndTime;
   private long windowStartTime;
   private long windowEndTime;
   private Timestamp lastModified;
+  // The id of the job configuration, which could be a detection, alert, or classification job, that triggers
+  // this job. If this job is not triggered from a job config (e.g., monitor job), then it is 0.
+  // For example, this config id is the function id when this job is an anomaly detection.
+  private long configId;
 
   public String getJobName() {
     return jobName;
@@ -34,6 +38,14 @@ public class JobBean extends AbstractBean {
 
   public void setStatus(JobStatus status) {
     this.status = status;
+  }
+
+  public TaskType getTaskType() {
+    return taskType;
+  }
+
+  public void setTaskType(TaskType taskType) {
+    this.taskType = taskType;
   }
 
   public long getScheduleStartTime() {
@@ -72,28 +84,31 @@ public class JobBean extends AbstractBean {
     return lastModified;
   }
 
+  public void setLastModified(Timestamp lastModified) {
+    this.lastModified = lastModified;
+  }
+
+  public long getConfigId() {
+    return configId;
+  }
+
+  public void setConfigId(long configId) {
+    this.configId = configId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof JobBean)) {
       return false;
     }
     JobBean af = (JobBean) o;
-    return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName())
-        && Objects.equals(status, af.getStatus())
-        && Objects.equals(scheduleStartTime, af.getScheduleStartTime());
+    return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName()) && Objects
+        .equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime())
+        && Objects.equals(taskType, af.getTaskType()) && Objects.equals(configId, af.getConfigId());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), jobName, status, scheduleStartTime);
-  }
-
-  @Override
-  public String toString() {
-
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobName", jobName)
-        .add("status", status).add("scheduleStartTime", scheduleStartTime)
-        .add("scheduleEndTime", scheduleEndTime).add("windowStartTime", windowStartTime)
-        .add("windowEndTime", windowEndTime).add("lastModified", lastModified).toString();
+    return Objects.hash(getId(), jobName, status, scheduleStartTime, taskType, configId);
   }
 }

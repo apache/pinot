@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.dashboard.handler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -9,12 +11,13 @@ import org.joda.time.DateTime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewHandler;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewRequest;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
+import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */
 public class HeatMapTest {
@@ -35,11 +38,13 @@ public class HeatMapTest {
     request.setTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     request.setMetricExpressions(metricExpressions);
 
-    PinotThirdEyeClient pinotThirdEyeClient = PinotThirdEyeClient.getDefaultTestClient(); // TODO
+    PinotThirdEyeDataSource pinotThirdEyeDataSource = PinotThirdEyeDataSource.getDefaultTestDataSource(); // TODO
                                                                                           // make
                                                                                           // this
     // configurable;
-    QueryCache queryCache = new QueryCache(pinotThirdEyeClient, Executors.newFixedThreadPool(10));
+    Map<String, ThirdEyeDataSource> dataSourceMap = new HashMap<>();
+    dataSourceMap.put(PinotThirdEyeDataSource.class.getSimpleName(), pinotThirdEyeDataSource);
+    QueryCache queryCache = new QueryCache(dataSourceMap, Executors.newFixedThreadPool(10));
 
     HeatMapViewHandler handler = new HeatMapViewHandler(queryCache);
     HeatMapViewResponse response = handler.process(request);

@@ -15,51 +15,70 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import com.linkedin.pinot.common.exception.HttpErrorStatusException;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import java.io.File;
-import java.util.Map;
-
+import java.net.URI;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import static com.linkedin.pinot.common.utils.CommonConstants.SegmentFetcher.*;
+
 
 public class HttpSegmentFetcher implements SegmentFetcher {
+  protected final Logger _logger = LoggerFactory.getLogger(getClass().getSimpleName());
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(HttpSegmentFetcher.class);
-  private static final String MAX_RETRIES = "maxRetries";
-  private static final int DEFAULT_MAX_RETRIES = 3;
-  private int maxRetryCount = DEFAULT_MAX_RETRIES;
+  protected FileUploadDownloadClient _httpClient;
+  protected int _retryCount;
+  protected int _retryWaitMs;
 
   @Override
-  public void init(Map<String, String> configs) {
-    if (configs.containsKey(MAX_RETRIES)) {
-      try {
-        maxRetryCount = Integer.parseInt(configs.get(MAX_RETRIES));
-      } catch (Exception e) {
-        maxRetryCount = DEFAULT_MAX_RETRIES;
-      }
-    }
+  public void init(Configuration configs) {
+    initHttpClient(configs);
+    _retryCount = configs.getInt(RETRY, RETRY_DEFAULT);
+    _retryWaitMs = configs.getInt(RETRY_WAITIME_MS, RETRY_WAITIME_MS_DEFAULT);
+  }
+
+  protected void initHttpClient(Configuration configs) {
+    _httpClient = new FileUploadDownloadClient();
   }
 
   @Override
-  public void fetchSegmentToLocal(String uri, File tempFile) throws Exception {
-    for (int retry = 1; retry <= maxRetryCount; ++retry) {
-      try {
-        final long httpGetResponseContentLength = FileUploadUtils.getFile(uri, tempFile);
-        LOGGER.info(
-            "Downloaded file from {} to {}; Length of httpGetResponseContent: {}; Length of downloaded file: {}", uri,
-            tempFile, httpGetResponseContentLength, tempFile.length());
-        return;
-      } catch (Exception e) {
-        LOGGER.error("Failed to download file from {}, retry: {}", uri, retry, e);
-        if (retry == maxRetryCount) {
-          LOGGER.error("Exceeded maximum retry count while fetching file from {} to local file: {}, aborting.", uri, tempFile, e);
-          throw e;
-        } else {
-          long backOffTimeInSec = 5 * retry;
-          Thread.sleep(backOffTimeInSec * 1000);
+  public void fetchSegmentToLocal(final String uri, final File tempFile) throws Exception {
+    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, 5).attempt(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        try {
+          int statusCode = _httpClient.downloadFile(new URI(uri), tempFile);
+          _logger.info("Downloaded file from: {} to: {}; Length of downloaded file: {}; Response status code: {}", uri,
+              tempFile, tempFile.length(), statusCode);
+          return true;
+        } catch (HttpErrorStatusException e) {
+          int statusCode = e.getStatusCode();
+          if (statusCode >= 500) {
+            // Temporary exception
+            _logger.warn("Caught temporary exception while downloading file from: {}, will retry", uri, e);
+            return false;
+          } else {
+            // Permanent exception
+            _logger.error("Caught permanent exception while downloading file from: {}, won't retry", uri, e);
+            throw e;
+          }
+        } catch (Exception e) {
+          _logger.warn("Caught temporary exception while downloading file from: {}, will retry", uri, e);
+          return false;
         }
       }
-    }
+    });
+  }
+
+  @Override
+  public Set<String> getProtectedConfigKeys() {
+    return Collections.<String>emptySet();
   }
 }

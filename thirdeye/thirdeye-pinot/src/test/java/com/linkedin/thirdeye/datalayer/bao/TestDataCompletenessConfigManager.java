@@ -1,16 +1,20 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
 
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 
-public class TestDataCompletenessConfigManager extends AbstractManagerTestBase {
+public class TestDataCompletenessConfigManager {
 
   private Long dataCompletenessConfigId1;
   private Long dataCompletenessConfigId2;
@@ -18,16 +22,28 @@ public class TestDataCompletenessConfigManager extends AbstractManagerTestBase {
   private DateTime now = new DateTime();
   private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
 
+  private DAOTestBase testDAOProvider;
+  private DataCompletenessConfigManager dataCompletenessConfigDAO;
+  @BeforeClass
+  void beforeClass() {
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    dataCompletenessConfigDAO = daoRegistry.getDataCompletenessConfigDAO();
+  }
 
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    testDAOProvider.cleanup();
+  }
 
   @Test
   public void testCreate() {
 
     dataCompletenessConfigId1 = dataCompletenessConfigDAO.
-        save(getTestDataCompletenessConfig(collection1, now.getMillis(), dateTimeFormatter.print(now.getMillis()), true));
+        save(DaoTestUtils.getTestDataCompletenessConfig(collection1, now.getMillis(), dateTimeFormatter.print(now.getMillis()), true));
 
     dataCompletenessConfigId2 = dataCompletenessConfigDAO.
-        save(getTestDataCompletenessConfig(collection1, now.minusHours(1).getMillis(), dateTimeFormatter.print(now.minusHours(1).getMillis()), false));
+        save(DaoTestUtils.getTestDataCompletenessConfig(collection1, now.minusHours(1).getMillis(), dateTimeFormatter.print(now.minusHours(1).getMillis()), false));
 
     Assert.assertNotNull(dataCompletenessConfigId1);
     Assert.assertNotNull(dataCompletenessConfigId2);

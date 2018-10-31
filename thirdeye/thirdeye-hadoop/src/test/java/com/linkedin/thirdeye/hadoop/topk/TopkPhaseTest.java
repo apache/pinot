@@ -20,6 +20,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -49,7 +50,6 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
@@ -101,7 +101,7 @@ public class TopkPhaseTest {
 
     GenericRecord input = new GenericData.Record(inputSchema);
     input.put("d1", "abc1");
-    input.put("d2", "pqr1");
+    input.put("d2", 501L);
     input.put("d3", "xyz1");
     input.put("hoursSinceEpoch", generateRandomHoursSinceEpoch());
     input.put("m1", 100);
@@ -110,7 +110,7 @@ public class TopkPhaseTest {
 
     input = new GenericData.Record(inputSchema);
     input.put("d1", "abc2");
-    input.put("d2", "pqr2");
+    input.put("d2", 502L);
     input.put("d3", "xyz2");
     input.put("hoursSinceEpoch", generateRandomHoursSinceEpoch());
     input.put("m1", 10);
@@ -139,6 +139,7 @@ public class TopkPhaseTest {
 
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString(), "STRING,LONG,STRING");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
@@ -191,9 +192,10 @@ public class TopkPhaseTest {
     }
 
     List<Pair<BytesWritable, BytesWritable>> result = mapDriver.run();
-    // for each record, we emit 2 records per dimension:
-    // once for actual value of dimension, once for ALL,ALL
-    Assert.assertEquals("Incorrect number of records emitted by mapper", recordCount * 3 * 2, result.size());
+    // for each record, we emit
+    // a records per dimension
+    // and one record for ALL,ALL
+    Assert.assertEquals("Incorrect number of records emitted by mapper", recordCount * (3 + 1), result.size());
 
     Map<String, Integer> counts = new HashMap<>();
     for (Pair<BytesWritable, BytesWritable> pair : result) {
@@ -208,7 +210,7 @@ public class TopkPhaseTest {
     Assert.assertEquals("Incorrect number of records emitted from map", 2, (int) counts.get("d1"));
     Assert.assertEquals("Incorrect number of records emitted from map", 2, (int) counts.get("d2"));
     Assert.assertEquals("Incorrect number of records emitted from map", 2, (int) counts.get("d3"));
-    Assert.assertEquals("Incorrect number of records emitted from map", 6, (int) counts.get("0"));
+    Assert.assertEquals("Incorrect number of records emitted from map", 2, (int) counts.get("0"));
 
     List<Pair<BytesWritable, List<BytesWritable>>> reduceInput = generateTestReduceData(result);
     reduceDriver.addAll(reduceInput);
@@ -219,7 +221,9 @@ public class TopkPhaseTest {
     TopKDimensionValues topk = OBJECT_MAPPER.readValue(new FileInputStream(topKFile), TopKDimensionValues.class);
     Map<String, Set<String>> topkMap = topk.getTopKDimensions();
     Assert.assertEquals("Incorrect topk object", topkMap.size(), 1);
-    Assert.assertEquals("Incorrect topk values in topk object", Sets.newHashSet("pqr1"), topkMap.get("d2"));
+    Set<String> expected = new HashSet<>();
+    expected.add("501");
+    Assert.assertEquals("Incorrect topk values in topk object", expected, topkMap.get("d2"));
     Assert.assertEquals("Incorrect whitelist values in topk object", null, topkMap.get("d3"));
   }
 

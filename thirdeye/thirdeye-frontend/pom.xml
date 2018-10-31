@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+  xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.linkedin.thirdeye</groupId>
+    <artifactId>thirdeye</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+  <groupId>com.linkedin.thirdeye</groupId>
+  <artifactId>thirdeye-frontend</artifactId>
+  <name>thirdeye-frontend</name>
+  <url>http://maven.apache.org</url>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.github.eirslett</groupId>
+        <artifactId>frontend-maven-plugin</artifactId>
+        <version>1.3</version>
+
+        <executions>
+          <execution>
+            <id>install node and npm</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>install-node-and-yarn</goal>
+            </goals>
+            <configuration>
+              <nodeVersion>v6.10.0</nodeVersion>
+              <yarnVersion>v0.16.1</yarnVersion>
+            </configuration>
+          </execution>
+          <execution>
+            <id>yarn install</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>yarn</goal>
+            </goals>
+            <configuration>
+              <arguments>install</arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>bower install</id>
+            <goals>
+              <goal>bower</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>build front end</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>yarn</goal>
+            </goals>
+            <configuration>
+              <arguments>run build -- --prod --output-path=../thirdeye-pinot/src/main/resources/app</arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>test front end</id>
+            <phase>test</phase>
+            <goals>
+              <goal>yarn</goal>
+            </goals>
+            <configuration>
+              <arguments>run test</arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-clean-plugin</artifactId>
+        <version>3.0.0</version>
+        <executions>
+          <execution>
+            <phase>clean</phase>
+            <goals>
+              <goal>clean</goal>
+            </goals>
+            <configuration>
+              <filesets>
+                <fileset>
+                  <directory>tmp</directory>
+                </fileset>
+                <fileset>
+                  <directory>node</directory>
+                </fileset>
+                <fileset>
+                  <directory>node_modules</directory>
+                </fileset>
+                <fileset>
+                  <directory>bower_components</directory>
+                </fileset>
+              </filesets>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    <plugin>
+      <groupId>org.apache.maven.plugins</groupId>
+      <artifactId>maven-war-plugin</artifactId>
+      <version>2.4</version>
+   </plugin>
+    </plugins>
+    <resources>
+      <resource>
+        <directory>${basedir}/dist/</directory>
+        <excludes>
+          <exclude>tests/</exclude>
+          <exclude>**/.gitkeep</exclude>
+          <exclude>testem.js</exclude>
+        </excludes>
+        <targetPath>META-INF/resources/</targetPath>
+      </resource>
+    </resources>
+
+  </build>
+</project>

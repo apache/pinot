@@ -15,14 +15,18 @@
  */
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
-import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 
 
 /**
  * AST node for HAVING clauses.
  */
 public class HavingAstNode extends BaseAstNode {
-  public HavingAstNode() {
-    throw new Pql2CompilationException("HAVING clauses are not supported");
+  @Override
+  public void updateBrokerRequest(BrokerRequest brokerRequest) {
+    PredicateAstNode predicateAstNode = (PredicateAstNode) getChildren().get(0);
+    RequestUtils.generateFilterFromTree(predicateAstNode.buildHavingQueryTree(), brokerRequest);
   }
+
 }

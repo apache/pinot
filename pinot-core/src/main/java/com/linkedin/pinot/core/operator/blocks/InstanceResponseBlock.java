@@ -19,10 +19,8 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,8 +35,7 @@ public class InstanceResponseBlock implements Block {
 
   private DataTable _instanceResponseDataTable;
 
-  public InstanceResponseBlock(Block block) {
-    IntermediateResultsBlock intermediateResultsBlock = (IntermediateResultsBlock) block;
+  public InstanceResponseBlock(IntermediateResultsBlock intermediateResultsBlock) {
     try {
       _instanceResponseDataTable = intermediateResultsBlock.getDataTable();
     } catch (Exception e) {
@@ -49,16 +46,6 @@ public class InstanceResponseBlock implements Block {
 
   public DataTable getInstanceResponseDataTable() {
     return _instanceResponseDataTable;
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public BlockId getId() {
-    throw new UnsupportedOperationException();
   }
 
   @Override

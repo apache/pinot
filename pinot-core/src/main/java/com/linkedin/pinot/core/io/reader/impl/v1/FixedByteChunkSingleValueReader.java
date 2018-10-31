@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
-import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
 import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedByteChunkSingleValueWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -30,16 +29,27 @@ import java.nio.ByteBuffer;
  */
 public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader {
 
+  // Thread local (reusable) byte[] to read bytes from data file.
+  private final ThreadLocal<byte[]> _reusableBytes = ThreadLocal.withInitial(() -> new byte[_lengthOfLongestEntry]);
+
   /**
    * Constructor for the class.
    *
    * @param pinotDataBuffer Data buffer to read from
-   * @param uncompressor Chunk uncompressor
    * @throws IOException
    */
-  public FixedByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer, ChunkDecompressor uncompressor)
+  public FixedByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer)
       throws IOException {
-    super(pinotDataBuffer, uncompressor);
+    super(pinotDataBuffer);
+  }
+
+  @Override
+  public int getInt(int row) {
+    if (!isCompressed()) {
+      return getRawData().getInt(row * INT_SIZE);
+    } else {
+      throw new UnsupportedOperationException("Read without context not supported for compressed data.");
+    }
   }
 
   @Override
@@ -51,11 +61,29 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
   }
 
   @Override
+  public float getFloat(int row) {
+    if (!isCompressed()) {
+      return getRawData().getFloat(row * FLOAT_SIZE);
+    } else {
+      throw new UnsupportedOperationException("Read without context not supported for compressed data.");
+    }
+  }
+
+  @Override
   public float getFloat(int row, ChunkReaderContext context) {
     assert _lengthOfLongestEntry == FLOAT_SIZE;
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
     return chunkBuffer.getFloat(chunkRowId * FLOAT_SIZE);
+  }
+
+  @Override
+  public long getLong(int row) {
+    if (!isCompressed()) {
+      return getRawData().getLong(row * LONG_SIZE);
+    } else {
+      throw new UnsupportedOperationException("Read without context not supported for compressed data.");
+    }
   }
 
   @Override
@@ -67,11 +95,42 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
   }
 
   @Override
+  public double getDouble(int row) {
+    if (!isCompressed()) {
+      return getRawData().getDouble(row * DOUBLE_SIZE);
+    } else {
+      throw new UnsupportedOperationException("Read without context not supported for compressed data.");
+    }
+  }
+
+  @Override
   public double getDouble(int row, ChunkReaderContext context) {
     assert _lengthOfLongestEntry == DOUBLE_SIZE;
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
     return chunkBuffer.getDouble(chunkRowId * DOUBLE_SIZE);
+  }
+
+  @Override
+  public byte[] getBytes(int row) {
+    if (!isCompressed()) {
+      byte[] bytes = _reusableBytes.get();
+      getRawData().copyTo(row * _lengthOfLongestEntry, bytes, 0, _lengthOfLongestEntry);
+      return bytes;
+    } else {
+      throw new UnsupportedOperationException("Read without context not supported for compressed data.");
+    }
+  }
+
+  @Override
+  public byte[] getBytes(int row, ChunkReaderContext context) {
+    int chunkRowId = row % _numDocsPerChunk;
+    ByteBuffer chunkBuffer = getChunkForRow(row, context);
+
+    byte[] bytes = _reusableBytes.get();
+    chunkBuffer.position(chunkRowId * _lengthOfLongestEntry );
+    chunkBuffer.get(bytes);
+    return bytes;
   }
 
   @Override

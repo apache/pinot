@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import java.io.IOException;
+import java.net.URLEncoder;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang.StringUtils;
 
@@ -54,6 +56,10 @@ public class ControllerRequestURLBuilder {
 
   public String forInstanceCreate() {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances/");
+  }
+
+  public String forInstanceDelete(String instanceName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", instanceName);
   }
 
   public String forInstanceState(String instanceName) {
@@ -125,8 +131,12 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables");
   }
 
-  public String forTableGetConfig(String tableName) {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "configs");
+  public String forUpdateTableConfig(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName);
+  }
+
+  public String forTableUpdateIndexingConfigs(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "indexingConfigs");
   }
 
   public String forTableGetServerInstances(String tableName) {
@@ -138,7 +148,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableGet(String tableName) {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "instances");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName);
   }
 
   public String forTableDelete(String tableName) {
@@ -152,13 +162,65 @@ public class ControllerRequestURLBuilder {
     }
     return url;
   }
+
+  public String forSchemaCreate() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "schemas");
+  }
+
+  public String forSchemaUpdate(String schemaName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "schemas", schemaName);
+  }
+
+  public String forSchemaGet(String schemaName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "schemas", schemaName);
+  }
+
   public static void main(String[] args) {
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forResourceCreate());
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forInstanceCreate());
+  }
+
+  public String forSegmentDownload(String tableName, String segmentName) throws IOException {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName,
+        URLEncoder.encode(segmentName, "UTF-8"));
   }
 
   public String forSegmentDelete(String resourceName, String segmentName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "datafiles", resourceName, segmentName);
   }
 
+  public String forSegmentDeleteAPI(String tableName, String segmentName, String tableType) throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName, URLEncoder.encode(segmentName, "UTF-8") + "?type=" + tableType);
+  }
+
+  public String forSegmentDeleteAllAPI(String tableName, String tableType) throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName + "?type=" + tableType);
+  }
+
+  public String forListAllSegments(String tableName) throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments");
+  }
+
+  public String forListAllCrcInformationForTable(String tableName) throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments", "crc");
+  }
+
+  public String forDeleteTableWithType(String tableName, String tableType) throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName + "?type=" + tableType);
+  }
+
+  public String forDeleteSegmentWithGetAPI(String tableName, String segmentName, String tableType) throws Exception {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments", URLEncoder.encode(segmentName, "UTF-8") + "?state=drop&" + "type=" + tableType);
+  }
+
+  public String forDeleteAllSegmentsWithTypeWithGetAPI(String tableName, String tableType) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments" + "?state=drop&" + "type=" + tableType);
+  }
+
+  public String forSegmentListAPIWithTableType(String tableName, String tableType) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName + "?type=" + tableType);
+  }
+  public String forSegmentListAPI(String tableName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName);
+  }
 }

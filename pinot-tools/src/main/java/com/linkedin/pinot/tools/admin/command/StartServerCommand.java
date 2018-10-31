@@ -15,18 +15,16 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
-
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
 /**
@@ -36,11 +34,15 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 public class StartServerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartServerCommand.class);
 
-  @Option(name = "-serverHost", required = false, metaVar = "<String>", usage = "host name for controller.")
+  @Option(name = "-serverHost", required = false, metaVar = "<String>", usage = "Host name for controller.")
   private String _serverHost;
 
   @Option(name = "-serverPort", required = false, metaVar = "<int>", usage = "Port number to start the server at.")
   private int _serverPort = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+
+  @Option(name = "-serverAdminPort", required = false, metaVar = "<int>",
+      usage = "Port number to serve the server admin API at.")
+  private int _serverAdminPort = CommonConstants.Server.DEFAULT_ADMIN_API_PORT;
 
   @Option(name = "-dataDir", required = false, metaVar = "<string>", usage = "Path to directory containing data.")
   private String _dataDir = TMP_DIR + "pinotServerData";
@@ -83,6 +85,11 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
     return this;
   }
 
+  public StartServerCommand setAdminPort(int adminPort) {
+    _serverAdminPort = adminPort;
+    return this;
+  }
+
   public StartServerCommand setDataDir(String dataDir) {
     _dataDir = dataDir;
     return this;
@@ -102,10 +109,12 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
   public String toString() {
     if (_configFileName != null) {
       return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort " + _serverPort
-          + " -configFileName " + _configFileName + " -zkAddress " + _zkAddress);
+          + " -serverAdminPort " + _serverAdminPort + " -configFileName " + _configFileName + " -zkAddress "
+          + _zkAddress);
     } else {
       return ("StartServer -clusterName " + _clusterName + " -serverHost " + _serverHost + " -serverPort " + _serverPort
-          + " -dataDir " + _dataDir + " -segmentDir " + _segmentDir + " -zkAddress " + _zkAddress);
+          + " -serverAdminPort " + _serverAdminPort + " -dataDir " + _dataDir + " -segmentDir " + _segmentDir
+          + " -zkAddress " + _zkAddress);
     }
   }
 
@@ -126,28 +135,35 @@ public class StartServerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public boolean execute() throws Exception {
-    if (_serverHost == null) {
-      _serverHost = NetUtil.getHostAddress();
-    }
-
-    Configuration configuration = readConfigFromFile(_configFileName);
-    if (configuration == null) {
-      if (_configFileName != null) {
-        LOGGER.error("Error: Unable to find file {}.", _configFileName);
-        return false;
+    try {
+      if (_serverHost == null) {
+        _serverHost = NetUtil.getHostAddress();
       }
 
-      configuration = new PropertiesConfiguration();
-      configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, _serverHost);
-      configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _serverPort);
-      configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
-      configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
-    }
+      Configuration configuration = readConfigFromFile(_configFileName);
+      if (configuration == null) {
+        if (_configFileName != null) {
+          LOGGER.error("Error: Unable to find file {}.", _configFileName);
+          return false;
+        }
 
-    LOGGER.info("Executing command: " + toString());
-    final HelixServerStarter pinotHelixStarter = new HelixServerStarter(_clusterName, _zkAddress, configuration);
-    String pidFile = ".pinotAdminServer-" + String.valueOf(System.currentTimeMillis()) + ".pid";
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
-    return true;
+        configuration = new PropertiesConfiguration();
+        configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, _serverHost);
+        configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, _serverPort);
+        configuration.addProperty(CommonConstants.Server.CONFIG_OF_ADMIN_API_PORT, _serverAdminPort);
+        configuration.addProperty("pinot.server.instance.dataDir", _dataDir + _serverPort + "/index");
+        configuration.addProperty("pinot.server.instance.segmentTarDir", _segmentDir + _serverPort + "/segmentTar");
+      }
+
+      LOGGER.info("Executing command: " + toString());
+      new HelixServerStarter(_clusterName, _zkAddress, configuration);
+      String pidFile = ".pinotAdminServer-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+      savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
+      return true;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while starting Pinot server, exiting.", e);
+      System.exit(-1);
+      return false;
+    }
   }
 }

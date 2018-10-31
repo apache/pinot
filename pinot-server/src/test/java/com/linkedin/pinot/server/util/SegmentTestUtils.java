@@ -15,38 +15,44 @@
  */
 package com.linkedin.pinot.server.util;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
-
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.util.AvroUtils;
+import java.io.File;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 public class SegmentTestUtils {
+  private SegmentTestUtils() {
+  }
 
-  public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
-      TimeUnit timeUnit, String clusterName, Schema inputPinotSchema) throws IOException {
-    Schema schema;
-    if (inputPinotSchema == null) {
-      schema = AvroUtils.extractSchemaFromAvro(inputAvro);
+  @Nonnull
+  public static SegmentGeneratorConfig getSegmentGeneratorConfig(@Nonnull File inputAvro, @Nonnull File outputDir,
+      @Nonnull TimeUnit timeUnit, @Nonnull String tableName, @Nullable Schema pinotSchema)
+      throws IOException {
+    SegmentGeneratorConfig segmentGeneratorConfig;
+    if (pinotSchema == null) {
+      segmentGeneratorConfig = new SegmentGeneratorConfig(AvroUtils.getPinotSchemaFromAvroDataFile(inputAvro));
     } else {
-      schema = inputPinotSchema;
+      segmentGeneratorConfig = new SegmentGeneratorConfig(pinotSchema);
     }
-    SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(schema);
-    segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
-    segmentGenSpec.setSegmentTimeUnit(timeUnit);
+
+    segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());
+    segmentGeneratorConfig.setSegmentTimeUnit(timeUnit);
     if (inputAvro.getName().endsWith("gz")) {
-      segmentGenSpec.setFormat(FileFormat.GZIPPED_AVRO);
+      segmentGeneratorConfig.setFormat(FileFormat.GZIPPED_AVRO);
     } else {
-      segmentGenSpec.setFormat(FileFormat.AVRO);
+      segmentGeneratorConfig.setFormat(FileFormat.AVRO);
     }
-    segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
-    segmentGenSpec.setTableName(clusterName);
-    segmentGenSpec.setOutDir(outputDir.getAbsolutePath());
-    return segmentGenSpec;
+    segmentGeneratorConfig.setSegmentVersion(SegmentVersion.v1);
+    segmentGeneratorConfig.setTableName(tableName);
+    segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
+
+    return segmentGeneratorConfig;
   }
 }

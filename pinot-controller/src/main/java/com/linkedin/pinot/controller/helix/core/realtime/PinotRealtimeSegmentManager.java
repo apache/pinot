@@ -15,6 +15,26 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Function;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,26 +58,6 @@ import org.apache.zookeeper.data.Stat;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Function;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
-import com.linkedin.pinot.core.query.utils.Pair;
 
 
 /**
@@ -118,15 +118,20 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   private synchronized void assignRealtimeSegmentsToServerInstancesIfNecessary()
       throws JSONException, IOException {
     // Fetch current ideal state snapshot
-    Map<String, IdealState> idealStateMap = new HashMap<String, IdealState>();
+    Map<String, IdealState> idealStateMap = new HashMap<>();
 
-    for (String resource : _pinotHelixResourceManager.getAllRealtimeTables()) {
-      final String tableName = TableNameBuilder.extractRawTableName(resource);
-      AbstractTableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName, TableType.REALTIME);
-      KafkaStreamMetadata metadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+    for (String realtimeTableName : _pinotHelixResourceManager.getAllRealtimeTables()) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(realtimeTableName);
+
+      // Table config might have already been deleted
+      if (tableConfig == null) {
+        continue;
+      }
+
+      StreamMetadata metadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
       if (metadata.hasHighLevelKafkaConsumerType()) {
-        idealStateMap.put(resource, _pinotHelixResourceManager.getHelixAdmin()
-            .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), resource));
+        idealStateMap.put(realtimeTableName, _pinotHelixResourceManager.getHelixAdmin()
+            .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName));
       } else {
         LOGGER.debug("Not considering table {} for realtime segment assignment");
       }
@@ -134,18 +139,18 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
 
     List<Pair<String, String>> listOfSegmentsToAddToInstances = new ArrayList<Pair<String, String>>();
 
-    for (String resource : idealStateMap.keySet()) {
+    for (String realtimeTableName : idealStateMap.keySet()) {
       try {
-        IdealState state = idealStateMap.get(resource);
+        IdealState state = idealStateMap.get(realtimeTableName);
 
         // Are there any partitions?
         if (state.getPartitionSet().size() == 0) {
           // No, this is a brand new ideal state, so we will add one new segment to every partition and replica
-          List<String> instancesInResource = new ArrayList<String>();
+          List<String> instancesInResource = new ArrayList<>();
           try {
-            instancesInResource.addAll(_pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
+            instancesInResource.addAll(_pinotHelixResourceManager.getServerInstancesForTable(realtimeTableName, TableType.REALTIME));
           } catch (Exception e) {
-            LOGGER.error("Caught exception while fetching instances for resource {}", resource, e);
+            LOGGER.error("Caught exception while fetching instances for resource {}", realtimeTableName, e);
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
           }
 
@@ -160,15 +165,15 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
               continue;
             }
 
-            String groupId = instanceZKMetadata.getGroupId(resource);
-            String partitionId = instanceZKMetadata.getPartition(resource);
+            String groupId = instanceZKMetadata.getGroupId(realtimeTableName);
+            String partitionId = instanceZKMetadata.getPartition(realtimeTableName);
             if (groupId != null && !groupId.isEmpty() && partitionId != null && !partitionId.isEmpty()) {
               listOfSegmentsToAddToInstances.add(new Pair<String, String>(
                   new HLCSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())).getSegmentName(),
                   instanceId));
             } else {
               LOGGER.warn("Instance {} has invalid groupId ({}) and/or partitionId ({}) for resource {}, ignoring for segment assignment.",
-                  instanceId, groupId, partitionId, resource);
+                  instanceId, groupId, partitionId, realtimeTableName);
               _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
             }
           }
@@ -177,9 +182,9 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           Set<String> instancesToAssignRealtimeSegment = new HashSet<String>();
           try {
             instancesToAssignRealtimeSegment.addAll(
-                _pinotHelixResourceManager.getServerInstancesForTable(resource, TableType.REALTIME));
+                _pinotHelixResourceManager.getServerInstancesForTable(realtimeTableName, TableType.REALTIME));
           } catch (Exception e) {
-            LOGGER.error("Caught exception while fetching instances for resource {}", resource, e);
+            LOGGER.error("Caught exception while fetching instances for resource {}", realtimeTableName, e);
             _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
           }
 
@@ -204,15 +209,15 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
           // Assign a new segment to the server instances not currently processing this segment
           for (String instanceId : instancesToAssignRealtimeSegment) {
             InstanceZKMetadata instanceZKMetadata = _pinotHelixResourceManager.getInstanceZKMetadata(instanceId);
-            String groupId = instanceZKMetadata.getGroupId(resource);
-            String partitionId = instanceZKMetadata.getPartition(resource);
+            String groupId = instanceZKMetadata.getGroupId(realtimeTableName);
+            String partitionId = instanceZKMetadata.getPartition(realtimeTableName);
             listOfSegmentsToAddToInstances.add(new Pair<String, String>(
                 new HLCSegmentName(groupId, partitionId, String.valueOf(System.currentTimeMillis())).getSegmentName(),
                 instanceId));
           }
         }
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while processing resource {}, skipping.", resource, e);
+        LOGGER.warn("Caught exception while processing resource {}, skipping.", realtimeTableName, e);
         _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR, 1L);
       }
     }
@@ -320,10 +325,10 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       try {
         String znRecordId = tableConfigZnRecord.getId();
         if (TableNameBuilder.getTableTypeFromTableName(znRecordId) == TableType.REALTIME) {
-          AbstractTableConfig abstractTableConfig = AbstractTableConfig.fromZnRecord(tableConfigZnRecord);
-          KafkaStreamMetadata metadata = new KafkaStreamMetadata(abstractTableConfig.getIndexingConfig().getStreamConfigs());
+          TableConfig tableConfig = TableConfig.fromZnRecord(tableConfigZnRecord);
+          StreamMetadata metadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
           if (metadata.hasHighLevelKafkaConsumerType()) {
-            String realtimeTable = abstractTableConfig.getTableName();
+            String realtimeTable = tableConfig.getTableName();
             String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTable;
 
             LOGGER.info("Setting data/child changes watch for real-time table '{}'", realtimeTable);
@@ -339,9 +344,9 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
                   continue;
                 }
                 String segmentPath = realtimeSegmentsPathForTable + "/" + segmentName;
-                RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
-                    .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
-                        abstractTableConfig.getTableName(), segmentName);
+                RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+                    ZKMetadataProvider.getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
+                        tableConfig.getTableName(), segmentName);
                 if (realtimeSegmentZKMetadata == null) {
                   // The segment got deleted by retention manager
                   continue;
@@ -360,21 +365,30 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       } catch (Exception e) {
         // we want to continue setting watches for other tables for any kind of exception here so that
         // errors with one table don't impact others
-        LOGGER.error("Caught exception while processing ZNRecord id: {}. Skipping node to continue setting watches",
-            tableConfigZnRecord.getId(), e);
+        if (tableConfigZnRecord == null) {
+          // Can happen if the table config zn record failed to parse.
+          LOGGER.error("Got null ZN record for table config", e);
+        } else {
+          LOGGER.error("Caught exception while processing ZNRecord id: {}. Skipping node to continue setting watches",
+              tableConfigZnRecord.getId(), e);
+        }
       }
     }
   }
 
   @Override
-  public void handleChildChange(String parentPath, List<String> currentChilds)
+  public void handleChildChange(String parentPath, List<String> currentChildren)
       throws Exception {
     LOGGER.info("PinotRealtimeSegmentManager.handleChildChange: {}", parentPath);
     processPropertyStoreChange(parentPath);
-    for (String table : currentChilds) {
-      if (table.endsWith("_REALTIME")) {
-        LOGGER.info("PinotRealtimeSegmentManager.handleChildChange with table: {}", parentPath + "/" + table);
-        processPropertyStoreChange(parentPath + "/" + table);
+
+    // If parent path get removed, currentChildren will be null
+    if (currentChildren != null) {
+      for (String table : currentChildren) {
+        if (table.endsWith("_REALTIME")) {
+          LOGGER.info("PinotRealtimeSegmentManager.handleChildChange with table: {}", parentPath + "/" + table);
+          processPropertyStoreChange(parentPath + "/" + table);
+        }
       }
     }
   }

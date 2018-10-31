@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.anomaly.classification.ClassificationJobContext;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,20 +18,16 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessJobContext;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+
 
 /**
  * Generates tasks for a job depending on the task type
  */
 public class TaskGenerator {
 
-
   public List<DetectionTaskInfo> createDetectionTasks(DetectionJobContext detectionJobContext,
-      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime)
+      List<DateTime> monitoringWindowStartTimes, List<DateTime> monitoringWindowEndTimes)
       throws Exception {
 
     List<DetectionTaskInfo> tasks = new ArrayList<>();
@@ -39,31 +38,18 @@ public class TaskGenerator {
     String exploreDimensionsString = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isBlank(exploreDimensionsString)) {
       DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId,
-          monitoringWindowStartTime, monitoringWindowEndTime, anomalyFunctionSpec, null);
+          monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec, null,
+          detectionJobContext.getDetectionJobType());
       tasks.add(taskInfo);
     } else {
       DetectionTaskInfo taskInfo =
-          new DetectionTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, anomalyFunctionSpec,
-              exploreDimensionsString);
+          new DetectionTaskInfo(jobExecutionId, monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec,
+              exploreDimensionsString, detectionJobContext.getDetectionJobType());
         tasks.add(taskInfo);
     }
 
     return tasks;
 
-  }
-
-  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext,
-      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
-
-    List<AlertTaskInfo> tasks = new ArrayList<>();
-    EmailConfigurationDTO alertConfig = alertJobContext.getAlertConfig();
-    long jobExecutionId = alertJobContext.getJobExecutionId();
-
-    AlertTaskInfo taskInfo =
-        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
-            alertConfig, null);
-    tasks.add(taskInfo);
-    return tasks;
   }
 
   public List<AlertTaskInfo> createAlertTasksV2(AlertJobContext alertJobContext,
@@ -74,7 +60,7 @@ public class TaskGenerator {
     long jobExecutionId = alertJobContext.getJobExecutionId();
 
     AlertTaskInfo taskInfo =
-        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, null,
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
             alertConfig);
     tasks.add(taskInfo);
     return tasks;
@@ -83,39 +69,40 @@ public class TaskGenerator {
 
   public List<MonitorTaskInfo> createMonitorTasks(MonitorJobContext monitorJobContext) {
     List<MonitorTaskInfo> tasks = new ArrayList<>();
+    MonitorConfiguration monitorConfiguration = monitorJobContext.getMonitorConfiguration();
 
-    // TODO: Currently generates 1 task for updating all the completed jobs
-    // We might need to create more tasks and assign only certain number of updations to each (say 5k)
+    // Generates the task to updating the status of all jobs and tasks
     MonitorTaskInfo updateTaskInfo = new MonitorTaskInfo();
     updateTaskInfo.setMonitorType(MonitorType.UPDATE);
+    updateTaskInfo.setCompletedJobRetentionDays(monitorConfiguration.getCompletedJobRetentionDays());
+    updateTaskInfo.setDefaultRetentionDays(monitorConfiguration.getDefaultRetentionDays());
+    updateTaskInfo.setDetectionStatusRetentionDays(monitorConfiguration.getDetectionStatusRetentionDays());
+    updateTaskInfo.setRawAnomalyRetentionDays(monitorConfiguration.getRawAnomalyRetentionDays());
     tasks.add(updateTaskInfo);
 
-    MonitorConfiguration monitorConfiguration = monitorJobContext.getMonitorConfiguration();
+    // Generates the task to expire (delete) old jobs and tasks in DB
     MonitorTaskInfo expireTaskInfo = new MonitorTaskInfo();
     expireTaskInfo.setMonitorType(MonitorType.EXPIRE);
-    expireTaskInfo.setExpireDaysAgo(monitorConfiguration.getExpireDaysAgo());
+    expireTaskInfo.setCompletedJobRetentionDays(monitorConfiguration.getCompletedJobRetentionDays());
+    expireTaskInfo.setDefaultRetentionDays(monitorConfiguration.getDefaultRetentionDays());
+    expireTaskInfo.setDetectionStatusRetentionDays(monitorConfiguration.getDetectionStatusRetentionDays());
+    expireTaskInfo.setRawAnomalyRetentionDays(monitorConfiguration.getRawAnomalyRetentionDays());
     tasks.add(expireTaskInfo);
 
     return tasks;
   }
 
+  public List<ClassificationTaskInfo> createGroupingTasks(ClassificationJobContext classificationJobContext,
+      long monitoringWindowStartTime, long monitoringWindowEndTime) {
+    long jobExecutionId = classificationJobContext.getJobExecutionId();
+    ClassificationConfigDTO groupingConfig = classificationJobContext.getConfigDTO();
+    ClassificationTaskInfo classificationTaskInfo =
+        new ClassificationTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
+            groupingConfig);
 
-  public List<DataCompletenessTaskInfo> createDataCompletenessTasks(DataCompletenessJobContext dataCompletenessJobContext) {
-    List<DataCompletenessTaskInfo> tasks = new ArrayList<>();
-
-    // create 1 task, which will get data and perform check
-    DataCompletenessTaskInfo dataCompletenessCheck = new DataCompletenessTaskInfo();
-    dataCompletenessCheck.setDataCompletenessType(DataCompletenessType.CHECKER);
-    dataCompletenessCheck.setDataCompletenessStartTime(dataCompletenessJobContext.getCheckDurationStartTime());
-    dataCompletenessCheck.setDataCompletenessEndTime(dataCompletenessJobContext.getCheckDurationEndTime());
-    dataCompletenessCheck.setDatasetsToCheck(dataCompletenessJobContext.getDatasetsToCheck());
-    tasks.add(dataCompletenessCheck);
-
-    // create 1 task, for cleanup
-    DataCompletenessTaskInfo cleanup = new DataCompletenessTaskInfo();
-    cleanup.setDataCompletenessType(DataCompletenessType.CLEANUP);
-    tasks.add(cleanup);
-
+    List<ClassificationTaskInfo> tasks = new ArrayList<>();
+    tasks.add(classificationTaskInfo);
     return tasks;
   }
+
 }

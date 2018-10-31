@@ -1,38 +1,32 @@
 {
-  "metricFieldSpecs" : [
+  "metricFieldSpecs": [
     {
-      "dataType" : "FLOAT",
-      "delimiter" : null,
-      "singleValueField" : true,
-      "name" : "percent"
+      "dataType": "FLOAT",
+      "name": "percent"
     }
   ],
-  "dimensionFieldSpecs" : [
+  "dimensionFieldSpecs": [
     {
-      "dataType" : "STRING",
-      "delimiter" : null,
-      "singleValueField" : true,
-      "name" : "dim1"
+      "dataType": "STRING",
+      "name": "dim1"
     },
     {
-      "dataType" : "STRING",
-      "delimiter" : null,
-      "singleValueField" : false,
-      "name" : "dim2"
+      "dataType": "STRING",
+      "singleValueField": false,
+      "name": "dim2"
     }
   ],
-  "timeFieldSpec" : {
-    "incomingGranularitySpec" : {
-      "timeType" : "DAYS",
-      "dataType" : "LONG",
-      "name" : "incomingName1"
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "DAYS",
+      "dataType": "LONG",
+      "name": "incomingName"
     },
-    "outgoingGranularitySpec" : {
-      "timeType" : "DAYS",
-      "dataType" : "LONG",
-      "name" : "outgoingName1"
+    "outgoingGranularitySpec": {
+      "timeType": "DAYS",
+      "dataType": "LONG",
+      "name": "outgoingName"
     }
   },
-  "schemaName" : "schemaName",
-  "schemaVersion" : 1009
+  "schemaName": "schemaName"
 }

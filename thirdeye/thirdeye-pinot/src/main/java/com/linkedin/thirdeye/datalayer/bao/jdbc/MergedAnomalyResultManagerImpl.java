@@ -1,21 +1,22 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
-import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -23,10 +24,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
+@Singleton
 public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAnomalyResultDTO>
     implements MergedAnomalyResultManager {
+  private static final Logger LOG = LoggerFactory.getLogger(MergedAnomalyResultManagerImpl.class);
+
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME =
       " where collection=:collection and metric=:metric " + "and dimensions in (:dimensions) "
@@ -36,6 +42,10 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   private static final String FIND_BY_COLLECTION_METRIC_TIME =
       "where collection=:collection and metric=:metric "
           + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
+
+  // find a conflicting window
+  private static final String FIND_BY_METRIC_TIME =
+      "where metric=:metric and (startTime < :endTime and endTime > :startTime) order by endTime desc";
 
 
   // find a conflicting window
@@ -54,8 +64,8 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
       "where functionId=:functionId " + "and dimensions is null order by endTime desc";
 
-
-  private ExecutorService executorService = Executors.newFixedThreadPool(10);
+  // TODO inject as dependency
+  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(10);
 
   public MergedAnomalyResultManagerImpl() {
     super(MergedAnomalyResultDTO.class, MergedAnomalyResultBean.class);
@@ -86,59 +96,51 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       return genericPojoDao.update(mergeAnomalyBean);
     }
   }
-  public MergedAnomalyResultDTO findById(Long id, boolean loadRawAnomalies) {
+
+  @Override
+  public MergedAnomalyResultDTO findById(Long id) {
     MergedAnomalyResultBean mergedAnomalyResultBean = genericPojoDao.get(id, MergedAnomalyResultBean.class);
     if (mergedAnomalyResultBean != null) {
       MergedAnomalyResultDTO mergedAnomalyResultDTO;
-      mergedAnomalyResultDTO = convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, loadRawAnomalies);
+      mergedAnomalyResultDTO = convertMergedAnomalyBean2DTO(mergedAnomalyResultBean);
       return mergedAnomalyResultDTO;
     } else {
       return null;
     }
   }
 
-  public MergedAnomalyResultDTO findById(Long id) {
-    return findById(id, true);
-  }
-
-  @Override
-  public List<MergedAnomalyResultDTO> getAllByTimeEmailIdAndNotifiedFalse(long startTime,
-      long endTime, long emailConfigId) {
-    EmailConfigurationBean emailConfigurationBean =
-        genericPojoDao.get(emailConfigId, EmailConfigurationBean.class);
-    List<Long> functionIds = emailConfigurationBean.getFunctionIds();
-    if (functionIds == null || functionIds.isEmpty()) {
+  public List<MergedAnomalyResultDTO> findByIdList(List<Long> idList) {
+    List<MergedAnomalyResultBean> mergedAnomalyResultBeanList =
+        genericPojoDao.get(idList, MergedAnomalyResultBean.class);
+    if (CollectionUtils.isNotEmpty(mergedAnomalyResultBeanList)) {
+      List<MergedAnomalyResultDTO> mergedAnomalyResultDTOList =
+          convertMergedAnomalyBean2DTO(mergedAnomalyResultBeanList);
+      return mergedAnomalyResultDTOList;
+    } else {
       return Collections.emptyList();
     }
-    Long[] functionIdArray = functionIds.toArray(new Long[] {});
-    Predicate predicate = Predicate.AND(//
-        Predicate.LT("startTime", endTime), //
-        Predicate.GT("endTime", startTime), //
-        Predicate.IN("functionId", functionIdArray), //
-        Predicate.EQ("notified", false)//
-    );
-    List<MergedAnomalyResultBean> list =
-        genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, true);
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findAllConflictByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd) {
-    Predicate predicate =
-        Predicate.AND(Predicate.LE("startTime", conflictWindowEnd), Predicate.GE("endTime", conflictWindowStart),
+  public List<MergedAnomalyResultDTO> findOverlappingByFunctionId(long functionId, long searchWindowStart,
+      long searchWindowEnd) {
+    // LT and GT are used instead of LE and GE because ThirdEye uses end time exclusive.
+    Predicate predicate = Predicate
+        .AND(Predicate.LT("startTime", searchWindowEnd), Predicate.GT("endTime", searchWindowStart),
             Predicate.EQ("functionId", functionId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, true);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findAllConflictByFunctionIdDimensions(long functionId, long conflictWindowStart,
-      long conflictWindowEnd, String dimensions) {
-    Predicate predicate =
-        Predicate.AND(Predicate.LE("startTime", conflictWindowEnd), Predicate.GE("endTime", conflictWindowStart),
+  public List<MergedAnomalyResultDTO> findOverlappingByFunctionIdDimensions(long functionId, long searchWindowStart,
+      long searchWindowEnd, String dimensions) {
+    // LT and GT are used instead of LE and GE because ThirdEye uses end time exclusive.
+    Predicate predicate = Predicate
+        .AND(Predicate.LT("startTime", searchWindowEnd), Predicate.GT("endTime", searchWindowStart),
             Predicate.EQ("functionId", functionId), Predicate.EQ("dimensions", dimensions));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, true);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
   @Override
@@ -148,30 +150,30 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(FIND_BY_FUNCTION_ID,
         filterParams, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, true);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
   @Override
   public List<MergedAnomalyResultDTO> findByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId) {
     Predicate predicate = Predicate.AND(Predicate.EQ("functionId", functionId), Predicate.GT("baseId", anomalyId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, true);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
 
   @Override
-  public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long
-      endTime, long functionId) {
+  public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long endTime,
+      long functionId) {
     Predicate predicate =
         Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LT("endTime", endTime),
             Predicate.EQ("functionId", functionId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, true);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
-      String metric, String dimensions, long startTime, long endTime, boolean loadRawAnomalies) {
+  public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection, String metric,
+      String dimensions, long startTime, long endTime) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("collection", collection);
     filterParams.put("metric", metric);
@@ -181,12 +183,12 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
         FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME, filterParams, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection, String metric,
-      long startTime, long endTime, boolean loadRawAnomalies) {
+  public List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection, String metric, long startTime,
+      long endTime) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("collection", collection);
     filterParams.put("metric", metric);
@@ -195,18 +197,28 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
         FIND_BY_COLLECTION_METRIC_TIME, filterParams, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
+    return convertMergedAnomalyBean2DTO(list);
+  }
+
+  public List<MergedAnomalyResultDTO> findByMetricTime(String metric, long startTime, long endTime) {
+    Map<String, Object> filterParams = new HashMap<>();
+    filterParams.put("metric", metric);
+    filterParams.put("startTime", startTime);
+    filterParams.put("endTime", endTime);
+
+    List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
+        FIND_BY_METRIC_TIME, filterParams, MergedAnomalyResultBean.class);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime,
-      long endTime, boolean loadRawAnomalies) {
+  public List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime, long endTime) {
     Predicate predicate = Predicate
         .AND(Predicate.EQ("collection", collection), Predicate.GT("startTime", startTime),
             Predicate.LT("endTime", endTime));
 
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
   @Override
@@ -217,11 +229,31 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     List<MergedAnomalyResultBean> list =
         genericPojoDao.executeParameterizedSQL(FIND_BY_TIME, filterParams, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, false);
+    return convertMergedAnomalyBean2DTO(list);
+  }
+
+  public List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(long functionId, long anomalyId) {
+    Predicate predicate = Predicate
+        .AND(Predicate.EQ("functionId", functionId), Predicate.LT("baseId", anomalyId),
+            Predicate.EQ("notified", false), Predicate.GT("endTime", System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)));
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return convertMergedAnomalyBean2DTO(list);
   }
 
   @Override
-  public MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
+  public List<MergedAnomalyResultDTO> findNotifiedByTime(long startTime, long endTime) {
+    List<MergedAnomalyResultDTO> anomaliesByTime = findByTime(startTime, endTime);
+    List<MergedAnomalyResultDTO> notifiedAnomalies = new ArrayList<>();
+    for (MergedAnomalyResultDTO anomaly : anomaliesByTime) {
+      if (anomaly.isNotified()) {
+        notifiedAnomalies.add(anomaly);
+      }
+    }
+    return notifiedAnomalies;
+  }
+
+  @Override
+  public MergedAnomalyResultDTO findLatestOverlapByFunctionIdDimensions(Long functionId, String dimensions,
       long conflictWindowStart, long conflictWindowEnd) {
     Map<String, Object> filterParams = new HashMap<>();
     filterParams.put("functionId", functionId);
@@ -234,68 +266,131 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     if (CollectionUtils.isNotEmpty(list)) {
       MergedAnomalyResultBean mostRecentConflictMergedAnomalyResultBean = list.get(0);
-      return convertMergedAnomalyBean2DTO(mostRecentConflictMergedAnomalyResultBean, true);
-    }
-    return null;
-  }
-
-  @Override
-  public MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId) {
-    Map<String, Object> filterParams = new HashMap<>();
-    filterParams.put("functionId", functionId);
-
-    List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
-        FIND_BY_FUNCTION_AND_NULL_DIMENSION, filterParams, MergedAnomalyResultBean.class);
-    List<MergedAnomalyResultDTO> result = batchConvertMergedAnomalyBean2DTO(list, true);
-    // TODO: Check list size instead of result size?
-    if (result.size() > 0) {
-      return result.get(0);
+      return convertMergedAnomalyBean2DTO(mostRecentConflictMergedAnomalyResultBean);
     }
     return null;
   }
 
   public void updateAnomalyFeedback(MergedAnomalyResultDTO entity) {
     MergedAnomalyResultBean bean = convertDTO2Bean(entity, MergedAnomalyResultBean.class);
-    if (entity.getFeedback() != null) {
-      if (entity.getFeedback().getId() == null) {
-        AnomalyFeedbackBean feedbackBean =
-            (AnomalyFeedbackBean) convertDTO2Bean(entity.getFeedback(), AnomalyFeedbackBean.class);
+    AnomalyFeedbackDTO feedbackDTO = (AnomalyFeedbackDTO) entity.getFeedback();
+    if (feedbackDTO != null) {
+      if (feedbackDTO.getId() == null) {
+        AnomalyFeedbackBean feedbackBean = convertDTO2Bean(feedbackDTO, AnomalyFeedbackBean.class);
         Long feedbackId = genericPojoDao.put(feedbackBean);
-        entity.getFeedback().setId(feedbackId);
+        feedbackDTO.setId(feedbackId);
       } else {
-        AnomalyFeedbackBean feedbackBean = genericPojoDao.get(entity.getFeedback().getId(), AnomalyFeedbackBean.class);
-        feedbackBean.setStatus(entity.getFeedback().getStatus());
-        feedbackBean.setFeedbackType(entity.getFeedback().getFeedbackType());
-        feedbackBean.setComment(entity.getFeedback().getComment());
+        AnomalyFeedbackBean feedbackBean = genericPojoDao.get(feedbackDTO.getId(), AnomalyFeedbackBean.class);
+        feedbackBean.setFeedbackType(feedbackDTO.getFeedbackType());
+        feedbackBean.setComment(feedbackDTO.getComment());
         genericPojoDao.update(feedbackBean);
       }
-      bean.setAnomalyFeedbackId(entity.getFeedback().getId());
+      bean.setAnomalyFeedbackId(feedbackDTO.getId());
     }
     genericPojoDao.update(bean);
   }
 
-  protected MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity) {
+  /**
+   * Returns a map (keyed by metric id) of lists of merged anomalies that fall (partially)
+   * within a given time range.
+   *
+   * <br/><b>NOTE:</b> this function implements a manual join between three tables. This is bad.
+   *
+   * @param metricIds metric ids to seek anomalies for
+   * @param start time range start (inclusive)
+   * @param end time range end (exclusive)
+   * @return Map (keyed by metric id) of lists of merged anomalies (sorted by start time)
+   */
+  @Override
+  public Map<Long, List<MergedAnomalyResultDTO>> findAnomaliesByMetricIdsAndTimeRange(List<Long> metricIds, long start, long end) {
+    Map<Long, List<MergedAnomalyResultDTO>> output = new HashMap<>();
+
+    List<MetricConfigBean> metricBeans = genericPojoDao.get(metricIds, MetricConfigBean.class);
+
+    for (MetricConfigBean mbean : metricBeans) {
+      output.put(mbean.getId(), getAnomaliesForMetricBeanAndTimeRange(mbean, start, end));
+    }
+
+    return output;
+  }
+
+  /**
+   * Returns a list of merged anomalies that fall (partially) within a given time range for
+   * a given metric id
+   *
+   * <br/><b>NOTE:</b> this function implements a manual join between three tables. This is bad.
+   *
+   * @param metricId metric id to seek anomalies for
+   * @param start time range start (inclusive)
+   * @param end time range end (exclusive)
+   * @return List of merged anomalies (sorted by start time)
+   */
+  @Override
+  public List<MergedAnomalyResultDTO> findAnomaliesByMetricIdAndTimeRange(Long metricId, long start, long end) {
+    MetricConfigBean mbean = genericPojoDao.get(metricId, MetricConfigBean.class);
+    if (mbean == null) {
+      throw new IllegalArgumentException(String.format("Could not resolve metric id '%d'", metricId));
+    }
+
+    return this.getAnomaliesForMetricBeanAndTimeRange(mbean, start, end);
+  }
+
+  private List<MergedAnomalyResultDTO> getAnomaliesForMetricBeanAndTimeRange(MetricConfigBean mbean, long start, long end) {
+
+    LOG.info("Fetching functions for metricId={}", mbean.getId());
+
+    // TODO use metricId instead of metric/dataset on join (requires database cleanup)
+    List<AnomalyFunctionBean> functionBeans = genericPojoDao.get(
+        Predicate.AND(
+            Predicate.EQ("metric", mbean.getName()),
+            Predicate.EQ("collection", mbean.getDataset())),
+        AnomalyFunctionBean.class);
+
+    // extract functionIds
+    List<Long> functionIds = new ArrayList<>();
+    for(AnomalyFunctionBean fbean : functionBeans) {
+      functionIds.add(fbean.getId());
+    }
+
+    LOG.info("Fetching anomalies for metricId={}, functionIds={}", mbean.getId(), functionIds);
+
+    List<MergedAnomalyResultBean> anomalyBeans = genericPojoDao.get(
+        Predicate.AND(
+            Predicate.IN("functionId", functionIds.toArray()),
+            Predicate.LT("startTime", end),
+            Predicate.GT("endTime", start)
+        ),
+        MergedAnomalyResultBean.class);
+
+    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>(convertMergedAnomalyBean2DTO(anomalyBeans));
+
+    Collections.sort(anomalies, new Comparator<MergedAnomalyResultDTO>() {
+      @Override
+      public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
+        return Long.compare(o1.getStartTime(), o2.getStartTime());
+      }
+    });
+
+    return anomalies;
+  }
+
+  @Override
+  public MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity) {
     MergedAnomalyResultBean bean = convertDTO2Bean(entity, MergedAnomalyResultBean.class);
-    if (entity.getFeedback() != null && entity.getFeedback().getId() != null) {
-        bean.setAnomalyFeedbackId(entity.getFeedback().getId());
+    AnomalyFeedbackDTO feedbackDTO = (AnomalyFeedbackDTO) entity.getFeedback();
+    if (feedbackDTO != null && feedbackDTO.getId() != null) {
+        bean.setAnomalyFeedbackId(feedbackDTO.getId());
     }
 
     if (entity.getFunction() != null) {
       bean.setFunctionId(entity.getFunction().getId());
     }
 
-    if (entity.getAnomalyResults() != null && !entity.getAnomalyResults().isEmpty()) {
-      List<Long> rawAnomalyIds = new ArrayList<>();
-      for (RawAnomalyResultDTO rawAnomalyDTO : entity.getAnomalyResults()) {
-        rawAnomalyIds.add(rawAnomalyDTO.getId());
-      }
-      bean.setRawAnomalyIdList(rawAnomalyIds);
-    }
     return bean;
   }
 
-  protected MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(
-      MergedAnomalyResultBean mergedAnomalyResultBean, boolean loadRawAnomalies) {
+  @Override
+  public MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(MergedAnomalyResultBean mergedAnomalyResultBean) {
     MergedAnomalyResultDTO mergedAnomalyResultDTO;
     mergedAnomalyResultDTO =
         MODEL_MAPPER.map(mergedAnomalyResultBean, MergedAnomalyResultDTO.class);
@@ -313,26 +408,21 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
           MODEL_MAPPER.map(anomalyFeedbackBean, AnomalyFeedbackDTO.class);
       mergedAnomalyResultDTO.setFeedback(anomalyFeedbackDTO);
     }
-    if (loadRawAnomalies && mergedAnomalyResultBean.getRawAnomalyIdList() != null
-        && !mergedAnomalyResultBean.getRawAnomalyIdList().isEmpty()) {
-      List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
-      List<RawAnomalyResultBean> list = genericPojoDao
-          .get(mergedAnomalyResultBean.getRawAnomalyIdList(), RawAnomalyResultBean.class);
-      for (RawAnomalyResultBean rawAnomalyResultBean : list) {
-        anomalyResults.add(createRawAnomalyDTOFromBean(rawAnomalyResultBean));
-      }
-      mergedAnomalyResultDTO.setAnomalyResults(anomalyResults);
-    }
 
     return mergedAnomalyResultDTO;
   }
 
-  protected List<MergedAnomalyResultDTO> batchConvertMergedAnomalyBean2DTO(
-      List<MergedAnomalyResultBean> mergedAnomalyResultBeanList, boolean loadRawAnomalies) {
+  @Override
+  public List<MergedAnomalyResultDTO> convertMergedAnomalyBean2DTO(
+      List<MergedAnomalyResultBean> mergedAnomalyResultBeanList) {
     List<Future<MergedAnomalyResultDTO>> mergedAnomalyResultDTOFutureList = new ArrayList<>(mergedAnomalyResultBeanList.size());
-    for (MergedAnomalyResultBean mergedAnomalyResultBean : mergedAnomalyResultBeanList) {
+    for (final MergedAnomalyResultBean mergedAnomalyResultBean : mergedAnomalyResultBeanList) {
       Future<MergedAnomalyResultDTO> future =
-          executorService.submit(() -> convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, loadRawAnomalies));
+          EXECUTOR_SERVICE.submit(new Callable<MergedAnomalyResultDTO>() {
+            @Override public MergedAnomalyResultDTO call() throws Exception {
+              return MergedAnomalyResultManagerImpl.this.convertMergedAnomalyBean2DTO(mergedAnomalyResultBean);
+            }
+          });
       mergedAnomalyResultDTOFutureList.add(future);
     }
 
@@ -348,4 +438,13 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return mergedAnomalyResultDTOList;
   }
 
+  @Override
+  public List<MergedAnomalyResultDTO> findByPredicate(Predicate predicate) {
+    List<MergedAnomalyResultDTO> dtoList = super.findByPredicate(predicate);
+    List<MergedAnomalyResultBean> beanList = new ArrayList<>();
+    for (MergedAnomalyResultDTO mergedAnomalyResultDTO :  dtoList) {
+      beanList.add(mergedAnomalyResultDTO);
+    }
+    return convertMergedAnomalyBean2DTO(beanList);
+  }
 }

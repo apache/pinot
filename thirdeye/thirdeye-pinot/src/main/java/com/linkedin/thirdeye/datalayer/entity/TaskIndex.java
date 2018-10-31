@@ -73,13 +73,4 @@ public class TaskIndex extends AbstractIndexEntity {
   public void setWorkerId(long workerId) {
     this.workerId = workerId;
   }
-
-  @Override
-  public String toString() {
-    return "TaskIndex [name=" + name + ", status=" + status + ", type=" + type + ", startTime="
-        + startTime + ", endTime=" + endTime + ", jobId=" + jobId + ", workerId=" + workerId
-        + ", version=" + version + ", baseId=" + baseId + ", id=" + id + ", createTime="
-        + createTime + ", updateTime=" + updateTime + "]";
-  }
-  
 }

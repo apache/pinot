@@ -1,89 +1,126 @@
-<div class="container-fluid">
-  <div class="row row-bordered">
-    <div class="container top-buffer bottom-buffer">
-      <div>
-        Showing <label style="font-size: 15px; font-weight: 500"> {{this.numAnomaliesOnPage}} </label> anomalies of <label style="font-size: 15px; font-weight: 500"> {{this.totalAnomalies}}</label>
-      </div>
+<div class="anomalies-panel">
+  <div class ="padding-all">
+    <span class="panel-title">Anomalies</span>
+    <span class="pull-right">
+    Showing <strong>{{this.numAnomaliesOnPage}} </strong> anomalies of <strong> {{this.totalAnomalies}}</strong>
+    </span>
+    <div class="filter-list">
+      <div>Selected Filters:</div>
+      <span class="filter-list__item">
+      {{#if appliedFilters}}
+        {{appliedFilters}}
+      {{else}}
+        N/A
+      {{/if}}
+      </span>
     </div>
+  </div>
+  <div class="anomaly-cards-wrapper padding-all">
     {{#each this.anomalyDetailsList as |anomalyData anomalyIndex|}}
-    <div class="container">
-      <div class="panel padding-all">
-        <div class="row">
-          <div id="show-details-{{anomalyIndex}}" class="col-md-3">
-            <label>{{this.anomalyId}}<a href="#"> show details</a></label>
+      {{#with anomalyData}}
+        <div class="anomaly-card" id="anomaly-card-{{anomalyIndex}}">
+          <div class="anomaly-result-header">
+            <div class="anomaly-result-title">
+              <span class="anomaly-result-metric">{{metric}}</span> from <span class="anomaly-result-dataset">{{dataset}}</span>
+              <div>&num;{{anomalyId}}</div>
+            </div>
+            <div id="investigate-button-{{anomalyIndex}}">
+              <a href="/app/#/rootcause?anomalyId={{anomalyId}}" type="button" class="btn thirdeye-btn pull-right">Investigate</a>
+            </div>
           </div>
-          <div class="col-md-6"></div>
-          <div class="col-md-1">
-            <span class="pull-right">______</span>
-          </div>
-          <div id="current-range-{{anomalyIndex}}" class="col-md-2">
-            <span class="pull-left"><label></label></span>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-md-3">
-            <label>{{this.metric}}</label>
-          </div>
-          <div class="col-md-6"></div>
-          <div class="col-md-1">
-            <span class="pull-right">--------</span>
-          </div>
-          <div id="baseline-range-{{anomalyIndex}}" class="col-md-2">
-            <span class="pull-left"><label></label></span>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-md-12">
-            <div id="anomaly-chart-{{anomalyIndex}}" style="height: 200px"></div>
-          </div>
-        </div>
-        <div class="row">
-          <div class="col-md-7">
-            <div class="row">
-              <div class="col-md-3">
-                <span class="pull-left">Dimension</span>
+
+          <div class ="anomaly-chart" id="anomaly-chart-{{anomalyIndex}}"></div>
+
+          <div class="anomaly-details bg-white">
+            <div class="anomaly-details-row">
+              <div class="anomaly-details-items anomaly-details-items--small">
+                <label class="label-medium-semibold">Change</label>
+                <span class="anomaly-change-delta {{colorDelta changeDelta}}">{{changeDelta}}</span>
               </div>
-              <div id="dimension-{{anomalyIndex}}" class="col-md-9">
-                <span class="pull-left"></span>
+              <div class="anomaly-details-items anomaly-details-items--small">
+                <label class="label-medium-semibold">Duration</label>
+                <span class="anomaly-duration">{{duration}}</span>
+              </div>
+              <div class="anomaly-details-items anomaly-details-items--small">
+                <label class="label-medium-semibold">Status</label>
+                <span>
+                  <select class="card-feedback-select hidden">
+                    <option value="ANOMALY">Yes (True Anomaly)</option>
+                    <option value="ANOMALY_NEW_TREND">Yes (New Trend)</option>
+                    <option value="NOT_ANOMALY">No (False Alarm)</option>
+                  </select>
+                  <span class="card-feedback-final"> 
+                    {{#if anomalyFeedback}}
+                      Resolved ({{anomalyFeedback}})
+                    {{else}}
+                      Not Resolved
+                    {{/if}}
+                  </span>
+                  <button class="thirdeye-link thirdeye-link--secondary" id="feedback-edit-{{anomalyIndex}}" title="edit">
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-pencil"></i></span> 
+                  </button>
+                  <button class="thirdeye-link thirdeye-link--secondary hidden" id="feedback-submit-{{anomalyIndex}}" title="submit">
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-ok"></i></span> 
+                  </button>
+                  <button class="thirdeye-link thirdeye-link--secondary thirdeye-link--delimited hidden" id="feedback-cancel-{{anomalyIndex}}" title="cancel">
+                    <span class="thirdeye-link__icon"><i class="glyphicon glyphicon-remove"></i></span> 
+                  </button>
+                </span>
+              </div>
+              {{#if issueType}}
+                <div class="anomaly-details-items anomaly-details-items--small">
+                  <label class="label-medium-semibold">Issue Type</label>
+                  <span>
+                      {{issueType}}
+                    </span>
+                </div>
+              {{/if}}
+            </div>
+            <div class="anomaly-details-row">
+              <div class="anomaly-details-items">
+                <label class="label-medium-semibold">Dimension</label>
+                <span>
+                {{#if_eq anomalyFunctionDimension '{}'}}
+                  N/A
+                {{else}}
+                  {{parseFilters anomalyFunctionDimension}}
+                {{/if_eq}}
+                </span>
+              </div>
+
+              <div class="anomaly-details-items">
+                <label class="label-medium-semibold">Alert Name</label>
+                <span>{{anomalyFunctionName}}</span>
               </div>
             </div>
-            <div class="row">
-              <div class="col-md-3">Current</div>
-              <div id="current-value-{{anomalyIndex}}" class="col-md-9"></div>
+            <div class="anomaly-details-row">
+              <div class="anomaly-details-items">
+                <label class="label-medium-semibold">Current Avg</label>
+                <span>{{formatNumber current}}</span>
+              </div>
+              <div class="anomaly-details-items">
+                <label class="label-medium-semibold">Baseline Avg</label>
+                <span>
+                  {{#if baseline}}
+                    {{formatNumber baseline}}
+                  {{else}}
+                    N/A
+                  {{/if}}
+                </span>
+              </div>
             </div>
-            <div class="row">
-              <div class="col-md-3">Baseline</div>
-              <div id="baseline-value-{{anomalyIndex}}" class="col-md-9"></div>
-            </div>
-            <div class="row">
-              <div class="col-md-3">Start-End (PDT)</div>
-              <div id="region-{{anomalyIndex}}" class="col-md-9"></div>
-            </div>
-          </div>
-          <div class="col-md-5">
-            <label>Anomaly Function Details:</label><br /> <label>{{this.anomalyFunctionName}}</label> <br /> <label>{{this.anomalyFunctionType}}</label>
           </div>
         </div>
-        <div class="row">
-          <div id="anomaly-feedback-{{anomalyIndex}}" class="col-md-3">
-            <select data-placeholder="Provide Anomaly Feedback" style="width: 250px; border: 0px" class="chosen-select">
-              <option>False Alarm</option>
-              <option>Confirmed Anomaly</option>
-              <option>Confirmed - Not Actionable</option>
-            </select>
-          </div>
-          <div class="col-md-6"></div>
-          <div id="root-cause-analysis-button-{{anomalyIndex}}" class="col-md-3">
-            <button type="button" class="btn btn-primary btn-sm">Root Cause Analysis</button>
-          </div>
-        </div>
+      {{/with}}
+    {{else}}
+      <div class="anomaly-card">
+        No anomalies found.
       </div>
-    </div>
     {{/each}}
-    <div class="container">
-      <nav aria-label="Page navigation">
-        <ul id="pagination" class="pagination-sm"></ul>
-      </nav>
-    </div>
+  </div>
+  <div class="text-center padding-all">
+    <nav aria-label="Page navigation">
+      <ul id="pagination" class="pagination-sm thirdeye-pagination"></ul>
+    </nav>
   </div>
 </div>

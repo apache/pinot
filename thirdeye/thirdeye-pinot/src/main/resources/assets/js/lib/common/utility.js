@@ -1,8 +1,6 @@
 /** AJAX and HASH RELATED METHODS **/
 
 function getData(url, tab) {
-    console.log("request url:", url)
-
     tab = tab ? tab : hash.view;
     return $.ajax({
         url: url,
@@ -40,8 +38,6 @@ function getData(url, tab) {
 }
 
 function getDataCustomCallback(url, tab) {
-    console.log("request url:", url)
-
     tab = tab ? tab : hash.view;
     return $.ajax({
         url: url,
@@ -76,7 +72,7 @@ function getDataCustomCallback(url, tab) {
     });
 };
 
-function submitData(url, data, tab) {
+function submitData(url, data, tab, dataType = "json") {
 
     if (data === undefined) {
         data = ""
@@ -85,7 +81,6 @@ function submitData(url, data, tab) {
     if (!tab) {
         tab = hash.view;
     }
-    console.log("post url:", url)
     return $.ajax({
         url: url,
         headers: {
@@ -93,7 +88,7 @@ function submitData(url, data, tab) {
             'Content-Type': 'application/json'
         },
         type: 'post',
-        dataType: 'json',
+        dataType: dataType, // NOTE: expecting 'json' fails on empty 200 response
         data: data,
         statusCode: {
             404: function () {
@@ -119,7 +114,49 @@ function submitData(url, data, tab) {
     })
 }
 
-function deleteData(url, data, tab) {
+function updateData(url, data, tab, dataType = "json") {
+
+  if (data === undefined) {
+    data = ""
+  }
+
+  if (!tab) {
+    tab = hash.view;
+  }
+  return $.ajax({
+    url: url,
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    },
+    type: 'put',
+    dataType: dataType, // NOTE: expecting 'json' fails on empty 200 response
+    data: data,
+    statusCode: {
+      404: function () {
+        $("#" + tab + "-chart-area-error").empty();
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
+        var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
+        warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }));
+        $("#" + tab + "-chart-area-error").append(closeBtn);
+        $("#" + tab + "-chart-area-error").append(warning);
+        $("#" + tab + "-chart-area-error").fadeIn(100);
+        return
+      },
+      500: function () {
+        $("#" + tab + "-chart-area-error").empty();
+        var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' });
+        error.append($('<p></p>', { html: 'Internal server error' }));
+        $("#" + tab + "-chart-area-error").append(error);
+        $("#" + tab + "-chart-area-error").fadeIn(100);
+        return
+      }
+    }
+  }).always(function () {
+  })
+}
+
+function deleteData(url, data, tab, dataType = "json") {
     if (data === undefined) {
         data = ""
     }
@@ -127,11 +164,10 @@ function deleteData(url, data, tab) {
     if (!tab) {
         tab = hash.view;
     }
-    console.log("delete url:", url)
     return $.ajax({
         url: url,
         type: 'delete',
-        dataType: 'json',
+        dataType: dataType, // NOTE: expecting 'json' fails on empty 200 response
         data: data,
         statusCode: {
             404: function () {
@@ -674,7 +710,6 @@ function toggleSumDetails(target) {
             .getElementsByClassName("details-cell");
         //Alert
         if (detailsCells.length > 1000) {
-            console.log('details cells to paint:', detailsCells.length)
         }
 
         for (var dIndex = 0, detailsLen = detailsCells.length; dIndex < detailsLen; dIndex++) {

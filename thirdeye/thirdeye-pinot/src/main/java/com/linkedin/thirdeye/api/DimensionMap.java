@@ -2,18 +2,24 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ObjectUtils;
-
+import org.apache.commons.lang.exception.ExceptionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Stores key-value pairs of dimension name and value. The paris are sorted by their dimension names in ascending order.
@@ -23,22 +29,45 @@ import org.apache.commons.lang.ObjectUtils;
  * "page_name":"front_page"}}, we only need to store {"country":"US","page_name":"front_page"}.
  */
 public class DimensionMap implements SortedMap<String, String>, Comparable<DimensionMap>, Serializable {
+  private static final Logger LOG = LoggerFactory.getLogger(DimensionMap.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   // Dimension name to dimension value pairs, which are sorted by dimension names
   private SortedMap<String, String> sortedDimensionMap = new TreeMap<>();
 
+
+  /**
+   * Constructs an empty dimension map.
+   */
   public DimensionMap() {
   }
 
   /**
-   * (Backward compatibility) For cleaning old anomalies from database.
+   * Constructs a dimension map from a json string; if the given string is not in Json format, then this method falls
+   * back to parse Java's map string format, which is {key1=value1,key2=value2}.
    *
-   * TODO: Remove this constructor after old anomalies are deleted
-   *
-   * @param dimensionKeyString
+   * @param value the json string that represents this dimension map.
    */
-  public DimensionMap(String dimensionKeyString) {
+  public DimensionMap(String value) {
+    Preconditions.checkNotNull(value); // We do not allow null pointers flying around the code.
+    if (!Strings.isNullOrEmpty(value)) { // Empty string produces empty dimension map.
+      try {
+        sortedDimensionMap = OBJECT_MAPPER.readValue(value, TreeMap.class);
+      } catch (IOException e) {
+        try { // Fall back to Java's map string, which is {key=value} (including curly brackets).
+          value = value.substring(1, value.length() - 1); // Remove curly brackets
+          String[] keyValuePairs = value.split(",");
+          for (String pair : keyValuePairs) {
+            String[] entry = pair.split("=");
+            sortedDimensionMap.put(entry[0].trim(), entry[1].trim());
+          }
+        } catch (Exception finalE) {
+          throw new IllegalArgumentException(String
+              .format("Failed to initialize dimension map from this string: \"{%s}\": %s", value,
+                  ExceptionUtils.getStackTrace(finalE)));
+        }
+      }
+    }
   }
 
   /**
@@ -66,8 +95,47 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
     return dimensionMap;
   }
 
-  public String toJson()
-      throws JsonProcessingException {
+  /**
+   * Returns if this dimension map equals or is a child of the given dimension map, i.e., the given dimension map is
+   * a subset of this dimension map.
+   *
+   * @param that the given dimension map.
+   * @return true if this dimension map is a child of the given dimension map.
+   */
+  public boolean equalsOrChildOf(DimensionMap that) {
+    // A null dimension map equals to an empty dimension map, which is the root level of all dimensions
+    if (that == null) {
+      return true;
+    } else if (that.size() < this.size()) {
+      // parent dimension map must be a subset of this dimension map
+      for (Entry<String, String> parentDimensionEntry : that.entrySet()) {
+        String thisDimensionValue = this.get(parentDimensionEntry.getKey());
+        if (!parentDimensionEntry.getValue().equals(thisDimensionValue)) {
+          return false;
+        }
+      }
+      return true;
+    } else if (that.size() == this.size()) {
+      return this.equals(that);
+    } else {
+      return false;
+    }
+  }
+
+  /**
+   * Returns Java's string representation for Map class, which is in the form of {key1=value1,key2=value2}.
+   * @return Java's string representation for Map class.
+   */
+  public String toJavaString() {
+    return sortedDimensionMap.toString();
+  }
+
+  /**
+   * Returns Json string representation for Map class, which is in the form of {"key1":"value1","key2"="value2"}.
+   * @return Json string representation for Map class.
+   * @throws JsonProcessingException
+   */
+  public String toJson() throws JsonProcessingException {
     return OBJECT_MAPPER.writeValueAsString(this);
   }
 
@@ -93,17 +161,19 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
 
   @Override
   public boolean equals(Object o) {
-    if (o instanceof DimensionMap) {
-      DimensionMap otherDimensionMap = (DimensionMap) o;
-      return ObjectUtils.equals(sortedDimensionMap, otherDimensionMap.sortedDimensionMap);
-    } else {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
+    DimensionMap that = (DimensionMap) o;
+    return Objects.equals(sortedDimensionMap, that.sortedDimensionMap);
   }
 
   @Override
   public int hashCode() {
-    return sortedDimensionMap.hashCode();
+    return Objects.hash(sortedDimensionMap);
   }
 
   /**
@@ -112,7 +182,7 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
    * Examples:
    * 1. a={}, b={"K"="V"} --> a="", b="KV" --> a < b
    * 2. a={"K"="V"}, b={"K"="V"} --> a="KV", b="KV" --> a = b
-   * 3. a={"K2"="V1"}, b={"K1"="V1","K2"="V2"} --> a="K2V1", b="K1V1K2V2" --> b < a
+   * 3. a={"K2"="V1"}, b={"K1"="V1","K2"="V2"} --> a="K2V1", b="K1V1K2V2" --> a > b
    *
    * @param o the dimension to compare to
    */
@@ -120,7 +190,7 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
   public int compareTo(DimensionMap o) {
     Iterator<Map.Entry<String, String>> thisIte = sortedDimensionMap.entrySet().iterator();
     Iterator<Map.Entry<String, String>> thatIte = o.sortedDimensionMap.entrySet().iterator();
-    if (thisIte.hasNext()) {
+    while (thisIte.hasNext()) {
       // o is a smaller map
       if (!thatIte.hasNext()) {
         return 1;

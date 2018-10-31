@@ -15,30 +15,22 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Arrays;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
-
-
-/**
- * Nov 7, 2014
- */
 
 public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-
   private Integer min = null;
   private Integer max = null;
   private final IntSet rawIntSet;
   private final IntSet aggregatedIntSet;
-  private boolean hasNull = false;
   private int[] sortedIntList;
   private boolean sealed = false;
 
-  public IntColumnPreIndexStatsCollector(FieldSpec spec) {
-    super(spec);
+  public IntColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
+    super(column, statsCollectorConfig);
     rawIntSet = new IntOpenHashSet(INITIAL_HASH_SET_SIZE);
     aggregatedIntSet = new IntOpenHashSet(INITIAL_HASH_SET_SIZE);
   }
@@ -65,6 +57,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
       int value = ((Number) entry).intValue();
       addressSorted(value);
+      updatePartition(value);
       set.add(value);
       totalNumberOfEntries++;
     }
@@ -95,35 +88,35 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
 
 
   @Override
-  public Integer getMinValue() throws Exception {
+  public Integer getMinValue() {
     if (sealed) {
       return min;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public Integer getMaxValue() throws Exception {
+  public Integer getMaxValue() {
     if (sealed) {
       return max;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for max value");
+    throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
 
   @Override
-  public Object getUniqueValuesSet() throws Exception {
+  public Object getUniqueValuesSet() {
     if (sealed) {
       return sortedIntList;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for unique value set");
+    throw new IllegalStateException("you must seal the collector first before asking for unique value set");
   }
 
   @Override
-  public int getCardinality() throws Exception {
+  public int getCardinality() {
     if (sealed) {
       return sortedIntList.length;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for cardinality");
+    throw new IllegalStateException("you must seal the collector first before asking for cardinality");
   }
 
   @Override

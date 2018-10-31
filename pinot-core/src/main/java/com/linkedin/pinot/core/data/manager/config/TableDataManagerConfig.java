@@ -15,41 +15,29 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.IndexingConfig;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
-import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * The config used for TableDataManager.
  */
 public class TableDataManagerConfig {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableDataManagerConfig.class);
-
-  private static final String TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS = "numQueryExecutorThreads";
   private static final String TABLE_DATA_MANAGER_TYPE = "dataManagerType";
-  private static final String READ_MODE = "readMode";
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
+  private static final String TABLE_DATA_MANAGER_CONSUMER_DIRECTORY = "consumerDirectory";
   private static final String TABLE_DATA_MANAGER_NAME = "name";
+  private static final String TABLE_DATA_MANAGER_MAX_PARALLEL_SEGMENT_BUILDS = "maxParallelSegmentBuilds";
 
   private final Configuration _tableDataManagerConfig;
 
-  public TableDataManagerConfig(Configuration tableDataManagerConfig) throws ConfigurationException {
+  public TableDataManagerConfig(@Nonnull Configuration tableDataManagerConfig) {
     _tableDataManagerConfig = tableDataManagerConfig;
-  }
-
-  public String getReadMode() {
-    return _tableDataManagerConfig.getString(READ_MODE);
   }
 
   public Configuration getConfig() {
@@ -64,88 +52,40 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_DATA_DIRECTORY);
   }
 
+  public String getConsumerDir() {
+    return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_CONSUMER_DIRECTORY);
+  }
+
   public String getTableName() {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
   }
 
-  public int getNumberOfTableQueryExecutorThreads() {
-    return _tableDataManagerConfig.getInt(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 10);
+  public int getMaxParallelSegmentBuilds() {
+    return _tableDataManagerConfig.getInt(TABLE_DATA_MANAGER_MAX_PARALLEL_SEGMENT_BUILDS);
   }
 
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
-      InstanceDataManagerConfig _instanceDataManagerConfig, String tableName) throws ConfigurationException {
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-
+      @Nonnull InstanceDataManagerConfig instanceDataManagerConfig, @Nonnull String tableNameWithType) {
     Configuration defaultConfig = new PropertiesConfiguration();
-    defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableName);
-    String dataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + tableName;
-    defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
-    if (_instanceDataManagerConfig.getReadMode() != null) {
-      defaultConfig.addProperty(READ_MODE, _instanceDataManagerConfig.getReadMode().toString());
-    } else {
-      defaultConfig.addProperty(READ_MODE, ReadMode.heap);
-    }
-    if (_instanceDataManagerConfig.getSegmentFormatVersion() != null) {
-      defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,
-          _instanceDataManagerConfig.getSegmentFormatVersion());
-    }
-    if (_instanceDataManagerConfig.isEnableDefaultColumns()) {
-      defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_ENABLE_DEFAULT_COLUMNS, true);
-    }
-    defaultConfig.addProperty(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
-    TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(defaultConfig);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableNameWithType);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY,
+        instanceDataManagerConfig.getInstanceDataDir() + "/" + tableNameWithType);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_CONSUMER_DIRECTORY, instanceDataManagerConfig.getConsumerDir());
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_MAX_PARALLEL_SEGMENT_BUILDS,
+        instanceDataManagerConfig.getMaxParallelSegmentBuilds());
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    Preconditions.checkNotNull(tableType);
+    defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, tableType.name());
 
-    switch (tableType) {
-      case OFFLINE:
-        defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, "offline");
-        break;
-      case REALTIME:
-        defaultConfig.addProperty(TABLE_DATA_MANAGER_TYPE, "realtime");
-        break;
-
-      default:
-        throw new UnsupportedOperationException("Not supported table type for - " + tableName);
-    }
-    return tableDataManagerConfig;
+    return new TableDataManagerConfig(defaultConfig);
   }
 
-  public void overrideConfigs(String tableName, AbstractTableConfig tableConfig) {
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    _tableDataManagerConfig.setProperty(READ_MODE, indexingConfig.getLoadMode().toLowerCase());
-    _tableDataManagerConfig.setProperty(TABLE_DATA_MANAGER_NAME, tableConfig.getTableName());
-    _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.getKeyOfLoadingInvertedIndex(),
-        indexingConfig.getInvertedIndexColumns());
-    _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_STAR_TREE_FORMAT_VERSION,
-        indexingConfig.getStarTreeFormat());
-    String segmentVersionKey = IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION;
+  public void overrideConfigs(@Nonnull TableConfig tableConfig) {
+    // Override table level configs
 
-    // Server configuration is always to DEFAULT or configured value
-    // Apply table configuration only if the server configuration is set with table config
-    // overriding server config
-    //
-    // Server config not set means table config has no impact. This provides additional
-    // security from inadvertent changes as both config will need to be enabled for the
-    // change to take effect
-    SegmentVersion tableConfigVersion =
-        SegmentVersion.fromString(indexingConfig.getSegmentFormatVersion(), SegmentVersion.DEFAULT_TABLE_VERSION);
-
-    SegmentVersion serverConfigVersion = SegmentVersion.fromString(
-        _tableDataManagerConfig.getString(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION),
-        SegmentVersion.DEFAULT_SERVER_VERSION);
-
-    // override server based configuration with table level configuration iff table configuration
-    // is less than server configuration
-    if (SegmentVersion.compare(tableConfigVersion, serverConfigVersion) < 0) {
-      LOGGER.info("Overriding server segment format version: {} with table version: {} for table: {}",
-          serverConfigVersion, tableConfigVersion, tableName);
-      _tableDataManagerConfig.setProperty(segmentVersionKey, indexingConfig.getSegmentFormatVersion());
-    } else {
-      LOGGER.info("Loading table: {} with server configured segment format version: {}", tableName, serverConfigVersion);
-    }
-  }
-
-  public IndexLoadingConfigMetadata getIndexLoadingConfigMetadata() {
-    IndexLoadingConfigMetadata indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(_tableDataManagerConfig);
-    return indexLoadingConfigMetadata;
+    // Currently we do not override any table level configs into TableDataManagerConfig
+    // If we wish to override some table level configs using table config, override them here
+    // Note: the configs in TableDataManagerConfig is immutable once the table is created, which mean it will not pick
+    // up the latest table config
   }
 }

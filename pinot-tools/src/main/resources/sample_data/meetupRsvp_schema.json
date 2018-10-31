@@ -1,0 +1,50 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType": "INT",
+      "name": "rsvp_count"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "venue_name"
+    },
+    {
+      "dataType": "STRING",
+      "name": "event_name"
+    },
+    {
+      "dataType": "STRING",
+      "name": "event_id"
+    },
+    {
+      "dataType": "LONG",
+      "name": "event_time"
+    },
+    {
+      "dataType": "STRING",
+      "name": "group_city"
+    },
+    {
+      "dataType": "STRING",
+      "name": "group_country"
+    },
+    {
+      "dataType": "LONG",
+      "name": "group_id"
+    },
+    {
+      "dataType": "STRING",
+      "name": "group_name"
+    }
+  ],
+  "timeFieldSpec": {
+    "incomingGranularitySpec": {
+      "timeType": "MILLISECONDS",
+      "dataType": "LONG",
+      "name": "mtime"
+    }
+  },
+  "schemaName": "meetupRsvp"
+}

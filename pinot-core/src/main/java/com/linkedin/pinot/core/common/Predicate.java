@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.core.common;
 
-import java.util.Arrays;
-import java.util.List;
-
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
@@ -25,7 +22,9 @@ import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.common.predicate.RegexPredicate;
+import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
+import java.util.Arrays;
+import java.util.List;
 
 
 public abstract class Predicate {
@@ -33,11 +32,15 @@ public abstract class Predicate {
   public enum Type {
     EQ,
     NEQ,
-    REGEX,
+    REGEXP_LIKE,
     RANGE,
     IN,
-    NOT_IN
-  };
+    NOT_IN;
+
+    public boolean isExclusive() {
+      return this == NEQ || this == NOT_IN;
+    }
+  }
 
   private final String lhs;
   private final List<String> rhs;
@@ -81,8 +84,8 @@ public abstract class Predicate {
     case RANGE:
       predicate = new RangePredicate(column, value);
       break;
-    case REGEX:
-      predicate = new RegexPredicate(column, value);
+    case REGEXP_LIKE:
+      predicate = new RegexpLikePredicate(column, value);
       break;
     case NOT:
       predicate = new NEqPredicate(column, value);

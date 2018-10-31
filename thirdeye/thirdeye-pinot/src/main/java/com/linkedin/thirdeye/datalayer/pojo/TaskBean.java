@@ -1,11 +1,9 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
-import java.sql.Timestamp;
-import java.util.Objects;
-
-import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import java.sql.Timestamp;
+import java.util.Objects;
 
 
 /**
@@ -22,7 +20,10 @@ public class TaskBean extends AbstractBean {
   private TaskStatus status;
   private long startTime;
   private long endTime;
+  // A JSON string of the task info such as anomaly function, monitoring windows, etc.
   private String taskInfo;
+  // The task results, which could contain the error messages of tasks' execution.
+  private String message;
   private Timestamp lastModified;
 
   public Long getWorkerId() {
@@ -77,10 +78,17 @@ public class TaskBean extends AbstractBean {
     return taskType;
   }
 
+  public String getMessage() {
+    return message;
+  }
+
+  public void setMessage(String message) {
+    this.message = message;
+  }
+
   public void setTaskType(TaskType taskType) {
     this.taskType = taskType;
   }
-
 
   public Timestamp getLastModified() {
     return lastModified;
@@ -98,6 +106,7 @@ public class TaskBean extends AbstractBean {
     this.jobId = jobId;
   }
 
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof TaskBean)) {
@@ -112,12 +121,5 @@ public class TaskBean extends AbstractBean {
   @Override
   public int hashCode() {
     return Objects.hash(getId(), status, startTime, endTime, taskInfo);
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("status", status)
-        .add("startTime", startTime).add("endTime", endTime).add("taskInfo", taskInfo)
-        .add("lastModified", lastModified).toString();
   }
 }

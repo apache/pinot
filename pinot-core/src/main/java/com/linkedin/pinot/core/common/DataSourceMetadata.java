@@ -16,22 +16,21 @@
 package com.linkedin.pinot.core.common;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 
 
 public interface DataSourceMetadata {
 
-  public DataType getDataType();
+  DataType getDataType();
 
-  public boolean hasInvertedIndex();
+  boolean isSingleValue();
 
-  public boolean isSorted();
+  boolean isSorted();
 
-  public boolean hasDictionary();
+  int getNumDocs();
 
-  public int cardinality();
+  int getMaxNumMultiValues();
 
-  public FieldType getFieldType();
+  boolean hasInvertedIndex();
 
-  public boolean isSingleValue();
+  boolean hasDictionary();
 }

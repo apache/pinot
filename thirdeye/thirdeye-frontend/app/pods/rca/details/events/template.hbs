@@ -1,0 +1,48 @@
+<section class="card-container__body">
+  {{#containers/events-table-container as |events|}}
+  <div class="row rca-header rca-header--flush">
+    <div class="col-xs-9">
+      <h3 class="te-sub-title te-sub-title--flush">Events Correlation</h3>
+        <span>(Investigation Period: {{moment-format events.eventStart dateFormat
+          }} - {{moment-format events.eventEnd dateFormat}})</span>
+    </div>
+  </div>
+    {{#containers/primary-metric-container as |summary actions|}}
+      <div class="rca-body">
+        {{#if (or events.loading (not summary.loaded))}}
+          <div class="spinner-wrapper spinner-wrapper__border">
+            {{ember-spinner}}
+          </div>
+          <div class="spinner-wrapper spinner-wrapper__border spinner-wrapper__margin-top">
+            {{ember-spinner}}
+          </div>
+        {{else if events.loaded}}
+          {{anomaly-graph
+            componentId='correlated-events'
+            primaryMetric=summary.primaryMetric
+            events=events.data
+            showGraphLegend=false
+            showLegend=false
+            height=400
+            showEvents=true
+            showSubchart=true
+            analysisStart=events.eventStart
+            analysisEnd=events.eventEnd
+            onSubchartChange=(action "setDateParams")
+            onSelection=(action actions.onEventSelection)
+            minDate=displayStart
+            maxDate=displayEnd
+          }}
+
+          {{events-table
+            events=events.data
+            start=eventsStart
+            end=eventsEnd
+            onSelection=(action actions.onEventSelection)
+          }}
+        {{/if}}
+      </div>
+    {{/containers/primary-metric-container}}
+  {{/containers/events-table-container}}
+</section>
+

@@ -15,11 +15,12 @@
  */
 package com.linkedin.thirdeye.hadoop.backfill;
 
-import static com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseConstants.*;
-
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 import java.io.File;
 import java.io.IOException;
-
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData.Record;
@@ -34,10 +35,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
+import static com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseConstants.*;
 
 /**
  * Mapper class for Backfill job, which converts a pinot segment to avro files
@@ -140,7 +138,6 @@ public class BackfillPhaseMapJob {
       recordWriter.create(avroSchema, localAvroFile);
 
       LOGGER.info("Converting pinot segment to avro at {}", localAvroFile);
-      pinotSegmentRecordReader.init();
       while (pinotSegmentRecordReader.hasNext()) {
         GenericRecord outputRecord = new Record(avroSchema);
         GenericRow row = pinotSegmentRecordReader.next();

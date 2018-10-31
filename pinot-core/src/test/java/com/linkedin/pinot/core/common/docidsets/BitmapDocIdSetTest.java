@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.common.docidsets;
 
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
+import com.linkedin.pinot.core.common.Constants;
+import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -23,33 +26,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.TreeSet;
-
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-
 
 public class BitmapDocIdSetTest {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(BitmapDocIdSetTest.class);
 
   @Test
   public void testSimple() throws IOException {
     int numBitMaps = 5;
     final int numDocs = 1000;
-    List<ImmutableRoaringBitmap> list = new ArrayList<ImmutableRoaringBitmap>();
+    List<ImmutableRoaringBitmap> list = new ArrayList<>();
     Random r = new Random();
-    TreeSet<Integer> originalSet = new TreeSet<Integer>();
+    TreeSet<Integer> originalSet = new TreeSet<>();
 
     for (int i = 0; i < numBitMaps; i++) {
       MutableRoaringBitmap mutableRoaringBitmap = new MutableRoaringBitmap();
@@ -61,7 +52,7 @@ public class BitmapDocIdSetTest {
       }
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
       DataOutputStream dos = new DataOutputStream(bos);
-      // could call "rr1.runOptimize()" and "rr2.runOptimize" if there 
+      // could call "rr1.runOptimize()" and "rr2.runOptimize" if there
       // there were runs to compress
       mutableRoaringBitmap.serialize(dos);
       dos.close();
@@ -71,82 +62,10 @@ public class BitmapDocIdSetTest {
     }
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[list.size()];
     list.toArray(bitmaps);
-    BlockMetadata blockMetadata = new BlockMetadata() {
-
-      @Override
-      public boolean isSparse() {
-        // TODO Auto-generated method stub
-        return false;
-      }
-
-      @Override
-      public boolean isSorted() {
-        // TODO Auto-generated method stub
-        return false;
-      }
-
-      @Override
-      public boolean isSingleValue() {
-        // TODO Auto-generated method stub
-        return false;
-      }
-
-      @Override
-      public boolean hasInvertedIndex() {
-        // TODO Auto-generated method stub
-        return false;
-      }
-
-      @Override
-      public boolean hasDictionary() {
-        // TODO Auto-generated method stub
-        return false;
-      }
-
-      @Override
-      public int getStartDocId() {
-        // TODO Auto-generated method stub
-        return 0;
-      }
-
-      @Override
-      public int getSize() {
-        // TODO Auto-generated method stub
-        return 0;
-      }
-
-      @Override
-      public int getMaxNumberOfMultiValues() {
-        // TODO Auto-generated method stub
-        return 0;
-      }
-
-      @Override
-      public int getLength() {
-        return numDocs;
-      }
-
-      @Override
-      public int getEndDocId() {
-        return numDocs - 1;
-      }
-
-      @Override
-      public Dictionary getDictionary() {
-        // TODO Auto-generated method stub
-        return null;
-      }
-
-      @Override
-      public DataType getDataType() {
-        // TODO Auto-generated method stub
-        return null;
-      }
-    };
-    BitmapDocIdSet bitmapDocIdSet = new BitmapDocIdSet("testColumn", blockMetadata, 0, numDocs - 1, bitmaps);
+    BitmapDocIdSet bitmapDocIdSet = new BitmapDocIdSet(bitmaps, 0, numDocs - 1, false);
     BlockDocIdIterator iterator = bitmapDocIdSet.iterator();
     int docId;
-    TreeSet<Integer> result = new TreeSet<Integer>();
+    TreeSet<Integer> result = new TreeSet<>();
 
     while ((docId = iterator.next()) != Constants.EOF) {
       result.add(docId);

@@ -16,45 +16,48 @@
 package com.linkedin.pinot.core.data.readers;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import java.io.FileReader;
-import java.io.Reader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonParser;
 import org.codehaus.jackson.map.ObjectMapper;
 
-public class JSONRecordReader extends BaseRecordReader {
-  private final String _dataFile;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.Map;
+
+
+/**
+ * Record reader for JSON file.
+ */
+public class JSONRecordReader implements RecordReader {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  private final JsonFactory _factory = new JsonFactory();
+  private final File _dataFile;
   private final Schema _schema;
 
-  JsonParser _parser;
-  Iterator<Map> _iterator;
+  private JsonParser _parser;
+  private Iterator<Map> _iterator;
 
-  public JSONRecordReader(String dataFile, Schema schema) {
-    super();
-    super.initNullCounters(schema);
+  public JSONRecordReader(File dataFile, Schema schema) throws IOException {
     _dataFile = dataFile;
     _schema = schema;
-  }
 
-  @Override
-  public void init() throws Exception {
-    final Reader reader = new FileReader(_dataFile);
-    _parser = new JsonFactory().createJsonParser(reader);
-    _iterator = new ObjectMapper().readValues(_parser, Map.class);
-
-  }
-
-  @Override
-  public void rewind() throws Exception {
-    _parser.close();
     init();
+  }
+
+  private void init() throws IOException {
+    _parser = _factory.createJsonParser(RecordReaderUtils.getFileReader(_dataFile));
+    try {
+      _iterator = OBJECT_MAPPER.readValues(_parser, Map.class);
+    } catch (Exception e) {
+      _parser.close();
+      throw e;
+    }
   }
 
   @Override
@@ -63,62 +66,45 @@ public class JSONRecordReader extends BaseRecordReader {
   }
 
   @Override
-  public Schema getSchema() {
-    return _schema;
-  }
-
-  @Override
   public GenericRow next() {
     return next(new GenericRow());
   }
 
   @Override
-  public GenericRow next(GenericRow row) {
-    Map<String, Object> record = _iterator.next();
+  public GenericRow next(GenericRow reuse) {
+    Map record = _iterator.next();
 
-    for (final FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
-      String column = fieldSpec.getName();
-      Object data = record.get(column);
+    for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
+      String fieldName = fieldSpec.getName();
+      Object jsonValue = record.get(fieldName);
 
-      Object value=null;
+      Object value;
       if (fieldSpec.isSingleValueField()) {
-        String token = (data != null) ? data.toString() : null;
-        if (token == null || token.isEmpty()) {
-          incrementNullCountFor(fieldSpec.getName());
-        }
-        value = RecordReaderUtils.convertToDataType(token, fieldSpec.getDataType());
+        String token = jsonValue != null ? jsonValue.toString() : null;
+        value = RecordReaderUtils.convertToDataType(token, fieldSpec);
       } else {
-        value = convertToDataTypeArray(data, fieldSpec.getDataType());
+        value = RecordReaderUtils.convertToDataTypeArray((ArrayList) jsonValue, fieldSpec);
       }
 
-      row.putField(column, value);
+      reuse.putField(fieldName, value);
     }
 
-    return row;
+    return reuse;
   }
 
   @Override
-  public void close() throws Exception {
+  public void rewind() throws IOException {
     _parser.close();
+    init();
   }
 
-  private Object [] convertToDataTypeArray(Object data, DataType dataType) {
-    Object [] value;
+  @Override
+  public Schema getSchema() {
+    return _schema;
+  }
 
-    if ((data == null)) {
-      value = new Object[1];
-      value[0] = RecordReaderUtils.getDefaultNullValue(dataType);
-
-    } else {
-      ArrayList objs = (ArrayList) data;
-      value = new Object[objs.size()];
-
-      for (int i = 0; i < objs.size(); ++i) {
-        String token = (objs.get(i) != null) ? objs.get(i).toString() : null;
-        value[i] = RecordReaderUtils.convertToDataType(token, dataType);
-      }
-    }
-
-    return value;
+  @Override
+  public void close() throws IOException {
+    _parser.close();
   }
 }

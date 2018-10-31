@@ -1,14 +1,12 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import java.util.Objects;
-
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
 
-import com.google.common.base.MoreObjects;
-
-
+@Deprecated
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
 
   private Long functionId;
@@ -16,6 +14,8 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
   private Long startTime;
   private Long endTime;
   private DimensionMap dimensions;
+  private Long jobId;
+  private AnomalyResultSource anomalyResultSource = AnomalyResultSource.DEFAULT_ANOMALY_DETECTION;
 
   // significance level
   private double score;
@@ -27,6 +27,32 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
   private Long creationTimeUtc;
   private boolean dataMissing;
   private boolean merged;
+  private double avgCurrentVal;
+  private double avgBaselineVal;
+
+  public Long getJobId() {
+    return jobId;
+  }
+
+  public void setJobId(Long jobId) {
+    this.jobId = jobId;
+  }
+
+  public double getAvgCurrentVal(){
+    return this.avgCurrentVal;
+  }
+
+  public double getAvgBaselineVal(){
+    return this.avgBaselineVal;
+  }
+
+  public void setAvgCurrentVal(double val){
+    this.avgCurrentVal = val;
+  }
+
+  public void setAvgBaselineVal(double val){
+    this.avgBaselineVal = val;
+  }
 
   public RawAnomalyResultBean() {
     creationTimeUtc = DateTime.now().getMillis();
@@ -129,12 +155,12 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     AnomalyFeedbackId = anomalyFeedbackId;
   }
 
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("startTimeUtc", startTime)
-        .add("dimensions", dimensions).add("endTimeUtc", endTime).add("score", score)
-        .add("weight", weight).add("properties", properties).add("message", message)
-        .add("creationTimeUtc", creationTimeUtc).toString();
+  public AnomalyResultSource getAnomalyResultSource() {
+    return anomalyResultSource;
+  }
+
+  public void setAnomalyResultSource(AnomalyResultSource anomalyResultSource) {
+    this.anomalyResultSource = anomalyResultSource;
   }
 
   @Override
@@ -146,7 +172,9 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     return Objects.equals(startTime, r.getStartTime())
         && Objects.equals(dimensions, r.getDimensions()) && Objects.equals(endTime, r.getEndTime())
         && Objects.equals(score, r.getScore()) && Objects.equals(weight, r.getWeight())
-        && Objects.equals(properties, r.getProperties()) && Objects.equals(message, r.getMessage());
+        && Objects.equals(properties, r.getProperties()) && Objects.equals(message, r.getMessage())
+        && Objects.equals(avgBaselineVal, r.getAvgBaselineVal()) && Objects.equals(avgCurrentVal, r.getAvgCurrentVal())
+        && Objects.equals(anomalyResultSource, r.anomalyResultSource);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
   }
@@ -154,7 +182,7 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
   @Override
   public int hashCode() {
     return Objects.hash(dimensions, startTime, endTime, score, weight, properties,
-        message);
+        message, avgBaselineVal, avgCurrentVal, anomalyResultSource);
     // Intentionally omit creationTimeUtc, since start/end are the truly significant dates for
     // anomalies
   }

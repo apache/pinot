@@ -15,15 +15,12 @@
  */
 package com.linkedin.pinot.core.common;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.operator.docvalsets.SingleValueSet;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
-import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 /**
@@ -33,346 +30,304 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
  * duplicate codes and garbage collection.
  */
 public class DataFetcher {
-  private static final BlockId BLOCK_ZERO = new BlockId(0);
+  // Thread local (reusable) buffer for single-valued column dictionary Ids
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS = new ThreadLocal<int[]>() {
+    @Override
+    protected int[] initialValue() {
+      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+  };
 
-  private final Map<String, Dictionary> _columnToDictionaryMap;
-  private final Map<String, BlockValSet> _columnToBlockValSetMap;
-  private final Map<String, BlockValIterator> _columnToBlockValIteratorMap;
-  private final Map<String, BlockMetadata> _columnToBlockMetadataMap;
-
-  // Map from MV column name to max number of entries for the column.
-  private final Map<String, Integer> _columnToMaxNumMultiValuesMap;
-
-  // Re-usable array for all dictionary ids in the block, of a single valued column
-  private final int[] _reusableDictIds;
-
-  // Re-usable array to store MV dictionary id's for a given docId
+  private final Map<String, Dictionary> _dictionaryMap;
+  // For single-valued column
+  private final Map<String, SingleValueSet> _singleValueSetMap;
+  // For multi-valued column
+  private final Map<String, BlockMultiValIterator> _blockMultiValIteratorMap;
   private final int[] _reusableMVDictIds;
 
   /**
    * Constructor for DataFetcher.
    *
-   * @param columnToDataSourceMap Map from column name to data source
+   * @param dataSourceMap Map from column to data source
    */
-  public DataFetcher(Map<String, BaseOperator> columnToDataSourceMap) {
-    _columnToDictionaryMap = new HashMap<>();
-    _columnToBlockValSetMap = new HashMap<>();
-    _columnToBlockValIteratorMap = new HashMap<>();
-    _columnToBlockMetadataMap = new HashMap<>();
+  public DataFetcher(Map<String, DataSource> dataSourceMap) {
+    int numColumns = dataSourceMap.size();
+    _dictionaryMap = new HashMap<>(numColumns);
+    _singleValueSetMap = new HashMap<>(numColumns);
+    _blockMultiValIteratorMap = new HashMap<>(numColumns);
 
-    _reusableDictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    _columnToMaxNumMultiValuesMap = new HashMap<>();
-
-    int reusableMVDictIdSize = 0;
-    for (String column : columnToDataSourceMap.keySet()) {
-      BaseOperator dataSource = columnToDataSourceMap.get(column);
-      Block dataSourceBlock = dataSource.nextBlock(BLOCK_ZERO);
-      BlockMetadata metadata = dataSourceBlock.getMetadata();
-      _columnToDictionaryMap.put(column, metadata.getDictionary());
-
-      BlockValSet blockValSet = dataSourceBlock.getBlockValueSet();
-      _columnToBlockValSetMap.put(column, blockValSet);
-      _columnToBlockValIteratorMap.put(column, blockValSet.iterator());
-      _columnToBlockMetadataMap.put(column, metadata);
-
-      int maxNumberOfMultiValues = metadata.getMaxNumberOfMultiValues();
-      _columnToMaxNumMultiValuesMap.put(column, maxNumberOfMultiValues);
-      reusableMVDictIdSize = Math.max(reusableMVDictIdSize, maxNumberOfMultiValues);
+    int maxNumMultiValues = 0;
+    for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
+      String column = entry.getKey();
+      DataSource dataSource = entry.getValue();
+      _dictionaryMap.put(column, dataSource.getDictionary());
+      DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
+      BlockValSet blockValueSet = dataSource.nextBlock().getBlockValueSet();
+      if (dataSourceMetadata.isSingleValue()) {
+        _singleValueSetMap.put(column, (SingleValueSet) blockValueSet);
+      } else {
+        _blockMultiValIteratorMap.put(column, (BlockMultiValIterator) blockValueSet.iterator());
+        maxNumMultiValues = Math.max(maxNumMultiValues, dataSourceMetadata.getMaxNumMultiValues());
+      }
     }
 
-    _reusableMVDictIds = new int[reusableMVDictIdSize];
+    _reusableMVDictIds = new int[maxNumMultiValues];
   }
 
   /**
-   * Given a column, fetch its dictionary.
-   *
-   * @param column column name.
-   * @return dictionary associated with this column.
+   * SINGLE-VALUED COLUMN API
    */
-  public Dictionary getDictionaryForColumn(String column) {
-    return _columnToDictionaryMap.get(column);
+
+  /**
+   * Fetch the dictionary Ids for a single-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outDictIds Buffer for output
+   */
+  public void fetchDictIds(String column, int[] inDocIds, int length, int[] outDictIds) {
+    _singleValueSetMap.get(column).getDictionaryIds(inDocIds, 0, length, outDictIds, 0);
   }
 
   /**
-   * Given a column, fetch its block value set.
+   * Fetch the int values for a single-valued column.
    *
-   * @param column column name.
-   * @return block value set associated with this column.
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
    */
-  public BlockValSet getBlockValSetForColumn(String column) {
-    return _columnToBlockValSetMap.get(column);
-  }
-
-  /**
-   * Returns the BlockValIterator for the specified column.
-   *
-   * @param column Column for which to return the blockValIterator.
-   * @return BlockValIterator for the column.
-   */
-  public BlockValIterator getBlockValIteratorForColumn(String column) {
-    return _columnToBlockValIteratorMap.get(column);
-  }
-
-  public BlockMetadata getBlockMetadataFor(String column) {
-    return _columnToBlockMetadataMap.get(column);
-  }
-
-  /**
-   * Fetch the dictionary Ids for a single value column.
-   *
-   * @param column column name.
-   * @param inDocIds document Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outDictIds dictionary Id array buffer.
-   * @param outStartPos output start position.
-   */
-  public void fetchSingleDictIds(String column, int[] inDocIds, int inStartPos, int length, int[] outDictIds, int outStartPos) {
-    BlockValSet blockValSet = getBlockValSetForColumn(column);
-    blockValSet.getDictionaryIds(inDocIds, inStartPos, length, outDictIds, outStartPos);
-  }
-
-  /**
-   * Fetch the dictionary Ids for a multi value column.
-   *
-   * @param column column name.
-   * @param inDocIds document Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outDictIdsArray dictionary Id array array buffer.
-   * @param outStartPos output start position.
-   * @param tempDictIdArray temporary holding dictIds read from BlockMultiValIterator.
-   *          Array size has to be >= max number of entries for this column.
-   */
-  public void fetchMultiValueDictIds(String column, int[] inDocIds, int inStartPos, int length, int[][] outDictIdsArray, int outStartPos,
-      int[] tempDictIdArray) {
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
-    for (int i = inStartPos; i < inStartPos + length; i++, outStartPos++) {
-      iterator.skipTo(inDocIds[i]);
-      int dictIdLength = iterator.nextIntVal(tempDictIdArray);
-      outDictIdsArray[outStartPos] = Arrays.copyOfRange(tempDictIdArray, 0, dictIdLength);
+  public void fetchIntValues(String column, int[] inDocIds, int length, int[] outValues) {
+    Dictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchDictIds(column, inDocIds, length, dictIds);
+      dictionary.readIntValues(dictIds, 0, length, outValues, 0);
+    } else {
+      _singleValueSetMap.get(column).getIntValues(inDocIds, 0, length, outValues, 0);
     }
   }
 
   /**
-   * For a given multi-value column, trying to get the max number of
-   * entries per row.
+   * Fetch the long values for a single-valued column.
    *
-   * @param column Column for which to get the max number of multi-values.
-   * @return max number of entries for a given column.
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
    */
-  public int getMaxNumberOfEntriesForColumn(String column) {
-    return _columnToMaxNumMultiValuesMap.get(column);
+  public void fetchLongValues(String column, int[] inDocIds, int length, long[] outValues) {
+    Dictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchDictIds(column, inDocIds, length, dictIds);
+      dictionary.readLongValues(dictIds, 0, length, outValues, 0);
+    } else {
+      _singleValueSetMap.get(column).getLongValues(inDocIds, 0, length, outValues, 0);
+    }
   }
 
   /**
-   * Fetch the values for a single int value column.
+   * Fetch the float values for a single-valued column.
    *
-   * @param column column name.
-   * @param inDocIds doc Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
    */
-  public void fetchIntValues(String column, int[] inDocIds, int inStartPos, int length, int[] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-    dictionary.readIntValues(_reusableDictIds, 0, length, outValues, outStartPos);
+  public void fetchFloatValues(String column, int[] inDocIds, int length, float[] outValues) {
+    Dictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchDictIds(column, inDocIds, length, dictIds);
+      dictionary.readFloatValues(dictIds, 0, length, outValues, 0);
+    } else {
+      _singleValueSetMap.get(column).getFloatValues(inDocIds, 0, length, outValues, 0);
+    }
+  }
+
+  /**
+   * Fetch the double values for a single-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchDoubleValues(String column, int[] inDocIds, int length, double[] outValues) {
+    Dictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchDictIds(column, inDocIds, length, dictIds);
+      dictionary.readDoubleValues(dictIds, 0, length, outValues, 0);
+    } else {
+      _singleValueSetMap.get(column).getDoubleValues(inDocIds, 0, length, outValues, 0);
+    }
+  }
+
+  /**
+   * Fetch the string values for a single-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
+   */
+  public void fetchStringValues(String column, int[] inDocIds, int length, String[] outValues) {
+    Dictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchDictIds(column, inDocIds, length, dictIds);
+      dictionary.readStringValues(dictIds, 0, length, outValues, 0);
+    } else {
+      _singleValueSetMap.get(column).getStringValues(inDocIds, 0, length, outValues, 0);
+    }
+  }
+
+  /**
+   * Fetch byte[] values for a single-valued column.
+   *
+   * @param column Column to read
+   * @param inDocIds Input document id's buffer
+   * @param length Number of input document id'
+   * @param outValues Buffer for output
+   */
+  public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][] outValues) {
+    Dictionary dictionary = _dictionaryMap.get(column);
+    if (dictionary != null) {
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchDictIds(column, inDocIds, length, dictIds);
+      dictionary.readBytesValues(dictIds, 0, length, outValues, 0);
+    } else {
+      _singleValueSetMap.get(column).getBytesValues(inDocIds, 0, length, outValues, 0);
+    }
+  }
+
+  /**
+   * MULTI-VALUED COLUMN API
+   */
+
+  /**
+   * Fetch the dictionary Ids for a multi-valued column.
+   *
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outDictIds Buffer for output
+   */
+  public void fetchDictIds(String column, int[] inDocIds, int length, int[][] outDictIds) {
+    BlockMultiValIterator blockMultiValIterator = _blockMultiValIteratorMap.get(column);
+    for (int i = 0; i < length; i++) {
+      blockMultiValIterator.skipTo(inDocIds[i]);
+      int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
+      outDictIds[i] = Arrays.copyOfRange(_reusableMVDictIds, 0, numMultiValues);
+    }
   }
 
   /**
    * Fetch the int values for a multi-valued column.
    *
-   * @param column column name.
-   * @param inDocIds dictionary Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
    */
-  public void fetchIntValues(String column, int[] inDocIds, int inStartPos, int length, int[][] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
-
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
-      outValues[outStartPos] = new int[numValues];
-      dictionary.readIntValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+  public void fetchIntValues(String column, int[] inDocIds, int length, int[][] outValues) {
+    BlockMultiValIterator blockMultiValIterator = _blockMultiValIteratorMap.get(column);
+    for (int i = 0; i < length; i++) {
+      blockMultiValIterator.skipTo(inDocIds[i]);
+      int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
+      outValues[i] = new int[numMultiValues];
+      _dictionaryMap.get(column).readIntValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
     }
-  }
-
-  /**
-   * Fetch the values for a single long value column.
-   *
-   * @param column column name.
-   * @param inDocIds doc Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
-   */
-  public void fetchLongValues(String column, int[] inDocIds, int inStartPos, int length, long[] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-    dictionary.readLongValues(_reusableDictIds, 0, length, outValues, outStartPos);
   }
 
   /**
    * Fetch the long values for a multi-valued column.
    *
-   * @param column column name.
-   * @param inDocIds dictionary Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
    */
-  public void fetchLongValues(String column, int[] inDocIds, int inStartPos, int length, long[][] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
-
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
-      outValues[outStartPos] = new long[numValues];
-      dictionary.readLongValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+  public void fetchLongValues(String column, int[] inDocIds, int length, long[][] outValues) {
+    BlockMultiValIterator blockMultiValIterator = _blockMultiValIteratorMap.get(column);
+    for (int i = 0; i < length; i++) {
+      blockMultiValIterator.skipTo(inDocIds[i]);
+      int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
+      outValues[i] = new long[numMultiValues];
+      _dictionaryMap.get(column).readLongValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
     }
-  }
-
-  /**
-   * Fetch the values for a single float value column.
-   *
-   * @param column column name.
-   * @param inDocIds doc Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
-   */
-  public void fetchFloatValues(String column, int[] inDocIds, int inStartPos, int length, float[] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-    dictionary.readFloatValues(_reusableDictIds, 0, length, outValues, outStartPos);
   }
 
   /**
    * Fetch the float values for a multi-valued column.
    *
-   * @param column column name.
-   * @param inDocIds dictionary Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
    */
-  public void fetchFloatValues(String column, int[] inDocIds, int inStartPos, int length, float[][] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
-
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
-      outValues[outStartPos] = new float[numValues];
-      dictionary.readFloatValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
-    }
-  }
-
-  /**
-   * Fetch the values for a single double value column.
-   *
-   * @param column column name.
-   * @param inDocIds dictionary Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
-   */
-  public void fetchDoubleValues(String column, int[] inDocIds, int inStartPos, int length, double[] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    if (dictionary != null) {
-      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-      dictionary.readDoubleValues(_reusableDictIds, 0, length, outValues, outStartPos);
-    } else {
-      BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
-      blockValSet.getDoubleValues(inDocIds, 0, length, outValues, 0);
+  public void fetchFloatValues(String column, int[] inDocIds, int length, float[][] outValues) {
+    BlockMultiValIterator blockMultiValIterator = _blockMultiValIteratorMap.get(column);
+    for (int i = 0; i < length; i++) {
+      blockMultiValIterator.skipTo(inDocIds[i]);
+      int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
+      outValues[i] = new float[numMultiValues];
+      _dictionaryMap.get(column).readFloatValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
     }
   }
 
   /**
    * Fetch the double values for a multi-valued column.
    *
-   * @param column column name.
-   * @param inDocIds dictionary Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
    */
-  public void fetchDoubleValues(String column, int[] inDocIds, int inStartPos, int length, double[][] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
-
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
-      outValues[outStartPos] = new double[numValues];
-      dictionary.readDoubleValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+  public void fetchDoubleValues(String column, int[] inDocIds, int length, double[][] outValues) {
+    BlockMultiValIterator blockMultiValIterator = _blockMultiValIteratorMap.get(column);
+    for (int i = 0; i < length; i++) {
+      blockMultiValIterator.skipTo(inDocIds[i]);
+      int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
+      outValues[i] = new double[numMultiValues];
+      _dictionaryMap.get(column).readDoubleValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
     }
   }
 
   /**
+   * Fetch the string values for a multi-valued column.
    *
-   * @param column Column for which to fetch the values
-   * @param inDocIds Array of docIds for which to fetch the values
-   * @param outValues Array of strings where output will be written
-   * @param length Length of input docIds
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outValues Buffer for output
    */
-  public void fetchStringValues(String column, int[] inDocIds, int inStartPos, int length, String[] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    if (dictionary != null) {
-      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-      dictionary.readStringValues(_reusableDictIds, 0, length, outValues, outStartPos);
-    } else {
-      BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
-      blockValSet.getStringValues(inDocIds, 0, length, outValues, 0);
+  public void fetchStringValues(String column, int[] inDocIds, int length, String[][] outValues) {
+    BlockMultiValIterator blockMultiValIterator = _blockMultiValIteratorMap.get(column);
+    for (int i = 0; i < length; i++) {
+      blockMultiValIterator.skipTo(inDocIds[i]);
+      int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
+      outValues[i] = new String[numMultiValues];
+      _dictionaryMap.get(column).readStringValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
     }
   }
 
   /**
+   * Fetch the number of values for a multi-valued column.
    *
-   * @param column Column for which to fetch the values
-   * @param inDocIds Array of docIds for which to fetch the values
-   * @param outValues Array of strings where output will be written
-   * @param length Length of input docIds
+   * @param column Column name
+   * @param inDocIds Input document Ids buffer
+   * @param length Number of input document Ids
+   * @param outNumValues Buffer for output
    */
-  public void fetchStringValues(String column, int[] inDocIds, int inStartPos, int length, String[][] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
-
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
-      outValues[outStartPos] = new String[numValues];
-      dictionary.readStringValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+  public void fetchNumValues(String column, int[] inDocIds, int length, int[] outNumValues) {
+    BlockMultiValIterator blockMultiValIterator = _blockMultiValIteratorMap.get(column);
+    for (int i = 0; i < length; i++) {
+      blockMultiValIterator.skipTo(inDocIds[i]);
+      outNumValues[i] = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
     }
-  }
-
-  /**
-   * Returns the data type for the specified column.
-   *
-   * @param column Name of column for which to return the data type.
-   * @return Data type of the column.
-   */
-  public FieldSpec.DataType getDataType(String column) {
-    BlockMetadata blockMetadata = _columnToBlockMetadataMap.get(column);
-    Preconditions.checkNotNull(blockMetadata, "Invalid column " + column + " specified in DataFetcher.");
-    return blockMetadata.getDataType();
   }
 }

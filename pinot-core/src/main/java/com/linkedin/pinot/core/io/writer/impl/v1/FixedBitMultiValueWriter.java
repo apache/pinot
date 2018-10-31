@@ -17,11 +17,11 @@ package com.linkedin.pinot.core.io.writer.impl.v1;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
+import com.linkedin.pinot.core.io.util.FixedByteValueReaderWriter;
+import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
-import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleValueMultiColWriter;
-import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import com.linkedin.pinot.core.util.PinotDataCustomBitSet;
 import java.io.File;
 import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
@@ -57,9 +57,9 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
   private PinotDataBuffer bitsetBuffer;
   private PinotDataBuffer rawDataBuffer;
 
-  private FixedByteSingleValueMultiColWriter chunkOffsetsWriter;
-  private PinotDataCustomBitSet customBitSet;
-  private FixedBitSingleValueMultiColWriter rawDataWriter;
+  private FixedByteValueReaderWriter chunkOffsetsWriter;
+  private PinotDataBitSet customBitSet;
+  private FixedBitIntReaderWriter rawDataWriter;
   private int numChunks;
   int prevRowStartIndex = 0;
   int prevRowLength = 0;
@@ -88,16 +88,9 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
     bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
     rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos + rawDataSize);
 
-    chunkOffsetsWriter = new FixedByteSingleValueMultiColWriter(chunkOffsetsBuffer, numDocs,
-        NUM_COLS_IN_HEADER, new int[] {
-            SIZE_OF_INT
-    });
-    customBitSet = PinotDataCustomBitSet.withDataBuffer(bitsetSize, bitsetBuffer);
-    rawDataWriter =
-        new FixedBitSingleValueMultiColWriter(rawDataBuffer, totalNumValues, 1, new int[] {
-            columnSizeInBits
-    });
-
+    chunkOffsetsWriter = new FixedByteValueReaderWriter(chunkOffsetsBuffer);
+    customBitSet = new PinotDataBitSet(bitsetBuffer);
+    rawDataWriter = new FixedBitIntReaderWriter(rawDataBuffer, totalNumValues, columnSizeInBits);
   }
 
   public int getChunkOffsetHeaderSize() {
@@ -144,7 +137,7 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
     int newStartIndex = prevRowStartIndex + prevRowLength;
     if (rowId % docsPerChunk == 0) {
       int chunkId = rowId / docsPerChunk;
-      chunkOffsetsWriter.setInt(chunkId, 0, newStartIndex);
+      chunkOffsetsWriter.writeInt(chunkId, newStartIndex);
     }
     customBitSet.setBit(newStartIndex);
     prevRowStartIndex = newStartIndex;
@@ -165,10 +158,7 @@ public class FixedBitMultiValueWriter implements SingleColumnMultiValueWriter {
 
   @Override
   public void setIntArray(int row, int[] intArray) {
-    int newStartIndex = updateHeader(row, intArray.length);
-    for (int i = 0; i < intArray.length; i++) {
-      rawDataWriter.setInt(newStartIndex + i, 0, intArray[i]);
-    }
+    rawDataWriter.writeInt(updateHeader(row, intArray.length), intArray.length, intArray);
   }
 
   @Override

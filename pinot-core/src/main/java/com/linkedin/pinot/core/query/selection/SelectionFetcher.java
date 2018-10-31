@@ -17,11 +17,6 @@ package com.linkedin.pinot.core.query.selection;
 
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.operator.blocks.MultiValueBlock;
-import com.linkedin.pinot.core.operator.blocks.RealtimeMultiValueBlock;
-import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
-import com.linkedin.pinot.core.operator.blocks.SortedSingleValueBlock;
-import com.linkedin.pinot.core.operator.blocks.UnSortedSingleValueBlock;
 import com.linkedin.pinot.core.query.selection.iterator.DoubleArraySelectionColumnIterator;
 import com.linkedin.pinot.core.query.selection.iterator.DoubleSelectionColumnIterator;
 import com.linkedin.pinot.core.query.selection.iterator.FloatArraySelectionColumnIterator;
@@ -33,17 +28,9 @@ import com.linkedin.pinot.core.query.selection.iterator.LongSelectionColumnItera
 import com.linkedin.pinot.core.query.selection.iterator.SelectionColumnIterator;
 import com.linkedin.pinot.core.query.selection.iterator.SelectionSingleValueColumnWithDictIterator;
 import com.linkedin.pinot.core.query.selection.iterator.StringArraySelectionColumnIterator;
-import com.linkedin.pinot.core.realtime.impl.dictionary.DoubleMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.FloatMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.IntMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.LongMutableDictionary;
-import com.linkedin.pinot.core.realtime.impl.dictionary.StringMutableDictionary;
-import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
-import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
-import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
-import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
-import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
+import com.linkedin.pinot.core.query.selection.iterator.StringSelectionColumnIterator;
 import java.io.Serializable;
+
 
 /**
  * Selection fetcher is used for querying rows from given blocks and schema.
@@ -52,100 +39,80 @@ import java.io.Serializable;
  *
  */
 public class SelectionFetcher {
-  private final int length;
-  private final SelectionColumnIterator[] selectionColumnIterators;
+  private final int _numColumns;
+  private final SelectionColumnIterator[] _selectionColumnIterators;
 
   public SelectionFetcher(Block[] blocks, DataSchema dataSchema) {
-    this.length = blocks.length;
-    selectionColumnIterators = new SelectionColumnIterator[blocks.length];
-    for (int i = 0; i < dataSchema.size(); ++i) {
-      if (blocks[i] instanceof RealtimeSingleValueBlock && blocks[i].getMetadata().hasDictionary()) {
-        switch (dataSchema.getColumnType(i)) {
+    _numColumns = blocks.length;
+    _selectionColumnIterators = new SelectionColumnIterator[_numColumns];
+
+    for (int i = 0; i < _numColumns; i++) {
+      Block block = blocks[i];
+      DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+      if (block.getMetadata().hasDictionary()) {
+        // With dictionary
+
+        switch (columnDataType) {
+          // Single value
           case INT:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Integer, IntMutableDictionary>(blocks[i]);
-            break;
-          case FLOAT:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Float, FloatMutableDictionary>(blocks[i]);
-            break;
           case LONG:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Long, LongMutableDictionary>(blocks[i]);
-            break;
-          case DOUBLE:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Double, DoubleMutableDictionary>(blocks[i]);
-            break;
-          case STRING:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<String, StringMutableDictionary>(blocks[i]);
-            break;
-          default:
-            break;
-        }
-      } else if ((blocks[i] instanceof UnSortedSingleValueBlock || blocks[i] instanceof SortedSingleValueBlock) && blocks[i].getMetadata().hasDictionary()) {
-        switch (dataSchema.getColumnType(i)) {
-          case INT:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Integer, IntDictionary>(blocks[i]);
-            break;
           case FLOAT:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Float, FloatDictionary>(blocks[i]);
-            break;
-          case LONG:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Long, LongDictionary>(blocks[i]);
-            break;
           case DOUBLE:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<Double, DoubleDictionary>(blocks[i]);
-            break;
           case STRING:
-            selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator<String, StringDictionary>(blocks[i]);
+          case BYTES:
+            _selectionColumnIterators[i] = new SelectionSingleValueColumnWithDictIterator(block);
             break;
-          default:
-            break;
-        }
-      } else if (blocks[i] instanceof RealtimeMultiValueBlock || blocks[i] instanceof MultiValueBlock) {
-        switch (dataSchema.getColumnType(i)) {
+          // Multi value
           case INT_ARRAY:
-            selectionColumnIterators[i] = new IntArraySelectionColumnIterator(blocks[i]);
+            _selectionColumnIterators[i] = new IntArraySelectionColumnIterator(block);
             break;
           case FLOAT_ARRAY:
-            selectionColumnIterators[i] = new FloatArraySelectionColumnIterator(blocks[i]);
+            _selectionColumnIterators[i] = new FloatArraySelectionColumnIterator(block);
             break;
           case LONG_ARRAY:
-            selectionColumnIterators[i] = new LongArraySelectionColumnIterator(blocks[i]);
+            _selectionColumnIterators[i] = new LongArraySelectionColumnIterator(block);
             break;
           case DOUBLE_ARRAY:
-            selectionColumnIterators[i] = new DoubleArraySelectionColumnIterator(blocks[i]);
+            _selectionColumnIterators[i] = new DoubleArraySelectionColumnIterator(block);
             break;
           case STRING_ARRAY:
-            selectionColumnIterators[i] = new StringArraySelectionColumnIterator(blocks[i]);
+            _selectionColumnIterators[i] = new StringArraySelectionColumnIterator(block);
             break;
           default:
-            break;
-        }
-      } else if (!blocks[i].getMetadata().hasDictionary()) {
-        switch (dataSchema.getColumnType(i)) {
-          case INT:
-            selectionColumnIterators[i] = new IntSelectionColumnIterator(blocks[i]);
-            break;
-          case FLOAT:
-            selectionColumnIterators[i] = new FloatSelectionColumnIterator(blocks[i]);
-            break;
-          case LONG:
-            selectionColumnIterators[i] = new LongSelectionColumnIterator(blocks[i]);
-            break;
-          case DOUBLE:
-            selectionColumnIterators[i] = new DoubleSelectionColumnIterator(blocks[i]);
-            break;
-          default:
-            break;
+            throw new UnsupportedOperationException();
         }
       } else {
-        throw new UnsupportedOperationException("Failed to get SelectionColumnIterator on Block - " + blocks[i] + " with index - " + i);
+        // No dictionary
+
+        switch (columnDataType) {
+          case INT:
+            _selectionColumnIterators[i] = new IntSelectionColumnIterator(block);
+            break;
+          case LONG:
+            _selectionColumnIterators[i] = new LongSelectionColumnIterator(block);
+            break;
+          case FLOAT:
+            _selectionColumnIterators[i] = new FloatSelectionColumnIterator(block);
+            break;
+          case DOUBLE:
+            _selectionColumnIterators[i] = new DoubleSelectionColumnIterator(block);
+            break;
+          case STRING:
+          case BYTES:
+            _selectionColumnIterators[i] = new StringSelectionColumnIterator(block);
+            break;
+          // TODO: add multi value support
+          default:
+            throw new UnsupportedOperationException();
+        }
       }
     }
   }
 
   public Serializable[] getRow(int docId) {
-    final Serializable[] row = new Serializable[length];
-    for (int i = 0; i < length; ++i) {
-      row[i] = selectionColumnIterators[i].getValue(docId);
+    final Serializable[] row = new Serializable[_numColumns];
+    for (int i = 0; i < _numColumns; i++) {
+      row[i] = _selectionColumnIterators[i].getValue(docId);
     }
     return row;
   }

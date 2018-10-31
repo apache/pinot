@@ -41,6 +41,11 @@ public class TopKPhaseMapOutputValue {
     return metricValues;
   }
 
+  /**
+   * Converts TopkPhaseMapOutputValue to a buffer of bytes
+   * @return
+   * @throws IOException
+   */
   public byte[] toBytes() throws IOException {
 
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -51,23 +56,7 @@ public class TopKPhaseMapOutputValue {
     for (int i = 0; i < metricValues.length; i++) {
       Number number = metricValues[i];
       MetricType metricType = metricTypes.get(i);
-      switch (metricType) {
-        case SHORT:
-          dos.writeShort(number.intValue());
-          break;
-        case LONG:
-          dos.writeLong(number.longValue());
-          break;
-        case INT:
-          dos.writeInt(number.intValue());
-          break;
-        case FLOAT:
-          dos.writeFloat(number.floatValue());
-          break;
-        case DOUBLE:
-          dos.writeDouble(number.doubleValue());
-          break;
-      }
+      MetricType.writeMetricValueToDataOutputStream(dos, number, metricType);
     }
 
     baos.close();
@@ -75,6 +64,13 @@ public class TopKPhaseMapOutputValue {
     return baos.toByteArray();
   }
 
+  /**
+   * Constructs TopKPhaseMapOutputValue from bytes buffer
+   * @param buffer
+   * @param metricTypes
+   * @return
+   * @throws IOException
+   */
   public static TopKPhaseMapOutputValue fromBytes(byte[] buffer, List<MetricType> metricTypes) throws IOException {
     DataInputStream dis = new DataInputStream(new ByteArrayInputStream(buffer));
     int length;
@@ -85,23 +81,8 @@ public class TopKPhaseMapOutputValue {
 
     for (int i = 0 ; i < length; i++) {
       MetricType metricType = metricTypes.get(i);
-      switch (metricType) {
-        case SHORT:
-          metricValues[i] = dis.readShort();
-          break;
-        case LONG:
-          metricValues[i] = dis.readLong();
-          break;
-        case INT:
-          metricValues[i] = dis.readInt();
-          break;
-        case FLOAT:
-          metricValues[i] = dis.readFloat();
-          break;
-        case DOUBLE:
-          metricValues[i] = dis.readDouble();
-          break;
-      }
+      Number metricValue = MetricType.readMetricValueFromDataInputStream(dis, metricType);
+      metricValues[i] = metricValue;
     }
 
     TopKPhaseMapOutputValue wrapper;

@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 
 
 public class DataTableImplV2 implements DataTable {
@@ -97,8 +98,7 @@ public class DataTableImplV2 implements DataTable {
   /**
    * Construct data table from byte array. (broker side)
    */
-  public DataTableImplV2(@Nonnull ByteBuffer byteBuffer)
-      throws IOException {
+  public DataTableImplV2(@Nonnull ByteBuffer byteBuffer) throws IOException {
     // Read header.
     _numRows = byteBuffer.getInt();
     _numColumns = byteBuffer.getInt();
@@ -166,61 +166,54 @@ public class DataTableImplV2 implements DataTable {
     }
   }
 
-  private Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes)
-      throws IOException {
-    ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-    DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+  private Map<String, Map<Integer, String>> deserializeDictionaryMap(byte[] bytes) throws IOException {
+    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
+      int numDictionaries = dataInputStream.readInt();
+      Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
 
-    int numDictionaries = dataInputStream.readInt();
-    Map<String, Map<Integer, String>> dictionaryMap = new HashMap<>(numDictionaries);
-
-    int readLength;
-    for (int i = 0; i < numDictionaries; i++) {
-      int columnNameLength = dataInputStream.readInt();
-      byte[] columnNameBytes = new byte[columnNameLength];
-      readLength = dataInputStream.read(columnNameBytes);
-      assert readLength == columnNameLength;
-      Map<Integer, String> dictionary = new HashMap<>();
-      dictionaryMap.put(new String(columnNameBytes, UTF_8), dictionary);
-
-      int dictionarySize = dataInputStream.readInt();
-      for (int j = 0; j < dictionarySize; j++) {
-        int key = dataInputStream.readInt();
-        int valueLength = dataInputStream.readInt();
-        byte[] valueBytes = new byte[valueLength];
-        readLength = dataInputStream.read(valueBytes);
-        assert readLength == valueLength;
-        dictionary.put(key, new String(valueBytes, UTF_8));
+      for (int i = 0; i < numDictionaries; i++) {
+        String column = decodeString(dataInputStream);
+        int dictionarySize = dataInputStream.readInt();
+        Map<Integer, String> dictionary = new HashMap<>(dictionarySize);
+        for (int j = 0; j < dictionarySize; j++) {
+          int key = dataInputStream.readInt();
+          String value = decodeString(dataInputStream);
+          dictionary.put(key, value);
+        }
+        dictionaryMap.put(column, dictionary);
       }
-    }
 
-    return dictionaryMap;
+      return dictionaryMap;
+    }
   }
 
-  private Map<String, String> deserializeMetadata(byte[] bytes)
-      throws IOException {
-    ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-    DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+  private Map<String, String> deserializeMetadata(byte[] bytes) throws IOException {
+    try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+        DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream)) {
+      int numEntries = dataInputStream.readInt();
+      Map<String, String> metadata = new HashMap<>(numEntries);
 
-    int numEntries = dataInputStream.readInt();
-    Map<String, String> metadata = new HashMap<>(numEntries);
+      for (int i = 0; i < numEntries; i++) {
+        String key = decodeString(dataInputStream);
+        String value = decodeString(dataInputStream);
+        metadata.put(key, value);
+      }
 
-    int readLength;
-    for (int i = 0; i < numEntries; i++) {
-      int keyLength = dataInputStream.readInt();
-      byte[] keyBytes = new byte[keyLength];
-      readLength = dataInputStream.read(keyBytes);
-      assert readLength == keyLength;
-
-      int valueLength = dataInputStream.readInt();
-      byte[] valueBytes = new byte[valueLength];
-      readLength = dataInputStream.read(valueBytes);
-      assert readLength == valueLength;
-
-      metadata.put(new String(keyBytes, UTF_8), new String(valueBytes, UTF_8));
+      return metadata;
     }
+  }
 
-    return metadata;
+  private static String decodeString(DataInputStream dataInputStream) throws IOException {
+    int length = dataInputStream.readInt();
+    if (length == 0) {
+      return StringUtils.EMPTY;
+    } else {
+      byte[] buffer = new byte[length];
+      int numBytesRead = dataInputStream.read(buffer);
+      assert numBytesRead == length;
+      return new String(buffer, UTF_8);
+    }
   }
 
   @Override
@@ -230,8 +223,7 @@ public class DataTableImplV2 implements DataTable {
 
   @Nonnull
   @Override
-  public byte[] toBytes()
-      throws IOException {
+  public byte[] toBytes() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
     dataOutputStream.writeInt(VERSION);
@@ -302,8 +294,7 @@ public class DataTableImplV2 implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private byte[] serializeDictionaryMap()
-      throws IOException {
+  private byte[] serializeDictionaryMap() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
@@ -327,8 +318,7 @@ public class DataTableImplV2 implements DataTable {
     return byteArrayOutputStream.toByteArray();
   }
 
-  private byte[] serializeMetadata()
-      throws IOException {
+  private byte[] serializeMetadata() throws IOException {
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
 
@@ -361,30 +351,6 @@ public class DataTableImplV2 implements DataTable {
   @Override
   public int getNumberOfRows() {
     return _numRows;
-  }
-
-  @Override
-  public boolean getBoolean(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.get() == 1;
-  }
-
-  @Override
-  public char getChar(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getChar();
-  }
-
-  @Override
-  public byte getByte(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.get();
-  }
-
-  @Override
-  public short getShort(int rowId, int colId) {
-    _fixedSizeData.position(rowId * _rowSizeInBytes + _columnOffsets[colId]);
-    return _fixedSizeData.getShort();
   }
 
   @Override
@@ -424,46 +390,13 @@ public class DataTableImplV2 implements DataTable {
   public <T> T getObject(int rowId, int colId) {
     int size = positionCursorInVariableBuffer(rowId, colId);
     ObjectType objectType = ObjectType.getObjectType(_variableSizeData.getInt());
-    byte[] bytes = new byte[size];
-    _variableSizeData.get(bytes);
+    ByteBuffer byteBuffer = _variableSizeData.slice();
+    byteBuffer.limit(size);
     try {
-      return ObjectCustomSerDe.deserialize(bytes, objectType);
+      return ObjectCustomSerDe.deserialize(byteBuffer, objectType);
     } catch (IOException e) {
       throw new RuntimeException("Caught exception while de-serializing object.", e);
     }
-  }
-
-  @Nonnull
-  @Override
-  public byte[] getByteArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    byte[] bytes = new byte[length];
-    for (int i = 0; i < length; i++) {
-      bytes[i] = _variableSizeData.get();
-    }
-    return bytes;
-  }
-
-  @Nonnull
-  @Override
-  public char[] getCharArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    char[] chars = new char[length];
-    for (int i = 0; i < length; i++) {
-      chars[i] = _variableSizeData.getChar();
-    }
-    return chars;
-  }
-
-  @Nonnull
-  @Override
-  public short[] getShortArray(int rowId, int colId) {
-    int length = positionCursorInVariableBuffer(rowId, colId);
-    short[] shorts = new short[length];
-    for (int i = 0; i < length; i++) {
-      shorts[i] = _variableSizeData.getShort();
-    }
-    return shorts;
   }
 
   @Nonnull
@@ -541,19 +474,7 @@ public class DataTableImplV2 implements DataTable {
     _fixedSizeData.position(0);
     for (int rowId = 0; rowId < _numRows; rowId++) {
       for (int colId = 0; colId < _numColumns; colId++) {
-        switch (_dataSchema.getColumnType(colId)) {
-          case BOOLEAN:
-            stringBuilder.append(_fixedSizeData.get());
-            break;
-          case BYTE:
-            stringBuilder.append(_fixedSizeData.get());
-            break;
-          case CHAR:
-            stringBuilder.append(_fixedSizeData.getChar());
-            break;
-          case SHORT:
-            stringBuilder.append(_fixedSizeData.getShort());
-            break;
+        switch (_dataSchema.getColumnDataType(colId)) {
           case INT:
             stringBuilder.append(_fixedSizeData.getInt());
             break;

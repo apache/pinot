@@ -15,7 +15,7 @@ $(document).ready(function() {
     mode: "sql",
     theme: "elegant"
   });
-  
+
   RESULTS = CodeMirror.fromTextArea(document.getElementById('results-maker'), {
     mode         : 'ruby',
     value        : "",
@@ -58,7 +58,8 @@ var HELPERS = {
     $.get("/tables", function(data) {
       var source   = $("#table-names-template").html();
       var template = Handlebars.compile(source);
-      var d = template(JSON.parse(data));
+      var dataObj = HELPERS.getAsObject(data);
+      var d = template(dataObj);
       $(".schema-list-view").html(d);
       $("#table-names").DataTable({
         "searching":true,
@@ -71,9 +72,16 @@ var HELPERS = {
     });
   },
 
+  getAsObject : function(str) {
+    if (typeof str === 'string' || str instanceof String) {
+      return JSON.parse(str);
+    }
+    return str;
+  },
+
   decorateTableSchema : function(tableName, th) {
     $.get("/tables/" + tableName + "/schema/", function(data){
-      var schema = JSON.parse(data);
+      var schema = HELPERS.getAsObject(data);
       var source   = $("#table-schema-template").html();
       var template = Handlebars.compile(source);
       var d = template(schema);
@@ -87,7 +95,7 @@ var HELPERS = {
       });
     });
   },
-  
+
   populateDefaultQuery: function(tableName) {
     EDITOR.setValue("select * from " + tableName + " limit 10");
   },
@@ -97,10 +105,15 @@ var HELPERS = {
   },
 
   executeQuery: function(query, traceEnabled, callback) {
-    var url = "/pql?pql=" + query +"&trace=" + traceEnabled;
+    var url = "/pql";
+    var params = JSON.stringify({
+      "pql": query,
+      "trace": traceEnabled
+    });
     $.ajax({
-      type: 'GET',
+      type: 'POST',
       url: url,
+      data: params,
       contentType: 'application/json; charset=utf-8',
       success: function (text) {
         callback(text);

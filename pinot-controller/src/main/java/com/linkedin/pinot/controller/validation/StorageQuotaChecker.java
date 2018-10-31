@@ -16,16 +16,18 @@
 
 package com.linkedin.pinot.controller.validation;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.QuotaConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.ControllerGauge;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.io.File;
+import javax.annotation.Nonnegative;
+import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.QuotaConfig;
-import com.linkedin.pinot.controller.api.restlet.resources.TableSizeReader;
-import javax.annotation.Nonnegative;
-import javax.annotation.Nonnull;
 
 
 /**
@@ -35,12 +37,14 @@ import javax.annotation.Nonnull;
 public class StorageQuotaChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(StorageQuotaChecker.class);
 
-  private final TableSizeReader tableSizeReader;
-  private final AbstractTableConfig tableConfig;
+  private final TableSizeReader _tableSizeReader;
+  private final TableConfig _tableConfig;
+  private final ControllerMetrics _controllerMetrics;
 
-  public StorageQuotaChecker(AbstractTableConfig tableConfig, TableSizeReader tableSizeReader) {
-    this.tableConfig = tableConfig;
-    this.tableSizeReader = tableSizeReader;
+  public StorageQuotaChecker(TableConfig tableConfig, TableSizeReader tableSizeReader, ControllerMetrics controllerMetrics) {
+    _tableConfig = tableConfig;
+    _tableSizeReader = tableSizeReader;
+    _controllerMetrics = controllerMetrics;
   }
 
   public class QuotaCheckerResponse {
@@ -55,7 +59,7 @@ public class StorageQuotaChecker {
    * check if the segment represented by segmentFile is within the storage quota
    * @param segmentFile untarred segment. This should not be null.
    *                    segmentFile must exist on disk and must be a directory
-   * @param tableNameWithType table name without type (OFFLINE/REALTIME) information
+   * @param tableNameWithType table name with type (OFFLINE/REALTIME) information
    * @param segmentName name of the segment being added
    * @param timeoutMsec timeout in milliseconds for reading table sizes from server
    *
@@ -74,41 +78,50 @@ public class StorageQuotaChecker {
     // 2. read table size from all the servers
     // 3. update predicted segment sizes
     // 4. is the updated size within quota
-    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
-    int numReplicas = tableConfig.getValidationConfig().getReplicationNumber();
-    final String tableName = tableConfig.getTableName();
+    QuotaConfig quotaConfig = _tableConfig.getQuotaConfig();
+    int numReplicas = _tableConfig.getValidationConfig().getReplicationNumber();
+    final String tableName = _tableConfig.getTableName();
 
     if (quotaConfig == null) {
       // no quota configuration...so ignore for backwards compatibility
+      LOGGER.warn("Quota configuration not set for table: {}", tableNameWithType);
       return new QuotaCheckerResponse(true,
-          "Quota configuration not set for table: " +tableNameWithType);
+          "Quota configuration not set for table: " + tableNameWithType);
     }
 
     long allowedStorageBytes = numReplicas * quotaConfig.storageSizeBytes();
     if (allowedStorageBytes < 0) {
+      LOGGER.warn("Storage quota is not configured for table: {}", tableNameWithType);
       return new QuotaCheckerResponse(true,
           "Storage quota is not configured for table: " + tableNameWithType);
     }
+    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.TABLE_QUOTA, allowedStorageBytes);
 
     long incomingSegmentSizeBytes = FileUtils.sizeOfDirectory(segmentFile);
 
     // read table size
     TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize =
-        tableSizeReader.getTableSubtypeSize(tableNameWithType, timeoutMsec);
+        _tableSizeReader.getTableSubtypeSize(tableNameWithType, timeoutMsec);
 
     // If the segment exists(refresh), get the existing size
     TableSizeReader.SegmentSizeDetails sizeDetails = tableSubtypeSize.segments.get(segmentName);
     long existingSegmentSizeBytes = sizeDetails != null ?  sizeDetails.estimatedSizeInBytes : 0;
 
+    // Since tableNameWithType comes with the table type(OFFLINE), thus we guarantee that
+    // tableSubtypeSize.estimatedSizeInBytes is the offline table size.
+    _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE, tableSubtypeSize.estimatedSizeInBytes);
+
     long estimatedFinalSizeBytes = tableSubtypeSize.estimatedSizeInBytes - existingSegmentSizeBytes + incomingSegmentSizeBytes;
     if (estimatedFinalSizeBytes <= allowedStorageBytes) {
-      return new QuotaCheckerResponse(true,
-          String.format("Estimated size: %d bytes is within the configured quota of %d (bytes) for table %s. Incoming segment size: %d (bytes)",
-          estimatedFinalSizeBytes, allowedStorageBytes, tableName, incomingSegmentSizeBytes) );
+      String message = String.format("Estimated size: %d bytes is within the configured quota of %d (bytes) for table %s. Incoming segment size: %d (bytes)",
+          estimatedFinalSizeBytes, allowedStorageBytes, tableName, incomingSegmentSizeBytes);
+      LOGGER.info(message);
+      return new QuotaCheckerResponse(true, message);
     } else {
-      return new QuotaCheckerResponse(false,
-          String.format("Estimated size: %d bytes exceeds the configured quota of %d (bytes) for table %s. Incoming segment size: %d (bytes)",
-          estimatedFinalSizeBytes, allowedStorageBytes, tableName, incomingSegmentSizeBytes));
+      String message = String.format("Estimated size: %d bytes exceeds the configured quota of %d (bytes) for table %s. Incoming segment size: %d (bytes)",
+          estimatedFinalSizeBytes, allowedStorageBytes, tableName, incomingSegmentSizeBytes);
+      LOGGER.warn(message);
+      return new QuotaCheckerResponse(false, message);
     }
   }
 }

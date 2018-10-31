@@ -88,7 +88,8 @@ public class PinotZKChanger {
       for (String server : mapIS.keySet()) {
         String state = mapIS.get(server);
         if (mapEV == null || mapEV.get(server) == null || !mapEV.get(server).equals(state)) {
-          LOGGER.info("Mismatch: segment" + segment + " server:" + server + " state:" + state);
+          LOGGER.info("Mismatch: segment " + segment + " server:" + server + " expected state:" + state +
+             " actual state:" + ((mapEV == null || mapEV.get(server) == null) ? "null" : mapEV.get(server)));
           numDiff = numDiff + 1;
         }
       }

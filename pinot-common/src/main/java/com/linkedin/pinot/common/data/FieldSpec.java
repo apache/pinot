@@ -15,13 +15,18 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.utils.DataSchema;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.ConfigKey;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
+import java.nio.charset.Charset;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 
 
 /**
@@ -34,157 +39,277 @@ import org.json.JSONObject;
  * <p>- <code>IsSingleValueField</code>: single-value or multi-value field.
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
  */
+@SuppressWarnings("unused")
 public abstract class FieldSpec {
-  private static final Integer DEFAULT_DIM_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
-  private static final Long DEFAULT_DIM_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
-  private static final Float DEFAULT_DIM_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
-  private static final Double DEFAULT_DIM_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
-  private static final String DEFAULT_DIM_NULL_VALUE_OF_STRING = "null";
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
+  private static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
+  private static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
+  private static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
+  private static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
+  private static final ByteArray DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
+
+  private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
   private static final Long DEFAULT_METRIC_NULL_VALUE_OF_LONG = 0L;
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
+  private static final ByteArray DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
 
-  private String _name;
-  private DataType _dataType;
-  private boolean _isSingleValueField = true;
-  private String _stringDefaultNullValue;
-  private Object _cachedDefaultNullValue;
+  @ConfigKey("name")
+  protected String _name;
+
+  @ConfigKey("dataType")
+  protected DataType _dataType;
+
+  @ConfigKey("singleValue")
+  protected boolean _isSingleValueField = true;
+
+  protected Object _defaultNullValue;
+
+  @ConfigKey("defaultNullValue")
+  private transient String _stringDefaultNullValue;
+
+  // Transform function to generate this column, can be based on other columns
+  protected String _transformFunction;
 
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
   }
 
   public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField) {
-    Preconditions.checkNotNull(name);
-
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
+    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, null);
   }
 
   public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
       @Nonnull Object defaultNullValue) {
-    Preconditions.checkNotNull(name);
-
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
     _stringDefaultNullValue = defaultNullValue.toString();
+    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
+  @Nonnull
   public abstract FieldType getFieldType();
 
+  @Nonnull
   public String getName() {
     return _name;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setName(@Nonnull String name) {
-    Preconditions.checkNotNull(name);
-
     _name = name;
   }
 
+  @Nonnull
   public DataType getDataType() {
     return _dataType;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDataType(@Nonnull DataType dataType) {
     _dataType = dataType.getStoredType();
-    _cachedDefaultNullValue = null;
+    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
   public boolean isSingleValueField() {
     return _isSingleValueField;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setSingleValueField(boolean isSingleValueField) {
     _isSingleValueField = isSingleValueField;
   }
 
+  @Nonnull
   public Object getDefaultNullValue() {
-    FieldType fieldType = getFieldType();
-    if (_cachedDefaultNullValue == null) {
-      if (_stringDefaultNullValue != null) {
-        switch (_dataType) {
-          case INT:
-            _cachedDefaultNullValue = Integer.valueOf(_stringDefaultNullValue);
-            break;
-          case LONG:
-            _cachedDefaultNullValue = Long.valueOf(_stringDefaultNullValue);
-            break;
-          case FLOAT:
-            _cachedDefaultNullValue = Float.valueOf(_stringDefaultNullValue);
-            break;
-          case DOUBLE:
-            _cachedDefaultNullValue = Double.valueOf(_stringDefaultNullValue);
-            break;
-          case STRING:
-            _cachedDefaultNullValue = _stringDefaultNullValue;
-            break;
-          default:
-            throw new UnsupportedOperationException("Unsupported data type: " + _dataType);
-        }
-      } else {
-        switch (fieldType) {
-          case METRIC:
-            switch (_dataType) {
-              case INT:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_INT;
-                break;
-              case LONG:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_LONG;
-                break;
-              case FLOAT:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
-                break;
-              case DOUBLE:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
-                break;
-              case STRING:
-                _cachedDefaultNullValue = DEFAULT_METRIC_NULL_VALUE_OF_STRING;
-                break;
-              default:
-                throw new UnsupportedOperationException(
-                    "Unknown default null value for metric field of data type: " + _dataType);
-            }
-            break;
-          case DIMENSION:
-          case TIME:
-            switch (_dataType) {
-              case INT:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_INT;
-                break;
-              case LONG:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_LONG;
-                break;
-              case FLOAT:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_FLOAT;
-                break;
-              case DOUBLE:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_DOUBLE;
-                break;
-              case STRING:
-                _cachedDefaultNullValue = DEFAULT_DIM_NULL_VALUE_OF_STRING;
-                break;
-              default:
-                throw new UnsupportedOperationException(
-                    "Unknown default null value for dimension/time field of data type: " + _dataType);
-            }
-            break;
-          default:
-            throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
-        }
-      }
-    }
-    return _cachedDefaultNullValue;
+    return _defaultNullValue;
   }
 
+  // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDefaultNullValue(@Nonnull Object defaultNullValue) {
     _stringDefaultNullValue = defaultNullValue.toString();
-    _cachedDefaultNullValue = null;
+    if (_dataType != null) {
+      _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
+    }
+  }
+
+  private static Object getDefaultNullValue(@Nonnull FieldType fieldType, @Nonnull DataType dataType,
+      String stringDefaultNullValue) {
+    if (stringDefaultNullValue != null) {
+      switch (dataType) {
+        case INT:
+          return Integer.valueOf(stringDefaultNullValue);
+        case LONG:
+          return Long.valueOf(stringDefaultNullValue);
+        case FLOAT:
+          return Float.valueOf(stringDefaultNullValue);
+        case DOUBLE:
+          return Double.valueOf(stringDefaultNullValue);
+        case STRING:
+          return stringDefaultNullValue;
+        case BYTES:
+          try {
+            return new ByteArray(Hex.decodeHex(stringDefaultNullValue.toCharArray()));
+          } catch (DecoderException e) {
+            Utils.rethrowException(e); // Re-throw to avoid handling exceptions in all callers.
+          }
+        default:
+          throw new UnsupportedOperationException("Unsupported data type: " + dataType);
+      }
+    } else {
+      switch (fieldType) {
+        case METRIC:
+          switch (dataType) {
+            case INT:
+              return DEFAULT_METRIC_NULL_VALUE_OF_INT;
+            case LONG:
+              return DEFAULT_METRIC_NULL_VALUE_OF_LONG;
+            case FLOAT:
+              return DEFAULT_METRIC_NULL_VALUE_OF_FLOAT;
+            case DOUBLE:
+              return DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE;
+            case STRING:
+              return DEFAULT_METRIC_NULL_VALUE_OF_STRING;
+            case BYTES:
+              return DEFAULT_METRIC_NULL_VALUE_OF_BYTES;
+            default:
+              throw new UnsupportedOperationException(
+                  "Unknown default null value for metric field of data type: " + dataType);
+          }
+        case DIMENSION:
+        case TIME:
+        case DATE_TIME:
+          switch (dataType) {
+            case INT:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_INT;
+            case LONG:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_LONG;
+            case FLOAT:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT;
+            case DOUBLE:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE;
+            case STRING:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
+            case BYTES:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES;
+            default:
+              throw new UnsupportedOperationException(
+                  "Unknown default null value for dimension/time field of data type: " + dataType);
+          }
+        default:
+          throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
+      }
+    }
+  }
+
+  /**
+   * Transform function if defined else null.
+   * @return
+   */
+  public String getTransformFunction() {
+    return _transformFunction;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setTransformFunction(@Nonnull String transformFunction) {
+    _transformFunction = transformFunction;
+  }
+
+  /**
+   * Returns the {@link JsonObject} representing the field spec.
+   * <p>Only contains fields with non-default value.
+   * <p>NOTE: here we use {@link JsonObject} to preserve the insertion order.
+   */
+  @Nonnull
+  public JsonObject toJsonObject() {
+    JsonObject jsonObject = new JsonObject();
+    jsonObject.addProperty("name", _name);
+    jsonObject.addProperty("dataType", _dataType.name());
+    if (!_isSingleValueField) {
+      jsonObject.addProperty("singleValueField", false);
+    }
+    appendDefaultNullValue(jsonObject);
+    return jsonObject;
+  }
+
+  protected void appendDefaultNullValue(@Nonnull JsonObject jsonObject) {
+    if (_defaultNullValue == null) {
+      return;
+    }
+
+    if (!_defaultNullValue.equals(getDefaultNullValue(getFieldType(), _dataType, null))) {
+      if (_defaultNullValue instanceof Number) {
+        jsonObject.add("defaultNullValue", new JsonPrimitive((Number) _defaultNullValue));
+      } else {
+        jsonObject.addProperty("defaultNullValue", _defaultNullValue.toString());
+      }
+    }
+  }
+
+  @Nonnull
+  public JsonObject toAvroSchemaJsonObject() {
+    JsonObject jsonSchema = new JsonObject();
+    jsonSchema.addProperty("name", _name);
+    switch (_dataType) {
+      case INT:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "int"));
+        return jsonSchema;
+      case LONG:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "long"));
+        return jsonSchema;
+      case FLOAT:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "float"));
+        return jsonSchema;
+      case DOUBLE:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "double"));
+        return jsonSchema;
+      case STRING:
+        jsonSchema.add("type", convertStringsToJsonArray("null", "string"));
+        return jsonSchema;
+      default:
+        throw new UnsupportedOperationException();
+    }
+  }
+
+  private static JsonArray convertStringsToJsonArray(String... strings) {
+    JsonArray jsonArray = new JsonArray();
+    for (String string : strings) {
+      jsonArray.add(new JsonPrimitive(string));
+    }
+    return jsonArray;
+  }
+
+  @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    FieldSpec that = (FieldSpec) o;
+    return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
+        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(_defaultNullValue,
+        that._defaultNullValue);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_name);
+    result = EqualityUtils.hashCodeOf(result, _dataType);
+    result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
+    result = EqualityUtils.hashCodeOf(result, _defaultNullValue);
+    return result;
   }
 
   /**
@@ -192,158 +317,37 @@ public abstract class FieldSpec {
    * <p><code>DIMENSION</code>: columns used to filter records.
    * <p><code>METRIC</code>: columns used to apply aggregation on. <code>METRIC</code> field only contains numeric data.
    * <p><code>TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
+   * <p><code>DATE_TIME</code>: time column (at most one per {@link Schema}). <code>TIME</code> field can be used to prune
    * segments, otherwise treated the same as <code>DIMENSION</code> field.
    */
   public enum FieldType {
     DIMENSION,
     METRIC,
-    TIME
+    TIME,
+    DATE_TIME
   }
 
   /**
-   * The <code>DataType</code> enum is used to demonstrate the data type of a column.
-   * <p>Array <code>DataType</code> is only used in {@link DataSchema}.
-   * <p>In {@link Schema}, use non-array <code>DataType</code> only.
-   * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
-   * <code>DataType</code>s will be converted to one of them.
+   * The <code>DataType</code> enum is used to demonstrate the data type of a field.
    */
   public enum DataType {
-    BOOLEAN,      // Stored as STRING.
-    BYTE,         // Stored as INT.
-    CHAR,         // Stored as STRING.
-    SHORT,        // Stored as INT.
     INT,
     LONG,
     FLOAT,
     DOUBLE,
+    BOOLEAN,  // Stored as STRING
     STRING,
-    OBJECT,       // Used in dataTable to transfer data structure.
-    //EVERYTHING AFTER THIS MUST BE ARRAY TYPE
-    BYTE_ARRAY,   // Unused.
-    CHAR_ARRAY,   // Unused.
-    SHORT_ARRAY,  // Unused.
-    INT_ARRAY,
-    LONG_ARRAY,
-    FLOAT_ARRAY,
-    DOUBLE_ARRAY,
-    STRING_ARRAY;
-
-    public boolean isNumber() {
-      switch (this) {
-        case BYTE:
-        case SHORT:
-        case INT:
-        case LONG:
-        case FLOAT:
-        case DOUBLE:
-          return true;
-        default:
-          return false;
-      }
-    }
-
-    public boolean isInteger() {
-      switch (this) {
-        case BYTE:
-        case SHORT:
-        case INT:
-        case LONG:
-          return true;
-        default:
-          return false;
-      }
-    }
-
-    public boolean isSingleValue() {
-      return this.ordinal() < BYTE_ARRAY.ordinal();
-    }
-
-    public DataType toMultiValue() {
-      switch (this) {
-        case BYTE:
-          return BYTE_ARRAY;
-        case CHAR:
-          return CHAR_ARRAY;
-        case INT:
-          return INT_ARRAY;
-        case LONG:
-          return LONG_ARRAY;
-        case FLOAT:
-          return FLOAT_ARRAY;
-        case DOUBLE:
-          return DOUBLE_ARRAY;
-        case STRING:
-          return STRING_ARRAY;
-        default:
-          throw new UnsupportedOperationException("Unsupported toMultiValue for data type: " + this);
-      }
-    }
-
-    public DataType toSingleValue() {
-      switch (this) {
-        case BYTE_ARRAY:
-          return BYTE;
-        case CHAR_ARRAY:
-          return CHAR;
-        case INT_ARRAY:
-          return INT;
-        case LONG_ARRAY:
-          return LONG;
-        case FLOAT_ARRAY:
-          return FLOAT;
-        case DOUBLE_ARRAY:
-          return DOUBLE;
-        case STRING_ARRAY:
-          return STRING;
-        default:
-          throw new UnsupportedOperationException("Unsupported toSingleValue for data type: " + this);
-      }
-    }
-
-    public boolean isCompatible(DataType anotherDataType) {
-      // Single-value is not compatible with multi-value.
-      if (isSingleValue() != anotherDataType.isSingleValue()) {
-        return false;
-      }
-      // Number is not compatible with String.
-      if (isSingleValue()) {
-        if (isNumber() != anotherDataType.isNumber()) {
-          return false;
-        }
-      } else {
-        if (toSingleValue().isNumber() != anotherDataType.toSingleValue().isNumber()) {
-          return false;
-        }
-      }
-      return true;
-    }
+    BYTES;
 
     /**
-     * Return the {@link DataType} stored in pinot.
+     * Returns the data type stored in Pinot.
      */
     public DataType getStoredType() {
-      switch (this) {
-        case BYTE:
-        case SHORT:
-        case INT:
-          return INT;
-        case LONG:
-          return LONG;
-        case FLOAT:
-          return FLOAT;
-        case DOUBLE:
-          return DOUBLE;
-        case BOOLEAN:
-        case CHAR:
-        case STRING:
-          return STRING;
-        default:
-          throw new UnsupportedOperationException("Unsupported data type: " + this);
-      }
+      return this == BOOLEAN ? STRING : this;
     }
 
     /**
-     * Return the {@link DataType} associate with the {@link Type}
+     * Returns the data type stored in Pinot that is associated with the given Avro type.
      */
     public static DataType valueOf(Type avroType) {
       switch (avroType) {
@@ -359,67 +363,28 @@ public abstract class FieldSpec {
         case STRING:
         case ENUM:
           return STRING;
+        case BYTES:
+          return BYTES;
         default:
           throw new UnsupportedOperationException("Unsupported Avro type: " + avroType);
       }
     }
 
     /**
-     * Return number of bytes needed for storage.
+     * Returns the number of bytes needed to store the data type.
      */
     public int size() {
       switch (this) {
         case INT:
-          return 4;
+          return Integer.BYTES;
         case LONG:
-          return 8;
+          return Long.BYTES;
         case FLOAT:
-          return 4;
+          return Float.BYTES;
         case DOUBLE:
-          return 8;
+          return Double.BYTES;
         default:
-          throw new UnsupportedOperationException("Cannot get number of bytes for: " + this);
-      }
-    }
-
-    public JSONObject toJSONSchemaFor(String column)
-        throws JSONException {
-      final JSONObject ret = new JSONObject();
-      ret.put("name", column);
-      ret.put("doc", "data sample from load generator");
-      switch (this) {
-        case INT:
-          final JSONArray intType = new JSONArray();
-          intType.put("null");
-          intType.put("int");
-          ret.put("type", intType);
-          return ret;
-        case LONG:
-          final JSONArray longType = new JSONArray();
-          longType.put("null");
-          longType.put("long");
-          ret.put("type", longType);
-          return ret;
-        case FLOAT:
-          final JSONArray floatType = new JSONArray();
-          floatType.put("null");
-          floatType.put("float");
-          ret.put("type", floatType);
-          return ret;
-        case DOUBLE:
-          final JSONArray doubleType = new JSONArray();
-          doubleType.put("null");
-          doubleType.put("double");
-          ret.put("type", doubleType);
-          return ret;
-        case STRING:
-          final JSONArray stringType = new JSONArray();
-          stringType.put("null");
-          stringType.put("string");
-          ret.put("type", stringType);
-          return ret;
-        default:
-          return null;
+          throw new IllegalStateException("Cannot get number of bytes for: " + this);
       }
     }
   }

@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.serde;
 
-import org.apache.http.annotation.NotThreadSafe;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;

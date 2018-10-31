@@ -1,0 +1,249 @@
+<div class="table-responsive analysis-table-wrapper">
+  <table class="table table-bordered analysis-table">
+
+    <tbody>
+      {{#if primaryMetricRows.length}}
+        <tr>
+          <td class="analysis-table__anchor analysis-table__anchor--white">
+            <h5 class="contribution-table__title">Primary Metric</h5>
+          </td>
+          {{#each filteredDates as |date|}}
+            <td class="analysis-table__header">
+              {{moment-format date dateFormat}}
+            </td>
+          {{/each}}
+        </tr>
+
+        {{#if showDetails}}
+          <tr>
+            <td class="analysis-table__anchor analysis-table__anchor--low"></td>
+            {{#each filteredDates as |date|}}
+            <td class="analysis-table__subheader">
+              <div class="analysis-table__cell">
+                <div class="analysis-table__item">
+                  Current
+                </div>
+                <div class="analysis-table__item">
+                  Expected
+                </div>
+                <div class="analysis-table__item analysis-table__item--small">
+                  Ratio
+                </div>
+              </div>
+            </td>
+            {{/each}}
+          </tr>
+        {{/if}}
+
+        {{#each filteredPrimaryMetricRows as |metric|}}
+          <tr>
+            <td class="analysis-table__dimension">
+              <div class="analysis-table__cell analysis-table__cell--primary">{{metric.metricName}}</div>
+            </td>
+
+            {{#if showDetails}}
+              {{#each-in metric.subDimensionContributionMap.All.percentageChange as |index percentChange|}}
+                <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}; color: {{compute-text-color percentChange}};">
+                  <div class="analysis-table__cell">
+                    <div class="analysis-table__item">
+                      {{format-number (get metric.subDimensionContributionMap.All.currentValues index)}}
+                    </div>
+                    <div class="analysis-table__item">
+                      {{format-number (get metric.subDimensionContributionMap.All.baselineValues index)}}
+                    </div>
+                    <div class="analysis-table__item analysis-table__item--small">
+                      <div class="analysis-table__item  analysis-table__item--large">
+                          {{percentChange}}%
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              {{/each-in}}
+            {{else}}
+
+              {{#each metric.subDimensionContributionMap.All.percentageChange as |percentChange index|}}
+                <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}">
+                  <div class="analysis-table__cell">
+                    <div class="analysis-table__item  analysis-table__item--large">
+                      <span style="color:{{compute-text-color percentChange}}">
+                        {{percentChange}}%
+                      </span>
+                    </div>
+                  </div>
+                </td>
+              {{/each}}
+            {{/if}}
+          </tr>
+          <tr>
+            <td class="analysis-table__dimension">
+              <div class="analysis-table__cell analysis-table__cell--primary"></div>
+            </td>
+          </tr>
+        {{/each}}
+      {{/if}}
+  
+      {{#if filteredRelatedMetricRows.length}}
+        <tr>
+          <td class="analysis-table__dimension analysis-table__anchor--white">
+            <h5 class="contribution-table__title">Related Metrics</h5>
+          </td>
+          {{#each filteredDates as |date|}}
+            <td class="analysis-table__header">
+              {{moment-format date dateFormat}}
+            </td>
+          {{/each}}
+        </tr>
+
+        {{#if showDetails}}
+          <td class="analysis-table__anchor analysis-table__anchor--low"></td>
+          {{#each filteredDates as |date|}}
+          <td class="analysis-table__subheader">
+            <div class="analysis-table__cell">
+              <div class="analysis-table__item">
+                Current
+              </div>
+              <div class="analysis-table__item">
+                Expected
+              </div>
+              <div class="analysis-table__item analysis-table__item--small">
+                Ratio
+              </div>
+            </div>
+          </td>
+          {{/each}}
+        {{/if}}
+
+        {{#each filteredRelatedMetricRows as |metric|}}
+          <tr>
+            <td class="analysis-table__dimension">
+              <div class="analysis-table__cell analysis-table__cell--primary">{{metric.metricName}}</div>
+            </td>
+
+            {{#if showDetails}}
+              {{#each-in metric.subDimensionContributionMap.All.percentageChange as |index percentChange|}}
+                <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}; color: {{compute-text-color percentChange}};">
+                  <div class="analysis-table__cell">
+                    <div class="analysis-table__item">
+                      {{format-number (get metric.subDimensionContributionMap.All.currentValues index)}}
+                    </div>
+                    <div class="analysis-table__item">
+                      {{format-number (get metric.subDimensionContributionMap.All.baselineValues index)}}
+                    </div>
+                    <div class="analysis-table__item analysis-table__item--small">
+                      <div class="analysis-table__item  analysis-table__item--large">
+                          {{percentChange}}%
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              {{/each-in}}
+            {{else}}
+
+              {{#each metric.subDimensionContributionMap.All.percentageChange as |percentChange index|}}
+                <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}">
+                  <div class="analysis-table__cell">
+                    <div class="analysis-table__item  analysis-table__item--large">
+                      <span style="color:{{compute-text-color percentChange}}">
+                        {{percentChange}}%
+                      </span>
+                    </div>
+                  </div>
+                </td>
+              {{/each}}
+              
+            {{/if}}
+          </tr>
+        {{/each}}
+
+        <tr>
+          <td class="analysis-table__dimension">
+            <div class="analysis-table__cell analysis-table__cell--primary"></div>
+          </td>
+        </tr>
+      {{/if}}
+
+      {{#if dimensionRows.length}}
+        <tr>
+          <td class="analysis-table__dimension analysis-table__anchor--white">
+            <h5 class="contribution-table__title">Dimensions </h5>
+          </td>
+          {{#each filteredDates as |date|}}
+            <td class="analysis-table__header">
+              {{moment-format date dateFormat}}
+            </td>
+          {{/each}}
+        </tr>
+
+        {{#if showDetails}}
+          <tr>
+            <td class="analysis-table__anchor analysis-table__anchor--low"></td>
+            {{#each filteredDates as |date|}}
+            <td class="analysis-table__subheader">
+              <div class="analysis-table__cell">
+                <div class="analysis-table__item">
+                  Current
+                </div>
+                <div class="analysis-table__item">
+                  Expected
+                </div>
+                <div class="analysis-table__item analysis-table__item--small">
+                  Ratio
+                </div>
+              </div>
+            </td>
+            {{/each}}
+          </tr>
+        {{/if}}
+
+        {{#each filteredDimensionRows as |dimension|}}
+          <tr>
+            <td class="analysis-table__dimension">
+              <div class="analysis-table__cell analysis-table__cell--primary">{{dimension.name}}</div>
+            </td>
+
+            {{#if showDetails}}
+              {{#each-in dimension.percentageChange as |index percentChange|}}
+                <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}; color: {{compute-text-color percentChange}};">
+                  <div class="analysis-table__cell">
+                    <div class="analysis-table__item">
+                      {{format-number (get dimension.currentValues index)}}
+                    </div>
+                    <div class="analysis-table__item">
+                      {{format-number (get dimension.baselineValues index)}}
+                    </div>
+                    <div class="analysis-table__item analysis-table__item--small">
+                      <div class="analysis-table__item  analysis-table__item--large">
+                          {{percentChange}}%
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              {{/each-in}}
+            {{else}}
+
+              {{#each dimension.percentageChange as |percentChange index|}}
+                <td class="analysis-table__data" style="background-color: {{compute-color percentChange}}">
+                  <div class="analysis-table__cell">
+                    <div class="analysis-table__item  analysis-table__item--large">
+                      <span style="color:{{compute-text-color percentChange}}">
+                        {{percentChange}}%
+                      </span>
+                    </div>
+                  </div>
+                </td>
+              {{/each}}
+              
+            {{/if}}
+          </tr>
+        {{/each}}
+
+        <tr>
+          <td class="analysis-table__dimension">
+            <div class="analysis-table__cell analysis-table__cell--primary"></div>
+          </td>
+        </tr>
+      {{/if}}
+    </tbody>
+  </table>
+</div>
+

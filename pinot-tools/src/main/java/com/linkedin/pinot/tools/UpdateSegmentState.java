@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.tools;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -131,7 +131,7 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
     List<ZNRecord> tableConfigs = _propertyStore.getChildren(tableConfigPath, null, 0);
     List<String> tables = new ArrayList<>(128);
     for (ZNRecord znRecord : tableConfigs) {
-      AbstractTableConfig tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+      TableConfig tableConfig = TableConfig.fromZnRecord(znRecord);
       if (tableConfig.getTenantConfig().getServer().equals(_tenantName)) {
         tables.add(tableConfig.getTableName());
       }

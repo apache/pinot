@@ -15,46 +15,55 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
+import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
-public final class ArrayBasedDocIdIterator implements IndexBasedDocIdIterator {
 
-  int counter = 0;
-  private int[] list;
-  private int searchableLength;
+public final class ArrayBasedDocIdIterator implements BlockDocIdIterator {
+  private final int[] _docIds;
+  private final int _searchableLength;
 
-  public ArrayBasedDocIdIterator(int[] _docIdArray, int _searchableLength) {
-    super();
-    this.list = _docIdArray;
-    this.searchableLength = _searchableLength;
-  }
+  private int _currentIndex = -1;
+  private int _currentDocId = -1;
 
-  @Override
-  public int advance(int targetDocId) {
-    int ret = Constants.EOF;
-    while (counter < list.length) {
-      if (list[counter] >= targetDocId) {
-        ret = list[counter];
-        break;
-      }
-      counter = counter + 1;
-    }
-    return ret;
-
+  public ArrayBasedDocIdIterator(int[] docIds, int searchableLength) {
+    _docIds = docIds;
+    _searchableLength = searchableLength;
   }
 
   @Override
   public int next() {
-    if (counter == searchableLength) {
+    if (_currentDocId == Constants.EOF) {
       return Constants.EOF;
     }
-    int ret = list[counter];
-    counter = counter + 1;
-    return ret;
+    if (++_currentIndex == _searchableLength) {
+      _currentDocId = Constants.EOF;
+    } else {
+      _currentDocId = _docIds[_currentIndex];
+    }
+    return _currentDocId;
+  }
+
+  @Override
+  public int advance(int targetDocId) {
+    if (_currentDocId == Constants.EOF) {
+      return Constants.EOF;
+    }
+    if (targetDocId <= _currentDocId) {
+      return _currentDocId;
+    }
+    while (++_currentIndex < _searchableLength) {
+      if (_docIds[_currentIndex] >= targetDocId) {
+        _currentDocId = _docIds[_currentIndex];
+        return _currentDocId;
+      }
+    }
+    _currentDocId = Constants.EOF;
+    return Constants.EOF;
   }
 
   @Override
   public int currentDocId() {
-    return list[counter];
+    return _currentDocId;
   }
 }

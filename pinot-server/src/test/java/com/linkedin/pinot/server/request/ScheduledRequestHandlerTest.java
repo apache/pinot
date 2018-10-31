@@ -15,11 +15,14 @@
  */
 package com.linkedin.pinot.server.request;
 
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataSchema;
@@ -27,7 +30,9 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
+import com.linkedin.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import com.linkedin.pinot.serde.SerDe;
 import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.buffer.ByteBuf;
@@ -36,51 +41,41 @@ import io.netty.channel.ChannelHandlerContext;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nonnull;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.thrift.protocol.TCompactProtocol;
-import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class ScheduledRequestHandlerTest {
-
-  public static Logger LOGGER = LoggerFactory.getLogger(ScheduledRequestHandlerTest.class);
-
   private ServerMetrics serverMetrics;
   private ChannelHandlerContext channelHandlerContext;
   private QueryScheduler queryScheduler;
+  private QueryExecutor queryExecutor;
+  private UnboundedResourceManager resourceManager;
 
-  @BeforeTest
-  public void setupTestMethod() {
+  @BeforeClass
+  public void setUp() {
     serverMetrics = new ServerMetrics(new MetricsRegistry());
     channelHandlerContext = mock(ChannelHandlerContext.class, RETURNS_DEEP_STUBS);
-    when(channelHandlerContext.channel().remoteAddress())
-        .thenAnswer(new Answer<InetSocketAddress>() {
-          @Override
-          public InetSocketAddress answer(InvocationOnMock invocationOnMock)
-              throws Throwable {
-            return new InetSocketAddress("localhost", 60000);
-          }
-        });
+    when(channelHandlerContext.channel().remoteAddress()).thenAnswer(
+        (Answer<InetSocketAddress>) invocationOnMock -> new InetSocketAddress("localhost", 60000));
 
     queryScheduler = mock(QueryScheduler.class);
+    queryExecutor = new ServerQueryExecutorV1Impl();
+    resourceManager = new UnboundedResourceManager(new PropertiesConfiguration());
   }
 
   @Test
-  public void testBadRequest()
-      throws Exception {
+  public void testBadRequest() throws Exception {
     ScheduledRequestHandler handler = new ScheduledRequestHandler(queryScheduler, serverMetrics);
     String requestBadString = "foobar";
     byte[] requestData = requestBadString.getBytes();
@@ -89,10 +84,7 @@ public class ScheduledRequestHandlerTest {
     // The handler method is expected to return immediately
     Assert.assertTrue(response.isDone());
     byte[] responseBytes = response.get();
-    Assert.assertTrue(responseBytes.length > 0);
-    DataTable expectedDT = new DataTableImplV2();
-    expectedDT.addException(QueryException.INTERNAL_ERROR);
-    Assert.assertEquals(responseBytes, expectedDT.toBytes());
+    Assert.assertNull(responseBytes);
   }
 
   private InstanceRequest getInstanceRequest() {
@@ -112,20 +104,33 @@ public class ScheduledRequestHandlerTest {
   }
 
   @Test
-  public void testQueryProcessingException()
-      throws Exception {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(null) {
-      @Override
-      public ListenableFuture<DataTable> submit(QueryRequest queryRequest) {
-        return queryWorkers.submit(new Callable<DataTable>() {
+  public void testQueryProcessingException() throws Exception {
+    ScheduledRequestHandler handler =
+        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
+          @Nonnull
           @Override
-          public DataTable call()
-              throws Exception {
-            throw new RuntimeException("query processing error");
+          public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+            ListenableFuture<DataTable> dataTable = resourceManager.getQueryRunners().submit(() -> {
+              throw new RuntimeException("query processing error");
+            });
+            ListenableFuture<DataTable> queryResponse = Futures.catching(dataTable, Throwable.class, input -> {
+              DataTable result = new DataTableImplV2();
+              result.addException(QueryException.INTERNAL_ERROR);
+              return result;
+            });
+            return serializeData(queryResponse);
           }
-        });
-      }
-    }, serverMetrics);
+
+          @Override
+          public void start() {
+
+          }
+
+          @Override
+          public String name() {
+            return "test";
+          }
+        }, serverMetrics);
 
     ByteBuf requestBuf = getSerializedInstanceRequest(getInstanceRequest());
     ListenableFuture<byte[]> responseFuture = handler.processRequest(channelHandlerContext, requestBuf);
@@ -138,36 +143,41 @@ public class ScheduledRequestHandlerTest {
   }
 
   @Test
-  public void testValidQueryResponse()
-      throws InterruptedException, ExecutionException, TimeoutException, IOException {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(null) {
-      @Override
-      public ListenableFuture<DataTable> submit(QueryRequest queryRequest) {
-        return queryRunners.submit(new Callable<DataTable>() {
+  public void testValidQueryResponse() throws InterruptedException, ExecutionException, TimeoutException, IOException {
+    ScheduledRequestHandler handler =
+        new ScheduledRequestHandler(new QueryScheduler(queryExecutor, resourceManager, serverMetrics) {
+          @Nonnull
           @Override
-          public DataTable call()
-              throws Exception {
-            String[] columns = new String[] { "foo", "bar"};
-            FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[] {
-              FieldSpec.DataType.STRING,
-              FieldSpec.DataType.INT
-            };
-            DataSchema dataSchema = new DataSchema(
-                columns, columnTypes);
-            DataTableBuilder dtBuilder = new DataTableBuilder(dataSchema);
-            dtBuilder.startRow();
-            dtBuilder.setColumn(0, "mars");
-            dtBuilder.setColumn(1, 10);
-            dtBuilder.finishRow();
-            dtBuilder.startRow();
-            dtBuilder.setColumn(0, "jupiter");
-            dtBuilder.setColumn(1, 100);
-            dtBuilder.finishRow();
-            return dtBuilder.build();
+          public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
+            ListenableFuture<DataTable> response = resourceManager.getQueryRunners().submit(() -> {
+              String[] columnNames = new String[]{"foo", "bar"};
+              DataSchema.ColumnDataType[] columnDataTypes =
+                  new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT};
+              DataSchema dataSchema = new DataSchema(columnNames, columnDataTypes);
+              DataTableBuilder dtBuilder = new DataTableBuilder(dataSchema);
+              dtBuilder.startRow();
+              dtBuilder.setColumn(0, "mars");
+              dtBuilder.setColumn(1, 10);
+              dtBuilder.finishRow();
+              dtBuilder.startRow();
+              dtBuilder.setColumn(0, "jupiter");
+              dtBuilder.setColumn(1, 100);
+              dtBuilder.finishRow();
+              return dtBuilder.build();
+            });
+            return serializeData(response);
           }
-        });
-      }
-    }, serverMetrics);
+
+          @Override
+          public void start() {
+
+          }
+
+          @Override
+          public String name() {
+            return "test";
+          }
+        }, serverMetrics);
 
     ByteBuf requestBuf = getSerializedInstanceRequest(getInstanceRequest());
     ListenableFuture<byte[]> responseFuture = handler.processRequest(channelHandlerContext, requestBuf);
@@ -180,4 +190,14 @@ public class ScheduledRequestHandlerTest {
     Assert.assertEquals(responseDT.getInt(1, 1), 100);
   }
 
+  private ListenableFuture<byte[]> serializeData(ListenableFuture<DataTable> dataTable) {
+    return Futures.transform(dataTable, (Function<DataTable, byte[]>) input -> {
+      try {
+        Preconditions.checkNotNull(input);
+        return input.toBytes();
+      } catch (IOException e) {
+        return new byte[0];
+      }
+    });
+  }
 }

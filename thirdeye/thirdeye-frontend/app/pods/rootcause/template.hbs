@@ -1,0 +1,293 @@
+{{#if hasErrorsRoute}}
+  <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+    <a class="close" data-dismiss="alert" {{action "clearErrors" "route"}}>&times;</a>
+    Error:{{#each routeErrors as |e|}} <strong>{{e}}</strong>{{/each}}
+  </div>
+{{/if}}
+
+{{#if sessionUpdateWarning}}
+  <div class="rootcause-alert alert alert-warning fade in">
+    {{sessionUpdateWarning}}
+  </div>
+{{/if}}
+
+{{#if selectedUrns.size}}
+  {{rootcause-header
+    sessionId=sessionId
+    sessionName=sessionName
+    sessionText=sessionText
+    sessionOwner=sessionOwner
+    sessionModified=sessionModified
+    sessionUpdatedBy=sessionUpdatedBy
+    sessionUpdatedTime=sessionUpdatedTime
+    canSave=sessionCanSave
+    canCopy=sessionCanCopy
+    onChange=(action "onSessionChange")
+    onSave=(action "onSessionSave")
+    onCopy=(action "onSessionCopy")}}
+{{/if}}
+
+<div class="container">
+  {{#if context.anomalyUrns.size}}
+    {{rootcause-anomaly
+      entities=entities
+      aggregates=aggregates
+      anomalyUrns=context.anomalyUrns
+      onFeedback=(action "onFeedback")
+    }}
+  {{/if}}
+
+  <div class="row card-container card-container--md card-container--box-shadow">
+    <div class="card-container__body--padding-md card-container__body--flush-bottom">
+      {{#if selectedUrns.size}}
+        <div class="rootcause-wrapper">
+          {{rootcause-legend
+            entities=entities
+            selectedUrns=selectedUrns
+            invisibleUrns=invisibleUrns
+            onVisibility=(action "onVisibility")
+            onSelection=(action "onSelection")
+            onMouseEnter=(action "onLegendHover")
+            onMouseLeave=(action "onLegendHover")
+          }}
+          <div class="rootcause-wrapper__chart">
+            <div class="row rootcause-wrapper__toolbar">
+              {{rootcause-chart-toolbar
+                context=context
+                timeseriesMode=timeseriesMode
+                onContext=(action "onContext")
+                onChart=(action "onChart")
+              }}
+            </div>
+            {{#if isLoadingTimeseries}}
+              <div class="spinner-wrapper spinner-wrapper--card">
+                {{ember-spinner}}
+              </div>
+            {{/if}}
+            {{rootcause-chart
+              entities=entities
+              selectedUrns=chartSelectedUrns
+              timeseries=timeseries
+              timeseriesMode=timeseriesMode
+              focusedUrns=focusedUrns
+              context=context
+              onHover=(action "chartOnHover")
+            }}
+          </div>
+        </div>
+        <div class="row rootcause-compare">
+          {{rootcause-select-comparison-range
+            range=context.anomalyRange
+            compareMode=context.compareMode
+            onChange=(action "onComparisonChange")
+          }}
+        </div>
+      {{else}}
+        <div class="card-container card-container--md card-container--flush-top">
+          {{rootcause-placeholder
+            message="Please select a metric and click on '+ add to chart' below. The root cause graph will load here."
+            iconClass="glyphicon glyphicon-equalizer"}}
+        </div>
+      {{/if}}
+    </div>
+
+    {{#if hasServiceErrors}}
+      {{#if hasErrorsEntities}}
+        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "entities"}}>&times;</a>
+          Error for task(s):{{#each entitiesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+
+      {{#if hasErrorsTimeseries}}
+        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "timeseries"}}>&times;</a>
+          Could not load timeseries:{{#each timeseriesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+
+      {{#if hasErrorsAggregates}}
+        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "aggregates"}}>&times;</a>
+          Could not load aggregates:{{#each aggregatesService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+
+      {{#if hasErrorsBreakdowns}}
+        <div class="rootcause-alert alert alert-danger alert-dismissable fade in">
+          <a class="close" data-dismiss="alert" {{action "clearErrors" "breakdowns"}}>&times;</a>
+          Could not load dimensions:{{#each breakdownsService.errors as |e|}} <strong>{{e}}</strong>{{/each}}
+        </div>
+      {{/if}}
+    {{/if}}
+
+    <div class="card-container card-container--md card-container--space-around card-container--flush-top">
+      <div class="card-container__row card-container__row--flex row">
+        <div class="col-xs-10">
+          {{rootcause-select-metric-dimension
+            selectedUrn=metricUrn
+            onSelection=(action "onPrimaryChange")
+          }}
+        </div>
+        <div class="col-xs-2">
+          {{#if context.urns.size}}
+            <a class="thirdeye-link thirdeye-link--settings" {{action "onPrimarySelection"}}>
+              + add to chart
+              {{#tooltip-on-element
+                class="te-tooltip"
+                isShown=metricUrn}}
+                Click here to load metric
+              {{/tooltip-on-element}}
+            </a>
+          {{/if}}
+        </div>
+      </div>
+      <div class="card-container__row card-container__row--flex row">
+        <div class="col-xs-12">
+          {{rootcause-data-indicator
+            selectedUrn=metricUrn
+            anomalyRange=context.anomalyRange
+          }}
+        </div>
+      </div>
+
+      {{#if context.urns.size}}
+        <div class="card-container__row card-container__row--flex row">
+          <div class="col-xs-12 rootcause-tabs card-container__row--bg-color">
+            {{#shared/common-tabs selection=activeTab activeTab=activeTab as |tabs|}}
+              {{#tabs.tablist as |tablist|}}
+                {{#tablist.tab name="metrics"}}Metrics{{/tablist.tab}}
+                {{#tablist.tab name="dimensions"}}Dimensions{{/tablist.tab}}
+                {{#tablist.tab name="events"}}Events{{/tablist.tab}}
+                {{#tablist.tab name="trend"}}Trend{{/tablist.tab}}
+              {{/tabs.tablist}}
+
+              {{!-- metrics --}}
+              {{#tabs.tabpanel name="metrics"}}
+                {{#if (set-has loadingFrameworks "metricRelated")}}
+                  <div class="spinner-wrapper spinner-wrapper--card">
+                    {{ember-spinner}}
+                  </div>
+                {{/if}}
+                <div class="pull-right">
+                  <a {{action "onEntityMappingClick"}} class="thirdeye-link thirdeye-link--settings">
+                    + add related metrics
+                  </a>
+                  <span class="te-tooltip-wrapper">
+                    <i class="glyphicon glyphicon-question-sign">
+                      {{#tooltip-on-element class="te-tooltip"}}
+                        Can't find your metric? Click here to add a new metric mapping.
+                      {{/tooltip-on-element}}
+                    </i>
+                  </span>
+                </div>
+                {{rootcause-metrics
+                  entities=entities
+                  aggregates=aggregates
+                  scores=scores
+                  selectedUrns=selectedUrns
+                  isLoading=(or isLoadingAggregates isLoadingScores)
+                  onSelection=(action "onSelection")
+                }}
+              {{/tabs.tabpanel}}
+
+              {{!-- dimensions --}}
+              {{#tabs.tabpanel name="dimensions"}}
+                {{#if isLoadingBreakdowns}}
+                  <div class="spinner-wrapper spinner-wrapper--card">
+                    {{ember-spinner}}
+                  </div>
+                {{/if}}
+
+                {{rootcause-heatmap
+                  entities=entities
+                  breakdowns=breakdowns
+                  selectedUrn=metricUrn
+                  isLoadingBreakdowns=isLoadingBreakdowns
+                  onSelection=(action "heatmapOnSelection")
+                }}
+              {{/tabs.tabpanel}}
+
+              {{!-- events --}}
+              {{#tabs.tabpanel name="events"}}
+                <div class="row">
+                  <div class="col-xs-12">
+                    <div class="pull-right">
+                      <a {{action "onCreateEventClick"}} class="thirdeye-link thirdeye-link--settings">
+                        + add event
+                      </a>
+                      <span class="te-tooltip-wrapper">
+                        <i class="glyphicon glyphicon-question-sign">
+                          {{#tooltip-on-element class="te-tooltip"}}
+                            Can't find your event? Click here to add a new event.
+                          {{/tooltip-on-element}}
+                        </i>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="col-xs-3">
+                    {{filter-bar
+                      config=filterConfig
+                      entities=eventFilterEntities
+                      loadingFrameworks=loadingFrameworks
+                      onFilter=(action "onFilter")}}
+                  </div>
+                  <div class="col-xs-9">
+                    {{rootcause-table
+                      entities=eventTableEntities
+                      columns=eventTableColumns
+                      selectedUrns=selectedUrns
+                      onSelection=(action "onSelection")
+                    }}
+                  </div>
+                </div>
+              {{/tabs.tabpanel}}
+
+              {{!-- trend --}}
+              {{#tabs.tabpanel name="trend"}}
+                {{#if (set-has loadingFrameworks "metricRelated")}}
+                  <div class="spinner-wrapper spinner-wrapper--card">
+                    {{ember-spinner}}
+                  </div>
+                {{/if}}
+                <div class="pull-right">
+                  <a {{action "onEntityMappingClick"}} class="thirdeye-link thirdeye-link--settings">
+                    + add related metrics
+                  </a>
+                  <span class="te-tooltip-wrapper">
+                    <i class="glyphicon glyphicon-question-sign">
+                      {{#tooltip-on-element class="te-tooltip"}}
+                        Can't find your metric? Click here to add a new metric mapping.
+                      {{/tooltip-on-element}}
+                    </i>
+                  </span>
+                </div>
+                {{rootcause-trend
+                  entities=entities
+                  timeseries=timeseries
+                  context=context
+                  selectedUrns=selectedUrns
+                  isLoading=isLoadingTimeseries
+                  onSelection=(action "onSelection")
+                }}
+              {{/tabs.tabpanel}}
+            {{/shared/common-tabs}}
+          </div>
+        </div>
+      {{/if}}
+    </div>
+  </div>
+</div>
+
+{{#if metricUrn }}
+  {{modals/create-event-modal
+    showCreateEventModal=showCreateEventModal
+  }}
+  {{#unless isLoadingAggregates}}
+    {{modals/entity-mapping-modal
+      showEntityMappingModal=showEntityMappingModal
+      metric=(get entities metricUrn)
+      onSubmit=(action "onModalSubmit")
+    }}
+  {{/unless}}
+{{/if}}

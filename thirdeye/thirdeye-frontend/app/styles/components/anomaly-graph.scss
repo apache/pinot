@@ -1,0 +1,150 @@
+// Overriding default c3
+
+.anomaly-graph {
+  box-sizing: border-box;
+  display: flex;
+  border: 1px solid $te-grey--border;
+
+  &:not(:first-child) {
+      margin-top: 14px;
+  }
+
+  &--no-border {
+    border: 0;
+  }
+
+  .c3-brush .extent {
+    fill: #4682b4;
+    fill-opacity: .125;
+    stroke: #CCC;
+  }
+
+  .c3-line {
+    stroke-width: 2px;
+  }
+
+  .c3-chart-line:nth-child(even) > .c3-lines {
+    stroke-dasharray: 1%;
+  }
+
+  .anomaly-graph__slider-line {
+    stroke: white;
+    stroke-width: 3;
+  }
+
+  .anomaly-graph__region-slider .extent{
+    stroke: #fff;
+    fill-opacity: .2;
+    fill: $te-orange;
+  }
+
+  &__legend {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  &__legend-item {
+    display: block;
+  }
+
+  &__legend-line {
+    stroke: $te-blue !important;
+    stroke-width: 3;
+
+    &--orange {
+      stroke: $te-orange !important;
+    }
+  }
+}
+
+.anomaly-graph__filter-item {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.anomaly-graph__filter-label {
+  cursor: pointer;
+  color: #0091CA;
+  font-weight: normal;
+}
+
+.anomaly-graph__filter-group {
+  padding-left: 14px;
+  margin: 14px 0;
+  list-style: none;
+  &--hidden {
+    height: 0;
+    overflow: hidden;
+    margin: 0;
+  }
+}
+
+.anomaly-graph__title {
+  @include margin-reset;
+  @include padding-reset;
+  font-size: initial;
+  font-weight: normal;
+  margin-bottom: 14px;
+}
+
+.legend-title {
+  padding: 14px;
+  color: rgba(0,0,0, 0.55);
+  margin: 0;
+  background-color: #F3F6F8;
+  font-size: 14px;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.legend-cta {
+  color: rgba(0, 0, 0, 0.30);
+}
+
+.anomaly-graph__left-panel {
+  min-width: 250px;
+  flex-grow: 1;
+  overflow: scroll;
+  position: relative;
+  border-right: 1px solid $te-grey--border;
+}
+
+.anomaly-graph__right-panel {
+  position: relative;
+  flex-basis: 75%;
+  flex-grow: 1;
+  width: 75%;
+  padding: 14px;
+}
+
+.anomaly_graph__filters {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  left: 0;
+}
+
+
+$colors:
+  "blue" $te-blue,
+  "orange" $te-orange,
+  "teal" $te-teal,
+  "purple" $te-purple,
+  "red" $te-red,
+  "green" $te-green,
+  "pink" $te-pink,
+  "dark-orange" #B74700;
+
+// creates .c3-region-"color" classes
+@each $i in $colors{
+  .c3-region--#{nth($i, 1)} {
+    fill: nth($i, 2);
+  }
+
+  .anomaly-graph__filter-label--#{nth($i, 1)} {
+  color: lighten(nth($i, 2), 10%);
+  }
+};

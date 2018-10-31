@@ -1,17 +1,13 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import java.io.Serializable;
 import java.util.Objects;
-
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
 
 public class AnomalyFeedbackBean extends AbstractBean implements Serializable {
   private static final long serialVersionUID = 1L;
 
   private AnomalyFeedbackType feedbackType;
-
-  private FeedbackStatus status;
 
   private String comment;
 
@@ -21,14 +17,6 @@ public class AnomalyFeedbackBean extends AbstractBean implements Serializable {
 
   public void setFeedbackType(AnomalyFeedbackType feedbackType) {
     this.feedbackType = feedbackType;
-  }
-
-  public FeedbackStatus getStatus() {
-    return status;
-  }
-
-  public void setStatus(FeedbackStatus status) {
-    this.status = status;
   }
 
   public String getComment() {
@@ -50,17 +38,11 @@ public class AnomalyFeedbackBean extends AbstractBean implements Serializable {
 
     AnomalyFeedbackBean that = (AnomalyFeedbackBean) o;
     return Objects.equals(getId(), that.getId()) && Objects.equals(feedbackType, that.getFeedbackType())
-        && Objects.equals(status, that.getStatus()) && Objects.equals(comment, that.getComment());
+        && Objects.equals(comment, that.getComment());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), feedbackType, status, comment);
-  }
-
-  @Override
-  public String toString() {
-    return "AnomalyFeedback{" + "id=" + getId() + ", feedbackType=" + feedbackType + ", status=" + status
-        + ", comment='" + comment + '\'' + '}';
+    return Objects.hash(getId(), feedbackType, comment);
   }
 }

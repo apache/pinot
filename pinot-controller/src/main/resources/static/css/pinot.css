@@ -1,0 +1,66 @@
+body {
+  /*  font-family: tahoma;*/
+  background:#e8e8e8;
+  height:100%;
+  font-family: 'Open Sans', sans-serif;
+}
+
+.DIMENSION {
+  color:#547a1f;
+}
+
+.METRIC {
+  color:#bdb65c;
+}
+
+.TIME {
+  color:#845cbd;
+}
+
+
+.search {
+  height:20px;
+  font-size:10px;
+}
+
+.row {
+  margin-top:1%;
+  margin-left:5px;
+  margin-right:5px;
+  max-width:100%;
+}
+
+.separator10 {
+  min-height: 10px;
+}
+.button-submit-row {
+ margin-top:0; 
+}
+
+.query-box {
+  min-height:20%;
+  position: relative;
+}
+
+.query-results {
+  position:relative;
+  min-height:60%;
+  color:#43AC6A;
+}
+
+.top-bar {
+  background : #330033 !important;
+  opacity: 0.7;
+}
+
+.query-box .CodeMirror {
+  border:none;
+  color:#722F37;
+  font-size:16px;
+}
+
+.query-results .CodeMirror {
+  border:none;
+  color:black;
+  font-size:14px;
+}

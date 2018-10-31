@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
@@ -25,7 +24,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BitmapInvertedIndexReader implements InvertedIndexReader {
+public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableRoaringBitmap> {
   public static final Logger LOGGER = LoggerFactory.getLogger(BitmapInvertedIndexReader.class);
 
   final private int numberOfBitmaps;
@@ -51,16 +50,15 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
 
   /**
    * {@inheritDoc}
-   * @see InvertedIndexReader#getImmutable(int)
    */
   @Override
-  public ImmutableRoaringBitmap getImmutable(int idx) {
+  public ImmutableRoaringBitmap getDocIds(int dictId) {
     SoftReference<ImmutableRoaringBitmap>[] bitmapArrayReference = null;
     // Return the bitmap if it's still on heap
     if (bitmaps != null) {
       bitmapArrayReference = bitmaps.get();
       if (bitmapArrayReference != null) {
-        SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[idx];
+        SoftReference<ImmutableRoaringBitmap> bitmapReference = bitmapArrayReference[dictId];
         if (bitmapReference != null) {
           ImmutableRoaringBitmap value = bitmapReference.get();
           if (value != null) {
@@ -77,11 +75,11 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
     }
     synchronized (this) {
       ImmutableRoaringBitmap value;
-      if (bitmapArrayReference[idx] == null || bitmapArrayReference[idx].get() == null) {
-        value = buildRoaringBitmapForIndex(idx);
-        bitmapArrayReference[idx] = new SoftReference<ImmutableRoaringBitmap>(value);
+      if (bitmapArrayReference[dictId] == null || bitmapArrayReference[dictId].get() == null) {
+        value = buildRoaringBitmapForIndex(dictId);
+        bitmapArrayReference[dictId] = new SoftReference<ImmutableRoaringBitmap>(value);
       } else {
-        value = bitmapArrayReference[idx].get();
+        value = bitmapArrayReference[dictId].get();
       }
       return value;
     }
@@ -117,12 +115,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     buffer.close();
-  }
-
-  @Override
-  public IntPair getMinMaxRangeFor(int dicId) {
-    throw new UnsupportedOperationException("not supported in inverted index type bitmap");
   }
 }

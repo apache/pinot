@@ -15,15 +15,21 @@
  */
 package com.linkedin.pinot.tools.segment.converter;
 
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
+import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.lang.reflect.Field;
 import org.apache.commons.io.FileUtils;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
@@ -33,6 +39,7 @@ import org.kohsuke.args4j.Option;
  */
 public class ColumnarToStarTreeConverter {
   private static final String TMP_DIR_PREFIX = "_tmp_";
+  private static final ObjectMapper objectMapper = new ObjectMapper();
 
   @Option(name = "-inputDir", required = true, usage = "Path to input directory containing Pinot segments")
   private String _inputDirName = null;
@@ -109,11 +116,20 @@ public class ColumnarToStarTreeConverter {
     config.setDataDir(_inputDirName);
     config.setInputFilePath(columnarSegment.getAbsolutePath());
     config.setFormat(FileFormat.PINOT);
-    config.setEnableStarTreeIndex(true);
     config.setOutDir(_outputDirName);
-    config.setStarTreeIndexSpecFile(_starTreeConfigFileName);
     config.setOverwrite(_overwrite);
-    config.setSegmentName(columnarSegment.getName());
+
+    StarTreeIndexSpec starTreeIndexSpec = null;
+    if (_starTreeConfigFileName != null) {
+       starTreeIndexSpec = StarTreeIndexSpec.fromFile(new File(_starTreeConfigFileName));
+    }
+    config.enableStarTreeIndex(starTreeIndexSpec);
+
+    // Read the segment and table name from the segment's metadata.
+    SegmentMetadata metadata = new SegmentMetadataImpl(columnarSegment);
+    SegmentNameGenerator nameGenerator = new DefaultSegmentNameGenerator(metadata.getName());
+    config.setSegmentNameGenerator(nameGenerator);
+    config.setTableName(metadata.getTableName());
 
     SegmentIndexCreationDriver indexCreator = new SegmentIndexCreationDriverImpl();
     indexCreator.init(config);

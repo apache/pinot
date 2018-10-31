@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -16,6 +17,7 @@ import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
 public class BackwardAnomalyFunctionUtils {
+  private static final Double NULL_DOUBLE = Double.NaN;
 
   public static List<Pair<Long, Long>> toBackwardCompatibleDataRanges(
       List<Interval> timeSeriesIntervals) {
@@ -47,7 +49,7 @@ public class BackwardAnomalyFunctionUtils {
     }
     // Sort time series by their start time in reversed natural order, i.e., the latest time series
     // is arranged in the front of the list
-    Collections.sort(timeSeriesList, new TimeSeriesStartTimeComparator().reversed());
+    Collections.sort(timeSeriesList, Collections.reverseOrder(new TimeSeriesStartTimeComparator()));
 
     // If a timestamp is contained in the interval of a time series, then the timestamp and its
     // value is inserted into that time series. If the intervals of time series have overlap, then
@@ -55,8 +57,10 @@ public class BackwardAnomalyFunctionUtils {
     for (long timestamp : metricTimeSeries.getTimeWindowSet()) {
       for (TimeSeries timeSeries : timeSeriesList) {
         if (timeSeries.getTimeSeriesInterval().contains(timestamp)) {
-          double value = metricTimeSeries.get(timestamp, metricName).doubleValue();
-          timeSeries.set(timestamp, value);
+          double value = metricTimeSeries.getOrDefault(timestamp, metricName, NULL_DOUBLE).doubleValue();
+          if (Double.compare(value, NULL_DOUBLE) != 0) {
+            timeSeries.set(timestamp, value);
+          }
         }
       }
     }
@@ -72,13 +76,14 @@ public class BackwardAnomalyFunctionUtils {
    * @param exploredDimensions the dimension map of the given time series.
    * @param windowStart the start of the interval of the time series.
    * @param windowEnd the end of the interval of the time series.
+   * @param knownAnomalies the list of historical merged anomalies.
    *
    * @return an anomaly detection context from the given information.
    */
   public static AnomalyDetectionContext buildAnomalyDetectionContext(
       AnomalyDetectionFunction anomalyFunction, MetricTimeSeries timeSeries, String metric,
       DimensionMap exploredDimensions, int bucketSize, TimeUnit bucketUnit, DateTime windowStart,
-      DateTime windowEnd) {
+      DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies) {
     // Create the anomaly detection context for the new modularized anomaly function
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
     anomalyDetectionContext
@@ -91,14 +96,20 @@ public class BackwardAnomalyFunctionUtils {
     timeSeriesKey.setMetricName(metric);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    // Split metric time series to observed time series and baselines
-    List<Interval> intervals =
-        anomalyFunction.getTimeSeriesIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    List<TimeSeries> timeSeriesList =
-        BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(timeSeries, metric, intervals);
-    anomalyDetectionContext.setCurrent(timeSeriesList.get(0));
-    timeSeriesList.remove(0);
-    anomalyDetectionContext.setBaselines(timeSeriesList);
+    // set historical anomalies
+    anomalyDetectionContext.setHistoricalAnomalies(knownAnomalies);
+
+    // Split time series to observed time series and baselines for each metric
+    for (String metricName : anomalyFunction.getSpec().getMetrics()) {
+      List<Interval> intervals =
+          anomalyFunction.getTimeSeriesIntervals(windowStart.getMillis(), windowEnd.getMillis());
+      List<TimeSeries> timeSeriesList =
+          BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(timeSeries, metricName, intervals);
+      anomalyDetectionContext.setCurrent(metricName, timeSeriesList.get(0));
+      timeSeriesList.remove(0);
+      anomalyDetectionContext.setBaselines(metricName, timeSeriesList);
+    }
+
 
     return anomalyDetectionContext;
   }
@@ -110,7 +121,7 @@ public class BackwardAnomalyFunctionUtils {
     @Override public int compare(TimeSeries ts1, TimeSeries ts2) {
       long startTime1 = ts1.getTimeSeriesInterval().getStartMillis();
       long startTime2 = ts2.getTimeSeriesInterval().getStartMillis();
-      return (int) (startTime1 - startTime2);
+      return Long.compare(startTime1, startTime2);
     }
   }
 }

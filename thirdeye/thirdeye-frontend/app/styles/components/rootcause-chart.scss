@@ -1,0 +1,20 @@
+.rootcause-chart {
+  flex-grow: 1;
+  min-height: 400px;
+
+  &__title {
+    padding-left: 16px;
+  }
+
+  g[class*='c3-target-frontend-metric-baseline'] > .c3-lines {
+    stroke-dasharray: 1%;
+  }
+}
+
+.c3-line {
+  stroke-width: 2px;
+}
+
+g[class^='c3-circles-frontend-metric'], g[class*=' c3-circles-frontend-metric'], g[class*=' c3-circles-frontend-anomalyfunction']{
+    display: none;
+}

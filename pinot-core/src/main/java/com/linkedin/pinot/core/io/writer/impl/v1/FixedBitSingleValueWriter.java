@@ -15,19 +15,24 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
 import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
-import com.linkedin.pinot.core.io.writer.impl.FixedBitSingleValueMultiColWriter;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
+import java.nio.channels.FileChannel;
 
 
-public class FixedBitSingleValueWriter implements
-    SingleColumnSingleValueWriter {
-  private FixedBitSingleValueMultiColWriter dataFileWriter;
+public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter {
+  private FixedBitIntReaderWriter dataFileWriter;
 
-  public FixedBitSingleValueWriter(File file, int rows,
-      int columnSizeInBits) throws Exception {
-    dataFileWriter = new FixedBitSingleValueMultiColWriter(file, rows, 1,
-        new int[] { columnSizeInBits });
+  public FixedBitSingleValueWriter(File file, int rows, int columnSizeInBits) throws Exception {
+    // Convert to long in order to avoid int overflow
+    long length =  ((long) rows * columnSizeInBits + Byte.SIZE - 1) / Byte.SIZE;
+    PinotDataBuffer dataBuffer =
+        PinotDataBuffer.fromFile(file, 0, (int) length, ReadMode.mmap,
+            FileChannel.MapMode.READ_WRITE, file.getAbsolutePath());
+    dataFileWriter = new FixedBitIntReaderWriter(dataBuffer, rows, columnSizeInBits);
   }
 
   @Override
@@ -43,7 +48,7 @@ public class FixedBitSingleValueWriter implements
 
   @Override
   public void setInt(int row, int i) {
-    dataFileWriter.setInt(row, 0, i);
+    dataFileWriter.writeInt(row, i);
   }
 
   @Override

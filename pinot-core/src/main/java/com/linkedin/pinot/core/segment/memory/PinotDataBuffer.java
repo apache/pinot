@@ -15,12 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.memory;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.segment.ReadMode;
 
 
 /**
@@ -104,11 +105,18 @@ public abstract class PinotDataBuffer implements AutoCloseable {
   }
 
   public static PinotDataBuffer allocateDirect(long size) {
+    return allocateDirect(size, " direct allocation");
+
+  }
+
+  public static PinotDataBuffer allocateDirect(long size, String description) {
     if (USE_LBUFFER) {
       return PinotLByteBuffer.allocateDirect(size);
     } else {
-      // TODO: provide proper context
-      return PinotByteBuffer.allocateDirect(size, " direct allocation");
+      if (description == null || description.length() == 0) {
+        description = " no description";
+      }
+      return PinotByteBuffer.allocateDirect(size, description);
     }
   }
 
@@ -254,4 +262,6 @@ public abstract class PinotDataBuffer implements AutoCloseable {
   public abstract ByteBuffer toDirectByteBuffer(long bufferOffset, int size);
 
   protected abstract long start();
+
+  public abstract void order(ByteOrder byteOrder);
 }

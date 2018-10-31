@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin.command;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.tools.AbstractBaseCommand;
@@ -122,7 +122,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
       LOGGER.info("  Validating table config for table: \"{}\"", tableName);
       try {
         ZNRecord record = _helixPropertyStore.get(TABLE_CONFIG_PATH + "/" + tableName, null, 0);
-        AbstractTableConfig tableConfig = AbstractTableConfig.fromZnRecord(record);
+        TableConfig tableConfig = TableConfig.fromZnRecord(record);
         if (!TableConfigValidator.validate(tableConfig)) {
           LOGGER.error("    Table config validation failed for table: \"{}\"", tableName);
         }

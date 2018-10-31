@@ -123,40 +123,46 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
 
   @Override
   public boolean execute() throws Exception {
-    if (_controllerHost == null) {
-      _controllerHost = NetUtil.getHostAddress();
-    }
-
-    ControllerConf conf = readConfigFromFile(_configFileName);
-    if (conf == null) {
-      if (_configFileName != null) {
-        LOGGER.error("Error: Unable to find file {}.", _configFileName);
-        return false;
+    try {
+      if (_controllerHost == null) {
+        _controllerHost = NetUtil.getHostAddress();
       }
 
-      conf = new ControllerConf();
+      ControllerConf conf = readConfigFromFile(_configFileName);
+      if (conf == null) {
+        if (_configFileName != null) {
+          LOGGER.error("Error: Unable to find file {}.", _configFileName);
+          return false;
+        }
 
-      conf.setControllerHost(_controllerHost);
-      conf.setControllerPort(_controllerPort);
-      conf.setDataDir(_dataDir);
-      conf.setZkStr(_zkAddress);
+        conf = new ControllerConf();
 
-      conf.setHelixClusterName(_clusterName);
-      conf.setControllerVipHost(_controllerHost);
-      conf.setTenantIsolationEnabled(_tenantIsolation);
+        conf.setControllerHost(_controllerHost);
+        conf.setControllerPort(_controllerPort);
+        conf.setDataDir(_dataDir);
+        conf.setZkStr(_zkAddress);
 
-      conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
-      conf.setValidationControllerFrequencyInSeconds(3600);
+        conf.setHelixClusterName(_clusterName);
+        conf.setControllerVipHost(_controllerHost);
+        conf.setTenantIsolationEnabled(_tenantIsolation);
+
+        conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
+        conf.setValidationControllerFrequencyInSeconds(3600);
+      }
+
+      LOGGER.info("Executing command: " + toString());
+      final ControllerStarter starter = new ControllerStarter(conf);
+
+      starter.start();
+
+      String pidFile = ".pinotAdminController-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+      savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
+      return true;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while starting controller, exiting.", e);
+      System.exit(-1);
+      return false;
     }
-
-    LOGGER.info("Executing command: " + toString());
-    final ControllerStarter starter = new ControllerStarter(conf);
-
-    starter.start();
-
-    String pidFile = ".pinotAdminController-" + String.valueOf(System.currentTimeMillis()) + ".pid";
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
-    return true;
   }
 
   @Override

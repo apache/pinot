@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
 
@@ -29,18 +28,13 @@ public class MatchEntireSegmentOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean open() {
-    return true;
-  }
-
-  @Override
-  public boolean close() {
-    return true;
-  }
-
-  @Override
-  public BaseFilterBlock nextFilterBlock(BlockId blockId) {
+  protected BaseFilterBlock getNextBlock() {
     return new MatchEntireSegmentDocIdSetBlock(_totalDocs);
+  }
+
+  @Override
+  public boolean isResultEmpty() {
+    return false;
   }
 
   @Override

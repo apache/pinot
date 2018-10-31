@@ -13,7 +13,6 @@ WoWSummaryView.prototype = {
     this.render();
   },
   render : function() {
-    console.log("WOWSummaryView.render")
     var result = this.template_compiled(this.wowSummaryModel);
     $(this.placeHolderId).html(result);
   }

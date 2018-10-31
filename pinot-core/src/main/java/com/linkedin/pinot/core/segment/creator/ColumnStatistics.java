@@ -15,52 +15,56 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
+import com.linkedin.pinot.core.data.partition.PartitionFunction;
+import java.util.List;
+import org.apache.commons.lang.math.IntRange;
+
+
 /**
  * An interface to read the column statistics from statistics collectors.
- *
  */
 public interface ColumnStatistics {
     /**
      * @return Minimum value of the column
-     * @throws Exception
      */
-    Object getMinValue() throws Exception;
+    Object getMinValue();
 
     /**
      * @return Maximum value of the column
-     * @throws Exception
      */
-    Object getMaxValue() throws Exception;
+    Object getMaxValue();
 
     /**
      *
      * @return An array of elements that has the unique values for this column, sorted order.
-     * @throws Exception
      */
-    Object getUniqueValuesSet() throws Exception;
+    Object getUniqueValuesSet();
 
     /**
      *
      * @return The number of unique values of this column.
-     * @throws Exception
      */
-    int getCardinality() throws Exception;
+    int getCardinality();
 
     /**
      *
-     * @return For string objects, returns the length of the longest string value. For others, returns -1.
-     * @throws Exception
+     * @return For variable length objects, returns the length of the shortest value. For others, returns -1.
      */
-    int getLengthOfLargestElement() throws Exception;
+    int getLengthOfShortestElement();
 
     /**
      *
-     * @return The number of null values in the input for this column.
+     * @return For variable length objects, returns the length of the longest value. For others, returns -1.
      */
-    int getNumInputNullValues();
+    int getLengthOfLargestElement();
 
     /**
-     *
+     * Whether or not the data in this column is in ascending order.
+     * @return true if the data is in ascending order.
+     */
+    boolean isSorted();
+
+    /**
      * @return total number of entries
      */
     int getTotalNumberOfEntries();
@@ -71,8 +75,18 @@ public interface ColumnStatistics {
     int getMaxNumberOfMultiValues();
 
     /**
-     * @note
      * @return Returns if any of the values have nulls in the segments.
      */
     boolean hasNull();
+
+    PartitionFunction getPartitionFunction();
+
+    int getNumPartitions();
+
+    List<IntRange> getPartitionRanges();
+
+    /**
+     * Returns the width of the partition range for this column, used when doing per-column partitioning.
+     */
+    int getPartitionRangeWidth();
 }

@@ -15,16 +15,38 @@
 # limitations under the License.
 #
 
-# Ignore changes not related to pinot code
-git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(pinot-|pom.xml|.travis|.codecov)'
-if [ $? -ne 0 ]; then
-  echo 'No changes related to the pinot code, skip the test.'
-  exit 0
+# ThirdEye related changes
+git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(thirdeye)'
+if [ $? -eq 0 ]; then
+  echo 'ThirdEye changes.'
+
+  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
+    echo 'Skip ThirdEye tests for version other than oracle jdk8.'
+    rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
+    exit 0
+  fi
+
+  if [ "$RUN_INTEGRATION_TESTS" == 'false' ]; then
+    echo 'Skip ThirdEye tests when integration tests off'
+    rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
+    exit 0
+  fi
+
+  cd thirdeye
+  mvn test
+  failed=$?
+  # Remove Pinot/ThirdEye files from local Maven repository to avoid a useless cache rebuild
+  rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
+  if [ $failed -eq 0 ]; then
+    exit 0
+  else
+    exit 1
+  fi
 fi
 
-# Only run tests for JDK 7
-if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk7' ]; then
-  echo 'Skip tests for version other than oracle jdk7.'
+# Only run tests for JDK 8
+if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
+  echo 'Skip tests for version other than oracle jdk8.'
   # Remove Pinot files from local Maven repository to avoid a useless cache rebuild
   rm -rf ~/.m2/repository/com/linkedin/pinot
   exit 0

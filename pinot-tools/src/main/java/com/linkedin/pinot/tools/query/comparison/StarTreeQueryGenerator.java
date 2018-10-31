@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.util.Arrays;
@@ -44,11 +44,12 @@ public class StarTreeQueryGenerator {
   private static final String GROUP_BY = " GROUP BY ";
   private static final String BETWEEN = " BETWEEN ";
   private static final String IN = " IN ";
+  private static final String NOT_IN = " NOT IN ";
   private static final String AND = " AND ";
 
-  private static final int MAX_NUM_AGGREGATIONS = 3;
-  private static final int MAX_NUM_PREDICATES = 3;
-  private static final int MAX_NUM_GROUP_BYS = 2;
+  private static final int MAX_NUM_AGGREGATIONS = 5;
+  private static final int MAX_NUM_PREDICATES = 10;
+  private static final int MAX_NUM_GROUP_BYS = 3;
   private static final int MAX_NUM_IN_VALUES = 5;
   private static final int SHUFFLE_THRESHOLD = 5 * MAX_NUM_IN_VALUES;
   private static final Random RANDOM = new Random();
@@ -169,7 +170,12 @@ public class StarTreeQueryGenerator {
    * @return in predicate.
    */
   private StringBuilder generateInPredicate(String dimensionColumn) {
-    StringBuilder stringBuilder = new StringBuilder(dimensionColumn).append(IN).append('(');
+    StringBuilder stringBuilder = new StringBuilder(dimensionColumn);
+    if (RANDOM.nextBoolean()) {
+      stringBuilder.append(IN).append('(');
+    } else {
+      stringBuilder.append(NOT_IN).append('(');
+    }
 
     List<Object> valueArray = _singleValueDimensionValuesMap.get(dimensionColumn);
     int size = valueArray.size();
@@ -219,7 +225,7 @@ public class StarTreeQueryGenerator {
    * @return all predicates.
    */
   private StringBuilder generatePredicates() {
-    int numPredicates = Math.min(RANDOM.nextInt(MAX_NUM_PREDICATES + 1), _singleValueDimensionColumns.size());
+    int numPredicates = RANDOM.nextInt(MAX_NUM_PREDICATES + 1);
     if (numPredicates == 0) {
       return null;
     }
@@ -230,7 +236,7 @@ public class StarTreeQueryGenerator {
       if (i != 0) {
         stringBuilder.append(AND);
       }
-      String dimensionName = _singleValueDimensionColumns.get(i);
+      String dimensionName = _singleValueDimensionColumns.get(RANDOM.nextInt(numPredicates));
       switch (RANDOM.nextInt(3)) {
         case 0:
           stringBuilder.append(generateComparisonPredicate(dimensionName));
@@ -253,14 +259,14 @@ public class StarTreeQueryGenerator {
    * @return group by section.
    */
   private StringBuilder generateGroupBys() {
-    int numPredicates = Math.min(RANDOM.nextInt(MAX_NUM_GROUP_BYS + 1), _singleValueDimensionColumns.size());
-    if (numPredicates == 0) {
+    int numGroupBys = Math.min(RANDOM.nextInt(MAX_NUM_GROUP_BYS + 1), _singleValueDimensionColumns.size());
+    if (numGroupBys == 0) {
       return null;
     }
 
     StringBuilder stringBuilder = new StringBuilder(GROUP_BY);
     Collections.shuffle(_singleValueDimensionColumns);
-    for (int i = 0; i < numPredicates; i++) {
+    for (int i = 0; i < numGroupBys; i++) {
       if (i != 0) {
         stringBuilder.append(',').append(' ');
       }
@@ -319,7 +325,7 @@ public class StarTreeQueryGenerator {
     File[] segments = segmentsDir.listFiles();
     Preconditions.checkNotNull(segments);
     File segment = segments[0];
-    IndexSegment indexSegment = Loaders.IndexSegment.load(segment, ReadMode.heap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(segment, ReadMode.heap);
     SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
     String tableName = segmentMetadata.getTableName();
 
@@ -337,9 +343,8 @@ public class StarTreeQueryGenerator {
 
       // Verify that query is fit for star tree.
       BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
-      Preconditions.checkState(
-          RequestUtils.isFitForStarTreeIndex(segmentMetadata, RequestUtils.generateFilterQueryTree(brokerRequest),
-              brokerRequest));
+      Preconditions.checkState(RequestUtils.isFitForStarTreeIndex(segmentMetadata, brokerRequest,
+          RequestUtils.generateFilterQueryTree(brokerRequest)));
     }
   }
 }

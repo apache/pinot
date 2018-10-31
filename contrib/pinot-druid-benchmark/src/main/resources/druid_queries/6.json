@@ -1,0 +1,34 @@
+{
+  "queryType": "topN",
+  "dataSource": "tpch_lineitem",
+  "intervals": ["1992-01-01/1999-01-01"],
+  "granularity": "all",
+  "filter": {
+    "type": "and",
+    "fields": [
+      {
+        "type": "in",
+        "dimension": "l_shipmode",
+        "values": ["RAIL", "FOB"]
+      },
+      {
+        "type": "bound",
+        "dimension": "l_receiptdate",
+        "lower": "1997-01-01",
+        "upper": "1998-01-01",
+        "upperStrict": true,
+        "alphaNumeric": false
+      }
+    ]
+  },
+  "aggregations": [
+    {
+      "type": "doubleSum",
+      "name": "l_extendedprice_sum",
+      "fieldName": "l_extendedprice"
+    }
+  ],
+  "dimension": "l_shipmode",
+  "threshold": 10,
+  "metric": "l_extendedprice_sum"
+}

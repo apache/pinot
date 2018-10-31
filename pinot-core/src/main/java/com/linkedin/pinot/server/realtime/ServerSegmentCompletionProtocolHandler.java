@@ -14,27 +14,19 @@
  * limitations under the License.
  */
 
-
 package com.linkedin.pinot.server.realtime;
 
-import java.io.BufferedInputStream;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import com.linkedin.pinot.core.query.utils.Pair;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpMethodBase;
-import org.apache.commons.httpclient.methods.GetMethod;
-import org.apache.commons.httpclient.methods.PostMethod;
-import org.apache.commons.httpclient.methods.multipart.FilePart;
-import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
-import org.apache.commons.httpclient.methods.multipart.Part;
-import org.apache.commons.httpclient.methods.multipart.PartSource;
-import org.apache.commons.httpclient.params.HttpMethodParams;
+import java.net.URI;
+import javax.net.ssl.SSLContext;
+import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 
 
 /**
@@ -43,84 +35,158 @@ import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
  */
 public class ServerSegmentCompletionProtocolHandler {
   private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
+  private static final int SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 30_000;
+  private static final int OTHER_REQUESTS_TIMEOUT = 5_000;
+  private static final String HTTPS_PROTOCOL = "https";
+  private static final String HTTP_PROTOCOL = "http";
 
-  private final String _instance;
+  private static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+  private static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
 
-  public ServerSegmentCompletionProtocolHandler(String instance) {
-    _instance = instance;
-  }
+  private static SSLContext _sslContext;
+  private static Integer _controllerHttpsPort;
 
-  public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) throws FileNotFoundException {
-    SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(segmentName, offset, _instance);
-    final InputStream inputStream = new FileInputStream(segmentTarFile);
-    Part[] parts = {
-        new FilePart(segmentName, new PartSource() {
-          @Override
-          public long getLength() {
-            return segmentTarFile.length();
-          }
+  private final FileUploadDownloadClient _fileUploadDownloadClient;
 
-          @Override
-          public String getFileName() {
-            return "fileName";
-          }
-
-          @Override
-          public InputStream createInputStream() throws IOException {
-            return new BufferedInputStream(inputStream);
-          }
-        })
-    };
-    return doHttp(request, parts);
-  }
-
-  public SegmentCompletionProtocol.Response segmentConsumed(String segmentName, long offset) {
-    SegmentCompletionProtocol.SegmentConsumedRequest request = new SegmentCompletionProtocol.SegmentConsumedRequest(segmentName, offset, _instance);
-    return doHttp(request, null);
-  }
-
-  public SegmentCompletionProtocol.Response segmentStoppedConsuming(String segmentName, long offset, String reason) {
-    SegmentCompletionProtocol.SegmentStoppedConsuming request = new SegmentCompletionProtocol.SegmentStoppedConsuming(segmentName, offset, _instance, reason);
-    return doHttp(request, null);
-  }
-
-  private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts) {
-    SegmentCompletionProtocol.Response response =
-        new SegmentCompletionProtocol.Response(SegmentCompletionProtocol.ControllerResponseStatus.NOT_SENT, -1L);
-    HttpClient httpClient = new HttpClient();
-    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
-    final String leaderAddress = leaderLocator.getControllerLeader();
-    if (leaderAddress == null) {
-      LOGGER.error("No leader found {}", this.toString());
-      return new SegmentCompletionProtocol.Response(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER, -1L);
+  public static void init(Configuration uploaderConfig) {
+    Configuration httpsConfig = uploaderConfig.subset(HTTPS_PROTOCOL);
+    if (httpsConfig.getBoolean(CONFIG_OF_CONTROLLER_HTTPS_ENABLED, false)) {
+      _sslContext = new ClientSSLContextGenerator(httpsConfig.subset(CommonConstants.PREFIX_OF_SSL_SUBSET)).generate();
+      _controllerHttpsPort = httpsConfig.getInt(CONFIG_OF_CONTROLLER_HTTPS_PORT);
     }
-    final String url = request.getUrl(leaderAddress);
-    HttpMethodBase method;
-    if (parts != null) {
-      PostMethod postMethod = new PostMethod(url);
-      postMethod.setRequestEntity(new MultipartRequestEntity(parts, new HttpMethodParams()));
-      method = postMethod;
-    } else {
-      method = new GetMethod(url);
+  }
+
+  public ServerSegmentCompletionProtocolHandler() {
+    _fileUploadDownloadClient = new FileUploadDownloadClient(_sslContext);
+  }
+
+  public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params params) {
+    SegmentCompletionProtocol.SegmentCommitStartRequest request =
+        new SegmentCompletionProtocol.SegmentCommitStartRequest(params);
+    String url = createSegmentCompletionUrl(request);
+    if (url == null) {
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
-    LOGGER.info("Sending request {} for {}", url, this.toString());
+    return sendRequest(url);
+  }
+
+  // TODO We need to make this work with trusted certificates if the VIP is using https.
+  public SegmentCompletionProtocol.Response segmentCommitUpload(SegmentCompletionProtocol.Request.Params params,
+      final File segmentTarFile, final String controllerVipUrl) {
+    SegmentCompletionProtocol.SegmentCommitUploadRequest request =
+        new SegmentCompletionProtocol.SegmentCommitUploadRequest(params);
+
+    String hostPort;
+    String protocol;
     try {
-      int responseCode = httpClient.executeMethod(method);
-      if (responseCode >= 300) {
-        LOGGER.error("Bad controller response code {} for {}", responseCode, this.toString());
-        return response;
-      } else {
-        response = new SegmentCompletionProtocol.Response(method.getResponseBodyAsString());
-        LOGGER.info("Controller response {} for {}", response.toJsonString(), this.toString());
-        if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
-          leaderLocator.refreshControllerLeader();
-        }
-        return response;
-      }
-    } catch (IOException e) {
-      LOGGER.error("IOException {}", this.toString(), e);
-      leaderLocator.refreshControllerLeader();
-      return response;
+      URI uri = URI.create(controllerVipUrl);
+      protocol = uri.getScheme();
+      hostPort = uri.getAuthority();
+    } catch (Exception e) {
+      throw new RuntimeException("Could not make URI", e);
     }
+    String url = request.getUrl(hostPort, protocol);
+    return uploadSegment(url, params.getSegmentName(), segmentTarFile);
+  }
+
+  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params params) {
+    SegmentCompletionProtocol.SegmentCommitEndRequest request =
+        new SegmentCompletionProtocol.SegmentCommitEndRequest(params);
+    String url = createSegmentCompletionUrl(request);
+    if (url == null) {
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
+    }
+    return sendRequest(url);
+  }
+
+  public SegmentCompletionProtocol.Response segmentCommit(SegmentCompletionProtocol.Request.Params params,
+      final File segmentTarFile) {
+    SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
+    String url = createSegmentCompletionUrl(request);
+    if (url == null) {
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
+    }
+
+    return uploadSegment(url, params.getSegmentName(), segmentTarFile);
+  }
+
+  public SegmentCompletionProtocol.Response extendBuildTime(SegmentCompletionProtocol.Request.Params params) {
+    SegmentCompletionProtocol.ExtendBuildTimeRequest request =
+        new SegmentCompletionProtocol.ExtendBuildTimeRequest(params);
+    String url = createSegmentCompletionUrl(request);
+    return sendRequest(url);
+  }
+
+  public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params params) {
+    SegmentCompletionProtocol.SegmentConsumedRequest request =
+        new SegmentCompletionProtocol.SegmentConsumedRequest(params);
+    String url = createSegmentCompletionUrl(request);
+    if (url == null) {
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
+    }
+    return sendRequest(url);
+  }
+
+  public SegmentCompletionProtocol.Response segmentStoppedConsuming(SegmentCompletionProtocol.Request.Params params) {
+    SegmentCompletionProtocol.SegmentStoppedConsuming request =
+        new SegmentCompletionProtocol.SegmentStoppedConsuming(params);
+    String url = createSegmentCompletionUrl(request);
+    if (url == null) {
+      return SegmentCompletionProtocol.RESP_NOT_SENT;
+    }
+    return sendRequest(url);
+  }
+
+  private String createSegmentCompletionUrl(SegmentCompletionProtocol.Request request) {
+    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
+    final Pair<String, Integer> leaderHostPort = leaderLocator.getControllerLeader();
+    if (leaderHostPort == null) {
+      LOGGER.warn("No leader found while trying to send {}", request.toString());
+      return null;
+    }
+    String protocol = HTTP_PROTOCOL;
+    if (_controllerHttpsPort != null) {
+      leaderHostPort.setSecond(_controllerHttpsPort);
+      protocol = HTTPS_PROTOCOL;
+    }
+
+    return request.getUrl(leaderHostPort.getFirst() + ":" + leaderHostPort.getSecond(), protocol);
+  }
+
+  private SegmentCompletionProtocol.Response sendRequest(String url) {
+    try {
+      String responseStr =
+          _fileUploadDownloadClient.sendSegmentCompletionProtocolRequest(new URI(url), OTHER_REQUESTS_TIMEOUT)
+              .getResponse();
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(responseStr);
+      LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
+      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
+        ControllerLeaderLocator.getInstance().refreshControllerLeader();
+      }
+      return response;
+    } catch (Exception e) {
+      // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
+      LOGGER.error("Could not send request {}", url, e);
+    }
+    return SegmentCompletionProtocol.RESP_NOT_SENT;
+  }
+
+  private SegmentCompletionProtocol.Response uploadSegment(String url, final String segmentName,
+      final File segmentTarFile) {
+    try {
+      String responseStr =
+          _fileUploadDownloadClient.uploadSegment(new URI(url), segmentName, segmentTarFile, null, null,
+              SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS).getResponse();
+      SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(responseStr);
+      LOGGER.info("Controller response {} for {}", response.toJsonString(), url);
+      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER)) {
+        ControllerLeaderLocator.getInstance().refreshControllerLeader();
+      }
+      return response;
+    } catch (Exception e) {
+      // Catch all exceptions, we want the protocol to handle the case assuming the request was never sent.
+      LOGGER.error("Could not send request {}", url, e);
+    }
+    return SegmentCompletionProtocol.RESP_NOT_SENT;
   }
 }

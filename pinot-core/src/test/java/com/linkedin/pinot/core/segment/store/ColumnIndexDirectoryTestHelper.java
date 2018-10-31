@@ -26,8 +26,7 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class ColumnIndexDirectoryTestHelper {
@@ -106,7 +105,7 @@ public class ColumnIndexDirectoryTestHelper {
     SegmentMetadataImpl meta = mock(SegmentMetadataImpl.class);
     when(meta.getVersion()).thenReturn(version.toString());
     when(meta.getSegmentVersion()).thenReturn(version);
-    when(meta.getDictionaryFileName(anyString(), anyString()))
+    when(meta.getDictionaryFileName(anyString()))
         .thenAnswer(new Answer<String>() {
           @Override
           public String answer(InvocationOnMock invocationOnMock)
@@ -114,7 +113,7 @@ public class ColumnIndexDirectoryTestHelper {
             return invocationOnMock.getArguments()[0] + ".dict";
           }
         });
-    when(meta.getForwardIndexFileName(anyString(), anyString()))
+    when(meta.getForwardIndexFileName(anyString()))
         .thenAnswer(new Answer<String>() {
           @Override
           public String answer(InvocationOnMock invocationOnMock)
@@ -123,7 +122,7 @@ public class ColumnIndexDirectoryTestHelper {
           }
         });
 
-    when(meta.getBitmapInvertedIndexFileName(anyString(), anyString()))
+    when(meta.getBitmapInvertedIndexFileName(anyString()))
         .thenAnswer(new Answer<String>() {
           @Override
           public String answer(InvocationOnMock invocationOnMock)

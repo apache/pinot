@@ -106,27 +106,30 @@ public class StartBrokerCommand extends AbstractBaseAdminCommand implements Comm
 
   @Override
   public boolean execute() throws Exception {
-    if (_brokerHost == null) {
-      _brokerHost = NetUtil.getHostAddress();
-    }
+    try {
+      Configuration configuration = readConfigFromFile(_configFileName);
+      if (configuration == null) {
+        if (_configFileName != null) {
+          LOGGER.error("Error: Unable to find file {}.", _configFileName);
+          return false;
+        }
 
-    Configuration configuration = readConfigFromFile(_configFileName);
-    if (configuration == null) {
-      if (_configFileName != null) {
-        LOGGER.error("Error: Unable to find file {}.", _configFileName);
-        return false;
+        configuration = new PropertiesConfiguration();
+        configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
+        configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
       }
 
-      configuration = new PropertiesConfiguration();
-      configuration.addProperty(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, _brokerPort);
-      configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
-    }
+      LOGGER.info("Executing command: " + toString());
+      final HelixBrokerStarter pinotHelixBrokerStarter =
+          new HelixBrokerStarter(_brokerHost, _clusterName, _zkAddress, configuration);
 
-    LOGGER.info("Executing command: " + toString());
-    final HelixBrokerStarter pinotHelixBrokerStarter = new HelixBrokerStarter(_clusterName, _zkAddress, configuration);
-    
-    String pidFile = ".pinotAdminBroker-" + String.valueOf(System.currentTimeMillis()) + ".pid";
-    savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
-    return true;
+      String pidFile = ".pinotAdminBroker-" + String.valueOf(System.currentTimeMillis()) + ".pid";
+      savePID(System.getProperty("java.io.tmpdir") + File.separator + pidFile);
+      return true;
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while starting broker, exiting", e);
+      System.exit(-1);
+      return false;
+    }
   }
 }

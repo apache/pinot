@@ -1,31 +1,40 @@
 package com.linkedin.thirdeye.anomaly;
 
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
-import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
-import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
-import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationJobScheduler;
+import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
+import com.linkedin.thirdeye.anomaly.events.HolidayEventResource;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardResource;
+import com.linkedin.thirdeye.anomaly.onboard.DetectionOnboardServiceExecutor;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
-import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.tracking.RequestStatisticsLogger;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardService;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.common.ThirdEyeSwaggerBundle;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
+import com.linkedin.thirdeye.dashboard.resources.DetectionJobResource;
+import com.linkedin.thirdeye.dashboard.resources.EmailResource;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-
+import com.linkedin.thirdeye.anomaly.events.HolidayEventsLoader;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
+
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
@@ -33,18 +42,26 @@ public class ThirdEyeAnomalyApplication
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
-  private AlertJobScheduler alertJobScheduler = null;
   private AlertJobSchedulerV2 alertJobSchedulerV2;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
-  private AnomalyMergeExecutor anomalyMergeExecutor = null;
-  private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
+  private AutoOnboardService autoOnboardService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
+  private AlertFilterFactory alertFilterFactory = null;
+  private AnomalyClassifierFactory anomalyClassifierFactory = null;
+  private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
+  private ClassificationJobScheduler classificationJobScheduler = null;
+  private DetectionOnboardServiceExecutor detectionOnboardServiceExecutor = null;
+  private EmailResource emailResource = null;
+  private HolidayEventsLoader holidayEventsLoader = null;
+  private RequestStatisticsLogger requestStatisticsLogger = null;
 
   public static void main(final String[] args) throws Exception {
+
     List<String> argList = new ArrayList<>(Arrays.asList(args));
     if (argList.size() == 1) {
       argList.add(0, "server");
     }
+
     int lastIndex = argList.size() - 1;
     String thirdEyeConfigDir = argList.get(lastIndex);
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
@@ -62,6 +79,7 @@ public class ThirdEyeAnomalyApplication
   @Override
   public void initialize(final Bootstrap<ThirdEyeAnomalyConfiguration> bootstrap) {
     bootstrap.addBundle(new AssetsBundle("/assets/", "/", "index.html"));
+    bootstrap.addBundle(new ThirdEyeSwaggerBundle());
   }
 
   @Override
@@ -69,82 +87,140 @@ public class ThirdEyeAnomalyApplication
       throws Exception {
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDAOs();
-    ThirdEyeCacheRegistry.initializeCaches(config);
+    try {
+      ThirdEyeCacheRegistry.initializeCaches(config);
+    } catch (Exception e) {
+      LOG.error("Exception while loading caches", e);
+    }
+
+    environment.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {
 
+        requestStatisticsLogger = new RequestStatisticsLogger(new TimeGranularity(1, TimeUnit.HOURS));
+        requestStatisticsLogger.start();
+
         if (config.isWorker()) {
-          anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-          taskDriver = new TaskDriver(config, anomalyFunctionFactory);
+          initAnomalyFunctionFactory(config.getFunctionConfigPath());
+          initAlertFilterFactory(config.getAlertFilterConfigPath());
+          initAnomalyClassifierFactory(config.getAnomalyClassifierConfigPath());
+
+          taskDriver = new TaskDriver(config, anomalyFunctionFactory, alertFilterFactory, anomalyClassifierFactory);
           taskDriver.start();
         }
         if (config.isScheduler()) {
+          initAnomalyFunctionFactory(config.getFunctionConfigPath());
+          initAlertFilterFactory(config.getAlertFilterConfigPath());
+          initAlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
+
+          emailResource = new EmailResource(config);
           detectionJobScheduler = new DetectionJobScheduler();
           detectionJobScheduler.start();
-          environment.jersey().register(new DetectionJobResource(detectionJobScheduler));
-          environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
+          environment.jersey().register(
+              new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory, emailResource));
         }
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(config.getMonitorConfiguration());
           monitorJobScheduler.start();
         }
         if (config.isAlert()) {
-          alertJobScheduler = new AlertJobScheduler();
-          alertJobScheduler.start();
-
           // start alert scheduler v2
           alertJobSchedulerV2 = new AlertJobSchedulerV2();
           alertJobSchedulerV2.start();
-
-          environment.jersey()
-          .register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
-        }
-        if (config.isMerger()) {
-          // anomalyFunctionFactory might have initiated if current machine is also a worker
-          if (anomalyFunctionFactory == null) {
-            anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-          }
-          ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-          anomalyMergeExecutor =
-              new AnomalyMergeExecutor(executorService, anomalyFunctionFactory);
-          anomalyMergeExecutor.start();
         }
         if (config.isAutoload()) {
-          autoLoadPinotMetricsService = new AutoLoadPinotMetricsService(config);
-          autoLoadPinotMetricsService.start();
+          autoOnboardService = new AutoOnboardService(config);
+          autoOnboardService.start();
+        }
+        if (config.isHolidayEventsLoader()) {
+          holidayEventsLoader =
+              new HolidayEventsLoader(config.getHolidayEventsLoaderConfiguration(), config.getCalendarApiKeyPath(),
+                  DAORegistry.getInstance().getEventDAO());
+          holidayEventsLoader.start();
+          environment.jersey().register(new HolidayEventResource(holidayEventsLoader));
         }
         if (config.isDataCompleteness()) {
-          dataCompletenessScheduler = new DataCompletenessScheduler(config.getDatasetsToCheck());
+          dataCompletenessScheduler = new DataCompletenessScheduler();
           dataCompletenessScheduler.start();
+        }
+        if (config.isClassifier()) {
+          classificationJobScheduler = new ClassificationJobScheduler();
+          classificationJobScheduler.start();
+        }
+        if (config.isPinotProxy()) {
+          environment.jersey().register(new PinotDataSourceResource());
+        }
+        if (config.isDetectionOnboard()) {
+          Configuration systemConfig = DetectionOnboardResource.toSystemConfiguration(config);
+
+          detectionOnboardServiceExecutor = new DetectionOnboardServiceExecutor();
+          detectionOnboardServiceExecutor.start();
+          environment.jersey().register(new DetectionOnboardResource(detectionOnboardServiceExecutor, systemConfig));
         }
       }
 
       @Override
       public void stop() throws Exception {
-        if (config.isWorker()) {
-          taskDriver.stop();
+        if (requestStatisticsLogger != null) {
+          requestStatisticsLogger.shutdown();
         }
-        if (config.isScheduler()) {
+        if (taskDriver != null) {
+          taskDriver.shutdown();
+        }
+        if (detectionJobScheduler != null) {
           detectionJobScheduler.shutdown();
         }
-        if (config.isMonitor()) {
-          monitorJobScheduler.stop();
+        if (monitorJobScheduler != null) {
+          monitorJobScheduler.shutdown();
         }
-        if (config.isAlert()) {
-          alertJobScheduler.shutdown();
+        if (holidayEventsLoader != null) {
+          holidayEventsLoader.shutdown();
+        }
+        if (alertJobSchedulerV2 != null) {
           alertJobSchedulerV2.shutdown();
         }
-        if (config.isMerger()) {
-          anomalyMergeExecutor.stop();
+        if (autoOnboardService != null) {
+          autoOnboardService.shutdown();
         }
-        if (config.isAutoload()) {
-          autoLoadPinotMetricsService.shutdown();
-        }
-        if (config.isDataCompleteness()) {
+        if (dataCompletenessScheduler != null) {
           dataCompletenessScheduler.shutdown();
+        }
+        if (classificationJobScheduler != null) {
+          classificationJobScheduler.shutdown();
+        }
+        if (config.isPinotProxy()) {
+          // Do nothing
+        }
+        if (detectionOnboardServiceExecutor != null) {
+          detectionOnboardServiceExecutor.shutdown();
         }
       }
     });
+  }
+
+  private void initAnomalyFunctionFactory(String functoinConfigPath) {
+    if (anomalyFunctionFactory == null) {
+      anomalyFunctionFactory = new AnomalyFunctionFactory(functoinConfigPath);
+    }
+  }
+
+  private void initAlertFilterFactory(String alertFilterConfigPath) {
+    if (alertFilterFactory == null) {
+      alertFilterFactory = new AlertFilterFactory(alertFilterConfigPath);
+    }
+  }
+
+  private void initAnomalyClassifierFactory(String anomalyClassifierConfigPath) {
+    if (anomalyClassifierFactory == null) {
+      anomalyClassifierFactory = new AnomalyClassifierFactory(anomalyClassifierConfigPath);
+    }
+  }
+
+  private void initAlertFilterAutotuneFactory(String filterAutotuneConfigPath) {
+    if (alertFilterAutotuneFactory == null) {
+      alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(filterAutotuneConfigPath);
+    }
   }
 }

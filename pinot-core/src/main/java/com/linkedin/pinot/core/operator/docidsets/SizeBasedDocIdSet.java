@@ -20,11 +20,10 @@ import com.linkedin.pinot.core.operator.dociditerators.SizeBasedDocIdIterator;
 
 
 public final class SizeBasedDocIdSet implements FilterBlockDocIdSet {
-
   private final int _maxDocId;
 
   public SizeBasedDocIdSet(int maxDocId) {
-    this._maxDocId = maxDocId;
+    _maxDocId = maxDocId;
   }
 
   @Override
@@ -39,12 +38,10 @@ public final class SizeBasedDocIdSet implements FilterBlockDocIdSet {
 
   @Override
   public void setStartDocId(int startDocId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override
   public void setEndDocId(int endDocId) {
-    throw new UnsupportedOperationException();
   }
 
   @Override

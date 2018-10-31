@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import java.util.HashSet;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.config.SegmentPrunerConfig;
 
@@ -52,12 +52,12 @@ public class SegmentPrunerServiceImpl implements SegmentPrunerService {
   }
 
   @Override
-  public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
+  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
     if (_segmentPrunerSet == null || _segmentPrunerSet.size() == 0) {
       return false;
     }
     for (SegmentPruner pruner : _segmentPrunerSet) {
-      if (pruner.prune(segment, brokerRequest)) {
+      if (pruner.prune(segment, queryRequest)) {
         LOGGER.debug("pruned segment: {}", segment.getSegmentName());
         return true;
       }

@@ -89,7 +89,7 @@ public class NettyTCPServer extends NettyServer {
 
     @Override
     protected void initChannel(SocketChannel ch) throws Exception {
-      LOGGER.info("Setting up Server channel !!");
+      LOGGER.info("Setting up Server channel, scheduler");
       ch.pipeline().addLast("decoder", new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4));
       ch.pipeline().addLast("encoder", new LengthFieldPrepender(4));
       //ch.pipeline().addLast("logger", new LoggingHandler());

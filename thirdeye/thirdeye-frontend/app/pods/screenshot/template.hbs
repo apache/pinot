@@ -1,0 +1,19 @@
+{{#if anomaly}}
+  <div class="card-container card-container--padding">
+    {{anomaly-graph
+      primaryMetric=primaryMetric
+      isLoading=false
+      showSubchart=false
+      showLegend=false
+      legendText=legendText
+      enableZoom=true
+      componentId='anomaly-screenshot'
+      showGraphLegend=false
+      height=400
+      chartDates=dates
+      primaryMetricColumn=columns
+      point=point
+      padding=screenshotPadding
+    }}
+  </div>
+{{/if}}

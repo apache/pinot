@@ -23,11 +23,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.common.response.ServerInstance;
 
 
 public class SelectingFutureTest {
@@ -39,17 +39,17 @@ public class SelectingFutureTest {
    * @throws Exception
    */
   public void testMultiFutureComposite1() throws Exception {
-    List<String> keys = new ArrayList<String>();
+    List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
-    List<KeyedFuture<String, String>> futureList = new ArrayList<KeyedFuture<String, String>>();
+    List<ServerResponseFuture<String>> futureList = new ArrayList<>();
     String expectedMessage = null;
     for (int i = 0; i < numFutures; i++) {
-      String key = "key_" + i;
+      ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key, "");
       futureList.add(future);
     }
-    SelectingFuture<String, String> compositeFuture = new SelectingFuture<String, String>("test");
+    SelectingFuture<String> compositeFuture = new SelectingFuture<>("test");
     compositeFuture.start(futureList);
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -65,7 +65,7 @@ public class SelectingFutureTest {
     // Send response for underlying futures. Key : key_0 first
     for (int i = 0; i < numFutures; i++) {
       String message = "dummy Message_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureList.get(i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureList.get(i);
       future.onSuccess(message);
     }
     expectedMessage = "dummy Message_0";
@@ -92,16 +92,16 @@ public class SelectingFutureTest {
    * @throws Exception
    */
   public void testMultiFutureComposite2() throws Exception {
-    List<String> keys = new ArrayList<String>();
+    List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
-    List<KeyedFuture<String, String>> futureList = new ArrayList<KeyedFuture<String, String>>();
+    List<ServerResponseFuture<String>> futureList = new ArrayList<>();
     for (int i = 0; i < numFutures; i++) {
-      String key = "key_" + i;
+      ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key, "");
       futureList.add(future);
     }
-    SelectingFuture<String, String> compositeFuture = new SelectingFuture<String, String>("abc");
+    SelectingFuture<String> compositeFuture = new SelectingFuture<>("abc");
     compositeFuture.start(futureList);
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -119,7 +119,7 @@ public class SelectingFutureTest {
     for (int i = 0; i < numFutures; i++) {
       String message = "dummy Message_" + i;
       error = new Exception(message);
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureList.get(i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureList.get(i);
       future.onError(error);
     }
     Throwable expectedError = error;
@@ -133,7 +133,8 @@ public class SelectingFutureTest {
     Assert.assertFalse(futureList.get(2).isCancelled(), "Third response not cancelled");
     Assert.assertNotNull(futureList.get(0).getError());
     Assert.assertNotNull(futureList.get(1).getError());
-    Assert.assertEquals(futureList.get(2).getError().get("key_2"), runner.getError());
+    ServerInstance key2 = new ServerInstance("localhost:2");
+    Assert.assertEquals(futureList.get(2).getError().get(key2), runner.getError());
     Assert.assertNull(futureList.get(0).get());
     Assert.assertNull(futureList.get(1).get());
     Assert.assertNull(futureList.get(2).get());
@@ -147,16 +148,16 @@ public class SelectingFutureTest {
    * @throws Exception
    */
   public void testMultiFutureComposite3() throws Exception {
-    List<String> keys = new ArrayList<String>();
+    List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
-    List<KeyedFuture<String, String>> futureList = new ArrayList<KeyedFuture<String, String>>();
+    List<ServerResponseFuture<String>> futureList = new ArrayList<>();
     for (int i = 0; i < numFutures; i++) {
-      String key = "key_" + i;
+      ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key, "");
       futureList.add(future);
     }
-    SelectingFuture<String, String> compositeFuture = new SelectingFuture<String, String>("test");
+    SelectingFuture<String> compositeFuture = new SelectingFuture<>("test");
     compositeFuture.start(futureList);
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -174,18 +175,18 @@ public class SelectingFutureTest {
     String message = "dummy Message_" + 0;
     // First future gets an error
     Throwable error = new Exception(message);
-    AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureList.get(0);
+    AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureList.get(0);
     future.onError(error);
     //Second future gets a response
     message = "dummy Message_" + 1;
-    future = (AsyncResponseFuture<String, String>) futureList.get(1);
+    future = (AsyncResponseFuture<String>) futureList.get(1);
     future.onSuccess(message);
     expectedMessage = message;
 
     // Third future gets a response
     message = "dummy Message_" + 2;
     error = new Exception(message);
-    future = (AsyncResponseFuture<String, String>) futureList.get(2);
+    future = (AsyncResponseFuture<String>) futureList.get(2);
     future.onError(error);
 
     runner.waitForDone();
@@ -213,11 +214,11 @@ public class SelectingFutureTest {
     private boolean _isCancelled;
     private String _message;
     private Throwable _error;
-    private final SelectingFuture<String, String> _future;
+    private final SelectingFuture<String> _future;
     private final CountDownLatch _latch = new CountDownLatch(1);
     private final CountDownLatch _endLatch = new CountDownLatch(1);
 
-    public ResponseCompositeFutureClientRunnerListener(SelectingFuture<String, String> f) {
+    public ResponseCompositeFutureClientRunnerListener(SelectingFuture<String> f) {
       _future = f;
     }
 
@@ -252,7 +253,7 @@ public class SelectingFutureTest {
       if (null != message) {
         _message = message;
       }
-      Map<String, Throwable> t = _future.getError();
+      Map<ServerInstance, Throwable> t = _future.getError();
       if ((null != t) && (!t.isEmpty())) {
         _error = t.values().iterator().next();
       }
@@ -276,7 +277,7 @@ public class SelectingFutureTest {
       return _error;
     }
 
-    public SelectingFuture<String, String> getFuture() {
+    public SelectingFuture<String> getFuture() {
       return _future;
     }
   }

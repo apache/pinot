@@ -17,10 +17,8 @@ package com.linkedin.pinot.core.operator.docvalsets;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
-import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.common.DataBlockCache;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.ProjectionOperator;
 
 
 /**
@@ -29,57 +27,52 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
  * It uses {@link DataBlockCache} to cache the projection data.
  */
 public class ProjectionBlockValSet extends BaseBlockValSet {
-
-  private DataBlockCache _dataBlockCache;
-  private final BlockValIterator _blockValIterator;
-  private final FieldSpec.DataType _columnDataType;
-  private String _column;
+  private final DataBlockCache _dataBlockCache;
+  private final String _column;
+  private final FieldSpec.DataType _dataType;
 
   /**
-
-
    * Constructor for the class.
-   * The dataBlockCache argument is initialized in {@link com.linkedin.pinot.core.operator.MProjectionOperator},
-   * so that it can be reused across multiple calls to {@link MProjectionOperator#getNextBlock()}.
+   * The dataBlockCache argument is initialized in {@link ProjectionOperator},
+   * so that it can be reused across multiple calls to {@link ProjectionOperator#nextBlock()}.
    *
    * @param dataBlockCache data block cache
    * @param column Projection column.
    */
-  public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column) {
+  public ProjectionBlockValSet(DataBlockCache dataBlockCache, String column, FieldSpec.DataType dataType) {
     _dataBlockCache = dataBlockCache;
     _column = column;
-    _columnDataType = _dataBlockCache.getDataType(column);
-    _blockValIterator = _dataBlockCache.getDataFetcher().getBlockValIteratorForColumn(column);
+    _dataType = dataType;
   }
 
   @Override
   public int[] getIntValuesSV() {
-    return _dataBlockCache.getIntValueArrayForColumn(_column);
+    return _dataBlockCache.getIntValuesForSVColumn(_column);
   }
 
   @Override
   public int[][] getIntValuesMV() {
-    return _dataBlockCache.getIntValuesArrayForColumn(_column);
+    return _dataBlockCache.getIntValuesForMVColumn(_column);
   }
 
   @Override
   public long[] getLongValuesSV() {
-    return _dataBlockCache.getLongValueArrayForColumn(_column);
+    return _dataBlockCache.getLongValuesForSVColumn(_column);
   }
 
   @Override
   public long[][] getLongValuesMV() {
-    return _dataBlockCache.getLongValuesArrayForColumn(_column);
+    return _dataBlockCache.getLongValuesForMVColumn(_column);
   }
 
   @Override
   public float[] getFloatValuesSV() {
-    return _dataBlockCache.getFloatValueArrayForColumn(_column);
+    return _dataBlockCache.getFloatValuesForSVColumn(_column);
   }
 
   @Override
   public float[][] getFloatValuesMV() {
-    return _dataBlockCache.getFloatValuesArrayForColumn(_column);
+    return _dataBlockCache.getFloatValuesForMVColumn(_column);
   }
 
   /**
@@ -90,7 +83,7 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
    */
   @Override
   public double[] getDoubleValuesSV() {
-    return _dataBlockCache.getDoubleValueArrayForColumn(_column);
+    return _dataBlockCache.getDoubleValuesForSVColumn(_column);
   }
 
   /**
@@ -101,46 +94,41 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
    */
   @Override
   public double[][] getDoubleValuesMV() {
-    return _dataBlockCache.getDoubleValuesArrayForColumn(_column);
+    return _dataBlockCache.getDoubleValuesForMVColumn(_column);
   }
-
 
   @Override
   public String[] getStringValuesSV() {
-    return _dataBlockCache.getStringValueArrayForColumn(_column);
+    return _dataBlockCache.getStringValuesForSVColumn(_column);
+  }
+
+  @Override
+  public byte[][] getBytesValuesSV() {
+    return _dataBlockCache.getBytesValuesForSVColumn(_column);
   }
 
   @Override
   public String[][] getStringValuesMV() {
-    return _dataBlockCache.getStringValuesArrayForColumn(_column);
+    return _dataBlockCache.getStringValuesForMVColumn(_column);
   }
 
   @Override
   public FieldSpec.DataType getValueType() {
-    return _columnDataType;
-  }
-
-  // TODO: Remove arguments from interface, as projection block will have the information.
-  @Override
-  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
-      int outStartPos) {
-    getDictionaryIds();
+    return _dataType;
   }
 
   @Override
-  public int[] getDictionaryIds() {
-    return _dataBlockCache.getDictIdArrayForColumn(_column);
+  public int[] getDictionaryIdsSV() {
+    return _dataBlockCache.getDictIdsForSVColumn(_column);
   }
 
   @Override
-  public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
-    BlockMultiValIterator blockValIterator = (BlockMultiValIterator) _blockValIterator;
-    blockValIterator.skipTo(docId);
-    return blockValIterator.nextIntVal(outputDictIds);
+  public int[][] getDictionaryIdsMV() {
+    return _dataBlockCache.getDictIdsForMVColumn(_column);
   }
 
   @Override
-  public int[] getNumberOfMVEntriesArray() {
-    return _dataBlockCache.getNumberOfEntriesArrayForColumn(_column);
+  public int[] getNumMVEntries() {
+    return _dataBlockCache.getNumValuesForMVColumn(_column);
   }
 }

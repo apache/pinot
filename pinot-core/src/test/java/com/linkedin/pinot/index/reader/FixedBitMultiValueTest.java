@@ -41,10 +41,6 @@ public class FixedBitMultiValueTest {
     testSingleColMultiValueWithContext(
         com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter.class,
         com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader.class);
-    testSingleColMultiValue(
-        com.linkedin.pinot.core.io.writer.impl.v2.FixedBitMultiValueWriter.class,
-        com.linkedin.pinot.core.io.reader.impl.v2.FixedBitMultiValueReader.class);
-
   }
 
   public void testSingleColMultiValue(Class<? extends SingleColumnMultiValueWriter> writerClazz,
@@ -52,13 +48,9 @@ public class FixedBitMultiValueTest {
     LOGGER.info("Testing for writerClazz:{} readerClass:{}", writerClazz.getName(),
         readerClazz.getName());
     Constructor<? extends SingleColumnMultiValueWriter> writerClazzConstructor =
-        writerClazz.getConstructor(new Class[] {
-            File.class, int.class, int.class, int.class
-    });
+        writerClazz.getConstructor(new Class[]{File.class, int.class, int.class, int.class});
     Constructor<? extends SingleColumnMultiValueReader> readerClazzConstructor =
-        readerClazz.getConstructor(new Class[] {
-            PinotDataBuffer.class, int.class, int.class, int.class, boolean.class
-    });
+        readerClazz.getConstructor(new Class[]{PinotDataBuffer.class, int.class, int.class, int.class});
     int maxBits = 1;
     while (maxBits < 32) {
       final String fileName = getClass().getName() + "_test_single_col_mv_fixed_bit.dat";
@@ -98,9 +90,7 @@ public class FixedBitMultiValueTest {
       // Test heap mode
       PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
       SingleColumnMultiValueReader<? extends ReaderContext> heapReader =
-          readerClazzConstructor.newInstance(new Object[] {
-              heapBuffer, numDocs, totalNumValues, maxBits, false
-      });
+          readerClazzConstructor.newInstance(new Object[]{heapBuffer, numDocs, totalNumValues, maxBits});
       final int[] readValues = new int[maxNumValues];
       for (int i = 0; i < data.length; i++) {
         final int numValues = heapReader.getIntArray(i, readValues);
@@ -116,9 +106,7 @@ public class FixedBitMultiValueTest {
       PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "testing");
 
       SingleColumnMultiValueReader<? extends ReaderContext> mmapReader =
-          readerClazzConstructor.newInstance(new Object[] {
-              mmapBuffer, numDocs, totalNumValues, maxBits, false
-      });
+          readerClazzConstructor.newInstance(new Object[]{mmapBuffer, numDocs, totalNumValues, maxBits});
       for (int i = 0; i < data.length; i++) {
         final int numValues = mmapReader.getIntArray(i, readValues);
         Assert.assertEquals(numValues, data[i].length);
@@ -144,13 +132,9 @@ public class FixedBitMultiValueTest {
     LOGGER.info("Testing for writerClazz:{} readerClass:{}", writerClazz.getName(),
         readerClazz.getName());
     Constructor<? extends SingleColumnMultiValueWriter> writerClazzConstructor =
-        writerClazz.getConstructor(new Class[] {
-            File.class, int.class, int.class, int.class
-    });
+        writerClazz.getConstructor(new Class[]{File.class, int.class, int.class, int.class});
     Constructor<? extends SingleColumnMultiValueReader<? extends ReaderContext>> readerClazzConstructor =
-        readerClazz.getConstructor(new Class[] {
-            PinotDataBuffer.class, int.class, int.class, int.class, boolean.class
-    });
+        readerClazz.getConstructor(new Class[]{PinotDataBuffer.class, int.class, int.class, int.class});
     int maxBits = 1;
     while (maxBits < 32) {
       final String fileName = getClass().getName() + "_test_single_col_mv_fixed_bit.dat";
@@ -190,9 +174,7 @@ public class FixedBitMultiValueTest {
       // Test heap mode
       PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
       SingleColumnMultiValueReader heapReader =
-          readerClazzConstructor.newInstance(new Object[] {
-              heapBuffer, numDocs, totalNumValues, maxBits, false
-      });
+          readerClazzConstructor.newInstance(new Object[]{heapBuffer, numDocs, totalNumValues, maxBits});
       ReaderContext context = heapReader.createContext();
       final int[] readValues = new int[maxNumValues];
       for (int i = 0; i < data.length; i++) {
@@ -213,9 +195,7 @@ public class FixedBitMultiValueTest {
       // Test mmap mode
       PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "testing");
       SingleColumnMultiValueReader<? extends ReaderContext> mmapReader =
-          readerClazzConstructor.newInstance(new Object[] {
-              mmapBuffer, numDocs, totalNumValues, maxBits, false
-      });
+          readerClazzConstructor.newInstance(new Object[]{mmapBuffer, numDocs, totalNumValues, maxBits});
       for (int i = 0; i < data.length; i++) {
         final int numValues = mmapReader.getIntArray(i, readValues);
         Assert.assertEquals(numValues, data[i].length);

@@ -17,17 +17,16 @@ package com.linkedin.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.Tenant;
 import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.BufferedReader;
@@ -37,20 +36,17 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
-import java.sql.Timestamp;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.tools.ClusterStateVerifier;
-import org.apache.helix.tools.ClusterStateVerifier.Verifier;
+import org.apache.helix.tools.ClusterVerifiers.StrictMatchExternalViewVerifier;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +56,7 @@ import org.yaml.snakeyaml.Yaml;
 @SuppressWarnings("FieldCanBeLocal")
 public class PerfBenchmarkDriver {
   private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkDriver.class);
+  private static final long BROKER_TIMEOUT_MS = 60_000L;
 
   private final PerfBenchmarkDriverConf _conf;
   private final String _zkAddress;
@@ -89,7 +86,7 @@ public class PerfBenchmarkDriver {
   private PinotHelixResourceManager _helixResourceManager;
 
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf) {
-    this(conf, "/tmp/", "HEAP", "v1", false);
+    this(conf, "/tmp/", "HEAP", null, false);
   }
 
   public PerfBenchmarkDriver(PerfBenchmarkDriverConf conf, String tempDir, String loadMode, String segmentFormatVersion,
@@ -209,7 +206,8 @@ public class PerfBenchmarkDriver {
     }
     Configuration brokerConfiguration = new PropertiesConfiguration();
     String brokerInstanceName = "Broker_localhost_" + CommonConstants.Helix.DEFAULT_BROKER_QUERY_PORT;
-    brokerConfiguration.setProperty("instanceId", brokerInstanceName);
+    brokerConfiguration.setProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, brokerInstanceName);
+    brokerConfiguration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
     new HelixBrokerStarter(_clusterName, _zkAddress, brokerConfiguration);
   }
@@ -224,8 +222,10 @@ public class PerfBenchmarkDriver {
     serverConfiguration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_DATA_DIR, _serverInstanceDataDir);
     serverConfiguration.addProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
         _serverInstanceSegmentTarDir);
-    serverConfiguration.setProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
-    serverConfiguration.setProperty("instanceId", _serverInstanceName);
+    if (_segmentFormatVersion != null) {
+      serverConfiguration.setProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
+    }
+    serverConfiguration.setProperty(CommonConstants.Helix.Instance.INSTANCE_ID_KEY, _serverInstanceName);
     LOGGER.info("Starting server instance: {}", _serverInstanceName);
     new HelixServerStarter(_clusterName, _zkAddress, serverConfiguration);
   }
@@ -264,23 +264,19 @@ public class PerfBenchmarkDriver {
 
   public void configureTable(String tableName, List<String> invertedIndexColumns)
       throws Exception {
-    String jsonString =
-        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, _serverTenantName, _brokerTenantName,
-            _numReplicas, _segmentAssignmentStrategy).toString();
-    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(jsonString);
-    offlineTableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
-    offlineTableConfig.getValidationConfig().setRetentionTimeValue("");
-    IndexingConfig indexingConfig = offlineTableConfig.getIndexingConfig();
-    indexingConfig.setLoadMode(_loadMode);
-    indexingConfig.setSegmentFormatVersion(_segmentFormatVersion);
-    if (invertedIndexColumns != null && !invertedIndexColumns.isEmpty()) {
-      indexingConfig.setInvertedIndexColumns(invertedIndexColumns);
-    }
-    _helixResourceManager.addTable(offlineTableConfig);
+    TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
+        .setSegmentAssignmentStrategy(_segmentAssignmentStrategy)
+        .setNumReplicas(_numReplicas)
+        .setBrokerTenant(_brokerTenantName)
+        .setServerTenant(_serverTenantName)
+        .setLoadMode(_loadMode)
+        .setSegmentVersion(_segmentFormatVersion)
+        .setInvertedIndexColumns(invertedIndexColumns)
+        .build();
+    _helixResourceManager.addTable(tableConfig);
   }
 
-  private void uploadIndexSegments()
-      throws Exception {
+  private void uploadIndexSegments() throws Exception {
     if (!_conf.isUploadIndexes()) {
       LOGGER.info("Skipping upload index segments step.");
       return;
@@ -288,10 +284,12 @@ public class PerfBenchmarkDriver {
     String indexDirectory = _conf.getIndexDirectory();
     File[] indexFiles = new File(indexDirectory).listFiles();
     Preconditions.checkNotNull(indexFiles);
-    for (File indexFile : indexFiles) {
-      LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
-      FileUploadUtils.sendSegmentFile(_controllerHost, String.valueOf(_controllerPort), indexFile.getName(),
-          indexFile, indexFile.length());
+    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      URI uploadSegmentHttpURI = FileUploadDownloadClient.getUploadSegmentHttpURI(_controllerHost, _controllerPort);
+      for (File indexFile : indexFiles) {
+        LOGGER.info("Uploading index segment: {}", indexFile.getAbsolutePath());
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, indexFile.getName(), indexFile);
+      }
     }
   }
 
@@ -301,43 +299,31 @@ public class PerfBenchmarkDriver {
    * @param segmentMetadata segment metadata.
    */
   public void addSegment(SegmentMetadata segmentMetadata) {
-    _helixResourceManager.addSegment(segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
+    _helixResourceManager.addNewSegment(segmentMetadata, "http://" + _controllerAddress + "/" + segmentMetadata.getName());
   }
 
   public static void waitForExternalViewUpdate(String zkAddress, final String clusterName, long timeoutInMilliseconds) {
     final ZKHelixAdmin helixAdmin = new ZKHelixAdmin(zkAddress);
 
-    Verifier customVerifier = new Verifier() {
-
-      @Override
-      public boolean verify() {
-        List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
-        LOGGER.info("Waiting for the cluster to be set up and indexes to be loaded on the servers" + new Timestamp(
-            System.currentTimeMillis()));
-        for (String resourceName : resourcesInCluster) {
-          IdealState idealState = helixAdmin.getResourceIdealState(clusterName, resourceName);
-          ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, resourceName);
-          if (idealState == null || externalView == null) {
-            return false;
-          }
-          Set<String> partitionSet = idealState.getPartitionSet();
-          for (String partition : partitionSet) {
-            Map<String, String> instanceStateMapIS = idealState.getInstanceStateMap(partition);
-            Map<String, String> instanceStateMapEV = externalView.getStateMap(partition);
-            if (instanceStateMapIS == null || instanceStateMapEV == null) {
-              return false;
-            }
-            if (!instanceStateMapIS.equals(instanceStateMapEV)) {
-              return false;
-            }
-          }
-        }
-        LOGGER.info("Cluster is ready to serve queries");
-        return true;
+    List<String> allResourcesInCluster = helixAdmin.getResourcesInCluster(clusterName);
+    Set<String> tableAndBrokerResources = new HashSet<>();
+    for (String resourceName : allResourcesInCluster) {
+      // Only check table resources and broker resource
+      if (TableNameBuilder.isTableResource(resourceName) || resourceName.equals(
+          CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)) {
+        tableAndBrokerResources.add(resourceName);
       }
-    };
+    }
 
-    ClusterStateVerifier.verifyByPolling(customVerifier, timeoutInMilliseconds);
+    StrictMatchExternalViewVerifier verifier = new StrictMatchExternalViewVerifier.Builder(clusterName)
+        .setZkAddr(zkAddress)
+        .setResources(tableAndBrokerResources)
+        .build();
+
+    boolean success = verifier.verify(timeoutInMilliseconds);
+    if (success) {
+      LOGGER.info("Cluster is ready to serve queries");
+    }
   }
 
   private void postQueries()

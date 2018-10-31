@@ -332,6 +332,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       if (executorService.isTerminated()) {
         LOGGER.error("All threads got exception and already dead.");
         return;
+
       }
 
       for (String query : queries) {

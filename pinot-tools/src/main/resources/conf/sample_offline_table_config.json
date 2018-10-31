@@ -1,0 +1,28 @@
+{
+  "tableName": "sampleTable",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "timeColumnName": "outgoingName",
+    "timeType": "DAYS",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "365",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "replication": "3"
+  },
+  "tenants": {
+    "broker": "brokerOne",
+    "server": "serverOne"
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [
+      "column1",
+      "column2"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

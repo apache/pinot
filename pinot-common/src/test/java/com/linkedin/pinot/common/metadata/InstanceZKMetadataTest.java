@@ -28,8 +28,7 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 public class InstanceZKMetadataTest {
 
   @Test
-  public void instanceZKMetadataConvertionTest() {
-
+  public void instanceZKMetadataConversionTest() {
     ZNRecord znRecord = getTestInstanceZNRecord();
     InstanceZKMetadata instanceMetadataFromZNRecord = new InstanceZKMetadata(znRecord);
 
@@ -44,9 +43,9 @@ public class InstanceZKMetadataTest {
   }
 
   private ZNRecord getTestInstanceZNRecord() {
-    ZNRecord record = new ZNRecord("Server_lva1-app0120.corp.linkedin.com_8001");
-    Map<String, String> groupIdMap = new HashMap<String, String>();
-    Map<String, String> partitionMap = new HashMap<String, String>();
+    ZNRecord record = new ZNRecord("Server_localhost_1234");
+    Map<String, String> groupIdMap = new HashMap<>();
+    Map<String, String> partitionMap = new HashMap<>();
 
     for (int i = 0; i < 10; ++i) {
       groupIdMap.put("testRes" + i + "_REALTIME", "groupId" + i);
@@ -60,8 +59,8 @@ public class InstanceZKMetadataTest {
   private InstanceZKMetadata getTestInstanceMetadata() {
     InstanceZKMetadata instanceMetadata = new InstanceZKMetadata();
     instanceMetadata.setInstanceType("Server");
-    instanceMetadata.setInstanceName("lva1-app0120.corp.linkedin.com");
-    instanceMetadata.setInstancePort(8001);
+    instanceMetadata.setInstanceName("localhost");
+    instanceMetadata.setInstancePort(1234);
     for (int i = 0; i < 10; ++i) {
       instanceMetadata.setGroupId("testRes" + i, "groupId" + i);
       instanceMetadata.setPartition("testRes" + i, "part" + i);

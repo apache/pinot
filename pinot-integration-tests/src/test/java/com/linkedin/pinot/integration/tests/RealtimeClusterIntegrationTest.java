@@ -15,120 +15,172 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
-import java.sql.ResultSet;
-import java.sql.Statement;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import kafka.server.KafkaServerStartable;
+import org.testng.annotations.Test;
 
 
 /**
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
- *
  */
-public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
-  private final File _tmpDir = new File("/tmp/RealtimeClusterIntegrationTest");
-  protected static final String KAFKA_TOPIC = "realtime-integration-test";
-
-  private static final int SEGMENT_COUNT = 12;
-  protected static final int ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH = 20000;
-  protected List<KafkaServerStartable> kafkaStarters;
-
-  protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
-      String kafkaTopic, File schemaFile, File avroFile) throws Exception {
-    Schema schema = Schema.fromFile(schemaFile);
-    addSchema(schemaFile, schema.getSchemaName());
-    addRealtimeTable(tableName, timeColumnName, timeColumnType, -1, "", kafkaZkUrl, kafkaTopic, schema.getSchemaName(),
-        null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier");
-  }
-
-  protected void startKafka() {
-    kafkaStarters =
-        KafkaStarterUtils.startServers(getKafkaBrokerCount(), KafkaStarterUtils.DEFAULT_KAFKA_PORT,
-            KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
-
-    // Create Kafka topic
-    createKafkaTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
-  }
+public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+  private List<KafkaServerStartable> _kafkaStarters;
 
   @BeforeClass
   public void setUp() throws Exception {
-    // Start ZK and Kafka
-    startZk();
-    startKafka();
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
     // Start the Pinot cluster
+    startZk();
     startController();
     startBroker();
     startServer();
 
-    // Unpack data
-    final List<File> avroFiles = unpackAvroData(_tmpDir, SEGMENT_COUNT);
+    // Start Kafka
+    startKafka();
 
-    File schemaFile = getSchemaFile();
+    // Unpack the Avro files
+    List<File> avroFiles = unpackAvroData(_tempDir);
 
-    // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
-    setupH2AndInsertAvro(avroFiles, executor);
-
-    // Initialize query generator
-    setupQueryGenerator(avroFiles, executor);
 
     // Push data into the Kafka topic
-    pushAvroIntoKafka(avroFiles, executor, KAFKA_TOPIC);
+    pushAvroIntoKafka(avroFiles, getKafkaTopic(), executor);
 
-    // Wait for data push, query generator initialization and H2 load to complete
+    // Load data into H2
+    setUpH2Connection(avroFiles, executor);
+
+    // Initialize query generator
+    setUpQueryGenerator(avroFiles, executor);
+
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     // Create Pinot table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
-        schemaFile, avroFiles.get(0));
+    setUpTable(avroFiles.get(0));
 
-    // Wait until the Pinot event count matches with the number of events in the Avro files
-    long timeInFiveMinutes = System.currentTimeMillis() + 5 * 60 * 1000L;
-    Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    statement.execute("select count(*) from mytable");
-    ResultSet rs = statement.getResultSet();
-    rs.first();
-    int h2RecordCount = rs.getInt(1);
-    rs.close();
-
-    waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
+    // Wait for all documents loaded
+    waitForAllDocsLoaded(600_000L);
   }
 
-  protected int getKafkaBrokerCount() {
-    return 1;
+  protected void startKafka() {
+    _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), KafkaStarterUtils.DEFAULT_KAFKA_PORT,
+        KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
+    KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, getNumKafkaPartitions());
   }
 
-  protected void createKafkaTopic(String kafkaTopic, String zkStr) {
-    KafkaStarterUtils.createTopic(kafkaTopic, zkStr, 10);
+  protected void setUpTable(File avroFile) throws Exception {
+    File schemaFile = getSchemaFile();
+    Schema schema = Schema.fromFile(schemaFile);
+    String schemaName = schema.getSchemaName();
+    addSchema(schemaFile, schemaName);
+
+    String timeColumnName = schema.getTimeColumnName();
+    Assert.assertNotNull(timeColumnName);
+    TimeUnit outgoingTimeUnit = schema.getOutgoingTimeUnit();
+    Assert.assertNotNull(outgoingTimeUnit);
+    String timeType = outgoingTimeUnit.toString();
+
+    addRealtimeTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
+        getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, null, null,
+        getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(), getTaskConfig(), null);
+  }
+
+  @Test
+  @Override
+  public void testQueriesFromQueryFile() throws Exception {
+    super.testQueriesFromQueryFile();
+  }
+
+  @Test
+  @Override
+  public void testGeneratedQueriesWithMultiValues() throws Exception {
+    super.testGeneratedQueriesWithMultiValues();
+  }
+
+  /**
+   * In realtime consuming segments, the dictionary is not sorted,
+   * and the dictionary based operator should not be used
+   *
+   * Adding explicit queries to test dictionary based functions,
+   * to ensure the right result is computed, wherein dictionary is not read if it is mutable
+   * @throws Exception
+   */
+  @Test
+  public void testDictionaryBasedQueries() throws Exception {
+
+    // Dictionary columns
+    // int
+    testDictionaryBasedFunctions("NASDelay");
+
+    // long
+    testDictionaryBasedFunctions("AirlineID");
+
+    // double
+    testDictionaryBasedFunctions("ArrDelayMinutes");
+
+    // float
+    testDictionaryBasedFunctions("DepDelayMinutes");
+
+    // Non Dictionary columns
+    // int
+    testDictionaryBasedFunctions("ActualElapsedTime");
+
+    // double
+    testDictionaryBasedFunctions("DepDelay");
+
+    // float
+    testDictionaryBasedFunctions("ArrDelay");
+  }
+
+  @Test
+  @Override
+  public void testQueryExceptions() throws Exception {
+    super.testQueryExceptions();
+  }
+
+  @Test
+  @Override
+  public void testInstanceShutdown() throws Exception {
+    super.testInstanceShutdown();
   }
 
   @AfterClass
   public void tearDown() throws Exception {
+    dropRealtimeTable(getTableName());
+    stopServer();
     stopBroker();
     stopController();
-    stopServer();
-    for (KafkaServerStartable kafkaStarter : kafkaStarters) {
+    for (KafkaServerStartable kafkaStarter : _kafkaStarters) {
       KafkaStarterUtils.stopServer(kafkaStarter);
     }
-    try {
-      stopZk();
-    } catch (Exception e) {
-      // Swallow ZK Exceptions.
-    }
-    FileUtils.deleteDirectory(_tmpDir);
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
+  }
+
+  private void testDictionaryBasedFunctions(String column) throws Exception {
+    String pqlQuery;
+    String sqlQuery;
+    pqlQuery = "SELECT MAX(" + column + ") FROM " + getTableName();
+    sqlQuery = "SELECT MAX(" + column + ") FROM " + getTableName();
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT MIN(" + column + ") FROM " + getTableName();
+    sqlQuery = "SELECT MIN(" + column + ") FROM " + getTableName();
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT MINMAXRANGE(" + column + ") FROM " + getTableName();
+    sqlQuery = "SELECT MAX(" + column + ")-MIN(" + column + ") FROM " + getTableName();
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
   }
 }

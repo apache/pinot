@@ -15,11 +15,15 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+import com.linkedin.pinot.pql.parsers.pql2.ast.TopAstNode;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.pql.parsers.pql2.ast.TopAstNode;
+
+import java.util.Collections;
 
 
 /**
@@ -92,5 +96,113 @@ public class Pql2CompilerTest {
     GroupBy groupBy = req.getGroupBy();
     Assert.assertTrue(groupBy.isSetTopN());
     Assert.assertEquals(expectedTopN, groupBy.getTopN());
+  }
+
+  @Test
+  public void testRejectInvalidLexerToken() {
+    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz ?= 2");
+    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz =! 2");
+  }
+
+  @Test
+  public void testRejectInvalidParses() {
+    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz < > 2");
+    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz ! = 2");
+  }
+
+  @Test
+  public void testParseExceptionHasCharacterPosition() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    final String query = "select foo from bar where baz ? 2";
+
+    try {
+      compiler.compileToBrokerRequest(query);
+    } catch (Pql2CompilationException e) {
+      // Expected
+      Assert.assertTrue(e.getMessage().startsWith("1:30: "), "Compilation exception should contain line and character for error message. Error message is " + e.getMessage());
+      return;
+    }
+
+    Assert.fail("Query " + query + " compiled successfully but was expected to fail compilation");
+  }
+
+  @Test
+  public void testCStyleInequalityOperator() {
+    Pql2Compiler compiler = new Pql2Compiler();
+
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts'");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.NOT);
+  }
+
+  @Test
+  public void testCompilationWithHaving() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+        "select avg(age) as avg_age from person group by address_city having avg(age)=20");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.EQUALITY);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationType(), "avg");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"),
+        "age");
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0), "20");
+    brokerRequest = compiler.compileToBrokerRequest(
+        "select count(*) as count from sell group by price having count(*) > 100 AND count(*)<200");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 3);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.AND);
+    brokerRequest = compiler.compileToBrokerRequest(
+        "select count(*) as count, avg(price) as avgprice from sell having count(*) > 0 OR (avg(price) < 45 AND count(*) > 22)");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 5);
+
+    brokerRequest = compiler.compileToBrokerRequest(
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch >= 16312 group by Carrier having count(*) in (375,5005,1099)");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 1);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.IN);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().size(), 1);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("375"), true);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("5005"), true);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getValue().get(0).contains("1099"), true);
+    brokerRequest = compiler.compileToBrokerRequest(
+        "SELECT count(*) FROM mytable WHERE DaysSinceEpoch >= 16312 group by Carrier having count(*) not in (375,5005,1099)");
+    Assert.assertEquals(brokerRequest.getHavingFilterSubQueryMap().getFilterQueryMap().size(), 1);
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getOperator(), FilterOperator.NOT_IN);
+  }
+
+  @Test
+  public void testQueryOptions() {
+    Pql2Compiler compiler = new Pql2Compiler();
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts'");
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 0);
+    Assert.assertNull(brokerRequest.getQueryOptions());
+
+    brokerRequest = compiler.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes)");
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 1);
+    Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
+    Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");
+
+    brokerRequest = compiler.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts' OPTION (delicious=yes, foo=1234, bar='potato')");
+    Assert.assertEquals(brokerRequest.getQueryOptionsSize(), 3);
+    Assert.assertTrue(brokerRequest.getQueryOptions().containsKey("delicious"));
+    Assert.assertEquals(brokerRequest.getQueryOptions().get("delicious"), "yes");
+    Assert.assertEquals(brokerRequest.getQueryOptions().get("foo"), "1234");
+    Assert.assertEquals(brokerRequest.getQueryOptions().get("bar"), "potato");
+  }
+
+  @Test
+  public void testIdentifierQuoteCharacter() {
+    Pql2Compiler compiler = new Pql2Compiler();
+
+    TransformExpressionTree expTree = compiler.compileToExpressionTree("`a.b.c`");
+    Assert.assertEquals(expTree.getExpressionType(), TransformExpressionTree.ExpressionType.IDENTIFIER);
+    Assert.assertEquals(expTree.getValue(), "a.b.c");
+
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+            "select avg(`attributes.age`) as `avg_age` from `person` group by `attributes.address_city` having avg(`attributes.age`)=20");
+
+    Assert.assertEquals(brokerRequest.getAggregationsInfo().get(0).getAggregationParams().get("column"),"attributes.age");
+    Assert.assertEquals(brokerRequest.getGroupBy().getColumns(), Collections.singletonList("attributes.address_city"));
+    Assert.assertEquals(brokerRequest.getHavingFilterQuery().getAggregationInfo().getAggregationParams().get("column"),"attributes.age");
   }
 }

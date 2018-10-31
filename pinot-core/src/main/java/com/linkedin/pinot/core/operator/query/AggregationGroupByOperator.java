@@ -16,14 +16,13 @@
 package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
-import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.operator.transform.TransformOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import javax.annotation.Nonnull;
@@ -32,72 +31,58 @@ import javax.annotation.Nonnull;
 /**
  * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
  */
-public class AggregationGroupByOperator extends BaseOperator {
+public class AggregationGroupByOperator extends BaseOperator<IntermediateResultsBlock> {
   private static final String OPERATOR_NAME = "AggregationGroupByOperator";
 
-  private final AggregationFunctionContext[] _aggregationFunctionContexts;
+  private final AggregationFunctionContext[] _functionContexts;
   private final GroupBy _groupBy;
+  private final int _maxInitialResultHolderCapacity;
   private final int _numGroupsLimit;
-  private final TransformExpressionOperator _transformOperator;
+  private final TransformOperator _transformOperator;
   private final long _numTotalRawDocs;
+
   private ExecutionStatistics _executionStatistics;
 
-  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull GroupBy groupBy, int numGroupsLimit, @Nonnull TransformExpressionOperator transformOperator,
-      long numTotalRawDocs) {
-    _aggregationFunctionContexts = aggregationFunctionContexts;
+  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] functionContexts,
+      @Nonnull GroupBy groupBy, int maxInitialResultHolderCapacity, int numGroupsLimit,
+      @Nonnull TransformOperator transformOperator, long numTotalRawDocs) {
+    _functionContexts = functionContexts;
     _groupBy = groupBy;
+    _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
     _numGroupsLimit = numGroupsLimit;
     _transformOperator = transformOperator;
     _numTotalRawDocs = numTotalRawDocs;
   }
 
   @Override
-  public boolean open() {
-    _transformOperator.open();
-    return true;
-  }
-
-  @Override
-  public Block getNextBlock() {
+  protected IntermediateResultsBlock getNextBlock() {
     int numDocsScanned = 0;
 
-    // Perform aggregation group-by on all the blocks.
+    // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor =
-        new DefaultGroupByExecutor(_aggregationFunctionContexts, _groupBy, _numGroupsLimit);
-    groupByExecutor.init();
+        new DefaultGroupByExecutor(_functionContexts, _groupBy, _maxInitialResultHolderCapacity,
+            _numGroupsLimit, _transformOperator);
     TransformBlock transformBlock;
-    while ((transformBlock = (TransformBlock) _transformOperator.nextBlock()) != null) {
+    while ((transformBlock = _transformOperator.nextBlock()) != null) {
       numDocsScanned += transformBlock.getNumDocs();
       groupByExecutor.process(transformBlock);
     }
-    groupByExecutor.finish();
+    AggregationGroupByResult groupByResult = groupByExecutor.getResult();
 
-    // Create execution statistics.
+    // Gather execution statistics
     long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumProjectionColumns();
+    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             _numTotalRawDocs);
 
-    // Build intermediate result block based on aggregation group-by result from the executor.
-    return new IntermediateResultsBlock(_aggregationFunctionContexts, groupByExecutor.getResult());
-  }
-
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    throw new UnsupportedOperationException();
+    // Build intermediate result block based on aggregation group-by result from the executor
+    return new IntermediateResultsBlock(_functionContexts, groupByResult);
   }
 
   @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
-  }
-
-  @Override
-  public boolean close() {
-    _transformOperator.close();
-    return true;
   }
 
   @Override

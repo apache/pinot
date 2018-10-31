@@ -17,11 +17,10 @@ package com.linkedin.pinot.core.startree.hll;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableBiMap;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.data.GenericRow;
-
+import com.linkedin.pinot.startree.hll.HllSizeUtils;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
@@ -33,8 +32,7 @@ import java.util.List;
  */
 public class HllUtil {
 
-  private static final ImmutableBiMap<Integer, Integer> LOG2M_TO_SIZE_IN_BYTES =
-      ImmutableBiMap.of(5, 32, 6, 52, 7, 96, 8, 180, 9, 352);
+  private static final ImmutableBiMap<Integer, Integer> LOG2M_TO_SIZE_IN_BYTES = HllSizeUtils.getLog2mToSizeInBytes();
 
   private static final Charset charset = Charset.forName("UTF-8");
 
@@ -64,18 +62,6 @@ public class HllUtil {
       b.append(", ");
     }
     return b.toString();
-  }
-
-  public static int getHllFieldSizeFromLog2m(int log2m) {
-    Preconditions.checkArgument(LOG2M_TO_SIZE_IN_BYTES.containsKey(log2m),
-        "Log2m: " + log2m + " is not in valid range.");
-    return LOG2M_TO_SIZE_IN_BYTES.get(log2m);
-  }
-
-  public static int getLog2mFromHllFieldSize(int hllFieldSize) {
-    Preconditions.checkArgument(LOG2M_TO_SIZE_IN_BYTES.containsValue(hllFieldSize),
-        "HllFieldSize: " + hllFieldSize + " is not in valid range.");
-    return LOG2M_TO_SIZE_IN_BYTES.inverse().get(hllFieldSize);
   }
 
   public static String convertHllToString(HyperLogLog hll) {

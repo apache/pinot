@@ -15,30 +15,38 @@
  */
 package com.linkedin.pinot.core.query.selection.iterator;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import java.io.Serializable;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+
 
 /**
  * Iterator on single-value column with dictionary for selection query.
  *
  */
-public class SelectionSingleValueColumnWithDictIterator<T extends Serializable, DICT extends Dictionary> implements SelectionColumnIterator {
-  protected BlockSingleValIterator bvIter;
-  protected DICT dict;
+public class SelectionSingleValueColumnWithDictIterator implements SelectionColumnIterator {
+  protected BlockSingleValIterator _blockSingleValIterator;
+  protected Dictionary _dictionary;
+  private final FieldSpec.DataType _dataType;
 
-  @SuppressWarnings("unchecked")
   public SelectionSingleValueColumnWithDictIterator(Block block) {
-    bvIter = (BlockSingleValIterator) block.getBlockValueSet().iterator();
-    dict = (DICT) block.getMetadata().getDictionary();
+    _blockSingleValIterator = (BlockSingleValIterator) block.getBlockValueSet().iterator();
+    _dataType = block.getMetadata().getDataType();
+    _dictionary = block.getMetadata().getDictionary();
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public Serializable getValue(int docId) {
-    bvIter.skipTo(docId);
-    return (T) ((DICT) dict).get(bvIter.nextIntVal());
+    _blockSingleValIterator.skipTo(docId);
+
+    // For selection, we convert BYTES data type to equivalent HEX string.
+    if (_dataType.equals(FieldSpec.DataType.BYTES)) {
+      return ByteArray.toHexString(_dictionary.getBytesValue(_blockSingleValIterator.nextIntVal()));
+    }
+    return (Serializable) _dictionary.get(_blockSingleValIterator.nextIntVal());
   }
 }

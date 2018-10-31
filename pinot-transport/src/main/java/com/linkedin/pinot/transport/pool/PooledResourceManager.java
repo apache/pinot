@@ -15,23 +15,25 @@
  */
 package com.linkedin.pinot.transport.pool;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+
+
 /**
  *
  * Interface to create/destroy and validate pooled resource
  * The implementation is expected to be thread-safe as concurrent request to create connection for same/different servers
  * is possible.
  *
- * @param <K>
  * @param <T>
  */
-public interface PooledResourceManager<K, T> {
+public interface PooledResourceManager<T> {
 
   /**
    * Create a new resource
    * @param key to identify the pool which will host the resource
    * @return future for the resource creation
    */
-  public T create(K key);
+  public T create(ServerInstance key);
 
   /**
    * Destroy the pooled resource
@@ -40,7 +42,7 @@ public interface PooledResourceManager<K, T> {
    * @param resource Resource to be destroyed
    * @return true if successfully destroyed the resource, false otherwise
    */
-  public boolean destroy(K key, boolean isBad, T resource);
+  public boolean destroy(ServerInstance key, boolean isBad, T resource);
 
   /**
    * Validate if the resource is good.
@@ -49,6 +51,6 @@ public interface PooledResourceManager<K, T> {
    * @param resource
    * @return
    */
-  public boolean validate(K key, T resource);
+  public boolean validate(ServerInstance key, T resource);
 
 }

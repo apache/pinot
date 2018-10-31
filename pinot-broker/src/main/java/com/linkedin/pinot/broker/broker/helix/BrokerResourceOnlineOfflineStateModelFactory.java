@@ -15,25 +15,28 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
-import java.util.List;
+import com.linkedin.pinot.broker.routing.HelixExternalViewBasedRouting;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 
+import java.util.List;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 
 
 /**
@@ -43,14 +46,19 @@ import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
  *
  */
 public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceOnlineOfflineStateModelFactory.class);
 
-  private HelixManager _helixManager;
-  private HelixAdmin _helixAdmin;
-  private HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
+  private final HelixManager _helixManager;
+  private final HelixAdmin _helixAdmin;
+  private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
+
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   public BrokerResourceOnlineOfflineStateModelFactory(HelixManager helixManager,
-      HelixExternalViewBasedRouting helixExternalViewBasedRouting) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore, HelixExternalViewBasedRouting helixExternalViewBasedRouting) {
     _helixManager = helixManager;
+    _propertyStore = propertyStore;
+    _helixAdmin = helixManager.getClusterManagmentTool();
     _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
   }
 
@@ -65,21 +73,19 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
   @StateModelInfo(states = "{'OFFLINE','ONLINE', 'DROPPED'}", initialState = "OFFLINE")
   public class BrokerResourceOnlineOfflineStateModel extends StateModel {
-    private final Logger LOGGER = LoggerFactory.getLogger(BrokerResourceOnlineOfflineStateModelFactory.class);
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
-      ensureHelixAdminIsInitialized();
-
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
         Builder keyBuilder = _helixManager.getHelixDataAccessor().keyBuilder();
         String tableName = message.getPartitionName();
         HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
         List<InstanceConfig> instanceConfigList = helixDataAccessor.getChildValues(keyBuilder.instanceConfigs());
+        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableName);
 
         _helixExternalViewBasedRouting.markDataResourceOnline(
-            tableName,
+            tableConfig,
             HelixHelper.getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), tableName),
             instanceConfigList);
       } catch (Exception e) {
@@ -91,8 +97,6 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
-      ensureHelixAdminIsInitialized();
-
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
         String tableName = message.getPartitionName();
@@ -106,8 +110,6 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "OFFLINE", to = "DROPPED")
     public void onBecomeDroppedFromOffline(Message message, NotificationContext context) {
-      ensureHelixAdminIsInitialized();
-
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
         String tableName = message.getPartitionName();
@@ -121,8 +123,6 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
-      ensureHelixAdminIsInitialized();
-
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
         String tableName = message.getPartitionName();
@@ -136,16 +136,7 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "ERROR", to = "OFFLINE")
     public void onBecomeOfflineFromError(Message message, NotificationContext context) {
-      ensureHelixAdminIsInitialized();
-
       LOGGER.info("Resetting the state for broker resource:{} from ERROR to OFFLINE", message.getPartitionName());
-    }
-
-  }
-
-  private void ensureHelixAdminIsInitialized() {
-    if (_helixAdmin == null) {
-      _helixAdmin = _helixManager.getClusterManagmentTool();
     }
   }
 }

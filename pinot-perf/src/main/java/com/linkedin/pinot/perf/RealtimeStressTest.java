@@ -18,6 +18,7 @@ package com.linkedin.pinot.perf;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.integration.tests.ClusterIntegrationTestUtils;
 import com.linkedin.pinot.integration.tests.OfflineClusterIntegrationTest;
 import com.linkedin.pinot.integration.tests.RealtimeClusterIntegrationTest;
 import com.linkedin.pinot.util.TestUtils;
@@ -40,7 +41,6 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
   private static final int ROW_COUNT_FOR_SEGMENT_FLUSH = 10_000;
   private static final long TIMEOUT_MILLIS = 20 * 60 * 1000L; // Twenty minutes
   private final File _tmpDir = new File("/tmp/" + getHelixClusterName());
-  private final String KAFKA_TOPIC = "benchmark-realtime-consumption-speed";
   private static final int SEGMENT_COUNT = 1;
   private static final Random RANDOM = new Random(123456L);
   private static long rowsWritten = 0L;
@@ -61,7 +61,7 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
+    KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Unpack data (needed to get the Avro schema)
     TarGzCompressionUtils.unTar(
@@ -84,15 +84,14 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
     startServer();
 
     // Create realtime table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
-        avroFiles.get(0));
+    setUpTable(avroFiles.get(0));
 
     // Wait a couple of seconds for all Helix state transitions to happen
     Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
 
     // Generate ROW_COUNT rows and write them into Kafka
-    pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC, ROW_COUNT,
-        RANDOM);
+    ClusterIntegrationTestUtils.pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+        getKafkaTopic(), ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
     rowsWritten += ROW_COUNT;
 
     // Run forever until something breaks or the timeout completes
@@ -115,8 +114,8 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
 
       // Write more rows if needed
       if (rowsWritten - pinotRecordCount < MIN_ROW_COUNT) {
-        pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC, ROW_COUNT,
-            RANDOM);
+        ClusterIntegrationTestUtils.pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+            getKafkaTopic(), ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
         rowsWritten += ROW_COUNT;
       }
 
@@ -125,10 +124,5 @@ public class RealtimeStressTest extends RealtimeClusterIntegrationTest {
         throw new RuntimeException("Timeout exceeded!");
       }
     } while (true);
-  }
-
-  @Override
-  protected String getHelixClusterName() {
-    return getClass().getSimpleName();
   }
 }

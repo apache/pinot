@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<head>
+
+<script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.7/js/jquery.dataTables.min.js"></script>
+<script src="js/lib/handlebars.js"></script>
+<script src="js/lib/underscore.js"></script>
+<script src="js/lib/foundation/foundation.js"></script>
+<script src="js/lib/foundation/foundation.topbar.js"></script>
+<script src="js/lib/codemirror/codemirror.js"></script>
+<script src="js/lib/codemirror/sql.js"></script>
+<script src="js/lib/codemirror/ruby.js"></script>
+<script src="js/lib/codemirror/javascript.js"></script>
+<script src="js/lib/underscore-min.js"></script>
+<script src="js/lib/beautify.js"></script>
+
+<link href="https://cdn.datatables.net/1.10.7/css/jquery.dataTables.css" type="text/css" rel="stylesheet">
+<link href='http://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+
+<link href="css/lib/normalize.css" type="text/css" rel="stylesheet">
+<link href="css/lib/foundation.css" type="text/css" rel="stylesheet">
+<link href="css/lib/codemirror.css" type="text/css" rel="stylesheet">
+<link href="css/lib/codemirror-elegant.css" type="text/css" rel="stylesheet">
+<link href="css/pinot.css" type="text/css" rel="stylesheet">
+<script src="js/init.js"></script>
+
+<title>Pinot Data Explorer</title>
+</head>
+  <body>
+    <nav class="top-bar" data-topbar role="navigation">
+      <ul class="title-area">
+        <li class="name">
+          <h1><a href="#/">Pinot Data Explorer</a></h1>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="row">
+      <div class="small-3 columns">
+        <div class="schema-list-view"></div>
+        <div class="separator10"></div>
+        <div class="schema-detail-view"></div>
+      </div>
+
+      <div class="small-9 columns">
+
+        <div class="query-box">
+          <textarea id="query-maker"></textarea>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="row">
+          <div class="small-8 columns">&nbsp;</div>
+          <div class="small-2 columns"><input type=checkbox id="trace-enabled">&nbsp;&nbsp;Enable Tracing</input></div>
+          <div class="small-2 columns"><a href="#" id="execute-query" class="button round success small">Run Query</a></div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="query-results">
+          <div id="query-results-table-wrapper" style="overflow-x: scroll"></div>
+          <textarea id="results-maker"></textarea>
+        </div>
+
+      </div>
+    </div>
+
+    <script>$(function() { $(document).foundation(); } ); </script>
+
+  </body>
+</html>
+
+
+<script id="table-names-template" type="text/x-handlebars-template">
+  <table id="table-names" class="display" cellspacing="0">
+    <thead>
+      <tr><th>tables</th></tr>
+    </thead>
+    <tbody>
+      {{#each tables}}
+        <tr><td><a href="#" table-name="{{this}}" class="table-name-entry">{{this}}</a></td></tr>
+      {{/each}}
+    </tbody>
+  </table>
+</script>
+
+<script id="table-schema-template" type="text/x-handlebars-template">
+  <table id="table-schema" class="display" cellspacing="0">
+    <thead>
+      <tr>
+        <th>column</th>
+        <th>type</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each dimensionFieldSpecs}}
+        <tr>
+          <td class="{{this.fieldType}}">{{this.name}}</td>
+          <td class="{{this.fieldType}}">{{this.dataType}}</td>
+        </tr>
+      {{/each}}
+      {{#each metricFieldSpecs}}
+        <tr>
+          <td class="{{this.fieldType}}">{{this.name}}</td>
+          <td class="{{this.fieldType}}">{{this.dataType}}</td>
+        </tr>
+      {{/each}}
+
+      {{#if timeFieldSpec}}
+         {{#if outgoingGranularitySpec}}
+            <td class="{{this.fieldType}}">{{this.name}}</td>
+            <td class="{{this.fieldType}}">{{this.dataType}}</td>
+          {{else}}
+            <td class="{{incomingGranularitySpec.fieldType}}">{{incomingGranularitySpec.name}}</td>
+            <td class="{{incomingGranularitySpec.fieldType}}">{{incomingGranularitySpec.dataType}}</td>
+          {{/if}}
+      {{/if}}
+
+    </tbody>
+  </table>
+</script>
+
+<script id="selections-result-template" type="text/x-handlebars-template">
+  <table id="selections-results" class="display" cellspacing="0">
+
+    <thead>
+      <tr>
+        {{#each columns}}
+          <th>{{this}}</th>
+        {{/each}}
+      </tr>
+    </thead>
+
+    <tbody>
+      {{#each results}}
+        <tr>
+          {{#each this}}
+            <td>{{this}}</td>
+          {{/each}}
+        </tr>
+      {{/each}}
+    </tbody>
+
+  </table>
+</script>
+

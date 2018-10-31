@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.dashboard.views;
 import java.util.HashSet;
 import java.util.Set;
 
-import com.linkedin.thirdeye.client.comparison.Row;
+import com.linkedin.thirdeye.datasource.comparison.Row;
 
 public class TimeBucket implements Comparable<TimeBucket> {
 

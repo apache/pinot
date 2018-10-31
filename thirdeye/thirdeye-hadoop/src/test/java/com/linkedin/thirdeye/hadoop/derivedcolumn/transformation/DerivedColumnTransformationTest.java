@@ -15,6 +15,7 @@
  */
 package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
 
+import java.io.DataInput;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -49,10 +50,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
 import com.linkedin.thirdeye.hadoop.topk.TopKDimensionValues;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
@@ -121,7 +122,7 @@ public class DerivedColumnTransformationTest {
 
     GenericRecord input = new GenericData.Record(schema);
     input.put("d1", "abc1");
-    input.put("d2", "pqr1");
+    input.put("d2", 501L);
     input.put("d3", "xyz1");
     input.put("hoursSinceEpoch", generateRandomHoursSinceEpoch());
     input.put("m1", 10);
@@ -130,7 +131,7 @@ public class DerivedColumnTransformationTest {
 
     input = new GenericData.Record(schema);
     input.put("d1", "abc2");
-    input.put("d2", "pqr2");
+    input.put("d2", 502L);
     input.put("d3", "xyz2");
     input.put("hoursSinceEpoch", generateRandomHoursSinceEpoch());
     input.put("m1", 10);
@@ -150,6 +151,7 @@ public class DerivedColumnTransformationTest {
 
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TABLE_NAME.toString(), "collection");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString(), "d1,d2,d3");
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString(), "STRING,LONG,STRING");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString(), "m1,m2");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString(), "INT,INT");
     props.setProperty(ThirdEyeConfigProperties.THIRDEYE_TIMECOLUMN_NAME.toString(), "hoursSinceEpoch");
@@ -197,9 +199,9 @@ public class DerivedColumnTransformationTest {
       GenericRecord datum = pair.getFirst().datum();
       Assert.assertEquals("TopKTransformationJob did not add new column for topk column",
           datum.getSchema().getField("d2_topk") != null, true);
-      String d2 = (String) datum.get("d2");
-      String d2_topk = (String) datum.get("d2_topk");
-      Assert.assertEquals("Incorrect topk column transformation", (d2_topk.equals("other") && d2.equals("pqr1")) || (d2_topk.equals("pqr2") && d2.equals("pqr2")), true);
+      Long d2 =  (Long) datum.get("d2");
+      String d2_topk =  (String) datum.get("d2_topk");
+      Assert.assertEquals("Incorrect topk column transformation", (d2_topk.equals("other") && d2 == 501l) || (d2_topk.equals("502") && d2 == 502l), true);
     }
   }
 
@@ -217,11 +219,13 @@ public class DerivedColumnTransformationTest {
     private ThirdEyeConfig thirdeyeConfig;
     private DerivedColumnTransformationPhaseConfig config;
     private List<String> dimensionsNames;
+    private List<DimensionType> dimensionTypes;
+    private Map<String, String> nonWhitelistValueMap;
     private List<String> metricNames;
     private TopKDimensionValues topKDimensionValues;
     private Map<String, Set<String>> topKDimensionsMap;
     private String timeColumnName;
-    private Map<String, Set<String>> whitelist;
+    private Map<String, List<String>> whitelist;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -231,6 +235,8 @@ public class DerivedColumnTransformationTest {
       thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
       config = DerivedColumnTransformationPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
       dimensionsNames = config.getDimensionNames();
+      dimensionTypes = config.getDimensionTypes();
+      nonWhitelistValueMap = config.getNonWhitelistValue();
       metricNames = config.getMetricNames();
       timeColumnName = config.getTimeColumnName();
       whitelist = config.getWhitelist();
@@ -242,7 +248,7 @@ public class DerivedColumnTransformationTest {
       topKDimensionValues = new TopKDimensionValues();
       if (fs.exists(topKPath)) {
         FSDataInputStream topkValuesStream = fs.open(topKPath);
-        topKDimensionValues = OBJECT_MAPPER.readValue(topkValuesStream, TopKDimensionValues.class);
+        topKDimensionValues = OBJECT_MAPPER.readValue((DataInput)topkValuesStream, TopKDimensionValues.class);
         topkValuesStream.close();
       }
       topKDimensionsMap = topKDimensionValues.getTopKDimensions();
@@ -260,18 +266,20 @@ public class DerivedColumnTransformationTest {
       GenericRecord outputRecord = new Record(outputSchema);
 
       // dimensions
-      for (String dimension : dimensionsNames) {
-        String dimensionName = dimension;
-        String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimension);
+      for (int i = 0; i < dimensionsNames.size(); i++) {
+        String dimensionName = dimensionsNames.get(i);
+        DimensionType dimensionType = dimensionTypes.get(i);
+        Object dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimensionName);
+        String dimensionValueStr = String.valueOf(dimensionValue);
 
         // add original dimension value with whitelist applied
-        String whitelistDimensionValue = dimensionValue;
+        Object whitelistDimensionValue = dimensionValue;
         if (whitelist != null) {
-          Set<String> whitelistDimensions = whitelist.get(dimensionName);
+          List<String> whitelistDimensions = whitelist.get(dimensionName);
           if (CollectionUtils.isNotEmpty(whitelistDimensions)) {
             // whitelist config exists for this dimension but value not present in whitelist
-            if (!whitelistDimensions.contains(dimensionValue)) {
-              whitelistDimensionValue = ThirdEyeConstants.OTHER;
+            if (!whitelistDimensions.contains(dimensionValueStr)) {
+              whitelistDimensionValue = dimensionType.getValueFromString(nonWhitelistValueMap.get(dimensionName));
             }
           }
         }
@@ -283,13 +291,13 @@ public class DerivedColumnTransformationTest {
           // if topk config exists for that dimension
           if (CollectionUtils.isNotEmpty(topKDimensionValues)) {
             String topkDimensionName = dimensionName + ThirdEyeConstants.TOPK_DIMENSION_SUFFIX;
-            String topkDimensionValue = dimensionValue;
+            Object topkDimensionValue = dimensionValue;
             // topk config exists for this dimension, but value not present in topk
-            if (!topKDimensionValues.contains(dimensionValue) &&
-                (whitelist == null || whitelist.get(dimensionName) == null || !whitelist.get(dimensionName).contains(dimensionValue))) {
+            if (!topKDimensionValues.contains(dimensionValueStr) &&
+                (whitelist == null || whitelist.get(dimensionName) == null || !whitelist.get(dimensionName).contains(dimensionValueStr))) {
               topkDimensionValue = ThirdEyeConstants.OTHER;
             }
-            outputRecord.put(topkDimensionName, topkDimensionValue);
+            outputRecord.put(topkDimensionName, String.valueOf(topkDimensionValue));
           }
         }
       }

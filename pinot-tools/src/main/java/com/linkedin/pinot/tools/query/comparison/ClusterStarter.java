@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.tools.query.comparison;
 
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
@@ -37,7 +38,6 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -200,10 +200,16 @@ public class ClusterStarter {
     }
 
     String controllerAddress = "http://" + _localhost + ":" + _controllerPort;
-    JSONObject request = ControllerRequestBuilder
-        .buildCreateOfflineTableJSON(_tableName, "server", "broker", _timeColumnName, _timeUnit,
-            "", "", 3, "BalanceNumSegmentAssignmentStrategy");
-    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(), request.toString());
+    String tableJSONConfigString =
+        new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(_tableName)
+            .setTimeColumnName(_timeColumnName)
+            .setTimeType(_timeUnit)
+            .setNumReplicas(3)
+            .setBrokerTenant("broker")
+            .setServerTenant("server")
+            .build()
+            .toJSONConfigString();
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(controllerAddress).forTableCreate(), tableJSONConfigString);
   }
 
   private void uploadData()

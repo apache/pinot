@@ -15,38 +15,30 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
-/**
- * Blockmetadata wrapper on column metadata. Currently we support only one block per segment. We
- * will have to change this when we start supporting multiple blocks per segment
- */
+
 public final class BlockMetadataImpl implements BlockMetadata {
+  private final int _numDocs;
+  private final boolean _isSingleValue;
+  private final int _maxNumMultiValues;
+  private final FieldSpec.DataType _dataType;
+  private final Dictionary _dictionary;
 
-  private final ColumnMetadata columnMetadata;
-  private final Dictionary dictionary;
-
-  public BlockMetadataImpl(ColumnMetadata columnMetadata, Dictionary dictionary) {
-    this.columnMetadata = columnMetadata;
-    this.dictionary = dictionary;
+  public BlockMetadataImpl(int numDocs, boolean isSingleValue, int maxNumMultiValues, FieldSpec.DataType dataType,
+      Dictionary dictionary) {
+    _numDocs = numDocs;
+    _isSingleValue = isSingleValue;
+    _maxNumMultiValues = maxNumMultiValues;
+    _dataType = dataType;
+    _dictionary = dictionary;
   }
 
   @Override
-  public boolean isSparse() {
-    return false;
-  }
-
-  @Override
-  public boolean isSorted() {
-    return columnMetadata.isSorted();
-  }
-
-  @Override
-  public boolean hasInvertedIndex() {
-    return columnMetadata.hasInvertedIndex();
+  public int getLength() {
+    return _numDocs;
   }
 
   @Override
@@ -55,42 +47,32 @@ public final class BlockMetadataImpl implements BlockMetadata {
   }
 
   @Override
-  public int getSize() {
-    return columnMetadata.getTotalDocs();
-  }
-
-  @Override
-  public int getLength() {
-    return columnMetadata.getTotalDocs();
-  }
-
-  @Override
   public int getEndDocId() {
-    return columnMetadata.getTotalDocs() - 1;
+    return _numDocs - 1;
   }
 
   @Override
-  public boolean hasDictionary() {
-    return columnMetadata.hasDictionary();
+  public FieldSpec.DataType getDataType() {
+    return _dataType;
   }
 
   @Override
   public boolean isSingleValue() {
-    return columnMetadata.isSingleValue();
-  }
-
-  @Override
-  public Dictionary getDictionary() {
-    return dictionary;
+    return _isSingleValue;
   }
 
   @Override
   public int getMaxNumberOfMultiValues() {
-    return columnMetadata.getMaxNumberOfMultiValues();
+    return _maxNumMultiValues;
   }
 
   @Override
-  public DataType getDataType() {
-    return columnMetadata.getDataType();
+  public boolean hasDictionary() {
+    return _dictionary != null;
+  }
+
+  @Override
+  public Dictionary getDictionary() {
+    return _dictionary;
   }
 }

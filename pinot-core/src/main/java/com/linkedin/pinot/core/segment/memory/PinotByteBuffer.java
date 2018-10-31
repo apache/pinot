@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +78,8 @@ public class PinotByteBuffer extends PinotDataBuffer {
     Preconditions.checkNotNull(file);
     Preconditions.checkArgument(start >= 0);
     Preconditions.checkArgument(length >= 0 && length < Integer.MAX_VALUE,
-        "Mapping files larger than 2GB is not supported, file: " + file.toString() + ", context: " + context);
+        "Mapping files larger than 2GB is not supported, file: " + file.toString() + ", context: " + context
+            + ", length: " + length);
     Preconditions.checkNotNull(context);
 
     if (openMode == FileChannel.MapMode.READ_ONLY) {
@@ -116,7 +118,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   public static PinotByteBuffer allocateDirect(long size, String context) {
-    Preconditions.checkArgument(size >= 0 && size < Integer.MAX_VALUE);
+    Preconditions.checkArgument(size >= 0 && size < Integer.MAX_VALUE, "bad value for size " + size);
     Preconditions.checkNotNull(context);
 
     ByteBuffer bb = MmapUtils.allocateDirectByteBuffer( (int)size, null, context);
@@ -273,9 +275,9 @@ public class PinotByteBuffer extends PinotDataBuffer {
   @Override
   public PinotDataBuffer view(long start, long end) {
     Preconditions.checkArgument(start >= 0 && start <= buffer.limit(),
-        "View start position is not valid, start: {}, end: {}, buffer limit: {}", start, end, buffer.limit());
+        "View start position is not valid, start: %s, end: %s, buffer limit: %s", start, end, buffer.limit());
     Preconditions.checkArgument(end >= start && end <= buffer.limit(),
-        "View end position is not valid, start: {}, end: {}, buffer limit: {}", start, end, buffer.limit());
+        "View end position is not valid, start: %s, end: %s, buffer limit: %s", start, end, buffer.limit());
 
     ByteBuffer bb = this.buffer.duplicate();
     bb.position((int)start);
@@ -352,6 +354,11 @@ public class PinotByteBuffer extends PinotDataBuffer {
   @Override
   protected long start() {
     return buffer.clear().position();
+  }
+
+  @Override
+  public void order(ByteOrder byteOrder) {
+    buffer.order(byteOrder);
   }
 
   @Override

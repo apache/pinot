@@ -1,0 +1,17 @@
+{{#if (not-eq data.tot 0)}}
+  <a class="te-anomaly-table__link" href="#">
+    {{if viewTotals data.tot data.avg}}
+      {{#tooltip-on-element}}
+        {{category}} for <span class="te-performance-tooltip__title">{{data.name}}</span><br>
+        <ul class="te-performance-tooltip__list">
+          <li class="te-performance-tooltip__item"><span class="te-performance-tooltip__category">Total: </span>{{data.tot}}</li>
+          <li class="te-performance-tooltip__item"><span class="te-performance-tooltip__category">Avg: </span>{{data.avg}}</li>
+          <li class="te-performance-tooltip__item"><span class="te-performance-tooltip__category">Min: </span>{{data.min}}</li>
+          <li class="te-performance-tooltip__item"><span class="te-performance-tooltip__category">Max: </span>{{data.max}}</li>
+          <li class="te-performance-tooltip__item"><span class="te-performance-tooltip__category">Standard deviation: </span>{{data.std}}</li>
+        </ul>
+      {{/tooltip-on-element}}
+  </a>
+{{else}}
+  {{if viewTotals data.tot data.avg}}
+{{/if}}

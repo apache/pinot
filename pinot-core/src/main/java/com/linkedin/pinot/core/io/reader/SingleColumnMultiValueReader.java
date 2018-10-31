@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.io.reader;
 
-public interface SingleColumnMultiValueReader<T extends ReaderContext> extends DataFileReader {
+public interface SingleColumnMultiValueReader<T extends ReaderContext> extends DataFileReader<T> {
 
   /**
    * Read the multiple values for a column at a specific row.
@@ -74,8 +74,5 @@ public interface SingleColumnMultiValueReader<T extends ReaderContext> extends D
    */
   int getBytesArray(int row, byte[][] bytesArray);
 
-  T createContext();
-
   int getIntArray(int row, int[] intArray, T readerContext);
-
 }

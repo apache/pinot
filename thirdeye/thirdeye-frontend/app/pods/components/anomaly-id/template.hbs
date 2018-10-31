@@ -1,0 +1,15 @@
+<div class="container">
+  <li class="anomaly-id__item anomaly-id__item--title">
+    <span class="anomaly-id__title">Anomaly ID #</span>
+    <span class="anomaly-id__id">{{anomaly.anomalyIds}}</span>
+  </li>
+  <li class="anomaly-id__item">
+    <span class="anomaly-id__subtitle">Metric:</span>
+    <span class="anomaly-id__name">{{anomaly.anomalyFunctionName}}</span>
+  </li>
+  <li class="anomaly-id__item anomaly-id__item--value">
+    <span class="anomaly-id__total">{{anomaly.current}}</span>
+    <span class="anomaly-id__percent">({{anomalyChangeRate}}%)</span>
+    <span class="anomaly-id__text">WoW</span>
+  </li>
+</div>

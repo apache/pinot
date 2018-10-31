@@ -15,28 +15,29 @@
  */
 package com.linkedin.pinot.tools;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.controller.strategy.AutoRebalanceStrategy;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.zookeeper.data.Stat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
+import org.apache.helix.controller.stages.ClusterDataCache;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotSegmentRebalancer extends PinotZKChanger {
@@ -87,9 +88,9 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     String rawTenantName = tenantName.replaceAll("_OFFLINE", "").replace("_REALTIME", "");
     int nRebalances = 0;
     for (ZNRecord znRecord : tableConfigs) {
-      AbstractTableConfig tableConfig;
+      TableConfig tableConfig;
       try {
-        tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+        tableConfig = TableConfig.fromZnRecord(znRecord);
       } catch (Exception e) {
         LOGGER.warn("Failed to parse table configuration for ZnRecord id: {}. Skipping", znRecord.getId());
         continue;
@@ -114,7 +115,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     String tableConfigPath = "/CONFIGS/TABLE/" + tableName;
     Stat stat = new Stat();
     ZNRecord znRecord = propertyStore.get(tableConfigPath, stat, 0);
-    AbstractTableConfig tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+    TableConfig tableConfig = TableConfig.fromZnRecord(znRecord);
     String tenantName = tableConfig.getTenantConfig().getServer().replaceAll(TableType.OFFLINE.toString(), "")
         .replace(TableType.OFFLINE.toString(), "");
     rebalanceTable(tableName, tenantName);
@@ -138,8 +139,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     List<String> partitions = Lists.newArrayList(currentIdealState.getPartitionSet());
     LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
     int numReplicasInIdealState = Integer.parseInt(currentIdealState.getReplicas());
-    final AbstractTableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(propertyStore, tableName);
+    final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(propertyStore, tableName);
     final int numReplicasInTableConfig = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
 
     final int targetNumReplicas = numReplicasInTableConfig;
@@ -160,13 +160,16 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     }
     AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableName, partitions, states);
 
-    TableNameBuilder builder = new TableNameBuilder(tableType);
-    List<String> instancesInClusterWithTag = helixAdmin.getInstancesInClusterWithTag(clusterName, builder.forTable(tenantName));
-    LOGGER.info("Current: Nodes:" + currentHosts);
-    LOGGER.info("New Nodes:" + instancesInClusterWithTag);
+    String serverTenant = TableNameBuilder.forType(tableType).tableNameWithType(tenantName);
+    List<String> instancesInClusterWithTag = helixAdmin.getInstancesInClusterWithTag(clusterName, serverTenant);
+    List<String> enabledInstancesWithTag =
+        HelixHelper.getEnabledInstancesWithTag(helixAdmin, clusterName, serverTenant);
+    LOGGER.info("Current nodes: {}", currentHosts);
+    LOGGER.info("New nodes: {}", instancesInClusterWithTag);
+    LOGGER.info("Enabled nodes: {}", enabledInstancesWithTag);
     Map<String, Map<String, String>> currentMapping = currentIdealState.getRecord().getMapFields();
     ZNRecord newZnRecord = rebalanceStrategy
-        .computePartitionAssignment(instancesInClusterWithTag, currentMapping, instancesInClusterWithTag);
+        .computePartitionAssignment(instancesInClusterWithTag, enabledInstancesWithTag, currentMapping, new ClusterDataCache());
     final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
     LOGGER.info("Current segment Assignment:");
     printSegmentAssignment(currentMapping);
@@ -183,6 +186,8 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
               public IdealState apply(@Nullable IdealState idealState) {
                 for (String segmentId : newMapping.keySet()) {
                   Map<String, String> instanceStateMap = newMapping.get(segmentId);
+
+                  idealState.getInstanceStateMap(segmentId).clear();
                   for (String instanceId : instanceStateMap.keySet()) {
                     idealState.setPartitionState(segmentId, instanceId, instanceStateMap.get(instanceId));
                   }

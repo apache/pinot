@@ -15,9 +15,15 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
+import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -28,19 +34,13 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
-
+import io.netty.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.metrics.AggregatedMetricsRegistry;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.transport.metrics.AggregatedTransportServerMetrics;
-import com.linkedin.pinot.transport.metrics.NettyServerMetrics;
 
 
 /**
@@ -87,6 +87,10 @@ public abstract class NettyServer implements Runnable {
      * thread-safe. Hence, we need a factory for the Channel Initializer to use for each incoming channel.
      * @return
      */
+    /*
+     * TODO/atumbde: Our exisiting request handlers are thread-safe. So, we can replace factory
+     * with request handler object
+     */
     RequestHandler createNewRequestHandler();
   }
 
@@ -99,11 +103,13 @@ public abstract class NettyServer implements Runnable {
   protected AtomicBoolean _shutdownComplete = new AtomicBoolean(false);
 
   //TODO: Need configs to control number of threads
+  // NOTE/atumbde: With ScheduledRequestHandler, queries are executed asynchronously.
+  // So, these netty threads are not blocked. Config is still important
   protected final EventLoopGroup _bossGroup = new NioEventLoopGroup(1);
   protected final EventLoopGroup _workerGroup = new NioEventLoopGroup(20);
 
   // Netty Channel
-  protected Channel _channel = null;
+  protected volatile Channel _channel = null;
 
   // Factory for generating request Handlers
   protected RequestHandlerFactory _handlerFactory;
@@ -150,6 +156,10 @@ public abstract class NettyServer implements Runnable {
    */
   protected abstract ServerBootstrap getServerBootstrap();
 
+  public boolean isStarted() {
+    return _channel != null;
+  }
+
   /**
    *  Shutdown gracefully
    */
@@ -160,6 +170,41 @@ public abstract class NettyServer implements Runnable {
       _channel.close();
       _bossGroup.shutdownGracefully();
       _workerGroup.shutdownGracefully();
+    }
+  }
+
+  /**
+   * Blocking call to wait for shutdown completely.
+   */
+  public void waitForShutdown(long millis) {
+    LOGGER.info("Waiting for Shutdown");
+
+    if (_channel != null) {
+      LOGGER.info("Closing the server channel");
+      long endTime = System.currentTimeMillis() + millis;
+
+      ChannelFuture channelFuture = _channel.close();
+      Future<?> bossGroupFuture = _bossGroup.shutdownGracefully();
+      Future<?> workerGroupFuture = _workerGroup.shutdownGracefully();
+
+      long currentTime = System.currentTimeMillis();
+      if (endTime > currentTime) {
+        channelFuture.awaitUninterruptibly(endTime - currentTime, TimeUnit.MILLISECONDS);
+      }
+
+      currentTime = System.currentTimeMillis();
+      if (endTime > currentTime) {
+        bossGroupFuture.awaitUninterruptibly(endTime - currentTime, TimeUnit.MINUTES);
+      }
+
+      currentTime = System.currentTimeMillis();
+      if (endTime > currentTime) {
+        workerGroupFuture.awaitUninterruptibly(endTime - currentTime, TimeUnit.MINUTES);
+      }
+
+      Preconditions.checkState(channelFuture.isDone(), "Unable to close the channel in %s ms", millis);
+      Preconditions.checkState(bossGroupFuture.isDone(), "Unable to shutdown the boss group in %s ms", millis);
+      Preconditions.checkState(workerGroupFuture.isDone(), "Unable to shutdown the worker group in %s ms", millis);
     }
   }
 

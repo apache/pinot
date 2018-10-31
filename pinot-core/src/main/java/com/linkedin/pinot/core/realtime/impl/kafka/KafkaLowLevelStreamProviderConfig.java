@@ -16,11 +16,11 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import java.util.Map;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import java.util.Map;
 
 
 /**
@@ -31,20 +31,19 @@ public class KafkaLowLevelStreamProviderConfig extends KafkaHighLevelStreamProvi
 
   private long llcSegmentTimeInMillis = NOT_DEFINED;
   private int llcRealtimeRecordsThreshold = NOT_DEFINED;
-  public static final String LLC_PROPERTY_SUFFIX = ".llc";
 
   @Override
-  public void init(AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
+  public void init(TableConfig tableConfig, InstanceZKMetadata instanceMetadata, Schema schema) {
     super.init(tableConfig, instanceMetadata, schema);
 
-    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE + LLC_PROPERTY_SUFFIX)) {
+    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE)) {
       llcRealtimeRecordsThreshold =
-          Integer.parseInt(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE + LLC_PROPERTY_SUFFIX));
+          Integer.parseInt(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE));
     }
 
-    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX)) {
+    if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME)) {
       llcSegmentTimeInMillis =
-          Long.parseLong(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX));
+          Long.parseLong(tableConfig.getIndexingConfig().getStreamConfigs().get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME));
     }
   }
 
@@ -52,14 +51,14 @@ public class KafkaLowLevelStreamProviderConfig extends KafkaHighLevelStreamProvi
   public void init(Map<String, String> properties, Schema schema) {
     super.init(properties, schema);
 
-    if (properties.containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE + LLC_PROPERTY_SUFFIX)) {
+    if (properties.containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE)) {
       llcRealtimeRecordsThreshold =
-          Integer.parseInt(properties.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE + LLC_PROPERTY_SUFFIX));
+          Integer.parseInt(properties.get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_SIZE));
     }
 
-    if (properties.containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX)) {
+    if (properties.containsKey(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME)) {
       llcSegmentTimeInMillis =
-          convertToMs(properties.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX));
+          convertToMs(properties.get(CommonConstants.Helix.DataSource.Realtime.LLC_REALTIME_SEGMENT_FLUSH_TIME));
     }
   }
 

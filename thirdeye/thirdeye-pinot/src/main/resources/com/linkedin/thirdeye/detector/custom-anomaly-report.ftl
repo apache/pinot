@@ -20,7 +20,8 @@
       <br/>Analysis End : ${endTime?date}
     </td>
   </tr>
-  <tr>
+<#if includeSummary>
+<tr>
     <td>
       <h3>Summary : </h3>
       <table align="left" border="1" cellpadding="4px"
@@ -32,7 +33,7 @@
           <th>Feedback Received</th>
           <th>True Alert</th>
           <th>False Alert</th>
-          <th>Non Actionable</th>
+          <th>New Trend</th>
         </tr>
         <tr>
           <td>${anomalyCount}</td>
@@ -41,12 +42,12 @@
           <td>${feedbackCount}</td>
           <td>${trueAlertCount}</td>
           <td>${falseAlertCount}</td>
-          <td>${nonActionableCount}</td>
+          <td>${newTrendCount}</td>
         </tr>
       </table>
     </td>
   </tr>
-
+</#if>
 <#if anomalyDetails?has_content>
   <tr>
     <td>
@@ -58,7 +59,9 @@
           <th>Anomaly Start Time</th>
           <th>Window Size (hours)</th>
           <th>Lift</th>
-          <th>Feedback</th>
+          <#if includeSummary>
+            <th>Feedback</th>
+          </#if>
           <th>AnomalyId</th>
         </tr>
         <#list anomalyDetails as r>
@@ -67,7 +70,9 @@
             <td>${r.startDateTime}</td>
             <td>${r.windowSize}</td>
             <td>${r.lift}</td>
+            <#if includeSummary>
             <td>${r.feedback}</td>
+            </#if>
             <td><a href="${r.anomalyURL}" target="_blank">${r.anomalyId?string}</a></td>
           </tr>
         </#list>

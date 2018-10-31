@@ -1,0 +1,9 @@
+{{#each statsTransformed as |card|}}
+  <ul class="te-horizontal-cards__card">
+    <li class="te-horizontal-cards__card-title">{{card.title}}</li>
+    <li class="te-horizontal-cards__card-text">{{card.description}}</li>
+    <li class="te-horizontal-cards__card-number">
+      {{card.value}}{{#if (eq card.unit 'percent')}}%{{/if}}
+    </li>
+  </ul>
+{{/each}}

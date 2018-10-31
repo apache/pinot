@@ -25,7 +25,7 @@ enum FilterOperator {
   EQUALITY,
   NOT,
   RANGE,
-  REGEX,
+  REGEXP_LIKE,
   NOT_IN,
   IN
 }
@@ -39,6 +39,7 @@ struct QueryType {
   2: optional bool hasFilter;
   3: optional bool hasAggregation;
   4: optional bool hasGroup_by;
+  5: optional bool hasHaving;
 }
 
 /**
@@ -71,11 +72,29 @@ struct FilterQueryMap {
 
 /**
  * AUTO GENERATED: DO NOT EDIT
+ * Having Filter query
+ **/
+struct HavingFilterQuery {
+  1: required i32 id; /** This should be unique within a single request **/
+  2: optional AggregationInfo aggregationInfo;
+  3: list<string> value;
+  4: optional FilterOperator operator;
+  5: list<i32> nestedFilterQueryIds;
+}
+
+struct HavingFilterQueryMap {
+ 1: optional map<i32,HavingFilterQuery> filterQueryMap;
+}
+
+/**
+ * AUTO GENERATED: DO NOT EDIT
  *  Aggregation
  **/
 struct AggregationInfo {
   1: optional string aggregationType;
   2: optional map<string,string> aggregationParams;
+  3: optional bool isInSelectList;
+
 }
 
 /**
@@ -127,6 +146,9 @@ struct BrokerRequest {
  11: optional bool enableTrace;
  12: optional string responseFormat;
  13: optional map<string, string> debugOptions;
+ 14: optional map<string, string> queryOptions;
+ 15: optional HavingFilterQuery havingFilterQuery;
+ 16: optional HavingFilterQueryMap havingFilterSubQueryMap;
 }
 
 /**

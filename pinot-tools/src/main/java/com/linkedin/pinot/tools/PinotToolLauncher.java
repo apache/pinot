@@ -36,6 +36,8 @@ public class PinotToolLauncher {
   @Argument(handler = SubCommandHandler.class, metaVar = "<subCommand>")
   @SubCommands({
       @SubCommand(name = "UpdateSegmentState", impl = UpdateSegmentState.class),
+      @SubCommand(name = "AutoAddInvertedIndex", impl = AutoAddInvertedIndexTool.class),
+      @SubCommand(name = "ValidateTableRetention", impl = ValidateTableRetention.class),
       @SubCommand(name = "PerfBenchmarkRunner", impl = PerfBenchmarkRunner.class),
       @SubCommand(name = "QueryRunner", impl = QueryRunner.class)
   })

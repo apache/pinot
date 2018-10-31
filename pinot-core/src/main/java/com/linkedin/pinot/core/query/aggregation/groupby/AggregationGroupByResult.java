@@ -62,6 +62,6 @@ public class AggregationGroupByResult {
    * @return
    */
   public Object getResultForKey(GroupKeyGenerator.GroupKey groupKey, int index) {
-    return _aggregationFunctions[index].extractGroupByResult(_resultHolders[index], groupKey.getFirst());
+    return _aggregationFunctions[index].extractGroupByResult(_resultHolders[index], groupKey._groupId);
   }
 }

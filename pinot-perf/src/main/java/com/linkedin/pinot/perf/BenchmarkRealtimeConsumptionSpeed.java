@@ -18,7 +18,7 @@ package com.linkedin.pinot.perf;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.integration.tests.OfflineClusterIntegrationTest;
+import com.linkedin.pinot.integration.tests.ClusterIntegrationTestUtils;
 import com.linkedin.pinot.integration.tests.RealtimeClusterIntegrationTest;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
@@ -40,7 +40,6 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
   private static final int ROW_COUNT_FOR_SEGMENT_FLUSH = 10_000;
   private static final long TIMEOUT_MILLIS = 20 * 60 * 1000L; // Twenty minutes
   private final File _tmpDir = new File("/tmp/" + getHelixClusterName());
-  private final String KAFKA_TOPIC = "benchmark-realtime-consumption-speed";
   private static final int SEGMENT_COUNT = 1;
   private static final Random RANDOM = new Random(123456L);
 
@@ -61,7 +60,7 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
-    KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, 10);
+    KafkaStarterUtils.createTopic(getKafkaTopic(), KafkaStarterUtils.DEFAULT_ZK_STR, 10);
 
     // Unpack data (needed to get the Avro schema)
     TarGzCompressionUtils.unTar(
@@ -74,18 +73,13 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
       avroFiles.add(new File(_tmpDir.getPath() + "/On_Time_On_Time_Performance_2014_" + segmentNumber + ".avro"));
     }
 
-    File schemaFile =
-        new File(OfflineClusterIntegrationTest.class.getClassLoader()
-            .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
-
     // Start the Pinot cluster
     startController();
     startBroker();
     startServer();
 
     // Create realtime table
-    setUpTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC, schemaFile,
-        avroFiles.get(0));
+    setUpTable(avroFiles.get(0));
 
     // Wait a couple of seconds for all Helix state transitions to happen
     Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
@@ -94,8 +88,12 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
     new Thread() {
       @Override
       public void run() {
-        pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KAFKA_TOPIC, ROW_COUNT,
-            RANDOM);
+        try {
+          ClusterIntegrationTestUtils.pushRandomAvroIntoKafka(avroFiles.get(0), KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
+              getKafkaTopic(), ROW_COUNT, getMaxNumKafkaMessagesPerBatch(), getKafkaMessageHeader(), getPartitionColumn());
+        } catch (Exception e) {
+          // Ignored
+        }
       }
     }.start();
 
@@ -128,10 +126,5 @@ public class BenchmarkRealtimeConsumptionSpeed extends RealtimeClusterIntegratio
     long endTime = System.currentTimeMillis();
 
     System.out.println("Consumed " + ROW_COUNT + " rows in " + (endTime - startTime) / 1000.0 + " seconds");
-  }
-
-  @Override
-  protected String getHelixClusterName() {
-    return getClass().getSimpleName();
   }
 }

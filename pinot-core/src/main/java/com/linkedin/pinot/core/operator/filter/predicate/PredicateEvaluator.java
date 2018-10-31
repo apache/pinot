@@ -15,43 +15,134 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
+import com.linkedin.pinot.core.common.Predicate;
+
+
 public interface PredicateEvaluator {
+  /**
+   * APIs for both dictionary based and raw value based predicate evaluator
+   */
 
   /**
-   * @param dictionaryId
-   * @return
+   * Get the predicate type.
    */
-  public boolean apply(int dictionaryId);
+  Predicate.Type getPredicateType();
 
   /**
-   * @param dictionaryIds
-   * @return
+   * Return whether the predicate evaluator is dictionary based or raw value based.
    */
-  public boolean apply(int[] dictionaryIds);
+  boolean isDictionaryBased();
 
   /**
-   * @param dictionaryIds
-   * @param length how many elements in the array should the predicate be evaluated against
-   * @return
+   * Return whether the predicate is exclusive (e.g. NEQ, NOT_IN).
    */
-  public boolean apply(int[] dictionaryIds, int length);
+  boolean isExclusive();
 
   /**
-   * @return matching dictionary Ids
+   * Return whether the predicate will always be evaluated as false.
    */
-  public int[] getMatchingDictionaryIds();
+  boolean isAlwaysFalse();
 
   /**
-   * @return not matching dictionary Ids, useful for NOT IN, IN etc
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Dictionary id or raw value
+   * @return Whether the entry matches the predicate
    */
-  public int[] getNonMatchingDictionaryIds();
+  boolean applySV(int value);
 
   /**
-   * Will return true if the predicate is evaluated as false all the time. Useful to skip the
-   * segment. e.g if country=zm and segment contains no record for "zm" country we can skip the
-   * segment
-   * @return
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of dictionary ids or raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
    */
-  public boolean alwaysFalse();
+  boolean applyMV(int[] values, int length);
 
+  /**
+   * APIs for dictionary based predicate evaluator
+   */
+
+  /**
+   * Get the matching dictionary ids.
+   */
+  int[] getMatchingDictIds();
+
+  /**
+   * Get the non-matching dictionary ids.
+   */
+  int[] getNonMatchingDictIds();
+
+  /**
+   * APIs for raw value based predicate evaluator.
+   */
+
+  /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
+   */
+  boolean applySV(long value);
+
+  /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(long[] values, int length);
+
+  /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
+   */
+  boolean applySV(float value);
+
+  /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(float[] values, int length);
+
+  /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
+   */
+  boolean applySV(double value);
+
+  /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(double[] values, int length);
+
+  /**
+   * Apply a single-value entry to the predicate.
+   *
+   * @param value Raw value
+   * @return Whether the entry matches the predicate
+   */
+  boolean applySV(String value);
+
+  /**
+   * Apply a multi-value entry to the predicate.
+   *
+   * @param values Array of raw values
+   * @param length Number of values in the entry
+   * @return Whether the entry matches the predicate
+   */
+  boolean applyMV(String[] values, int length);
 }

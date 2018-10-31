@@ -15,26 +15,42 @@
  */
 package com.linkedin.pinot.controller.api.pojos;
 
-import com.linkedin.pinot.common.restlet.swagger.Example;
-import org.apache.helix.model.InstanceConfig;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import org.apache.helix.model.InstanceConfig;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 
 /**
  * Instance POJO, used as part of the API to create instances.
  */
-@Example("{\n" + "\t\"host\": \"hostname.example.com\",\n" + "\t\"port\": \"1234\",\n" + "\t\"type\": \"server\"\n" + "}")
+//@Example("{\n" + "\t\"host\": \"hostname.example.com\",\n" + "\t\"port\": \"1234\",\n" + "\t\"type\": \"server\"\n" + "}")
 public class Instance {
   private final String _host;
   private final String _port;
   private final String _type;
   private final String _tag;
   private final String _instancePrefix;
+
+  public static Instance fromInstanceConfig(InstanceConfig instanceConfig) {
+    InstanceConfig ic = instanceConfig;
+    String instanceName = ic.getInstanceName();
+    String type;
+    if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+      type = CommonConstants.Helix.SERVER_INSTANCE_TYPE;
+    } else if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      type = CommonConstants.Helix.BROKER_INSTANCE_TYPE;
+    } else {
+      throw new RuntimeException("Unknown instance type for: " + instanceName);
+    }
+
+    Instance instance = new Instance(ic.getHostName(),
+        ic.getPort(),
+        type, org.apache.commons.lang.StringUtils.join(ic.getTags(), ','));
+    return instance;
+  }
 
   @JsonCreator
   public Instance(
@@ -52,6 +68,9 @@ public class Instance {
     } else if (CommonConstants.Helix.BROKER_INSTANCE_TYPE.equalsIgnoreCase(type)) {
       _instancePrefix = CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE;
       _type = CommonConstants.Helix.BROKER_INSTANCE_TYPE;
+    } else if (CommonConstants.Minion.INSTANCE_TYPE.equalsIgnoreCase(type)) {
+      _instancePrefix = CommonConstants.Minion.INSTANCE_PREFIX;
+      _type = CommonConstants.Minion.INSTANCE_TYPE;
     } else {
       throw new IllegalArgumentException("Invalid instance type " + type + ", expected either server or broker");
     }
@@ -116,6 +135,8 @@ public class Instance {
           return CommonConstants.Helix.UNTAGGED_SERVER_INSTANCE;
         case CommonConstants.Helix.BROKER_INSTANCE_TYPE:
           return CommonConstants.Helix.UNTAGGED_BROKER_INSTANCE;
+        case CommonConstants.Minion.INSTANCE_TYPE:
+          return CommonConstants.Minion.UNTAGGED_INSTANCE;
         default:
           throw new RuntimeException("Unknown instance type " + _type + ", was expecting either server or broker");
       }

@@ -1,0 +1,27 @@
+{{#containers/dimensions-container as |dimensions|}}
+  <span>(Investigation Period: {{moment-format dimensions.regionStart dateFormat}} -
+      {{moment-format dimensions.regionEnd dateFormat}})</span>
+  {{#with dimensions.heatmapData.summary.simpleFields as |summary|}}
+    {{dimension-summary
+      data=summary
+    }}
+  {{/with}}
+  <div class="row rca-header">
+    <div class="col-xs-9">
+    </div>
+    <div class="col-xs-3 pull-right">
+      <label class="te-label" for="select-heatmap-mode">Mode: </label>
+      {{#power-select 
+        triggerId="select-heatmap-mode"
+        selected=heatmapMode
+        options=heatmapModes
+        onchange=(action (mut heatmapMode))
+        as |mode|}}
+        {{mode}}
+      {{/power-select}}
+    </div>
+  </div>
+  {{dimension-heatmap
+    heatMapData=dimensions.heatmapData
+    heatmapMode=heatmapMode}} 
+{{/containers/dimensions-container}}

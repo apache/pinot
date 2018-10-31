@@ -15,15 +15,11 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.UResultOperator;
+import com.linkedin.pinot.core.operator.InstanceResponseOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * The <code></code>
- */
 public class InstanceResponsePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponsePlanNode.class);
 
@@ -34,18 +30,18 @@ public class InstanceResponsePlanNode implements PlanNode {
   }
 
   @Override
-  public Operator run() {
+  public InstanceResponseOperator run() {
     long start = System.currentTimeMillis();
-    UResultOperator uResultOperator = new UResultOperator(_combinePlanNode.run());
+    InstanceResponseOperator instanceResponseOperator = new InstanceResponseOperator(_combinePlanNode.run());
     long end = System.currentTimeMillis();
     LOGGER.debug("InstanceResponsePlanNode.run took: {}ms", end - start);
-    return uResultOperator;
+    return instanceResponseOperator;
   }
 
   @Override
   public void showTree(String prefix) {
     LOGGER.debug(prefix + "Instance Level Inter-Segments Query Plan Node:");
-    LOGGER.debug(prefix + "Operator: UResultOperator");
+    LOGGER.debug(prefix + "Operator: InstanceResponseOperator");
     LOGGER.debug(prefix + "Argument 0: Combine -");
     _combinePlanNode.showTree(prefix + "    ");
   }

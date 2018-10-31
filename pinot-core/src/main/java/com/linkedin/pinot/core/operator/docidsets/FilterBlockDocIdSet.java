@@ -18,15 +18,54 @@ package com.linkedin.pinot.core.operator.docidsets;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 
 
+/**
+ * The <code>FilterBlockDocIdSet</code> interface represents the <code>BlockDocIdSet</code> returned by
+ * <code>BaseFilterBlock</code>.
+ *
+ * <p>To accelerate the filter process, we added several methods to help filtering out documents that do not need to be
+ * processed.
+ *
+ * <p>The correct order of calling these methods are:
+ * <ul>
+ *   <li>
+ *     Construct the <code>FilterBlockDocIdSet</code>
+ *   </li>
+ *   <li>
+ *     Call <code>getMinDocId()</code> and <code>getMaxDocId()</code> to gather information
+ *   </li>
+ *   <li>
+ *     Narrow down the documents that need to be processed by calling <code>setStartDocId()</code> and
+ *     <code>setEndDocId()</code>
+ *   </li>
+ *   <li>
+ *     Call <code>iterator()</code> to get all documents that are selected
+ *   </li>
+ * </ul>
+ */
 public interface FilterBlockDocIdSet extends BlockDocIdSet {
 
+  /**
+   * Returns the minimum document id the set can possibly contain.
+   */
   int getMinDocId();
 
+  /**
+   * Returns the maximum document id (inclusive) the set can possibly contain.
+   */
   int getMaxDocId();
 
+  /**
+   * Sets the start document id that need to be processed.
+   */
   void setStartDocId(int startDocId);
 
+  /**
+   * Sets the end document id (inclusive) that need to be processed.
+   */
   void setEndDocId(int endDocId);
 
+  /**
+   * Returns the number of entries scanned in filtering phase.
+   */
   long getNumEntriesScannedInFilter();
 }

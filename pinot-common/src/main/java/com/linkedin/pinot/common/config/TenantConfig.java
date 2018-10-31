@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
 import java.lang.reflect.Field;
 
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
@@ -25,7 +26,12 @@ import org.slf4j.LoggerFactory;
 public class TenantConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantConfig.class);
 
+  @ConfigKey("brokerTenant")
+  @ConfigDoc("Broker tenant used by this table")
   private String broker;
+
+  @ConfigKey("serverTenant")
+  @ConfigDoc("Server tenant used by this table")
   private String server;
 
   public String getBroker() {
@@ -74,5 +80,27 @@ public class TenantConfig {
     result.append("}");
 
     return result.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    TenantConfig that = (TenantConfig) o;
+
+    return EqualityUtils.isEqual(broker, that.broker) && EqualityUtils.isEqual(server, that.server);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(broker);
+    result = EqualityUtils.hashCodeOf(result, server);
+    return result;
   }
 }

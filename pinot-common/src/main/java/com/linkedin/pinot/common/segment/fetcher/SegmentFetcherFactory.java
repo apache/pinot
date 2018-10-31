@@ -15,78 +15,88 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import com.google.common.base.Preconditions;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
+import java.util.Set;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
 
 public class SegmentFetcherFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherFactory.class);
+  private static final SegmentFetcherFactory INSTANCE = new SegmentFetcherFactory();
 
-  public static String SEGMENT_FETCHER_CLASS_KEY = "class";
-  public static String SEGMENT_FETCHER_PROTOCOL_KEY = "protocol";
-
-  private static Map<String, SegmentFetcher> SEGMENT_FETCHER_MAP = new ConcurrentHashMap<String, SegmentFetcher>();
-
-  static {
-    SEGMENT_FETCHER_MAP.put("file", new LocalFileSegmentFetcher());
-    SEGMENT_FETCHER_MAP.put("http", new HttpSegmentFetcher());
-    SEGMENT_FETCHER_MAP.put("https", new HttpSegmentFetcher());
+  private SegmentFetcherFactory() {
   }
 
-  public static void initSegmentFetcherFactory(Configuration pinotHelixProperties) {
-    Configuration segmentFetcherFactoryConfig =
-        pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+  public static SegmentFetcherFactory getInstance() {
+    return INSTANCE;
+  }
 
-    Iterator segmentFetcherFactoryConfigIterator = segmentFetcherFactoryConfig.getKeys();
-    while (segmentFetcherFactoryConfigIterator.hasNext()) {
-      Object configKeyObject = segmentFetcherFactoryConfigIterator.next();
-      try {
-        String segmentFetcherConfigKey = configKeyObject.toString();
-        String protocol = segmentFetcherConfigKey.split(".", 2)[0];
-        if (!SegmentFetcherFactory.containsProtocol(protocol)) {
-          SegmentFetcherFactory.initSegmentFetcher(
-              new ConfigurationMap(segmentFetcherFactoryConfig.subset(protocol)));
-        }
-      } catch (Exception e) {
-        LOGGER.error("Got exception to process the key: " + configKeyObject);
+  public static final String PROTOCOLS_KEY = "protocols";
+  public static final List<String> DEFAULT_PROTOCOLS = Collections.unmodifiableList(Arrays.asList("file", "http"));
+  public static final Map<String, String> DEFAULT_FETCHER_CLASS_MAP =
+      Collections.unmodifiableMap(new HashMap<String, String>(4) {{
+        put("file", LocalFileSegmentFetcher.class.getName());
+        put("http", HttpSegmentFetcher.class.getName());
+        put("https", HttpsSegmentFetcher.class.getName());
+        put("hdfs", HdfsSegmentFetcher.class.getName());
+      }});
+  public static final String FETCHER_CLASS_KEY_SUFFIX = ".class";
+
+  private final Map<String, SegmentFetcher> _segmentFetcherMap = new HashMap<>();
+
+  /**
+   * Initiate the segment fetcher factory. This method should only be called once.
+   *
+   * @param config Segment fetcher factory config
+   */
+  public void init(Configuration config) throws ClassNotFoundException, IllegalAccessException, InstantiationException {
+    @SuppressWarnings("unchecked")
+    List<String> protocols = config.getList(PROTOCOLS_KEY, DEFAULT_PROTOCOLS);
+    for (String protocol : protocols) {
+      String fetcherClass =
+          config.getString(protocol + FETCHER_CLASS_KEY_SUFFIX, DEFAULT_FETCHER_CLASS_MAP.get(protocol));
+      Preconditions.checkNotNull(fetcherClass, "No fetcher class defined for protocol: " + protocol);
+      LOGGER.info("Creating a new segment fetcher for protocol: {} with class: {}", protocol, fetcherClass);
+      SegmentFetcher segmentFetcher = (SegmentFetcher) Class.forName(fetcherClass).newInstance();
+      LOGGER.info("Initializing segment fetcher for protocol: {}", protocol);
+      Configuration segmentFetcherConfig = config.subset(protocol);
+      logFetcherInitConfig(segmentFetcher, protocol, segmentFetcherConfig);
+      segmentFetcher.init(segmentFetcherConfig);
+      _segmentFetcherMap.put(protocol, segmentFetcher);
+    }
+  }
+
+  public boolean containsProtocol(String protocol) {
+    return _segmentFetcherMap.containsKey(protocol);
+  }
+
+  public SegmentFetcher getSegmentFetcherBasedOnURI(String uri) throws URISyntaxException {
+    String protocol = new URI(uri).getScheme();
+    return _segmentFetcherMap.get(protocol);
+  }
+
+  private static void logFetcherInitConfig(SegmentFetcher fetcher, String protocol, Configuration conf) {
+    LOGGER.info("Initializing protocol [{}] with the following configs:", protocol);
+    Iterator iter = conf.getKeys();
+    Set<String> secretKeys = fetcher.getProtectedConfigKeys();
+    while (iter.hasNext()) {
+      String key = (String) iter.next();
+      if (secretKeys.contains(key)) {
+        LOGGER.info("{}: {}", key, "********");
+      } else {
+        LOGGER.info("{}: {}", key, conf.getString(key));
       }
     }
-  }
-
-  public static void initSegmentFetcher(Map<String, String> configs) {
-    try {
-      String segmentFetcherKlass = configs.get(SEGMENT_FETCHER_CLASS_KEY);
-      SegmentFetcher segmentFetcher = (SegmentFetcher) Class.forName(segmentFetcherKlass).newInstance();
-      segmentFetcher.init(configs);
-      String segmentFetcherProtocol = configs.get(SEGMENT_FETCHER_PROTOCOL_KEY);
-      SEGMENT_FETCHER_MAP.put(segmentFetcherProtocol, segmentFetcher);
-    } catch (Exception e) {
-      LOGGER.error("Failed to init SegmentFetcher: {}", Arrays.toString(configs.entrySet().toArray()));
-    }
-  }
-
-  public static boolean containsProtocol(String protocol) {
-    return SEGMENT_FETCHER_MAP.containsKey(protocol);
-  }
-
-  public static SegmentFetcher getSegmentFetcherBasedOnURI(String uri) {
-    String protocol = getProtocolFromUri(uri);
-    return SEGMENT_FETCHER_MAP.get(protocol);
-  }
-
-  private static String getProtocolFromUri(String uri) {
-    String[] splitedUri = uri.split(":", 2);
-    if (splitedUri.length > 1) {
-      return splitedUri[0];
-    }
-    throw new UnsupportedOperationException("Not supported uri: " + uri);
+    LOGGER.info("");
   }
 }

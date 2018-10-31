@@ -15,22 +15,20 @@
  */
 package com.linkedin.pinot.core.util;
 
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.chunk.creator.impl.ChunkIndexCreationDriverImplTest;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 
 
 /**
@@ -63,19 +61,17 @@ public class CrcUtilsTest {
 
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    final com.linkedin.pinot.core.indexsegment.IndexSegment segment = Loaders.IndexSegment.load(new File(makeSegmentAndReturnPath()), ReadMode.mmap);
+    final IndexSegment segment = ImmutableSegmentLoader.load(new File(makeSegmentAndReturnPath()), ReadMode.mmap);
     final SegmentMetadata m = segment.getSegmentMetadata();
 
 //    System.out.println(m.getCrc());
 //    System.out.println(m.getIndexCreationTime());
 
     FileUtils.deleteQuietly(INDEX_DIR);
-
   }
 
   private String makeSegmentAndReturnPath() throws Exception {
-    final String filePath = TestUtils
-        .getFileFromResourceUrl(ChunkIndexCreationDriverImplTest.class.getClassLoader().getResource(AVRO_DATA));
+    final String filePath = TestUtils.getFileFromResourceUrl(CrcUtils.class.getClassLoader().getResource(AVRO_DATA));
 
     final SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR,

@@ -1,8 +1,12 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+
 public class JobIndex extends AbstractIndexEntity {
   String name;
   String status;
+  TaskConstants.TaskType type;
+  long configId;
   long scheduleStartTime;
   long scheduleEndTime;
 
@@ -23,6 +27,22 @@ public class JobIndex extends AbstractIndexEntity {
     this.scheduleEndTime = scheduleEndTime;
   }
 
+  public TaskConstants.TaskType getType() {
+    return type;
+  }
+
+  public void setType(TaskConstants.TaskType type) {
+    this.type = type;
+  }
+
+  public long getConfigId() {
+    return configId;
+  }
+
+  public void setConfigId(long configId) {
+    this.configId = configId;
+  }
+
   public String getName() {
     return name;
   }
@@ -40,11 +60,4 @@ public class JobIndex extends AbstractIndexEntity {
   public void setStatus(String status) {
     this.status = status;
   }
-
-  @Override
-  public String toString() {
-    return "JobIndex [name=" + name + ", status=" + status + ", scheduleStartTime="
-        + scheduleStartTime + ", scheduleEndTime=" + scheduleEndTime + "]";
-  }
-
 }

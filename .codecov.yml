@@ -17,9 +17,9 @@
 coverage:
   ignore:
     # Ignore all files under pinot-tools, pinot-perf and pinot-hadoop.
-    - pinot-tools/*
-    - pinot-perf/*
-    - pinot-hadoop/*
+    - pinot-tools/.*
+    - pinot-perf/.*
+    - pinot-hadoop/.*
     # Ignore all the auto generated files.
     - pinot-common/src/main/java/com/linkedin/pinot/common/request/AggregationInfo.java
     - pinot-common/src/main/java/com/linkedin/pinot/common/request/BrokerRequest.java

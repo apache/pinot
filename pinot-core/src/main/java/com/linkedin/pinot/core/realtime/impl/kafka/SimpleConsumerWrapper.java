@@ -16,24 +16,20 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.kafka.common.errors.TimeoutException;
-import org.apache.kafka.common.protocol.Errors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.core.realtime.stream.MessageBatch;
+import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.PartitionOffsetRequestInfo;
@@ -48,12 +44,16 @@ import kafka.javaapi.TopicMetadataResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
+import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.kafka.common.protocol.Errors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Wrapper for Kafka's SimpleConsumer which ensures that we're connected to the appropriate broker for consumption.
  */
-public class SimpleConsumerWrapper implements Closeable {
+public class SimpleConsumerWrapper implements PinotStreamConsumer {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleConsumerWrapper.class);
   private static final int SOCKET_TIMEOUT_MILLIS = 10000;
   private static final int SOCKET_BUFFER_SIZE = 512000;
@@ -102,7 +102,7 @@ public class SimpleConsumerWrapper implements Closeable {
     }
   }
 
-  private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
+  public SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
@@ -118,7 +118,7 @@ public class SimpleConsumerWrapper implements Closeable {
     setCurrentState(new ConnectingToBootstrapNode());
   }
 
-  private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
+  public SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId, String topic, int partition, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
     _clientId = clientId;
@@ -180,6 +180,8 @@ public class SimpleConsumerWrapper implements Closeable {
       LOGGER.warn("Caught Kafka consumer exception while in state {}, disconnecting and trying again",
           _currentState.getStateValue(), e);
 
+      Uninterruptibles.sleepUninterruptibly(250, TimeUnit.MILLISECONDS);
+
       setCurrentState(new ConnectingToBootstrapNode());
     }
 
@@ -209,6 +211,7 @@ public class SimpleConsumerWrapper implements Closeable {
       _currentPort = _bootstrapPorts[randomHostIndex];
 
       try {
+        LOGGER.info("Connecting to bootstrap host {}:{}", _currentHost, _currentPort);
         _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
             SOCKET_BUFFER_SIZE, _clientId);
         setCurrentState(new ConnectedToBootstrapNode());
@@ -431,8 +434,7 @@ public class SimpleConsumerWrapper implements Closeable {
    * @return An iterable containing messages fetched from Kafka and their offsets, as well as the high watermark for
    * this partition.
    */
-  public synchronized Pair<Iterable<MessageAndOffset>, Long> fetchMessagesAndHighWatermark(long startOffset,
-      long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
+  public synchronized MessageBatch fetchMessages(long startOffset, long endOffset, int timeoutMillis) throws java.util.concurrent.TimeoutException {
     Preconditions.checkState(!_metadataOnlyConsumer, "Cannot fetch messages from a metadata-only SimpleConsumerWrapper");
     // Ensure that we're connected to the leader
     // TODO Improve error handling
@@ -456,7 +458,9 @@ public class SimpleConsumerWrapper implements Closeable {
     if (!fetchResponse.hasError()) {
       final Iterable<MessageAndOffset> messageAndOffsetIterable =
           buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
-      return Pair.of(messageAndOffsetIterable, fetchResponse.highWatermark(_topic, _partition));
+
+      // TODO: Instantiate with factory
+      return new SimpleConsumerMessageBatch(messageAndOffsetIterable);
     } else {
       throw exceptionForKafkaErrorCode(fetchResponse.errorCode(_topic, _partition));
     }
@@ -502,21 +506,6 @@ public class SimpleConsumerWrapper implements Closeable {
       default:
         return new RuntimeException("Unhandled error " + kafkaError);
     }
-  }
-
-  /**
-   * Fetch messages from Kafka between the specified offsets.
-   *
-   * @param startOffset The offset of the first message desired, inclusive
-   * @param endOffset The offset of the last message desired, exclusive, or {@link Long#MAX_VALUE} for no end offset.
-   * @param timeoutMillis Timeout in milliseconds
-   * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
-   * milliseconds
-   * @return An iterable containing messages fetched from Kafka and their offsets.
-   */
-  public synchronized Iterable<MessageAndOffset> fetchMessages(long startOffset, long endOffset, int timeoutMillis)
-      throws java.util.concurrent.TimeoutException {
-    return fetchMessagesAndHighWatermark(startOffset, endOffset, timeoutMillis).getLeft();
   }
 
   /**
@@ -617,40 +606,6 @@ public class SimpleConsumerWrapper implements Closeable {
         return true;
       }
     });
-  }
-
-  /**
-   * Creates a simple consumer wrapper that connects to a random Kafka broker, which allows for fetching topic and
-   * partition metadata. It does not allow to consume from a partition, since Kafka requires connecting to the
-   * leader of that partition for consumption.
-   *
-   * @param simpleConsumerFactory The SimpleConsumer factory to use
-   * @param bootstrapNodes A comma separated list of Kafka broker nodes
-   * @param clientId The Kafka client identifier, to be used to uniquely identify the client when tracing calls
-   * @param connectTimeoutMillis The timeout for connecting or re-establishing a connection to the Kafka cluster
-   * @return A consumer wrapper
-   */
-  public static SimpleConsumerWrapper forMetadataConsumption(KafkaSimpleConsumerFactory simpleConsumerFactory,
-      String bootstrapNodes, String clientId, long connectTimeoutMillis) {
-    return new SimpleConsumerWrapper(simpleConsumerFactory, bootstrapNodes, clientId, connectTimeoutMillis);
-  }
-
-  /**
-   * Creates a simple consumer wrapper that automatically connects to the leader broker for the given topic and
-   * partition. This consumer wrapper can also fetch topic and partition metadata.
-   *
-   * @param simpleConsumerFactory The SimpleConsumer factory to use
-   * @param bootstrapNodes A comma separated list of Kafka broker nodes
-   * @param clientId The Kafka client identifier, to be used to uniquely identify the client when tracing calls
-   * @param topic The Kafka topic to consume from
-   * @param partition The partition id to consume from
-   * @param connectTimeoutMillis The timeout for connecting or re-establishing a connection to the Kafka cluster
-   * @return A consumer wrapper
-   */
-  public static SimpleConsumerWrapper forPartitionConsumption(KafkaSimpleConsumerFactory simpleConsumerFactory,
-      String bootstrapNodes, String clientId, String topic, int partition, long connectTimeoutMillis) {
-    return new SimpleConsumerWrapper(simpleConsumerFactory, bootstrapNodes, clientId, topic, partition,
-        connectTimeoutMillis);
   }
 
   @Override

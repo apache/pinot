@@ -1,0 +1,23 @@
+{
+  "tableName": "baseballStats",
+  "tableType": "OFFLINE",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "schemaName": "baseball",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "HEAP",
+    "invertedIndexColumns": [
+      "playerID",
+      "teamID"
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

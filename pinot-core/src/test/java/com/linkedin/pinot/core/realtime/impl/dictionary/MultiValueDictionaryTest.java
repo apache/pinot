@@ -15,30 +15,49 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.linkedin.pinot.core.io.readerwriter.PinotDataBufferMemoryManager;
 import java.util.Random;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
+import com.linkedin.pinot.core.io.writer.impl.DirectMemoryManager;
 
 
 public class MultiValueDictionaryTest {
-  private static final String COL_NAME = "greek";
   private static final int NROWS = 1000;
-  private static final int MAX_N_VALUES = FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES;
-  private static final long RANDOM_SEED = System.nanoTime();
+  private static final int MAX_N_VALUES = 1000;
+  private PinotDataBufferMemoryManager _memoryManager;
+
+  @BeforeClass
+  public void setUp() {
+    _memoryManager = new DirectMemoryManager(MultiValueDictionaryTest.class.getName());
+  }
+
+  @AfterClass
+  public void tearDown() throws Exception {
+    _memoryManager.close();
+  }
 
   @Test
-  public void testMultiValueIndexing()
+  public void testMultiValueIndexing() {
+    final long seed = System.nanoTime();
+    try {
+      testMultiValueIndexing(seed);
+    } catch (Exception e) {
+      Assert.fail("Failed with seed=" + seed);
+    }
+  }
+
+  private void testMultiValueIndexing(final long seed)
       throws Exception {
-    final FieldSpec mvIntFs = new DimensionFieldSpec(COL_NAME, FieldSpec.DataType.LONG, false);
-    final LongMutableDictionary dict = new LongMutableDictionary(mvIntFs);
+    final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
-        new FixedByteSingleColumnMultiValueReaderWriter(NROWS, Integer.SIZE / 8, MAX_N_VALUES);
+        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8, new DirectMemoryManager("test"), "indexer");
 
     // Insert rows into the indexer and dictionary
-    Random random = new Random(RANDOM_SEED);
+    Random random = new Random(seed);
     for (int row = 0; row < NROWS; row++) {
       int nValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
       Long[] val = new Long[nValues];
@@ -54,17 +73,17 @@ public class MultiValueDictionaryTest {
     }
 
     // Read back rows and make sure that the values are good.
-    random = new Random(RANDOM_SEED);
+    random = new Random(seed);
     final int[] dictIds = new int[MAX_N_VALUES];
     for (int row = 0; row < NROWS; row++) {
       int nValues = indexer.getIntArray(row, dictIds);
       Assert.assertEquals(nValues, Math.abs(random.nextInt()) % MAX_N_VALUES,
-          "Mismatching number of values, random seed is: " + RANDOM_SEED);
+          "Mismatching number of values, random seed is: " + seed);
 
       for (int i = 0; i < nValues; i++) {
         Long val = dict.getLongValue(dictIds[i]);
         Assert.assertEquals(val.longValue(), random.nextLong(),
-            "Value mismatch at row " + row + ", random seed is: " + RANDOM_SEED);
+            "Value mismatch at row " + row + ", random seed is: " + seed);
       }
     }
   }

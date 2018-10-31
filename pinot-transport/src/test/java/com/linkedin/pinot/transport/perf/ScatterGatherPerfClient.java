@@ -15,13 +15,35 @@
  */
 package com.linkedin.pinot.transport.perf;
 
+import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.transport.common.CompositeFuture;
+import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
+import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
+import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
+import com.linkedin.pinot.transport.pool.KeyedPool;
+import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
+import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
+import com.yammer.metrics.core.Histogram;
+import com.yammer.metrics.core.MetricName;
+import com.yammer.metrics.core.MetricsRegistry;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timer;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -39,37 +61,6 @@ import org.apache.commons.configuration.PropertiesConfiguration;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.util.concurrent.MoreExecutors;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.LatencyMetric;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.BucketingSelection;
-import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.ReplicaSelection;
-import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
-import com.linkedin.pinot.transport.common.SegmentId;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
-import com.linkedin.pinot.transport.config.RoutingTableConfig;
-import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.netty.NettyClientConnection;
-import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
-import com.linkedin.pinot.transport.pool.KeyedPool;
-import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
-import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
-import com.yammer.metrics.core.Histogram;
-import com.yammer.metrics.core.MetricName;
-import com.yammer.metrics.core.MetricsRegistry;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.util.HashedWheelTimer;
-import io.netty.util.Timer;
 
 
 public class ScatterGatherPerfClient implements Runnable {
@@ -80,13 +71,10 @@ public class ScatterGatherPerfClient implements Runnable {
   private static final String REQUEST_SIZE_OPT_NAME = "request_size";
   private static final String TABLE_NAME_OPT_NAME = "resource_name";
 
-  // RequestId Generator
-  private static AtomicLong _requestIdGen = new AtomicLong(0);
-
   //Routing Config and Pool
   private final RoutingTableConfig _routingConfig;
   private ScatterGatherImpl _scatterGather;
-  private KeyedPool<ServerInstance, NettyClientConnection> _pool;
+  private KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> _pool;
   private ExecutorService _service;
   private EventLoopGroup _eventLoopGroup;
   private Timer _timer;
@@ -163,7 +151,7 @@ public class ScatterGatherPerfClient implements Runnable {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(_eventLoopGroup, _timer, clientMetrics);
     _pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, _maxActiveConnections, 300000, 10, rm,
+        new KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection>(1, _maxActiveConnections, 300000, 10, rm,
             _timedExecutor, MoreExecutors.sameThreadExecutor(), registry);
     rm.setPool(_pool);
     _scatterGather = new ScatterGatherImpl(_pool, _service);
@@ -203,7 +191,7 @@ public class ScatterGatherPerfClient implements Runnable {
           sendRequestAndGetResponse(req, scatterGatherStats);
           _endLastResponseTime = System.currentTimeMillis();
         } else {
-          CompositeFuture<ServerInstance, ByteBuf> future = asyncSendRequestAndGetResponse(req, scatterGatherStats);
+          CompositeFuture<byte[]> future = asyncSendRequestAndGetResponse(req, scatterGatherStats);
           _queue
               .offer(new QueueEntry(false, i >= _numRequestsToSkipForMeasurement, System.currentTimeMillis(), future));
         }
@@ -233,8 +221,6 @@ public class ScatterGatherPerfClient implements Runnable {
         System.out.println("Total time :" + tc.getLatencyMs());
         System.out
             .println("Throughput (Requests/Second) :" + ((_numRequestsMeasured * 1.0 * 1000) / tc.getLatencyMs()));
-        System.out.println("Latency :" + new LatencyMetric<Histogram>(_latencyHistogram));
-        System.out.println("Scatter-Gather Latency :" + new LatencyMetric<Histogram>(_scatterGather.getLatency()));
       }
     } catch (Exception ex) {
       System.err.println("Client stopped abnormally ");
@@ -309,39 +295,20 @@ public class ScatterGatherPerfClient implements Runnable {
    * @return
    * @throws InterruptedException
    * @throws ExecutionException
-   * @throws IOException
-   * @throws ClassNotFoundException
    */
   private String sendRequestAndGetResponse(SimpleScatterGatherRequest request,
-      final ScatterGatherStats scatterGatherStats) throws InterruptedException,
-      ExecutionException, IOException, ClassNotFoundException {
+      final ScatterGatherStats scatterGatherStats) throws InterruptedException, ExecutionException {
     BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
-    CompositeFuture<ServerInstance, ByteBuf> future = _scatterGather.scatterGather(request, scatterGatherStats,
-        brokerMetrics);
-    ByteBuf b = future.getOne();
-    String r = null;
-    if (null != b) {
-      byte[] b2 = new byte[b.readableBytes()];
-      b.readBytes(b2);
-      r = new String(b2);
-
-    }
-    return r;
-  }
-
-  private static void releaseByteBuf(CompositeFuture<ServerInstance, ByteBuf> future) throws Exception {
-    Map<ServerInstance, ByteBuf> bMap = future.get();
-    if (null != bMap) {
-      for (Entry<ServerInstance, ByteBuf> bEntry : bMap.entrySet()) {
-        ByteBuf b = bEntry.getValue();
-        if (null != b) {
-          b.release();
-        }
-      }
+    CompositeFuture<byte[]> future = _scatterGather.scatterGather(request, scatterGatherStats, brokerMetrics);
+    byte[] bytes = future.getOne();
+    if (bytes == null) {
+      return null;
+    } else {
+      return new String(bytes);
     }
   }
 
-  private CompositeFuture<ServerInstance, ByteBuf> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request,
+  private CompositeFuture<byte[]> asyncSendRequestAndGetResponse(SimpleScatterGatherRequest request,
       final ScatterGatherStats scatterGatherStats)
       throws InterruptedException {
     final BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
@@ -352,14 +319,14 @@ public class ScatterGatherPerfClient implements Runnable {
     private final boolean _last;
     private final boolean _measured;
     private final long _timeSentMs;
-    private final CompositeFuture<ServerInstance, ByteBuf> future;
+    private final CompositeFuture<byte[]> _future;
 
-    public QueueEntry(boolean last, boolean measured, long timeSentMs, CompositeFuture<ServerInstance, ByteBuf> future) {
+    public QueueEntry(boolean last, boolean measured, long timeSentMs, CompositeFuture<byte[]> future) {
       super();
       _last = last;
       _measured = measured;
       _timeSentMs = timeSentMs;
-      this.future = future;
+      _future = future;
     }
 
     public boolean isMeasured() {
@@ -370,8 +337,8 @@ public class ScatterGatherPerfClient implements Runnable {
       return _last;
     }
 
-    public CompositeFuture<ServerInstance, ByteBuf> getFuture() {
-      return future;
+    public CompositeFuture<byte[]> getFuture() {
+      return _future;
     }
 
     public long getTimeSentMs() {
@@ -403,33 +370,15 @@ public class ScatterGatherPerfClient implements Runnable {
           break;
         }
 
-        ByteBuf b = null;
         try {
-          b = e.getFuture().getOne();
+          e.getFuture().getOne();
           _endLastResponseTime = System.currentTimeMillis();
-        } catch (InterruptedException e1) {
-          // TODO Auto-generated catch block
-          e1.printStackTrace();
         } catch (Exception e1) {
           // TODO Auto-generated catch block
           e1.printStackTrace();
         }
         long timeDiff = System.currentTimeMillis() - e.getTimeSentMs();
         _latencyHistogram.update(timeDiff);
-
-        String r = null;
-        if (null != b) {
-          byte[] b2 = new byte[b.readableBytes()];
-          b.readBytes(b2);
-          r = new String(b2);
-        }
-        //Release bytebuf
-        try {
-          releaseByteBuf(e.getFuture());
-        } catch (Exception e1) {
-          // TODO Auto-generated catch block
-          e1.printStackTrace();
-        }
       }
     }
   }
@@ -441,7 +390,7 @@ public class ScatterGatherPerfClient implements Runnable {
   public static class SimpleScatterGatherRequest implements ScatterGatherRequest {
     private final byte[] _brokerRequest;
     private final long _requestId;
-    private final Map<ServerInstance, SegmentIdSet> _pgToServersMap;
+    private final Map<String, List<String>> _pgToServersMap;
 
     public SimpleScatterGatherRequest(byte[] q, PerTableRoutingConfig routingConfig, long requestId) {
       _brokerRequest = q;
@@ -450,42 +399,17 @@ public class ScatterGatherPerfClient implements Runnable {
     }
 
     @Override
-    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
+    public Map<String, List<String>> getRoutingTable() {
       return _pgToServersMap;
     }
 
     @Override
-    public byte[] getRequestForService(ServerInstance service, SegmentIdSet queryPartitions) {
+    public byte[] getRequestForService(List<String> segments) {
       return _brokerRequest;
     }
 
     @Override
-    public ReplicaSelection getReplicaSelection() {
-      return new FirstReplicaSelection();
-    }
-
-    @Override
-    public ReplicaSelectionGranularity getReplicaSelectionGranularity() {
-      return ReplicaSelectionGranularity.SEGMENT_ID_SET;
-    }
-
-    @Override
-    public Object getHashKey() {
-      return null;
-    }
-
-    @Override
-    public int getNumSpeculativeRequests() {
-      return 0;
-    }
-
-    @Override
-    public BucketingSelection getPredefinedSelection() {
-      return null;
-    }
-
-    @Override
-    public long getRequestTimeoutMS() {
+    public long getRequestTimeoutMs() {
       return 10000; //10 second timeout
     }
 
@@ -497,27 +421,6 @@ public class ScatterGatherPerfClient implements Runnable {
     @Override
     public BrokerRequest getBrokerRequest() {
       return null;
-    }
-  }
-
-  /**
-   * Selects the first replica in the list
-   *
-   */
-  public static class FirstReplicaSelection extends ReplicaSelection {
-
-    @Override
-    public void reset(SegmentId p) {
-    }
-
-    @Override
-    public void reset(SegmentIdSet p) {
-    }
-
-    @Override
-    public ServerInstance selectServer(SegmentId p, List<ServerInstance> orderedServers, Object hashKey) {
-      //System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
-      return orderedServers.get(0);
     }
   }
 
@@ -567,10 +470,6 @@ public class ScatterGatherPerfClient implements Runnable {
 
   public int getNumRequestsMeasured() {
     return _numRequestsMeasured;
-  }
-
-  public TimerContext getTimerContext() {
-    return _timerContext;
   }
 
   public long getBeginFirstRequestTime() {

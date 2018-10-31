@@ -269,8 +269,10 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
     final long prefetchSlowdownPageLimit = (long) (PREFETCH_SLOWDOWN_PCT * MAX_MMAP_PREFETCH_PAGES);
     if (prefetchedPages.get() >= prefetchSlowdownPageLimit) {
-      buffer.getByte(0);
-      prefetchedPages.incrementAndGet();
+      if (0 < buffer.size()) {
+        buffer.getByte(0);
+        prefetchedPages.incrementAndGet();
+      }
     } else {
       // pos needs to be long because buffer.size() is 32 bit but
       // adding 4k can make it go over int size
@@ -426,8 +428,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    void save()
-        throws IOException {
+    public void save() throws IOException {
     }
 
     void abort() {

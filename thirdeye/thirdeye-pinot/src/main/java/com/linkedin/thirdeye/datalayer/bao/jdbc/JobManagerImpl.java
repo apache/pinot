@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.common.base.Preconditions;
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -21,7 +23,11 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.pojo.JobBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Singleton
 public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobManager {
+
+  private static final String FIND_RECENT_SCHEDULED_JOB_BY_TYPE_AND_CONFIG_ID =
+      "where type=:type and configId=:configId and status!=:status and scheduleStartTime>=:scheduleStartTime order by scheduleStartTime desc";
 
   public JobManagerImpl() {
     super(JobDTO.class, JobBean.class);
@@ -30,17 +36,28 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   @Override
   @Transactional
   public List<JobDTO> findByStatus(JobStatus status) {
-    return super.findByParams(ImmutableMap.of("status", status.toString()));
+    return super.findByParams(ImmutableMap.<String, Object>of("status", status.toString()));
+  }
+
+  @Override
+  public List<JobDTO> findByStatusWithinDays(JobStatus status, int days) {
+    DateTime activeDate = new DateTime().minusDays(days);
+    Timestamp activeTimestamp = new Timestamp(activeDate.getMillis());
+    Predicate statusPredicate = Predicate.EQ("status", status.toString());
+    Predicate timestampPredicate = Predicate.GE("createTime", activeTimestamp);
+    return findByPredicate(Predicate.AND(statusPredicate, timestampPredicate));
   }
 
   @Override
   @Transactional
-  public void updateStatusAndJobEndTimeForJobIds(Set<Long> ids, JobStatus status, Long jobEndTime) {
-    for (Long id : ids) {
-      JobDTO anomalyJobSpec = findById(id);
-      anomalyJobSpec.setStatus(status);
-      anomalyJobSpec.setScheduleEndTime(jobEndTime);
-      update(anomalyJobSpec);
+  public void updateJobStatusAndEndTime(List<JobDTO> jobsToUpdate, JobStatus newStatus, long newEndTime) {
+    Preconditions.checkNotNull(newStatus);
+    if (CollectionUtils.isNotEmpty(jobsToUpdate)) {
+      for (JobDTO jobDTO : jobsToUpdate) {
+        jobDTO.setStatus(newStatus);
+        jobDTO.setScheduleEndTime(newEndTime);
+      }
+      update(jobsToUpdate);
     }
   }
 
@@ -51,12 +68,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
     Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());
     Predicate statusPredicate = Predicate.EQ("status", status.toString());
     Predicate timestampPredicate = Predicate.LT("updateTime", expireTimestamp);
-    List<JobBean> list =
-        genericPojoDao.get(Predicate.AND(statusPredicate, timestampPredicate), JobBean.class);
-    for (JobBean jobBean : list) {
-      deleteById(jobBean.getId());
-    }
-    return list.size();
+    return deleteByPredicate(Predicate.AND(statusPredicate, timestampPredicate));
   }
 
   @Override
@@ -64,12 +76,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
     String parameterizedSQL = "order by scheduleStartTime desc limit "+n;
     HashMap<String, Object> parameterMap = new HashMap<>();
     List<JobBean> list = genericPojoDao.executeParameterizedSQL(parameterizedSQL, parameterMap, JobBean.class);
-    List<JobDTO> ret = new ArrayList<>();
-    for (JobBean bean : list) {
-      JobDTO dto = convertBean2DTO(bean, JobDTO.class);
-      ret.add(dto);
-    }
-    return ret;
+    return convertBeanListToDTOList(list);
   }
 
   @Override
@@ -80,21 +87,6 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
     } else {
       return null;
     }
-  }
-
-  @Override
-  public JobDTO findLatestScheduledJobByName(String jobName) {
-    Predicate namePredicate = Predicate.EQ("name", jobName);
-    Predicate statusPredicate = Predicate.EQ("status", "SCHEDULED");
-
-    List<JobBean> list = genericPojoDao.get(Predicate.AND(statusPredicate, namePredicate), JobBean.class);
-
-    if (CollectionUtils.isNotEmpty(list)) {
-      JobDTO dto = convertBean2DTO(list.get(0), JobDTO.class);
-      return dto;
-    }
-
-    return null;
   }
 
   @Override
@@ -124,5 +116,28 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
     return null;
   }
 
+  @Override
+  public List<JobDTO> findRecentScheduledJobByTypeAndConfigId(TaskConstants.TaskType taskType, long configId,
+      long minScheduledTime) {
+    HashMap<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("type", taskType);
+    parameterMap.put("configId", configId);
+    parameterMap.put("status", JobStatus.FAILED);
+    parameterMap.put("scheduleStartTime", minScheduledTime);
+    List<JobBean> list = genericPojoDao
+        .executeParameterizedSQL(FIND_RECENT_SCHEDULED_JOB_BY_TYPE_AND_CONFIG_ID, parameterMap, JobBean.class);
 
+    if (CollectionUtils.isNotEmpty(list)) {
+      // Sort by scheduleStartTime; most recent scheduled job at the beginning
+      Collections.sort(list, Collections.reverseOrder(new Comparator<JobBean>() {
+        @Override
+        public int compare(JobBean o1, JobBean o2) {
+          return Long.compare(o1.getScheduleStartTime(), o2.getScheduleStartTime());
+        }
+      }));
+      return convertBeanListToDTOList(list);
+    } else {
+      return Collections.emptyList();
+    }
+  }
 }

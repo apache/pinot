@@ -1,63 +1,182 @@
 function DimensionTreeMapView(dimensionTreeMapModel) {
-  var template = $("#dimension-tree-map-template").html();
-  this.template_compiled = Handlebars.compile(template);
+  const template = $("#dimension-tree-map-template").html();
+  const graphTemplate = $("#dimension-tree-map-graph-template").html();
+  this.compiledTemplate = Handlebars.compile(template);
+  this.compiledGraph = Handlebars.compile(graphTemplate);
   this.placeHolderId = "#dimension-tree-map-placeholder";
+  this.graphPlaceholderId = "#dimension-tree-map-graph-placeholder";
+
   this.dimensionTreeMapModel = dimensionTreeMapModel;
+  this.currentRange = () => {
+    return {
+      'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
+      'Yesterday': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
+      'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+      'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+      'This Month': [moment().startOf('month'), moment().endOf('month')],
+      'Last Month': [moment().subtract(1, 'month').startOf('month'),
+        moment().subtract(1, 'month').endOf('month')]
+    };
+  };
+
+  this.baselineRange = () => {
+    const range = {};
+    constants.COMPARE_MODE_OPTIONS.forEach((options) => {
+      const offset = constants.WOW_MAPPING[options];
+      range[options] = [this.calculateBaselineDate('currentStart', offset),this.calculateBaselineDate('currentEnd', offset)];
+    });
+   return range;
+  };
 }
 
 DimensionTreeMapView.prototype = {
-  render: function () {
+  render() {
     if (this.dimensionTreeMapModel.heatmapData) {
-      var result = this.template_compiled(this.dimensionTreeMapModel);
-      $(this.placeHolderId).html(result);
+      const dimensionTreeMapModel = this.makeUrl(this.dimensionTreeMapModel);
+
+      var compiledTemplate = this.compiledTemplate(dimensionTreeMapModel);
+      $(this.placeHolderId).html(compiledTemplate);
       this.renderTreemapHeaderSection();
       this.renderTreemapSection();
       this.setupListenersForMode();
     }
   },
 
-  renderTreemapHeaderSection : function() {
-    var self = this;
-    function current_range_cb(start, end) {
-      $('#heatmap-current-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
-    }
-    function baseline_range_cb(start, end) {
-      $('#heatmap-baseline-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
-    }
-    this.renderDatePicker('#heatmap-current-range', current_range_cb, self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
-    this.renderDatePicker('#heatmap-baseline-range', baseline_range_cb, self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
-    current_range_cb(self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
-    baseline_range_cb(self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
+  /**
+   * Takes propertie from dimensionTreeMapModel
+   * and creates an url to the new ember app
+   * @param {Object} dimensionTreeMapModel
+   */
+  makeUrl(dimensionTreeMapModel) {
+    let {
+      granularity,
+      currentStart,
+      currentEnd,
+      heatMapFilters,
+      compareMode,
+      metricId
+    } = dimensionTreeMapModel;
+
+    // needed because of inconsistency (5_MINUTES = MINUTES)
+    granularity = (granularity === '5_MINUTES')
+      ? 'MINUTES'
+      : granularity;
+
+    const offset = {
+      MINUTES: 6,
+      HOURS: 72,
+      DAYS: 168
+    }[granularity] || 0;
+
+    const startDate = currentStart.clone().subtract(offset, 'hours');
+    const endDate = currentEnd.clone().add(offset, 'hours');
+
+    const url = `app/#/rca/metrics/${metricId}?startDate=${startDate.valueOf()}&endDate=${endDate.valueOf()}&granularity=${granularity}&compareMode=${compareMode}&filters=${JSON.stringify(heatMapFilters)}`
+
+    return Object.assign({}, dimensionTreeMapModel, { rcaMetricUrl: url })
   },
 
-  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd){
+  destroy() {
+    const $heatMapCurrent = $('#heatmap-current-range');
+    const $heatMapBaseline = $('#heatmap-baseline-range');
+
+    $heatMapCurrent.length && $heatMapCurrent.data('daterangepicker').remove();
+    $heatMapBaseline.length && $heatMapBaseline.data('daterangepicker').remove();
+    $("#dimension-tree-map-placeholder").children().remove();
+  },
+
+  renderTreemapHeaderSection : function() {
+    const $currentRangeText = $('#heatmap-current-range span');
+    const $baselineRangeText = $('#heatmap-baseline-range span');
+    const $currentRange = $('#heatmap-current-range');
+    const $baselineRange = $('#heatmap-baseline-range');
+    const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
+    const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+
+    const setRangeText = (selector, start, end, dateFormat, compareMode) => {
+       selector.addClass("time-range").html(
+        `<span class="time-range__type">${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
+    };
+
+    const baselineCallBack = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {
+      // show time needs to be after
+      const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
+      const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+      this.dimensionTreeMapModel['baselineStart'] = start;
+      this.dimensionTreeMapModel['baselineEnd'] = end;
+      this.dimensionTreeMapModel['compareMode'] = compareMode;
+      setRangeText($baselineRangeText, start, end, dateFormat, compareMode);
+      this.destroyTreemapSection();
+      this.dimensionTreeMapModel.update().then(() => {
+        this.renderTreemapSection();
+      });
+    };
+
+    const currentCallBack = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+      const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
+      const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+      const $baselineRangePicker = $('#heatmap-baseline-range');
+      const baselineCompareMode = this.dimensionTreeMapModel['compareMode'];
+      const compareMode = this.dimensionTreeMapModel['compareMode'];
+
+      this.dimensionTreeMapModel['currentStart'] = start;
+      this.dimensionTreeMapModel['currentEnd'] = end;
+
+      if (baselineCompareMode !== constants.DATE_RANGE_CUSTOM) {
+        const offset = constants.WOW_MAPPING[compareMode];
+        const baselineStart = start.clone().subtract(offset, 'days');
+        const baselineEnd = end.clone().subtract(offset, 'days');
+        $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
+        this.renderDatePicker($baselineRange, baselineCallBack, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
+        baselineCallBack(baselineStart, baselineEnd, baselineCompareMode);
+      }
+      setRangeText($currentRangeText, start, end, dateFormat, rangeType);
+    };
+
+        // TIME RANGE SELECTION
+    const currentStart = this.dimensionTreeMapModel.currentStart;
+    const currentEnd = this.dimensionTreeMapModel.currentEnd;
+    const baselineStart = this.dimensionTreeMapModel.baselineStart;
+    const baselineEnd = this.dimensionTreeMapModel.baselineEnd;
+
+
+    this.renderDatePicker($currentRange, currentCallBack, currentStart, currentEnd, showTime, this.currentRange);
+    this.renderDatePicker($baselineRange, baselineCallBack, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
+
+    setRangeText($currentRangeText, currentStart, currentEnd, dateFormat, constants.DATE_RANGE_CUSTOM);
+    setRangeText($baselineRangeText, baselineStart, baselineEnd, dateFormat, this.dimensionTreeMapModel['compareMode']);
+  },
+
+  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, opens = 'right'){
+    const ranges = rangeGenerator();
     $(domId).daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
+      maxDate: moment(),
       dateLimit: {
         days: 60
       },
+      opens,
       showDropdowns: true,
       showWeekNumbers: true,
-      timePicker: true,
+      timePicker: showTime,
       timePickerIncrement: 5,
       timePicker12Hour: true,
-      ranges: {
-        'Last 24 Hours': [moment(), moment()],
-        'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-        'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-        'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-        'This Month': [moment().startOf('month'), moment().endOf('month')],
-        'Last Month': [moment().subtract(1, 'month').startOf('month'),
-          moment().subtract(1, 'month').endOf('month')]
-      },
+      ranges,
       buttonClasses: ['btn', 'btn-sm'],
       applyClass: 'btn-primary',
       cancelClass: 'btn-default'
     }, callbackFun);
   },
 
-  renderTreemapSection : function() {
+  destroyTreemapSection() {
+    $(this.graphPlaceholderId).children().remove();
+  },
+
+  renderTreemapSection() {
+    this.destroyTreemapSection();
+    const compiledGraph = this.compiledGraph(this.dimensionTreeMapModel);
+    $(this.graphPlaceholderId).html(compiledGraph);
     // DRAW THE AXIS
     // Create the SVG Viewport
     var height = $('#axis-placeholder').height();
@@ -89,7 +208,8 @@ DimensionTreeMapView.prototype = {
 
     var getBackgroundColor = function (factor) {
       var opacity = Math.abs(factor / 25);
-      if(factor > 0){
+      var inverseMetric = self.dimensionTreeMapModel.inverseMetric;
+      if((factor > 0 && !inverseMetric) || (factor < 0 && inverseMetric)){
         return "rgba(0,0,234," + opacity + ")";
       } else{
         return "rgba(234,0,0,"  + opacity + ")" ;
@@ -112,7 +232,7 @@ DimensionTreeMapView.prototype = {
       var dimensionPlaceHolderId = '#' + dimension + '-heatmap-placeholder';
       var height = $(dimensionPlaceHolderId).height();
       var width = $(dimensionPlaceHolderId).width();
-      var treeMap = d3.layout.treemap().mode("slice").size([ width, height ]).sort(function(a, b) {
+      var treeMap = d3.layout.treemap().size([ width, height ]).sort(function(a, b) {
         return a.value - b.value;
       });
 
@@ -127,17 +247,26 @@ DimensionTreeMapView.prototype = {
       }).on("click", function(d) {
         // return zoom(node == d.parent ? root : d.parent);
       }).on("mousemove", function(d) {
-        var xPosition = d3.event.pageX + 5;
-        var yPosition = d3.event.pageY + 5;
+        const tooltipWidth = 200;
+        const xPosition = d3.event.pageX - (tooltipWidth + 20);
+        const yPosition = d3.event.pageY + 5;
         d3.select("#tooltip")
           .style("left", xPosition + "px")
           .style("top", yPosition + "px");
         d3.select("#tooltip #heading")
           .text(d.t);
         d3.select("#tooltip #percentageChange")
-          .text(d.percentageChange);
+          .text(`${d.percentageChange}%`);
         d3.select("#tooltip #currentValue")
           .text(d.value);
+        d3.select("#tooltip #contributionChange")
+          .text(`${d.contributionChange}%`);
+        d3.select("#tooltip #currentContribution")
+          .text(d.currentContribution);
+        d3.select("#tooltip #baselineContribution")
+          .text(d.baselineContribution);
+        d3.select("#tooltip #baselineValue")
+          .text(d.baselineValue);
         d3.select("#tooltip").classed("hidden", false);
       }).on("mouseout", function() {
         d3.select("#tooltip").classed("hidden", true);
@@ -182,21 +311,27 @@ DimensionTreeMapView.prototype = {
       });
 
     }
+    // anchor page to dimension tree map if exists
+    $("#dimension-tree-map-placeholder").get(0).scrollIntoView()
+  },
+
+  calculateBaselineDate(dateType, offset) {
+    const baseDate = this.dimensionTreeMapModel[dateType] || moment();
+    return baseDate.clone().subtract(offset, 'days');
   },
 
   setupListenersForMode : function () {
-    var self = this;
-    $("#percent_change a").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "percentChange";
-      self.render();
+    $("#percent_change a").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "percentChange";
+      this.renderTreemapSection();
     });
-    $("#change_in_contribution").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "contributionChange";
-      self.render();
+    $("#change_in_contribution").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "contributionChange";
+      this.renderTreemapSection();
     });
-    $("#contribution_to_overall_change").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "contributionToOverallChange";
-      self.render();
+    $("#contribution_to_overall_change").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "contributionToOverallChange";
+      this.renderTreemapSection();
     });
   },
 }

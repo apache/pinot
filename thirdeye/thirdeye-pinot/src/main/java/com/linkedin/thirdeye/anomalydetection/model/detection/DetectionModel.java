@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.anomalydetection.model.detection;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import java.util.List;
 import java.util.Properties;
 
@@ -20,10 +20,11 @@ public interface DetectionModel {
   /**
    * Detects anomalies on the observed (current) time series and returns a list of raw anomalies.
    *
+   * @param metricName the name of the metric on which this detection model should detect anomalies
    * @param anomalyDetectionContext the context that contains the observed time series and
    *                                prediction model, which could provide an expected time series or
    *                                additional parameters (e.g., sigma) for anomaly detection.
    * @return list of raw anomalies.
    */
-  List<RawAnomalyResultDTO> detect(AnomalyDetectionContext anomalyDetectionContext);
+  List<AnomalyResult> detect(String metricName, AnomalyDetectionContext anomalyDetectionContext);
 }

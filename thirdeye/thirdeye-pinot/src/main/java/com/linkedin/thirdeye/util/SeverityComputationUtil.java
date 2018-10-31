@@ -1,33 +1,33 @@
 package com.linkedin.thirdeye.util;
 
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.dashboard.Utils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.concurrent.ExecutionException;
+
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Maps;
-import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
 
 public class SeverityComputationUtil {
 
-  private ThirdEyeClient thirdEyeClient;
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
   private String collectionName;
   private String metricName;
 
-  public SeverityComputationUtil(ThirdEyeClient thirdEyeClient, String collectionName, String metricName) {
-    this.thirdEyeClient = thirdEyeClient;
+  public SeverityComputationUtil(String collectionName, String metricName) {
     this.collectionName = collectionName;
     this.metricName = metricName;
   }
@@ -62,7 +62,7 @@ public class SeverityComputationUtil {
 
   private double getSum(ThirdEyeRequest thirdEyeRequest) throws Exception {
     double sum = 0;
-    ThirdEyeResponse response = thirdEyeClient.execute(thirdEyeRequest);
+    ThirdEyeResponse response = CACHE_REGISTRY.getQueryCache().getQueryResult(thirdEyeRequest);
     if (response.getNumRows() == 1) {
       ThirdEyeResponseRow row = response.getRow(0);
       sum = row.getMetrics().get(0);
@@ -73,7 +73,6 @@ public class SeverityComputationUtil {
   private ThirdEyeRequest createThirdEyeRequest(long currentWindowStart, long currentWindowEnd)
       throws ExecutionException {
     ThirdEyeRequestBuilder requestBuilder = ThirdEyeRequest.newBuilder();
-    requestBuilder.setCollection(collectionName);
     requestBuilder.setStartTimeInclusive(new DateTime(currentWindowStart));
     requestBuilder.setEndTimeExclusive(new DateTime(currentWindowEnd));
     // requestBuilder.setFilterSet(comparisonRequest.getFilterSet());
@@ -82,8 +81,9 @@ public class SeverityComputationUtil {
 
     List<MetricExpression> metricExpressions =
         Utils.convertToMetricExpressions(metricName, MetricAggFunction.SUM, collectionName);
-    requestBuilder.setMetricFunctions(metricExpressions.get(0).computeMetricFunctions());
-
+    List<MetricFunction> metricFunctions = metricExpressions.get(0).computeMetricFunctions();
+    requestBuilder.setMetricFunctions(metricFunctions);
+    requestBuilder.setDataSource(ThirdEyeUtils.getDataSourceFromMetricFunctions(metricFunctions));
     ThirdEyeRequest thirdEyeRequest = requestBuilder.build("test-" + System.currentTimeMillis());
     return thirdEyeRequest;
   }

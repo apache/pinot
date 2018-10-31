@@ -87,14 +87,4 @@ public class MergedAnomalyResultIndex extends AbstractIndexEntity {
   public void setNotified(boolean notified) {
     this.notified = notified;
   }
-
-  @Override
-  public String toString() {
-    return "MergedAnomalyResultIndex [functionId=" + functionId + ", anomalyFeedbackId="
-        + anomalyFeedbackId + ", metricId=" + metricId + ", startTime=" + startTime + ", endTime="
-        + endTime + ", collection=" + collection + ", metric=" + metric + ", dimensionValue="
-        + dimensions + ", notified=" + notified + ", baseId=" + baseId + ", id=" + id
-        + ", createTime=" + createTime + ", updateTime=" + updateTime + ", version=" + version
-        + "]";
-  }
 }

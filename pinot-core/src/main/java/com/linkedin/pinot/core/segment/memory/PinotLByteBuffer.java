@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.memory;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -25,13 +23,14 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.segment.ReadMode;
 import xerial.larray.buffer.LBuffer;
 import xerial.larray.buffer.LBufferAPI;
 import xerial.larray.buffer.UnsafeUtil;
+import static xerial.larray.buffer.UnsafeUtil.unsafe;
 import xerial.larray.mmap.MMapBuffer;
 import xerial.larray.mmap.MMapMode;
-
-import static xerial.larray.buffer.UnsafeUtil.unsafe;
 
 /**
  * In-memory byte buffer for pinot data.
@@ -457,5 +456,10 @@ public class PinotLByteBuffer extends PinotDataBuffer {
   @Override
   protected long start() {
     return startPosition;
+  }
+
+  @Override
+  public void order(ByteOrder byteOrder) {
+    throw new UnsupportedOperationException();
   }
 }

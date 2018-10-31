@@ -15,63 +15,60 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
-public class LongDictionary extends ImmutableDictionaryReader {
 
-  public LongDictionary(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    super(dataBuffer, metadata.getCardinality(), Long.SIZE / 8);
+public class LongDictionary extends ImmutableDictionaryReader {
+  private static final int LONG_SIZE_IN_BYTES = Long.SIZE / Byte.SIZE;
+
+  public LongDictionary(PinotDataBuffer dataBuffer, int length) {
+    super(dataBuffer, length, LONG_SIZE_IN_BYTES, (byte) 0);
   }
 
   @Override
   public int indexOf(Object rawValue) {
-    Long lookup;
+    int index = insertionIndexOf(rawValue);
+    return (index >= 0) ? index : -1;
+  }
+
+  @Override
+  public int insertionIndexOf(Object rawValue) {
+    long value;
     if (rawValue instanceof String) {
-      lookup = Long.parseLong((String) rawValue);
+      value = Long.parseLong((String) rawValue);
     } else {
-      lookup = (Long) rawValue;
+      value = (Long) rawValue;
     }
-    return longIndexOf(lookup);
+    return binarySearch(value);
   }
 
   @Override
-  public Long get(int dictionaryId) {
-    return getLong(dictionaryId);
+  public Long get(int dictId) {
+    return getLong(dictId);
   }
 
   @Override
-  public long getLongValue(int dictionaryId) {
-    return getLong(dictionaryId);
+  public int getIntValue(int dictId) {
+    return (int) getLong(dictId);
   }
 
   @Override
-  public double getDoubleValue(int dictionaryId) {
-    return getLong(dictionaryId);
+  public long getLongValue(int dictId) {
+    return getLong(dictId);
   }
 
   @Override
-  public String getStringValue(int dictionaryId) {
-    return Long.toString(getLong(dictionaryId));
+  public float getFloatValue(int dictId) {
+    return getLong(dictId);
   }
 
   @Override
-  public float getFloatValue(int dictionaryId) {
-    return (float) getLong(dictionaryId);
+  public double getDoubleValue(int dictId) {
+    return getLong(dictId);
   }
 
   @Override
-  public int getIntValue(int dictionaryId) {
-    return (int) getLong(dictionaryId);
+  public String getStringValue(int dictId) {
+    return Long.toString(getLong(dictId));
   }
-
-  @Override
-  public String toString(int dictionaryId) {
-    return Long.toString(getLong(dictionaryId));
-  }
-
-  private long getLong(int dictionaryId) {
-    return dataFileReader.getLong(dictionaryId, 0);
-  }
-
 }

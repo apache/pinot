@@ -1,27 +1,34 @@
+
+
 package com.linkedin.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.api.DimensionMap;
 
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import io.dropwizard.configuration.ConfigurationFactory;
+import io.dropwizard.jackson.Jackson;
+import java.io.File;
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
+import javax.validation.Validation;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
+import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,22 +37,19 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.CollectionSchema;
-import com.linkedin.thirdeye.api.DimensionSpec;
-import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 
 
 public abstract class ThirdEyeUtils {
@@ -55,6 +59,9 @@ public abstract class ThirdEyeUtils {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
+  private static final String TWO_DECIMALS_FORMAT = "##.##";
+  private static final String MAX_DECIMALS_FORMAT = "##.#####";
+  private static final String DECIMALS_FORMAT_TOKEN = "#";
 
   private ThirdEyeUtils () {
 
@@ -181,23 +188,45 @@ public abstract class ThirdEyeUtils {
     return sortedFilters;
   }
 
-  public static TimeSpec getTimeSpecFromDataset(String dataset) {
-
-    TimeSpec timespec = null;
-    try {
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
-      timespec = getTimeSpecFromDatasetConfig(datasetConfig);
-    } catch (ExecutionException e) {
-      LOG.error("Exception when fetching datasetconfig from cache", e);
-    }
-    return timespec;
-  }
-
-  public static TimeSpec getTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
+  private static String getTimeFormatString(DatasetConfigDTO datasetConfig) {
     String timeFormat = datasetConfig.getTimeFormat();
     if (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
       timeFormat = getSDFPatternFromTimeFormat(timeFormat);
     }
+    return timeFormat;
+  }
+
+  /**
+   * Returns the time spec of the buckets (data points) in the specified dataset config. For additive dataset, this
+   * method returns the same time spec as getTimestampTimeSpecFromDatasetConfig; however, for non-additive dataset,
+   * this method return the time spec for buckets (data points) instead of the one for the timestamp in the backend
+   * database. For example, the data points of a non-additive dataset could be 5-MINUTES granularity, but timestamp's
+   * granularity could be 1-Milliseconds. For additive dataset, the discrepancy is not an issue, but it could be
+   * a problem for non-additive dataset.
+   *
+   * @param datasetConfig the given dataset config
+   *
+   * @return the time spec of the buckets (data points) in the specified dataset config.
+   */
+  public static TimeSpec getTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
+    String timeFormat = getTimeFormatString(datasetConfig);
+    TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
+        new TimeGranularity(datasetConfig.bucketTimeGranularity()), timeFormat);
+    return timespec;
+  }
+
+  /**
+   * Returns the time spec of the timestamp in the specified dataset config. The timestamp time spec is mainly used
+   * for constructing the queries to backend database. For most use case, this method returns the same time spec as
+   * getTimeSpecFromDatasetConfig(); however, if the dataset is non-additive, then getTimeSpecFromDatasetConfig
+   * should be used unless the application is related to database queries.
+   *
+   * @param datasetConfig the given dataset config
+   *
+   * @return the time spec of the timestamp in the specified dataset config.
+   */
+  public static TimeSpec getTimestampTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
+    String timeFormat = getTimeFormatString(datasetConfig);
     TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
         new TimeGranularity(datasetConfig.getTimeDuration(), datasetConfig.getTimeUnit()), timeFormat);
     return timespec;
@@ -205,7 +234,7 @@ public abstract class ThirdEyeUtils {
 
   private static String getSDFPatternFromTimeFormat(String timeFormat) {
     String pattern = timeFormat;
-    String[] tokens = timeFormat.split(":");
+    String[] tokens = timeFormat.split(":", 2);
     if (tokens.length == 2) {
       pattern = tokens[1];
     }
@@ -213,13 +242,14 @@ public abstract class ThirdEyeUtils {
   }
 
   public static MetricExpression getMetricExpressionFromMetricConfig(MetricConfigDTO metricConfig) {
-    MetricExpression metricExpression = new MetricExpression();
-    metricExpression.setExpressionName(metricConfig.getName());
+    String expression = null;
     if (metricConfig.isDerived()) {
-      metricExpression.setExpression(metricConfig.getDerivedMetricExpression());
+      expression = metricConfig.getDerivedMetricExpression();
     } else {
-      metricExpression.setExpression(MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId());
+      expression = MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId();
     }
+    MetricExpression metricExpression = new MetricExpression(metricConfig.getName(), expression,
+        metricConfig.getDefaultAggFunction(), metricConfig.getDataset());
     return metricExpression;
   }
 
@@ -241,12 +271,15 @@ public abstract class ThirdEyeUtils {
   public static String getDerivedMetricExpression(String metricExpressionName, String dataset) throws ExecutionException {
     String derivedMetricExpression = null;
     MetricDataset metricDataset = new MetricDataset(metricExpressionName, dataset);
+
     MetricConfigDTO metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(metricDataset);
-    if (metricConfig.isDerived()) {
+
+    if (metricConfig != null && metricConfig.isDerived()) {
       derivedMetricExpression = metricConfig.getDerivedMetricExpression();
     } else {
       derivedMetricExpression = MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId();
     }
+
     return derivedMetricExpression;
   }
 
@@ -267,57 +300,11 @@ public abstract class ThirdEyeUtils {
     return metricConfig.getName();
   }
 
-  public static Schema createSchema(CollectionSchema collectionSchema) {
-    Schema schema = new Schema();
-
-    for (DimensionSpec dimensionSpec : collectionSchema.getDimensions()) {
-      FieldSpec fieldSpec = new DimensionFieldSpec();
-      String dimensionName = dimensionSpec.getName();
-      fieldSpec.setName(dimensionName);
-      fieldSpec.setDataType(DataType.STRING);
-      fieldSpec.setSingleValueField(true);
-      schema.addField(dimensionName, fieldSpec);
-    }
-    for (MetricSpec metricSpec : collectionSchema.getMetrics()) {
-      FieldSpec fieldSpec = new MetricFieldSpec();
-      String metricName = metricSpec.getName();
-      fieldSpec.setName(metricName);
-      fieldSpec.setDataType(DataType.valueOf(metricSpec.getType().toString()));
-      fieldSpec.setSingleValueField(true);
-      schema.addField(metricName, fieldSpec);
-    }
-    TimeSpec timeSpec = collectionSchema.getTime();
-    String timeFormat = timeSpec.getFormat().equals("sinceEpoch") ? TimeFormat.EPOCH.toString()
-        : TimeFormat.SIMPLE_DATE_FORMAT.toString() + ":" + timeSpec.getFormat();
-    TimeGranularitySpec incoming =
-        new TimeGranularitySpec(DataType.LONG,
-            timeSpec.getDataGranularity().getSize(),
-            timeSpec.getDataGranularity().getUnit(),
-            timeFormat,
-            timeSpec.getColumnName());
-    TimeGranularitySpec outgoing =
-        new TimeGranularitySpec(DataType.LONG,
-            timeSpec.getDataGranularity().getSize(),
-            timeSpec.getDataGranularity().getUnit(),
-            timeFormat,
-            timeSpec.getColumnName());
-
-    schema.addField(timeSpec.getColumnName(), new TimeFieldSpec(incoming, outgoing));
-
-    schema.setSchemaName(collectionSchema.getCollection());
-
-    return schema;
-  }
-
   public static String constructMetricAlias(String datasetName, String metricName) {
     String alias = datasetName + MetricConfigBean.ALIAS_JOINER + metricName;
     return alias;
   }
 
-  public static String getDefaultDashboardName(String dataset) {
-    String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
-    return dashboardName;
-  }
 
   //By default, query only offline, unless dataset has been marked as realtime
   public static String computeTableName(String collection) {
@@ -325,7 +312,7 @@ public abstract class ThirdEyeUtils {
     try {
       DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
       dataset = collection + DatasetConfigBean.DATASET_OFFLINE_PREFIX;
-      if (datasetConfig.queryRealtime()) {
+      if (datasetConfig.isRealtime()) {
         dataset = collection;
       }
     } catch (ExecutionException e) {
@@ -334,4 +321,184 @@ public abstract class ThirdEyeUtils {
     return dataset;
   }
 
+  public static Period getbaselineOffsetPeriodByMode(COMPARE_MODE compareMode) {
+    int numWeeksAgo = 1;
+    switch (compareMode) {
+    case Wo2W:
+      numWeeksAgo = 2;
+      break;
+    case Wo3W:
+      numWeeksAgo = 3;
+      break;
+    case Wo4W:
+      numWeeksAgo = 4;
+      break;
+    case WoW:
+    default:
+      numWeeksAgo = 1;
+      break;
+    }
+    return new Period(0, 0, 0, 7 * numWeeksAgo, 0, 0, 0, 0);
+  }
+
+  public static DatasetConfigDTO getDatasetConfigFromName(String dataset) {
+    DatasetConfigDTO datasetConfig = null;
+    try {
+      datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+    } catch (ExecutionException e) {
+      LOG.error("Exception in getting dataset config {} from cache", dataset, e);
+    }
+    return datasetConfig;
+  }
+
+  public static String getDatasetFromMetricFunction(MetricFunction metricFunction) {
+    MetricConfigDTO metricConfig = getMetricConfigFromId(metricFunction.getMetricId());
+    return metricConfig.getDataset();
+  }
+
+  public static MetricConfigDTO getMetricConfigFromId(Long metricId) {
+    MetricConfigDTO metricConfig = null;
+    if (metricId != null) {
+      metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
+    }
+    return metricConfig;
+  }
+
+
+  public static MetricConfigDTO getMetricConfigFromNameAndDataset(String metricName, String dataset) {
+    MetricConfigDTO metricConfig = null;
+    try {
+      metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(new MetricDataset(metricName, dataset));
+    } catch (ExecutionException e) {
+      LOG.error("Exception while fetching metric by name {} and dataset {}", metricName, dataset, e);
+    }
+    return metricConfig;
+  }
+
+  /**
+   * Get rounded double value, according to the value of the double.
+   * Max rounding will be upto 4 decimals
+   * For values gte 0.1, use ##.## (eg. 123, 2.5, 1.26, 0.5, 0.162)
+   * For values lt 0.1 and gte 0.01, use ##.### (eg. 0.08, 0.071, 0.0123)
+   * For values lt 0.01 and gte 0.001, use ##.#### (eg. 0.001, 0.00367)
+   * This function ensures we don't prematurely round off double values to a fixed format, and make it 0.00 or lose out information
+   * @param value
+   * @return
+   */
+  public static String getRoundedValue(double value) {
+    if (Double.isNaN(value) || Double.isInfinite(value)) {
+      if (Double.isNaN(value)) {
+        return Double.toString(Double.NaN);
+      }
+      if (value > 0) {
+        return Double.toString(Double.POSITIVE_INFINITY);
+      } else {
+        return Double.toString(Double.NEGATIVE_INFINITY);
+      }
+    }
+    StringBuffer decimalFormatBuffer = new StringBuffer(TWO_DECIMALS_FORMAT);
+    double compareValue = 0.1;
+    while (value > 0 && value < compareValue && !decimalFormatBuffer.toString().equals(MAX_DECIMALS_FORMAT)) {
+      decimalFormatBuffer.append(DECIMALS_FORMAT_TOKEN);
+      compareValue = compareValue * 0.1;
+    }
+    DecimalFormat decimalFormat = new DecimalFormat(decimalFormatBuffer.toString());
+    return decimalFormat.format(value);
+  }
+
+
+  //TODO: currently assuming all metrics in one request are for the same data source
+  // It would be better to not assume that, and split the thirdeye request into more requests depending upon the data sources
+  public static String getDataSourceFromMetricFunctions(List<MetricFunction> metricFunctions) {
+    String dataSource = null;
+    for (MetricFunction metricFunction : metricFunctions) {
+      String functionDatasetDatasource = metricFunction.getDatasetConfig().getDataSource();
+      if (dataSource == null) {
+        dataSource = functionDatasetDatasource;
+      } else if (!dataSource.equals(functionDatasetDatasource)) {
+        throw new IllegalStateException("All metric funcitons of one request must belong to the same data source. "
+            + dataSource + " is not equal to" + functionDatasetDatasource);
+      }
+    }
+    return dataSource;
+  }
+
+  /**
+   * Converts a Properties, which is a Map<Object, Object>, to a Map<String, String>.
+   *
+   * @param properties the properties to be converted
+   * @return the map of the properties.
+   */
+  public static Map<String, String> propertiesToStringMap(Properties properties) {
+    Map<String, String> map = new HashMap<>();
+    if (MapUtils.isNotEmpty(properties)) {
+      for (String propertyKey : properties.stringPropertyNames()) {
+        map.put(propertyKey, properties.getProperty(propertyKey));
+      }
+    }
+    return map;
+  }
+
+  /**
+   * Prints messages and stack traces of the given list of exceptions in a string.
+   *
+   * @param exceptions the list of exceptions to be printed.
+   * @param maxWordCount the length limitation of the string; set to 0 to remove the limitation.
+   *
+   * @return the string that contains the messages and stack traces of the given exceptions.
+   */
+  public static String exceptionsToString(List<Exception> exceptions, int maxWordCount) {
+    String message = "";
+    if (CollectionUtils.isNotEmpty(exceptions)) {
+      StringBuilder sb = new StringBuilder();
+      for (Exception exception : exceptions) {
+        sb.append(ExceptionUtils.getStackTrace(exception));
+        if (maxWordCount > 0 && sb.length() > maxWordCount) {
+          message = sb.toString().substring(0, maxWordCount) + "\n...";
+          break;
+        }
+      }
+      if (message.equals("")) {
+        message = sb.toString();
+      }
+    }
+    return message;
+  }
+
+  /**
+   * Initializes a light weight ThirdEye environment for conducting standalone experiments.
+   *
+   * @param thirdEyeConfigDir the directory to ThirdEye configurations.
+   */
+  public static void initLightWeightThirdEyeEnvironment(String thirdEyeConfigDir) {
+    System.setProperty("dw.rootDir", thirdEyeConfigDir);
+
+    // Initialize DAO Registry
+    String persistenceConfig = thirdEyeConfigDir + "/persistence.yml";
+    LOG.info("Loading persistence config from [{}]", persistenceConfig);
+    DaoProviderUtil.init(new File(persistenceConfig));
+
+    // Read configuration for data sources, etc.
+    ThirdEyeDashboardConfiguration config;
+    try {
+      String dashboardConfigFilePath = thirdEyeConfigDir + "/dashboard.yml";
+      File configFile = new File(dashboardConfigFilePath);
+      ConfigurationFactory<ThirdEyeDashboardConfiguration> factory =
+          new ConfigurationFactory<>(ThirdEyeDashboardConfiguration.class,
+              Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(), "");
+      config = factory.build(configFile);
+      config.setRootDir(thirdEyeConfigDir);
+    } catch (Exception e) {
+      LOG.error("Exception while constructing ThirdEye config:", e);
+      throw new RuntimeException(e);
+    }
+
+    // Initialize Cache Registry
+    try {
+      ThirdEyeCacheRegistry.initializeCachesWithoutRefreshing(config);
+    } catch (Exception e) {
+      LOG.error("Exception while loading caches:", e);
+      throw new RuntimeException(e);
+    }
+  }
 }

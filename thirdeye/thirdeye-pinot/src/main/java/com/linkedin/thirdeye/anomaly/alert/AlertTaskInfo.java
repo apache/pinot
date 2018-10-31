@@ -10,7 +10,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.util.CustomDateDeserializer;
 import com.linkedin.thirdeye.util.CustomDateSerializer;
 
@@ -26,20 +25,17 @@ public class AlertTaskInfo implements TaskInfo {
   @JsonSerialize(using = CustomDateSerializer.class)
   @JsonDeserialize(using = CustomDateDeserializer.class)
   private DateTime windowEndTime;
-  private EmailConfigurationDTO alertConfig;
   private AlertConfigDTO alertConfigDTO;
 
-  public AlertTaskInfo(long jobExecutionId, DateTime windowStartTime,
-      DateTime windowEndTime, EmailConfigurationDTO alertConfig, AlertConfigDTO alertConfigDTO) {
+  public AlertTaskInfo(long jobExecutionId, DateTime windowStartTime, DateTime windowEndTime,
+      AlertConfigDTO alertConfigDTO) {
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
-    this.alertConfig = alertConfig;
     this.alertConfigDTO = alertConfigDTO;
   }
 
   public AlertTaskInfo() {
-
   }
 
   public long getJobExecutionId() {
@@ -66,14 +62,6 @@ public class AlertTaskInfo implements TaskInfo {
     this.windowEndTime = windowEndTime;
   }
 
-  public EmailConfigurationDTO getAlertConfig() {
-    return alertConfig;
-  }
-
-  public void setAlertConfig(EmailConfigurationDTO emailConfig) {
-    this.alertConfig = emailConfig;
-  }
-
   public AlertConfigDTO getAlertConfigDTO() {
     return alertConfigDTO;
   }
@@ -90,13 +78,12 @@ public class AlertTaskInfo implements TaskInfo {
     AlertTaskInfo at = (AlertTaskInfo) o;
     return Objects.equals(jobExecutionId, at.getJobExecutionId())
         && Objects.equals(windowStartTime, at.getWindowStartTime())
-        && Objects.equals(windowEndTime, at.getWindowEndTime())
-        && Objects.equals(alertConfig, at.getAlertConfig());
+        && Objects.equals(windowEndTime, at.getWindowEndTime());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(jobExecutionId, windowStartTime, windowEndTime, alertConfig, alertConfigDTO);
+    return Objects.hash(jobExecutionId, windowStartTime, windowEndTime, alertConfigDTO);
   }
 
   @Override

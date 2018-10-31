@@ -11,6 +11,7 @@
 
   <modules>
     <module>thirdeye-hadoop</module>
+    <module>thirdeye-frontend</module>
     <module>thirdeye-pinot</module>
   </modules>
 
@@ -18,9 +19,12 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <pinot.version>0.016</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jdk.version>1.8</jdk.version>
-    <dropwizard.version>0.8.4</dropwizard.version>
-    <jackson.version>2.5.1</jackson.version>
+    <jdk.version>1.7</jdk.version>
+    <dropwizard.version>0.9.2</dropwizard.version>
+    <dropwizard-auth.version>0.9.2</dropwizard-auth.version>
+    <dropwizard.redirect.bundle.version>1.0.5</dropwizard.redirect.bundle.version>
+    <jetty.version>9.2.13.v20150730</jetty.version>
+    <jackson.version>2.8.3</jackson.version>
     <mysql.connector.version>5.1.39</mysql.connector.version>
     <quartz.version>2.2.1</quartz.version>
     <httpclient.version>4.5.2</httpclient.version>
@@ -30,11 +34,13 @@
     <commons-lang.version>2.6</commons-lang.version>
     <commons-io.version>2.4</commons-io.version>
     <commons-jexl.version>2.0</commons-jexl.version>
-    <commons-cli.version>1.2</commons-cli.version>
+    <commons-cli.version>1.3</commons-cli.version>
+    <commons-csv.version>1.3</commons-csv.version>
+    <commons-dbcp2.version>2.1.1</commons-dbcp2.version>
     <mrunit.version>1.1.0</mrunit.version>
     <slf4j-api.version>1.7.12</slf4j-api.version>
     <jodatime.version>2.7</jodatime.version>
-    <guava.version>18.0</guava.version>
+    <guava.version>20.0</guava.version>
     <evalex.version>1.0</evalex.version>
     <parsii.version>1.5</parsii.version>
     <handlebars.version>4.0.4</handlebars.version>
@@ -49,6 +55,12 @@
     <guice-persist.version>4.1.0</guice-persist.version>
     <hibernate-jpa-2.1-api.version>1.0.0.Final</hibernate-jpa-2.1-api.version>
     <hibernate-entirymanager.version>4.3.10.Final</hibernate-entirymanager.version>
+    <jsonpath.version>2.4.0</jsonpath.version>
+    <!-- force bump up for LI usage -->
+    <glassfish.hk2.utils.version>2.5.0-b34</glassfish.hk2.utils.version>
+    <kafka.clients.version>0.10.2.1</kafka.clients.version>
+    <swagger.version>0.7.0</swagger.version>
+    <calendar-api.version>v3-rev300-1.23.0</calendar-api.version>
   </properties>
 
   <build>
@@ -66,6 +78,11 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-surefire-plugin</artifactId>
           <version>2.18</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-clean-plugin</artifactId>
+          <version>3.0.0</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -135,11 +152,42 @@
         <artifactId>dropwizard-views-freemarker</artifactId>
         <version>${dropwizard.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.dropwizard</groupId>
+        <artifactId>dropwizard-auth</artifactId>
+        <version>${dropwizard-auth.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.dropwizard-bundles</groupId>
+        <artifactId>dropwizard-redirect-bundle</artifactId>
+        <version>${dropwizard.redirect.bundle.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-proxy</artifactId>
+        <version>${jetty.version}</version>
+      </dependency>
 
       <!-- jackson -->
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-core</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core-asl</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-mapper-asl</artifactId>
         <version>${jackson.version}</version>
       </dependency>
       <dependency>
@@ -156,6 +204,13 @@
         <groupId>com.fasterxml.jackson.datatype</groupId>
         <artifactId>jackson-datatype-joda</artifactId>
         <version>${jackson.version}</version>
+      </dependency>
+
+      <!-- yaml parser -->
+      <dependency>
+          <groupId>org.yaml</groupId>
+          <artifactId>snakeyaml</artifactId>
+          <version>1.17</version>
       </dependency>
 
       <!-- utils -->
@@ -195,6 +250,16 @@
         <version>${commons-cli.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-csv</artifactId>
+        <version>${commons-csv.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-dbcp2</artifactId>
+        <version>${commons-dbcp2.version}</version>
+      </dependency>
+      <dependency>
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
         <version>${commons-io.version}</version>
@@ -228,6 +293,11 @@
         <groupId>com.udojava</groupId>
         <artifactId>EvalEx</artifactId>
         <version>${evalex.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.jayway.jsonpath</groupId>
+        <artifactId>json-path</artifactId>
+        <version>${jsonpath.version}</version>
       </dependency>
 
       <!-- UI dependencies -->
@@ -275,6 +345,24 @@
         <version>${hibernate-entirymanager.version}</version>
       </dependency>
 
+      <!-- force bump up for LI usage -->
+      <dependency>
+        <groupId>org.glassfish.hk2</groupId>
+        <artifactId>hk2-utils</artifactId>
+        <version>${glassfish.hk2.utils.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.inject</groupId>
+            <artifactId>javax.inject</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.kafka</groupId>
+        <artifactId>kafka-clients</artifactId>
+        <version>${kafka.clients.version}</version>
+      </dependency>
+
       <!-- test dependencies -->
       <dependency>
         <groupId>org.testng</groupId>
@@ -301,6 +389,19 @@
         <groupId>org.hsqldb</groupId>
         <artifactId>hsqldb</artifactId>
         <version>${hsqldb.version}</version>
+      </dependency>
+
+      <!-- swagger -->
+      <dependency>
+        <groupId>io.federecio</groupId>
+        <artifactId>dropwizard-swagger</artifactId>
+        <version>${swagger.version}</version>
+      </dependency>
+      <!-- Google Calendar API -->
+      <dependency>
+        <groupId>com.google.apis</groupId>
+        <artifactId>google-api-services-calendar</artifactId>
+        <version>${calendar-api.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>

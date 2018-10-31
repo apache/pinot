@@ -24,8 +24,9 @@ function getHeatmap(tab) {
             "&currentStart=" + hash.currentStart +
             "&currentEnd=" + hash.currentEnd +
             "&dimensions=" + hash.dimensions +
+            "&filters=" + hash.filters +
             "&topDimensions=3" +
-            "&oneSideError=true" +
+            "&oneSideError=false" +
             "&summarySize=10" +
             "&hierarchies=[[\"browser_name\", \"browser_version\"],[\"continent\",\"countryCode\"]]"
         var metrics = hash.metrics.split(",")
@@ -283,9 +284,7 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
             drawTreemap(root_0, placeholder_0)
             drawTreemap(root_1, placeholder_1)
             drawTreemap(root_2, placeholder_2)
-
         }
-
     }
 }
 
@@ -305,6 +304,12 @@ function renderHeatMapSummary(summaryData){
     //Create dataTable instance of summary table
     $("#heat-map-" + summaryData.metricName +"-difference-summary-table").DataTable({
         "bSort" : false
+    });
+    $("#heat-map-" + summaryData.metricName +"-gainer-summary-table").DataTable({
+        "order": [[ 7, "desc" ]]
+    });
+    $("#heat-map-" + summaryData.metricName +"-loser-summary-table").DataTable({
+        "order": [[ 7, "desc" ]]
     });
 }
 

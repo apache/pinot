@@ -15,41 +15,67 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
 import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
+import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
 public class PredicateEvaluatorProvider {
+  private PredicateEvaluatorProvider() {
+  }
 
-  public static PredicateEvaluator getPredicateFunctionFor(Predicate predicate, Dictionary dictionary) {
-    switch (predicate.getType()) {
-      case EQ:
-        return new EqualsPredicateEvaluator((EqPredicate) predicate, dictionary);
-      case NEQ:
-        return new NotEqualsPredicateEvaluator((NEqPredicate) predicate, dictionary);
-      case IN:
-        return new InPredicateEvaluator((InPredicate) predicate, dictionary);
-      case NOT_IN:
-        return new NotInPredicateEvaluator((NotInPredicate) predicate, dictionary);
-      case RANGE:
-        if (dictionary instanceof ImmutableDictionaryReader) {
-          return new RangeOfflineDictionaryPredicateEvaluator((RangePredicate) predicate,
-              (ImmutableDictionaryReader) dictionary);
-        } else {
-          return new RangeRealtimeDictionaryPredicateEvaluator((RangePredicate) predicate,
-              (MutableDictionaryReader) dictionary);
+  public static PredicateEvaluator getPredicateEvaluator(Predicate predicate, DataSource dataSource) {
+    try {
+      if (dataSource.getDataSourceMetadata().hasDictionary()) {
+        Dictionary dictionary = dataSource.getDictionary();
+        switch (predicate.getType()) {
+          case EQ:
+            return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary);
+          case NEQ:
+            return NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NEqPredicate) predicate, dictionary);
+          case IN:
+            return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary);
+          case NOT_IN:
+            return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary);
+          case RANGE:
+            return RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RangePredicate) predicate, dictionary);
+          case REGEXP_LIKE:
+            return RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate,
+                dictionary);
+          default:
+            throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
         }
-      case REGEX:
-        throw new UnsupportedOperationException("regex is not supported");
-      default:
-        throw new UnsupportedOperationException("UnKnown predicate type");
+      } else {
+        DataType dataType = dataSource.getDataSourceMetadata().getDataType();
+        switch (predicate.getType()) {
+          case EQ:
+            return EqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((EqPredicate) predicate, dataType);
+          case NEQ:
+            return NotEqualsPredicateEvaluatorFactory.newRawValueBasedEvaluator((NEqPredicate) predicate, dataType);
+          case IN:
+            return InPredicateEvaluatorFactory.newRawValueBasedEvaluator((InPredicate) predicate, dataType);
+          case NOT_IN:
+            return NotInPredicateEvaluatorFactory.newRawValueBasedEvaluator((NotInPredicate) predicate, dataType);
+          case RANGE:
+            return RangePredicateEvaluatorFactory.newRawValueBasedEvaluator((RangePredicate) predicate, dataType);
+          case REGEXP_LIKE:
+            return RegexpLikePredicateEvaluatorFactory.newRawValueBasedEvaluator((RegexpLikePredicate) predicate,
+                dataType);
+          default:
+            throw new UnsupportedOperationException("Unsupported predicate type: " + predicate.getType());
+        }
+      }
+    } catch (NumberFormatException e) {
+      // This NumberFormatException is caused by passing in a non-numeric string as numeric number in query
+      throw new BadQueryRequestException(e);
     }
   }
 }

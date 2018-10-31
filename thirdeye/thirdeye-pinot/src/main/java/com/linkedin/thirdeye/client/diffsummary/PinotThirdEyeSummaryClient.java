@@ -1,35 +1,25 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import java.io.File;
-import java.io.IOException;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-
 import org.jfree.util.Log;
 import org.joda.time.DateTime;
-
-import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class generates query requests to the backend database and retrieve the data for summary algorithm.
@@ -44,6 +34,8 @@ import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
  * located together.
  */
 public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
+  private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeSummaryClient.class);
+
   private final static DateTime NULL_DATETIME = new DateTime();
   private final static int TIME_OUT_VALUE = 120;
   private final static TimeUnit TIME_OUT_UNIT = TimeUnit.SECONDS;
@@ -63,9 +55,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     this.queryCache = queryCache;
   }
 
-  public PinotThirdEyeSummaryClient(ThirdEyeClient thirdEyeClient) {
-    this(new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10)));
-  }
 
   @Override
   public void setCollection(String collection) {
@@ -104,30 +93,32 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
   }
 
   @Override
-  public Row getTopAggregatedValues() throws Exception {
+  public Row getTopAggregatedValues(Multimap<String, String> filterSets) throws Exception {
     List<String> groupBy = Collections.emptyList();
-      List<ThirdEyeRequest> timeOnTimeBulkRequests = constructTimeOnTimeBulkRequests(groupBy);
-      Row row = constructAggregatedValues(null, timeOnTimeBulkRequests).get(0).get(0);
+      List<ThirdEyeRequest> timeOnTimeBulkRequests = constructTimeOnTimeBulkRequests(groupBy, filterSets);
+      Row row = constructAggregatedValues(new Dimensions(), timeOnTimeBulkRequests).get(0).get(0);
       return row;
   }
 
   @Override
-  public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions) throws Exception {
+  public List<List<Row>> getAggregatedValuesOfDimension(Dimensions dimensions, Multimap<String, String> filterSets)
+      throws Exception {
       List<ThirdEyeRequest> timeOnTimeBulkRequests = new ArrayList<>();
       for (int level = 0; level < dimensions.size(); ++level) {
         List<String> groupBy = Lists.newArrayList(dimensions.get(level));
-        timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy));
+        timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy, filterSets));
       }
       List<List<Row>> rows = constructAggregatedValues(dimensions, timeOnTimeBulkRequests);
       return rows;
   }
 
   @Override
-  public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions) throws Exception {
+  public List<List<Row>> getAggregatedValuesOfLevels(Dimensions dimensions, Multimap<String, String> filterSets)
+      throws Exception {
       List<ThirdEyeRequest> timeOnTimeBulkRequests = new ArrayList<>();
       for (int level = 0; level < dimensions.size() + 1; ++level) {
-        List<String> groupBy = Lists.newArrayList(dimensions.groupByStringsAtLevel(level));
-        timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy));
+        List<String> groupBy = Lists.newArrayList(dimensions.namesToDepth(level));
+        timeOnTimeBulkRequests.addAll(constructTimeOnTimeBulkRequests(groupBy, filterSets));
       }
       List<List<Row>> rows = constructAggregatedValues(dimensions, timeOnTimeBulkRequests);
       return rows;
@@ -137,28 +128,32 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
    * Returns the baseline and current requests for the given GroupBy dimensions.
    *
    * @param groupBy the dimensions to do GroupBy queries
+   * @param filterSets the filter to apply on the DB queries (e.g., country=US, etc.)
    * @return Baseline and Current requests.
    */
-  private List<ThirdEyeRequest> constructTimeOnTimeBulkRequests(List<String> groupBy) {
+  private List<ThirdEyeRequest> constructTimeOnTimeBulkRequests(List<String> groupBy,
+      Multimap<String, String> filterSets) {
     List<ThirdEyeRequest> requests = new ArrayList<>();;
 
     // baseline requests
     ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder();
-    builder.setCollection(collection);
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(baselineStartInclusive);
     builder.setEndTimeExclusive(baselineEndExclusive);
+    builder.setDataSource(ThirdEyeUtils.getDataSourceFromMetricFunctions(metricFunctions));
+    builder.setFilterSet(filterSets);
     ThirdEyeRequest baselineRequest = builder.build("baseline");
     requests.add(baselineRequest);
 
     // current requests
     builder = ThirdEyeRequest.newBuilder();
-    builder.setCollection(collection);
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(currentStartInclusive);
     builder.setEndTimeExclusive(currentEndExclusive);
+    builder.setDataSource(ThirdEyeUtils.getDataSourceFromMetricFunctions(metricFunctions));
+    builder.setFilterSet(filterSets);
     ThirdEyeRequest currentRequest = builder.build("current");
     requests.add(currentRequest);
 
@@ -179,17 +174,18 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
       ThirdEyeRequest currentRequest = bulkRequests.get(i++);
       ThirdEyeResponse baselineResponses = queryResponses.get(baselineRequest).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
       ThirdEyeResponse currentResponses = queryResponses.get(currentRequest).get(TIME_OUT_VALUE, TIME_OUT_UNIT);
-      if (baselineResponses.getNumRows() == 0 || currentResponses.getNumRows() == 0) {
-        throw new Exception("Failed to retrieve results with this request: "
-            + (baselineResponses.getNumRows() == 0 ? baselineRequest : currentRequest));
+      if (baselineResponses.getNumRows() == 0) {
+        LOG.warn("Get 0 rows from the request(s): {}", baselineRequest);
+      }
+      if (currentResponses.getNumRows() == 0) {
+        LOG.warn("Get 0 rows from the request(s): {}", currentRequest);
       }
 
       Map<List<String>, Row> rowTable = new HashMap<>();
       buildMetricFunctionOrExpressionsRows(dimensions, baselineResponses, rowTable, true);
       buildMetricFunctionOrExpressionsRows(dimensions, currentResponses, rowTable, false);
       if (rowTable.size() == 0) {
-        throw new Exception("Failed to retrieve non-zero results with these requests: "
-            + baselineRequest + ", " + currentRequest);
+        LOG.warn("Failed to retrieve non-zero results with these requests: " + baselineRequest + ", " + currentRequest);
       }
       List<Row> rows = new ArrayList<>(rowTable.values());
       res.add(rows);
@@ -224,19 +220,17 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
           Log.warn(e);
         }
       }
-      if (Double.compare(0d, value) < 0 && Double.isFinite(value)) {
+      if (Double.compare(0d, value) < 0 && !Double.isInfinite(value)) {
         List<String> dimensionValues = response.getRow(rowIdx).getDimensions();
         Row row = rowTable.get(dimensionValues);
         if (row == null) {
-          row = new Row();
-          row.setDimensions(dimensions);
-          row.setDimensionValues(new DimensionValues(dimensionValues));
+          row = new Row(dimensions, new DimensionValues(dimensionValues));
           rowTable.put(dimensionValues, row);
         }
         if (isBaseline) {
-          row.baselineValue = value;
+          row.setBaselineValue(value);
         } else {
-          row.currentValue = value;
+          row.setCurrentValue(value);
         }
       }
     }
@@ -261,120 +255,5 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
         entry.setValue(0d);
       }
     }
-  }
-
-  public static void main(String[] args) throws Exception {
-    String oFileName = "Cube.json";
-
-    // An interesting data set that difficult to tell because too many dark reds and blues (Granularity: DAYS)
-//    String collection = "thirdeyeKbmi";
-//    String metricName = "pageViews";
-//    DateTime baselineStart = new DateTime(1467788400000L);
-//    DateTime baselineEnd =   new DateTime(1469862000000L);
-//    DateTime currentStart =  new DateTime(1468393200000L);
-//    DateTime currentEnd =    new DateTime(1470466800000L);
-
-    // An interesting data set that difficult to tell because most cells are light red or blue (Granularity: HOURS)
-//    String collection = "thirdeyeKbmi";
-//    String metricName = "mobilePageViews";
-//    DateTime baselineStart = new DateTime(1469628000000L);
-//    DateTime baselineEnd =   new DateTime(1469714400000L);
-//    DateTime currentStart =  new DateTime(1470232800000L);
-//    DateTime currentEnd =    new DateTime(1470319200000L);
-
-    // A migration of Asia connections from other data center to lsg data center (Granularity: DAYS)
-    // Most contributors: India and China
-//    String collection = "thirdeyeAbook";
-//    String metricName = "totalFlows";
-//    DateTime baselineStart = new DateTime(2016, 7, 11, 00, 00);
-//    DateTime baselineEnd =   new DateTime(2016, 7, 12, 00, 00);
-//    DateTime currentStart =  new DateTime(2016, 7, 18, 00, 00);
-//    DateTime currentEnd =    new DateTime(2016, 7, 19, 00, 00);
-
-    // National Holidays in India and several countries in Europe and Latin America. (Granularity: DAYS)
-    String collection = "thirdeyeKbmi";
-    String metricName = "desktopPageViews";
-    DateTime baselineStart = new DateTime(1470589200000L);
-    DateTime baselineEnd =   new DateTime(1470675600000L);
-    DateTime currentStart =  new DateTime(1471194000000L);
-    DateTime currentEnd =    new DateTime(1471280400000L);
-
-//    String collection = "ptrans_additive";
-//    String metricName = "txProcessTime/__COUNT";
-//    DateTime baselineStart = new DateTime(1470938400000L);
-//    DateTime baselineEnd =   new DateTime(1471024800000L);
-//    DateTime currentStart =  new DateTime(1471543200000L);
-//    DateTime currentEnd =    new DateTime(1471629600000L);
-
-    // Create ThirdEye client
-    List<String> argList = new ArrayList<String>(Arrays.asList(args));
-    if (argList.size() == 1) {
-      argList.add(0, "server");
-    }
-    int lastIndex = argList.size() - 1;
-    String thirdEyeConfigDir = argList.get(lastIndex);
-    String persistenceConfig = thirdEyeConfigDir + "/persistence.yml";
-    DaoProviderUtil.init(new File(persistenceConfig));
-
-    ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
-    thirdEyeConfig.setWhitelistCollections(collection);
-    thirdEyeConfig.setRootDir(thirdEyeConfigDir);
-
-    ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig);
-    ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
-
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricName, MetricAggFunction.SUM, collection);
-    System.out.println(metricExpressions);
-
-    OLAPDataBaseClient pinotClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
-    pinotClient.setCollection(collection);
-    pinotClient.setMetricExpression(metricExpressions.get(0));
-    pinotClient.setCurrentStartInclusive(currentStart);
-    pinotClient.setCurrentEndExclusive(currentEnd);
-    pinotClient.setBaselineStartInclusive(baselineStart);
-    pinotClient.setBaselineEndExclusive(baselineEnd);
-
-    List<List<String>> hierarchies = new ArrayList<>();
-    hierarchies.add(Lists.newArrayList("continent", "countryCode"));
-    hierarchies.add(Lists.newArrayList("browser_name", "browser_version"));
-
-    Dimensions dimensions;
-    try {
-      dimensions = new Dimensions(Utils.getSchemaDimensionNames(collection));
-    } catch (Exception e1) {
-      System.out.println("Failed to get dimensions names of the collection: " + collection);
-      String[] dimensionNames =
-          { "browserName", "continent", "countryCode", "deviceName", "environment", "locale", "osName", "pageKey", "service", "sourceApp" };
-      System.out.println("Default dimension names are used:" + dimensionNames);
-      dimensions = new Dimensions(Lists.newArrayList(dimensionNames));
-    }
-
-    int maxDimensionSize = 3;
-
-    // Build the cube for computing the summary
-    Cube initCube = new Cube();
-    initCube.buildWithAutoDimensionOrder(pinotClient, dimensions, maxDimensionSize, hierarchies);
-//    initCube.buildWithManualDimensionOrder(pinotClient, dimensions);
-
-
-    int answerSize = 10;
-    boolean oneSideErrors = true;
-    Summary summary = new Summary(initCube);
-    System.out.println(summary.computeSummary(answerSize, oneSideErrors, maxDimensionSize));
-
-    try {
-      initCube.toJson(oFileName);
-      Cube cube = Cube.fromJson(oFileName);
-      System.out.println("Restored Cube:");
-      System.out.println(cube);
-      summary = new Summary(cube);
-      System.out.println(summary.computeSummary(answerSize, oneSideErrors, maxDimensionSize));
-    } catch (IOException e) {
-      System.err.println("WARN: Unable to save the cube to the file: " + oFileName);
-      e.printStackTrace();
-    }
-
-    // closing
-    System.exit(0);
   }
 }

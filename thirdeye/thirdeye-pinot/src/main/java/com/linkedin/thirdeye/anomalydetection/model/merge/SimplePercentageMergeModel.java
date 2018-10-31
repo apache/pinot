@@ -5,9 +5,6 @@ import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,9 +32,11 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
    * @param anomalyToUpdated the anomaly of which the information is updated.
    */
   @Override
-  public void update(AnomalyDetectionContext anomalyDetectionContext,
-      MergedAnomalyResultDTO anomalyToUpdated) {
-    PredictionModel predictionModel = anomalyDetectionContext.getTrainedPredictionModel();
+  public void update(AnomalyDetectionContext anomalyDetectionContext, MergedAnomalyResultDTO anomalyToUpdated) {
+    String mainMetric =
+        anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
+
+    PredictionModel predictionModel = anomalyDetectionContext.getTrainedPredictionModel(mainMetric);
     if (!(predictionModel instanceof ExpectedTimeSeriesPredictionModel)) {
       LOGGER.error("SimplePercentageMergeModel expects an ExpectedTimeSeriesPredictionModel but the trained model is not one.");
       return;
@@ -49,11 +48,11 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     TimeSeries expectedTimeSeries = expectedTimeSeriesPredictionModel.getExpectedTimeSeries();
     long expectedStartTime = expectedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
-    TimeSeries observedTimeSeries = anomalyDetectionContext.getTransformedCurrent();
+    TimeSeries observedTimeSeries = anomalyDetectionContext.getTransformedCurrent(mainMetric);
     long observedStartTime = observedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
-    double avgObserved = 0d;
-    double avgExpected = 0d;
+    double avgCurrent = 0d;
+    double avgBaseline = 0d;
     int count = 0;
     Interval anomalyInterval =
         new Interval(anomalyToUpdated.getStartTime(), anomalyToUpdated.getEndTime());
@@ -64,37 +63,25 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
         long expectedTimestamp = expectedStartTime + offset;
 
         if (expectedTimeSeries.hasTimestamp(expectedTimestamp)) {
-          avgObserved += observedTimeSeries.get(observedTimestamp);
-          avgExpected += expectedTimeSeries.get(expectedTimestamp);
+          avgCurrent += observedTimeSeries.get(observedTimestamp);
+          avgBaseline += expectedTimeSeries.get(expectedTimestamp);
           ++count;
         }
       }
     }
 
     double weight = 0d;
-    if (count != 0 && avgExpected != 0d) {
-      weight = (avgObserved - avgExpected) / avgExpected;
-      avgObserved /= count;
-      avgExpected /= count;
-    } else {
-      weight = 0d;
-    }
-
-    // Average score of raw anomalies
-    List<RawAnomalyResultDTO> rawAnomalyResultDTOs = anomalyToUpdated.getAnomalyResults();
-    double score = 0d;
-    if (CollectionUtils.isNotEmpty(rawAnomalyResultDTOs)) {
-      for (RawAnomalyResultDTO rawAnomaly : rawAnomalyResultDTOs) {
-        score += rawAnomaly.getScore();
-      }
-      score /= rawAnomalyResultDTOs.size();
-    } else {
-      score = anomalyToUpdated.getScore();
+    if (count != 0 && avgBaseline != 0d) {
+      weight = (avgCurrent - avgBaseline) / avgBaseline;
+      avgCurrent /= count;
+      avgBaseline /= count;
     }
 
     anomalyToUpdated.setWeight(weight);
-    anomalyToUpdated.setScore(score);
+    anomalyToUpdated.setScore(Math.abs(weight));
+    anomalyToUpdated.setAvgCurrentVal(avgCurrent);
+    anomalyToUpdated.setAvgBaselineVal(avgBaseline);
     anomalyToUpdated.setMessage(
-        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgObserved, avgExpected, score));
+        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgCurrent, avgBaseline, Math.abs(weight)));
   }
 }

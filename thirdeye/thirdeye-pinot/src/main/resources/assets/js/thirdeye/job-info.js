@@ -2,8 +2,8 @@ function listJobs() {
 
   $.ajax({
     type : "GET",
-    url : "/dashboard/data/datasets",
-    data : "{}",
+    url : "/data/datasets",
+    data : encodeURIComponent("{}"),
     contentType : "application/json; charset=utf-8",
     dataType : "json",
     success : function(data) {

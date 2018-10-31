@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressor;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -40,13 +40,15 @@ import javax.annotation.concurrent.NotThreadSafe;
  *   <li> Integer offsets to start position of rows: For partial chunks, offset values are 0 for missing rows. </li>
  *   <li> Data bytes. </li>
  * </ul>
+ *
+ * Only sequential writes are supported.
  */
 @NotThreadSafe
 public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
 
   private static final int INT_SIZE = Integer.SIZE / Byte.SIZE;
   private static final Charset UTF_8 = Charset.forName("UTF-8");
-  private static final int VERSION = 1;
+  private static final int CURRENT_VERSION = 2;
 
   private final int _chunkHeaderSize;
   private int _chunkHeaderOffset;
@@ -56,47 +58,44 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
    * Constructor for the class.
    *
    * @param file File to write to.
-   * @param compressor Compressor for compressing individual chunks of data.
+   * @param compressionType Type of compression to use.
    * @param totalDocs Total number of docs to write.
    * @param numDocsPerChunk Number of documents per chunk.
    * @param lengthOfLongestEntry Length of longest entry (in bytes).
    * @throws IOException
    */
-  public VarByteChunkSingleValueWriter(File file, ChunkCompressor compressor, int totalDocs, int numDocsPerChunk,
-      int lengthOfLongestEntry)
+  public VarByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
+      int numDocsPerChunk, int lengthOfLongestEntry)
       throws IOException {
 
-    super(file, compressor, totalDocs, numDocsPerChunk,
+    super(file, compressionType, totalDocs, numDocsPerChunk,
         ((numDocsPerChunk * INT_SIZE) + (lengthOfLongestEntry * numDocsPerChunk)), // chunkSize
-        lengthOfLongestEntry, VERSION);
+        lengthOfLongestEntry, CURRENT_VERSION);
 
     _chunkHeaderOffset = 0;
     _chunkHeaderSize = numDocsPerChunk * INT_SIZE;
     _chunkDataOffSet = _chunkHeaderSize;
   }
 
-
   @Override
   public void setString(int row, String string) {
     byte[] bytes = string.getBytes(UTF_8);
-    int length = bytes.length;
+    setBytes(row, bytes);
+  }
 
+  @Override
+  public void setBytes(int row, byte[] bytes) {
     _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
     _chunkHeaderOffset += INT_SIZE;
 
     _chunkBuffer.position(_chunkDataOffSet);
     _chunkBuffer.put(bytes);
-    _chunkDataOffSet += length;
+    _chunkDataOffSet += bytes.length;
 
     // If buffer filled, then compress and write to file.
     if (_chunkHeaderOffset == _chunkHeaderSize) {
       writeChunk();
     }
-  }
-
-  @Override
-  public void setBytes(int row, byte[] bytes) {
-    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -130,7 +129,6 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
       _chunkBuffer.putInt(i, 0);
     }
 
-    _chunkBuffer.flip(); // This is because setString changes 'position' of ByteBuffer.
     super.writeChunk();
 
     // Reset the chunk offsets.

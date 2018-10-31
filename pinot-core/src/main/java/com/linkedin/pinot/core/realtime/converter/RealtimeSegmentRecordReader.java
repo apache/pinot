@@ -17,70 +17,42 @@ package com.linkedin.pinot.core.realtime.converter;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.BaseRecordReader;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
 
-// TODO Implement null counting if needed.
-public class RealtimeSegmentRecordReader extends BaseRecordReader {
 
-  private final Schema dataSchema;
-  private final List<String> columns;
-  private final String sortedColumn;
+/**
+ * Record reader for Pinot realtime segment.
+ */
+public class RealtimeSegmentRecordReader implements RecordReader {
+  private final MutableSegmentImpl _realtimeSegment;
+  private final int _numDocs;
+  private final Schema _schema;
+  private final int[] _sortedDocIdIterationOrder;
 
-  private RealtimeSegmentImpl realtimeSegment;
-  private int counter = 0;
-  private Iterator<Integer> docIdIterator = null;
+  private int _nextDocId = 0;
 
-  public RealtimeSegmentRecordReader(RealtimeSegmentImpl rtSegment, Schema schema) {
-    super();
-    super.initNullCounters(schema);
-    this.realtimeSegment = rtSegment;
-    this.dataSchema = schema;
-    this.columns = new ArrayList<String>();
-    this.sortedColumn = null;
-    this.docIdIterator = null;
+  public RealtimeSegmentRecordReader(MutableSegmentImpl realtimeSegment, Schema schema) {
+    _realtimeSegment = realtimeSegment;
+    _numDocs = realtimeSegment.getNumDocsIndexed();
+    _schema = schema;
+    _sortedDocIdIterationOrder = null;
   }
 
-  public RealtimeSegmentRecordReader(RealtimeSegmentImpl rtSegment, Schema schema, String sortedColumn) {
-    super();
-    super.initNullCounters(schema);
-    this.realtimeSegment = rtSegment;
-    this.dataSchema = schema;
-    columns = new ArrayList<String>();
-    this.sortedColumn = sortedColumn;
-    this.docIdIterator = realtimeSegment.getSortedDocIdIteratorOnColumn(sortedColumn);
+  public RealtimeSegmentRecordReader(MutableSegmentImpl realtimeSegment, Schema schema, String sortedColumn) {
+    _realtimeSegment = realtimeSegment;
+    _numDocs = realtimeSegment.getNumDocsIndexed();
+    _schema = schema;
+    _sortedDocIdIterationOrder = realtimeSegment.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn);
   }
 
-  @Override
-  public void init() throws Exception {
-    columns.addAll(dataSchema.getDimensionNames());
-    columns.addAll(dataSchema.getMetricNames());
-    columns.add(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
-  }
-
-  @Override
-  public void rewind() throws Exception {
-    if (docIdIterator == null) {
-      counter = 0;
-    } else {
-      this.docIdIterator = realtimeSegment.getSortedDocIdIteratorOnColumn(this.sortedColumn);
-    }
+  public int[] getSortedDocIdIterationOrder() {
+    return _sortedDocIdIterationOrder;
   }
 
   @Override
   public boolean hasNext() {
-    if (docIdIterator == null) {
-      return counter < realtimeSegment.getAggregateDocumentCount();
-    }
-    return docIdIterator.hasNext();
-  }
-
-  @Override
-  public Schema getSchema() {
-    return dataSchema;
+    return _nextDocId < _numDocs;
   }
 
   @Override
@@ -89,18 +61,25 @@ public class RealtimeSegmentRecordReader extends BaseRecordReader {
   }
 
   @Override
-  public GenericRow next(GenericRow row) {
-    if (docIdIterator == null) {
-      row = realtimeSegment.getRawValueRowAt(counter, row);
-      counter++;
-      return row;
+  public GenericRow next(GenericRow reuse) {
+    if (_sortedDocIdIterationOrder == null) {
+      return _realtimeSegment.getRecord(_nextDocId++, reuse);
+    } else {
+      return _realtimeSegment.getRecord(_sortedDocIdIterationOrder[_nextDocId++], reuse);
     }
-    int docId = docIdIterator.next();
-    return realtimeSegment.getRawValueRowAt(docId, row);
   }
 
   @Override
-  public void close() throws Exception {
-    realtimeSegment = null;
+  public void rewind() {
+    _nextDocId = 0;
+  }
+
+  @Override
+  public Schema getSchema() {
+    return _schema;
+  }
+
+  @Override
+  public void close() {
   }
 }

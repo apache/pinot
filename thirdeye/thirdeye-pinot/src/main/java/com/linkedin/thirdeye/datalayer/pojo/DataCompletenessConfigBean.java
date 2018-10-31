@@ -2,9 +2,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
 
-import com.google.common.base.MoreObjects;
-
-
 /**
  * This class corresponds to data completeness config.
  */
@@ -111,13 +108,5 @@ public class DataCompletenessConfigBean extends AbstractBean {
   public int hashCode() {
     return Objects.hash(getId(), dataset, dateToCheckInMS, dateToCheckInSDF, countStar, dataComplete, percentComplete,
         numAttempts, delayNotified, timedOut);
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
-        .add("dateToCheckInMS", dateToCheckInMS).add("dateToCheckInSDF", dateToCheckInSDF)
-        .add("countStar", countStar).add("dataComplete", dataComplete).add("percentComplete", percentComplete)
-        .add("numAttempts", numAttempts).add("delayNotified", delayNotified).add("timedOut", timedOut).toString();
   }
 }

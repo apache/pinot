@@ -1,0 +1,50 @@
+.dashboard-container {
+  &__body {
+    background-color: #FFF;
+    margin-bottom: $te-default-element-spacing;
+    padding: 0 15px 15px 15px;
+    border: 1px solid app-shade(black, 0.1);
+  }
+
+  &__title {
+    margin: 30px 0 15px 0;
+
+    span {
+      margin-left: 5px;
+    }
+  }
+
+  &__application-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+
+    &-dropdown {
+      width: 200px;
+    }
+  }
+
+  &__redirect-link{
+    display: flex;
+    justify-content: center;
+    border: solid 1px $te-light-grey;
+    border-top: none;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  //dashboard table styles
+  .anomalies-table {
+    &__column {
+        &--small-width {
+          width: 60px;
+        }
+        &--med-width {
+          width: 120px;
+        }
+        &--large-width {
+          width: 250px;;
+        }
+    }
+  }
+}

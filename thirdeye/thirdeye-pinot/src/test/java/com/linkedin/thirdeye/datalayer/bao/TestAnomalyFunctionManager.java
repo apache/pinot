@@ -1,22 +1,43 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.DaoTestUtils;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import java.util.Arrays;
 import java.util.List;
 
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
-public class TestAnomalyFunctionManager extends AbstractManagerTestBase {
+public class TestAnomalyFunctionManager {
 
   private Long anomalyFunctionId;
   private static String collection = "my dataset";
   private static String metricName = "__counts";
 
+  private DAOTestBase testDAOProvider;
+  private AnomalyFunctionManager anomalyFunctionDAO;
+  @BeforeClass
+  void beforeClass() {
+    testDAOProvider = DAOTestBase.getInstance();
+    DAORegistry daoRegistry = DAORegistry.getInstance();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    testDAOProvider.cleanup();
+  }
+
   @Test
   public void testCreate() {
-    anomalyFunctionId = anomalyFunctionDAO.save(getTestFunctionSpec(metricName, collection));
+    anomalyFunctionId = anomalyFunctionDAO.save(DaoTestUtils.getTestFunctionSpec(metricName, collection));
     Assert.assertNotNull(anomalyFunctionId);
 
     // test fetch all
@@ -28,14 +49,34 @@ public class TestAnomalyFunctionManager extends AbstractManagerTestBase {
   }
 
   @Test(dependsOnMethods = {"testCreate"})
+  public void testFindNameEquals(){
+    AnomalyFunctionDTO anomalyFunctionSpec = DaoTestUtils.getTestFunctionSpec(metricName, collection);
+    Assert.assertNotNull(anomalyFunctionDAO.findWhereNameEquals(anomalyFunctionSpec.getFunctionName()));
+  }
+
+  @Test(dependsOnMethods = {"testCreate"})
   public void testFindAllByCollection() {
     List<AnomalyFunctionDTO> functions = anomalyFunctionDAO.findAllByCollection(collection);
     Assert.assertEquals(functions.size(), 1);
   }
 
+  @Test(dependsOnMethods = {"testCreate"})
+  public void testFindAllByApplication() {
+    AlertConfigDTO alertConfigDTO = new AlertConfigDTO();
+    alertConfigDTO.setName("test");
+    alertConfigDTO.setApplication("test");
+    EmailConfig emailConfig = new EmailConfig();
+    emailConfig.setFunctionIds(Arrays.asList(anomalyFunctionId));
+    alertConfigDTO.setEmailConfig(emailConfig);
+    DAORegistry.getInstance().getAlertConfigDAO().save(alertConfigDTO);
+
+    List<AnomalyFunctionDTO> applicationAnomalyFunctions = anomalyFunctionDAO.findAllByApplication("test");
+    Assert.assertEquals(applicationAnomalyFunctions.size(), 1);
+  }
+
   @Test(dependsOnMethods = {"testFindAllByCollection"})
   public void testDistinctMetricsByCollection() {
-    List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(collection);
+    List<String> metrics = anomalyFunctionDAO.findDistinctTopicMetricsByCollection(collection);
     Assert.assertEquals(metrics.get(0), metricName);
   }
 

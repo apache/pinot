@@ -1,17 +1,11 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
-import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.Interval;
 
 /**
@@ -52,17 +46,29 @@ public interface AnomalyDetectionFunction {
    *
    * @throws Exception
    */
-  List<RawAnomalyResultDTO> analyze(AnomalyDetectionContext anomalyDetectionContext) throws Exception;
+  List<AnomalyResult> analyze(AnomalyDetectionContext anomalyDetectionContext) throws Exception;
 
   /**
    * Updates the information of the given merged anomaly.
    *
-   * @param anomalyDetectionContext
-   * @param anomalyToUpdated
+   * @param anomalyDetectionContext context that provide time series data
+   * @param anomalyToUpdated the anomaly to be updated
    *
    * @throws Exception
    */
   void updateMergedAnomalyInfo(AnomalyDetectionContext anomalyDetectionContext,
       MergedAnomalyResultDTO anomalyToUpdated) throws Exception;
 
+  /**
+   * Returns the time series that are located in the given time window.
+   * @param anomalyDetectionContext context that provide time series data
+   * @param bucketMillis bucket size in millis
+   * @param metric the target metric name
+   * @param viewWindowStartTime window start, inclusive
+   * @param viewWindowEndTime window end, exclusive
+   * @param knownAnomalies known anomalies
+   * @return the time series that are located in the given time window.
+   */
+  AnomalyTimelinesView getTimeSeriesView(AnomalyDetectionContext anomalyDetectionContext, long bucketMillis,
+      String metric, long viewWindowStartTime, long viewWindowEndTime, List<MergedAnomalyResultDTO> knownAnomalies);
 }

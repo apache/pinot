@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,7 +11,9 @@ import java.util.Map;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -18,14 +23,12 @@ import org.codehaus.jackson.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.MetricType;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -35,13 +38,12 @@ public class MetricConfigResource {
   private static final Logger LOG = LoggerFactory.getLogger(MetricConfigResource.class);
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private MetricConfigManager metricConfigDao;
-  private DashboardConfigManager dashboardConfigDAO;
 
   public MetricConfigResource() {
     this.metricConfigDao = DAO_REGISTRY.getMetricConfigDAO();
-    this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
   @GET
@@ -137,14 +139,6 @@ public class MetricConfigResource {
   @Path("/delete")
   public String deleteMetricConfig(@NotNull @QueryParam("dataset") String dataset, @NotNull @QueryParam("id") Long metricConfigId) {
     metricConfigDao.deleteById(metricConfigId);
-    DashboardConfigDTO dashboardConfigDTO =
-        dashboardConfigDAO.findByName(ThirdEyeUtils.getDefaultDashboardName(dataset));
-    if (dashboardConfigDTO != null) {
-      List<Long> metricIds = dashboardConfigDTO.getMetricIds();
-      metricIds.removeAll(Lists.newArrayList(metricConfigId));
-      dashboardConfigDTO.setMetricIds(metricIds);
-      dashboardConfigDAO.update(dashboardConfigDTO);
-    }
     return JsonResponseUtil.buildSuccessResponseJSON("Successully deleted " + metricConfigId).toString();
   }
 
@@ -156,6 +150,13 @@ public class MetricConfigResource {
     Map<String, Object> filters = new HashMap<>();
     filters.put("dataset", dataset);
     List<MetricConfigDTO> metricConfigDTOs = metricConfigDao.findByParams(filters);
+    Collections.sort(metricConfigDTOs, new Comparator<MetricConfigDTO>() {
+
+      @Override
+      public int compare(MetricConfigDTO m1, MetricConfigDTO m2) {
+        return m1.getName().compareTo(m2.getName());
+      }
+    });
     List<MetricConfigDTO> subList = Utils.sublist(metricConfigDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
@@ -178,6 +179,37 @@ public class MetricConfigResource {
       metricConfigDTO = metricConfigDao.findByMetricAndDataset(metric, dataset);
     }
     return metricConfigDTO;
+  }
+
+  @GET
+  @Path("/view/dataset/{dataset}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<MetricConfigDTO> findByDataset(@PathParam("dataset") String dataset) {
+    List<MetricConfigDTO> metricConfigs = metricConfigDao.findByDataset(dataset);
+    return metricConfigs;
+  }
+
+
+  @POST
+  @Path("/create/payload")
+  public Long createMetricConfig(String payload) {
+    Long id = null;
+    try {
+      MetricConfigDTO metricConfig = OBJECT_MAPPER.readValue(payload, MetricConfigDTO.class);
+      id = metricConfigDao.save(metricConfig);
+    } catch (IOException e) {
+      LOG.error("Exception in creating dataset config with payload {}", payload);
+    }
+    return id;
+  }
+
+  public Long createMetricConfig(MetricConfigDTO metricConfig) {
+    Long id = metricConfigDao.save(metricConfig);
+    return id;
+  }
+
+  public void updateMetricConfig(MetricConfigDTO metricConfig) {
+    metricConfigDao.update(metricConfig);
   }
 
 }

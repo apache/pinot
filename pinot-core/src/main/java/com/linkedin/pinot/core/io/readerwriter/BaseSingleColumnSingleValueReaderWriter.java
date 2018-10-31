@@ -15,12 +15,13 @@
  */
 package com.linkedin.pinot.core.io.readerwriter;
 
-import java.io.IOException;
-
 import com.linkedin.pinot.core.io.reader.ReaderContext;
+import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
 
-public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
-    implements SingleColumnSingleValueReaderWriter {
+
+public abstract class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
+    implements SingleColumnSingleValueReader<T>, SingleColumnSingleValueWriter {
 
   @Override
   public char getChar(int row) {
@@ -39,7 +40,8 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
 
   @Override
   public int getInt(int row, ReaderContext context) {
-    throw new UnsupportedOperationException();  }
+    return getInt(row);
+  }
 
   @Override
   public long getLong(int row) {
@@ -48,7 +50,8 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
 
   @Override
   public long getLong(int row, ReaderContext context) {
-    throw new UnsupportedOperationException();  }
+    return getLong(row);
+  }
 
   @Override
   public float getFloat(int row) {
@@ -57,7 +60,8 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
 
   @Override
   public float getFloat(int row, ReaderContext context) {
-    throw new UnsupportedOperationException();  }
+    return getFloat(row);
+  }
 
   @Override
   public double getDouble(int row) {
@@ -66,7 +70,8 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
 
   @Override
   public double getDouble(int row, ReaderContext context) {
-    throw new UnsupportedOperationException();  }
+    return getDouble(row);
+  }
 
   @Override
   public String getString(int row) {
@@ -75,7 +80,7 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
 
   @Override
   public String getString(int row, ReaderContext context) {
-    throw new UnsupportedOperationException();
+    return getString(row);
   }
 
   @Override
@@ -84,67 +89,57 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
   }
 
   @Override
+  public byte[] getBytes(int row, ReaderContext context) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
-    throw new UnsupportedOperationException("not supported");
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public T createContext() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void close() throws IOException {
-    throw new UnsupportedOperationException();
-
+    return null;
   }
 
   @Override
   public void setChar(int row, char ch) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setInt(int row, int i) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setShort(int row, short s) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setLong(int row, long l) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setFloat(int row, float f) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setDouble(int row, double d) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setString(int row, String string) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setBytes(int row, byte[] bytes) {
     throw new UnsupportedOperationException();
-
   }
-
 }

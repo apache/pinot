@@ -29,13 +29,13 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileStream;
@@ -53,9 +53,19 @@ import org.slf4j.LoggerFactory;
 public class SegmentTestUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTestUtils.class);
 
+  @Nonnull
+  public static SegmentGeneratorConfig getSegmentGeneratorConfigWithoutTimeColumn(@Nonnull File avroFile,
+      @Nonnull File outputDir, @Nonnull String tableName) throws IOException {
+    SegmentGeneratorConfig segmentGeneratorConfig =
+        new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(avroFile));
+    segmentGeneratorConfig.setInputFilePath(avroFile.getAbsolutePath());
+    segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
+    segmentGeneratorConfig.setTableName(tableName);
+    return segmentGeneratorConfig;
+  }
+
   public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
-      String timeColumn, TimeUnit timeUnit, String tableName) throws FileNotFoundException,
-      IOException {
+      String timeColumn, TimeUnit timeUnit, String tableName) throws IOException {
     final SegmentGeneratorConfig segmentGenSpec =
         new SegmentGeneratorConfig(extractSchemaFromAvroWithoutTime(inputAvro));
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
@@ -69,7 +79,20 @@ public class SegmentTestUtils {
     return segmentGenSpec;
   }
 
-  public static List<String> getColumnNamesFromAvro(File avro) throws FileNotFoundException, IOException {
+  public static SegmentGeneratorConfig getSegmentGeneratorConfigWithSchema(File inputAvro, File outputDir,
+      String tableName, Schema schema) {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());
+    segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
+    segmentGeneratorConfig.setFormat(FileFormat.AVRO);
+    segmentGeneratorConfig.setSegmentVersion(SegmentVersion.v1);
+    segmentGeneratorConfig.setTableName(tableName);
+    segmentGeneratorConfig.setTimeColumnName(schema.getTimeColumnName());
+    segmentGeneratorConfig.setSegmentTimeUnit(schema.getOutgoingTimeUnit());
+    return segmentGeneratorConfig;
+  }
+
+  public static List<String> getColumnNamesFromAvro(File avro) throws IOException {
     List<String> ret = new ArrayList<String>();
     DataFileStream<GenericRecord> dataStream =
         new DataFileStream<GenericRecord>(new FileInputStream(avro), new GenericDatumReader<GenericRecord>());
@@ -114,7 +137,7 @@ public class SegmentTestUtils {
     return schema;
   }
 
-  public static Schema extractSchemaFromAvroWithoutTime(File avroFile) throws FileNotFoundException, IOException {
+  public static Schema extractSchemaFromAvroWithoutTime(File avroFile) throws IOException {
     DataFileStream<GenericRecord> dataStream =
         new DataFileStream<GenericRecord>(new FileInputStream(avroFile), new GenericDatumReader<GenericRecord>());
     Schema schema = new Schema();

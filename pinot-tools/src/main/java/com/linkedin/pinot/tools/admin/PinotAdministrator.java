@@ -16,7 +16,9 @@
 package com.linkedin.pinot.tools.admin;
 
 import com.linkedin.pinot.tools.admin.command.MoveReplicaGroup;
+
 import java.lang.reflect.Field;
+
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -26,11 +28,13 @@ import org.kohsuke.args4j.spi.SubCommandHandler;
 import org.kohsuke.args4j.spi.SubCommands;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import com.linkedin.pinot.tools.Command;
 import com.linkedin.pinot.tools.admin.command.AddSchemaCommand;
 import com.linkedin.pinot.tools.admin.command.AddTableCommand;
 import com.linkedin.pinot.tools.admin.command.AddTenantCommand;
 import com.linkedin.pinot.tools.admin.command.AvroSchemaToPinotSchema;
+import com.linkedin.pinot.tools.admin.command.BackfillDateTimeColumnCommand;
 import com.linkedin.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import com.linkedin.pinot.tools.admin.command.ChangeTableState;
 import com.linkedin.pinot.tools.admin.command.CreateSegmentCommand;
@@ -48,6 +52,7 @@ import com.linkedin.pinot.tools.admin.command.StopProcessCommand;
 import com.linkedin.pinot.tools.admin.command.StreamAvroIntoKafkaCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.ValidateConfigCommand;
+import com.linkedin.pinot.tools.admin.command.VerifyClusterStateCommand;
 import com.linkedin.pinot.tools.admin.command.VerifySegmentState;
 import com.linkedin.pinot.tools.segment.converter.PinotSegmentConvertCommand;
 
@@ -85,7 +90,9 @@ public class PinotAdministrator {
       @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
       @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
-      @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class)
+      @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class),
+      @SubCommand(name = "BackfillSegmentColumn", impl = BackfillDateTimeColumnCommand.class),
+      @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class)
   })
   Command _subCommand;
   // @formatter:on

@@ -18,28 +18,29 @@ package com.linkedin.pinot.core.operator.docvalsets;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.operator.docvaliterators.MultiValueIterator;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
 
 public final class MultiValueSet extends BaseBlockValSet {
-  private ColumnMetadata columnMetadata;
-  private SingleColumnMultiValueReader mVReader;
+  private final SingleColumnMultiValueReader<? super ReaderContext> _reader;
+  private final int _numDocs;
+  private final DataType _dataType;
 
-  public MultiValueSet(SingleColumnMultiValueReader mVReader, ColumnMetadata columnMetadata) {
-    super();
-    this.mVReader = mVReader;
-    this.columnMetadata = columnMetadata;
+  public MultiValueSet(SingleColumnMultiValueReader<? super ReaderContext> reader, int numDocs, DataType dataType) {
+    _reader = reader;
+    _numDocs = numDocs;
+    _dataType = dataType;
   }
 
   @Override
   public BlockValIterator iterator() {
-    return new MultiValueIterator(mVReader, columnMetadata);
+    return new MultiValueIterator(_reader, _numDocs);
   }
 
   @Override
   public DataType getValueType() {
-    return columnMetadata.getDataType();
+    return _dataType;
   }
 }

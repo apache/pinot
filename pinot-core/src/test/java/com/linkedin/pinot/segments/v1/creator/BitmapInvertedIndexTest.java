@@ -15,25 +15,28 @@
  */
 package com.linkedin.pinot.segments.v1.creator;
 
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.common.utils.Pairs;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.util.TestUtils;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.net.URL;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.util.Utf8;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -41,80 +44,93 @@ import org.testng.annotations.Test;
 
 
 public class BitmapInvertedIndexTest {
-  private final String AVRO_DATA = "data/test_sample_data.avro";
-  private static File INDEX_DIR = new File(BitmapInvertedIndexTest.class.toString());
-  private static File segmentDirectory;
-  String[] invertedIndexColumns;
+  private static final String AVRO_FILE_PATH = "data" + File.separator + "test_sample_data.avro";
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), BitmapInvertedIndexTest.class.getSimpleName());
+  private static final Set<String> INVERTED_INDEX_COLUMNS = new HashSet<String>(3) {
+    {
+      add("time_day");            // INT, cardinality 1
+      add("column10");            // STRING, cardinality 27
+      add("met_impressionCount"); // LONG, cardinality 21
+    }
+  };
 
-  @Test
-  public void test1() throws Exception {
-    // load segment in heap mode
-   testBitMapInvertedIndex(ReadMode.heap);
+  private File _avroFile;
+  private File _segmentDirectory;
+
+  @BeforeClass
+  public void setUp() throws Exception {
+    FileUtils.deleteQuietly(INDEX_DIR);
+    URL resourceUrl = getClass().getClassLoader().getResource(AVRO_FILE_PATH);
+    Assert.assertNotNull(resourceUrl);
+    _avroFile = new File(resourceUrl.getFile());
+
+    SegmentGeneratorConfig segmentGeneratorConfig =
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(_avroFile, INDEX_DIR, "myTable");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig);
+    driver.build();
+
+    _segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
   }
 
   @Test
-  public void test2() throws Exception {
-    testBitMapInvertedIndex(ReadMode.mmap);
+  public void testBitmapInvertedIndex() throws Exception {
+    testBitmapInvertedIndex(ReadMode.heap);
+    testBitmapInvertedIndex(ReadMode.mmap);
   }
 
-  void testBitMapInvertedIndex(ReadMode readMode)
-      throws Exception {
-    IndexLoadingConfigMetadata indexLoadingConfig = new IndexLoadingConfigMetadata(new PropertiesConfiguration());
-    indexLoadingConfig.initLoadingInvertedIndexColumnSet(invertedIndexColumns);
-    final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, readMode,
-        indexLoadingConfig);
-    // compare the loaded inverted index with the record in avro file
-    final DataFileStream<GenericRecord> reader =
-        new DataFileStream<GenericRecord>(new FileInputStream(new File(getClass().getClassLoader()
-            .getResource(AVRO_DATA).getFile())), new GenericDatumReader<GenericRecord>());
-    int docId = 0;
-    while (reader.hasNext()) {
-      final GenericRecord rec = reader.next();
-      for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
-        Object entry = rec.get(column);
-        if (entry instanceof Utf8) {
-          entry = ((Utf8) entry).toString();
-        }
-        final int dicId = mmapSegment.getDictionaryFor(column).indexOf(entry);
-        // make sure that docId for dicId exist in the inverted index
-        Assert.assertTrue(mmapSegment.getInvertedIndexFor(column).getImmutable(dicId).contains(docId));
-        final int size = mmapSegment.getDictionaryFor(column).length();
-        for (int i = 0; i < size; ++i) { // remove this for-loop for quick test
-          if (i == dicId) {
-            continue;
+  private void testBitmapInvertedIndex(ReadMode readMode) throws Exception {
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setReadMode(readMode);
+    indexLoadingConfig.setInvertedIndexColumns(INVERTED_INDEX_COLUMNS);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, indexLoadingConfig);
+
+    // Compare the loaded inverted index with the record in avro file
+    try (DataFileStream<GenericRecord> reader = new DataFileStream<>(new FileInputStream(_avroFile),
+        new GenericDatumReader<GenericRecord>())) {
+      // Check the first 1000 records
+      for (int docId = 0; docId < 1000; docId++) {
+        GenericRecord record = reader.next();
+        for (String column : INVERTED_INDEX_COLUMNS) {
+          Object entry = record.get(column);
+          if (entry instanceof Utf8) {
+            entry = entry.toString();
           }
-          // make sure that docId for dicId does not exist in the inverted index
-          Assert.assertFalse(mmapSegment.getInvertedIndexFor(column).getImmutable(i).contains(docId));
+          DataSource dataSource = indexSegment.getDataSource(column);
+          Dictionary dictionary = dataSource.getDictionary();
+          InvertedIndexReader invertedIndex = dataSource.getInvertedIndex();
+
+          int dictId = dictionary.indexOf(entry);
+          int size = dictionary.length();
+          if (dataSource.getDataSourceMetadata().isSorted()) {
+            for (int i = 0; i < size; i++) {
+              Pairs.IntPair minMaxRange = (Pairs.IntPair) invertedIndex.getDocIds(i);
+              int min = minMaxRange.getLeft();
+              int max = minMaxRange.getRight();
+              if (i == dictId) {
+                Assert.assertTrue(docId >= min && docId < max);
+              } else {
+                Assert.assertTrue(docId < min || docId >= max);
+              }
+            }
+          } else {
+            for (int i = 0; i < size; i++) {
+              ImmutableRoaringBitmap immutableRoaringBitmap = (ImmutableRoaringBitmap) invertedIndex.getDocIds(i);
+              if (i == dictId) {
+                Assert.assertTrue(immutableRoaringBitmap.contains(docId));
+              } else {
+                Assert.assertFalse(immutableRoaringBitmap.contains(docId));
+              }
+            }
+          }
         }
       }
-      ++docId;
     }
   }
 
   @AfterClass
-  public void teardown() {
+  public void tearDown() {
     FileUtils.deleteQuietly(INDEX_DIR);
-  }
-
-  @BeforeClass
-  public void setup() throws Exception {
-    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
-
-    if (INDEX_DIR.exists()) {
-      FileUtils.deleteQuietly(INDEX_DIR);
-    }
-
-    final SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "time_day",
-            TimeUnit.DAYS, "test");
-
-    final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    driver.init(config);
-    driver.build();
-    List<String> iiColumns = config.getInvertedIndexCreationColumns();
-    invertedIndexColumns = new String[iiColumns.size()];
-    iiColumns.toArray(invertedIndexColumns);
-    segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
-//    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
 }

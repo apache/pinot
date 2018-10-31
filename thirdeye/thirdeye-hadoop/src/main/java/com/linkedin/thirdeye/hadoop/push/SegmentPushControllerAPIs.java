@@ -19,19 +19,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 
@@ -46,11 +48,12 @@ public class SegmentPushControllerAPIs {
   private int controllerPort;
   private HttpHost controllerHttpHost;
 
+  private static final String OFFLINE_SEGMENTS = "OFFLINE";
   private static String DAILY_SCHEDULE = "DAILY";
   private static String HOURLY_SCHEDULE = "HOURLY";
-  private static String SEGMENTS_ENDPOINT = "segments/";
-  private static String TABLES_ENDPOINT = "tables/";
-  private static String DROP_PARAMETERS = "?state=drop&type=offline";
+  private static String SEGMENTS_ENDPOINT = "/segments/";
+  private static String TABLES_ENDPOINT = "/tables/";
+  private static String TYPE_PARAMETER = "?type=offline";
   private static String UTF_8 = "UTF-8";
   private static long TIMEOUT = 120000;
   private static String DATE_JOINER = "-";
@@ -129,17 +132,21 @@ public class SegmentPushControllerAPIs {
         throw new IllegalStateException(res.getStatusLine().toString());
       }
       InputStream content = res.getEntity().getContent();
-      String response = IOUtils.toString(content);
-      List<String> allSegmentsPaths = getSegmentsFromResponse(response);
-      for (String segment : allSegmentsPaths) {
-        allSegments.add(segment.substring(segment.lastIndexOf("/") + 1));
+      JsonNode segmentsData = new ObjectMapper().readTree(content);
+
+      if (segmentsData != null) {
+        JsonNode offlineSegments = segmentsData.get(0).get(OFFLINE_SEGMENTS);
+        if (offlineSegments != null) {
+          for (JsonNode segment : offlineSegments) {
+            allSegments.add(segment.asText());
+          }
+        }
       }
       LOGGER.info("All segments : {}", allSegments);
     } finally {
       if (res.getEntity() != null) {
         EntityUtils.consume(res.getEntity());
       }
-
     }
     return allSegments;
   }
@@ -149,7 +156,7 @@ public class SegmentPushControllerAPIs {
     boolean deleteSuccessful = false;
     HttpClient controllerClient = new DefaultHttpClient();
     // this endpoint gets from ideal state
-    HttpGet req = new HttpGet(TABLES_ENDPOINT + URLEncoder.encode(tablename, UTF_8) + "/" + SEGMENTS_ENDPOINT);
+    HttpGet req = new HttpGet(TABLES_ENDPOINT + URLEncoder.encode(tablename, UTF_8) + SEGMENTS_ENDPOINT);
     HttpResponse res = controllerClient.execute(controllerHttpHost, req);
     try {
       if (res.getStatusLine().getStatusCode() != 200) {
@@ -158,7 +165,9 @@ public class SegmentPushControllerAPIs {
       InputStream content = res.getEntity().getContent();
       String response = IOUtils.toString(content);
       LOGGER.info("All segments from ideal state {}", response);
-      if (!response.contains("\\\""+segmentName+"\\\"")) {
+      String decoratedSegmentName = "\\\""+segmentName+"\\\"";
+      LOGGER.info("Decorated segment name {}", decoratedSegmentName);
+      if (!response.contains(decoratedSegmentName)) {
         deleteSuccessful = true;
         LOGGER.info("Delete successful");
       } else {
@@ -172,11 +181,6 @@ public class SegmentPushControllerAPIs {
     }
     return deleteSuccessful;
 
-  }
-
-  private List<String> getSegmentsFromResponse(String response) {
-    String[] allSegments = response.replaceAll("\\[|\\]|\"", "").split(",");
-    return Arrays.asList(allSegments);
   }
 
 
@@ -199,9 +203,9 @@ public class SegmentPushControllerAPIs {
     boolean deleteSuccessful = false;
 
     HttpClient controllerClient = new DefaultHttpClient();
-    HttpGet req = new HttpGet(TABLES_ENDPOINT + URLEncoder.encode(tablename, UTF_8)
-        + "/" + SEGMENTS_ENDPOINT + URLEncoder.encode(segmentName, UTF_8)
-        + DROP_PARAMETERS);
+    HttpDelete req = new HttpDelete(SEGMENTS_ENDPOINT + URLEncoder.encode(tablename, UTF_8) + "/"
+        + URLEncoder.encode(segmentName, UTF_8)
+        + TYPE_PARAMETER);
     HttpResponse res = controllerClient.execute(controllerHttpHost, req);
     try {
       if (res == null || res.getStatusLine() == null || res.getStatusLine().getStatusCode() != 200

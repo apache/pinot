@@ -15,56 +15,8 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-
 public enum SegmentVersion {
-
-
-  v1 (1),
-  v2 (2),//Changed the forward index format to use bitpacking library instead of custombitset format.
-
-  // v3 supports writing all the indexes in a single file
-  v3 (3);
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentVersion.class);
-
-  public static SegmentVersion DEFAULT_TABLE_VERSION = SegmentVersion.v3;
-  public static SegmentVersion DEFAULT_SERVER_VERSION = SegmentVersion.v3;
-
-  int versionNumber;
-  SegmentVersion(int versionNum) {
-    this.versionNumber = versionNum;
-  }
-
-  /**
-   * Compares two segment versions
-   * @return returns &lt; 0 if lhs &lt; rhs, 0 if lhs == rhs and  &gt; 0 if lhs &gt; rhs
-   */
-  public static int compare(SegmentVersion lhs, SegmentVersion rhs) {
-    if (lhs.versionNumber == rhs.versionNumber) {
-      return 0;
-    }
-    return (lhs.versionNumber < rhs.versionNumber) ? -1 : 1;
-  }
-
-  /**
-   * Get the segment format version from string or return the default value
-   * @param inputVersion input segment format version to read
-   * @param defaultVal default value to use
-   * @return SegmentVersion for inputVersion of defaultVal if inputVersion is empty or bad value
-   */
-  public static SegmentVersion fromString(String inputVersion, SegmentVersion defaultVal) {
-    if (inputVersion == null) {
-      return defaultVal;
-    }
-    try {
-      return SegmentVersion.valueOf(inputVersion);
-    } catch (IllegalArgumentException e) {
-      LOGGER.error("Invalid argument for segment version input: {}, Returning default value: {}",
-          inputVersion, defaultVal);
-      return defaultVal;
-    }
-  }
+  v1, // Each index in a separate file
+  v2, // Use bit packing library instead of custom bit set for forward index format
+  v3  // All the indexes in a single file
 }

@@ -17,17 +17,20 @@ public class AlphaBetaAlertFilter extends BaseAlertFilter {
   public static final String DEFAULT_ALPHA = "1";
   public static final String DEFAULT_BETA = "1";
   public static final String DEFAULT_THRESHOLD = "0.8";
+  public static final String DEFAULT_TYPE = "alpha_beta";
 
   public static final String ALPHA = "alpha";
   public static final String BETA = "beta";
   public static final String THRESHOLD = "threshold";
+  public static final String TYPE = "type";
 
   private double alpha = Double.parseDouble(DEFAULT_ALPHA);
   private double beta = Double.parseDouble(DEFAULT_BETA);
   private double threshold = Double.parseDouble(DEFAULT_THRESHOLD);
+  private String type = DEFAULT_TYPE;
 
   private static final List<String> propertyNames =
-      Collections.unmodifiableList(new ArrayList<>(Arrays.asList(ALPHA, BETA, THRESHOLD)));
+      Collections.unmodifiableList(new ArrayList<>(Arrays.asList(ALPHA, BETA, THRESHOLD, TYPE)));
 
   public List<String> getPropertyNames() {
     return propertyNames;
@@ -67,10 +70,14 @@ public class AlphaBetaAlertFilter extends BaseAlertFilter {
     this.threshold = threshold;
   }
 
+  public String getType() {
+    return this.type;
+  }
+
   @Override
   public boolean isQualified(MergedAnomalyResultDTO anomaly) {
     double lengthInHour =
-        (anomaly.getEndTime().doubleValue() - anomaly.getStartTime().doubleValue()) / 36_00_000;
+        (double) (anomaly.getEndTime() - anomaly.getStartTime()) / 36_00_000d;
     // In ThirdEye, the absolute value of weight is the severity
     double qualificationScore =
         Math.pow(lengthInHour, alpha) * Math.pow(Math.abs(anomaly.getWeight()), beta);
@@ -79,6 +86,6 @@ public class AlphaBetaAlertFilter extends BaseAlertFilter {
 
   @Override
   public String toString() {
-    return MoreObjects.toStringHelper(this).add(ALPHA, alpha).add(BETA, beta).add(THRESHOLD, threshold).toString();
+    return MoreObjects.toStringHelper(this).add(ALPHA, alpha).add(BETA, beta).add(THRESHOLD, threshold).add(TYPE, type).toString();
   }
 }

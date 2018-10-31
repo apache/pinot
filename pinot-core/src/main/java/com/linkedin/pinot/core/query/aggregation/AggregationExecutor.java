@@ -17,40 +17,25 @@ package com.linkedin.pinot.core.query.aggregation;
 
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import java.util.List;
+import javax.annotation.Nonnull;
 
 
 /**
- * Interface for Aggregation executor, that executes all aggregation
- * functions (without group-bys). Aggregations are performed within a segment,
- * i.e. does not merge aggregation results from across different segments.
+ * Interface for Aggregation executor, that executes all aggregation functions (without group-bys).
+ * <p>Aggregations are performed within a segment, i.e. does not merge aggregation results across different segments.
  */
 public interface AggregationExecutor {
 
   /**
-   * Initializations that need to be performed before process can be called.
-   * Must be called before any of the other methods can be called.
-   */
-  void init();
-
-  /**
-   * Performs the actual aggregation on the given docId's of a segment.
-   * Asserts that 'init' has been called before calling this method.
+   * Performs aggregation on the given transform block.
    *
-   * @param transformBlock Block on which to perform aggregation.
+   * @param transformBlock Transform Block
    */
-  void aggregate(TransformBlock transformBlock);
-
-  /**
-   * Post processing (if any) to be done after all docIdSets have been processed, and
-   * before getResult can be called.
-   * Must be called after all 'aggregation' calls are completed, and before 'getResult'.
-   * Implementation to make sure that not calling it does not leak resources.
-   */
-  void finish();
+  void aggregate(@Nonnull TransformBlock transformBlock);
 
   /**
    * Returns the result of aggregation.
-   * Asserts that 'finish' has been called before calling getResult().
+   * <p>Should be called after all transform blocks has been aggregated.
    *
    * @return Result of aggregation
    */

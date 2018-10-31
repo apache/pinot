@@ -95,6 +95,10 @@ public class AggregationFunctionVisitorBase {
     visitFunction(function);
   }
 
+  public void visit(PercentileMVAggregationFunction function) {
+    visitFunction(function);
+  }
+
   public void visit(PercentileEstAggregationFunction function) {
     visitFunction(function);
   }
@@ -103,7 +107,7 @@ public class AggregationFunctionVisitorBase {
     visitFunction(function);
   }
 
-  public void visit(PercentileMVAggregationFunction function) {
+  public void visit(PercentileTDigestAggregationFunction function) {
     visitFunction(function);
   }
 

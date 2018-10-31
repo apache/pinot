@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -23,8 +24,12 @@ import com.linkedin.thirdeye.util.NumberUtils;
  */
 public class MetricTimeSeries {
   private static final Logger LOGGER = LoggerFactory.getLogger(MetricTimeSeries.class);
+  private static final String NULL_NUMBER_TOSTRING_STRING = "null";
 
-  Map<Long, ByteBuffer> timeseries;
+  // Mapping from timestamp to the value of metrics. (One value per metric and multiple metrics per timestamp.)
+  private Map<Long, ByteBuffer> metricsValue;
+
+  private Map<Long, boolean[]> hasValue;
 
   private MetricSchema schema;
 
@@ -32,7 +37,8 @@ public class MetricTimeSeries {
    * @param schema
    */
   public MetricTimeSeries(MetricSchema schema) {
-    timeseries = new HashMap<Long, ByteBuffer>();
+    metricsValue = new HashMap<>();
+    hasValue = new HashMap<>();
     this.schema = schema;
   }
 
@@ -41,110 +47,108 @@ public class MetricTimeSeries {
   }
 
   /**
-   * @param timeWindow
-   * @param value
+   * Sets the value of the metric with the given timestamp.
+   *
+   * @param timeWindow the timestamp for the value.
+   * @param name metric name.
+   * @param value a non-null value.
    */
   public void set(long timeWindow, String name, Number value) {
     initBufferForTimeWindow(timeWindow);
-    ByteBuffer buffer = timeseries.get(timeWindow);
+    setMetricValue(timeWindow, name, value);
+    setHasValue(timeWindow, name);
+  }
+
+  private void setMetricValue(long timeWindow, String name, Number value) {
+    ByteBuffer buffer = metricsValue.get(timeWindow);
     buffer.position(schema.getOffset(name));
     MetricType metricType = schema.getMetricType(name);
-    switch (metricType) {
-    case SHORT:
-      buffer.putShort(value.shortValue());
-      break;
-    case INT:
-      buffer.putInt(value.intValue());
-      break;
-    case LONG:
-      buffer.putLong(value.longValue());
-      break;
-    case FLOAT:
-      buffer.putFloat(value.floatValue());
-      break;
-    case DOUBLE:
-      buffer.putDouble(value.doubleValue());
-      break;
-    }
+    NumberUtils.addToBuffer(buffer, value, metricType);
+  }
+
+  private void setHasValue(long timeWindow, String name) {
+    boolean[] buffer = hasValue.get(timeWindow);
+    buffer[schema.getMetricIndex(name)] = true;
   }
 
   private void initBufferForTimeWindow(long timeWindow) {
-    if (!timeseries.containsKey(timeWindow)) {
-      byte[] bytes = new byte[schema.getRowSizeInBytes()];
-      timeseries.put(timeWindow, ByteBuffer.wrap(bytes));
+    if (!metricsValue.containsKey(timeWindow)) {
+      byte[] metricsValueBytes = new byte[schema.getRowSizeInBytes()];
+      metricsValue.put(timeWindow, ByteBuffer.wrap(metricsValueBytes));
+      boolean[] hasValueBytes = new boolean[schema.getNumMetrics()];
+      hasValue.put(timeWindow, hasValueBytes);
     }
   }
 
+  /**
+   * Gets the metric value with the timestamp if the value exists; otherwise, null is returned.
+   *
+   * @param timeWindow the timestamp.
+   * @param name the metric name.
+   *
+   * @return the metric value if exists; otherwise, null is returned.
+   */
   public Number get(long timeWindow, String name) {
-    ByteBuffer buffer = timeseries.get(timeWindow);
-    Number ret = 0;
+    return getOrDefault(timeWindow, name, null);
+  }
 
-    if (buffer != null) {
-      buffer = buffer.duplicate();
-      MetricType metricType = schema.getMetricType(name);
-      buffer.position(schema.getOffset(name));
-      switch (metricType) {
-      case SHORT:
-        ret = buffer.getShort();
-        break;
-      case INT:
-        ret = buffer.getInt();
-        break;
-      case LONG:
-        ret = buffer.getLong();
-        break;
-      case FLOAT:
-        ret = buffer.getFloat();
-        break;
-      case DOUBLE:
-        ret = buffer.getDouble();
-        break;
+  /**
+   * Gets the metric value with the timestamp if the value exists; otherwise, the default number is returned.
+   *
+   * @param timeWindow the timestamp.
+   * @param name the metric name.
+   * @param defaultNumber the default number for the returned value if the target value does not exist.
+   *
+   * @return the metric value with the timestamp if the value exists; otherwise, the default number is returned.
+   */
+  public Number getOrDefault(long timeWindow, String name, Number defaultNumber) {
+    Number ret = defaultNumber;
+
+    boolean[] hasValueBuffer = hasValue.get(timeWindow);
+    if (hasValueBuffer != null && hasValueBuffer[schema.getMetricIndex(name)]) {
+      ByteBuffer buffer = metricsValue.get(timeWindow);
+      if (buffer != null) {
+        buffer = buffer.duplicate();
+        buffer.position(schema.getOffset(name));
+        MetricType metricType = schema.getMetricType(name);
+        ret = NumberUtils.readFromBuffer(buffer, metricType);
       }
     }
+
     return ret;
   }
 
+  /**
+   * Increments the metric value of the timestamp with delta.
+   *
+   * @param timeWindow the timestamp.
+   * @param name the metric name.
+   * @param delta the non-null value to be added to the metric value.
+   */
   public void increment(long timeWindow, String name, Number delta) {
-    initBufferForTimeWindow(timeWindow);
-    ByteBuffer buffer = timeseries.get(timeWindow);
-    Number newValue;
+    Number newValue = delta;
+    Number oldValue = getOrDefault(timeWindow, name, null);
 
-    if (buffer != null) {
-      // get Old Value
-      Number oldValue = get(timeWindow, name);
+    if (oldValue != null) {
       MetricType metricType = schema.getMetricType(name);
-      switch (metricType) {
-      case SHORT:
-        newValue = oldValue.shortValue() + delta.shortValue();
-        break;
-      case INT:
-        newValue = oldValue.intValue() + delta.intValue();
-        break;
-      case LONG:
-        newValue = oldValue.longValue() + delta.longValue();
-        break;
-      case FLOAT:
-        newValue = oldValue.floatValue() + delta.floatValue();
-        break;
-      case DOUBLE:
-        newValue = oldValue.doubleValue() + delta.doubleValue();
-        break;
-      default:
+      newValue = NumberUtils.sum(newValue, oldValue, metricType);
+      if (newValue == null) {
         throw new UnsupportedOperationException(
             "unknown metricType:" + metricType + " for column:" + name);
       }
-    } else {
-      newValue = delta;
     }
+
     set(timeWindow, name, newValue);
   }
 
   public void aggregate(MetricTimeSeries series) {
-    for (long timeWindow : series.timeseries.keySet()) {
+    for (long timeWindow : series.metricsValue.keySet()) {
       for (int i = 0; i < schema.getNumMetrics(); i++) {
         String metricName = schema.getMetricName(i);
-        Number delta = series.get(timeWindow, metricName);
-        increment(timeWindow, metricName, delta);
+        Number delta = series.getOrDefault(timeWindow, metricName, null);
+        if (delta != null) {
+          increment(timeWindow, metricName, delta);
+        }
       }
     }
   }
@@ -156,18 +160,21 @@ public class MetricTimeSeries {
    *          Only include values from series that are in this time range
    */
   public void aggregate(MetricTimeSeries series, TimeRange timeRange) {
-    for (long timeWindow : series.timeseries.keySet()) {
+    for (long timeWindow : series.metricsValue.keySet()) {
       if (timeRange.contains(timeWindow)) {
         for (int i = 0; i < schema.getNumMetrics(); i++) {
           String metricName = schema.getMetricName(i);
-          Number delta = series.get(timeWindow, metricName);
-          increment(timeWindow, metricName, delta);
+          Number delta = series.getOrDefault(timeWindow, metricName, null);
+          if (delta != null) {
+            increment(timeWindow, metricName, delta);
+          }
         }
       }
     }
   }
 
-  public static MetricTimeSeries fromBytes(byte[] buf, MetricSchema schema) throws IOException {
+  // TODO: Consider default null value; before that, this method is set to private
+  private static MetricTimeSeries fromBytes(byte[] buf, MetricSchema schema) throws IOException {
     MetricTimeSeries series = new MetricTimeSeries(schema);
     DataInput in = new DataInputStream(new ByteArrayInputStream(buf));
     int numTimeWindows = in.readInt();
@@ -176,7 +183,12 @@ public class MetricTimeSeries {
       long timeWindow = in.readLong();
       byte[] bytes = new byte[bufferSize];
       in.readFully(bytes);
-      series.timeseries.put(timeWindow, ByteBuffer.wrap(bytes));
+      series.metricsValue.put(timeWindow, ByteBuffer.wrap(bytes));
+      boolean[] hasValues = new boolean[schema.getNumMetrics()];
+      for (int numMetrics = 0; numMetrics < schema.getNumMetrics(); numMetrics++) {
+        hasValues[numMetrics] = true;
+      }
+      series.hasValue.put(timeWindow, hasValues);
     }
     return series;
   }
@@ -185,19 +197,20 @@ public class MetricTimeSeries {
    * @return
    */
   public Set<Long> getTimeWindowSet() {
-    return timeseries.keySet();
+    return metricsValue.keySet();
   }
 
-  public byte[] toBytes() throws IOException {
+  // TODO: Consider default null value; before that, this method is set to private
+  private byte[] toBytes() throws IOException {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutput out = new DataOutputStream(baos);
     // write the number of timeWindows
-    out.writeInt(timeseries.size());
+    out.writeInt(metricsValue.size());
     // write the size of the metric buffer for each timeWindow
     out.writeInt(schema.getRowSizeInBytes());
-    for (long time : timeseries.keySet()) {
+    for (long time : metricsValue.keySet()) {
       out.writeLong(time);
-      out.write(timeseries.get(time).array());
+      out.write(metricsValue.get(time).array());
     }
     return baos.toByteArray();
   }
@@ -206,16 +219,21 @@ public class MetricTimeSeries {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("(");
-    for (long timeWindow : timeseries.keySet()) {
+    for (long timeWindow : metricsValue.keySet()) {
       sb.append("[");
       String delim = "";
-      ByteBuffer buffer = timeseries.get(timeWindow);
-      buffer.rewind();
       for (int i = 0; i < schema.getNumMetrics(); i++) {
         if (i > 0) {
           delim = ",";
         }
-        sb.append(delim).append(NumberUtils.readFromBuffer(buffer, schema.getMetricType(i)));
+        sb.append(delim);
+        Number number = getOrDefault(timeWindow, schema.getMetricName(i), null);
+        if (number != null) {
+          sb.append(number);
+        } else {
+          // TODO: read user specified null value from schema
+          sb.append(NULL_NUMBER_TOSTRING_STRING);
+        }
       }
       sb.append("]");
       sb.append("@");
@@ -228,36 +246,97 @@ public class MetricTimeSeries {
   }
 
   public Number[] getMetricSums() {
-    Number[] result = new Number[schema.getNumMetrics()];
+    Number[] sum = new Number[schema.getNumMetrics()];
+    int[] bucketCount = new int[schema.getNumMetrics()];
+    calculateMetricSumAndBucketCount(sum, bucketCount);
+
+    return sum;
+  }
+
+  /**
+   * Returns the average values of metrics. If a metric does not have any values, then its average value is null.
+   *
+   * @return the average values of metrics.
+   */
+  public Double[] getMetricAvgs() {
+    return getMetricAvgs(null);
+  }
+
+  /**
+   * Returns the average values of metrics. If a metric does not have any values, then its average value is
+   * valueOfdividedByZero.
+   *
+   * @param valueOfdividedByZero the value to be used when a metric does not have any values.
+   *
+   * @return the average values of metrics.
+   */
+  public Double[] getMetricAvgs(Double valueOfdividedByZero) {
+    Number[] sum = new Number[schema.getNumMetrics()];
+    int[] bucketCount = new int[schema.getNumMetrics()];
+    calculateMetricSumAndBucketCount(sum, bucketCount);
+
+    Double[] avg = new Double[schema.getNumMetrics()];
+    for (int i = 0; i < sum.length; i++) {
+      if (bucketCount[i] != 0) {
+        avg[i] = sum[i].doubleValue() / (double) bucketCount[i];
+      } else {
+        avg[i] = valueOfdividedByZero;
+      }
+    }
+
+    return avg;
+  }
+
+  private void calculateMetricSumAndBucketCount(Number[] sum, int[] bucketCount) {
+    for (int i = 0; i < schema.getNumMetrics(); i++) {
+      sum[i] = 0;
+      bucketCount[i] = 0;
+    }
+
+    for (Long time : metricsValue.keySet()) {
+      for (int i = 0; i < schema.getNumMetrics(); i++) {
+        String metricName = schema.getMetricName(i);
+        MetricType metricType = schema.getMetricType(i);
+        Number metricValue = getOrDefault(time, metricName, null);
+
+        if (metricValue != null) {
+          switch (metricType) {
+          case INT:
+            sum[i] = sum[i].intValue() + metricValue.intValue();
+            break;
+          case SHORT:
+            sum[i] = sum[i].shortValue() + metricValue.shortValue();
+            break;
+          case LONG:
+            sum[i] = sum[i].longValue() + metricValue.longValue();
+            break;
+          case FLOAT:
+            sum[i] = sum[i].floatValue() + metricValue.floatValue();
+            break;
+          case DOUBLE:
+            sum[i] = sum[i].doubleValue() + metricValue.doubleValue();
+            break;
+          default:
+            throw new IllegalStateException();
+          }
+          ++bucketCount[i];
+        }
+      }
+    }
+  }
+
+  public Integer[] getHasValueSums() {
+    Integer[] result = new Integer[schema.getNumMetrics()];
 
     for (int i = 0; i < schema.getNumMetrics(); i++) {
       result[i] = 0;
     }
 
-    for (Long time : timeseries.keySet()) {
+    for (Long time : hasValue.keySet()) {
+      boolean[] booleans = hasValue.get(time);
       for (int i = 0; i < schema.getNumMetrics(); i++) {
-        String metricName = schema.getMetricName(i);
-        MetricType metricType = schema.getMetricType(i);
-        Number metricValue = get(time, metricName);
-
-        switch (metricType) {
-        case INT:
-          result[i] = result[i].intValue() + metricValue.intValue();
-          break;
-        case SHORT:
-          result[i] = result[i].shortValue() + metricValue.shortValue();
-          break;
-        case LONG:
-          result[i] = result[i].longValue() + metricValue.longValue();
-          break;
-        case FLOAT:
-          result[i] = result[i].floatValue() + metricValue.floatValue();
-          break;
-        case DOUBLE:
-          result[i] = result[i].doubleValue() + metricValue.doubleValue();
-          break;
-        default:
-          throw new IllegalStateException();
+        if (booleans[i]) {
+          result[i] = result[i] + 1;
         }
       }
     }
@@ -267,18 +346,22 @@ public class MetricTimeSeries {
 
   @Override
   public int hashCode() {
-    return timeseries.keySet().hashCode() + 13 * schema.hashCode();
+    return Objects.hash(metricsValue.keySet(), getSchema());
   }
 
   @Override
   public boolean equals(Object o) {
-    if (!(o instanceof MetricTimeSeries)) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
 
     MetricTimeSeries ts = (MetricTimeSeries) o;
 
     return getTimeWindowSet().equals(ts.getTimeWindowSet())
-        && Arrays.equals(getMetricSums(), ts.getMetricSums());
+        && Arrays.equals(getMetricSums(), ts.getMetricSums())
+        && Arrays.equals(getHasValueSums(), ts.getHasValueSums());
   }
 }

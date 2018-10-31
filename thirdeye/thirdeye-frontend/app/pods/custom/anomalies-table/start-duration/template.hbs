@@ -1,0 +1,6 @@
+{{#link-to 'rootcause' (query-params anomalyId=record.id)}}
+   {{moment-format record.start 'MMM D, hh:mm A'}}
+{{/link-to}}
+<p class="anomalies-table__duration">
+  {{record.duration}}
+</p>

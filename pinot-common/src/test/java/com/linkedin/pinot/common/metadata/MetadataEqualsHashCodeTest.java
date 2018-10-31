@@ -15,20 +15,18 @@
  */
 package com.linkedin.pinot.common.metadata;
 
+import com.linkedin.pinot.common.data.DateTimeFieldSpec;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import nl.jqno.equalsverifier.EqualsVerifier;
-import nl.jqno.equalsverifier.Warning;
-
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import nl.jqno.equalsverifier.EqualsVerifier;
+import nl.jqno.equalsverifier.Warning;
+import org.testng.annotations.Test;
 
 
 /**
@@ -47,17 +45,15 @@ public class MetadataEqualsHashCodeTest {
         usingGetClass().verify();
     EqualsVerifier.forClass(RealtimeSegmentZKMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
-
-    EqualsVerifier.forClass(KafkaStreamMetadata.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
-        usingGetClass().verify();
-
     EqualsVerifier.forClass(Schema.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
         usingGetClass().verify();
-    EqualsVerifier.forClass(DimensionFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
+    EqualsVerifier.forClass(DimensionFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
-    EqualsVerifier.forClass(MetricFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
+    EqualsVerifier.forClass(MetricFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
-    EqualsVerifier.forClass(TimeFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS).
+    EqualsVerifier.forClass(TimeFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
+        usingGetClass().verify();
+    EqualsVerifier.forClass(DateTimeFieldSpec.class).suppress(Warning.NULL_FIELDS, Warning.NONFINAL_FIELDS, Warning.TRANSIENT_FIELDS).
         usingGetClass().verify();
   }
 }

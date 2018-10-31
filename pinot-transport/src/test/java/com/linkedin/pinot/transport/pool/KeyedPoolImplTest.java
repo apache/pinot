@@ -36,8 +36,9 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
-import com.linkedin.pinot.transport.common.KeyedFuture;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
 
@@ -52,14 +53,14 @@ public class KeyedPoolImplTest {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     int numKeys = 1;
     int numResourcesPerKey = 1;
-    Map<String, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
+    Map<ServerInstance, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
     BlockingTestResourceManager rm = new BlockingTestResourceManager(resources, null, null, null);
 
-    KeyedPool<String, String> kPool =
-        new KeyedPoolImpl<String, String>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
 
     kPool.start();
-    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>) kPool.checkoutObject(getKey(0));
+    AsyncResponseFuture<String> f = (AsyncResponseFuture<String>) kPool.checkoutObject(getKey(0), "none");
     boolean isTimedout = false;
     try {
       f.get(2, TimeUnit.SECONDS);
@@ -82,14 +83,14 @@ public class KeyedPoolImplTest {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     int numKeys = 1;
     int numResourcesPerKey = 1;
-    Map<String, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
+    Map<ServerInstance, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
     TestResourceManager rm = new TestResourceManager(resources, null, null, null);
 
-    KeyedPool<String, String> kPool =
-        new KeyedPoolImpl<String, String>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
 
     kPool.start();
-    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>) kPool.checkoutObject(getKey(0));
+    AsyncResponseFuture<String> f = (AsyncResponseFuture<String>) kPool.checkoutObject(getKey(0), "none");
     String s1 = f.getOne();
 
     // checkin with invalid key
@@ -117,14 +118,14 @@ public class KeyedPoolImplTest {
     ExecutorService service = new ThreadPoolExecutor(1, 1, 1, TimeUnit.DAYS, new LinkedBlockingDeque<Runnable>());
     int numKeys = 1;
     int numResourcesPerKey = 1;
-    Map<String, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
+    Map<ServerInstance, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
     BlockingTestResourceManager rm = new BlockingTestResourceManager(resources, null, null, null);
 
-    KeyedPool<String, String> kPool =
-        new KeyedPoolImpl<String, String>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
 
     kPool.start();
-    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>) kPool.checkoutObject(getKey(0));
+    AsyncResponseFuture<String> f = (AsyncResponseFuture<String>) kPool.checkoutObject(getKey(0), "none");
     boolean isTimedout = false;
     try {
       f.get(2, TimeUnit.SECONDS);
@@ -152,13 +153,13 @@ public class KeyedPoolImplTest {
     ExecutorService service = MoreExecutors.sameThreadExecutor();
     int numKeys = 1;
     int numResourcesPerKey = 1;
-    Map<String, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
+    Map<ServerInstance, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
 
     TestResourceManager rm = new TestResourceManager(resources, resources, null, null);
 
-    KeyedPool<String, String> kPool =
-        new KeyedPoolImpl<String, String>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
-    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>) kPool.checkoutObject(getKey(0));
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(0, 1, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
+    AsyncResponseFuture<String> f = (AsyncResponseFuture<String>) kPool.checkoutObject(getKey(0), "none");
     Assert.assertTrue(f.isDone());
     Assert.assertNull(f.get());
     Assert.assertNotNull(f.getError());
@@ -175,13 +176,13 @@ public class KeyedPoolImplTest {
     ExecutorService service = MoreExecutors.sameThreadExecutor();
     int numKeys = 1;
     int numResourcesPerKey = 1;
-    Map<String, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
+    Map<ServerInstance, List<String>> resources = buildCreateMap(numKeys, numResourcesPerKey);
 
     TestResourceManager rm = new TestResourceManager(resources, null, resources, null);
 
-    KeyedPool<String, String> kPool =
-        new KeyedPoolImpl<String, String>(0, 5, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
-    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>) kPool.checkoutObject(getKey(0));
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(0, 5, 1000L, 1000 * 60 * 60, rm, timedExecutor, service, null);
+    AsyncResponseFuture<String> f = (AsyncResponseFuture<String>) kPool.checkoutObject(getKey(0), "none");
     String r = f.getOne();
     Assert.assertTrue(f.isDone());
     Assert.assertNull(f.getError());
@@ -220,8 +221,8 @@ public class KeyedPoolImplTest {
     TestResourceManager rm = new TestResourceManager(buildCreateMap(numKeys, numResourcesPerKey), null, null, null);
 
     // Idle Timeout 1 second
-    KeyedPool<String, String> kPool =
-        new KeyedPoolImpl<String, String>(0, 5, 1000L, 100, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(0, 5, 1000L, 100, rm, timedExecutor, service, null);
 
     // Create a countdown latch that waits for all resources to be deleted
     CountDownLatch latch = new CountDownLatch(numKeys * numResourcesPerKey);
@@ -233,7 +234,7 @@ public class KeyedPoolImplTest {
     // checkout and checkin back all
     for (int j = 0; j < numResourcesPerKey; j++) {
       for (int i = 0; i < numKeys; i++) {
-        KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
+        ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i), "none");
         String resource = rFuture.getOne();
       }
     }
@@ -251,7 +252,7 @@ public class KeyedPoolImplTest {
     Assert.assertEquals(s.getTotalTimedOut(), 5);
 
     //Verify all objects are destroyed
-    Map<String, List<String>> destroyedMap = rm.getDestroyedMap();
+    Map<ServerInstance, List<String>> destroyedMap = rm.getDestroyedMap();
 
     Assert.assertEquals(destroyedMap.keySet().size(), numKeys);
     for (int i = 0; i < numKeys; i++) {
@@ -263,7 +264,7 @@ public class KeyedPoolImplTest {
     }
 
     // Proper shutdown
-    Future<Map<String, NoneType>> f = kPool.shutdown();
+    Future<Map<ServerInstance, NoneType>> f = kPool.shutdown();
     f.get();
   }
 
@@ -282,8 +283,8 @@ public class KeyedPoolImplTest {
     int numKeys = 5;
     int numResourcesPerKey = 5;
     TestResourceManager rm = new TestResourceManager(buildCreateMap(numKeys, numResourcesPerKey), null, null, null);
-    KeyedPool<String, String> kPool =
-        new KeyedPoolImpl<String, String>(5, 5, 1000 * 60 * 60L, 100, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(5, 5, 1000 * 60 * 60L, 100, rm, timedExecutor, service, null);
 
     kPool.start();
     AggregatedPoolStats s = (AggregatedPoolStats) kPool.getStats();
@@ -291,7 +292,7 @@ public class KeyedPoolImplTest {
     int c = 1;
     for (int j = 0; j < numResourcesPerKey; j++) {
       for (int i = 0; i < numKeys; i++) {
-        KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
+        ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i), "none");
         String resource = rFuture.getOne();
         Assert.assertEquals(resource, getResource(i, j));
         s.refresh();
@@ -316,7 +317,7 @@ public class KeyedPoolImplTest {
     c = 1;
     int d = 1;
     for (int i = 0; i < numKeys; i++) {
-      KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
+      ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i), "none");
       String resource = rFuture.getOne();
       Assert.assertEquals(resource, getResource(i, 0));
       CountDownLatch latch = new CountDownLatch(1);
@@ -328,10 +329,10 @@ public class KeyedPoolImplTest {
       Assert.assertEquals(s.getCheckedOut(), 0);
       Assert.assertEquals(s.getTotalDestroyed(), d++);
     }
-    Future<Map<String, NoneType>> f = kPool.shutdown();
+    Future<Map<ServerInstance, NoneType>> f = kPool.shutdown();
     f.get();
     //Verify all objects are destroyed
-    Map<String, List<String>> destroyedMap = rm.getDestroyedMap();
+    Map<ServerInstance, List<String>> destroyedMap = rm.getDestroyedMap();
 
     Assert.assertEquals(destroyedMap.keySet().size(), numKeys);
     for (int i = 0; i < numKeys; i++) {
@@ -359,15 +360,15 @@ public class KeyedPoolImplTest {
     int numKeys = 5;
     int numResourcesPerKey = 5;
     TestResourceManager rm = new TestResourceManager(buildCreateMap(numKeys, numResourcesPerKey), null, null, null);
-    KeyedPool<String, String> kPool =
-        new KeyedPoolImpl<String, String>(5, 5, 1000 * 60 * 60L, 100, rm, timedExecutor, service, null);
+    KeyedPool<String> kPool =
+        new KeyedPoolImpl<>(5, 5, 1000 * 60 * 60L, 100, rm, timedExecutor, service, null);
 
     kPool.start();
     AggregatedPoolStats s = (AggregatedPoolStats) kPool.getStats();
     int c = 1;
     for (int j = 0; j < numResourcesPerKey; j++) {
       for (int i = 0; i < numKeys; i++) {
-        KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
+        ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i), "none");
         String resource = rFuture.getOne();
         Assert.assertEquals(resource, getResource(i, j));
         s.refresh();
@@ -390,7 +391,7 @@ public class KeyedPoolImplTest {
     // Check out 1 object for each key
     c = 1;
     for (int i = 0; i < numKeys; i++) {
-      KeyedFuture<String, String> rFuture = kPool.checkoutObject(getKey(i));
+      ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i), "none");
       String resource = rFuture.getOne();
       Assert.assertEquals(resource, getResource(i, 0));
       s.refresh();
@@ -401,8 +402,8 @@ public class KeyedPoolImplTest {
     Assert.assertEquals(s.getIdleCount(), (numKeys * numResourcesPerKey) - 5);
 
     // SHutdown but it should not be done.
-    Future<Map<String, NoneType>> f = kPool.shutdown();
-    FutureReader<Map<String, NoneType>> reader = new FutureReader<Map<String, NoneType>>(f);
+    Future<Map<ServerInstance, NoneType>> f = kPool.shutdown();
+    FutureReader<Map<ServerInstance, NoneType>> reader = new FutureReader<Map<ServerInstance, NoneType>>(f);
     reader.start();
     reader.getBeginLatch().await();
     Assert.assertTrue(reader.isStarted());
@@ -430,10 +431,10 @@ public class KeyedPoolImplTest {
     Assert.assertTrue(reader.isDone());
 
     // Do one more shutdown call
-    Future<Map<String, NoneType>> f2 = kPool.shutdown();
+    Future<Map<ServerInstance, NoneType>> f2 = kPool.shutdown();
     f2.get();
     //Verify all objects are destroyed
-    Map<String, List<String>> destroyedMap = rm.getDestroyedMap();
+    Map<ServerInstance, List<String>> destroyedMap = rm.getDestroyedMap();
 
     Assert.assertEquals(destroyedMap.keySet().size(), numKeys);
     for (int i = 0; i < numKeys; i++) {
@@ -445,10 +446,10 @@ public class KeyedPoolImplTest {
     }
   }
 
-  private Map<String, List<String>> buildCreateMap(int numKeys, int numResourcesPerKey) {
-    Map<String, List<String>> createdMap = new HashMap<String, List<String>>();
+  private Map<ServerInstance, List<String>> buildCreateMap(int numKeys, int numResourcesPerKey) {
+    Map<ServerInstance, List<String>> createdMap = new HashMap<>();
     for (int i = 0; i < numKeys; i++) {
-      String key = getKey(i);
+      ServerInstance key = getKey(i);
       List<String> list = new ArrayList<String>();
       for (int j = 0; j < numKeys; j++) {
         list.add(getResource(i, j));
@@ -458,12 +459,12 @@ public class KeyedPoolImplTest {
     return createdMap;
   }
 
-  private String getKey(int id) {
-    return "key_" + id;
+  private ServerInstance getKey(int id) {
+    return new ServerInstance("key:" + id);
   }
 
   private String getResource(int key, int resource) {
-    String k = getKey(key);
+    ServerInstance k = getKey(key);
     return k + "_resource_" + resource;
   }
 
@@ -471,14 +472,14 @@ public class KeyedPoolImplTest {
     // Latch to block creating resource
     private final CountDownLatch _createBlockLatch = new CountDownLatch(1);
 
-    public BlockingTestResourceManager(Map<String, List<String>> createdMap,
-        Map<String, List<String>> failCreateResources, Map<String, List<String>> failDestroyResources,
-        Map<String, List<String>> failValidationResources) {
+    public BlockingTestResourceManager(Map<ServerInstance, List<String>> createdMap,
+        Map<ServerInstance, List<String>> failCreateResources, Map<ServerInstance, List<String>> failDestroyResources,
+        Map<ServerInstance, List<String>> failValidationResources) {
       super(createdMap, failCreateResources, failDestroyResources, failValidationResources);
     }
 
     @Override
-    public String create(String key) {
+    public String create(ServerInstance key) {
       try {
         _createBlockLatch.await();
       } catch (InterruptedException e) {
@@ -494,17 +495,17 @@ public class KeyedPoolImplTest {
 
   }
 
-  public static class TestResourceManager implements PooledResourceManager<String, String> {
+  public static class TestResourceManager implements PooledResourceManager<String> {
     // input related
-    public Map<String, List<String>> _createdMap = new HashMap<String, List<String>>();
-    public Map<String, List<String>> _failCreateResources = new HashMap<String, List<String>>();
-    public Map<String, List<String>> _failDestroyResources = new HashMap<String, List<String>>();
-    public Map<String, List<String>> _failValidationResources = new HashMap<String, List<String>>();
+    public Map<ServerInstance, List<String>> _createdMap = new HashMap<>();
+    public Map<ServerInstance, List<String>> _failCreateResources = new HashMap<>();
+    public Map<ServerInstance, List<String>> _failDestroyResources = new HashMap<>();
+    public Map<ServerInstance, List<String>> _failValidationResources = new HashMap<>();
 
     // output related
-    public Map<String, Integer> _createdIndex = new HashMap<String, Integer>();
-    public Map<String, List<String>> _destroyedMap = new HashMap<String, List<String>>();
-    public Map<String, List<String>> _validatedMap = new HashMap<String, List<String>>();
+    public Map<ServerInstance, Integer> _createdIndex = new HashMap<>();
+    public Map<ServerInstance, List<String>> _destroyedMap = new HashMap<>();
+    public Map<ServerInstance, List<String>> _validatedMap = new HashMap<>();
 
     private CountDownLatch _latch = null;
 
@@ -512,8 +513,8 @@ public class KeyedPoolImplTest {
       _latch = latch;
     }
 
-    public TestResourceManager(Map<String, List<String>> createdMap, Map<String, List<String>> failCreateResources,
-        Map<String, List<String>> failDestroyResources, Map<String, List<String>> failValidationResources) {
+    public TestResourceManager(Map<ServerInstance, List<String>> createdMap, Map<ServerInstance, List<String>> failCreateResources,
+        Map<ServerInstance, List<String>> failDestroyResources, Map<ServerInstance, List<String>> failValidationResources) {
       if (null != createdMap) {
         _createdMap.putAll(createdMap);
       }
@@ -532,7 +533,7 @@ public class KeyedPoolImplTest {
     }
 
     @Override
-    public String create(String key) {
+    public String create(ServerInstance key) {
 
       Integer index = _createdIndex.get(key);
 
@@ -550,7 +551,7 @@ public class KeyedPoolImplTest {
     }
 
     @Override
-    public boolean destroy(String key, boolean isBad, String resource) {
+    public boolean destroy(ServerInstance key, boolean isBad, String resource) {
       boolean fail = false;
       List<String> fails = _failDestroyResources.get(key);
       if (null != fails) {
@@ -569,7 +570,7 @@ public class KeyedPoolImplTest {
     }
 
     @Override
-    public boolean validate(String key, String resource) {
+    public boolean validate(ServerInstance key, String resource) {
       boolean fail = false;
       List<String> fails = _failValidationResources.get(key);
       if (null != fails) {
@@ -584,15 +585,15 @@ public class KeyedPoolImplTest {
       return !fail;
     }
 
-    public Map<String, Integer> getCreatedIndex() {
+    public Map<ServerInstance, Integer> getCreatedIndex() {
       return _createdIndex;
     }
 
-    public Map<String, List<String>> getDestroyedMap() {
+    public Map<ServerInstance, List<String>> getDestroyedMap() {
       return _destroyedMap;
     }
 
-    public Map<String, List<String>> getValidatedMap() {
+    public Map<ServerInstance, List<String>> getValidatedMap() {
       return _validatedMap;
     }
   }

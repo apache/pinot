@@ -1,28 +1,40 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.constant.AnomalyResultSource;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
 
 
-public class MergedAnomalyResultBean extends AbstractBean
-    implements Comparable<MergedAnomalyResultBean> {
+public class MergedAnomalyResultBean extends AbstractBean implements Comparable<MergedAnomalyResultBean> {
   private Long functionId;
   private Long anomalyFeedbackId;
-  private List<Long> rawAnomalyIdList;
   private String collection;
   private String metric;
-  private DimensionMap dimensions;
-  private Long startTime;
-  private Long endTime;
-  // significance level
-  private double score;
-  // severity
-  private double weight;
+  private DimensionMap dimensions = new DimensionMap();
+  private long startTime;
+  private long endTime;
+
+  private double avgCurrentVal; // actual value
+  private double avgBaselineVal; // expected value
+  private double score; // confidence level
+  private double weight; // change percentage, whose absolute value is severity
+  private double impactToGlobal; // the impact of this anomaly to the global metric
+  private AnomalyResultSource anomalyResultSource = AnomalyResultSource.DEFAULT_ANOMALY_DETECTION;
+  // Additional anomaly detection properties (e.g., patter=UP, etc.)
+  // Being used as identifying if two merged anomalies have same anomaly detection properties, thus can be mergeable
+  private Map<String, String> properties = new HashMap<>();
+
   private Long createdTime;
-  private String message;
   private boolean notified;
+
+  private String message;
+  // TODO: Remove raw anomaly id list after old merged anomalies are cleaned up
+  @Deprecated
+  private List<Long> rawAnomalyIdList;
 
 
   public Long getFunctionId() {
@@ -41,12 +53,12 @@ public class MergedAnomalyResultBean extends AbstractBean
     this.anomalyFeedbackId = anomalyFeedbackId;
   }
 
-  public List<Long> getRawAnomalyIdList() {
-    return rawAnomalyIdList;
+  public String getCollection() {
+    return collection;
   }
 
-  public void setRawAnomalyIdList(List<Long> rawAnomalyIdList) {
-    this.rawAnomalyIdList = rawAnomalyIdList;
+  public void setCollection(String collection) {
+    this.collection = collection;
   }
 
   public String getMetric() {
@@ -57,19 +69,19 @@ public class MergedAnomalyResultBean extends AbstractBean
     this.metric = metric;
   }
 
-  public Long getStartTime() {
+  public long getStartTime() {
     return startTime;
   }
 
-  public void setStartTime(Long startTime) {
+  public void setStartTime(long startTime) {
     this.startTime = startTime;
   }
 
-  public Long getEndTime() {
+  public long getEndTime() {
     return endTime;
   }
 
-  public void setEndTime(Long endTime) {
+  public void setEndTime(long endTime) {
     this.endTime = endTime;
   }
 
@@ -81,12 +93,44 @@ public class MergedAnomalyResultBean extends AbstractBean
     this.dimensions = dimensions;
   }
 
+  public double getAvgCurrentVal(){
+    return this.avgCurrentVal;
+  }
+
+  public double getAvgBaselineVal(){
+    return this.avgBaselineVal;
+  }
+
+  public void setAvgCurrentVal(double val){
+    this.avgCurrentVal = val;
+  }
+
+  public void setAvgBaselineVal(double val){
+    this.avgBaselineVal = val;
+  }
+
   public double getScore() {
     return score;
   }
 
   public void setScore(double score) {
     this.score = score;
+  }
+
+  public double getWeight() {
+    return weight;
+  }
+
+  public void setWeight(double weight) {
+    this.weight = weight;
+  }
+
+  public Map<String, String> getProperties() {
+    return properties;
+  }
+
+  public void setProperties(Map<String, String> properties) {
+    this.properties = properties;
   }
 
   public Long getCreatedTime() {
@@ -105,25 +149,6 @@ public class MergedAnomalyResultBean extends AbstractBean
     this.notified = notified;
   }
 
-  public String getCollection() {
-    return collection;
-  }
-
-  public void setCollection(String collection) {
-    this.collection = collection;
-  }
-
-  /**
-   * Weight is change ratio. The absolute value of weight is severity.
-   */
-  public double getWeight() {
-    return weight;
-  }
-
-  public void setWeight(double weight) {
-    this.weight = weight;
-  }
-
   public String getMessage() {
     return message;
   }
@@ -132,9 +157,37 @@ public class MergedAnomalyResultBean extends AbstractBean
     this.message = message;
   }
 
+  // TODO: Remove this method after old merged anomalies are cleaned up
+  @Deprecated
+  public List<Long> getRawAnomalyIdList() {
+    return rawAnomalyIdList;
+  }
+
+  // TODO: Remove this method after old merged anomalies are cleaned up
+  @Deprecated
+  public void setRawAnomalyIdList(List<Long> rawAnomalyIdList) {
+    this.rawAnomalyIdList = rawAnomalyIdList;
+  }
+
+  public double getImpactToGlobal() {
+    return impactToGlobal;
+  }
+
+  public void setImpactToGlobal(double impactToGlobal) {
+    this.impactToGlobal = impactToGlobal;
+  }
+
+  public AnomalyResultSource getAnomalyResultSource() {
+    return anomalyResultSource;
+  }
+
+  public void setAnomalyResultSource(AnomalyResultSource anomalyResultSource) {
+    this.anomalyResultSource = anomalyResultSource;
+  }
+
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score);
+    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToGlobal, avgBaselineVal, avgCurrentVal, anomalyResultSource);
   }
 
   @Override
@@ -143,9 +196,12 @@ public class MergedAnomalyResultBean extends AbstractBean
       return false;
     }
     MergedAnomalyResultBean m = (MergedAnomalyResultBean) o;
-    return Objects.equals(getId(), m.getId()) && Objects.equals(startTime, m.getStartTime())
-        && Objects.equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection())
-        && Objects.equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions());
+    return Objects.equals(getId(), m.getId()) && Objects.equals(startTime, m.getStartTime()) && Objects
+        .equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection()) && Objects
+        .equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions()) && Objects
+        .equals(score, m.getScore()) && Objects.equals(avgBaselineVal, m.getAvgBaselineVal()) && Objects
+        .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(impactToGlobal, m.getImpactToGlobal()) &&
+        Objects.equals(anomalyResultSource, m.getAnomalyResultSource());
   }
 
   @Override
@@ -161,15 +217,5 @@ public class MergedAnomalyResultBean extends AbstractBean
       return diff;
     }
     return ObjectUtils.compare(getId(), o.getId());
-  }
-
-  @Override
-  public String toString() {
-    return "MergedAnomalyResultBean{" + "anomalyFeedbackId=" + anomalyFeedbackId + ", functionId="
-        + functionId + ", rawAnomalyIdList=" + rawAnomalyIdList + ", collection='" + collection
-        + '\'' + ", metric='" + metric + '\'' + ", dimensions='" + dimensions + '\''
-        + ", startTime=" + startTime + ", endTime=" + endTime + ", score=" + score + ", weight="
-        + weight + ", createdTime=" + createdTime + ", message='" + message + '\'' + ", notified="
-        + notified + '}';
   }
 }

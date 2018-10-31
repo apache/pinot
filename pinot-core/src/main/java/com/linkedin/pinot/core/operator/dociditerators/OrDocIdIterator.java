@@ -15,139 +15,138 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
-import java.util.Iterator;
-import java.util.PriorityQueue;
-import java.util.concurrent.atomic.AtomicLong;
-
-import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 
-public final class OrDocIdIterator implements BlockDocIdIterator {
-  private BlockDocIdIterator[] docIdIterators;
 
-  final PriorityQueue<IntPair> queue;
-  final boolean[] iteratorIsInQueue;
-  int currentDocId = -1;
-  private int minDocId;
-  private int maxDocId;
-  private AtomicLong timeMeasure = new AtomicLong(0);
-  IntPair[] pointers;
+public final class OrDocIdIterator implements BlockDocIdIterator {
+  private final BlockDocIdIterator[] _docIdIterators;
+  private final int[] _nextDocIds;
+  private final int _minDocId;
+  private final int _maxDocId;
+
+  private int _numNotExhaustedIterators;
+  private int _currentDocId = -1;
+
+  public OrDocIdIterator(BlockDocIdIterator[] docIdIterators, int minDocId, int maxDocId) {
+    _docIdIterators = docIdIterators;
+    _numNotExhaustedIterators = docIdIterators.length;
+    _nextDocIds = new int[_numNotExhaustedIterators];
+    for (int i = 0; i < _numNotExhaustedIterators; i++) {
+      _nextDocIds[i] = docIdIterators[i].advance(minDocId);
+    }
+    _minDocId = minDocId;
+    _maxDocId = maxDocId;
+    removeExhaustedIterators();
+  }
 
   /**
-   * @param docIdIterators
+   * Loop over the document id array and pick the smallest one so that the document ids returned are in ascending order.
+   * <p>For each child iterator, fetch the next document id when its current document id is the same as the current
+   * document id of parent iterator so that each document id is only returned once.
+   * <p>{@inheritDoc}
    */
-  public OrDocIdIterator(BlockDocIdIterator[] docIdIterators) {
-    this.docIdIterators = docIdIterators;
-    queue =
-        new PriorityQueue<IntPair>(docIdIterators.length, new Pairs.AscendingIntPairComparator());
-    iteratorIsInQueue = new boolean[docIdIterators.length];
-    pointers= new IntPair[docIdIterators.length];
-    for (int i = 0; i < docIdIterators.length; i++) {
-      pointers[i] = new IntPair(0, i);
-    }
-  }
-
-  @Override
-  public int advance(int targetDocId) {
-    if (currentDocId == Constants.EOF) {
-      return Constants.EOF;
-    }
-    if (targetDocId < minDocId) {
-      targetDocId = minDocId;
-    } else if (targetDocId > maxDocId) {
-      currentDocId = Constants.EOF;
-      return currentDocId;
-    }
-    long start = System.nanoTime();
-
-    // Remove iterators that are before the target document id from the queue
-    Iterator<IntPair> iterator = queue.iterator();
-    while (iterator.hasNext()) {
-      IntPair pair = iterator.next();
-      if (pair.getLeft() < targetDocId) {
-        iterator.remove();
-        iteratorIsInQueue[pair.getRight()] = false;
-      }
-    }
-
-    // Advance all iterators that are not in the queue to the target document id
-    for (int i = 0; i < docIdIterators.length; i++) {
-      if (!iteratorIsInQueue[i]) {
-        int nextDocId = docIdIterators[i].advance(targetDocId);
-        if (nextDocId != Constants.EOF) {
-          pointers[i].setLeft(nextDocId);
-          queue.add(pointers[i]);
-        }
-        iteratorIsInQueue[i] = true;
-      }
-    }
-
-    // Return the first element
-    if (queue.size() > 0) {
-      currentDocId = queue.peek().getLeft();
-    } else {
-      currentDocId = Constants.EOF;
-    }
-
-    long end = System.nanoTime();
-    timeMeasure.addAndGet(end - start);
-    return currentDocId;
-  }
-
   @Override
   public int next() {
-    long start = System.currentTimeMillis();
+    if (_currentDocId == Constants.EOF) {
+      return Constants.EOF;
+    }
 
-    if (currentDocId == Constants.EOF) {
-      return currentDocId;
-    }
-    while (queue.size() > 0 && queue.peek().getLeft() <= currentDocId) {
-      IntPair pair = queue.remove();
-      iteratorIsInQueue[pair.getRight()] = false;
-    }
-    currentDocId++;
-    // Grab the next value from each iterator, if it's not in the queue
-    for (int i = 0; i < docIdIterators.length; i++) {
-      if (!iteratorIsInQueue[i]) {
-        int nextDocId = docIdIterators[i].advance(currentDocId);
-        if (nextDocId != Constants.EOF) {
-          if (!(nextDocId <= maxDocId && nextDocId >= minDocId) && nextDocId >= currentDocId) {
-            throw new RuntimeException("next Doc : " + nextDocId
-                + " should never crossing the range : [ " + minDocId + ", " + maxDocId + " ]");
-          }
-          queue.add(new IntPair(nextDocId, i));
-        }
-        iteratorIsInQueue[i] = true;
+    int nextDocId = Integer.MAX_VALUE;
+    boolean hasExhaustedIterator = false;
+    for (int i = 0; i < _numNotExhaustedIterators; i++) {
+      int docId = _nextDocIds[i];
+      if (docId == _currentDocId) {
+        docId = _docIdIterators[i].next();
+        _nextDocIds[i] = docId;
+      }
+      if (docId != Constants.EOF) {
+        nextDocId = Math.min(nextDocId, docId);
+      } else {
+        hasExhaustedIterator = true;
       }
     }
-
-    if (queue.size() > 0) {
-      currentDocId = queue.peek().getLeft();
+    if (nextDocId > _maxDocId) {
+      _currentDocId = Constants.EOF;
     } else {
-      currentDocId = Constants.EOF;
+      _currentDocId = nextDocId;
+      if (hasExhaustedIterator) {
+        removeExhaustedIterators();
+      }
     }
-    long end = System.currentTimeMillis();
-    timeMeasure.addAndGet(end - start);
-    // Remove this after tracing is added
-    // if (currentDocId == Constants.EOF) {
-    // LOGGER.debug("OR took:" + timeMeasure.get());
-    // }
+    return _currentDocId;
+  }
 
-    return currentDocId;
+  /**
+   * Loop over the document id array and pick the smallest one that is equal or grater than the given target document id
+   * so that the document ids returned are in ascending order.
+   * <p>For each child iterator, advance to the target document id when its current document id is smaller than the
+   * target document id  so that each document id is only returned once.
+   * <p>{@inheritDoc}
+   */
+  @Override
+  public int advance(int targetDocId) {
+    if (_currentDocId == Constants.EOF) {
+      return Constants.EOF;
+    }
+    if (targetDocId > _maxDocId) {
+      _currentDocId = Constants.EOF;
+      return Constants.EOF;
+    }
+    if (targetDocId <= _currentDocId) {
+      return _currentDocId;
+    }
+
+    if (targetDocId < _minDocId) {
+      targetDocId = _minDocId;
+    }
+
+    int nextDocId = Integer.MAX_VALUE;
+    boolean hasExhaustedIterator = false;
+    for (int i = 0; i < _numNotExhaustedIterators; i++) {
+      int docId = _nextDocIds[i];
+      if (docId < targetDocId) {
+        docId = _docIdIterators[i].advance(targetDocId);
+        _nextDocIds[i] = docId;
+      }
+      if (docId != Constants.EOF) {
+        nextDocId = Math.min(nextDocId, docId);
+      } else {
+        hasExhaustedIterator = true;
+      }
+    }
+    if (nextDocId > _maxDocId) {
+      _currentDocId = Constants.EOF;
+    } else {
+      _currentDocId = nextDocId;
+      if (hasExhaustedIterator) {
+        removeExhaustedIterators();
+      }
+    }
+    return _currentDocId;
+  }
+
+  /**
+   * Helper method to remove exhausted iterators.
+   * <p>Whenever we find an exhausted iterator, we replace it with the last one, and update number of not exhausted
+   * iterators until the first number of not exhausted iterators in the array are not exhausted.
+   */
+  private void removeExhaustedIterators() {
+    int i = 0;
+    while (i < _numNotExhaustedIterators) {
+      if (_nextDocIds[i] == Constants.EOF) {
+        // Need to check the new iterator moved to this index, so do not increase the index
+        _numNotExhaustedIterators--;
+        _docIdIterators[i] = _docIdIterators[_numNotExhaustedIterators];
+        _nextDocIds[i] = _nextDocIds[_numNotExhaustedIterators];
+      } else {
+        i++;
+      }
+    }
   }
 
   @Override
   public int currentDocId() {
-    return currentDocId;
-  }
-
-  public void setStartDocId(int minDocId) {
-    this.minDocId = minDocId;
-  }
-
-  public void setEndDocId(int maxDocId) {
-    this.maxDocId = maxDocId;
+    return _currentDocId;
   }
 }

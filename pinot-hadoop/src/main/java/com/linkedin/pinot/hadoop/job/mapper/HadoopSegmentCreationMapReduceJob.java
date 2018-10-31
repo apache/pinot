@@ -15,8 +15,15 @@
  */
 package com.linkedin.pinot.hadoop.job.mapper;
 
-import java.io.File;
-import java.io.IOException;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
+import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.data.readers.ThriftRecordReaderConfig;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.hadoop.job.JobConfigConstants;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -26,17 +33,11 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import java.io.File;
+import java.io.IOException;
 
 
 public class HadoopSegmentCreationMapReduceJob {
@@ -62,15 +63,16 @@ public class HadoopSegmentCreationMapReduceJob {
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
 
+
       _currentHdfsWorkDir = FileOutputFormat.getWorkOutputPath(context);
       _currentDiskWorkDir = "pinot_hadoop_tmp";
 
       // Temporary HDFS path for local machine
-      _localHdfsSegmentTarPath = _currentHdfsWorkDir + "/segmentTar";
+      _localHdfsSegmentTarPath =  _currentHdfsWorkDir + "/segmentTar";
+      _localDiskSegmentTarPath = _currentDiskWorkDir + "/segmentsTar";
 
-      // Temporary DISK path for local machine
-      _localDiskSegmentDirectory = _currentDiskWorkDir + "/segments/";
-      _localDiskSegmentTarPath = _currentDiskWorkDir + "/segmentsTar/";
+
+
       new File(_localDiskSegmentTarPath).mkdirs();
 
       LOGGER.info("*********************************************************************");
@@ -84,6 +86,7 @@ public class HadoopSegmentCreationMapReduceJob {
       _outputPath = _properties.get("path.to.output");
       _tableName = _properties.get("segment.table.name");
       _postfix = _properties.get("segment.name.postfix", null);
+
       if (_outputPath == null || _tableName == null) {
         throw new RuntimeException(
             "Missing configs: " +
@@ -92,6 +95,10 @@ public class HadoopSegmentCreationMapReduceJob {
                 "\n\ttableName: " +
                 _properties.get("segment.table.name"));
       }
+    }
+
+    protected String getTableName() {
+      return _tableName;
     }
 
     @Override
@@ -120,7 +127,36 @@ public class HadoopSegmentCreationMapReduceJob {
         throw new RuntimeException("Input to the mapper is malformed, please contact the pinot team");
       }
       _inputFilePath = lineSplits[1].trim();
-      Schema schema = Schema.fromString(context.getConfiguration().get("data.schema"));
+
+      String segmentDirectory = _tableName + "_" + Integer.parseInt(lineSplits[2]);
+      _localDiskSegmentDirectory = _currentDiskWorkDir + "/segments/" + segmentDirectory;
+
+      // To inherit from from the Hadoop Mapper class, you can't directly throw a general exception.
+      Schema schema;
+      final FileSystem fs = FileSystem.get(new Configuration());
+      final Path hdfsAvroPath = new Path(_inputFilePath);
+      final File dataPath = new File(_currentDiskWorkDir, "data");
+      try {
+        if (dataPath.exists()) {
+          dataPath.delete();
+        }
+        dataPath.mkdir();
+
+        final Path localAvroPath = new Path(dataPath + "/" + hdfsAvroPath.getName());
+        LOGGER.info("Copy from " + hdfsAvroPath + " to " + localAvroPath);
+        fs.copyToLocalFile(hdfsAvroPath, localAvroPath);
+
+        String schemaString = context.getConfiguration().get("data.schema");
+        try {
+          schema = Schema.fromString(schemaString);
+        } catch (Exception e) {
+          LOGGER.error("Could not get schema from string for value: " + schemaString);
+          throw new RuntimeException(e);
+        }
+      } catch (Exception e) {
+        LOGGER.error("Could not get schema: " + e);
+        throw new RuntimeException(e);
+      }
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("input data file path : {}", _inputFilePath);
@@ -131,40 +167,38 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("*********************************************************************");
 
       try {
-        createSegment(_inputFilePath, schema, lineSplits[2]);
+        String segmentName = createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsAvroPath, dataPath, fs);
+        LOGGER.info(segmentName);
         LOGGER.info("finished segment creation job successfully");
       } catch (Exception e) {
         LOGGER.error("Got exceptions during creating segments!", e);
       }
 
       context.write(new LongWritable(Long.parseLong(lineSplits[2])),
-          new Text(FileSystem.get(new Configuration()).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
+          new Text(FileSystem.get(_properties).listStatus(new Path(_localHdfsSegmentTarPath + "/"))[0].getPath().getName()));
       LOGGER.info("finished the job successfully");
     }
 
-    private String createSegment(String dataFilePath, Schema schema, String seqId) throws Exception {
-      final FileSystem fs = FileSystem.get(new Configuration());
-      final Path hdfsDataPath = new Path(dataFilePath);
-      final File dataPath = new File(_currentDiskWorkDir, "data");
-      if (dataPath.exists()) {
-        dataPath.delete();
-      }
-      dataPath.mkdir();
-      final Path localAvroPath = new Path(dataPath + "/" + hdfsDataPath.getName());
-      fs.copyToLocalFile(hdfsDataPath, localAvroPath);
+    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId, Path hdfsAvroPath, File dataPath) {
 
+    }
+
+    protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsDataPath, File dataPath, FileSystem fs) throws Exception {
       LOGGER.info("Data schema is : {}", schema);
       SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
       segmentGeneratorConfig.setTableName(_tableName);
+      setSegmentNameGenerator(segmentGeneratorConfig, seqId, hdfsDataPath, dataPath);
 
       segmentGeneratorConfig.setInputFilePath(new File(dataPath, hdfsDataPath.getName()).getAbsolutePath());
 
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setFormat(fileFormat);
+      segmentGeneratorConfig.setOnHeap(true);
+      
       if (null != _postfix) {
         segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
       } else {
-        segmentGeneratorConfig.setSegmentNamePostfix(seqId);
+        segmentGeneratorConfig.setSequenceId(seqId);
       }
       segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
 
@@ -185,13 +219,13 @@ public class HadoopSegmentCreationMapReduceJob {
       driver.init(segmentGeneratorConfig);
       driver.build();
       // Tar the segment directory into file.
-      String segmentName = (new File(_localDiskSegmentDirectory).listFiles()[0]).getName();
+      String segmentName = driver.getSegmentName();
       String localSegmentPath = new File(_localDiskSegmentDirectory, segmentName).getAbsolutePath();
 
-      String localTarPath = _localDiskSegmentTarPath + "/" + segmentName + ".tar.gz";
+      String localTarPath = _localDiskSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
       LOGGER.info("Trying to tar the segment to: {}", localTarPath);
       TarGzCompressionUtils.createTarGzOfDirectory(localSegmentPath, localTarPath);
-      String hdfsTarPath = _localHdfsSegmentTarPath + "/" + segmentName + ".tar.gz";
+      String hdfsTarPath = _localHdfsSegmentTarPath + "/" + segmentName + JobConfigConstants.TARGZ;
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("Copy from : {} to {}", localTarPath, hdfsTarPath);
@@ -210,6 +244,8 @@ public class HadoopSegmentCreationMapReduceJob {
           break;
         case JSON:
           break;
+        case THRIFT:
+          readerConfig = new ThriftRecordReaderConfig();
         default:
           break;
       }
@@ -225,6 +261,9 @@ public class HadoopSegmentCreationMapReduceJob {
       }
       if (dataFilePath.endsWith(".avro")) {
         return FileFormat.AVRO;
+      }
+      if (dataFilePath.endsWith(".thrift")) {
+        return FileFormat.THRIFT;
       }
       throw new RuntimeException("Not support file format - " + dataFilePath);
     }

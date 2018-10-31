@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.client;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +27,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import java.util.zip.GZIPInputStream;
 import org.I0Itec.zkclient.ZkClient;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -50,6 +54,7 @@ public class ExternalViewReader {
     try {
 
       byte[] brokerResourceNodeData = zkClient.readData(BROKER_EXTERNAL_VIEW_PATH, true);
+      brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
       JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");
 
@@ -80,6 +85,7 @@ public class ExternalViewReader {
     Map<String, Set<String>> brokerUrlsMap = new HashMap<>();
     try {
       byte[] brokerResourceNodeData = zkClient.readData("/EXTERNALVIEW/brokerResource", true);
+      brokerResourceNodeData = unpackZnodeIfNecessary(brokerResourceNodeData);
       JSONObject jsonObject = new JSONObject(new String(brokerResourceNodeData));
       JSONObject brokerResourceNode = jsonObject.getJSONObject("mapFields");
 
@@ -114,4 +120,27 @@ public class ExternalViewReader {
     return tableToBrokersMap;
   }
 
+  private static byte[] unpackZnodeIfNecessary(byte[] znodeContents) {
+    // Check for gzip header
+    if (znodeContents[0] == 0x1F && znodeContents[1] == (byte) 0x8B) {
+      try {
+        GZIPInputStream inputStream = new GZIPInputStream(new ByteArrayInputStream(znodeContents));
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        int byteRead = inputStream.read();
+
+        while (byteRead != -1) {
+          outputStream.write(byteRead);
+          byteRead = inputStream.read();
+        }
+
+        return outputStream.toByteArray();
+      } catch (IOException e) {
+        LOGGER.error("Failed to decompress znode contents", e);
+        return znodeContents;
+      }
+    } else {
+      // Doesn't look compressed, just return the contents verbatim
+      return znodeContents;
+    }
+  }
 }

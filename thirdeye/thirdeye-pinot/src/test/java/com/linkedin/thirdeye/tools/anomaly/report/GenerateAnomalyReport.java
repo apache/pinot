@@ -3,21 +3,21 @@ package com.linkedin.thirdeye.tools.anomaly.report;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.validation.Validation;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 
 public class GenerateAnomalyReport {
@@ -46,7 +47,6 @@ public class GenerateAnomalyReport {
 
   MergedAnomalyResultManager anomalyResultManager;
   MetricConfigManager metricConfigManager;
-  EmailConfigurationManager emailConfigurationManager;
 
   Date startTime;
   Date endTime;
@@ -61,7 +61,6 @@ public class GenerateAnomalyReport {
     DaoProviderUtil.init(persistenceConfig);
     anomalyResultManager = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     metricConfigManager = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
-    emailConfigurationManager = DaoProviderUtil.getInstance(EmailConfigurationManagerImpl.class);
 
     this.startTime = startTime;
     this.endTime = endTime;
@@ -83,26 +82,11 @@ public class GenerateAnomalyReport {
     }
   }
 
-  void updateEmailConfig() {
-    String recipients = "xyz@linkedin.com";
-    for (String collection : collections) {
-      List<EmailConfigurationDTO> emailConfigs =
-          emailConfigurationManager.findByCollection(collection);
-      for (EmailConfigurationDTO emailConfigurationDTO : emailConfigs) {
-        if (emailConfigurationDTO.getFunctions().size() > 0) {
-          emailConfigurationDTO.setToAddresses(recipients);
-          emailConfigurationManager.update(emailConfigurationDTO);
-          System.out.println("Email updated " + emailConfigurationDTO.getMetric());
-        }
-      }
-    }
-  }
-
   void buildReport() {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (String collection : collections) {
       anomalies.addAll(anomalyResultManager
-          .findByCollectionTime(collection, startTime.getTime(), endTime.getTime(), false));
+          .findByCollectionTime(collection, startTime.getTime(), endTime.getTime()));
     }
 
     if (anomalies.size() == 0) {
@@ -114,24 +98,25 @@ public class GenerateAnomalyReport {
       int feedbackCollected = 0;
       int trueAlert = 0;
       int falseAlert = 0;
-      int nonActionable = 0;
+      int newTrend = 0;
 
       List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
 
       for (MergedAnomalyResultDTO anomaly : anomalies) {
         metrics.add(anomaly.getMetric());
-        if (anomaly.getFeedback() != null) {
+        AnomalyFeedback feedback = anomaly.getFeedback();
+        if (feedback != null) {
           feedbackCollected++;
-          if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
+          if (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
             trueAlert++;
-          } else if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
+          } else if (feedback.getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
             falseAlert++;
           } else {
-            nonActionable++;
+            newTrend++;
           }
         }
         String feedbackVal = getFeedback(
-            anomaly.getFeedback() == null ? "NA" : anomaly.getFeedback().getFeedbackType().name());
+            feedback == null ? "NA" : feedback.getFeedbackType().name());
 
         AnomalyReportDTO anomalyReportDTO =
             new AnomalyReportDTO(String.valueOf(anomaly.getId()), feedbackVal,
@@ -157,8 +142,8 @@ public class GenerateAnomalyReport {
       templateData.put("feedbackCount", feedbackCollected);
       templateData.put("trueAlertCount", trueAlert);
       templateData.put("falseAlertCount", falseAlert);
-      templateData.put("nonActionableCount", nonActionable);
-      templateData.put("datasets", String.join(", ", collections));
+      templateData.put("newTrendCount", newTrend);
+      templateData.put("datasets", StringUtils.join(collections, ", "));
       templateData.put("anomalyDetails", anomalyReportDTOList);
       buildEmailTemplateAndSendAlert(templateData);
     }
@@ -167,17 +152,17 @@ public class GenerateAnomalyReport {
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap) {
     HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    try (Writer out = new OutputStreamWriter(baos, AlertTaskRunner.CHARSET)) {
+    try (Writer out = new OutputStreamWriter(baos, AlertTaskRunnerV2.CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
-      freemarkerConfig.setDefaultEncoding(AlertTaskRunner.CHARSET);
+      freemarkerConfig.setDefaultEncoding(AlertTaskRunnerV2.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
       Template template = freemarkerConfig.getTemplate("custom-anomaly-report.ftl");
       template.process(paramMap, out);
 
       String alertEmailSubject =
           "Thirdeye : Daily anomaly report";
-      String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);
+      String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
       EmailHelper.sendEmailWithHtml(email, smtpConfiguration, alertEmailSubject, alertEmailHtml,
           "thirdeye-dev@linkedin.com", emailRecipients);
     } catch (Exception e) {
@@ -195,8 +180,8 @@ public class GenerateAnomalyReport {
       return "Confirmed Anomaly";
     case "NOT_ANOMALY":
       return "False Alarm";
-    case "ANOMALY_NO_ACTION":
-      return "Not Actionable";
+    case "ANOMALY_NEW_TREND":
+      return "Anomaly New Trend";
     }
     return "NA";
   }
@@ -233,6 +218,15 @@ public class GenerateAnomalyReport {
             Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(),
             "");
     ThirdEyeAnomalyConfiguration detectorConfig = factory.build(detectorConfigFile);
+
+
+    // to start cache service
+    detectorConfig.setRootDir(config.getThirdEyeConfigDirectoryPath());
+    try {
+      ThirdEyeCacheRegistry.initializeCaches(detectorConfig);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
 
     GenerateAnomalyReport reportGenerator =
         new GenerateAnomalyReport(df.parse(config.getStartTimeIso()),
@@ -325,15 +319,9 @@ public class GenerateAnomalyReport {
 
     @Override
     public String toString() {
-      return "AnomalyReportDTO{" +
-          "anomalyId=" + anomalyId +
-          ", metric='" + metric + '\'' +
-          ", startDateTime='" + startDateTime + '\'' +
-          ", windowSize='" + windowSize + '\'' +
-          ", lift='" + lift + '\'' +
-          ", feedback='" + feedback + '\'' +
-          ", anomalyURL='" + anomalyURL + '\'' +
-          '}';
+      return MoreObjects.toStringHelper(this).add("metric", metric).add("startDateTime", startDateTime)
+          .add("windowSize", windowSize).add("lift", lift).add("feedback", feedback).add("anomalyId", anomalyId)
+          .add("anomalyURL", anomalyURL).toString();
     }
   }
 }

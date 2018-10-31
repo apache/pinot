@@ -1,1 +1,0 @@
-{"traceInfo":{},"numDocsScanned":788,"aggregationResults":[{"groupByResult":[{"value":"4982855600.93750","group":["FOB"]},{"value":"4981315185.84375","group":["RAIL"]}],"function":"sum_l_extendedprice","groupByColumns":["l_shipmode"]}],"timeUsedMs":4,"segmentStatistics":[],"exceptions":[],"totalDocs":6001215}

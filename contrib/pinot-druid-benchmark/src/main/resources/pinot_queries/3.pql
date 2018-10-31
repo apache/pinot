@@ -1,0 +1,1 @@
+SELECT SUM(l_extendedprice) FROM tpch_lineitem GROUP BY l_shipdate

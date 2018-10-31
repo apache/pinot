@@ -16,18 +16,18 @@
 
 package com.linkedin.pinot.tools;
 
-import java.util.Map;
-import java.util.Set;
-import org.apache.helix.model.IdealState;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.helix.model.IdealState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotNumReplicaChanger extends PinotZKChanger {
@@ -49,9 +49,8 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
   public void changeNumReplicas(final String tableName)
       throws Exception {
     // Get the number of replicas in the tableconfig.
-    final String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    final AbstractTableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
+    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
     final int newNumReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
 
     // Now get the idealstate, and get the number of replicas in it.

@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.hadoop.util;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.Schema;
-import org.apache.avro.Schema.Field;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -24,6 +23,18 @@ public class ThirdeyeAvroUtilsTest {
   @BeforeClass
   public void setup() throws Exception {
     avroSchema = new Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
+  }
+
+  @Test
+  public void testGetDimensionTypes() throws Exception{
+    String dimensionTypesProperty = ThirdeyeAvroUtils.getDimensionTypesProperty("d1,d2,d3", avroSchema);
+    Assert.assertEquals(dimensionTypesProperty, "STRING,LONG,STRING", "Dimension property not extracted correctly");
+  }
+
+  @Test
+  public void testGetDimensionTypesEmpty() throws Exception{
+    String dimensionTypesProperty = ThirdeyeAvroUtils.getDimensionTypesProperty("", avroSchema);
+    Assert.assertEquals(dimensionTypesProperty, "", "Dimension property not extracted correctly");
   }
 
   @Test
@@ -51,11 +62,11 @@ public class ThirdeyeAvroUtilsTest {
 
     pinotSchema.setSchemaName("test");
     FieldSpec spec = new DimensionFieldSpec("d1", DataType.STRING, true);
-    pinotSchema.addField("d1", spec);
+    pinotSchema.addField(spec);
     spec = new MetricFieldSpec("m1", DataType.DOUBLE);
-    pinotSchema.addField("m1", spec);
+    pinotSchema.addField(spec);
     spec = new TimeFieldSpec(new TimeGranularitySpec(DataType.LONG, TimeUnit.HOURS, "t"));
-    pinotSchema.addField("t", spec);
+    pinotSchema.addField(spec);
 
     Schema avroSchema = ThirdeyeAvroUtils.constructAvroSchemaFromPinotSchema(pinotSchema);
     String dType = ThirdeyeAvroUtils.getDataTypeForField("d1", avroSchema);

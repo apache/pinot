@@ -5,11 +5,16 @@ function DimensionTreeMapController() {
 
 DimensionTreeMapController.prototype = {
 
-  handleAppEvent : function(hashParams) {
-    console.log("----------------- rendering heatmap with hashParams ---------");
-    console.log(hashParams);
-    this.dimensionTreeMapModel.init(hashParams);
-    this.dimensionTreeMapModel.update();
-    this.dimensionTreeMapView.render();
+  handleAppEvent : function(params) {
+    params = params || HASH_SERVICE.getParams();
+    this.dimensionTreeMapModel.init(params);
+    this.dimensionTreeMapModel.update().then(() => {
+      this.dimensionTreeMapView.destroy();
+      this.dimensionTreeMapView.render();
+    });
   },
-}
+
+  destroy() {
+    this.dimensionTreeMapView.destroy();
+  },
+};

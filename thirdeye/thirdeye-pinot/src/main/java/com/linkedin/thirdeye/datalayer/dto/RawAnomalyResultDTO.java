@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.datalayer.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
+
+@Deprecated
 public class RawAnomalyResultDTO extends RawAnomalyResultBean {
 
   private AnomalyFeedbackDTO feedback;
@@ -22,8 +24,9 @@ public class RawAnomalyResultDTO extends RawAnomalyResultBean {
     this.function = function;
   }
 
+  // TODO: rename to getMetric and update the column name in DB?
   public String getMetric() {
-    return function.getMetric();
+    return function.getTopicMetric();
   }
 
   public String getCollection() {

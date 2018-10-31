@@ -15,70 +15,122 @@
  */
 package com.linkedin.pinot.core.data.readers;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.zip.GZIPInputStream;
+
 
 public class RecordReaderUtils {
-  public static Object convertToDataType(String token, DataType dataType) {
-    if ((token == null) || (token.isEmpty())) {
-      return getDefaultNullValue(dataType);
+  private RecordReaderUtils() {
+  }
+
+  public static Reader getFileReader(File dataFile) throws IOException {
+    return new BufferedReader(new InputStreamReader(getFileStreamReader(dataFile), "UTF-8"));
+  }
+
+  public static InputStream getFileStreamReader(File dataFile) throws IOException {
+    InputStream inputStream;
+    if (dataFile.getName().endsWith(".gz")) {
+      inputStream = new GZIPInputStream(new FileInputStream(dataFile));
+    } else {
+      inputStream = new FileInputStream(dataFile);
+    }
+    return inputStream;
+  }
+
+  public static BufferedInputStream getFileBufferStream(File dataFile) throws IOException {
+    return new BufferedInputStream(getFileStreamReader(dataFile));
+  }
+
+  public static Object convertToDataType(String token, FieldSpec fieldSpec) {
+    if ((token == null) || token.isEmpty()) {
+      return fieldSpec.getDefaultNullValue();
     }
 
+    DataType dataType = fieldSpec.getDataType();
     switch (dataType) {
       case INT:
-        return (int) Double.parseDouble(token);
-
+        return Integer.parseInt(token);
       case LONG:
         return Long.parseLong(token);
-
       case FLOAT:
         return Float.parseFloat(token);
-
       case DOUBLE:
         return Double.parseDouble(token);
-
       case STRING:
-      case BOOLEAN:
         return token;
-
       default:
-        throw new RuntimeException("Unsupported data type");
+        throw new IllegalStateException("Illegal data type: " + dataType);
     }
   }
 
-  public static Object convertToDataTypeArray(String [] tokens, DataType dataType) {
-    Object [] value;
+  public static Object convertToDataTypeArray(String[] tokens, FieldSpec fieldSpec) {
+    Object[] value;
 
     if ((tokens == null) || (tokens.length == 0)) {
-      value = new Object[1];
-      value[0] = getDefaultNullValue(dataType);
-
+      value = new Object[]{fieldSpec.getDefaultNullValue()};
     } else {
-      value = new Object[tokens.length];
-      for (int i = 0; i < tokens.length; ++ i) {
-        value[i] = convertToDataType(tokens[i], dataType);
+      int length = tokens.length;
+      value = new Object[length];
+      for (int i = 0; i < length; i++) {
+        value[i] = convertToDataType(tokens[i], fieldSpec);
       }
     }
 
     return value;
   }
 
-  public static Object getDefaultNullValue(DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return Dictionary.DEFAULT_NULL_INT_VALUE;
-      case FLOAT:
-        return Dictionary.DEFAULT_NULL_FLOAT_VALUE;
-      case DOUBLE:
-        return Dictionary.DEFAULT_NULL_DOUBLE_VALUE;
-      case LONG:
-        return Dictionary.DEFAULT_NULL_LONG_VALUE;
-      case STRING:
-      case BOOLEAN:
-        return Dictionary.DEFAULT_NULL_STRING_VALUE;
-      default:
-        break;
+  public static Object convertToDataTypeArray(ArrayList tokens, FieldSpec fieldSpec) {
+    Object[] value;
+
+    if ((tokens == null) || tokens.isEmpty()) {
+      value = new Object[]{fieldSpec.getDefaultNullValue()};
+    } else {
+      int length = tokens.size();
+      value = new Object[length];
+      for (int i = 0; i < length; i++) {
+        Object token = tokens.get(i);
+        if (token == null) {
+          value[i] = fieldSpec.getDefaultNullValue();
+        } else {
+          value[i] = convertToDataType(token.toString(), fieldSpec);
+        }
+      }
     }
-    return null;
+
+    return value;
+  }
+
+  public static Object convertToDataTypeSet(HashSet tokens, FieldSpec fieldSpec) {
+    Object[] value;
+
+    if ((tokens == null) || tokens.isEmpty()) {
+      value = new Object[]{fieldSpec.getDefaultNullValue()};
+    } else {
+      int length = tokens.size();
+      value = new Object[length];
+      int index = 0;
+      for (Object token: tokens) {
+        if (token == null) {
+          value[index] = fieldSpec.getDefaultNullValue();
+        } else {
+          value[index] = convertToDataType(token.toString(), fieldSpec);
+        }
+        index++;
+      }
+    }
+
+    return value;
   }
 }

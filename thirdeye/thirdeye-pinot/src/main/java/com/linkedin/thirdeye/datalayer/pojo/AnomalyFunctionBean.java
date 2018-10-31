@@ -1,17 +1,17 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 
 @JsonIgnoreProperties(ignoreUnknown=true)
@@ -21,17 +21,33 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private String functionName;
 
+  // This variable is topic metric, which is used as a search criteria for searching anomalies
   private String metric;
+
+  // The list of metrics that have to be retrieved in order to detect anomalies for this function
+  private List<String> metrics;
 
   private MetricAggFunction metricFunction;
 
   private String type;
+  private List<String> secondaryAnomalyFunctionsType;
 
   private boolean isActive = true;
+
+  /**
+   * Define the metric and the filters of global metric
+   * TODO: 1) Define a metric node with the metric and filter information, and 2) Point the global metric to the id of the metric node.
+   *
+   */
+  private String globalMetric;
+
+  private String globalMetricFilters;
 
   private String properties;
 
   private String cron;
+
+  private TimeGranularity frequency = new TimeGranularity(1, TimeUnit.HOURS);
 
   private Integer bucketSize;
 
@@ -51,8 +67,29 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private long metricId;
 
+  // Used to remove time series with small traffic or total count if the information is available
+  // This filter is different from the calculation of OTHER dimensions because it removes the time series if the
+  // count is not satisfied. Moreover, we won't have top level traffic or total count information when this filter
+  // is invoked, i.e., this filter is a local filter to time series with a certain dimensions.
+  private Map<String, String> dataFilter;
+
   private Map<String, String> alertFilter;
 
+  private AnomalyMergeConfig anomalyMergeConfig;
+
+  /**
+   * This flag always true.
+   * This flag would typically be unset, in backfill cases, where we want to override the completeness check,
+   */
+  private boolean requiresCompletenessCheck = true;
+
+  public List<String> getSecondaryAnomalyFunctionsType() {
+    return secondaryAnomalyFunctionsType;
+  }
+
+  public void setSecondaryAnomalyFunctionsType(List<String> secondaryAnomalyFunctionsType) {
+    this.secondaryAnomalyFunctionsType = secondaryAnomalyFunctionsType;
+  }
 
   public long getMetricId() {
     return metricId;
@@ -84,6 +121,14 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   public void setMetric(String metric) {
     this.metric = metric;
+  }
+
+  public List<String> getMetrics() {
+    return metrics;
+  }
+
+  public void setMetrics(List<String> metrics) {
+    this.metrics = metrics;
   }
 
   public MetricAggFunction getMetricFunction() {
@@ -124,6 +169,30 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   public void setCron(String cron) {
     this.cron = cron;
+  }
+
+  public String getGlobalMetric() {
+    return globalMetric;
+  }
+
+  public void setGlobalMetric(String globalMetric) {
+    this.globalMetric = globalMetric;
+  }
+
+  public String getGlobalMetricFilters() {
+    return globalMetricFilters;
+  }
+
+  public void setGlobalMetricFilters(String globalMetricFilters) {
+    this.globalMetricFilters = globalMetricFilters;
+  }
+
+  public TimeGranularity getFrequency() {
+    return frequency;
+  }
+
+  public void setFrequency(TimeGranularity frequency) {
+    this.frequency = frequency;
   }
 
   public Integer getBucketSize() {
@@ -186,6 +255,14 @@ public class AnomalyFunctionBean extends AbstractBean {
     return filters;
   }
 
+  public boolean isRequiresCompletenessCheck() {
+    return requiresCompletenessCheck;
+  }
+
+  public void setRequiresCompletenessCheck(boolean requiresCompletenessCheck) {
+    this.requiresCompletenessCheck = requiresCompletenessCheck;
+  }
+
   @JsonIgnore
   @JsonProperty("wrapper")
   public Multimap<String, String> getFilterSet() {
@@ -211,6 +288,22 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.alertFilter = alertFilter;
   }
 
+  public Map<String, String> getDataFilter() {
+    return dataFilter;
+  }
+
+  public void setDataFilter(Map<String, String> dataFilter) {
+    this.dataFilter = dataFilter;
+  }
+
+  public AnomalyMergeConfig getAnomalyMergeConfig() {
+    return anomalyMergeConfig;
+  }
+
+  public void setAnomalyMergeConfig(AnomalyMergeConfig anomalyMergeConfig) {
+    this.anomalyMergeConfig = anomalyMergeConfig;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof AnomalyFunctionBean)) {
@@ -219,9 +312,11 @@ public class AnomalyFunctionBean extends AbstractBean {
     AnomalyFunctionBean af = (AnomalyFunctionBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(collection, af.getCollection())
         && Objects.equals(metric, af.getMetric())
+        && Objects.equals(metrics, af.getMetrics())
         && Objects.equals(metricFunction, af.getMetricFunction())
         && Objects.equals(type, af.getType()) && Objects.equals(isActive, af.getIsActive())
         && Objects.equals(cron, af.getCron()) && Objects.equals(properties, af.getProperties())
+        && Objects.equals(frequency, af.getFrequency())
         && Objects.equals(bucketSize, af.getBucketSize())
         && Objects.equals(bucketUnit, af.getBucketUnit())
         && Objects.equals(windowSize, af.getWindowSize())
@@ -230,24 +325,16 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
         && Objects.equals(exploreDimensions, af.getExploreDimensions())
         && Objects.equals(filters, af.getFilters())
-        && Objects.equals(alertFilter, af.getAlertFilter());
+        && Objects.equals(globalMetric, af.getGlobalMetric())
+        && Objects.equals(globalMetricFilters, af.getGlobalMetricFilters())
+        && Objects.equals(alertFilter, af.getAlertFilter())
+        && Objects.equals(requiresCompletenessCheck,  af.isRequiresCompletenessCheck());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron,
+    return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron, frequency,
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
-        exploreDimensions, filters, alertFilter);
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("collection", collection)
-        .add("metric", metric).add("metric_function", getMetricFunction()).add("type", type)
-        .add("isActive", isActive).add("cron", cron).add("properties", properties)
-        .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
-        .add("windowUnit", windowUnit).add("windowDelay", windowDelay)
-        .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
-        .add("filters", filters).add("alertFilter", alertFilter).toString();
+        exploreDimensions, filters, globalMetric, globalMetricFilters, alertFilter, requiresCompletenessCheck);
   }
 }

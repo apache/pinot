@@ -15,307 +15,490 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.google.common.base.Function;
+import com.google.common.collect.ImmutableList;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
-import java.io.InputStream;
+import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkClient;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-
 
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
  */
-public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineClusterIntegrationTest.class);
+public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+  private static final int NUM_BROKERS = 1;
+  private static final int NUM_SERVERS = 1;
 
-  private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
-  private final File _segmentDir = new File("/tmp/OfflineClusterIntegrationTest/segmentDir");
-  private final File _tarDir = new File("/tmp/OfflineClusterIntegrationTest/tarDir");
-  private ServiceStatus.ServiceStatusCallback _brokerServiceStatusCallback;
-  private ServiceStatus.ServiceStatusCallback _serverServiceStatusCallback;
+  // For inverted index triggering test
+  private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
+      Arrays.asList("FlightNum", "Origin", "Quarter", "DivActualElapsedTime");
+  private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
+      "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
 
-  private static final int SEGMENT_COUNT = 12;
+  // For default columns test
+  private static final String SCHEMA_WITH_EXTRA_COLUMNS =
+      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_extra_columns.schema";
+  private static final String SCHEMA_WITH_MISSING_COLUMNS =
+      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_missing_columns.schema";
+  private static final String TEST_DEFAULT_COLUMNS_QUERY =
+      "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
+  private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
 
-  protected void startCluster() {
-    startZk();
-    startController();
-    startBroker();
-    startServer();
+  private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
+      new ArrayList<>(getNumBrokers() + getNumServers());
+
+  protected int getNumBrokers() {
+    return NUM_BROKERS;
   }
 
-  protected void createTable() throws Exception {
-    File schemaFile = getSchemaFile();
-
-    // Create a table
-    setUpTable(schemaFile, 1, 1);
-  }
-
-  protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
-    addSchema(schemaFile, "schemaFile");
-    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, "mytable", SegmentVersion.v1);
-  }
-
-  protected void dropTable() throws Exception {
-    dropOfflineTable("mytable");
+  protected int getNumServers() {
+    return NUM_SERVERS;
   }
 
   @BeforeClass
   public void setUp() throws Exception {
-    //Clean up
-    ensureDirectoryExistsAndIsEmpty(_tmpDir);
-    ensureDirectoryExistsAndIsEmpty(_segmentDir);
-    ensureDirectoryExistsAndIsEmpty(_tarDir);
+    TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
-    // Start the cluster
-    startCluster();
+    // Start the Pinot cluster
+    startZk();
+    startController();
+    startBrokers(getNumBrokers());
+    startServers(getNumServers());
 
-    // Unpack the Avro files
-    final List<File> avroFiles = unpackAvroData(_tmpDir, SEGMENT_COUNT);
-
-    createTable();
-
-    // Get the list of instances through the REST API
-    URL url = new URL("http://" + ControllerTestUtils.DEFAULT_CONTROLLER_HOST + ":"
-        + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT + "/instances");
-    InputStream inputStream = url.openConnection().getInputStream();
-    String instanceApiResponseString = IOUtils.toString(inputStream);
-    IOUtils.closeQuietly(inputStream);
-    JSONObject instanceApiResponse = new JSONObject(instanceApiResponseString);
-    JSONArray instanceArray = instanceApiResponse.getJSONArray("instances");
-
-    HelixAdmin helixAdmin = new ZKHelixAdmin(new ZkClient(ZkStarter.DEFAULT_ZK_STR, 10000, 10000, new ZNRecordSerializer()));
-    for (int i = 0; i < instanceArray.length(); i++) {
-      String instance = instanceArray.getString(i);
-
-      if (instance.startsWith("Server_")) {
-        _serverServiceStatusCallback =
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(helixAdmin, getHelixClusterName(),
-                instance);
+    // Set up service status callbacks
+    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
+    for (String instance : instances) {
+      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+        _serviceStatusCallbacks.add(
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName, instance,
+                Collections.singletonList(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)));
       }
-
-      if (instance.startsWith("Broker_")) {
-        _brokerServiceStatusCallback =
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(helixAdmin, getHelixClusterName(),
-                instance, Collections.singletonList("brokerResource"));
+      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
+                instance),
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
+                instance))));
       }
     }
 
-    // Load data into H2
+    // Unpack the Avro files
+    List<File> avroFiles = unpackAvroData(_tempDir);
+
     ExecutorService executor = Executors.newCachedThreadPool();
-    setupH2AndInsertAvro(avroFiles, executor);
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false, null);
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), false,
+        getRawIndexColumns(), null, executor);
+
+    // Load data into H2
+    setUpH2Connection(avroFiles, executor);
 
     // Initialize query generator
-    setupQueryGenerator(avroFiles, executor);
+    setUpQueryGenerator(avroFiles, executor);
 
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
-    // Set up a Helix spectator to count the number of segments that are uploaded and unlock the latch once 12 segments are online
-    final CountDownLatch latch = setupSegmentCountCountDownLatch("mytable", SEGMENT_COUNT);
+    // Create the table
+    addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
+        getTaskConfig());
 
-    // Upload the segments
-    int i = 0;
-    for (String segmentName : _tarDir.list()) {
-//      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
-      File file = new File(_tarDir, segmentName);
-      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
-    }
+    // Upload all segments
+    uploadSegments(_tarDir);
 
-    // Wait for all segments to be online
-    latch.await();
-    TOTAL_DOCS = 115545;
-    long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
-    long numDocs;
-    while ((numDocs = getCurrentServingNumDocs("mytable")) < TOTAL_DOCS) {
-//      System.out.println("Current number of documents: " + numDocs);
-      if (System.currentTimeMillis() < timeInTwoMinutes) {
-        Thread.sleep(1000);
-      } else {
-        Assert.fail("Segments were not completely loaded within two minutes");
-      }
-    }
+    // Wait for all documents loaded
+    waitForAllDocsLoaded(600_000L);
   }
 
   @Test
   public void testInstancesStarted() {
-    assertEquals(_serverServiceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD,
-        "Server status is not GOOD");
-
-    assertEquals(_brokerServiceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD,
-        "Broker status is not GOOD");
-  }
-
-  /**
-   * Compare the results with sql results
-   * @throws Exception
-   */
-  @Test
-  public void testDistinctCountNoGroupByQuery() throws Exception {
-    String query;
-    String[] testColumns = new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */, "Carrier"/* string */};
-    boolean hasWhere = true;
-    LOGGER.debug("========================== Test Total " + testColumns.length * 2 + " Queries ==========================");
-    for (String column: testColumns) {
-      for (int i = 0; i < 2; i++) {
-        query = "select distinctcount(" + column + ") from 'mytable'";
-        if (hasWhere) {
-          query += " where DaysSinceEpoch >= 16312";
-        }
-        super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable").replace("distinctcount(", "count(distinct ")));
-        LOGGER.debug("========================== End ==========================");
-        hasWhere = !hasWhere;
-      }
+    Assert.assertEquals(_serviceStatusCallbacks.size(), getNumBrokers() + getNumServers());
+    for (ServiceStatus.ServiceStatusCallback serviceStatusCallback : _serviceStatusCallbacks) {
+      Assert.assertEquals(serviceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD);
     }
   }
 
-  /**
-   * Compare the results with sql results
-   * @throws Exception
-   */
   @Test
-  public void testDistinctCountGroupByQuery() throws Exception {
-    String query;
-    String[] testColumns = new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */};
-    boolean hasWhere = true;
-    LOGGER.debug("========================== Test Total " + testColumns.length * 2 + " Queries ==========================");
-    for (String column: testColumns) {
-      for (int i = 0; i < 2; i++) {
-        /**
-         * Due to test codes, group by keys must appear in the select clause!
-         */
-        query = "select Carrier, distinctcount(" + column + ") from 'mytable'";
-        if (hasWhere) {
-          query += " where DaysSinceEpoch >= 16312";
+  public void testInvertedIndexTriggering() throws Exception {
+    final long numTotalDocs = getCountStarResult();
+
+    JSONObject queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+    Assert.assertEquals(queryResponse.getLong("numEntriesScannedInFilter"), numTotalDocs);
+
+    // Update table config and trigger reload
+    updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
+        UPDATED_INVERTED_INDEX_COLUMNS, getTaskConfig());
+    sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
+
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          JSONObject queryResponse = postQuery(TEST_UPDATED_INVERTED_INDEX_QUERY);
+          // Total docs should not change during reload
+          Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
+          return queryResponse.getLong("numEntriesScannedInFilter") == 0L;
+        } catch (Exception e) {
+          throw new RuntimeException(e);
         }
-        query += " group by Carrier";
-        super.runQuery(query, Collections.singletonList(query.replace("'mytable'", "mytable").replace("distinctcount(", "count(distinct ")));
-        LOGGER.debug("========================== End ==========================");
-        hasWhere = !hasWhere;
       }
+    }, 600_000L, "Failed to generate inverted index");
+  }
+
+  /**
+   * We will add extra new columns to the schema to test adding new columns with default value to the offline segments.
+   * <p>New columns are: (name, field type, data type, single/multi value, default null value)
+   * <ul>
+   *   <li>"newAddedIntMetric", METRIC, INT, single-value, 1</li>
+   *   <li>"newAddedLongMetric", METRIC, LONG, single-value, 1</li>
+   *   <li>"newAddedFloatMetric", METRIC, FLOAT, single-value, default (0.0)</li>
+   *   <li>"newAddedDoubleMetric", METRIC, DOUBLE, single-value, default (0.0)</li>
+   *   <li>"newAddedIntDimension", DIMENSION, INT, single-value, default (Integer.MIN_VALUE)</li>
+   *   <li>"newAddedLongDimension", DIMENSION, LONG, single-value, default (Long.MIN_VALUE)</li>
+   *   <li>"newAddedFloatDimension", DIMENSION, FLOAT, single-value, default (Float.NEGATIVE_INFINITY)</li>
+   *   <li>"newAddedDoubleDimension", DIMENSION, DOUBLE, single-value, default (Double.NEGATIVE_INFINITY)</li>
+   *   <li>"newAddedSVStringDimension", DIMENSION, STRING, single-value, default ("null")</li>
+   *   <li>"newAddedMVStringDimension", DIMENSION, STRING, multi-value, ""</li>
+   * </ul>
+   */
+  @Test
+  public void testDefaultColumns() throws Exception {
+    long numTotalDocs = getCountStarResult();
+
+    reloadDefaultColumns(true);
+    JSONObject queryResponse = postQuery(SELECT_STAR_QUERY);
+    Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
+    Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 89);
+
+    testNewAddedColumns();
+
+    reloadDefaultColumns(false);
+    queryResponse = postQuery(SELECT_STAR_QUERY);
+    Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
+    Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 79);
+  }
+
+  private void reloadDefaultColumns(final boolean withExtraColumns) throws Exception {
+    final long numTotalDocs = getCountStarResult();
+
+    if (withExtraColumns) {
+      sendSchema(SCHEMA_WITH_EXTRA_COLUMNS);
+    } else {
+      sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
     }
-  }
 
-  /**
-   * Compare HLL results with accurate distinct counting results
-   * @throws Exception
-   */
-  @Test
-  public void testDistinctCountHLLNoGroupByQuery() throws Exception {
-    testApproximationQuery(
-        new String[]{"distinctcount", "distinctcounthll"},
-        new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */, "Carrier"/* string */},
-        null,
-        TestUtils.hllEstimationThreshold);
-  }
+    // Trigger reload
+    sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
-  /**
-   * Compare HLL results with accurate distinct counting results
-   * @throws Exception
-   */
-  @Test
-  public void testDistinctCountHLLGroupByQuery() throws Exception {
-    testApproximationQuery(
-        new String[]{"distinctcount", "distinctcounthll"},
-        new String[]{"AirTime"/* int */, "ArrDelayMinutes"/* int */, "ArrTimeBlk"/* string */},
-        "Carrier",
-        TestUtils.hllEstimationThreshold);
-  }
+    String errorMessage;
+    if (withExtraColumns) {
+      errorMessage = "Failed to add default columns";
+    } else {
+      errorMessage = "Failed to remove default columns";
+    }
 
-  @Test
-  public void testQuantileNoGroupByQuery() throws Exception {
-    testApproximationQuery(
-        new String[]{"percentile50", "percentileest50"},
-        new String[]{"AirTime"/* int */, "ArrTime"/* int */},
-        null,
-        TestUtils.digestEstimationThreshold);
-  }
-
-  @Test
-  public void testQuantileGroupByQuery() throws Exception {
-    testApproximationQuery(
-        new String[]{"percentile50", "percentileest50"},
-        new String[]{"AirTime"/* int */, "ArrTime"/* int */},
-        "Carrier",
-        TestUtils.digestEstimationThreshold);
-  }
-
-
-  /**
-   *
-   * @param functionNames: accurate function comes first
-   * @param testColumns
-   * @param groupByColumn
-   * @param precision
-   * @throws Exception
-   */
-  private void testApproximationQuery(String[] functionNames, String[] testColumns, String groupByColumn, double precision) throws Exception {
-    String query;
-    boolean hasWhere = true;
-    LOGGER.debug("========================== Test Total " + testColumns.length * 2 + " Queries ==========================");
-    for (String column: testColumns) {
-      for (int i = 0; i < 2; i++) {
-        query = "select " + functionNames[0] + "(" + column + ") from 'mytable'";
-        if (hasWhere) {
-          query += " where DaysSinceEpoch >= 16312";
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          JSONObject queryResponse = postQuery(TEST_DEFAULT_COLUMNS_QUERY);
+          // Total docs should not change during reload
+          Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
+          long count = queryResponse.getJSONArray("aggregationResults").getJSONObject(0).getLong("value");
+          if (withExtraColumns) {
+            return count == numTotalDocs;
+          } else {
+            return count == 0;
+          }
+        } catch (Exception e) {
+          throw new RuntimeException(e);
         }
-        if (groupByColumn != null) {
-          query += " group by " + groupByColumn;
-          JSONArray accurate = getGroupByArrayFromJSONAggregationResults(postQuery(query));
-          query = query.replace(functionNames[0], functionNames[1]);
-          JSONArray estimate = getGroupByArrayFromJSONAggregationResults(postQuery(query));
-          TestUtils.assertJSONArrayApproximation(estimate, accurate, precision);
-        } else {
-          double accurate = Double.parseDouble(getSingleStringValueFromJSONAggregationResults(postQuery(query)));
-          query = query.replace(functionNames[0], functionNames[1]);
-          double estimate = Double.parseDouble(getSingleStringValueFromJSONAggregationResults(postQuery(query)));
-          TestUtils.assertApproximation(estimate, accurate, precision);
-          //
-        }
-        LOGGER.debug("========================== End ==========================");
-        hasWhere = !hasWhere;
       }
-    }
+    }, 600_000L, errorMessage);
+  }
+
+  private void sendSchema(String resourceName) throws Exception {
+    URL resource = OfflineClusterIntegrationTest.class.getClassLoader().getResource(resourceName);
+    Assert.assertNotNull(resource);
+    File schemaFile = new File(resource.getFile());
+    addSchema(schemaFile, getTableName());
+  }
+
+  private void testNewAddedColumns() throws Exception {
+    long numTotalDocs = getCountStarResult();
+
+    String pqlQuery;
+    String sqlQuery;
+
+    // Test queries with each new added columns
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedLongMetric = 1";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedFloatMetric = 0.0";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDoubleMetric = 0.0";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedLongDimension < 0";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedFloatDimension < 0.0";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDoubleDimension < 0.0";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVStringDimension = 'null'";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVStringDimension = ''";
+    sqlQuery = "SELECT COUNT(*) FROM mytable";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+
+    // Test queries with new added metric column in aggregation function
+    pqlQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch > 16312";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+    pqlQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE DaysSinceEpoch > 16312";
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312";
+    testQuery(pqlQuery, Collections.singletonList(sqlQuery));
+
+    // Test other query forms with new added columns
+    JSONObject response;
+    JSONObject groupByResult;
+    pqlQuery = "SELECT SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedSVStringDimension";
+    response = postQuery(pqlQuery);
+    groupByResult =
+        response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByResult.getInt("value"), 0);
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), "null");
+    pqlQuery = "SELECT SUM(NewAddedDoubleMetric) FROM mytable GROUP BY NewAddedIntDimension";
+    response = postQuery(pqlQuery);
+    groupByResult =
+        response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByResult.getInt("value"), 0);
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
+    pqlQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable GROUP BY NewAddedLongDimension";
+    response = postQuery(pqlQuery);
+    groupByResult =
+        response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByResult.getInt("value"), numTotalDocs);
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Long.MIN_VALUE));
+    pqlQuery =
+        "SELECT SUM(NewAddedIntMetric), SUM(NewAddedLongMetric), SUM(NewAddedFloatMetric), SUM(NewAddedDoubleMetric) "
+            + "FROM mytable GROUP BY NewAddedIntDimension, NewAddedLongDimension, NewAddedFloatDimension, "
+            + "NewAddedDoubleDimension, NewAddedSVStringDimension, NewAddedMVStringDimension";
+    response = postQuery(pqlQuery);
+    JSONArray groupByResultArray = response.getJSONArray("aggregationResults");
+    groupByResult = groupByResultArray.getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByResult.getInt("value"), numTotalDocs);
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
+    groupByResult = groupByResultArray.getJSONObject(1).getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByResult.getInt("value"), numTotalDocs);
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
+    groupByResult = groupByResultArray.getJSONObject(2).getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByResult.getInt("value"), 0);
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
+    groupByResult = groupByResultArray.getJSONObject(3).getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByResult.getInt("value"), 0);
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
+    Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
+  }
+
+  @Test
+  public void testUDF() throws Exception {
+    String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";
+    JSONObject response = postQuery(pqlQuery);
+    JSONObject groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    JSONObject groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24 * 3600);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
+        "timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
+
+    pqlQuery =
+        "SELECT COUNT(*) FROM mytable GROUP BY dateTimeConvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
+        "datetimeconvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY add(DaysSinceEpoch,DaysSinceEpoch,15)";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 + 16138 + 15);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
+        "add(DaysSinceEpoch,DaysSinceEpoch,'15')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY sub(DaysSinceEpoch,25)";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 - 25);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "sub(DaysSinceEpoch,'25')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY mult(DaysSinceEpoch,24,3600)";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24 * 3600);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "mult(DaysSinceEpoch,'24','3600')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY div(DaysSinceEpoch,2)";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 605);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 / 2);
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "div(DaysSinceEpoch,'2')");
+
+    pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY valueIn(DivAirports,'DFW','ORD')";
+    response = postQuery(pqlQuery);
+    groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
+    groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
+    Assert.assertEquals(groupByEntry.getInt("value"), 336);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), "ORD");
+    Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "valuein(DivAirports,'DFW','ORD')");
   }
 
   @AfterClass
   public void tearDown() throws Exception {
-    stopBroker();
+    // Test instance decommission before tearing down
+    testInstanceDecommission();
+
+    // Brokers and servers has been stopped
     stopController();
-    stopServer();
+    stopZk();
+    FileUtils.deleteDirectory(_tempDir);
+  }
+
+  private void testInstanceDecommission() throws Exception {
+    // Fetch all instances
+    JSONObject response = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
+    JSONArray instanceList = response.getJSONArray("instances");
+    int numInstances = instanceList.length();
+    Assert.assertEquals(numInstances, getNumBrokers() + getNumServers());
+
+    // Try to delete a server that does not exist
+    String deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete("potato");
     try {
-      stopZk();
-    } catch (Exception e) {
-      // Swallow ZK Exceptions.
+      sendDeleteRequest(deleteInstanceRequest);
+      Assert.fail("Delete should have returned a failure status (404)");
+    } catch (IOException e) {
+      // Expected exception on 404 status code
     }
-    FileUtils.deleteDirectory(_tmpDir);
+
+    // Get the server name
+    String serverName = null;
+    String brokerName = null;
+    for (int i = 0; i < numInstances; i++) {
+      String instanceName = instanceList.getString(i);
+      if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        serverName = instanceName;
+      } else if (instanceName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+        brokerName = instanceName;
+      }
+    }
+
+    // Try to delete a live server
+    deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete(serverName);
+    try {
+      sendDeleteRequest(deleteInstanceRequest);
+      Assert.fail("Delete should have returned a failure status (409)");
+    } catch (IOException e) {
+      // Expected exception on 409 status code
+    }
+
+    // Stop servers
+    stopServer();
+
+    // Try to delete a server whose information is still on the ideal state
+    try {
+      sendDeleteRequest(deleteInstanceRequest);
+      Assert.fail("Delete should have returned a failure status (409)");
+    } catch (IOException e) {
+      // Expected exception on 409 status code
+    }
+
+    // Delete the table
+    dropOfflineTable(getTableName());
+
+    // Now, delete server should work
+    response = new JSONObject(sendDeleteRequest(deleteInstanceRequest));
+    // TODO Cannot compare messages. We need to compare response code.
+//    Assert.assertEquals(response.getString("status"), "success");
+
+    // Try to delete a broker whose information is still live
+    try {
+      deleteInstanceRequest = _controllerRequestURLBuilder.forInstanceDelete(brokerName);
+      sendDeleteRequest(deleteInstanceRequest);
+      Assert.fail("Delete should have returned a failure status (409)");
+    } catch (IOException e) {
+      // Expected exception on 409 status code
+    }
+
+    // Stop brokers
+    stopBroker();
+
+    // TODO: Add test to delete broker instance. Currently, stopBroker() does not work correctly.
+
+    // Check if '/INSTANCES/<serverName>' has been erased correctly
+    String instancePath = "/" + _clusterName + "/INSTANCES/" + serverName;
+    Assert.assertFalse(_propertyStore.exists(instancePath, 0));
+
+    // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
+    String configPath = "/" + _clusterName + "/CONFIGS/PARTICIPANT/" + serverName;
+    Assert.assertFalse(_propertyStore.exists(configPath, 0));
   }
 }

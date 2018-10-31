@@ -4,6 +4,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
 
@@ -26,7 +28,6 @@ public class AnomalyFunctionFactory {
     } catch (FileNotFoundException e) {
       LOGGER.error("File {} not found", functionConfigPath, e);
     }
-
   }
 
   public AnomalyFunctionFactory(InputStream input) {
@@ -60,5 +61,28 @@ public class AnomalyFunctionFactory {
 
     anomalyFunction.init(functionSpec);
     return anomalyFunction;
+  }
+
+  public List<BaseAnomalyFunction> getSecondaryAnomalyFunctions(AnomalyFunctionDTO functionSpec) throws Exception {
+    List<String> secondaryAnomalyFunctionsType = functionSpec.getSecondaryAnomalyFunctionsType();
+
+    if (secondaryAnomalyFunctionsType == null) {
+      LOGGER.info("null secondary anomaly function");
+      return null;
+    }
+
+    List<BaseAnomalyFunction> baseAnomalyFunctions = new ArrayList<>();
+    for (String secondaryAnomalyFunctionType : secondaryAnomalyFunctionsType) {
+      if (secondaryAnomalyFunctionType == null || !props.containsKey(secondaryAnomalyFunctionType)) {
+        LOGGER.error("Unsupported secondary anomaly function type " + secondaryAnomalyFunctionType);
+        continue;
+      }
+      String className = props.getProperty(secondaryAnomalyFunctionType);
+      BaseAnomalyFunction anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
+      anomalyFunction.init(functionSpec);
+      baseAnomalyFunctions.add(anomalyFunction);
+    }
+
+    return baseAnomalyFunctions;
   }
 }

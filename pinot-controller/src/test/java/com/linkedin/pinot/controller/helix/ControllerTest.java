@@ -15,100 +15,69 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.ControllerStarter;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.PutMethod;
+import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
+import org.apache.commons.httpclient.methods.multipart.Part;
+import org.apache.commons.httpclient.methods.multipart.StringPart;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.validation.ValidationManager;
+import org.testng.Assert;
 
 
 /**
  * Base class for controller tests.
- *
  */
 public abstract class ControllerTest {
-  protected static boolean isTraceEnabled;
-  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
-  protected String CONTROLLER_BASE_API_URL = "http://localhost:" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT;
-  public static final int BROKER_PORT = 18099;
-  protected String BROKER_BASE_API_URL = "http://localhost:" + Integer.toString(BROKER_PORT);
-  protected final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
+  public static final String LOCAL_HOST = "localhost";
+
+  private static final int DEFAULT_CONTROLLER_PORT = 8998;
+  private static final String DEFAULT_DATA_DIR =
+      FileUtils.getTempDirectoryPath() + File.separator + "test-controller-" + System.currentTimeMillis();
+
+  protected int _controllerPort;
+  protected String _controllerBaseApiUrl;
+  protected ControllerRequestURLBuilder _controllerRequestURLBuilder;
+  protected String _controllerDataDir;
+
   protected ZkClient _zkClient;
   protected ControllerStarter _controllerStarter;
+  protected PinotHelixResourceManager _helixResourceManager;
+  protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  protected HelixManager _helixZkManager;
+
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
-  public JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {
-    final JSONObject json = new JSONObject();
-    json.put("pql", query);
-    json.put("trace", isTraceEnabled);
-//    json.put("debugOptions", "routingOptions=FORCE_LLC,FORCE_HLC;otherOption=foo,bar");
-
-    final long start = System.currentTimeMillis();
-    final URLConnection conn = new URL(brokerBaseApiUrl + "/query").openConnection();
-    conn.setDoOutput(true);
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-    final String reqStr = json.toString();
-
-    writer.write(reqStr, 0, reqStr.length());
-    writer.flush();
-
-    JSONObject ret = getBrokerReturnJson(conn);
-    final long stop = System.currentTimeMillis();
-
-    LOGGER.debug("Time taken for '{}':{}ms", query, (stop - start));
-    return ret;
-  }
-
-  public JSONObject getDebugInfo(final String uri) throws Exception {
-    final URLConnection conn = new URL(BROKER_BASE_API_URL + "/" + uri).openConnection();
-    conn.setDoOutput(true);
-    return getBrokerReturnJson(conn);
-  }
-
-  private JSONObject getBrokerReturnJson(URLConnection conn) throws Exception {
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
-    }
-
-    final String res = sb.toString();
-    try {
-      final JSONObject ret = new JSONObject(res);
-      return ret;
-    } catch (JSONException e) {
-      LOGGER.warn("Exception  to parse response \"{}\" as JSON", res);
-      return null;
-    }
-  }
-
-  public JSONObject postQuery(String query) throws Exception {
-    return postQuery(query, BROKER_BASE_API_URL);
+  protected String getHelixClusterName() {
+    return getClass().getSimpleName();
   }
 
   protected void startZk() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
+  }
+
+  protected void startZk(int port) {
+    _zookeeperInstance = ZkStarter.startLocalZkServer(port);
   }
 
   protected void stopZk() {
@@ -119,130 +88,125 @@ public abstract class ControllerTest {
     }
   }
 
-  /**
-   * Starts a controller instance.
-   */
-  protected void startController(boolean useTenantIsolation) {
-    assert _controllerStarter == null;
-    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
-    config.setTenantIsolationEnabled(!useTenantIsolation);
-
-    _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
-    if (_zkClient.exists("/" + getHelixClusterName())) {
-      _zkClient.deleteRecursive("/" + getHelixClusterName());
-    }
-    _controllerStarter = ControllerTestUtils.startController(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, config);
-    _helixAdmin = _controllerStarter.getHelixResourceManager().getHelixAdmin();
-    _propertyStore = _controllerStarter.getHelixResourceManager().getPropertyStore();
+  public static ControllerConf getDefaultControllerConfiguration() {
+    ControllerConf config = new ControllerConf();
+    config.setControllerHost(LOCAL_HOST);
+    config.setControllerPort(Integer.toString(DEFAULT_CONTROLLER_PORT));
+    config.setDataDir(DEFAULT_DATA_DIR);
+    config.setZkStr(ZkStarter.DEFAULT_ZK_STR);
+    return config;
   }
 
   protected void startController() {
-    startController(false);
+    startController(getDefaultControllerConfiguration());
   }
 
-  protected ValidationManager getControllerValidationManager() throws Exception {
-    assert _controllerStarter != null;
-    return _controllerStarter.getValidationManager();
+  protected void startController(ControllerConf config) {
+    Assert.assertNotNull(config);
+    Assert.assertNull(_controllerStarter);
+
+    _controllerPort = Integer.valueOf(config.getControllerPort());
+    _controllerBaseApiUrl = "http://localhost:" + _controllerPort;
+    _controllerRequestURLBuilder = ControllerRequestURLBuilder.baseUrl(_controllerBaseApiUrl);
+    _controllerDataDir = config.getDataDir();
+
+    String helixClusterName = getHelixClusterName();
+    config.setHelixClusterName(helixClusterName);
+
+    String zkStr = config.getZkStr();
+    _zkClient = new ZkClient(zkStr);
+    if (_zkClient.exists("/" + helixClusterName)) {
+      _zkClient.deleteRecursive("/" + helixClusterName);
+    }
+
+    _controllerStarter = new ControllerStarter(config);
+    _controllerStarter.start();
+
+    _helixResourceManager = _controllerStarter.getHelixResourceManager();
+    _helixManager = _helixResourceManager.getHelixZkManager();
+    _helixAdmin = _helixResourceManager.getHelixAdmin();
+    _propertyStore = _helixResourceManager.getPropertyStore();
   }
 
-  /**
-   * Stops an already started controller
-   */
   protected void stopController() {
-    assert _controllerStarter != null;
-    ControllerTestUtils.stopController(_controllerStarter);
+    Assert.assertNotNull(_controllerStarter);
+
+    _controllerStarter.stop();
     _controllerStarter = null;
+    FileUtils.deleteQuietly(new File(_controllerDataDir));
     _zkClient.close();
   }
 
-  public static String sendDeleteRequest(String urlString) throws IOException {
-    final long start = System.currentTimeMillis();
+  public static String sendGetRequest(String urlString) throws IOException {
+    return constructResponse(new URL(urlString).openStream());
+  }
 
-    final URL url = new URL(urlString);
-    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-    conn.setDoOutput(true);
-    conn.setRequestMethod("DELETE");
-    conn.connect();
+  public static String sendPostRequest(String urlString, String payload) throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setRequestMethod("POST");
 
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
+    if (payload != null && !payload.isEmpty()) {
+      httpConnection.setDoOutput(true);
+      try (BufferedWriter writer = new BufferedWriter(
+          new OutputStreamWriter(httpConnection.getOutputStream(), "UTF-8"))) {
+        writer.write(payload, 0, payload.length());
+        writer.flush();
+      }
     }
 
-    final long stop = System.currentTimeMillis();
-
-    LOGGER.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
-
-    return sb.toString();
+    return constructResponse(httpConnection.getInputStream());
   }
 
   public static String sendPutRequest(String urlString, String payload) throws IOException {
-    LOGGER.info("Sending PUT to " + urlString + " with payload " + payload);
-    final long start = System.currentTimeMillis();
-    final URL url = new URL(urlString);
-    final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-    conn.setDoOutput(true);
-    conn.setRequestMethod("PUT");
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setDoOutput(true);
+    httpConnection.setRequestMethod("PUT");
 
-    writer.write(payload, 0, payload.length());
-    writer.flush();
-
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
+    try (
+        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(httpConnection.getOutputStream(), "UTF-8"))) {
+      writer.write(payload);
+      writer.flush();
     }
 
-    final long stop = System.currentTimeMillis();
-
-    LOGGER.info(" Time take for Request : " + urlString + " in ms:" + (stop - start));
-
-    return sb.toString();
+    return constructResponse(httpConnection.getInputStream());
   }
 
-  public static String sendPostRequest(String urlString, String payload) throws UnsupportedEncodingException,
-      IOException, JSONException {
-    LOGGER.info("Sending POST to " + urlString + " with payload " + payload);
-    final long start = System.currentTimeMillis();
-    final URL url = new URL(urlString);
-    final URLConnection conn = url.openConnection();
-    conn.setDoOutput(true);
-    final BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
+  public static String sendDeleteRequest(String urlString) throws IOException {
+    HttpURLConnection httpConnection = (HttpURLConnection) new URL(urlString).openConnection();
+    httpConnection.setRequestMethod("DELETE");
+    httpConnection.connect();
 
-    writer.write(payload, 0, payload.length());
-    writer.flush();
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+    return constructResponse(httpConnection.getInputStream());
+  }
 
-    final StringBuilder sb = new StringBuilder();
-    String line = null;
-    while ((line = reader.readLine()) != null) {
-      sb.append(line);
+  private static String constructResponse(InputStream inputStream) throws IOException {
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"))) {
+      StringBuilder responseBuilder = new StringBuilder();
+      String line;
+      while ((line = reader.readLine()) != null) {
+        responseBuilder.append(line);
+      }
+      return responseBuilder.toString();
     }
-
-    final long stop = System.currentTimeMillis();
-
-    LOGGER.info(" Time take for Request : " + payload + " in ms:" + (stop - start));
-
-    return sb.toString();
   }
 
-  public static String sendGetRequest(String urlString) throws UnsupportedEncodingException, IOException, JSONException {
-    BufferedReader reader = null;
-    final URL url = new URL(urlString);
-    reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"));
-    final StringBuilder queryResp = new StringBuilder();
-    for (String respLine; (respLine = reader.readLine()) != null;) {
-      queryResp.append(respLine);
-    }
-    return queryResp.toString();
+  public static PostMethod sendMultipartPostRequest(String url, String body) throws IOException {
+    HttpClient httpClient = new HttpClient();
+    PostMethod postMethod = new PostMethod(url);
+    // our handlers ignore key...so we can put anything here
+    Part[] parts = {new StringPart("body", body)};
+    postMethod.setRequestEntity(new MultipartRequestEntity(parts, postMethod.getParams()));
+    httpClient.executeMethod(postMethod);
+    return postMethod;
   }
 
-  protected String getHelixClusterName() {
-    return this.getClass().getSimpleName();
+  public static PutMethod sendMultipartPutRequest(String url, String body) throws IOException {
+    HttpClient httpClient = new HttpClient();
+    PutMethod putMethod = new PutMethod(url);
+    // our handlers ignore key...so we can put anything here
+    Part[] parts = {new StringPart("body", body)};
+    putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
+    httpClient.executeMethod(putMethod);
+    return putMethod;
   }
 }

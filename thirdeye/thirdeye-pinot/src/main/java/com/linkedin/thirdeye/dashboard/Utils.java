@@ -1,10 +1,22 @@
 package com.linkedin.thirdeye.dashboard;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,90 +24,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-
-import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class Utils {
   private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
-
-  public static List<ThirdEyeRequest> generateRequests(String collection, String requestReference,
-      MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end) {
-
-    List<ThirdEyeRequest> requests = new ArrayList<>();
-
-    for (String dimension : dimensions) {
-      ThirdEyeRequestBuilder requestBuilder = new ThirdEyeRequestBuilder();
-      requestBuilder.setCollection(collection);
-      List<MetricFunction> metricFunctions = Arrays.asList(metricFunction);
-      requestBuilder.setMetricFunctions(metricFunctions);
-
-      requestBuilder.setStartTimeInclusive(start);
-      requestBuilder.setEndTimeExclusive(end);
-      requestBuilder.setGroupBy(dimension);
-
-      ThirdEyeRequest request = requestBuilder.build(requestReference);
-      requests.add(request);
-    }
-
-    return requests;
-  }
-
-  public static Map<String, List<String>> getFilters(QueryCache queryCache, String collection,
-      String requestReference, List<String> dimensions, DateTime start,
-      DateTime end) throws Exception {
-
-    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*");
-
-    List<ThirdEyeRequest> requests =
-        generateRequests(collection, requestReference, metricFunction, dimensions, start, end);
-
-    Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResultMap =
-        queryCache.getQueryResultsAsync(requests);
-
-    Map<String, List<String>> result = new HashMap<>();
-    for (Map.Entry<ThirdEyeRequest, Future<ThirdEyeResponse>> entry : queryResultMap.entrySet()) {
-      ThirdEyeRequest request = entry.getKey();
-      String dimension = request.getGroupBy().get(0);
-      ThirdEyeResponse thirdEyeResponse = entry.getValue().get();
-      int n = thirdEyeResponse.getNumRowsFor(metricFunction);
-
-      List<String> values = new ArrayList<>();
-      for (int i = 0; i < n; i++) {
-        Map<String, String> row = thirdEyeResponse.getRow(metricFunction, i);
-        String dimensionValue = row.get(dimension);
-        values.add(dimensionValue);
-      }
-      result.put(dimension, values);
-    }
-    return result;
-  }
 
   public static List<String> getSortedDimensionNames(String collection)
       throws Exception {
@@ -128,18 +65,9 @@ public class Utils {
     return dimensionsToGroupBy;
   }
 
-  public static List<String> getDashboards(DashboardConfigManager dashboardConfigDAO, String collection) throws Exception {
-    List<DashboardConfigDTO> dashboardConfigs = dashboardConfigDAO.findActiveByDataset(collection);
-
-    List<String> dashboards = new ArrayList<>();
-    for (DashboardConfigDTO dashboardConfig : dashboardConfigs) {
-      dashboards.add(dashboardConfig.getName());
-    }
-    return dashboards;
-  }
 
   public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
-      MetricAggFunction aggFunction, String collection) throws ExecutionException {
+      MetricAggFunction aggFunction, String dataset) throws ExecutionException {
 
     List<MetricExpression> metricExpressions = new ArrayList<>();
     if (metricsJson == null) {
@@ -147,12 +75,9 @@ public class Utils {
     }
     ArrayList<String> metricExpressionNames;
     try {
-      TypeReference<ArrayList<String>> valueTypeRef = new TypeReference<ArrayList<String>>() {
-      };
-
+      TypeReference<ArrayList<String>> valueTypeRef = new TypeReference<ArrayList<String>>() {};
       metricExpressionNames = OBJECT_MAPPER.readValue(metricsJson, valueTypeRef);
     } catch (Exception e) {
-      LOG.warn("Expected json expression for metric [{}], adding as it is. Error in json parsing : [{}]", metricsJson, e.getMessage());
       metricExpressionNames = new ArrayList<>();
       String[] metrics = metricsJson.split(",");
       for (String metric : metrics) {
@@ -160,9 +85,9 @@ public class Utils {
       }
     }
     for (String metricExpressionName : metricExpressionNames) {
-      String derivedMetricExpression = ThirdEyeUtils.getDerivedMetricExpression(metricExpressionName, collection);
+      String derivedMetricExpression = ThirdEyeUtils.getDerivedMetricExpression(metricExpressionName, dataset);
       MetricExpression metricExpression = new MetricExpression(metricExpressionName, derivedMetricExpression,
-           aggFunction);
+           aggFunction, dataset);
       metricExpressions.add(metricExpression);
     }
     return metricExpressions;
@@ -179,42 +104,30 @@ public class Utils {
     return Lists.newArrayList(metricFunctions);
   }
 
-  public static TimeGranularity getTimeGranularityFromString(String aggTimeGranularity) {
-    TimeGranularity timeGranularity = null;
-    if (aggTimeGranularity.indexOf("_") > -1) {
-      String[] split = aggTimeGranularity.split("_");
-      timeGranularity = new TimeGranularity(Integer.parseInt(split[0]), TimeUnit.valueOf(split[1]));
-    } else {
-      timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
-    }
-    return timeGranularity;
-  }
-
-  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity, String collection) {
-    TimeGranularity timeGranularity = getNonAdditiveTimeGranularity(collection);
-
-    if (timeGranularity == null) { // Data is additive and hence use the given time granularity -- aggTimeGranularity
-      timeGranularity = getTimeGranularityFromString(aggTimeGranularity);
-    }
-
-    return timeGranularity;
-  }
-
-  public static TimeGranularity getNonAdditiveTimeGranularity(String collection) {
+  /**
+   * If the dataset is non-additive, then the bucket granularity is return. Otherwise, a TimeGranularity that is
+   * constructed from the given string of aggregation granularity is returned.
+   *
+   * @param aggTimeGranularity the string of aggregation granularity.
+   * @param dataset            the name of the dataset.
+   *
+   * @return the available aggregation granularity for the given dataset.
+   */
+  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity, String dataset) {
     DatasetConfigDTO datasetConfig;
     try {
-      datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      Integer nonAdditiveBucketSize = datasetConfig.getNonAdditiveBucketSize();
-      String nonAdditiveBucketUnit = datasetConfig.getNonAdditiveBucketUnit();
-      if (nonAdditiveBucketSize != null && nonAdditiveBucketUnit != null) {
-        TimeGranularity timeGranularity = new TimeGranularity(datasetConfig.getNonAdditiveBucketSize(),
-            TimeUnit.valueOf(datasetConfig.getNonAdditiveBucketUnit()));
-        return timeGranularity;
-      }
+      datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
     } catch (ExecutionException e) {
-      LOG.info("Exception in fetching non additive time granularity");
+      LOG.info("Unable to determine whether dataset: {} is additive, the given aggregation granularity: {} is used.",
+          dataset, aggTimeGranularity);
+      return TimeGranularity.fromString(aggTimeGranularity);
     }
-    return null;
+
+    if (datasetConfig.isAdditive()) {
+      return TimeGranularity.fromString(aggTimeGranularity);
+    } else {
+      return datasetConfig.bucketTimeGranularity();
+    }
   }
 
   /**
@@ -231,9 +144,8 @@ public class Utils {
    * @return the resized time granularity in order to divide the duration to the number of chunks
    * that is smaller than or equals to the target chunk number.
    */
-  public static String resizeTimeGranularity(long duration, String timeGranularityString,
-      int targetChunkNum) {
-    TimeGranularity timeGranularity = Utils.getTimeGranularityFromString(timeGranularityString);
+  public static String resizeTimeGranularity(long duration, String timeGranularityString, int targetChunkNum) {
+    TimeGranularity timeGranularity = TimeGranularity.fromString(timeGranularityString);
 
     long timeGranularityMillis = timeGranularity.toMillis();
     long chunkNum = duration / timeGranularityMillis;
@@ -255,7 +167,7 @@ public class Utils {
       List<MetricFunction> metricFunctions) {
     List<MetricExpression> metricExpressions = new ArrayList<>();
     for (MetricFunction function : metricFunctions) {
-      metricExpressions.add(new MetricExpression(function.getMetricName()));
+      metricExpressions.add(new MetricExpression(function.getMetricName(), function.getDataset()));
     }
     return metricExpressions;
   }
@@ -266,8 +178,16 @@ public class Utils {
   public static DateTimeZone getDataTimeZone(String collection)  {
     String timezone = TimeSpec.DEFAULT_TIMEZONE;
     try {
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      timezone = datasetConfig.getTimezone();
+      DatasetConfigDTO datasetConfig;
+      LoadingCache<String, DatasetConfigDTO> datasetConfigCache = CACHE_REGISTRY.getDatasetConfigCache();
+      if (datasetConfigCache != null && datasetConfigCache.get(collection) != null) {
+        datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
+      } else {
+        datasetConfig = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(collection);
+      }
+      if (datasetConfig != null) {
+        timezone = datasetConfig.getTimezone();
+      }
     } catch (ExecutionException e) {
       LOG.error("Exception while getting dataset config for {}", collection);
     }
@@ -298,7 +218,7 @@ public class Utils {
   public static long getMaxDataTimeForDataset(String dataset) {
     long endTime = 0;
     try {
-      endTime = CACHE_REGISTRY.getCollectionMaxDataTimeCache().get(dataset);
+      endTime = CACHE_REGISTRY.getDatasetMaxDataTimeCache().get(dataset);
     } catch (ExecutionException e) {
       LOG.error("Exception when getting max data time for {}", dataset);
     }

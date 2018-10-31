@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.loader.defaultcolumn;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -60,14 +61,15 @@ public class V3DefaultColumnHandler extends BaseDefaultColumnHandler {
       createColumnV1Indices(column);
 
       // Write index to V3 format.
-      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
+      Preconditions.checkNotNull(fieldSpec);
       boolean isSingleValue = fieldSpec.isSingleValueField();
-      File dictionaryFile = new File(indexDir, column + V1Constants.Dict.FILE_EXTENTION);
+      File dictionaryFile = new File(_indexDir, column + V1Constants.Dict.FILE_EXTENSION);
       File forwardIndexFile;
       if (isSingleValue) {
-        forwardIndexFile = new File(indexDir, column + V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
+        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.SORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
       } else {
-        forwardIndexFile = new File(indexDir, column + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
+        forwardIndexFile = new File(_indexDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
       }
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, dictionaryFile, ColumnIndexType.DICTIONARY);
       LoaderUtils.writeIndexToV3Format(_segmentWriter, column, forwardIndexFile, ColumnIndexType.FORWARD_INDEX);

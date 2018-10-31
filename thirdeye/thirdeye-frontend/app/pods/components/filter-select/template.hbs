@@ -1,0 +1,13 @@
+{{#power-select-multiple
+  selected=selectedFilters
+  options=viewFilterOptions
+  search=(perform searchByFilterName)
+  onchange=(action "onFilterChange")
+  placeholder="  Add a filter (Type to search)"
+  noMatchesMessage=noMatchesMessage
+  triggerId=triggerId
+  disabled=disabled
+  as |filter|
+}}
+  {{filter.name}}
+{{/power-select-multiple}}

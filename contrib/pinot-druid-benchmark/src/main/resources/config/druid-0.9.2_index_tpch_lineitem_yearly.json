@@ -1,0 +1,91 @@
+{
+  "type": "index_hadoop",
+  "spec": {
+    "ioConfig": {
+      "type": "hadoop",
+      "inputSpec": {
+        "type": "static",
+        "paths": "<CSV FILE PATH>"
+      }
+    },
+    "dataSchema": {
+      "dataSource": "tpch_lineitem",
+      "granularitySpec": {
+        "segmentGranularity": "year",
+        "intervals": [
+          "1992/1999"
+        ]
+      },
+      "parser": {
+        "type": "hadoopyString",
+        "parseSpec": {
+          "format": "tsv",
+          "timestampSpec": {
+            "column": "l_shipdate"
+          },
+          "dimensionsSpec": {
+            "dimensions": [
+              "l_orderkey",
+              "l_partkey",
+              "l_suppkey",
+              "l_linenumber",
+              "l_returnflag",
+              "l_linestatus",
+              "l_shipdate",
+              "l_commitdate",
+              "l_receiptdate",
+              "l_shipinstruct",
+              "l_shipmode",
+              "l_comment"
+            ]
+          },
+          "delimiter": "|",
+          "columns": [
+            "l_orderkey",
+            "l_partkey",
+            "l_suppkey",
+            "l_linenumber",
+            "l_quantity",
+            "l_extendedprice",
+            "l_discount",
+            "l_tax",
+            "l_returnflag",
+            "l_linestatus",
+            "l_shipdate",
+            "l_commitdate",
+            "l_receiptdate",
+            "l_shipinstruct",
+            "l_shipmode",
+            "l_comment"
+          ]
+        }
+      },
+      "metricsSpec": [
+        {
+          "type": "count",
+          "name": "count"
+        },
+        {
+          "type": "longSum",
+          "name": "l_quantity",
+          "fieldName": "l_quantity"
+        },
+        {
+          "type": "doubleSum",
+          "name": "l_extendedprice",
+          "fieldName": "l_extendedprice"
+        },
+        {
+          "type": "doubleSum",
+          "name": "l_discount",
+          "fieldName": "l_discount"
+        },
+        {
+          "type": "doubleSum",
+          "name": "l_tax",
+          "fieldName": "l_tax"
+        }
+      ]
+    }
+  }
+}

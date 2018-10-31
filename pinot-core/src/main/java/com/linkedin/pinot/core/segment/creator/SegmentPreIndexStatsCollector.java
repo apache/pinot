@@ -17,17 +17,11 @@ package com.linkedin.pinot.core.segment.creator;
 
 import com.linkedin.pinot.core.data.GenericRow;
 
-/**
- * Nov 6, 2014
- */
-
-public interface SegmentPreIndexStatsCollector {
+public interface SegmentPreIndexStatsCollector extends SegmentPreIndexStatsContainer {
 
   void init();
 
   void build() throws Exception;
-
-  AbstractColumnStatisticsCollector getColumnProfileFor(String column) throws Exception;
 
   void collectRow(GenericRow row) throws Exception;
 

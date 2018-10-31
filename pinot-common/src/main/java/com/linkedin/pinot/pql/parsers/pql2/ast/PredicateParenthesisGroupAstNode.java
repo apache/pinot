@@ -16,6 +16,7 @@
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.HavingQueryTree;
 
 
 /**
@@ -24,6 +25,11 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 public class PredicateParenthesisGroupAstNode extends PredicateAstNode {
   @Override
   public FilterQueryTree buildFilterQueryTree() {
-    return ((PredicateAstNode)getChildren().get(0)).buildFilterQueryTree();
+    return ((PredicateAstNode) getChildren().get(0)).buildFilterQueryTree();
+  }
+
+  @Override
+  public HavingQueryTree buildHavingQueryTree() {
+    return ((PredicateAstNode) getChildren().get(0)).buildHavingQueryTree();
   }
 }

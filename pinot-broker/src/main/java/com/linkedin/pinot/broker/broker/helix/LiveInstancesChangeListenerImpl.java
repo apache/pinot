@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
+import com.linkedin.pinot.transport.pool.KeyedPool;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,10 +27,6 @@ import org.apache.helix.NotificationContext;
 import org.apache.helix.model.LiveInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.transport.netty.NettyClientConnection;
-import com.linkedin.pinot.transport.pool.KeyedPool;
 
 
 public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListener {
@@ -37,13 +37,13 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
 
   private long timeout;
   private final Map<String, String> liveInstanceToSessionIdMap;
-  private KeyedPool<ServerInstance, NettyClientConnection> connectionPool;
+  private KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool;
 
   public LiveInstancesChangeListenerImpl(String clusterName) {
     this.liveInstanceToSessionIdMap = new HashMap<String, String>();
   }
 
-  public void init(final KeyedPool<ServerInstance, NettyClientConnection> connectionPool, final long timeout) {
+  public void init(final KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool, final long timeout) {
     this.connectionPool = connectionPool;
     this.timeout = timeout;
   }
@@ -51,39 +51,37 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
   @Override
   public void onLiveInstanceChange(List<LiveInstance> liveInstances, NotificationContext changeContext) {
     if (connectionPool == null) {
-      LOGGER.info("init hasn't been called yet on the live instances listener...");
+      LOGGER.warn("init has not been called on the live instances listener, ignoring live instance change.");
       return;
     }
-
-    LOGGER.info("Connection pool found, moving on...");
 
     for (LiveInstance instance : liveInstances) {
 
       String instanceId = instance.getInstanceName();
       String sessionId = instance.getSessionId();
 
-      if (instanceId.startsWith("Broker_")) {
-        LOGGER.info("skipping broker instances {}", instanceId);
+      if (!instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        LOGGER.debug("Skipping non-server instance {}", instanceId);
         continue;
       }
 
-      String namePortStr = instanceId.split("Server_")[1];
+      String namePortStr = instanceId.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
       String hostName = namePortStr.split("_")[0];
       int port;
       try {
         port = Integer.parseInt(namePortStr.split("_")[1]);
       } catch (Exception e) {
-        LOGGER.warn("Port for server instance " + instanceId + " does not appear to be numeric", e);
         port = CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT;
+        LOGGER.warn("Port for server instance {} does not appear to be numeric, defaulting to {}.", instanceId, port, e);
       }
-      ServerInstance ins = new ServerInstance(hostName, port);
 
       if (liveInstanceToSessionIdMap.containsKey(instanceId)) {
         // sessionId has changed
-        LOGGER.info("found instance Id : {} with new session Id : {} old session Id {}", instanceId, sessionId,
-            liveInstanceToSessionIdMap.get(instanceId));
         if (!sessionId.equals(liveInstanceToSessionIdMap.get(instanceId))) {
           try {
+            LOGGER.info("Instance {} has changed session id {} -> {}, validating connection pool for this instance.", instanceId, sessionId,
+                liveInstanceToSessionIdMap.get(instanceId));
+            ServerInstance ins = ServerInstance.forHostPort(hostName, port);
             connectionPool.validatePool(ins, DO_NOT_RECREATE);
             liveInstanceToSessionIdMap.put(instanceId, sessionId);
           } catch (Exception e) {
@@ -91,10 +89,11 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
           }
         }
       } else {
-        LOGGER.info("found instance Id : {} with new session Id : {}", instanceId, sessionId);
+        LOGGER.info("Found new instance {} with session id {}, adding to session id map.", instanceId, sessionId);
         // we don't have this instanceId
         // lets first check if the connection is valid or not
         try {
+          ServerInstance ins = ServerInstance.forHostPort(hostName, port);
           connectionPool.validatePool(ins, DO_NOT_RECREATE);
           liveInstanceToSessionIdMap.put(instanceId, sessionId);
         } catch (Exception e) {
@@ -103,6 +102,4 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
       }
     }
   }
-
-
 }

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.plan.maker;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.PlanNode;

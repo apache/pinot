@@ -15,22 +15,18 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
-
-import org.apache.commons.io.FileUtils;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitMultiValueWriter;
 import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import java.io.File;
+import java.io.IOException;
+import java.util.Arrays;
+import org.apache.commons.io.FileUtils;
 
 
-public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardIndexCreator, Closeable {
-
+public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardIndexCreator {
   private final File forwardIndexFile;
   private final FieldSpec spec;
   private int maxNumberOfBits = 0;
@@ -38,8 +34,8 @@ public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardI
 
   public MultiValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs,
       int totalNumberOfValues, boolean hasNulls) throws Exception {
-
-    forwardIndexFile = new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UN_SORTED_MV_FWD_IDX_FILE_EXTENTION);
+    forwardIndexFile =
+        new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
     this.spec = spec;
     FileUtils.touch(forwardIndexFile);
     maxNumberOfBits = SingleValueUnsortedForwardIndexCreator.getNumOfBits(cardinality);
@@ -57,5 +53,4 @@ public class MultiValueUnsortedForwardIndexCreator implements MultiValueForwardI
   public void close() throws IOException {
     mVWriter.close();
   }
-
 }

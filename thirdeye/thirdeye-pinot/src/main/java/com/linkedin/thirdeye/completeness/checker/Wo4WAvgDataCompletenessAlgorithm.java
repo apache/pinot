@@ -15,11 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
-import com.linkedin.thirdeye.dashboard.resources.DataCompletenessResource;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 
 /**
  * This is the implementation of the WO4W Average function or checking data completeness of datasets
@@ -31,11 +29,9 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(Wo4WAvgDataCompletenessAlgorithm.class);
 
-  private DataCompletenessResource dataCompletenessResource = null;
   private DataCompletenessConfigManager dataCompletenessConfigDAO = null;
 
   public Wo4WAvgDataCompletenessAlgorithm() {
-    dataCompletenessResource = new DataCompletenessResource();
     dataCompletenessConfigDAO = DAO_REGISTRY.getDataCompletenessConfigDAO();
   }
 
@@ -65,7 +61,7 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
       if (!baselineBucketNameToBucketValueMS.isEmpty()) {
 
         Map<String, Long> baselineCountsForBuckets =
-            DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, baselineBucketNameToBucketValueMS);
+            DataCompletenessUtils.getCountsForBucketsOfDataset(dataset, timeSpec, baselineBucketNameToBucketValueMS);
         LOG.info("Baseline bucket counts {}", baselineCountsForBuckets);
 
         for (Entry<String, Long> entry : baselineCountsForBuckets.entrySet()) {
@@ -103,14 +99,28 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
     return baselineCounts;
   }
 
+
+
+  @Override
+  public Map<String, Long> getCurrentCountsForBuckets(String dataset, TimeSpec timeSpec,
+      Map<String, Long> bucketNameToBucketValueMS) {
+    return DataCompletenessUtils.getCountsForBucketsOfDataset(dataset, timeSpec, bucketNameToBucketValueMS);
+  }
+
   @Override
   public double getPercentCompleteness(List<Long> baselineCounts, Long currentCount) {
-    PercentCompletenessFunctionInput input = new PercentCompletenessFunctionInput();
-    input.setAlgorithm(DataCompletenessAlgorithmName.WO4W_AVERAGE);
-    input.setBaselineCounts(baselineCounts);
-    input.setCurrentCount(currentCount);
-    String jsonString = PercentCompletenessFunctionInput.toJson(input);
-    double percentCompleteness = dataCompletenessResource.getPercentCompleteness(jsonString);
+    double percentCompleteness = 0;
+    double baselineTotalCount = 0;
+    for (Long baseline : baselineCounts) {
+      baselineTotalCount = baselineTotalCount + baseline;
+    }
+    baselineTotalCount = baselineTotalCount/baselineCounts.size();
+    if (baselineTotalCount != 0) {
+      percentCompleteness = new Double(currentCount * 100) / baselineTotalCount;
+    }
+    if (baselineTotalCount == 0 && currentCount != 0) {
+      percentCompleteness = 100;
+    }
     return percentCompleteness;
   }
 
@@ -130,5 +140,6 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
   public double getConsiderCompleteAfter() {
     return CONSIDER_COMPLETE_AFTER;
   }
+
 
 }

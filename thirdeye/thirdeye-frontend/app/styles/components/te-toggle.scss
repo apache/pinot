@@ -1,0 +1,21 @@
+// overriding x-toggle default styling
+.te-toggle {
+  margin-right: 14px;
+  // necessary to override the ember-toggle component
+  .x-toggle:checked + label > .x-toggle-ios.x-toggle-btn {
+    background-color: $te-blue-6;
+  }
+
+  &--left {
+    justify-content: flex-start;
+  }
+
+  &--form {
+    margin-top: 6px;
+  }
+
+  &__label {
+    display: flex;
+    align-items: center;
+  }
+}

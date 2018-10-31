@@ -15,66 +15,60 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
-public class FloatDictionary extends ImmutableDictionaryReader {
 
-  public FloatDictionary(PinotDataBuffer dataBuffer, ColumnMetadata metadata) {
-    super(dataBuffer, metadata.getCardinality(), Float.SIZE / 8);
+public class FloatDictionary extends ImmutableDictionaryReader {
+  private static final int FLOAT_SIZE_IN_BYTES = Float.SIZE / Byte.SIZE;
+
+  public FloatDictionary(PinotDataBuffer dataBuffer, int length) {
+    super(dataBuffer, length, FLOAT_SIZE_IN_BYTES, (byte) 0);
   }
 
   @Override
   public int indexOf(Object rawValue) {
-    Float lookup ;
+    int index = insertionIndexOf(rawValue);
+    return (index >= 0) ? index : -1;
+  }
 
+  @Override
+  public int insertionIndexOf(Object rawValue) {
+    float value;
     if (rawValue instanceof String) {
-      lookup = Float.parseFloat((String) rawValue);
+      value = Float.parseFloat((String) rawValue);
     } else {
-      lookup = (Float) rawValue;
+      value = (Float) rawValue;
     }
-    return floatIndexOf(lookup);
+    return binarySearch(value);
   }
 
   @Override
-  public Float get(int dictionaryId) {
-    return getFloat(dictionaryId);
+  public Float get(int dictId) {
+    return getFloat(dictId);
   }
 
   @Override
-  public long getLongValue(int dictionaryId) {
-    return new Float(getFloat(dictionaryId)).longValue();
+  public int getIntValue(int dictId) {
+    return (int) getFloat(dictId);
   }
 
   @Override
-  public double getDoubleValue(int dictionaryId) {
-    return (double) getFloat(dictionaryId);
+  public long getLongValue(int dictId) {
+    return (long) getFloat(dictId);
   }
 
   @Override
-  public String toString(int dictionaryId) {
-    return Float.toString(getFloat(dictionaryId));
+  public float getFloatValue(int dictId) {
+    return getFloat(dictId);
   }
 
   @Override
-  public String getStringValue(int dictionaryId) {
-    return Float.toString(getFloat(dictionaryId));
+  public double getDoubleValue(int dictId) {
+    return getFloat(dictId);
   }
 
   @Override
-  public float getFloatValue(int dictionaryId) {
-    return getFloat(dictionaryId);
+  public String getStringValue(int dictId) {
+    return Float.toString(getFloat(dictId));
   }
-
-  @Override
-  public int getIntValue(int dictionaryId) {
-    return (int) getFloat(dictionaryId);
-  }
-
-  public float getFloat(int dictionaryId) {
-    return dataFileReader.getFloat(dictionaryId, 0);
-  }
-
-
-
 }

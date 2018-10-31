@@ -15,11 +15,13 @@
  */
 package com.linkedin.pinot.core.io.readerwriter;
 
-import java.io.IOException;
-
 import com.linkedin.pinot.core.io.reader.ReaderContext;
+import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
+import com.linkedin.pinot.core.io.writer.SingleColumnMultiValueWriter;
 
-public class BaseSingleColumnMultiValueReaderWriter<T extends ReaderContext> implements SingleColumnMultiValueReaderWriter {
+
+public abstract class BaseSingleColumnMultiValueReaderWriter<T extends ReaderContext>
+    implements SingleColumnMultiValueReader<T>, SingleColumnMultiValueWriter {
 
   @Override
   public int getCharArray(int row, char[] charArray) {
@@ -61,47 +63,39 @@ public class BaseSingleColumnMultiValueReaderWriter<T extends ReaderContext> imp
     throw new UnsupportedOperationException();
   }
 
+  @Override
   public T createContext() {
-    throw new UnsupportedOperationException();
-  }
-
-  public void read(T context) {
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   @Override
-  public void close() throws IOException {
-    throw new UnsupportedOperationException();
+  public int getIntArray(int row, int[] intArray, T readerContext) {
+    return getIntArray(row, intArray);
   }
 
   @Override
   public void setCharArray(int row, char[] charArray) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setShortArray(int row, short[] shortsArray) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setIntArray(int row, int[] intArray) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setLongArray(int row, long[] longArray) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
   public void setFloatArray(int row, float[] floatArray) {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
@@ -116,10 +110,6 @@ public class BaseSingleColumnMultiValueReaderWriter<T extends ReaderContext> imp
 
   @Override
   public void setBytesArray(int row, byte[][] bytesArray) {
-    throw new UnsupportedOperationException();
-  }
-
-  public int getIntArray(int row, int[] intArray, ReaderContext readerContext) {
     throw new UnsupportedOperationException();
   }
 }

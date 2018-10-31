@@ -1,0 +1,4 @@
+dataSourceConfigs:
+  - className: com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource
+    properties:
+        business: business.csv

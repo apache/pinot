@@ -23,14 +23,13 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.startree.StarTreeInterf;
-import com.linkedin.pinot.core.startree.StarTreeSerDe;
+import com.linkedin.pinot.core.startree.OffHeapStarTree;
+import com.linkedin.pinot.core.startree.StarTree;
 import java.io.File;
-import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -60,18 +59,17 @@ public class SegmentDumpTool {
 
     // All columns by default
     if (columnNames == null) {
-      columnNames = new ArrayList<String>(metadata.getSchema().getColumnNames());
+      columnNames = new ArrayList<>(metadata.getSchema().getColumnNames());
       Collections.sort(columnNames);
     }
 
-    IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDir, ReadMode.mmap);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(segmentDir, ReadMode.mmap);
 
-    Map<String, Dictionary> dictionaries = new HashMap<String, Dictionary>();
-    Map<String, BlockSingleValIterator> iterators = new HashMap<String, BlockSingleValIterator>();
+    Map<String, Dictionary> dictionaries = new HashMap<>();
+    Map<String, BlockSingleValIterator> iterators = new HashMap<>();
 
     for (String columnName : columnNames) {
       DataSource dataSource = indexSegment.getDataSource(columnName);
-      dataSource.open();
       Block block = dataSource.nextBlock();
       BlockValSet blockValSet = block.getBlockValueSet();
       BlockSingleValIterator itr = (BlockSingleValIterator) blockValSet.iterator();
@@ -104,8 +102,8 @@ public class SegmentDumpTool {
     if (dumpStarTree) {
       System.out.println();
       File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-      StarTreeInterf tree = StarTreeSerDe.fromFile(starTreeFile, ReadMode.mmap);
-      tree.printTree();
+      StarTree tree = new OffHeapStarTree(starTreeFile, ReadMode.mmap);
+      tree.printTree(dictionaries);
     }
   }
 

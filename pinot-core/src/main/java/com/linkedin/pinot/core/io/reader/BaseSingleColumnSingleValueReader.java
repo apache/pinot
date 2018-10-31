@@ -19,10 +19,7 @@ import java.io.IOException;
 
 public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
     implements SingleColumnSingleValueReader<T> {
-  @Override
-  public T createContext() {
-    throw new UnsupportedOperationException();
-  }
+ 
 
   @Override
   public void close() throws IOException {
@@ -88,6 +85,10 @@ public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
   }
 
   public byte[] getBytes(int row) {
+    throw new UnsupportedOperationException();
+  }
+
+  public byte[] getBytes(int row, T context) {
     throw new UnsupportedOperationException();
   }
 

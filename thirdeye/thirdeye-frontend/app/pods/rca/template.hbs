@@ -1,0 +1,19 @@
+<div class="rca-search-bar">
+  <div class="container">
+    <div class="row">
+      {{#power-select 
+        selected=primaryMetric
+        onchange=(action "onMetricChange")
+        search=(action "onSearch")
+        searchPlaceholder="Search for a metric"
+        placeholder="Search for a metric"
+        as |metric|
+      }}
+        {{metric.alias}}
+      {{/power-select}}
+    </div>
+  </div>
+</div>
+
+{{outlet}}
+

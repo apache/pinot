@@ -1,18 +1,14 @@
 package com.linkedin.thirdeye.util;
 
-
+import java.util.ArrayList;
+import java.util.List;
 import org.testng.Assert;
-import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Multimap;
 
 @Test
 public class ThirdEyeUtilsTest {
 
-  @Test(dataProvider = "testSortedFiltersDataProvider")
+  /*@Test(dataProvider = "testSortedFiltersDataProvider")
   public void testSortedFilters(String filters, String expectedFilters) {
     String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
     Assert.assertEquals(sortedFilters, expectedFilters);
@@ -96,6 +92,69 @@ public class ThirdEyeUtilsTest {
             multimap2, "a=b;a=c;i=c;k=b;z=g"
         }
     };
+  }*/
+
+  @Test
+  public void testGetRoundedValue() throws Exception {
+    double value = 123;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "123");
+    value = 123.24;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "123.24");
+    value = 123.246;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "123.25");
+    value = 123.241;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "123.24");
+    value = 0.23;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.23");
+    value = 0.236;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.24");
+    value = 0.01;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.01");
+    value = 0.016;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.016");
+    value = 0.0167;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.017");
+    value = 0.001;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.001");
+    value = 0.0013;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0013");
+    value = 0.00135;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0014");
+    value = 0;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0");
+    value = 0.0000;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0");
+    value = 0.0000009;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0");
+    value = 0.00123456789;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0012");
+  }
+
+  @Test
+  public void testGetRoundedValueNonRegularNumber() {
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.NaN), Double.toString(Double.NaN));
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.POSITIVE_INFINITY), Double.toString(Double.POSITIVE_INFINITY));
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(Double.NEGATIVE_INFINITY), Double.toString(Double.NEGATIVE_INFINITY));
+  }
+
+  @Test
+  public void testExceptionToStringUnlimited() {
+    List<Exception> exceptions = new ArrayList<>();
+    exceptions.add(new Exception("e1"));
+    exceptions.add(new Exception("e2"));
+    exceptions.add(new Exception("e3"));
+    String errorMessage = ThirdEyeUtils.exceptionsToString(exceptions, 0);
+    Assert.assertTrue(errorMessage.contains("e3"));
+  }
+
+  @Test
+  public void testExceptionToStringLimited() {
+    List<Exception> exceptions = new ArrayList<>();
+    exceptions.add(new Exception("e1"));
+    exceptions.add(new Exception("e2"));
+    exceptions.add(new Exception("e3"));
+    String errorMessage = ThirdEyeUtils.exceptionsToString(exceptions, 100);
+    Assert.assertFalse(errorMessage.contains("e3"));
   }
 
 }

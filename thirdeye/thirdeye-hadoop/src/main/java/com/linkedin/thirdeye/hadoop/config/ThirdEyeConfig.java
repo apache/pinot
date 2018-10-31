@@ -32,6 +32,7 @@ import org.apache.commons.lang.StringUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
@@ -261,26 +262,77 @@ public final class ThirdEyeConfig {
 
     Map<String, Double> threshold = getThresholdFromProperties(props);
     List<TopKDimensionToMetricsSpec> topKDimensionToMetricsSpec = getTopKDimensionToMetricsSpecFromProperties(props);
-    Map<String, String> whitelist = getWhitelistFromProperties(props);
+    Map<String, List<String>> whitelist = getWhitelistFromProperties(props);
+    Map<String, String> nonWhitelistValue = getNonWhitelistValueFromProperties(props);
 
     if (threshold != null || topKDimensionToMetricsSpec != null || whitelist != null) {
       topKWhitelist = new TopkWhitelistSpec();
       topKWhitelist.setThreshold(threshold);
       topKWhitelist.setTopKDimensionToMetricsSpec(topKDimensionToMetricsSpec);
       topKWhitelist.setWhitelist(whitelist);
+      topKWhitelist.setNonWhitelistValue(nonWhitelistValue);
     }
     return topKWhitelist;
   }
 
-  private static Map<String, String> getWhitelistFromProperties(Properties props) {
-    Map<String, String> whitelist = null;
-    String whitelistDimensions = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), null);
-    if (whitelistDimensions != null && whitelistDimensions.split(FIELD_SEPARATOR).length > 0) {
+  /**
+   * Creates a map of dimension name to the value that should be used for "others"
+   * @param props
+   * @return
+   */
+  private static Map<String, String> getNonWhitelistValueFromProperties(Properties props) {
+    Map<String, String> dimensionToNonWhitelistValueMap = null;
+
+    // create dimension to type map
+    List<DimensionSpec> dimensions = getDimensionFromProperties(props);
+    Map<String, DimensionType> dimensionToType = new HashMap<>();
+    for (int i = 0; i < dimensions.size(); i ++) {
+      DimensionSpec spec = dimensions.get(i);
+      dimensionToType.put(spec.getName(), spec.getDimensionType());
+    }
+
+    // dimensions with  whitelist
+    String whitelistDimensionsStr = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), null);
+    List<String> whitelistDimensions = new ArrayList<>();
+    if (StringUtils.isNotBlank(whitelistDimensionsStr)) {
+      dimensionToNonWhitelistValueMap = new HashMap<>();
+      whitelistDimensions.addAll(Lists.newArrayList(whitelistDimensionsStr.split(FIELD_SEPARATOR)));
+    }
+
+    for (String whitelistDimension : whitelistDimensions) {
+      String nonWhitelistValue = getAndCheck(props,
+          ThirdEyeConfigProperties.THIRDEYE_NONWHITELIST_VALUE_DIMENSION.toString() + CONFIG_JOINER + whitelistDimension, null);
+      if (StringUtils.isNotBlank(nonWhitelistValue)) {
+        dimensionToNonWhitelistValueMap.put(whitelistDimension, nonWhitelistValue);
+      } else {
+        dimensionToNonWhitelistValueMap.put(whitelistDimension, String.valueOf(dimensionToType.get(whitelistDimension).getDefaultOtherValue()));
+      }
+    }
+    return dimensionToNonWhitelistValueMap;
+  }
+
+
+  private static Map<String, List<String>> getWhitelistFromProperties(Properties props) {
+ // create dimension to type map
+    List<DimensionSpec> dimensions = getDimensionFromProperties(props);
+    Map<String, DimensionType> dimensionToType = new HashMap<>();
+    Map<String, Integer> dimensionToIndex = new HashMap<>();
+    for (int i = 0; i < dimensions.size(); i ++) {
+      DimensionSpec spec = dimensions.get(i);
+      dimensionToType.put(spec.getName(), spec.getDimensionType());
+      dimensionToIndex.put(spec.getName(), i);
+    }
+
+    Map<String, List<String>> whitelist = null;
+    String whitelistDimensionsStr = getAndCheck(props, ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION_NAMES.toString(), null);
+    if (whitelistDimensionsStr != null && whitelistDimensionsStr.split(FIELD_SEPARATOR).length > 0) {
       whitelist = new HashMap<>();
-      for (String dimension : whitelistDimensions.split(FIELD_SEPARATOR)) {
-        String dimensionWhitelist = getAndCheck(props,
+      for (String dimension : whitelistDimensionsStr.split(FIELD_SEPARATOR)) {
+        String whitelistValuesStr = getAndCheck(props,
             ThirdEyeConfigProperties.THIRDEYE_WHITELIST_DIMENSION.toString() + CONFIG_JOINER + dimension);
-        whitelist.put(dimension, dimensionWhitelist);
+        String[] whitelistValues = whitelistValuesStr.split(FIELD_SEPARATOR);
+        List<String> whitelistValuesList = Lists.newArrayList(whitelistValues);
+        whitelist.put(dimension, whitelistValuesList);
       }
     }
     return whitelist;
@@ -397,8 +449,10 @@ public final class ThirdEyeConfig {
     List<DimensionSpec> dimensions = new ArrayList<>();
     String[] dimensionNames = getAndCheck(props,
         ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString()).split(FIELD_SEPARATOR);
-    for (String dimension : dimensionNames) {
-      dimensions.add(new DimensionSpec(dimension));
+    String[] dimensionTypes = getAndCheck(props,
+        ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString()).split(FIELD_SEPARATOR);
+    for (int i = 0; i < dimensionNames.length; i++) {
+      dimensions.add(new DimensionSpec(dimensionNames[i], DimensionType.valueOf(dimensionTypes[i])));
     }
     return dimensions;
   }

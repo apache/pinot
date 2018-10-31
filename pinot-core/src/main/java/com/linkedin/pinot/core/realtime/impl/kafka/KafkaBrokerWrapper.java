@@ -71,4 +71,9 @@ public class KafkaBrokerWrapper {
     }
     return 0;
   }
+
+  @Override
+  public String toString() {
+    return host() + ":" + port();
+  }
 }

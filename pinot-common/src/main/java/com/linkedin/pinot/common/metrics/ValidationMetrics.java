@@ -16,7 +16,9 @@
 package com.linkedin.pinot.common.metrics;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricName;
@@ -25,15 +27,15 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 /**
  * Validation metrics utility class, which contains the glue code to publish metrics.
- *
  */
 public class ValidationMetrics {
   private final MetricsRegistry _metricsRegistry;
 
-  private final Map<String, Long> gaugeValues = new HashMap<String, Long>();
+  private final Map<String, Long> _gaugeValues = new HashMap<>();
+  private final Set<MetricName> _metricNames = new HashSet<>();
 
   /**
-   * A simple gauge that returns whatever last value was stored in the gaugeValues hash map.
+   * A simple gauge that returns whatever last value was stored in the _gaugeValues hash map.
    */
   private class StoredValueGauge extends Gauge<Long> {
     private final String key;
@@ -44,13 +46,13 @@ public class ValidationMetrics {
 
     @Override
     public Long value() {
-      return gaugeValues.get(key);
+      return _gaugeValues.get(key);
     }
   }
 
   /**
    * A simple gauge that returns the difference between the current system time in millis and the value stored in the
-   * gaugeValues hash map.
+   * _gaugeValues hash map.
    */
   private class CurrentTimeMillisDeltaGauge extends Gauge<Long> {
     private final String key;
@@ -61,7 +63,7 @@ public class ValidationMetrics {
 
     @Override
     public Long value() {
-      Long gaugeValue = gaugeValues.get(key);
+      Long gaugeValue = _gaugeValues.get(key);
 
       if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
         return System.currentTimeMillis() - gaugeValue;
@@ -72,7 +74,7 @@ public class ValidationMetrics {
 
   /**
    * A simple gauge that returns the difference in hours between the current system time and the value stored in the
-   * gaugeValues hash map.
+   * _gaugeValues hash map.
    */
   private class CurrentTimeMillisDeltaGaugeHours extends Gauge<Double> {
     private final String key;
@@ -85,7 +87,7 @@ public class ValidationMetrics {
 
     @Override
     public Double value() {
-      Long gaugeValue = gaugeValues.get(key);
+      Long gaugeValue = _gaugeValues.get(key);
 
       if (gaugeValue != null && gaugeValue != Long.MIN_VALUE)
         return (System.currentTimeMillis() - gaugeValue) / MILLIS_PER_HOUR;
@@ -133,18 +135,18 @@ public class ValidationMetrics {
   }
 
   /**
-   * Updates the gauge for the number of missing segments.
+   * Updates the missing segment count gauge.
    *
    * @param resource The resource for which the gauge is updated
    * @param missingSegmentCount The number of missing segments
    */
-  public void updateMissingSegmentsGauge(final String resource, final int missingSegmentCount) {
+  public void updateMissingSegmentCountGauge(final String resource, final int missingSegmentCount) {
     final String fullGaugeName = makeGaugeName(resource, "missingSegmentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, missingSegmentCount);
   }
 
   /**
-   * Updates the gauge for the offline segment delay.
+   * Updates the offline segment delay gauge.
    *
    * @param resource The resource for which the gauge is updated
    * @param lastOfflineSegmentTime The last offline segment end time, in milliseconds since the epoch, or Long.MIN_VALUE
@@ -158,7 +160,7 @@ public class ValidationMetrics {
   }
 
   /**
-   * Updates the gauge for the last push time.
+   * Updates the last push time gauge.
    *
    * @param resource The resource for which the gauge is updated
    * @param lastPushTimeMillis The last push time, in milliseconds since the epoch, or Long.MIN_VALUE if there is no
@@ -172,33 +174,33 @@ public class ValidationMetrics {
   }
 
   /**
-   * Updates the gauge for the Total Document Count
+   * Updates the total document count gauge.
    *
    * @param resource The resource for which the gauge is updated
-   * @param documentCount Total document count for the give resource name / tablename
+   * @param documentCount Total document count for the given resource name or table name
    */
-  public void updateTotalDocumentsGauge(final String resource, final long documentCount)
+  public void updateTotalDocumentCountGauge(final String resource, final long documentCount)
   {
     final String fullGaugeName = makeGaugeName(resource, "TotalDocumentCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, documentCount);
   }
 
   /**
+   * Updates the non consuming partition count metric.
    *
-   * @param resource The resource for which the guage is updated
-   * @param partitionCount Number of kafka partitions that do not have any segment in CONSUMING state.
+   * @param resource The resource for which the gauge is updated
+   * @param partitionCount Number of Kafka partitions that do not have any segment in CONSUMING state.
    */
-  public void updateNumNonConsumingPartitionsMetric(final String resource, final int partitionCount) {
+  public void updateNonConsumingPartitionCountMetric(final String resource, final int partitionCount) {
     final String fullGaugeName = makeGaugeName(resource, "NonConsumingPartitionCount");
     makeGauge(fullGaugeName, makeMetricName(fullGaugeName), _storedValueGaugeFactory, partitionCount);
-
   }
 
   /**
-   * Updates the gauge for the Total segment count
+   * Updates the segment count gauge.
    *
    * @param resource The resource for which the gauge is updated
-   * @param segmentCount Total segment count for the give resource name / tablename
+   * @param segmentCount Total segment count for the given resource name or table name
    */
   public void updateSegmentCountGauge(final String resource, final long segmentCount)
   {
@@ -215,11 +217,24 @@ public class ValidationMetrics {
   }
 
   private void makeGauge(final String gaugeName, final MetricName metricName, final GaugeFactory<?> gaugeFactory, final long value) {
-    if (!gaugeValues.containsKey(gaugeName)) {
-      gaugeValues.put(gaugeName, value);
+    if (!_gaugeValues.containsKey(gaugeName)) {
+      _gaugeValues.put(gaugeName, value);
       MetricsHelper.newGauge(_metricsRegistry, metricName, gaugeFactory.buildGauge(gaugeName));
+      _metricNames.add(metricName);
     } else {
-      gaugeValues.put(gaugeName, value);
+      _gaugeValues.put(gaugeName, value);
     }
+  }
+
+  /**
+   * Unregisters all validation metrics.
+   */
+  public void unregisterAllMetrics() {
+    for (MetricName metricName : _metricNames) {
+      MetricsHelper.removeMetric(_metricsRegistry, metricName);
+    }
+
+    _metricNames.clear();
+    _gaugeValues.clear();
   }
 }

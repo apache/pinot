@@ -14,8 +14,12 @@ import java.util.Map;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.thirdeye.datalayer.entity.AbstractEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class EntityMappingHolder {
+  private static final Logger LOG = LoggerFactory.getLogger(EntityMappingHolder.class);
+
   //Map<TableName,EntityName>
   BiMap<String, String> tableToEntityNameMap = HashBiMap.create();
   Map<String, LinkedHashMap<String, ColumnInfo>> columnInfoPerTable = new HashMap<>();
@@ -25,14 +29,14 @@ public class EntityMappingHolder {
   public void register(Connection connection, Class<? extends AbstractEntity> entityClass,
       String tableName) throws Exception {
     tableName = tableName.toLowerCase();
-    System.out.println("GENERATING MAPPING FOR TABLE:" + tableName);
+    LOG.info("GENERATING MAPPING FOR TABLE: {}", tableName);
     DatabaseMetaData databaseMetaData = connection.getMetaData();
     String catalog = null;
     String schemaPattern = null;
     String columnNamePattern = null;
     LinkedHashMap<String, ColumnInfo> columnInfoMap = new LinkedHashMap<>();
     tableToEntityNameMap.put(tableName, entityClass.getSimpleName());
-    columnMappingPerTable.put(tableName, HashBiMap.create());
+    columnMappingPerTable.put(tableName, HashBiMap.<String, String>create());
     boolean foundTable = false;
     for (String tableNamePattern : new String[] {tableName.toLowerCase(),
         tableName.toUpperCase()}) {
@@ -49,7 +53,7 @@ public class EntityMappingHolder {
       }
     }
     if (!foundTable) {
-      throw new RuntimeException("Unable to find table:" + tableName);
+      throw new RuntimeException("Unable to find table: " + tableName);
     }
     List<Field> fields = new ArrayList<>();
     getAllFields(fields, entityClass);
@@ -69,16 +73,14 @@ public class EntityMappingHolder {
         if (success) {
           columnInfoMap.get(dbColumn).columnNameInEntity = entityColumn;
           columnInfoMap.get(dbColumn).field = field;
-          System.out.println("Mapped " + dbColumn + " to " + entityColumn);
+          LOG.debug("Mapped {} to {}", dbColumn, entityColumn);
           columnMappingPerTable.get(tableName).put(dbColumn, entityColumn);
           break;
         }
       }
-      if (!success) {
-        String msg =
-            "Unable to map " + dbColumn + " to any field in " + entityClass.getSimpleName();
-        System.out.println(msg);
-        throw new RuntimeException(msg);
+      if(!success) {
+        LOG.error("Unable to map [" + dbColumn + "] to any field in table [" + entityClass
+            .getSimpleName() + "] !!!");
       }
     }
     columnInfoPerTable.put(tableName, columnInfoMap);
@@ -91,7 +93,6 @@ public class EntityMappingHolder {
     }
     return fields;
   }
-
 }
 
 

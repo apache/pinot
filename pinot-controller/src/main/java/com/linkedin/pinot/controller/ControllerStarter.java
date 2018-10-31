@@ -15,6 +15,30 @@
  */
 package com.linkedin.pinot.controller;
 
+import com.google.common.primitives.Longs;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.controller.api.ControllerAdminApiApplication;
+import com.linkedin.pinot.controller.api.access.AccessControlFactory;
+import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
+import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
+import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
+import com.linkedin.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
+import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
+import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -26,66 +50,63 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.PreConnectCallback;
-import org.restlet.Application;
-import org.restlet.Component;
-import org.restlet.Context;
-import org.restlet.data.Protocol;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.primitives.Longs;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.metrics.MetricsHelper;
-import com.linkedin.pinot.common.metrics.ValidationMetrics;
-import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
-import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
-import com.linkedin.pinot.controller.validation.ValidationManager;
-import com.yammer.metrics.core.MetricsRegistry;
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
-  private static final String MetricsRegistryName = "pinot.controller.metrics";
+
+  private static final String METRICS_REGISTRY_NAME = "pinot.controller.metrics";
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
+  private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
 
-  private final ControllerConf config;
-
-  private final Component component;
-  private final Application controllerRestApp;
-  private final PinotHelixResourceManager helixResourceManager;
-  private final RetentionManager retentionManager;
-  private ValidationManager validationManager;
+  private final ControllerConf _config;
+  private final ControllerAdminApiApplication _adminApp;
+  private final PinotHelixResourceManager _helixResourceManager;
+  private final RetentionManager _retentionManager;
   private final MetricsRegistry _metricsRegistry;
-  private final PinotRealtimeSegmentManager realtimeSegmentsManager;
-  private final SegmentStatusChecker segmentStatusChecker;
-  private final ExecutorService executorService;
+  private final ControllerMetrics _controllerMetrics;
+  private final PinotRealtimeSegmentManager _realtimeSegmentsManager;
+  private final SegmentStatusChecker _segmentStatusChecker;
+  private final ExecutorService _executorService;
+
+  // Can only be constructed after resource manager getting started
+  private ValidationManager _validationManager;
+  private RealtimeSegmentRelocator _realtimeSegmentRelocator;
+  private PinotHelixTaskResourceManager _helixTaskResourceManager;
+  private PinotTaskManager _taskManager;
 
   public ControllerStarter(ControllerConf conf) {
-    config = conf;
-    component = new Component();
-    controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
-    helixResourceManager = new PinotHelixResourceManager(config);
-    retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
+    _config = conf;
+    _adminApp = new ControllerAdminApiApplication(_config.getQueryConsole());
+    _helixResourceManager = new PinotHelixResourceManager(_config);
+    _retentionManager = new RetentionManager(_helixResourceManager, _config.getRetentionControllerFrequencyInSeconds(),
+        _config.getDeletedSegmentsRetentionInDays());
     _metricsRegistry = new MetricsRegistry();
-    realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
-    executorService = Executors.newCachedThreadPool(
-        new ThreadFactoryBuilder().setNameFormat("restlet-multiget-thread-%d").build());
+    _controllerMetrics = new ControllerMetrics(_metricsRegistry);
+    _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager);
+    _executorService = Executors.newCachedThreadPool(
+        new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
+    _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
+    _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
-    return helixResourceManager;
+    return _helixResourceManager;
   }
 
   public ValidationManager getValidationManager() {
-    return validationManager;
+    return _validationManager;
+  }
+
+  public PinotHelixTaskResourceManager getHelixTaskResourceManager() {
+    return _helixTaskResourceManager;
+  }
+
+  public PinotTaskManager getTaskManager() {
+    return _taskManager;
   }
 
   public void start() {
@@ -93,89 +114,128 @@ public class ControllerStarter {
 
     Utils.logVersions();
 
-    component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
-    component.getClients().add(Protocol.FILE);
-    component.getClients().add(Protocol.JAR);
-
-    final Context applicationContext = component.getContext().createChildContext();
-
-    LOGGER.info("Controller download url base: {}", config.generateVipUrl());
-    LOGGER.info("Injecting configuration and resource manager to the API context");
-    applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
-    applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
-    MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-    connectionManager.getParams().setConnectionTimeout(config.getServerAdminRequestTimeoutSeconds());
-    applicationContext.getAttributes().put(HttpConnectionManager.class.toString(), connectionManager);
-    applicationContext.getAttributes().put(Executor.class.toString(), executorService);
-
-    controllerRestApp.setContext(applicationContext);
-
-    component.getDefaultHost().attach(controllerRestApp);
-
-    MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));
+    // Set up controller metrics
+    MetricsHelper.initializeMetrics(_config.subset(METRICS_REGISTRY_NAME));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
-    final ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
 
+    // Start all components
     try {
+      LOGGER.info("initializing segment fetchers for all protocols");
+      SegmentFetcherFactory.getInstance()
+          .init(_config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
+
       LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
-      helixResourceManager.start();
-      // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
-      PinotLLCRealtimeSegmentManager.create(helixResourceManager, config, controllerMetrics);
-      ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-      validationManager = new ValidationManager(validationMetrics, helixResourceManager, config, PinotLLCRealtimeSegmentManager.getInstance());
-      LOGGER.info("Starting Pinot REST API component");
-      component.start();
+      _helixResourceManager.start();
+
+      LOGGER.info("Starting task resource manager");
+      _helixTaskResourceManager = new PinotHelixTaskResourceManager(_helixResourceManager.getHelixZkManager());
+
+      LOGGER.info("Starting task manager");
+      _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
+      int taskManagerFrequencyInSeconds = _config.getTaskManagerFrequencyInSeconds();
+      if (taskManagerFrequencyInSeconds > 0) {
+        LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);
+        _taskManager.startScheduler(taskManagerFrequencyInSeconds);
+      }
+
       LOGGER.info("Starting retention manager");
-      retentionManager.start();
+      _retentionManager.start();
+
       LOGGER.info("Starting validation manager");
-      validationManager.start();
+      // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
+      PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
+      ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
+      _validationManager = new ValidationManager(validationMetrics, _helixResourceManager, _config,
+          PinotLLCRealtimeSegmentManager.getInstance());
+      _validationManager.start();
+
       LOGGER.info("Starting realtime segment manager");
-      realtimeSegmentsManager.start(controllerMetrics);
+      _realtimeSegmentsManager.start(_controllerMetrics);
       PinotLLCRealtimeSegmentManager.getInstance().start();
+
       LOGGER.info("Starting segment status manager");
-      segmentStatusChecker.start(controllerMetrics);
-      LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
-      LOGGER.info("Controller services available at http://{}:{}/", config.getControllerHost(),
-          config.getControllerPort());
+      _segmentStatusChecker.start();
+
+      LOGGER.info("Starting realtime segment relocation manager");
+      _realtimeSegmentRelocator.start();
+
+      LOGGER.info("Creating rebalance segments factory");
+      RebalanceSegmentStrategyFactory.createInstance(_helixResourceManager.getHelixZkManager());
+
+      String accessControlFactoryClass = _config.getAccessControlFactoryClass();
+      LOGGER.info("Use class: {} as the access control factory", accessControlFactoryClass);
+      final AccessControlFactory accessControlFactory =
+          (AccessControlFactory) Class.forName(accessControlFactoryClass).newInstance();
+
+      final MetadataEventNotifierFactory metadataEventNotifierFactory = MetadataEventNotifierFactory.loadFactory(
+          _config.subset(METADATA_EVENT_NOTIFIER_PREFIX));
+
+      int jerseyPort = Integer.parseInt(_config.getControllerPort());
+
+      LOGGER.info("Controller download url base: {}", _config.generateVipUrl());
+      LOGGER.info("Injecting configuration and resource managers to the API context");
+      final MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
+      connectionManager.getParams().setConnectionTimeout(_config.getServerAdminRequestTimeoutSeconds());
+      // register all the controller objects for injection to jersey resources
+      _adminApp.registerBinder(new AbstractBinder() {
+        @Override
+        protected void configure() {
+          bind(_config).to(ControllerConf.class);
+          bind(_helixResourceManager).to(PinotHelixResourceManager.class);
+          bind(_helixTaskResourceManager).to(PinotHelixTaskResourceManager.class);
+          bind(_taskManager).to(PinotTaskManager.class);
+          bind(connectionManager).to(HttpConnectionManager.class);
+          bind(_executorService).to(Executor.class);
+          bind(_controllerMetrics).to(ControllerMetrics.class);
+          bind(accessControlFactory).to(AccessControlFactory.class);
+          bind(metadataEventNotifierFactory).to(MetadataEventNotifierFactory.class);
+        }
+      });
+
+      _adminApp.start(jerseyPort);
+      LOGGER.info("Started Jersey API on port {}", jerseyPort);
+      LOGGER.info("Pinot controller ready and listening on port {} for API requests", _config.getControllerPort());
+      LOGGER.info("Controller services available at http://{}:{}/", _config.getControllerHost(),
+          _config.getControllerPort());
     } catch (final Exception e) {
       LOGGER.error("Caught exception while starting controller", e);
       Utils.rethrowException(e);
       throw new AssertionError("Should not reach this");
     }
 
-    controllerMetrics.addCallbackGauge(
+    _controllerMetrics.addCallbackGauge(
             "helix.connected",
             new Callable<Long>() {
               @Override
               public Long call() throws Exception {
-                return helixResourceManager.getHelixZkManager().isConnected() ? 1L : 0L;
+                return _helixResourceManager.getHelixZkManager().isConnected() ? 1L : 0L;
               }
             });
 
-    controllerMetrics.addCallbackGauge(
+    _controllerMetrics.addCallbackGauge(
         "helix.leader", new Callable<Long>() {
               @Override
               public Long call() throws Exception {
-                return helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L;
+                return _helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L;
               }
             });
 
-    controllerMetrics.addCallbackGauge("dataDir.exists", new Callable<Long>() {
+    _controllerMetrics.addCallbackGauge("dataDir.exists", new Callable<Long>() {
       @Override
       public Long call() throws Exception {
-        return new File(config.getDataDir()).exists() ? 1L : 0L;
+        return new File(_config.getDataDir()).exists() ? 1L : 0L;
       }
     });
 
-    controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", new Callable<Long>() {
+    _controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", new Callable<Long>() {
       @Override
       public Long call() throws Exception {
-        File dataDir = new File(config.getDataDir());
+        File dataDir = new File(_config.getDataDir());
 
         if (dataDir.exists()) {
           try {
             long startTime = System.currentTimeMillis();
-            final File testFile = new File(dataDir, config.getControllerHost());
+            final File testFile = new File(dataDir, _config.getControllerHost());
             FileOutputStream outputStream = new FileOutputStream(testFile, false);
             outputStream.write(Longs.toByteArray(System.currentTimeMillis()));
             outputStream.flush();
@@ -196,11 +256,12 @@ public class ControllerStarter {
 
     ServiceStatus.setServiceStatusCallback(new ServiceStatus.ServiceStatusCallback() {
       private boolean _isStarted = false;
+      private String _statusDescription = "Helix ZK Not connected";
       @Override
       public ServiceStatus.Status getServiceStatus() {
         if(_isStarted) {
           // If we've connected to Helix at some point, the instance status depends on being connected to ZK
-          if (helixResourceManager.getHelixZkManager().isConnected()) {
+          if (_helixResourceManager.getHelixZkManager().isConnected()) {
             return ServiceStatus.Status.GOOD;
           } else {
             return ServiceStatus.Status.BAD;
@@ -208,49 +269,63 @@ public class ControllerStarter {
         }
 
         // Return starting until zk is connected
-        if (!helixResourceManager.getHelixZkManager().isConnected()) {
+        if (!_helixResourceManager.getHelixZkManager().isConnected()) {
           return ServiceStatus.Status.STARTING;
         } else {
           _isStarted = true;
+          _statusDescription = ServiceStatus.STATUS_DESCRIPTION_NONE;
           return ServiceStatus.Status.GOOD;
         }
       }
-    });
-
-    helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
       @Override
-      public void onPreConnect() {
-        controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+      public String getStatusDescription() {
+        return _statusDescription;
       }
     });
-    controllerMetrics.initializeGlobalMeters();
-    ControllerRestApplication.setControllerMetrics(controllerMetrics);
+
+    _helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
+      @Override
+      public void onPreConnect() {
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+      }
+    });
+    _controllerMetrics.initializeGlobalMeters();
   }
 
   public void stop() {
     try {
       LOGGER.info("Stopping validation manager");
-      validationManager.stop();
+      _validationManager.stop();
+
+      LOGGER.info("Stopping realtime segment relocation manager");
+      _realtimeSegmentRelocator.stop();
 
       LOGGER.info("Stopping retention manager");
-      retentionManager.stop();
+      _retentionManager.stop();
 
-      LOGGER.info("Stopping API component");
-      component.stop();
+      LOGGER.info("Stopping Jersey admin API");
+      _adminApp.stop();
 
       LOGGER.info("Stopping realtime segment manager");
-      realtimeSegmentsManager.stop();
+      _realtimeSegmentsManager.stop();
 
       LOGGER.info("Stopping resource manager");
-      helixResourceManager.stop();
+      _helixResourceManager.stop();
 
       LOGGER.info("Stopping segment status manager");
-      segmentStatusChecker.stop();
+      _segmentStatusChecker.stop();
 
-      executorService.shutdownNow();
+      LOGGER.info("Stopping task manager");
+      _taskManager.stopScheduler();
+
+      _executorService.shutdownNow();
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }
+  }
+
+  public MetricsRegistry getMetricsRegistry() {
+    return _metricsRegistry;
   }
 
   public static ControllerStarter startDefault() {
@@ -279,6 +354,7 @@ public class ControllerStarter {
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
     conf.setValidationControllerFrequencyInSeconds(3600);
     conf.setStatusCheckerFrequencyInSeconds(5*60);
+    conf.setRealtimeSegmentRelocatorFrequency("1h");
     conf.setStatusCheckerWaitForPushTimeInSeconds(10*60);
     conf.setTenantIsolationEnabled(true);
     final ControllerStarter starter = new ControllerStarter(conf);

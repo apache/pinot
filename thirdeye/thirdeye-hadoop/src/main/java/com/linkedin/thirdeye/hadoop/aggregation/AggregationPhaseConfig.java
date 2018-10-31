@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
 import com.linkedin.thirdeye.hadoop.config.MetricSpec;
 import com.linkedin.thirdeye.hadoop.config.MetricType;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
@@ -30,6 +31,7 @@ import com.linkedin.thirdeye.hadoop.config.TimeSpec;
  */
 public class AggregationPhaseConfig {
   private List<String> dimensionNames;
+  private List<DimensionType> dimensionTypes;
   private List<String> metricNames;
   private List<MetricType> metricTypes;
   private TimeSpec time;
@@ -40,9 +42,10 @@ public class AggregationPhaseConfig {
   }
 
   public AggregationPhaseConfig(List<String> dimensionNames, List<String> metricNames,
-      List<MetricType> metricTypes, TimeSpec time, TimeSpec inputTime) {
+      List<DimensionType> dimensionTypes, List<MetricType> metricTypes, TimeSpec time, TimeSpec inputTime) {
     super();
     this.dimensionNames = dimensionNames;
+    this.dimensionTypes = dimensionTypes;
     this.metricNames = metricNames;
     this.metricTypes = metricTypes;
     this.time = time;
@@ -51,6 +54,10 @@ public class AggregationPhaseConfig {
 
   public List<String> getDimensionNames() {
     return dimensionNames;
+  }
+
+  public List<DimensionType> getDimensionTypes() {
+    return dimensionTypes;
   }
 
   public List<String> getMetricNames() {
@@ -72,17 +79,19 @@ public class AggregationPhaseConfig {
   public static AggregationPhaseConfig fromThirdEyeConfig(ThirdEyeConfig config) {
 
     // metrics
-    List<String> metricNames = new ArrayList<String>(config.getMetrics().size());
-    List<MetricType> metricTypes = new ArrayList<MetricType>(config.getMetrics().size());
+    List<String> metricNames = new ArrayList<>(config.getMetrics().size());
+    List<MetricType> metricTypes = new ArrayList<>(config.getMetrics().size());
     for (MetricSpec spec : config.getMetrics()) {
       metricNames.add(spec.getName());
       metricTypes.add(spec.getType());
     }
 
     // dimensions
-    List<String> dimensionNames = new ArrayList<String>(config.getDimensions().size());
-    for (DimensionSpec dimensionSpec : config.getDimensions()) {
-      dimensionNames.add(dimensionSpec.getName());
+    List<String> dimensionNames = new ArrayList<>(config.getDimensions().size());
+    List<DimensionType> dimensionTypes = new ArrayList<>(config.getDimensions().size());
+    for (DimensionSpec spec : config.getDimensions()) {
+      dimensionNames.add(spec.getName());
+      dimensionTypes.add(spec.getDimensionType());
     }
 
     // time
@@ -94,7 +103,7 @@ public class AggregationPhaseConfig {
       throw new IllegalStateException("Must provide input time configs for aggregation job");
     }
 
-    return new AggregationPhaseConfig(dimensionNames, metricNames, metricTypes, time, inputTime);
+    return new AggregationPhaseConfig(dimensionNames, metricNames, dimensionTypes, metricTypes, time, inputTime);
   }
 
 }

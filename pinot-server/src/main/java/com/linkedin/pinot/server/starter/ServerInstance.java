@@ -15,186 +15,114 @@
  */
 package com.linkedin.pinot.server.starter;
 
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.lang.reflect.InvocationTargetException;
-import org.apache.commons.configuration.BaseConfiguration;
+import com.linkedin.pinot.core.query.scheduler.QuerySchedulerFactory;
+import com.linkedin.pinot.server.conf.ServerConf;
+import com.linkedin.pinot.server.request.ScheduledRequestHandler;
+import com.linkedin.pinot.transport.netty.NettyServer;
+import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.transport.netty.NettyServer;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
-
 
 /**
-*
-* A Standalone Server which will run on the port configured in the properties file.
-* and accept queries. All configurations needed to run the server is provided
-* in the config file passed. No external cluster manager integration available (yet)
-*
-*/
+ * A standalone server which will listen on a port and serve queries based on the given configuration. Cluster
+ * management is maintained outside of this class.
+ */
 public class ServerInstance {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   private ServerConf _serverConf;
-  private DataManager _instanceDataManager;
-  private QueryExecutor _queryExecutor;
-  private RequestHandlerFactory _requestHandlerFactory;
-  private NettyServer _nettyServer;
   private ServerMetrics _serverMetrics;
+  private InstanceDataManager _instanceDataManager;
+  private QueryExecutor _queryExecutor;
   private QueryScheduler _queryScheduler;
-  private Thread _serverThread;
+  private ScheduledRequestHandler _requestHandler;
+  private NettyServer _nettyServer;
 
-  private boolean _istarted = false;
+  private boolean _started = false;
 
-  public ServerInstance() {
+  public void init(@Nonnull ServerConf serverConf, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore)
+      throws Exception {
+    LOGGER.info("Initializing server instance");
 
-  }
-
-  /**
-   * Initialize ServerInstance with ServerConf
-   * @param serverConf
-   * @throws InstantiationException
-   * @throws IllegalAccessException
-   * @throws ClassNotFoundException
-   * @throws ConfigurationException
-   */
-  public void init(ServerConf serverConf, MetricsRegistry metricsRegistry)
-      throws InstantiationException, IllegalAccessException, ClassNotFoundException, ConfigurationException,
-             NoSuchMethodException, InvocationTargetException {
     _serverConf = serverConf;
-    LOGGER.info("Trying to build server config");
-    ServerBuilder serverBuilder = new ServerBuilder(_serverConf, metricsRegistry);
-    LOGGER.info("Trying to build InstanceDataManager");
+    ServerBuilder serverBuilder = new ServerBuilder(_serverConf, propertyStore);
+    _serverMetrics = serverBuilder.getServerMetrics();
     _instanceDataManager = serverBuilder.buildInstanceDataManager();
-    LOGGER.info("Trying to build QueryExecutor");
     _queryExecutor = serverBuilder.buildQueryExecutor(_instanceDataManager);
     _queryScheduler = serverBuilder.buildQueryScheduler(_queryExecutor);
+    _requestHandler = new ScheduledRequestHandler(_queryScheduler, _serverMetrics);
+    _nettyServer = serverBuilder.buildNettyServer(new RequestHandlerFactory() {
+      @Override
+      public NettyServer.RequestHandler createNewRequestHandler() {
+        return _requestHandler;
+      }
+    });
 
-    LOGGER.info("Trying to build RequestHandlerFactory");
-    setRequestHandlerFactory(serverBuilder.buildRequestHandlerFactory(_queryScheduler));
-
-    LOGGER.info("Trying to build TransformFunctionFactory");
-    serverBuilder.init(_serverConf);
-
-    LOGGER.info("Trying to build NettyServer");
-    _nettyServer = serverBuilder.buildNettyServer(_serverConf.getNettyConfig(), _requestHandlerFactory);
-    setServerThread(new Thread(_nettyServer));
-    LOGGER.info("ServerInstance Initialization is Done!");
-    _serverMetrics = serverBuilder.getServerMetrics();
+    LOGGER.info("Finish initializing server instance");
   }
 
-  /**
-   * Start ServerInstance
-   */
   public void start() {
-    LOGGER.info("Trying to start InstanceDataManager");
-    _instanceDataManager.start();
-    LOGGER.info("Trying to start QueryExecutor");
-    _queryExecutor.start();
-    LOGGER.info("Trying to start ServerThread");
-    _serverThread.start();
-    _istarted = true;
-    LOGGER.info("ServerInstance is Started!");
-  }
-
-  /**
-   * ShutDown ServerInstance
-   */
-  public void shutDown() {
-    if (isStarted()) {
-      _queryExecutor.shutDown();
-      _instanceDataManager.shutDown();
-      _nettyServer.shutdownGracefully();
-      _istarted = false;
-      LOGGER.info("ServerInstance is ShutDown Completely!");
-    } else {
-      LOGGER.info("ServerInstance is already ShutDown! Won't do anything!");
+    LOGGER.info("Starting server instance");
+    if (_started) {
+      LOGGER.info("Server instance is already started");
+      return;
     }
+
+    LOGGER.info("Starting instance data manager");
+    _instanceDataManager.start();
+    LOGGER.info("Starting query executor");
+    _queryExecutor.start();
+    LOGGER.info("Starting query scheduler");
+    _queryScheduler.start();
+    LOGGER.info("Starting netty server");
+    new Thread(_nettyServer).start();
+
+    _started = true;
+    LOGGER.info("Finish starting server instance");
   }
 
-  /**
-   * @return instanceDataManager
-   */
-  public DataManager getInstanceDataManager() {
-    return _instanceDataManager;
-  }
+  public void shutDown() {
+    LOGGER.info("Shutting down server instance");
+    if (!_started) {
+      LOGGER.info("Server instance is not running");
+      return;
+    }
 
-  /**
-   * @param instanceDataManager
-   */
-  public void setInstanceDataManager(DataManager instanceDataManager) {
-    this._instanceDataManager = instanceDataManager;
-  }
+    LOGGER.info("Shutting down netty server");
+    _nettyServer.shutdownGracefully();
+    LOGGER.info("Shutting down query scheduler");
+    _queryScheduler.stop();
+    LOGGER.info("Shutting down query executor");
+    _queryExecutor.shutDown();
+    LOGGER.info("Shutting down instance data manager");
+    _instanceDataManager.shutDown();
 
-  /**
-   * @return queryExecutor
-   */
-  public QueryExecutor getQueryExecutor() {
-    return _queryExecutor;
-  }
-
-  /**
-   * @param queryExecutor
-   */
-  public void setQueryExecutor(QueryExecutor queryExecutor) {
-    this._queryExecutor = queryExecutor;
-  }
-
-  /**
-   * @return requestHandlerFactory
-   */
-  public RequestHandlerFactory getRequestHandlerFactory() {
-    return _requestHandlerFactory;
-  }
-
-  /**
-   * @param requestHandlerFactory
-   */
-  public void setRequestHandlerFactory(RequestHandlerFactory requestHandlerFactory) {
-    this._requestHandlerFactory = requestHandlerFactory;
-  }
-
-  public boolean isStarted() {
-    return _istarted;
-  }
-
-  /**
-   * @return serverThread
-   */
-  public Thread getServerThread() {
-    return _serverThread;
-  }
-
-  /**
-   * @param serverThread
-   */
-  public void setServerThread(Thread serverThread) {
-    this._serverThread = serverThread;
-  }
-
-  /**
-   * @return nettyServer
-   */
-  public NettyServer getNettyServer() {
-    return _nettyServer;
-  }
-
-  /**
-   * @param nettyServer
-   */
-  public void setNettyServer(NettyServer nettyServer) {
-    this._nettyServer = nettyServer;
+    _started = false;
+    LOGGER.info("Finish shutting down server instance");
   }
 
   public ServerMetrics getServerMetrics() {
     return _serverMetrics;
+  }
+
+  public InstanceDataManager getInstanceDataManager() {
+    return _instanceDataManager;
+  }
+
+  public void resetQueryScheduler(String schedulerName) {
+    Configuration schedulerConfig = _serverConf.getSchedulerConfig();
+    schedulerConfig.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, schedulerName);
+    _queryScheduler = QuerySchedulerFactory.create(schedulerConfig, _queryExecutor, _serverMetrics);
+    _queryScheduler.start();
+    _requestHandler.setScheduler(_queryScheduler);
   }
 }

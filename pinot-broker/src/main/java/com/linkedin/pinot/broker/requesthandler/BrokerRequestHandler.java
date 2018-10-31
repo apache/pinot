@@ -16,6 +16,13 @@
 package com.linkedin.pinot.broker.requesthandler;
 
 import com.google.common.base.Splitter;
+import com.linkedin.pinot.broker.api.RequesterIdentity;
+import com.linkedin.pinot.broker.broker.AccessControlFactory;
+import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
+import com.linkedin.pinot.broker.routing.RoutingTable;
+import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.TimeBoundaryService;
+import com.linkedin.pinot.broker.routing.TimeBoundaryService.TimeBoundaryInfo;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -33,29 +40,20 @@ import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.BrokerResponseFactory.ResponseType;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.routing.RoutingTable;
-import com.linkedin.pinot.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.routing.TimeBoundaryService;
-import com.linkedin.pinot.routing.TimeBoundaryService.TimeBoundaryInfo;
 import com.linkedin.pinot.serde.SerDe;
-import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
-import com.linkedin.pinot.transport.common.ReplicaSelection;
-import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
-import com.linkedin.pinot.transport.common.RoundRobinReplicaSelection;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
-import io.netty.buffer.ByteBuf;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -65,6 +63,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.lang.mutable.MutableLong;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -80,24 +80,13 @@ public class BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerRequestHandler.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
 
-  private static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
-  private static final String BROKER_QUERY_RESPONSE_LIMIT_CONFIG = "pinot.broker.query.response.limit";
-  public static final long DEFAULT_BROKER_TIME_OUT_MS = 10 * 1000L;
-  private static final String BROKER_TIME_OUT_CONFIG = "pinot.broker.timeoutMs";
-  private static final String DEFAULT_BROKER_ID;
-  public static final String BROKER_ID_CONFIG_KEY = "pinot.broker.id";
+  private static final String BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
   private static final ResponseType DEFAULT_BROKER_RESPONSE_TYPE = ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+  private static final int DEFAULT_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
 
-  static {
-    String defaultBrokerId = "";
-    try {
-      defaultBrokerId = InetAddress.getLocalHost().getHostName();
-    } catch (UnknownHostException e) {
-      LOGGER.error("Failed to read default broker id.", e);
-    }
-    DEFAULT_BROKER_ID = defaultBrokerId;
-  }
-
+  private final SegmentZKMetadataPrunerService _segmentPrunerService;
+  private final int _queryLogLength;
+  private final AccessControlFactory _accessControlFactory;
   private final RoutingTable _routingTable;
   private final ScatterGather _scatterGatherer;
   private final ReduceServiceRegistry _reduceServiceRegistry;
@@ -108,38 +97,52 @@ public class BrokerRequestHandler {
   private final int _queryResponseLimit;
   private final AtomicLong _requestIdGenerator;
   private final String _brokerId;
-  // TODO: Currently only using RoundRobin selection. But, this can be allowed to be configured.
-  private RoundRobinReplicaSelection _replicaSelection;
 
   public BrokerRequestHandler(RoutingTable table, TimeBoundaryService timeBoundaryService,
-      ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry, BrokerMetrics brokerMetrics,
-      Configuration config) {
+      ScatterGather scatterGatherer, ReduceServiceRegistry reduceServiceRegistry,
+      SegmentZKMetadataPrunerService segmentPrunerService, BrokerMetrics brokerMetrics, Configuration config,
+      AccessControlFactory accessControlFactory) {
     _routingTable = table;
     _timeBoundaryService = timeBoundaryService;
     _reduceServiceRegistry = reduceServiceRegistry;
     _scatterGatherer = scatterGatherer;
-    _replicaSelection = new RoundRobinReplicaSelection();
     _brokerMetrics = brokerMetrics;
     _optimizer = new BrokerRequestOptimizer();
     _requestIdGenerator = new AtomicLong(0);
-    _queryResponseLimit = config.getInt(BROKER_QUERY_RESPONSE_LIMIT_CONFIG, DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
-    _brokerTimeOutMs = config.getLong(BROKER_TIME_OUT_CONFIG, DEFAULT_BROKER_TIME_OUT_MS);
-    _brokerId = config.getString(BROKER_ID_CONFIG_KEY, DEFAULT_BROKER_ID);
+    _queryResponseLimit = config.getInt(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT,
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+    _queryLogLength = config.getInt(BROKER_QUERY_LOG_LENGTH, DEFAULT_QUERY_LOG_LENGTH);
+    _brokerTimeOutMs = config.getLong(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS,
+        CommonConstants.Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    _brokerId = config.getString(CommonConstants.Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
+    _segmentPrunerService = segmentPrunerService;
+    _accessControlFactory = accessControlFactory;
+
     LOGGER.info("Broker response limit is: " + _queryResponseLimit);
     LOGGER.info("Broker timeout is - " + _brokerTimeOutMs + " ms");
     LOGGER.info("Broker id: " + _brokerId);
+  }
+
+  private String getDefaultBrokerId() {
+    String defaultBrokerId = "";
+    try {
+      defaultBrokerId = InetAddress.getLocalHost().getHostName();
+    } catch (UnknownHostException e) {
+      LOGGER.error("Caught exception while getting default broker id", e);
+    }
+    return defaultBrokerId;
   }
 
   /**
    * Process a JSON format request.
    *
    * @param request JSON format request to be processed.
+   * @param requesterIdentity
    * @return broker response.
    * @throws Exception
    */
   @Nonnull
-  public BrokerResponse handleRequest(@Nonnull JSONObject request)
-      throws Exception {
+  public BrokerResponse handleRequest(@Nonnull JSONObject request, RequesterIdentity requesterIdentity) throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
     String pql = request.getString("pql");
     LOGGER.debug("Query string for requestId {}: {}", requestId, pql);
@@ -158,26 +161,76 @@ public class BrokerRequestHandler {
       LOGGER.debug("Debug options are set to: {} for requestId {}: {}", debugOptions, requestId, pql);
     }
 
-    // Compile and validate the request.
-    long compilationStartTime = System.nanoTime();
+    // Compile the request
+    final long compilationStartTime = System.nanoTime();
     BrokerRequest brokerRequest;
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
     } catch (Exception e) {
-      LOGGER.warn("Parsing error on requestId {}: {}", requestId, pql, e);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      LOGGER.info("Parsing error on requestId {}: {}, {}", requestId, pql, e.getMessage());
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1L);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
-    String tableName = brokerRequest.getQuerySource().getTableName();
+    final String tableName = brokerRequest.getQuerySource().getTableName();
+    final String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
+        System.nanoTime() - compilationStartTime);
+
+    final long authStartTime = System.nanoTime();
+    try {
+      boolean hasAccess = _accessControlFactory.create().hasAccess(requesterIdentity, brokerRequest);
+      if (!hasAccess) {
+        _brokerMetrics.addMeteredTableValue(brokerRequest.getQuerySource().getTableName(), BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+        return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE, QueryException.ACCESS_DENIED_ERROR);
+      }
+    } finally {
+      _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
+          System.nanoTime() - authStartTime);
+    }
+
+    // Get the resources hit by the request
+    String offlineTableName = null;
+    String realtimeTableName = null;
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      // Offline table name
+      if (_routingTable.routingTableExists(tableName)) {
+        offlineTableName = tableName;
+      }
+    } else if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+      // Realtime table name
+      if (_routingTable.routingTableExists(tableName)) {
+        realtimeTableName = tableName;
+      }
+    } else {
+      // Raw table name (check both OFFLINE and REALTIME)
+      String offlineTableNameToCheck = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      if (_routingTable.routingTableExists(offlineTableNameToCheck)) {
+        offlineTableName = offlineTableNameToCheck;
+      }
+      String realtimeTableNameToCheck = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      if (_routingTable.routingTableExists(realtimeTableNameToCheck)) {
+        realtimeTableName = realtimeTableNameToCheck;
+      }
+    }
+    if ((offlineTableName == null) && (realtimeTableName == null)) {
+      // No table matches the request
+      LOGGER.info("No table matches the name: {}", tableName);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1L);
+      return BrokerResponseFactory.getStaticNoTableHitBrokerResponse(ResponseType.BROKER_RESPONSE_TYPE_NATIVE);
+    }
+
+    // Validate the request
     try {
       validateRequest(brokerRequest);
     } catch (Exception e) {
-      LOGGER.warn("Validation error on requestId {}: {}", requestId, pql, e);
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
+      LOGGER.info("Validation error on requestId {}: {}, {}", requestId, pql, e.getMessage());
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1L);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
+
     if (isTraceEnabled) {
       brokerRequest.setEnableTrace(true);
     }
@@ -185,15 +238,15 @@ public class BrokerRequestHandler {
       brokerRequest.setDebugOptions(debugOptions);
     }
     brokerRequest.setResponseFormat(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name());
-    _brokerMetrics.addPhaseTiming(tableName, BrokerQueryPhase.REQUEST_COMPILATION,
-        System.nanoTime() - compilationStartTime);
-    _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.QUERIES, 1);
+    _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERIES, 1L);
 
     // Execute the query.
     long executionStartTime = System.nanoTime();
     ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
-    BrokerResponse brokerResponse = processBrokerRequest(brokerRequest, scatterGatherStats, requestId);
-    _brokerMetrics.addPhaseTiming(tableName, BrokerQueryPhase.QUERY_EXECUTION, System.nanoTime() - executionStartTime);
+    BrokerResponse brokerResponse =
+        processBrokerRequest(brokerRequest, offlineTableName, realtimeTableName, scatterGatherStats, requestId);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
+        System.nanoTime() - executionStartTime);
 
     // Set total query processing time.
     long totalTimeMs = TimeUnit.MILLISECONDS.convert(System.nanoTime() - compilationStartTime, TimeUnit.NANOSECONDS);
@@ -205,7 +258,7 @@ public class BrokerRequestHandler {
             + "numEntriesScannedPostFilter: {}, totalDocs: {}, scatterGatherStats: {}, query: {}", requestId,
         brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
         brokerResponse.getNumEntriesScannedInFilter(), brokerResponse.getNumEntriesScannedPostFilter(),
-        brokerResponse.getTotalDocs(), scatterGatherStats, pql);
+        brokerResponse.getTotalDocs(), scatterGatherStats, StringUtils.substring(pql, 0, _queryLogLength));
 
     return brokerResponse;
   }
@@ -251,56 +304,56 @@ public class BrokerRequestHandler {
    * </ul>
    *
    * @param brokerRequest broker request to be processed.
+   * @param offlineTableName offline table hit by the request.
+   * @param realtimeTableName realtime table hit by the request.
    * @param scatterGatherStats scatter-gather statistics.
    * @param requestId broker request ID.
    * @return broker response.
    * @throws InterruptedException
    */
   @Nonnull
-  public BrokerResponse processBrokerRequest(@Nonnull BrokerRequest brokerRequest,
-      @Nonnull ScatterGatherStats scatterGatherStats, long requestId)
+  public BrokerResponse processBrokerRequest(@Nonnull BrokerRequest brokerRequest, @Nullable String offlineTableName,
+      @Nullable String realtimeTableName, @Nonnull ScatterGatherStats scatterGatherStats, long requestId)
       throws InterruptedException {
-    String tableName = brokerRequest.getQuerySource().getTableName();
     ResponseType responseType = BrokerResponseFactory.getResponseType(brokerRequest.getResponseFormat());
     LOGGER.debug("Broker Response Type: {}", responseType.name());
 
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    if (!_routingTable.routingTableExists(offlineTableName)) {
-      offlineTableName = null;
-    }
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    if (!_routingTable.routingTableExists(realtimeTableName)) {
-      realtimeTableName = null;
-    }
+    // TODO: get time column name from schema or table config so that we can apply it in realtime only use case.
+    // We get timeColumnName from time boundary service currently, which only exists for offline table.
+    String timeColumnName = (offlineTableName != null) ? getTimeColumnName(offlineTableName) : null;
 
-    if ((offlineTableName == null) && (realtimeTableName == null)) {
-      // No table matches the broker request.
-      LOGGER.warn("No table matches the name: {}", tableName);
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
-      return BrokerResponseFactory.getStaticNoTableHitBrokerResponse(responseType);
+    BrokerRequest offlineBrokerRequest = null;
+    BrokerRequest realtimeBrokerRequest = null;
+    if ((offlineTableName != null) && (realtimeTableName != null)) {
+      // Hybrid
+      offlineBrokerRequest = _optimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumnName);
+      realtimeBrokerRequest = _optimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumnName);
+    } else if (offlineTableName != null) {
+      // Offline only
+      brokerRequest.getQuerySource().setTableName(offlineTableName);
+      offlineBrokerRequest = _optimizer.optimize(brokerRequest, timeColumnName);
     } else {
-      // At least one table matches the broker request.
-      BrokerRequest offlineBrokerRequest = null;
-      BrokerRequest realtimeBrokerRequest = null;
-      if ((offlineTableName != null) && (realtimeTableName != null)) {
-        // Hybrid table.
-        offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
-        realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
-      } else if (offlineTableName != null) {
-        // Offline table only.
-        brokerRequest.getQuerySource().setTableName(offlineTableName);
-        offlineBrokerRequest = _optimizer.optimize(brokerRequest);
-      } else {
-        // Realtime table only.
-        brokerRequest.getQuerySource().setTableName(realtimeTableName);
-        realtimeBrokerRequest = _optimizer.optimize(brokerRequest);
-      }
-
-      ReduceService reduceService = _reduceServiceRegistry.get(responseType);
-      // TODO: wire up the customized BucketingSelection.
-      return processOptimizedBrokerRequests(brokerRequest, offlineBrokerRequest, realtimeBrokerRequest, reduceService,
-          scatterGatherStats, null, requestId);
+      // Realtime only
+      brokerRequest.getQuerySource().setTableName(realtimeTableName);
+      realtimeBrokerRequest = _optimizer.optimize(brokerRequest, timeColumnName);
     }
+
+    ReduceService reduceService = _reduceServiceRegistry.get(responseType);
+    return processOptimizedBrokerRequests(brokerRequest, offlineBrokerRequest, realtimeBrokerRequest, reduceService,
+        scatterGatherStats, requestId);
+  }
+
+  /**
+   * Returns the time column name for the table name from the time boundary service.
+   * Can return null if the time boundary service does not have the information.
+   *
+   * @param tableName Name of table for which to get the time column name
+   * @return Time column name for the table.
+   */
+  @Nullable
+  private String getTimeColumnName(@Nonnull String tableName) {
+    TimeBoundaryInfo timeBoundary = _timeBoundaryService.getTimeBoundaryInfoFor(tableName);
+    return (timeBoundary != null) ? timeBoundary.getTimeColumn() : null;
   }
 
   /**
@@ -313,10 +366,10 @@ public class BrokerRequestHandler {
   private BrokerRequest getOfflineBrokerRequest(@Nonnull BrokerRequest brokerRequest) {
     BrokerRequest offlineRequest = brokerRequest.deepCopy();
     String hybridTableName = brokerRequest.getQuerySource().getTableName();
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridTableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(hybridTableName);
     offlineRequest.getQuerySource().setTableName(offlineTableName);
     attachTimeBoundary(hybridTableName, offlineRequest, true);
-    return _optimizer.optimize(offlineRequest);
+    return offlineRequest;
   }
 
   /**
@@ -329,10 +382,10 @@ public class BrokerRequestHandler {
   private BrokerRequest getRealtimeBrokerRequest(@Nonnull BrokerRequest brokerRequest) {
     BrokerRequest realtimeRequest = brokerRequest.deepCopy();
     String hybridTableName = brokerRequest.getQuerySource().getTableName();
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(hybridTableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(hybridTableName);
     realtimeRequest.getQuerySource().setTableName(realtimeTableName);
     attachTimeBoundary(hybridTableName, realtimeRequest, false);
-    return _optimizer.optimize(realtimeRequest);
+    return realtimeRequest;
   }
 
   /**
@@ -344,8 +397,8 @@ public class BrokerRequestHandler {
    */
   private void attachTimeBoundary(@Nonnull String hybridTableName, @Nonnull BrokerRequest brokerRequest,
       boolean isOfflineRequest) {
-    TimeBoundaryInfo timeBoundaryInfo = _timeBoundaryService.getTimeBoundaryInfoFor(
-        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridTableName));
+    TimeBoundaryInfo timeBoundaryInfo =
+        _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE.tableNameWithType(hybridTableName));
     if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null
         || timeBoundaryInfo.getTimeValue() == null) {
       LOGGER.warn("No time boundary attached for table: {}", hybridTableName);
@@ -397,7 +450,6 @@ public class BrokerRequestHandler {
    * @param offlineBrokerRequest broker request for OFFLINE table.
    * @param realtimeBrokerRequest broker request for REALTIME table.
    * @param reduceService reduce service.
-   * @param bucketingSelection customized bucketing selection.
    * @param scatterGatherStats scatter-gather statistics.
    * @param requestId request ID.
    * @return broker response.
@@ -406,30 +458,26 @@ public class BrokerRequestHandler {
   @Nonnull
   private BrokerResponse processOptimizedBrokerRequests(@Nonnull BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nonnull ReduceService reduceService, @Nonnull ScatterGatherStats scatterGatherStats,
-      @Nullable BucketingSelection bucketingSelection, long requestId)
+      @Nonnull ReduceService reduceService, @Nonnull ScatterGatherStats scatterGatherStats, long requestId)
       throws InterruptedException {
-    String originalTableName = originalBrokerRequest.getQuerySource().getTableName();
     ResponseType serverResponseType = BrokerResponseFactory.getResponseType(originalBrokerRequest.getResponseFormat());
     PhaseTimes phaseTimes = new PhaseTimes();
 
     // Step 1: find the candidate servers to be queried for each set of segments from the routing table.
     // Step 2: select servers for each segment set and scatter request to the servers.
     String offlineTableName = null;
-    CompositeFuture<ServerInstance, ByteBuf> offlineCompositeFuture = null;
+    CompositeFuture<byte[]> offlineCompositeFuture = null;
     if (offlineBrokerRequest != null) {
       offlineTableName = offlineBrokerRequest.getQuerySource().getTableName();
       offlineCompositeFuture =
-          routeAndScatterBrokerRequest(offlineBrokerRequest, phaseTimes, scatterGatherStats, true, bucketingSelection,
-              requestId);
+          routeAndScatterBrokerRequest(offlineBrokerRequest, phaseTimes, scatterGatherStats, true, requestId);
     }
     String realtimeTableName = null;
-    CompositeFuture<ServerInstance, ByteBuf> realtimeCompositeFuture = null;
+    CompositeFuture<byte[]> realtimeCompositeFuture = null;
     if (realtimeBrokerRequest != null) {
       realtimeTableName = realtimeBrokerRequest.getQuerySource().getTableName();
       realtimeCompositeFuture =
-          routeAndScatterBrokerRequest(realtimeBrokerRequest, phaseTimes, scatterGatherStats, false, bucketingSelection,
-              requestId);
+          routeAndScatterBrokerRequest(realtimeBrokerRequest, phaseTimes, scatterGatherStats, false, requestId);
     }
     if ((offlineCompositeFuture == null) && (realtimeCompositeFuture == null)) {
       // No server found in either OFFLINE or REALTIME table.
@@ -440,8 +488,8 @@ public class BrokerRequestHandler {
     int numServersQueried = 0;
     long gatherStartTime = System.nanoTime();
     List<ProcessingException> processingExceptions = new ArrayList<>();
-    Map<ServerInstance, ByteBuf> offlineServerResponseMap = null;
-    Map<ServerInstance, ByteBuf> realtimeServerResponseMap = null;
+    Map<ServerInstance, byte[]> offlineServerResponseMap = null;
+    Map<ServerInstance, byte[]> realtimeServerResponseMap = null;
     if (offlineCompositeFuture != null) {
       numServersQueried += offlineCompositeFuture.getNumFutures();
       offlineServerResponseMap =
@@ -464,13 +512,16 @@ public class BrokerRequestHandler {
     int numServersResponded = 0;
     long deserializationStartTime = System.nanoTime();
     Map<ServerInstance, DataTable> dataTableMap = new HashMap<>();
+    // Add a long variable to sum the total response sizes from both realtime and offline servers.
+    long totalServerResponseSize = 0L;
     if (offlineServerResponseMap != null) {
       numServersResponded += offlineServerResponseMap.size();
-      deserializeServerResponses(offlineServerResponseMap, true, dataTableMap, offlineTableName, processingExceptions);
+      totalServerResponseSize += deserializeServerResponses(offlineServerResponseMap, true, dataTableMap, offlineTableName,
+          processingExceptions);
     }
     if (realtimeServerResponseMap != null) {
       numServersResponded += realtimeServerResponseMap.size();
-      deserializeServerResponses(realtimeServerResponseMap, false, dataTableMap, realtimeTableName,
+      totalServerResponseSize += deserializeServerResponses(realtimeServerResponseMap, false, dataTableMap, realtimeTableName,
           processingExceptions);
     }
     phaseTimes.addToDeserializationTime(System.nanoTime() - deserializationStartTime);
@@ -487,15 +538,16 @@ public class BrokerRequestHandler {
     brokerResponse.setNumServersResponded(numServersResponded);
 
     // Update broker metrics.
-    phaseTimes.addPhaseTimesToBrokerMetrics(_brokerMetrics, originalTableName);
+    String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
+    phaseTimes.addPhaseTimesToBrokerMetrics(_brokerMetrics, rawTableName);
     if (brokerResponse.getExceptionsSize() > 0) {
-      _brokerMetrics.addMeteredTableValue(originalTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS,
-          1);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS, 1L);
     }
     if (numServersQueried > numServersResponded) {
-      _brokerMetrics.addMeteredTableValue(originalTableName,
-          BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED, 1);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED,
+          1L);
     }
+    _brokerMetrics.addMeteredQueryValue(originalBrokerRequest, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE, totalServerResponseSize);
 
     return brokerResponse;
   }
@@ -506,53 +558,30 @@ public class BrokerRequestHandler {
    * @return composite future used to gather responses.
    */
   @Nullable
-  private CompositeFuture<ServerInstance, ByteBuf> routeAndScatterBrokerRequest(@Nonnull BrokerRequest brokerRequest,
+  private CompositeFuture<byte[]> routeAndScatterBrokerRequest(@Nonnull BrokerRequest brokerRequest,
       @Nonnull PhaseTimes phaseTimes, @Nonnull ScatterGatherStats scatterGatherStats, boolean isOfflineTable,
-      @Nullable BucketingSelection bucketingSelection, long requestId)
-      throws InterruptedException {
+      long requestId) throws InterruptedException {
     // Step 1: find the candidate servers to be queried for each set of segments from the routing table.
     // TODO: add checks for whether all segments are covered.
     long routingStartTime = System.nanoTime();
-    Map<ServerInstance, SegmentIdSet> segmentServices = findCandidateServers(brokerRequest);
+    Map<String, List<String>> routingTable =
+        _routingTable.getRoutingTable(new RoutingTableLookupRequest(brokerRequest));
     phaseTimes.addToRoutingTime(System.nanoTime() - routingStartTime);
-    if (segmentServices == null || segmentServices.isEmpty()) {
-      String tableName = brokerRequest.getQuerySource().getTableName();
-      LOGGER.warn("No server found for table: {}", tableName);
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
+    if (routingTable == null || routingTable.isEmpty()) {
+      String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+      LOGGER.info("No server found or all segments are pruned for table: {}", tableNameWithType);
+      _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1L);
       return null;
     }
 
     // Step 2: select servers for each segment set and scatter request to the servers.
     long scatterStartTime = System.nanoTime();
     ScatterGatherRequestImpl scatterRequest =
-        new ScatterGatherRequestImpl(brokerRequest, segmentServices, _replicaSelection,
-            ReplicaSelectionGranularity.SEGMENT_ID_SET, brokerRequest.getBucketHashKey(), 0, bucketingSelection,
-            requestId, _brokerTimeOutMs, _brokerId);
-    CompositeFuture<ServerInstance, ByteBuf> compositeFuture =
+        new ScatterGatherRequestImpl(brokerRequest, routingTable, requestId, _brokerTimeOutMs, _brokerId);
+    CompositeFuture<byte[]> compositeFuture =
         _scatterGatherer.scatterGather(scatterRequest, scatterGatherStats, isOfflineTable, _brokerMetrics);
     phaseTimes.addToScatterTime(System.nanoTime() - scatterStartTime);
     return compositeFuture;
-  }
-
-  /**
-   * Find the candidate servers to be queried for each set of segments from the routing table.
-   *
-   * @param brokerRequest broker request.
-   * @return map from server to set of segments.
-   */
-  @Nullable
-  private Map<ServerInstance, SegmentIdSet> findCandidateServers(@Nonnull BrokerRequest brokerRequest) {
-    String tableName = brokerRequest.getQuerySource().getTableName();
-    List<String> routingOptions;
-    Map<String, String> debugOptions = brokerRequest.getDebugOptions();
-    if (debugOptions == null || !debugOptions.containsKey("routingOptions")) {
-      routingOptions = Collections.emptyList();
-    } else {
-      routingOptions =
-          Splitter.on(",").omitEmptyStrings().trimResults().splitToList(debugOptions.get("routingOptions"));
-    }
-    RoutingTableLookupRequest routingTableLookupRequest = new RoutingTableLookupRequest(tableName, routingOptions);
-    return _routingTable.findServers(routingTableLookupRequest);
   }
 
   /**
@@ -561,22 +590,30 @@ public class BrokerRequestHandler {
    * @param compositeFuture composite future returned from scatter phase.
    * @param scatterGatherStats scatter-gather statistics.
    * @param isOfflineTable whether the scatter-gather target is an OFFLINE table.
-   * @param tableName table name.
+   * @param tableNameWithType table name with type suffix.
    * @param processingExceptions list of processing exceptions.
    * @return server response map.
    */
   @Nullable
-  private Map<ServerInstance, ByteBuf> gatherServerResponses(
-      @Nonnull CompositeFuture<ServerInstance, ByteBuf> compositeFuture, @Nonnull ScatterGatherStats scatterGatherStats,
-      boolean isOfflineTable, @Nonnull String tableName, @Nonnull List<ProcessingException> processingExceptions) {
+  private Map<ServerInstance, byte[]> gatherServerResponses(@Nonnull CompositeFuture<byte[]> compositeFuture,
+      @Nonnull ScatterGatherStats scatterGatherStats, boolean isOfflineTable, @Nonnull String tableNameWithType,
+      @Nonnull List<ProcessingException> processingExceptions) {
     try {
-      Map<ServerInstance, ByteBuf> serverResponseMap = compositeFuture.get();
-      Map<String, Long> responseTimes = compositeFuture.getResponseTimes();
+      Map<ServerInstance, byte[]> serverResponseMap = compositeFuture.get();
+      Iterator<Entry<ServerInstance, byte[]>> iterator = serverResponseMap.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Entry<ServerInstance, byte[]> entry = iterator.next();
+        if (entry.getValue().length == 0) {
+          LOGGER.warn("Got empty response from server: {]", entry.getKey().getShortHostName());
+          iterator.remove();
+        }
+      }
+      Map<ServerInstance, Long> responseTimes = compositeFuture.getResponseTimes();
       scatterGatherStats.setResponseTimeMillis(responseTimes, isOfflineTable);
       return serverResponseMap;
     } catch (Exception e) {
-      LOGGER.error("Caught exception while fetching responses for table: {}", tableName, e);
-      _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESPONSE_FETCH_EXCEPTIONS, 1);
+      LOGGER.error("Caught exception while fetching responses for table: {}", tableNameWithType, e);
+      _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.RESPONSE_FETCH_EXCEPTIONS, 1L);
       processingExceptions.add(QueryException.getException(QueryException.BROKER_GATHER_ERROR, e));
       return null;
     }
@@ -584,36 +621,38 @@ public class BrokerRequestHandler {
 
   /**
    * Deserialize the server responses, put the de-serialized data table into the data table map passed in, append
-   * processing exceptions to the processing exception list passed in.
+   * processing exceptions to the processing exception list passed in, and return the total response size from pinot servers.
    * <p>For hybrid use case, multiple responses might be from the same instance. Use response sequence to distinguish
    * them.
    *
    * @param responseMap map from server to response.
    * @param isOfflineTable whether the responses are from an OFFLINE table.
    * @param dataTableMap map from server to data table.
-   * @param tableName table name.
+   * @param tableNameWithType table name with type suffix.
    * @param processingExceptions list of processing exceptions.
+   * @return total server response size.
    */
-  private void deserializeServerResponses(@Nonnull Map<ServerInstance, ByteBuf> responseMap, boolean isOfflineTable,
-      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull String tableName,
+  private long deserializeServerResponses(@Nonnull Map<ServerInstance, byte[]> responseMap, boolean isOfflineTable,
+      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull String tableNameWithType,
       @Nonnull List<ProcessingException> processingExceptions) {
-    for (Entry<ServerInstance, ByteBuf> entry : responseMap.entrySet()) {
+    long totalResponseSize = 0L;
+    for (Entry<ServerInstance, byte[]> entry : responseMap.entrySet()) {
       ServerInstance serverInstance = entry.getKey();
       if (!isOfflineTable) {
-        serverInstance = new ServerInstance(serverInstance.getHostname(), serverInstance.getPort(), 1);
+        serverInstance = serverInstance.withSeq(1);
       }
-      ByteBuf byteBuf = entry.getValue();
+      byte[] responseInBytes = entry.getValue();
+      totalResponseSize += responseInBytes.length;
       try {
-        byte[] byteArray = new byte[byteBuf.readableBytes()];
-        byteBuf.readBytes(byteArray);
-        dataTableMap.put(serverInstance, DataTableFactory.getDataTable(byteArray));
+        dataTableMap.put(serverInstance, DataTableFactory.getDataTable(responseInBytes));
       } catch (Exception e) {
-        LOGGER.error("Caught exceptions while deserializing response for table: {} from server: {}", tableName,
+        LOGGER.error("Caught exceptions while deserializing response for table: {} from server: {}", tableNameWithType,
             serverInstance, e);
-        _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1);
+        _brokerMetrics.addMeteredTableValue(tableNameWithType, BrokerMeter.DATA_TABLE_DESERIALIZATION_EXCEPTIONS, 1L);
         processingExceptions.add(QueryException.getException(QueryException.DATA_TABLE_DESERIALIZATION_ERROR, e));
       }
     }
+    return totalResponseSize;
   }
 
   /**
@@ -656,73 +695,35 @@ public class BrokerRequestHandler {
 
   private static class ScatterGatherRequestImpl implements ScatterGatherRequest {
     private final BrokerRequest _brokerRequest;
-    private final Map<ServerInstance, SegmentIdSet> _segmentServices;
-    private final ReplicaSelection _replicaSelection;
-    private final ReplicaSelectionGranularity _replicaSelectionGranularity;
-    private final Object _hashKey;
-    private final int _numSpeculativeRequests;
-    private final BucketingSelection _bucketingSelection;
+    private final Map<String, List<String>> _routingTable;
     private final long _requestId;
     private final long _requestTimeoutMs;
     private final String _brokerId;
 
-    public ScatterGatherRequestImpl(BrokerRequest request, Map<ServerInstance, SegmentIdSet> segmentServices,
-        ReplicaSelection replicaSelection, ReplicaSelectionGranularity replicaSelectionGranularity, Object hashKey,
-        int numSpeculativeRequests, BucketingSelection bucketingSelection, long requestId, long requestTimeoutMs,
-        String brokerId) {
+    public ScatterGatherRequestImpl(BrokerRequest request, Map<String, List<String>> routingTable, long requestId,
+        long requestTimeoutMs, String brokerId) {
       _brokerRequest = request;
-      _segmentServices = segmentServices;
-      _replicaSelection = replicaSelection;
-      _replicaSelectionGranularity = replicaSelectionGranularity;
-      _hashKey = hashKey;
-      _numSpeculativeRequests = numSpeculativeRequests;
-      _bucketingSelection = bucketingSelection;
+      _routingTable = routingTable;
       _requestId = requestId;
       _requestTimeoutMs = requestTimeoutMs;
       _brokerId = brokerId;
     }
 
     @Override
-    public Map<ServerInstance, SegmentIdSet> getSegmentsServicesMap() {
-      return _segmentServices;
+    public Map<String, List<String>> getRoutingTable() {
+      return _routingTable;
     }
 
     @Override
-    public byte[] getRequestForService(ServerInstance service, SegmentIdSet querySegments) {
+    public byte[] getRequestForService(List<String> segments) {
       InstanceRequest r = new InstanceRequest();
       r.setRequestId(_requestId);
       r.setEnableTrace(_brokerRequest.isEnableTrace());
       r.setQuery(_brokerRequest);
-      r.setSearchSegments(querySegments.getSegmentsNameList());
+      r.setSearchSegments(segments);
       r.setBrokerId(_brokerId);
       // _serde is not threadsafe.
-      return getSerde().serialize(r);
-      //      return _serde.serialize(r);
-    }
-
-    @Override
-    public ReplicaSelection getReplicaSelection() {
-      return _replicaSelection;
-    }
-
-    @Override
-    public ReplicaSelectionGranularity getReplicaSelectionGranularity() {
-      return _replicaSelectionGranularity;
-    }
-
-    @Override
-    public Object getHashKey() {
-      return _hashKey;
-    }
-
-    @Override
-    public int getNumSpeculativeRequests() {
-      return _numSpeculativeRequests;
-    }
-
-    @Override
-    public BucketingSelection getPredefinedSelection() {
-      return _bucketingSelection;
+      return new SerDe(new TCompactProtocol.Factory()).serialize(r);
     }
 
     @Override
@@ -731,12 +732,8 @@ public class BrokerRequestHandler {
     }
 
     @Override
-    public long getRequestTimeoutMS() {
+    public long getRequestTimeoutMs() {
       return _requestTimeoutMs;
-    }
-
-    public SerDe getSerde() {
-      return new SerDe(new TCompactProtocol.Factory());
     }
 
     @Override
@@ -745,8 +742,7 @@ public class BrokerRequestHandler {
     }
   }
 
-  public String getRoutingTableSnapshot(String tableName)
-      throws Exception {
+  public String getRoutingTableSnapshot(String tableName) throws Exception {
     return _routingTable.dumpSnapshot(tableName);
   }
 }

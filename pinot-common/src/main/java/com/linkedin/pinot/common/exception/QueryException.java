@@ -37,7 +37,11 @@ public class QueryException {
   public static final int PQL_PARSING_ERROR_CODE = 150;
   public static final int SEGMENT_PLAN_EXECUTION_ERROR_CODE = 160;
   public static final int COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE = 170;
+  public static final int ACCESS_DENIED_ERROR_CODE = 180;
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
+  // TODO: Handle these errors in broker
+  public static final int SERVER_SHUTTING_DOWN_ERROR_CODE = 210;
+  public static final int SERVER_OUT_OF_CAPACITY_ERROR_CODE = 211;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
   public static final int DATA_TABLE_DESERIALIZATION_ERROR_CODE = 310;
@@ -55,11 +59,14 @@ public class QueryException {
   public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
   public static final ProcessingException JSON_COMPILATION_ERROR = new ProcessingException(JSON_COMPILATION_ERROR_CODE);
   public static final ProcessingException PQL_PARSING_ERROR = new ProcessingException(PQL_PARSING_ERROR_CODE);
+  public static final ProcessingException ACCESS_DENIED_ERROR = new ProcessingException(ACCESS_DENIED_ERROR_CODE);
   public static final ProcessingException SEGMENT_PLAN_EXECUTION_ERROR =
       new ProcessingException(SEGMENT_PLAN_EXECUTION_ERROR_CODE);
   public static final ProcessingException COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR =
       new ProcessingException(COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR_CODE);
   public static final ProcessingException QUERY_EXECUTION_ERROR = new ProcessingException(QUERY_EXECUTION_ERROR_CODE);
+  public static final ProcessingException SERVER_SCHEDULER_DOWN_ERROR = new ProcessingException(SERVER_SHUTTING_DOWN_ERROR_CODE);
+  public static final ProcessingException SERVER_OUT_OF_CAPACITY_ERROR = new ProcessingException(SERVER_OUT_OF_CAPACITY_ERROR_CODE);
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
       new ProcessingException(EXECUTION_TIMEOUT_ERROR_CODE);
   public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(BROKER_GATHER_ERROR_CODE);
@@ -87,6 +94,8 @@ public class QueryException {
     SEGMENT_PLAN_EXECUTION_ERROR.setMessage("SegmentPlanExecutionError");
     COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeoutError");
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
+    SERVER_SCHEDULER_DOWN_ERROR.setMessage("ServerShuttingDown");
+    SERVER_OUT_OF_CAPACITY_ERROR.setMessage("ServerOutOfCapacity");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
     DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableDeserializationError");
@@ -102,15 +111,14 @@ public class QueryException {
     UNKNOWN_ERROR.setMessage("UnknownError");
   }
 
-  public static ProcessingException getException(ProcessingException processingException, Exception exception,
-      int maxLinesOfStackTrace) {
+  public static ProcessingException getException(ProcessingException processingException, Exception exception) {
     String errorType = processingException.getMessage();
     ProcessingException copiedProcessingException = processingException.deepCopy();
     StringWriter stringWriter = new StringWriter();
     exception.printStackTrace(new PrintWriter(stringWriter));
     String fullStackTrace = stringWriter.toString();
     String[] lines = fullStackTrace.split("\n");
-    int numLinesOfStackTrace = Math.min(lines.length, maxLinesOfStackTrace);
+    int numLinesOfStackTrace = Math.min(lines.length, _maxLinesOfStackTrace);
     int lengthOfStackTrace = numLinesOfStackTrace - 1;
     for (int i = 0; i < numLinesOfStackTrace; i++) {
       lengthOfStackTrace += lines[i].length();
@@ -119,7 +127,10 @@ public class QueryException {
     return copiedProcessingException;
   }
 
-  public static ProcessingException getException(ProcessingException processingException, Exception exception) {
-    return getException(processingException, exception, _maxLinesOfStackTrace);
+  public static ProcessingException getException(ProcessingException processingException, String errorMessage) {
+    String errorType = processingException.getMessage();
+    ProcessingException copiedProcessingException = processingException.deepCopy();
+    copiedProcessingException.setMessage(errorType + ":\n" + errorMessage);
+    return copiedProcessingException;
   }
 }

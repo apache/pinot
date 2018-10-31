@@ -17,60 +17,61 @@ package com.linkedin.pinot.core.indexsegment;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.startree.StarTreeInterf;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.startree.StarTree;
+import java.util.Set;
 
 
-/**
- * This is the interface of index segment. The index type of index segment
- * should be one of the supported {@link com.linkedin.pinot.core.indexsegment.IndexType
- * IndexType}.
- *
- *
- */
 public interface IndexSegment {
-  /**
-   * @return
-   */
-  public IndexType getIndexType();
 
   /**
-   * @return
-   */
-  public String getSegmentName();
-
-  /**
-   * @return
-   */
-  public String getAssociatedDirectory();
-
-  /**
-   * @return SegmentMetadata
-   */
-  public SegmentMetadata getSegmentMetadata();
-
-  /**
+   * Returns the name of the segment.
    *
-   * @param columnName
-   * @return
+   * @return Segment name
+   */
+  String getSegmentName();
+
+  /**
+   * Returns the {@link SegmentMetadata} of the segment.
+   *
+   * @return Segment metadata
+   */
+  SegmentMetadata getSegmentMetadata();
+
+  /**
+   * Returns all the columns inside the segment.
+   *
+   * @return Set of column names
+   */
+  Set<String> getColumnNames();
+
+  /**
+   * Returns the {@link DataSource} for the given column.
+   *
+   * @param columnName Column name
+   * @return Data source for the given column
    */
   DataSource getDataSource(String columnName);
 
   /**
-   * @return
+   * Returns the Star-tree index if it exists, or null if it does not exist.
+   *
+   * @return Star-tree index
    */
-  String[] getColumnNames();
+  StarTree getStarTree();
 
   /**
-   * Destroy segment in memory and close file handler if in memory mapped mode
+   * Returns the record for the given document Id.
+   * <p>NOTE: don't use this method for high performance code.
+   *
+   * @param docId Document Id
+   * @param reuse Reusable buffer for the record
+   * @return Record for the given document Id
    */
-  public void destroy();
-
-  /** Returns the StarTree index structure, or null if it does not exist */
-  StarTreeInterf getStarTree();
+  GenericRow getRecord(int docId, GenericRow reuse);
 
   /**
-   * Get the total size of the segment in bytes
+   * Destroys segment in memory and closes file handlers if in MMAP mode.
    */
-
-  long getDiskSizeBytes();
+  void destroy();
 }

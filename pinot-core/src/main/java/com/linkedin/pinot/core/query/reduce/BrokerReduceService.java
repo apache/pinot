@@ -15,13 +15,15 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.HavingFilterQuery;
+import com.linkedin.pinot.common.request.HavingFilterQueryMap;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.AggregationResult;
@@ -36,12 +38,13 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUti
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -56,13 +59,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
-
-  @Nonnull
-  @Override
-  public BrokerResponseNative reduceOnDataTable(@Nonnull BrokerRequest brokerRequest,
-      @Nonnull Map<ServerInstance, DataTable> instanceResponseMap) {
-    return reduceOnDataTable(brokerRequest, instanceResponseMap, null);
-  }
 
   @Nonnull
   @Override
@@ -147,10 +143,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     // Update broker metrics.
     String tableName = brokerRequest.getQuerySource().getTableName();
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     if (brokerMetrics != null) {
-      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
-      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
-      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER,
+          numEntriesScannedInFilter);
+      brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
           numEntriesScannedPostFilter);
     }
 
@@ -162,8 +160,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         List<String> selectionColumns =
             SelectionOperatorUtils.getSelectionColumns(brokerRequest.getSelections().getSelectionColumns(),
                 cachedDataSchema);
-        brokerResponseNative.setSelectionResults(
-            new SelectionResults(selectionColumns, new ArrayList<Serializable[]>(0)));
+        brokerResponseNative.setSelectionResults(new SelectionResults(selectionColumns, new ArrayList<>(0)));
       }
     } else {
       // Reduce server responses data and set query results into the broker response.
@@ -180,9 +177,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             String errorMessage =
                 QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName
                     + " from servers: " + droppedServers + " got dropped due to data schema inconsistency.";
-            LOGGER.error(errorMessage);
+            LOGGER.info(errorMessage);
             if (brokerMetrics != null) {
-              brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
+              brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1L);
             }
             brokerResponseNative.addToExceptions(
                 new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
@@ -198,11 +195,20 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           setAggregationResults(brokerResponseNative, aggregationFunctions, dataTableMap, cachedDataSchema);
         } else {
           // Aggregation group-by query.
-          setGroupByResults(brokerResponseNative, aggregationFunctions, brokerRequest.getGroupBy(), dataTableMap);
+          boolean[] aggregationFunctionSelectStatus =
+              AggregationFunctionUtils.getAggregationFunctionsSelectStatus(brokerRequest.getAggregationsInfo());
+          setGroupByHavingResults(brokerResponseNative, aggregationFunctions, aggregationFunctionSelectStatus,
+              brokerRequest.getGroupBy(), dataTableMap, brokerRequest.getHavingFilterQuery(),
+              brokerRequest.getHavingFilterSubQueryMap());
+          if (brokerMetrics != null && (!brokerResponseNative.getAggregationResults().isEmpty())) {
+            // We emit the group by size when the result isn't empty. All the sizes among group-by results should be the same.
+            // Thus, we can just emit the one from the 1st result.
+            brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.GROUP_BY_SIZE,
+                brokerResponseNative.getAggregationResults().get(0).getGroupByResult().size());
+          }
         }
       }
     }
-
     return brokerResponseNative;
   }
 
@@ -280,8 +286,8 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     for (DataTable dataTable : dataTableMap.values()) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         Object intermediateResultToMerge;
-        FieldSpec.DataType columnType = dataSchema.getColumnType(i);
-        switch (columnType) {
+        DataSchema.ColumnDataType columnDataType = dataSchema.getColumnDataType(i);
+        switch (columnDataType) {
           case LONG:
             intermediateResultToMerge = dataTable.getLong(0, i);
             break;
@@ -292,7 +298,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             intermediateResultToMerge = dataTable.getObject(0, i);
             break;
           default:
-            throw new IllegalStateException("Illegal column type in aggregation results: " + columnType);
+            throw new IllegalStateException("Illegal column data type in aggregation results: " + columnDataType);
         }
         Object mergedIntermediateResult = intermediateResults[i];
         if (mergedIntermediateResult == null) {
@@ -320,11 +326,14 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param aggregationFunctions array of aggregation functions.
    * @param groupBy group-by information.
    * @param dataTableMap map from server to data table.
+   * @param havingFilterQuery having filter query
+   * @param havingFilterQueryMap having filter query map
    */
   @SuppressWarnings("unchecked")
-  private void setGroupByResults(@Nonnull BrokerResponseNative brokerResponseNative,
-      @Nonnull AggregationFunction[] aggregationFunctions, @Nonnull GroupBy groupBy,
-      @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
+  private void setGroupByHavingResults(@Nonnull BrokerResponseNative brokerResponseNative,
+      @Nonnull AggregationFunction[] aggregationFunctions, boolean[] aggregationFunctionsSelectStatus,
+      @Nonnull GroupBy groupBy, @Nonnull Map<ServerInstance, DataTable> dataTableMap,
+      HavingFilterQuery havingFilterQuery, HavingFilterQueryMap havingFilterQueryMap) {
     int numAggregationFunctions = aggregationFunctions.length;
 
     // Merge results from all data tables.
@@ -364,20 +373,75 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       }
       finalResultMaps[i] = finalResultMap;
     }
-
-    // Trim the final result maps to topN and set them into the broker response.
-    AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
-        new AggregationGroupByTrimmingService(aggregationFunctions, (int) groupBy.getTopN());
-    List<GroupByResult>[] groupByResultLists = aggregationGroupByTrimmingService.trimFinalResults(finalResultMaps);
-    List<AggregationResult> aggregationResults = new ArrayList<>(numAggregationFunctions);
-    for (int i = 0; i < numAggregationFunctions; i++) {
-      List<GroupByResult> groupByResultList = groupByResultLists[i];
-      List<String> groupByColumns = groupBy.getExpressions();
-      if (groupByColumns == null) {
-        groupByColumns = groupBy.getColumns();
+    //If HAVING clause is set, we further filter the group by results based on the HAVING predicate
+    if (havingFilterQuery != null) {
+      HavingClauseComparisonTree havingClauseComparisonTree =
+          HavingClauseComparisonTree.buildHavingClauseComparisonTree(havingFilterQuery, havingFilterQueryMap);
+      //Applying close policy
+      //We just keep those groups (from different aggregation functions) that are exist in the result set of all aggregation functions.
+      //In other words, we just keep intersection of groups of different aggregation functions.
+      //Here we calculate the intersection of group key sets of different aggregation functions
+      Set<String> intersectionOfKeySets = finalResultMaps[0].keySet();
+      for (int i = 1; i < numAggregationFunctions; i++) {
+        intersectionOfKeySets.retainAll(finalResultMaps[i].keySet());
       }
-      aggregationResults.add(new AggregationResult(groupByResultList, groupByColumns, columnNames[i]));
+
+      //Now it is time to remove those groups that do not validate HAVING clause predicate
+      //We use TreeMap which supports CASE_INSENSITIVE_ORDER
+      Map<String, Comparable> singleGroupAggResults = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+      Map<String, Comparable>[] finalFilteredResultMaps = new Map[numAggregationFunctions];
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        finalFilteredResultMaps[i] = new HashMap<>();
+      }
+
+      for (String groupKey : intersectionOfKeySets) {
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          singleGroupAggResults.put(columnNames[i], finalResultMaps[i].get(groupKey));
+        }
+        //if this group validate HAVING predicate keep it in the new map
+        if (havingClauseComparisonTree.isThisGroupPassPredicates(singleGroupAggResults)) {
+          for (int i = 0; i < numAggregationFunctions; i++) {
+            finalFilteredResultMaps[i].put(groupKey, singleGroupAggResults.get(columnNames[i]));
+          }
+        }
+      }
+      //update the final results
+      finalResultMaps = finalFilteredResultMaps;
     }
-    brokerResponseNative.setAggregationResults(aggregationResults);
+
+    int aggregationNumsInFinalResult = 0;
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      if (aggregationFunctionsSelectStatus[i]) {
+        aggregationNumsInFinalResult++;
+      }
+    }
+
+    if (aggregationNumsInFinalResult > 0) {
+      String[] finalColumnNames = new String[aggregationNumsInFinalResult];
+      Map<String, Comparable>[] finalOutResultMaps = new Map[aggregationNumsInFinalResult];
+      AggregationFunction[] finalAggregationFunctions = new AggregationFunction[aggregationNumsInFinalResult];
+      int count = 0;
+      for (int i = 0; i < numAggregationFunctions; i++) {
+        if (aggregationFunctionsSelectStatus[i]) {
+          finalColumnNames[count] = columnNames[i];
+          finalOutResultMaps[count] = finalResultMaps[i];
+          finalAggregationFunctions[count] = aggregationFunctions[i];
+          count++;
+        }
+      }
+      // Trim the final result maps to topN and set them into the broker response.
+      AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
+          new AggregationGroupByTrimmingService(finalAggregationFunctions, (int) groupBy.getTopN());
+      List<GroupByResult>[] groupByResultLists = aggregationGroupByTrimmingService.trimFinalResults(finalOutResultMaps);
+      List<AggregationResult> aggregationResults = new ArrayList<>(count);
+      for (int i = 0; i < aggregationNumsInFinalResult; i++) {
+        List<GroupByResult> groupByResultList = groupByResultLists[i];
+        aggregationResults.add(new AggregationResult(groupByResultList, groupBy.getExpressions(), finalColumnNames[i]));
+      }
+      brokerResponseNative.setAggregationResults(aggregationResults);
+    } else {
+      throw new IllegalStateException(
+          "There should be minimum one aggregation function in the select list of a Group by query");
+    }
   }
 }

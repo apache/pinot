@@ -15,27 +15,58 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.startree.hll.HllConfig;
 import java.lang.reflect.Field;
-
+import java.util.Set;
+import java.util.TreeSet;
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentsValidationAndRetentionConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentsValidationAndRetentionConfig.class);
 
+  @ConfigKey(value = "retention")
+  @UseDsl(dsl = DurationDsl.class, value = "unit")
   private String retentionTimeUnit;
+
+  @ConfigKey(value = "retention")
+  @UseDsl(dsl = DurationDsl.class, value = "unitCount")
   private String retentionTimeValue;
-  private String segmentPushFrequency;
+
+  @ConfigKey(value = "segmentPushFrequency")
+  private String segmentPushFrequency; // DO NOT REMOVE, this is used in internal segment generation management
+
+  @ConfigKey(value = "segmentPushType")
   private String segmentPushType;
+
+  @ConfigKey(value = "replication")
   private String replication; // For high-level kafka consumers, the number of replicas should be same as num server instances
+
+  @ConfigKey(value = "schemaName")
   private String schemaName;
+
+  @ConfigKey(value = "timeColumnName")
   private String timeColumnName;
+
+  @ConfigKey(value = "timeType")
   private String timeType;
+
+  @ConfigKey(value = "segmentAssignmentStrategy")
   private String segmentAssignmentStrategy;
 
+  @NestedConfig
+  private ReplicaGroupStrategyConfig replicaGroupStrategyConfig;
+
+  @NestedConfig
+  private HllConfig hllConfig;
+
   // Number of replicas per partition of low-level kafka consumers. This config is used for realtime tables only.
+  @ConfigKey(value = "replicasPerPartition")
   private String replicasPerPartition;
 
   public String getSegmentAssignmentStrategy() {
@@ -60,9 +91,6 @@ public class SegmentsValidationAndRetentionConfig {
 
   public void setTimeType(String timeType) {
     this.timeType = timeType;
-  }
-
-  public SegmentsValidationAndRetentionConfig() {
   }
 
   public String getRetentionTimeUnit() {
@@ -100,9 +128,6 @@ public class SegmentsValidationAndRetentionConfig {
   public String getReplication() {
     return replication;
   }
-  public int getReplicationNumber() {
-    return Integer.parseInt(replication);
-  }
 
   public void setReplication(String replication) {
     this.replication = replication;
@@ -122,6 +147,32 @@ public class SegmentsValidationAndRetentionConfig {
 
   public void setReplicasPerPartition(String replicasPerPartition) {
     this.replicasPerPartition = replicasPerPartition;
+  }
+
+  public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
+    return replicaGroupStrategyConfig;
+  }
+
+  public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
+    this.replicaGroupStrategyConfig = replicaGroupStrategyConfig;
+  }
+
+  public HllConfig getHllConfig() {
+    return hllConfig;
+  }
+
+  public void setHllConfig(HllConfig hllConfig) {
+    this.hllConfig = hllConfig;
+  }
+
+  @JsonIgnore
+  public int getReplicationNumber() {
+    return Integer.parseInt(replication);
+  }
+
+  @JsonIgnore
+  public int getReplicasPerPartitionNumber() {
+    return Integer.parseInt(replicasPerPartition);
   }
 
   @Override
@@ -155,4 +206,48 @@ public class SegmentsValidationAndRetentionConfig {
 
     return result.toString();
   }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    SegmentsValidationAndRetentionConfig that = (SegmentsValidationAndRetentionConfig) o;
+
+    return EqualityUtils.isEqual(retentionTimeUnit, that.retentionTimeUnit) &&
+        EqualityUtils.isEqual(retentionTimeValue, that.retentionTimeValue) &&
+        EqualityUtils.isEqual(segmentPushFrequency, that.segmentPushFrequency) &&
+        EqualityUtils.isEqual(segmentPushType, that.segmentPushType) &&
+        EqualityUtils.isEqual(replication, that.replication) &&
+        EqualityUtils.isEqual(schemaName, that.schemaName) &&
+        EqualityUtils.isEqual(timeColumnName, that.timeColumnName) &&
+        EqualityUtils.isEqual(timeType, that.timeType) &&
+        EqualityUtils.isEqual( segmentAssignmentStrategy, that.segmentAssignmentStrategy) &&
+        EqualityUtils.isEqual(replicaGroupStrategyConfig, that.replicaGroupStrategyConfig) &&
+        EqualityUtils.isEqual(hllConfig, that.hllConfig) &&
+        EqualityUtils.isEqual(replicasPerPartition, that.replicasPerPartition);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(retentionTimeUnit);
+    result = EqualityUtils.hashCodeOf(result, retentionTimeValue);
+    result = EqualityUtils.hashCodeOf(result, segmentPushFrequency);
+    result = EqualityUtils.hashCodeOf(result, segmentPushType);
+    result = EqualityUtils.hashCodeOf(result, replication);
+    result = EqualityUtils.hashCodeOf(result, schemaName);
+    result = EqualityUtils.hashCodeOf(result, timeColumnName);
+    result = EqualityUtils.hashCodeOf(result, timeType);
+    result = EqualityUtils.hashCodeOf(result, segmentAssignmentStrategy);
+    result = EqualityUtils.hashCodeOf(result, replicaGroupStrategyConfig);
+    result = EqualityUtils.hashCodeOf(result, hllConfig);
+    result = EqualityUtils.hashCodeOf(result, replicasPerPartition);
+    return result;
+  }
+
 }

@@ -26,9 +26,10 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.response.ServerInstance;
 
 
-public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFuture<K, T> {
+public abstract class AbstractCompositeListenableFuture<T> implements ServerResponseFuture<T> {
   protected static Logger LOGGER = LoggerFactory.getLogger(CompositeFuture.class);
 
   /**
@@ -171,16 +172,16 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
    * Process underlying futures. Returns true if all the processing is done
    * The framework will go ahead and cancel any outstanding futures.
    *
-   * @param name Name of the future which got completed
+   * @param server ServerInstance that is responding
    * @param responses Response
    * @param error Error
    * @param durationMillis
    * @return true if processing done
    */
-  protected abstract boolean processFutureResult(String name, Map<K, T> responses, Map<K, Throwable> error,
+  protected abstract boolean processFutureResult(ServerInstance server, Map<ServerInstance, T> responses, Map<ServerInstance, Throwable> error,
       long durationMillis);
 
-  protected void addResponseFutureListener(KeyedFuture<K, T> future) {
+  protected void addResponseFutureListener(ServerResponseFuture<T> future) {
     future.addListener(new ResponseFutureListener(future), null); // no need for separate Executors
   }
 
@@ -188,9 +189,9 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
    * Underlying Response future listener. This will count down the latch.
    */
   private class ResponseFutureListener implements Runnable {
-    private final KeyedFuture<K, T> _future;
+    private final ServerResponseFuture<T> _future;
 
-    public ResponseFutureListener(KeyedFuture<K, T> future) {
+    public ResponseFutureListener(ServerResponseFuture<T> future) {
       _future = future;
     }
 
@@ -206,7 +207,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
         _futureLock.unlock();
       }
 
-      Map<K, T> response = null;
+      Map<ServerInstance, T> response = null;
       try {
         response = _future.get();
       } catch (InterruptedException e) {
@@ -216,8 +217,8 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
       }
 
       // Since the future is done, it is safe to look at error results
-      Map<K, Throwable> error = _future.getError();
-      boolean done = processFutureResult(_future.getName(), response, error, _future.getDurationMillis());
+      Map<ServerInstance, Throwable> error = _future.getError();
+      boolean done = processFutureResult(_future.getServerInstance(), response, error, _future.getDurationMillis());
 
       if (done) {
         setDone(State.DONE);

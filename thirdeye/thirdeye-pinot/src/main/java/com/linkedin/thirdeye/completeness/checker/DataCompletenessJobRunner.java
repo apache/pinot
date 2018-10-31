@@ -1,8 +1,22 @@
 package com.linkedin.thirdeye.completeness.checker;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.job.JobRunner;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
@@ -11,40 +25,20 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.job.JobRunner;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.JobDTO;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-
 /** job runner for data completeness job
  *
  */
 public class DataCompletenessJobRunner implements JobRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessJobRunner.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private JobManager jobDAO;
-  private TaskManager taskDAO;
-  private TaskGenerator taskGenerator;
   private DataCompletenessJobContext dataCompletenessJobContext;
   private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
 
   public DataCompletenessJobRunner(DataCompletenessJobContext dataCompletenessJobContext) {
     this.dataCompletenessJobContext = dataCompletenessJobContext;
-
-    taskGenerator = new TaskGenerator();
-    jobDAO = DAO_REGISTRY.getJobDAO();
-    taskDAO = DAO_REGISTRY.getTaskDAO();
   }
 
   @Override
@@ -63,6 +57,17 @@ public class DataCompletenessJobRunner implements JobRunner {
     dataCompletenessJobContext.setCheckDurationEndTime(checkDurationEndTime);
     dataCompletenessJobContext.setJobName(jobName);
 
+    Set<String> datasetsToCheck = new HashSet<>();
+    for (DatasetConfigDTO datasetConfig : DAO_REGISTRY.getDatasetConfigDAO().findActiveRequiresCompletenessCheck()) {
+      datasetsToCheck.add(datasetConfig.getDataset());
+    }
+    for (AnomalyFunctionDTO anomalyFunction : DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions()) {
+      if (anomalyFunction.isRequiresCompletenessCheck()) {
+        datasetsToCheck.add(anomalyFunction.getCollection());
+      }
+    }
+    dataCompletenessJobContext.setDatasetsToCheck(Lists.newArrayList(datasetsToCheck));
+
     // create data completeness job
     long jobExecutionId = createJob();
     dataCompletenessJobContext.setJobExecutionId(jobExecutionId);
@@ -80,7 +85,9 @@ public class DataCompletenessJobRunner implements JobRunner {
       jobSpec.setJobName(dataCompletenessJobContext.getJobName());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
-      jobExecutionId = jobDAO.save(jobSpec);
+      jobSpec.setTaskType(TaskType.DATA_COMPLETENESS);
+      jobSpec.setConfigId(0); // Data completeness job does not have a config id
+      jobExecutionId = DAO_REGISTRY.getJobDAO().save(jobSpec);
       LOG.info("Created JobSpec {} with jobExecutionId {}", jobSpec,
           jobExecutionId);
     } catch (Exception e) {
@@ -89,22 +96,40 @@ public class DataCompletenessJobRunner implements JobRunner {
     return jobExecutionId;
   }
 
+  protected List<DataCompletenessTaskInfo> createDataCompletenessTasks(DataCompletenessJobContext dataCompletenessJobContext) {
+    List<DataCompletenessTaskInfo> tasks = new ArrayList<>();
+
+    // create 1 task, which will get data and perform check
+    DataCompletenessTaskInfo dataCompletenessCheck = new DataCompletenessTaskInfo();
+    dataCompletenessCheck.setDataCompletenessType(DataCompletenessConstants.DataCompletenessType.CHECKER);
+    dataCompletenessCheck.setDataCompletenessStartTime(dataCompletenessJobContext.getCheckDurationStartTime());
+    dataCompletenessCheck.setDataCompletenessEndTime(dataCompletenessJobContext.getCheckDurationEndTime());
+    dataCompletenessCheck.setDatasetsToCheck(dataCompletenessJobContext.getDatasetsToCheck());
+    tasks.add(dataCompletenessCheck);
+
+    // create 1 task, for cleanup
+    DataCompletenessTaskInfo cleanup = new DataCompletenessTaskInfo();
+    cleanup.setDataCompletenessType(DataCompletenessConstants.DataCompletenessType.CLEANUP);
+    tasks.add(cleanup);
+
+    return tasks;
+  }
 
   public List<Long> createTasks() {
     List<Long> taskIds = new ArrayList<>();
     try {
       LOG.info("Creating data completeness checker tasks");
       List<DataCompletenessTaskInfo> dataCompletenessTasks =
-          taskGenerator.createDataCompletenessTasks(dataCompletenessJobContext);
+          createDataCompletenessTasks(dataCompletenessJobContext);
       LOG.info("DataCompleteness tasks {}", dataCompletenessTasks);
       for (DataCompletenessTaskInfo taskInfo : dataCompletenessTasks) {
+
         String taskInfoJson = null;
         try {
           taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
         } catch (JsonProcessingException e) {
-          LOG.error("Exception when converting MonitorTaskInfo {} to jsonString", taskInfo, e);
+          LOG.error("Exception when converting DataCompletenessTaskInfo {} to jsonString", taskInfo, e);
         }
-
         TaskDTO taskSpec = new TaskDTO();
         taskSpec.setTaskType(TaskType.DATA_COMPLETENESS);
         taskSpec.setJobName(dataCompletenessJobContext.getJobName());
@@ -112,7 +137,7 @@ public class DataCompletenessJobRunner implements JobRunner {
         taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
         taskSpec.setJobId(dataCompletenessJobContext.getJobExecutionId());
-        long taskId = taskDAO.save(taskSpec);
+        long taskId = DAO_REGISTRY.getTaskDAO().save(taskSpec);
         taskIds.add(taskId);
         LOG.info("Created dataCompleteness task {} with taskId {}", taskSpec, taskId);
       }

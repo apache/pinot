@@ -1,0 +1,53 @@
+{{#each anomalyStats as |card|}}
+  <ul class="te-horizontal-cards__card">
+
+    <li class="te-horizontal-cards">
+      <div class="te-horizontal-cards__card-title">{{card.title}}</div>
+      {{#if card.tooltip}}
+        <div class="te-horizontal-cards__card-tooltip">
+          <span>
+            <i class="glyphicon glyphicon-question-sign"></i>
+            {{#tooltip-on-element}}{{card.text}}{{/tooltip-on-element}}
+          </span>
+        </div>
+      {{else}}
+        <div class="te-horizontal-cards__card-text">{{card.text}}</div>
+      {{/if}}
+    </li>
+
+    <li class="te-horizontal-cards__card-value">
+      <div class="te-horizontal-cards__val-group">
+        {{#if isTunePreviewActive}}
+          <div class="te-horizontal-cards__card-subt">Current</div>
+        {{/if}}
+        <div class="te-horizontal-cards__card-number">
+          {{card.value}}
+          {{#if card.valueUnits}}
+            <span class="te-horizontal-cards__card-units">{{card.valueUnits}}</span>
+          {{/if}}
+        </div>
+        {{#if card.showProjected}}
+          <div class="te-horizontal-cards__card-subt {{if card.hideProjected "te-horizontal-cards--hidden"}}">Estimated: <span class="te-horizontal-cards__card-subt--stronger">{{card.projected}}{{if card.projectedUnits card.projectedUnits}}</span></div>
+        {{/if}}
+      </div>
+      {{#if isTunePreviewActive}}
+        <div class="te-horizontal-cards__val-group">
+          <i class="te-horizontal-cards__val-glyph--middle glyphicon glyphicon-menu-right"></i>
+        </div>
+        <div class="te-horizontal-cards__val-group">
+          <div class="te-horizontal-cards__card-subt">New</div>
+          <div class="te-horizontal-cards__card-number">
+            {{#if card.showDirectionIcon}}
+              <i class="te-horizontal-cards__val-glyph--right glyphicon glyphicon-triangle-{{card.direction}}"></i>
+            {{/if}}
+            {{card.projected}}
+            {{#if card.projectedUnits}}
+              <span class="te-horizontal-cards__card-units">{{card.projectedUnits}}</span>
+            {{/if}}
+          </div>
+        </div>
+      {{/if}}
+    </li>
+
+  </ul>
+{{/each}}

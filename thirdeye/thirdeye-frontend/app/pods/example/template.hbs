@@ -1,0 +1,23 @@
+{{#containers/anomaly-container as |anomalyList actions|}}
+  {{#if anomalyList.loading}}
+    Loading...
+  {{/if}}
+
+  {{#if anomalyList.failed}}
+    Oops, something went wrong...
+  {{/if}}
+
+  {{#if anomalyList.loaded}}
+    {{#if anomalyList.anomaly}}
+        <section class="anomaly-title-bar">
+          {{anomaly-id anomaly=anomalyList.anomaly}}
+        </section>
+        <main class="anomaly-content container">
+          <h1>Example</h1>
+          <p>This is a placeholder example page for the new ember app utilizing ember-redux and connecting to the back end at localhost:1426</p>
+        </main>
+    {{else}}
+      No anomalies found.
+    {{/if}}
+  {{/if}}
+{{/containers/anomaly-container}}

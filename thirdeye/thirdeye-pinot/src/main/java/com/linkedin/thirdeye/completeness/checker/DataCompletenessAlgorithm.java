@@ -19,7 +19,16 @@ public interface DataCompletenessAlgorithm {
    * @param bucketValue
    * @return
    */
-  public List<Long> getBaselineCounts(String dataset, Long bucketValue);
+  List<Long> getBaselineCounts(String dataset, Long bucketValue);
+
+  /**
+   * Fetch current counts for all buckets of this dataset
+   * @param dataset
+   * @param timeSpec
+   * @param bucketNameToBucketValueMS
+   * @return
+   */
+  Map<String, Long> getCurrentCountsForBuckets(String dataset, TimeSpec timeSpec, Map<String, Long> bucketNameToBucketValueMS);
 
   /**
    * Given the baseline counts and the current count, find out the percent completeness
@@ -27,7 +36,7 @@ public interface DataCompletenessAlgorithm {
    * @param currentCount
    * @return
    */
-  public double getPercentCompleteness(List<Long> baselineCounts, Long currentCount);
+  double getPercentCompleteness(List<Long> baselineCounts, Long currentCount);
 
   /**
    * Verify whether the data completeness percentage passes the expectations
@@ -35,7 +44,7 @@ public interface DataCompletenessAlgorithm {
    * @param expectedCompleteness
    * @return
    */
-  public boolean isDataComplete(Double percentComplete, Double expectedCompleteness);
+  boolean isDataComplete(Double percentComplete, Double expectedCompleteness);
 
   /**
    * This method will return the percentage after which we can consider that the entry is complete, and doesn't need to be checked again
@@ -46,7 +55,7 @@ public interface DataCompletenessAlgorithm {
    *
    * @return
    */
-  public double getConsiderCompleteAfter();
+  double getConsiderCompleteAfter();
 
   /**
    * This method will help in the case of cold start.
@@ -55,10 +64,11 @@ public interface DataCompletenessAlgorithm {
    * and if not available, computes and stores them, for the rest of the computation to use
    * @param dataset
    * @param bucketNameToBucketValueMS
-   * @param bucketNameToTimeValues
+   * @param dateTimeFormatter
    * @param timeSpec
+   * @param zone
    */
-  public void computeBaselineCountsIfNotPresent(String dataset, Map<String, Long> bucketNameToBucketValueMS,
+  void computeBaselineCountsIfNotPresent(String dataset, Map<String, Long> bucketNameToBucketValueMS,
       DateTimeFormatter dateTimeFormatter, TimeSpec timeSpec, DateTimeZone zone);
 
 

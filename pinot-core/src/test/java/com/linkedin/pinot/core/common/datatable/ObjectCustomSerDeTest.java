@@ -15,11 +15,14 @@
  */
 package com.linkedin.pinot.core.common.datatable;
 
+import com.clearspring.analytics.stream.quantile.TDigest;
+import com.linkedin.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -162,6 +165,29 @@ public class ObjectCustomSerDeTest {
 
       // Use Object comparison instead of Collection comparison because order might change.
       Assert.assertEquals((Object) actual, expected, ERROR_MESSAGE);
+    }
+  }
+
+  @Test
+  public void testTDigest()
+      throws IOException {
+    for (int i = 0; i < NUM_ITERATIONS; i++) {
+      TDigest expected = new TDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      int size = RANDOM.nextInt(1000) + 2; // TDigest.quantile() requires at least 2 entries.
+      for (int j = 0; j < size; j++) {
+        expected.add(RANDOM.nextDouble());
+      }
+
+      ByteBuffer byteBuffer = ByteBuffer.allocate(expected.byteSize());
+      expected.asBytes(byteBuffer);
+
+      byte[] actualBytes = ObjectCustomSerDe.serialize(expected);
+      Assert.assertEquals(actualBytes, byteBuffer.array());
+
+      TDigest actual = ObjectCustomSerDe.deserialize(actualBytes, ObjectType.TDigest);
+      for (double j = 0; j < 1.0; j += 0.05) {
+        Assert.assertEquals(actual.quantile(j), expected.quantile(j), 1e-5);
+      }
     }
   }
 }

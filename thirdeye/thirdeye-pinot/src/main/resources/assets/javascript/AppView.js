@@ -4,10 +4,8 @@ function AppView(appModel) {
   this.currentActiveTab = undefined;
 }
 AppView.prototype = {
-
-  init : function() {
-    var self = this;
-    var tabSelectionEventHandler = function(e) {
+  init() {
+    var tabSelectionEventHandler = (e) => {
       e.preventDefault();
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
@@ -17,24 +15,32 @@ AppView.prototype = {
       };
       //don't notify if the tab is already active
       if(!$(e.target).parent().hasClass('active')) {
-        self.tabClickEvent.notify(args);
+        HASH_SERVICE.clear();
+        this.tabClickEvent.notify(args);
       }
     };
+
     $('#main-tabs').click(tabSelectionEventHandler);
     $('#admin-tabs').click(tabSelectionEventHandler);
     // compile thirdeye.ftl
   },
 
-  render : function() {
-    console.log("Switching to tab:" + this.appModel.tabSelected);
+  render() {
     switch (this.appModel.tabSelected) {
     case "dashboard":
-    case "anomalies":
     case "analysis":
       $('#main-tabs a[href=#' + this.appModel.tabSelected + "]").tab('show');
       break;
+    case "anomalies":
+      $('#main-tabs a[href=#anomalies]').tab('show');
+      $('#anomalies-place-holder').show();
+      $('#investigate-place-holder').hide();
+      break;
+    case "investigate":
+      $('#main-tabs a[href=#investigate]').tab('show');
+      $('#anomalies-place-holder').hide();
+      $('#investigate-place-holder').show();
+      break;
     }
-    // compiledHtml
   }
-
-}
+};

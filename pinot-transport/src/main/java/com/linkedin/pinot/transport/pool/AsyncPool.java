@@ -127,6 +127,8 @@ public interface AsyncPool<T> extends PoolStatsProvider<Histogram> {
 
     void destroy(T obj, boolean error, Callback<T> callback);
 
+    void shutdown();
+
     PoolStats.LifecycleStats<Histogram> getStats();
 
   }

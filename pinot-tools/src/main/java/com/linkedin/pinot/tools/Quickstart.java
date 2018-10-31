@@ -15,209 +15,215 @@
  */
 package com.linkedin.pinot.tools;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
 import java.io.File;
 import java.net.URL;
-
+import java.util.Enumeration;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.log4j.Category;
 import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.tools.admin.command.QuickstartRunner;
-
 
 public class Quickstart {
-  private File _quickStartDataDir;
-
-  public Quickstart() {
-
+  private Quickstart() {
   }
 
-  public enum color {
+  private static final String TAB = "\t\t";
+  private static final String NEW_LINE = "\n";
+
+  public enum Color {
+    RESET("\u001B[0m"),
     GREEN("\u001B[32m"),
     YELLOW("\u001B[33m"),
     CYAN("\u001B[36m");
-    private String code;
 
-    color(String code) {
-      this.code = code;
+    private String _code;
+
+    Color(String code) {
+      _code = code;
     }
   }
 
-  public static void printStatus(color code, String message) {
-    System.out.println(code.code + message + code.code);
+  public static void printStatus(Color color, String message) {
+    System.out.println(color._code + message + Color.RESET._code);
   }
 
-  public static String prettyprintResponse(JSONObject response) throws JSONException {
-    final String TAB = "\t\t";
-    final String NEW_LINE = "\n";
-    StringBuilder bld = new StringBuilder();
+  public static String prettyPrintResponse(JSONObject response)
+      throws JSONException {
+    StringBuilder responseBuilder = new StringBuilder();
 
-    if (response.has("selectionResults") && response.getJSONObject("selectionResults") != null) {
+    // Selection query
+    if (response.has("selectionResults")) {
       JSONArray columns = response.getJSONObject("selectionResults").getJSONArray("columns");
-      String[] columnsArr = new String[columns.length()];
-      for (int i = 0; i < columns.length(); i++) {
-        columnsArr[i] = columns.getString(i);
+      int numColumns = columns.length();
+      for (int i = 0; i < numColumns; i++) {
+        responseBuilder.append(columns.getString(i)).append(TAB);
       }
-      bld.append(StringUtils.join(columnsArr, TAB) + NEW_LINE);
+      responseBuilder.append(NEW_LINE);
       JSONArray rows = response.getJSONObject("selectionResults").getJSONArray("results");
-      for (int i = 0; i < rows.length(); i++) {
-        JSONArray a = rows.getJSONArray(i);
-        String[] rowsA = new String[a.length()];
-        for (int j = 0; j < a.length(); j++) {
-          rowsA[j] = a.getString(j);
+      int numRows = rows.length();
+      for (int i = 0; i < numRows; i++) {
+        JSONArray row = rows.getJSONArray(i);
+        for (int j = 0; j < numColumns; j++) {
+          responseBuilder.append(row.getString(j)).append(TAB);
         }
-        bld.append(StringUtils.join(rowsA, TAB) + NEW_LINE);
+        responseBuilder.append(NEW_LINE);
       }
-      return bld.toString();
-    } else if (response.has("aggregationResults") && response.getJSONArray("aggregationResults").length() > 0
-        && !response.getJSONArray("aggregationResults").getJSONObject(0).has("groupByResult")) {
-      JSONArray aggs = response.getJSONArray("aggregationResults");
-      for (int i = 0; i < aggs.length(); i++) {
-        bld.append(aggs.getJSONObject(i).getString("function") + TAB);
+      return responseBuilder.toString();
+    }
+
+    // Aggregation only query
+    if (!response.getJSONArray("aggregationResults").getJSONObject(0).has("groupByResult")) {
+      JSONArray aggregationResults = response.getJSONArray("aggregationResults");
+      int numAggregations = aggregationResults.length();
+      for (int i = 0; i < numAggregations; i++) {
+        responseBuilder.append(aggregationResults.getJSONObject(i).getString("function")).append(TAB);
       }
-      bld.append(NEW_LINE);
-      for (int i = 0; i < aggs.length(); i++) {
-        bld.append(aggs.getJSONObject(i).getString("value") + TAB);
+      responseBuilder.append(NEW_LINE);
+      for (int i = 0; i < numAggregations; i++) {
+        responseBuilder.append(aggregationResults.getJSONObject(i).getString("value")).append(TAB);
       }
-      return bld.toString();
-    } else {
+      responseBuilder.append(NEW_LINE);
+      return responseBuilder.toString();
+    }
 
-      JSONObject groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
-
-      bld.append(groupByResult.getString("function") + TAB);
-      JSONArray rowCols = groupByResult.getJSONArray("groupByColumns");
-      String[] rowColsArr = new String[rowCols.length()];
-      for (int i = 0; i < rowCols.length(); i++) {
-        rowColsArr[i] = rowCols.getString(i);
+    // Aggregation group-by query
+    JSONArray groupByResults = response.getJSONArray("aggregationResults");
+    int numGroupBys = groupByResults.length();
+    for (int i = 0; i < numGroupBys; i++) {
+      JSONObject groupByResult = groupByResults.getJSONObject(i);
+      responseBuilder.append(groupByResult.getString("function")).append(TAB);
+      JSONArray columns = groupByResult.getJSONArray("groupByColumns");
+      int numColumns = columns.length();
+      for (int j = 0; j < numColumns; j++) {
+        responseBuilder.append(columns.getString(j)).append(TAB);
       }
-      bld.append(StringUtils.join(rowColsArr, TAB) + NEW_LINE);
-
-      JSONArray groupByResults = groupByResult.getJSONArray("groupByResult");
-
-      for (int i = 0; i < groupByResults.length(); i++) {
-        JSONObject entry = groupByResults.getJSONObject(i);
-        bld.append(entry.getString("value") + TAB);
-        JSONArray colVals = entry.getJSONArray("group");
-        String[] colValsArr = new String[colVals.length()];
-        for (int j = 0; j < colVals.length(); j++) {
-          colValsArr[j] = colVals.getString(j);
+      responseBuilder.append(NEW_LINE);
+      JSONArray rows = groupByResult.getJSONArray("groupByResult");
+      int numRows = rows.length();
+      for (int j = 0; j < numRows; j++) {
+        JSONObject row = rows.getJSONObject(j);
+        responseBuilder.append(row.getString("value")).append(TAB);
+        JSONArray columnValues = row.getJSONArray("group");
+        for (int k = 0; k < numColumns; k++) {
+          responseBuilder.append(columnValues.getString(k)).append(TAB);
         }
-        bld.append(StringUtils.join(colValsArr, TAB) + NEW_LINE);
+        responseBuilder.append(NEW_LINE);
       }
-      return bld.toString();
+    }
+    return responseBuilder.toString();
+  }
+
+  public static void logOnlyErrors() {
+    Logger root = Logger.getRootLogger();
+    root.setLevel(Level.ERROR);
+    Enumeration allLoggers = root.getLoggerRepository().getCurrentCategories();
+    while (allLoggers.hasMoreElements()) {
+      Category tmpLogger = (Category) allLoggers.nextElement();
+      tmpLogger.setLevel(Level.ERROR);
     }
   }
 
-  public boolean execute() throws Exception {
-    _quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
-    String quickStartDataDirName = _quickStartDataDir.getName();
+  public void execute()
+      throws Exception {
+    final File quickStartDataDir = new File("quickStartData" + System.currentTimeMillis());
 
-    if (!_quickStartDataDir.exists()) {
-      _quickStartDataDir.mkdir();
+    if (!quickStartDataDir.exists()) {
+      Preconditions.checkState(quickStartDataDir.mkdirs());
     }
 
-    File schemaFile = new File(quickStartDataDirName + "/baseball.schema");
-    File dataFile = new File(quickStartDataDirName + "/baseball.csv");
-    File tableCreationJsonFileName = new File(quickStartDataDirName + "/baseballTable.json");
+    File schemaFile = new File(quickStartDataDir, "baseballStats_schema.json");
+    File dataFile = new File(quickStartDataDir, "baseballStats_data.csv");
+    File tableConfigFile = new File(quickStartDataDir, "baseballStats_offline_table_config.json");
 
-    FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseball.schema"), schemaFile);
-    FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseball.csv"), dataFile);
-    FileUtils.copyURLToFile(Quickstart.class.getClassLoader().getResource("sample_data/baseballTable.json"),
-        tableCreationJsonFileName);
+    ClassLoader classLoader = Quickstart.class.getClassLoader();
+    URL resource = classLoader.getResource("sample_data/baseballStats_schema.json");
+    com.google.common.base.Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, schemaFile);
+    resource = classLoader.getResource("sample_data/baseballStats_data.csv");
+    com.google.common.base.Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, dataFile);
+    resource = classLoader.getResource("sample_data/baseballStats_offline_table_config.json");
+    com.google.common.base.Preconditions.checkNotNull(resource);
+    FileUtils.copyURLToFile(resource, tableConfigFile);
 
-    File tempDirOne = new File("/tmp/" + System.currentTimeMillis());
-    tempDirOne.mkdir();
-
-    File tempDir = new File("/tmp/" + String.valueOf(System.currentTimeMillis()));
-    String tableName = "baseballStats";
-    QuickstartTableRequest request = new QuickstartTableRequest(tableName, schemaFile, tableCreationJsonFileName,
-        _quickStartDataDir, FileFormat.CSV);
+    File tempDir = new File("/tmp", String.valueOf(System.currentTimeMillis()));
+    Preconditions.checkState(tempDir.mkdirs());
+    QuickstartTableRequest request =
+        new QuickstartTableRequest("baseballStats", schemaFile, tableConfigFile, quickStartDataDir, FileFormat.CSV);
     final QuickstartRunner runner = new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, tempDir);
 
-    runner.clean();
+    printStatus(Color.CYAN, "***** Starting Zookeeper, controller, broker and server *****");
     runner.startAll();
-    printStatus(color.CYAN, "Deployed Zookeeper");
-    printStatus(color.CYAN, "Deployed controller, broker and server");
+    printStatus(Color.CYAN, "***** Adding baseballStats schema *****");
     runner.addSchema();
-    printStatus(color.CYAN, "Added baseballStats schema");
+    printStatus(Color.CYAN, "***** Adding baseballStats table *****");
     runner.addTable();
-    printStatus(color.CYAN, "Creating baseballStats table");
+    printStatus(Color.CYAN, "***** Building index segment for baseballStats *****");
     runner.buildSegment();
-    printStatus(color.CYAN, "Built index segment for baseballStats");
+    printStatus(Color.CYAN, "***** Pushing segment to the controller *****");
     runner.pushSegment();
-    printStatus(color.CYAN, "Pushing segments to the controller");
-    printStatus(color.CYAN, "Waiting for a second for the server to fetch the assigned segment");
-
+    printStatus(Color.CYAN, "***** Waiting for 5 seconds for the server to fetch the assigned segment *****");
     Thread.sleep(5000);
 
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
         try {
-          printStatus(color.GREEN, "***** shutting down offline quick start *****");
-          FileUtils.deleteDirectory(_quickStartDataDir);
-          runner.clean();
+          printStatus(Color.GREEN, "***** Shutting down offline quick start *****");
           runner.stop();
+          FileUtils.deleteDirectory(quickStartDataDir);
         } catch (Exception e) {
           e.printStackTrace();
         }
       }
     });
 
-    printStatus(color.YELLOW, "Offline quickstart complete");
+    printStatus(Color.YELLOW, "***** Offline quickstart setup complete *****");
 
     String q1 = "select count(*) from baseballStats limit 0";
-    printStatus(color.YELLOW, "Total number of documents in the table");
-    printStatus(color.CYAN, "Query : " + q1);
-    printStatus(color.YELLOW, prettyprintResponse(runner.runQuery(q1)));
-    printStatus(color.GREEN, "***************************************************");
+    printStatus(Color.YELLOW, "Total number of documents in the table");
+    printStatus(Color.CYAN, "Query : " + q1);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q1)));
+    printStatus(Color.GREEN, "***************************************************");
 
     String q2 = "select sum('runs') from baseballStats group by playerName top 5 limit 0";
-    printStatus(color.YELLOW, "Top 5 run scorers of all time ");
-    printStatus(color.CYAN, "Query : " + q2);
-    printStatus(color.YELLOW, prettyprintResponse(runner.runQuery(q2)));
-    printStatus(color.GREEN, "***************************************************");
+    printStatus(Color.YELLOW, "Top 5 run scorers of all time ");
+    printStatus(Color.CYAN, "Query : " + q2);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q2)));
+    printStatus(Color.GREEN, "***************************************************");
 
     String q3 = "select sum('runs') from baseballStats where yearID=2000 group by playerName top 5 limit 0";
-    printStatus(color.YELLOW, "Top 5 run scorers of the year 2000");
-    printStatus(color.CYAN, "Query : " + q3);
-    printStatus(color.YELLOW, prettyprintResponse(runner.runQuery(q3)));
-    printStatus(color.GREEN, "***************************************************");
+    printStatus(Color.YELLOW, "Top 5 run scorers of the year 2000");
+    printStatus(Color.CYAN, "Query : " + q3);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q3)));
+    printStatus(Color.GREEN, "***************************************************");
 
     String q4 = "select sum('runs') from baseballStats where yearID>=2000 group by playerName limit 0";
-    printStatus(color.YELLOW, "Top 10 run scorers after 2000");
-    printStatus(color.CYAN, "Query : " + q4);
-    printStatus(color.YELLOW, prettyprintResponse(runner.runQuery(q4)));
-    printStatus(color.GREEN, "***************************************************");
+    printStatus(Color.YELLOW, "Top 10 run scorers after 2000");
+    printStatus(Color.CYAN, "Query : " + q4);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q4)));
+    printStatus(Color.GREEN, "***************************************************");
 
     String q5 = "select playerName,runs,homeRuns from baseballStats order by yearID limit 10";
-    printStatus(color.YELLOW, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID");
-    printStatus(color.CYAN, "Query : " + q5);
-    printStatus(color.YELLOW, prettyprintResponse(runner.runQuery(q5)));
-    printStatus(color.GREEN, "***************************************************");
+    printStatus(Color.YELLOW, "Print playerName,runs,homeRuns for 10 records from the table and order them by yearID");
+    printStatus(Color.CYAN, "Query : " + q5);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(q5)));
+    printStatus(Color.GREEN, "***************************************************");
 
-    printStatus(color.GREEN, "you can always go to http://localhost:9000/query/ to play around in the query console");
-
-    long st = System.currentTimeMillis();
-    while (true) {
-      if (System.currentTimeMillis() - st >= (60 * 60) * 1000) {
-        break;
-      }
-    }
-
-    printStatus(color.YELLOW, "running since an hour, stopping now");
-    return true;
+    printStatus(Color.GREEN, "You can always go to http://localhost:9000/query/ to play around in the query console");
   }
 
-  public static void main(String[] args) throws Exception {
-    org.apache.log4j.Logger.getRootLogger().setLevel(Level.ERROR);
-    Quickstart st = new Quickstart();
-    st.execute();
+  public static void main(String[] args)
+      throws Exception {
+    logOnlyErrors();
+    new Quickstart().execute();
   }
-
 }

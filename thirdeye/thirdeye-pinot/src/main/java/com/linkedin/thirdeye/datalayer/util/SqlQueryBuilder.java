@@ -40,7 +40,7 @@ public class SqlQueryBuilder {
   private static final Pattern PARAM_PATTERN =
       Pattern.compile(PARAM_REGEX, Pattern.CASE_INSENSITIVE);
   private static Set<String> AUTO_UPDATE_COLUMN_SET =
-      Sets.newHashSet("id", "last_modified", "update_time");
+      Sets.newHashSet("id", "last_modified");
 
   private EntityMappingHolder entityMappingHolder;;
 
@@ -230,18 +230,23 @@ public class SqlQueryBuilder {
     return prepareStatement;
   }
 
-  public PreparedStatement createDeleteStatement(Connection connection,
-      Class<? extends AbstractEntity> entityClass, List<Long> ids) throws Exception {
+  public PreparedStatement createDeleteStatement(Connection connection, Class<? extends AbstractEntity> entityClass,
+      List<Long> ids, boolean useBaseId) throws Exception {
     if (ids == null || ids.isEmpty()) {
       throw new IllegalArgumentException("ids to delete cannot be null/empty");
     }
     String tableName =
         entityMappingHolder.tableToEntityNameMap.inverse().get(entityClass.getSimpleName());
     StringBuilder sqlBuilder = new StringBuilder("DELETE FROM " + tableName);
-    StringBuilder whereClause = new StringBuilder(" WHERE  id IN( ");
+    String whereString = " WHERE id IN( ";
+    if (useBaseId) {
+      whereString = " WHERE base_id IN( ";
+    }
+    StringBuilder whereClause = new StringBuilder(whereString);
     String delim = "";
     for (Long id : ids) {
       whereClause.append(delim).append(id);
+      delim = ",";
     }
     whereClause.append(")");
     sqlBuilder.append(whereClause.toString());
@@ -413,7 +418,10 @@ public class SqlQueryBuilder {
     LinkedHashMap<String, ColumnInfo> columnInfo =
         entityMappingHolder.columnInfoPerTable.get(tableName);
     for (String entityFieldName : paramNames) {
-      String dbFieldName = dbNameToEntityNameMapping.inverse().get(entityFieldName);
+      String[] entityFieldNameParts = entityFieldName.split("__", 2);
+      if (entityFieldNameParts.length > 1)
+        LOG.info("Using field name decomposition: '{}' to '{}'", entityFieldName, entityFieldNameParts[0]);
+      String dbFieldName = dbNameToEntityNameMapping.inverse().get(entityFieldNameParts[0]);
 
       Object val = parameterMap.get(entityFieldName);
       if (Enum.class.isAssignableFrom(val.getClass())) {

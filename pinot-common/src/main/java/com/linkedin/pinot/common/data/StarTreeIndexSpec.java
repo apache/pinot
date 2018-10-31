@@ -15,56 +15,74 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.common.base.Objects;
-
-import java.util.Collections;
+import com.google.common.collect.Sets;
+import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.config.ConfigKey;
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.codehaus.jackson.map.ObjectMapper;
 
+
+@SuppressWarnings("unused")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class StarTreeIndexSpec {
-  public static final Integer DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
+  public static final int DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
   public static final int DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD = 10000;
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   /** The upper bound on the number of leaf records to be scanned for any query */
-  private Integer maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
+  @ConfigKey("maxLeafRecords")
+  private int _maxLeafRecords = DEFAULT_MAX_LEAF_RECORDS;
 
   /** Dimension split order (if null or absent, descending w.r.t. dimension cardinality) */
-  private List<String> dimensionsSplitOrder;
+  @ConfigKey("dimensionsSplitOrder")
+  private List<String> _dimensionsSplitOrder;
 
   /** Dimensions for which to exclude star nodes at split. */
-  private Set<String> skipStarNodeCreationForDimensions = Collections.emptySet();
+  @ConfigKey("skipStarNodeCreationForDimensions")
+  private Set<String> _skipStarNodeCreationForDimensions;
+
+  @ConfigKey("skipMaterializationForDimensions")
   private Set<String> _skipMaterializationForDimensions;
-  private int skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
-  private boolean enableOffHeapFormat = true;
+  @ConfigKey("skipMaterializationCardinalityThreshold")
+  private int _skipMaterializationCardinalityThreshold = DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD;
 
-  public StarTreeIndexSpec() {}
+  @ConfigKey("excludeSkipMaterializationDimensionsForStarTreeIndex")
+  private boolean _excludeSkipMaterializationDimensionsForStarTreeIndex;
 
-  public Integer getMaxLeafRecords() {
-    return maxLeafRecords;
+  public int getMaxLeafRecords() {
+    return _maxLeafRecords;
   }
 
-  public void setMaxLeafRecords(Integer maxLeafRecords) {
-    this.maxLeafRecords = maxLeafRecords;
+  public void setMaxLeafRecords(int maxLeafRecords) {
+    _maxLeafRecords = maxLeafRecords;
   }
 
   public List<String> getDimensionsSplitOrder() {
-    return dimensionsSplitOrder;
+    return _dimensionsSplitOrder;
   }
 
   public void setDimensionsSplitOrder(List<String> dimensionsSplitOrder) {
-    this.dimensionsSplitOrder = dimensionsSplitOrder;
-  }
-
-  public void setSkipStarNodeCreationForDimensions(Set<String> skipStarNodeCreationForDimensions) {
-    this.skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
+    _dimensionsSplitOrder = dimensionsSplitOrder;
   }
 
   public Set<String> getSkipStarNodeCreationForDimensions() {
-    return skipStarNodeCreationForDimensions;
+    return _skipStarNodeCreationForDimensions;
   }
 
-  public Set<String> getskipMaterializationForDimensions() {
+  public void setSkipStarNodeCreationForDimensions(Set<String> skipStarNodeCreationForDimensions) {
+    _skipStarNodeCreationForDimensions = skipStarNodeCreationForDimensions;
+  }
+
+  public Set<String> getSkipMaterializationForDimensions() {
     return _skipMaterializationForDimensions;
   }
 
@@ -72,50 +90,87 @@ public class StarTreeIndexSpec {
     _skipMaterializationForDimensions = skipMaterializationForDimensions;
   }
 
-  public int getskipMaterializationCardinalityThreshold() {
-    return skipMaterializationCardinalityThreshold;
+  public int getSkipMaterializationCardinalityThreshold() {
+    return _skipMaterializationCardinalityThreshold;
   }
 
   public void setSkipMaterializationCardinalityThreshold(int skipMaterializationCardinalityThreshold) {
-    this.skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
+    _skipMaterializationCardinalityThreshold = skipMaterializationCardinalityThreshold;
   }
 
-  @Override
-  public boolean equals(Object o) {
-    if (!(o instanceof StarTreeIndexSpec)) {
-      return false;
-    }
-    StarTreeIndexSpec s = (StarTreeIndexSpec) o;
-    return Objects.equal(maxLeafRecords, s.getMaxLeafRecords())
-        && Objects.equal(dimensionsSplitOrder, s.getDimensionsSplitOrder());
+  public boolean isExcludeSkipMaterializationDimensionsForStarTreeIndex() {
+    return _excludeSkipMaterializationDimensionsForStarTreeIndex;
   }
 
-  @Override
-  public int hashCode() {
-    return Objects.hashCode(maxLeafRecords, dimensionsSplitOrder);
+  public void setExcludeSkipMaterializationDimensionsForStarTreeIndex(
+      boolean excludeSkipMaterializationDimensionsForStarTreeIndex) {
+    _excludeSkipMaterializationDimensionsForStarTreeIndex = excludeSkipMaterializationDimensionsForStarTreeIndex;
   }
 
   @Override
   public String toString() {
-    return Objects.toStringHelper(this)
-        .add("maxLeafRecords", maxLeafRecords)
-        .add("dimensionsSplitOrder", dimensionsSplitOrder)
-        .toString();
+    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
+  }
+
+  public String toJsonString() throws Exception {
+    return OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(this);
   }
 
   /**
-   * Returns True if StarTreeOffHeap is enabled, False otherwise.
-   * @return
+   * Builds and returns StarTreeIndexSpec from specified file.
+   *
+   * @param starTreeIndexSpecFile File containing star tree index spec.
+   * @return StarTreeIndexSpec object de-serialized from the file.
+   * @throws IOException
    */
-  public boolean isEnableOffHeapFormat() {
-    return enableOffHeapFormat;
+  public static StarTreeIndexSpec fromFile(File starTreeIndexSpecFile) throws IOException {
+    return OBJECT_MAPPER.readValue(starTreeIndexSpecFile, StarTreeIndexSpec.class);
   }
 
-  /**
-   * Enable/Disable StarTreeOffHeapFormat.
-   * @param enableOffHeapFormat
-   */
-  public void setEnableOffHeapFormat(boolean enableOffHeapFormat) {
-    this.enableOffHeapFormat = enableOffHeapFormat;
+  public static StarTreeIndexSpec fromJsonString(String jsonString) throws IOException {
+    return OBJECT_MAPPER.readValue(jsonString, StarTreeIndexSpec.class);
+  }
+
+  public static StarTreeIndexSpec fromStarTreeMetadata(StarTreeMetadata starTreeMetadata) {
+    StarTreeIndexSpec starTreeIndexSpec = new StarTreeIndexSpec();
+    starTreeIndexSpec.setMaxLeafRecords(starTreeMetadata.getMaxLeafRecords());
+    starTreeIndexSpec.setDimensionsSplitOrder(starTreeMetadata.getDimensionsSplitOrder());
+    starTreeIndexSpec.setSkipStarNodeCreationForDimensions(
+        Sets.newHashSet(starTreeMetadata.getSkipStarNodeCreationForDimensions()));
+    starTreeIndexSpec.setSkipMaterializationForDimensions(
+        Sets.newHashSet(starTreeMetadata.getSkipMaterializationForDimensions()));
+    starTreeIndexSpec.setSkipMaterializationCardinalityThreshold(starTreeMetadata.getSkipMaterializationCardinality());
+    return starTreeIndexSpec;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (EqualityUtils.isSameReference(this, o)) {
+      return true;
+    }
+
+    if (EqualityUtils.isNullOrNotSameClass(this, o)) {
+      return false;
+    }
+
+    StarTreeIndexSpec that = (StarTreeIndexSpec) o;
+
+    return EqualityUtils.isEqual(_maxLeafRecords, that._maxLeafRecords) &&
+        EqualityUtils.isEqual( _skipMaterializationCardinalityThreshold, that._skipMaterializationCardinalityThreshold) &&
+        EqualityUtils.isEqual(_excludeSkipMaterializationDimensionsForStarTreeIndex, that._excludeSkipMaterializationDimensionsForStarTreeIndex) &&
+        EqualityUtils.isEqual(_dimensionsSplitOrder, that._dimensionsSplitOrder) &&
+        EqualityUtils.isEqual(_skipStarNodeCreationForDimensions, that._skipStarNodeCreationForDimensions) &&
+        EqualityUtils.isEqual(_skipMaterializationForDimensions, that._skipMaterializationForDimensions);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = EqualityUtils.hashCodeOf(_maxLeafRecords);
+    result = EqualityUtils.hashCodeOf(result, _dimensionsSplitOrder);
+    result = EqualityUtils.hashCodeOf(result, _skipStarNodeCreationForDimensions);
+    result = EqualityUtils.hashCodeOf(result, _skipMaterializationForDimensions);
+    result = EqualityUtils.hashCodeOf(result, _skipMaterializationCardinalityThreshold);
+    result = EqualityUtils.hashCodeOf(result, _excludeSkipMaterializationDimensionsForStarTreeIndex);
+    return result;
   }
 }

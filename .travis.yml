@@ -1,26 +1,21 @@
 language: java
+sudo: false
+dist: trusty
 
 env:
   - RUN_INTEGRATION_TESTS=true
   - RUN_INTEGRATION_TESTS=false
 
 jdk:
-  - oraclejdk7
-  - openjdk7
   - oraclejdk8
-
-matrix:
-  exclude:
-    - jdk: openjdk7
-      env: RUN_INTEGRATION_TESTS=false
-    - jdk: oraclejdk8
-      env: RUN_INTEGRATION_TESTS=false
 
 cache:
   directories:
     - $HOME/.m2
+  yarn: true
 
-sudo: false
+addons:
+  firefox: latest
 
 install:
   - ./.travis_install.sh

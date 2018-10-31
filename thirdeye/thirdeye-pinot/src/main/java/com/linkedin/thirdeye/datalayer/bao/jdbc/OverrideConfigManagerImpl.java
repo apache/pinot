@@ -1,12 +1,13 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
-import java.util.ArrayList;
 import java.util.List;
 
+@Singleton
 public class OverrideConfigManagerImpl extends AbstractManagerImpl<OverrideConfigDTO> implements
     OverrideConfigManager {
 
@@ -30,15 +31,5 @@ public class OverrideConfigManagerImpl extends AbstractManagerImpl<OverrideConfi
         Predicate.AND(Predicate.LE("startTime", windowEnd), Predicate.GE("endTime", windowStart));
 
     return findByPredicate(predicate);
-  }
-
-  private List<OverrideConfigDTO> findByPredicate(Predicate predicate) {
-    List<OverrideConfigBean> list = genericPojoDao.get(predicate, OverrideConfigBean.class);
-    List<OverrideConfigDTO> result = new ArrayList<>();
-    for (OverrideConfigBean bean : list) {
-      OverrideConfigDTO dto = convertBean2DTO(bean, OverrideConfigDTO.class);
-      result.add(dto);
-    }
-    return result;
   }
 }

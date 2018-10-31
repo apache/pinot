@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.core.io.compression.ChunkCompressor;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import com.linkedin.pinot.core.segment.creator.BaseSingleValueRawIndexCreator;
@@ -28,37 +28,28 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
   VarByteChunkSingleValueWriter _indexWriter;
 
-  public SingleValueVarByteRawIndexCreator(File baseIndexDir, String column, int totalDocs, int maxLength)
-      throws IOException {
-    File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
+  public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
+      String column, int totalDocs, int maxLength) throws IOException {
+    File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
 
-    ChunkCompressor compressor = ChunkCompressorFactory.getCompressor("snappy");
-    _indexWriter = new VarByteChunkSingleValueWriter(file, compressor, totalDocs, NUM_DOCS_PER_CHUNK, maxLength);
+    _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, maxLength);
   }
 
   @Override
-  public void index(int docId, String valueToIndex)
-      throws IOException {
+  public void index(int docId, String valueToIndex) {
     _indexWriter.setString(docId, valueToIndex);
   }
 
   @Override
-  public void index(int docId, Object valueToIndex)
-      throws IOException {
+  public void index(int docId, Object valueToIndex) {
     if (valueToIndex instanceof String) {
       _indexWriter.setString(docId, (String) valueToIndex);
-    } else if (valueToIndex instanceof byte[]) {
-      _indexWriter.setBytes(docId, (byte[]) valueToIndex);
+    } else if (valueToIndex instanceof ByteArray) {
+      _indexWriter.setBytes(docId, ((ByteArray) valueToIndex).getBytes());
     } else {
       throw new IllegalArgumentException(
           "Illegal data type for variable length indexing: " + valueToIndex.getClass().getName());
     }
-  }
-
-  @Override
-  public void index(int docId, byte[] valueToIndex) {
-    // TODO: Add support for byte[] values.
-    throw new UnsupportedOperationException();
   }
 
   @Override

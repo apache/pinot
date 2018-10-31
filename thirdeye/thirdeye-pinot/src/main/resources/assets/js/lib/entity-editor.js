@@ -47,8 +47,6 @@ function buildNameForEntity(entity, entityType) {
       return entity.id + " : " + entity.dataset + " : " + entity.name;
     case "ANOMALY_FUNCTION":
       return entity.id + " : " + entity.functionName + " : " + entity.type;
-    case "EMAIL_CONFIGURATION":
-      return entity.id + " : " + entity.collection + " : " + entity.metric;
     case "OVERRIDE_CONFIG":
       var startTime = new Date(entity.startTime);
       var endTime = new Date(entity.endTime);
@@ -56,6 +54,11 @@ function buildNameForEntity(entity, entityType) {
              + endTime.toString();
     case "ALERT_CONFIG" :
       return entity.id + " : " + entity.name;
+    case "APPLICATION" :
+      return entity.id + " : " + entity.application;
+    case "ENTITY_MAPPING" :
+        console.log(entity)
+      return entity.id + " : " + entity.fromURN + "--->" + entity.toURN;
     default:
       console.log("entity type not found : " + entityType);
       return entity.id;

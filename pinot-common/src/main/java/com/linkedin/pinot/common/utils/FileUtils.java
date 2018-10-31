@@ -15,7 +15,11 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Random;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -23,9 +27,24 @@ import java.util.Random;
  */
 
 public class FileUtils {
+
+  public static Logger LOGGER = LoggerFactory.getLogger(FileUtils.class);
+
   private static final Random RANDOM = new Random();
 
   public static String getRandomFileName() {
     return StringUtil.join("-", "tmp", String.valueOf(System.currentTimeMillis()), Long.toString(RANDOM.nextLong()));
+  }
+
+  /**
+   * Deletes the destination file if it exists then calls org.apache.commons moveFile.
+   * @param srcFile
+   * @param destFile
+   */
+  public static void moveFileWithOverwrite(File srcFile, File destFile) throws IOException {
+    if (destFile.exists()) {
+      org.apache.commons.io.FileUtils.deleteQuietly(destFile);
+    }
+    org.apache.commons.io.FileUtils.moveFile(srcFile, destFile);
   }
 }

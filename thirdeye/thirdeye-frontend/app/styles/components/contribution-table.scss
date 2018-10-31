@@ -1,0 +1,132 @@
+/* analysis table css*/
+
+.contribution-table {
+  border: 1px solid $te-grey--border;
+  margin-top: $te-default-element-spacing;
+
+  &__body {
+    padding: $te-spacing;
+    position: relative;
+  }
+
+  &__title {
+    @include margin-reset;
+    @include padding-reset;
+    font-size: initial;
+    font-weight: 600;
+  }
+}
+
+
+
+
+.analysis-table-wrapper {
+  overflow-y: scroll;
+}
+
+.contribution-table__header {
+  display: flex;
+  border-bottom: 1px solid $te-grey--border;
+  padding: $te-spacing 0;
+}
+
+.contribution-table__subnav {
+  margin: 0 $te-spacing;
+}
+
+.analysis-table {
+  border-collapse: collapse;
+  border: none;
+  width: auto;
+  min-width: 100%;
+  font-size: 13px;
+  font-weight: 300;
+}
+
+.analysis-table__header {
+  text-align: center;
+  font-weight: 300;
+  font-size: 12px;
+  white-space: nowrap;
+  background-color: #E4E8EC;
+  padding: 4px 8px;
+    position: sticky;
+  /* offset the table border*/
+  top: -1px;
+}
+
+.analysis-table__anchor {
+  position: sticky;
+  z-index: 1;
+  left: -1px;
+  top: -1px;
+}
+
+.analysis-table__dimension {
+  position: sticky;
+  /* offset the table border*/
+  left: -1px;
+  font-weight: 300;
+  font-size: 13px;
+  white-space: nowrap;
+  background-color: white;
+}
+
+
+.analysis-table__anchor--low,
+.analysis-table__subheader {
+  /* offset the table border*/
+  position: sticky;
+  top: 34px;
+  background-color: white;
+  padding: 8px;
+}
+
+.analysis-table__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: 0;
+}
+
+.analysis-table__cell--primary {
+  justify-content: flex-start;
+  min-width: 220px;
+}
+
+.analysis-table__item {
+  width: 35%;
+  flex: none;
+  padding: 0 12px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.analysis-table__item--small {
+  width: 30%;
+  justify-content: center;
+}
+
+.analysis-table__item--large {
+  width: 100%;
+  justify-content: center;
+}
+
+.analysis-table__anchor--white {
+  background-color: white;
+  z-index: 2;
+}
+
+.analysis-table__anchor,
+.analysis-table__dimension {
+  border: none!important;
+  padding: 9px;
+}
+
+.analysis-table__dimension {
+  position: sticky;
+  /* offset the table border*/
+  left: -1px;
+}

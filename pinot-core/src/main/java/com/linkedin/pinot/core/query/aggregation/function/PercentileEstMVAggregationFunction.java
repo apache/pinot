@@ -23,13 +23,35 @@ import javax.annotation.Nonnull;
 
 
 public class PercentileEstMVAggregationFunction extends PercentileEstAggregationFunction {
+  private static final double DEFAULT_MAX_ERROR = 0.01;
   private final String _name;
 
   public PercentileEstMVAggregationFunction(int percentile) {
     super(percentile);
     switch (percentile) {
+      case 10:
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST10MV.getName();
+        break;
+      case 20:
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST20MV.getName();
+        break;
+      case 30:
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST30MV.getName();
+        break;
+      case 40:
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST40MV.getName();
+        break;
       case 50:
         _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST50MV.getName();
+        break;
+      case 60:
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST60MV.getName();
+        break;
+      case 70:
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST70MV.getName();
+        break;
+      case 80:
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST80MV.getName();
         break;
       case 90:
         _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILEEST90MV.getName();

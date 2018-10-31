@@ -1,0 +1,16 @@
+{{events-header
+  events=eventsInRange
+  onTabChange=(action "onTabChange")
+  activeTab=selectedTab
+}}
+
+{{models-table
+  data=filteredEvents
+  columns=columns
+  showColumnsDropdown=false
+  showGlobalFilter=false
+  filteringIgnoreCase=true
+  multipleExpand=true
+  expandedRowTemplate='custom/expanded-row'
+  onSelection='onSelection'
+}}

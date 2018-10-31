@@ -16,154 +16,134 @@
 
 package com.linkedin.pinot.server.api.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.util.List;
 import javax.ws.rs.core.Response;
-import org.json.JSONArray;
-import org.json.JSONException;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONObject;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.AssertJUnit.assertTrue;
 
-
-public class TablesResourceTest {
-
-  ResourceTestHelper testHelper = new ResourceTestHelper();
-
-  @BeforeClass
-  public void setupTest()
-      throws Exception {
-    testHelper.setup();
-  }
-
-  @AfterClass
-  public void teardownTest()
-      throws Exception {
-    testHelper.tearDown();
-  }
+public class TablesResourceTest extends BaseResourceTest {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Test
-  public void getTables()
-      throws Exception {
-    Response response =
-        testHelper.target.path("/tables").request().get(Response.class);
+  public void getTables() throws Exception {
+    String tablesPath = "/tables";
+
+    Response response = _webTarget.path(tablesPath).request().get(Response.class);
     String responseBody = response.readEntity(String.class);
-    TablesList tablesList =
-        new ObjectMapper().readValue(responseBody, TablesList.class);
-    assertNotNull(tablesList);
+    TablesList tablesList = OBJECT_MAPPER.readValue(responseBody, TablesList.class);
+
+    Assert.assertNotNull(tablesList);
     List<String> tables = tablesList.getTables();
-    assertNotNull(tables);
-    assertEquals(tables.size(), 1);
-    assertEquals(tables.get(0), ResourceTestHelper.DEFAULT_TABLE_NAME);
+    Assert.assertNotNull(tables);
+    Assert.assertEquals(tables.size(), 1);
+    Assert.assertEquals(tables.get(0), TABLE_NAME);
 
-    final String secondTable = "secondTable";
-    testHelper.addTable(secondTable);
-    IndexSegment secondSegment = testHelper.setupSegment(secondTable, ResourceTestHelper.DEFAULT_AVRO_DATA_FILE, "2");
-    tablesList = testHelper.target.path("/tables").request().get(TablesList.class);
-    assertNotNull(tablesList);
-    assertNotNull(tablesList.getTables());
-    assertEquals(tablesList.getTables().size(), 2);
-    assertTrue(tablesList.getTables().contains(ResourceTestHelper.DEFAULT_TABLE_NAME));
-    assertTrue(tablesList.getTables().contains(secondTable));
+    String secondTable = "secondTable";
+    addTable(secondTable);
+    response = _webTarget.path(tablesPath).request().get(Response.class);
+    responseBody = response.readEntity(String.class);
+    tablesList = OBJECT_MAPPER.readValue(responseBody, TablesList.class);
+
+    Assert.assertNotNull(tablesList);
+    tables = tablesList.getTables();
+    Assert.assertNotNull(tables);
+    Assert.assertEquals(tables.size(), 2);
+    Assert.assertTrue(tables.contains(TABLE_NAME));
+    Assert.assertTrue(tables.contains(secondTable));
   }
 
   @Test
-  public void getSegments()
-      throws Exception {
-    {
-      TableSegments tableSegments =
-          testHelper.target.path("/tables/" + ResourceTestHelper.DEFAULT_TABLE_NAME + "/segments").request()
-              .get(TableSegments.class);
-      assertNotNull(tableSegments);
-      assertNotNull(tableSegments.getSegments());
-      assertEquals(tableSegments.getSegments().size(), 1);
-      assertEquals(tableSegments.getSegments().get(0), testHelper.indexSegment.getSegmentName());
+  public void getSegments() throws Exception {
+    String segmentsPath = "/tables/" + TABLE_NAME + "/segments";
+    IndexSegment defaultSegment = _indexSegments.get(0);
 
-      IndexSegment secondSegment = testHelper
-          .setupSegment(ResourceTestHelper.DEFAULT_TABLE_NAME, ResourceTestHelper.DEFAULT_AVRO_DATA_FILE, "2");
-      tableSegments = testHelper.target.path("/tables/" + ResourceTestHelper.DEFAULT_TABLE_NAME + "/segments").request()
-          .get(TableSegments.class);
-      assertNotNull(tableSegments);
-      assertNotNull(tableSegments.getSegments());
-      assertEquals(tableSegments.getSegments().size(), 2);
-      assertTrue(tableSegments.getSegments().contains(testHelper.indexSegment.getSegmentName()));
-      assertTrue(tableSegments.getSegments().contains(secondSegment.getSegmentName()));
-    }
-    {
-      // No such table
-      Response response = testHelper.target.path("/tables/noSuchTable/segments").request().get(Response.class);
-      assertNotNull(response);
-      assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
-    }
+    TableSegments tableSegments = _webTarget.path(segmentsPath).request().get(TableSegments.class);
+    Assert.assertNotNull(tableSegments);
+    List<String> segmentNames = tableSegments.getSegments();
+    Assert.assertNotNull(segmentNames);
+    Assert.assertEquals(segmentNames.size(), 1);
+    Assert.assertEquals(segmentNames.get(0), _indexSegments.get(0).getSegmentName());
+
+    IndexSegment secondSegment = setUpSegment("0");
+    tableSegments = _webTarget.path(segmentsPath).request().get(TableSegments.class);
+    Assert.assertNotNull(tableSegments);
+    segmentNames = tableSegments.getSegments();
+    Assert.assertNotNull(segmentNames);
+    Assert.assertEquals(segmentNames.size(), 2);
+    Assert.assertTrue(segmentNames.contains(defaultSegment.getSegmentName()));
+    Assert.assertTrue(segmentNames.contains(secondSegment.getSegmentName()));
+
+    // No such table
+    Response response = _webTarget.path("/tables/noSuchTable/segments").request().get(Response.class);
+    Assert.assertNotNull(response);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
   }
 
   @Test
-  public void testSegmentMetadata()
-      throws JSONException {
-    final String urlFormat = "/tables/%s/segments/%s/metadata";
-    {
-      String response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME,
-          testHelper.indexSegment.getSegmentMetadata().getName())).request().get(String.class);
-      JSONObject jsonMeta = new JSONObject(response);
-      SegmentMetadataImpl segmentMeta = (SegmentMetadataImpl) testHelper.indexSegment.getSegmentMetadata();
-      assertEquals(jsonMeta.getString("segmentName"), segmentMeta.getName());
-      assertEquals(jsonMeta.getString("crc"), segmentMeta.getCrc());
-      assertEquals(jsonMeta.getLong("creationTimeMillis"), segmentMeta.getIndexCreationTime());
-      assertEquals(jsonMeta.getString("paddingCharacter"), String.valueOf(segmentMeta.getPaddingCharacter()));
-      assertEquals(jsonMeta.getLong("refreshTimeMillis"), segmentMeta.getRefreshTime());
-      assertEquals(jsonMeta.getLong("pushTimeMillis"), segmentMeta.getPushTime());
-      assertTrue(jsonMeta.has("pushTimeReadable"));
-      assertTrue(jsonMeta.has("refreshTimeReadable"));
-      assertTrue(jsonMeta.has("startTimeReadable"));
-      assertTrue(jsonMeta.has("endTimeReadable"));
-      assertTrue(jsonMeta.has("creationTimeReadable"));
-      assertEquals(jsonMeta.getLong("startTimeMillis"), segmentMeta.getTimeInterval().getStartMillis());
-      assertEquals(jsonMeta.getLong("endTimeMillis"), segmentMeta.getTimeInterval().getEndMillis());
+  public void testSegmentMetadata() throws Exception {
+    IndexSegment defaultSegment = _indexSegments.get(0);
+    String segmentMetadataPath = "/tables/" + TABLE_NAME + "/segments/" + defaultSegment.getSegmentName() + "/metadata";
 
-      JSONArray columns = jsonMeta.getJSONArray("columns");
-      assertEquals(columns.length(), 0);
-    }
-    {
-      Response response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME,
-          testHelper.indexSegment.getSegmentMetadata().getName()))
-          .queryParam("columns", "column1")
-          .queryParam("columns", "column2")
-          .request().get();
-      System.out.println(response.getStatus());
-      JSONObject jsonMeta = new JSONObject(response.readEntity(String.class));
-      JSONArray columns = jsonMeta.getJSONArray("columns");
-      assertEquals(columns.length(), 2);
-    }
-    {
-      String response = testHelper.target.path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME,
-          testHelper.indexSegment.getSegmentMetadata().getName()))
-          .queryParam("columns", "*")
-          .request().get(String.class);
-      JSONObject jsonMeta = new JSONObject(response);
-      JSONArray columns = jsonMeta.getJSONArray("columns");
-      assertEquals(columns.length(),
-          ((SegmentMetadataImpl) testHelper.indexSegment.getSegmentMetadata()).getAllColumns().size());
-    }
-    {
-      Response response = testHelper.target.path(String
-          .format(urlFormat, "UNKNOWN_TABLE", testHelper.indexSegment.getSegmentMetadata().getName()))
-          .request().get(Response.class);
-      assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
-    }
-    {
-      Response response = testHelper.target
-          .path(String.format(urlFormat, ResourceTestHelper.DEFAULT_TABLE_NAME, "UNKNOWN_SEGMENT"))
-          .request().get(Response.class);
-      assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    JSONObject jsonResponse = new JSONObject(_webTarget.path(segmentMetadataPath).request().get(String.class));
+    SegmentMetadataImpl segmentMetadata = (SegmentMetadataImpl) defaultSegment.getSegmentMetadata();
+    Assert.assertEquals(jsonResponse.getString("segmentName"), segmentMetadata.getName());
+    Assert.assertEquals(jsonResponse.getString("crc"), segmentMetadata.getCrc());
+    Assert.assertEquals(jsonResponse.getLong("creationTimeMillis"), segmentMetadata.getIndexCreationTime());
+    Assert.assertEquals(jsonResponse.getString("paddingCharacter"),
+        String.valueOf(segmentMetadata.getPaddingCharacter()));
+    Assert.assertEquals(jsonResponse.getLong("refreshTimeMillis"), segmentMetadata.getRefreshTime());
+    Assert.assertEquals(jsonResponse.getLong("pushTimeMillis"), segmentMetadata.getPushTime());
+    Assert.assertTrue(jsonResponse.has("pushTimeReadable"));
+    Assert.assertTrue(jsonResponse.has("refreshTimeReadable"));
+    Assert.assertTrue(jsonResponse.has("startTimeReadable"));
+    Assert.assertTrue(jsonResponse.has("endTimeReadable"));
+    Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
+    Assert.assertEquals(jsonResponse.getJSONArray("columns").length(), 0);
+
+    jsonResponse = new JSONObject(_webTarget.path(segmentMetadataPath)
+        .queryParam("columns", "column1")
+        .queryParam("columns", "column2")
+        .request()
+        .get(String.class));
+    Assert.assertEquals(jsonResponse.getJSONArray("columns").length(), 2);
+
+    jsonResponse =
+        new JSONObject(_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class));
+    Assert.assertEquals(jsonResponse.getJSONArray("columns").length(), segmentMetadata.getAllColumns().size());
+
+    Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName())
+        .request()
+        .get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+
+    response = _webTarget.path("/tables/" + TABLE_NAME + "/segments/UNKNOWN_SEGMENT").request().get(Response.class);
+    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  @Test
+  public void testSegmentCrcMetadata() throws Exception {
+    String segmentsCrcPath = "/tables/" + TABLE_NAME + "/segments/crc";
+
+    // Upload segments
+    List<ImmutableSegment> immutableSegments = setUpSegments(2);
+
+    // Trigger crc api to fetch crc information
+    String response = _webTarget.path(segmentsCrcPath).request().get(String.class);
+    JSONObject segmentsCrc = new JSONObject(response);
+
+    // Check that crc info is correct
+    for (ImmutableSegment immutableSegment : immutableSegments) {
+      String segmentName = immutableSegment.getSegmentName();
+      String crc = immutableSegment.getSegmentMetadata().getCrc();
+      Assert.assertEquals(segmentsCrc.getString(segmentName), crc);
     }
   }
 }

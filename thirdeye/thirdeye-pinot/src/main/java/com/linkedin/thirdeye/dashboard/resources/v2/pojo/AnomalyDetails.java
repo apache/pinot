@@ -9,20 +9,23 @@ public class AnomalyDetails {
   // anomaly details
   private Long anomalyId;
   private String metric;
+  private Long metricId;
   private String dataset;
+  private String timeUnit;
+  private String externalUrl;
 
   List<String> dates;
   private String currentEnd;
   private String currentStart;
-  private String baselineEnd;
-  private String baselineStart;
   private List<String> baselineValues;
   private List<String> currentValues;
   private String current = "1000";
   private String baseline = "2000";
 
   //function details
-  private String anomalyRegionStart;
+  private String anomalyStart; // start and end of anomaly
+  private String anomalyEnd;
+  private String anomalyRegionStart; // start and end of region to highlight as anomaly
   private String anomalyRegionEnd;
   private Long anomalyFunctionId = 5L;
   private String anomalyFunctionName;
@@ -30,13 +33,33 @@ public class AnomalyDetails {
   private String anomalyFunctionProps;
   private String anomalyFunctionDimension;
   private String anomalyFeedback;
+  private String anomalyFeedbackStatus;
+  private String anomalyFeedbackComments;
+  private String anomalyResultSource;
+  private String issueType;
 
   public Long getAnomalyId() {
     return anomalyId;
   }
 
+  public Long getMetricId() {
+    return metricId;
+  }
+
+  public void setMetricId(Long metricId) {
+    this.metricId = metricId;
+  }
+
   public void setAnomalyId(Long anomalyId) {
     this.anomalyId = anomalyId;
+  }
+
+  public String getExternalUrl() {
+    return externalUrl;
+  }
+
+  public void setExternalUrl(String externalUrl) {
+    this.externalUrl = externalUrl;
   }
 
   public String getMetric() {
@@ -53,6 +76,14 @@ public class AnomalyDetails {
 
   public void setDataset(String dataset) {
     this.dataset = dataset;
+  }
+
+  public String getTimeUnit() {
+    return timeUnit;
+  }
+
+  public void setTimeUnit(String timeUnit) {
+    this.timeUnit = timeUnit;
   }
 
   public List<String> getDates() {
@@ -77,22 +108,6 @@ public class AnomalyDetails {
 
   public void setCurrentStart(String currentStart) {
     this.currentStart = currentStart;
-  }
-
-  public String getBaselineEnd() {
-    return baselineEnd;
-  }
-
-  public void setBaselineEnd(String baselineEnd) {
-    this.baselineEnd = baselineEnd;
-  }
-
-  public String getBaselineStart() {
-    return baselineStart;
-  }
-
-  public void setBaselineStart(String baselineStart) {
-    this.baselineStart = baselineStart;
   }
 
   public List<String> getBaselineValues() {
@@ -125,6 +140,22 @@ public class AnomalyDetails {
 
   public void setBaseline(String baseline) {
     this.baseline = baseline;
+  }
+
+  public String getAnomalyStart() {
+    return anomalyStart;
+  }
+
+  public void setAnomalyStart(String anomalyStart) {
+    this.anomalyStart = anomalyStart;
+  }
+
+  public String getAnomalyEnd() {
+    return anomalyEnd;
+  }
+
+  public void setAnomalyEnd(String anomalyEnd) {
+    this.anomalyEnd = anomalyEnd;
   }
 
   public String getAnomalyRegionStart() {
@@ -192,14 +223,30 @@ public class AnomalyDetails {
   }
 
 
+  public String getAnomalyFeedbackStatus() {
+    return anomalyFeedbackStatus;
+  }
+
+  public void setAnomalyFeedbackStatus(String anomalyFeedbackStatus) {
+    this.anomalyFeedbackStatus = anomalyFeedbackStatus;
+  }
+
+  public String getAnomalyFeedbackComments() {
+    return anomalyFeedbackComments;
+  }
+
+  public void setAnomalyFeedbackComments(String anomalyFeedbackComments) {
+    this.anomalyFeedbackComments = anomalyFeedbackComments;
+  }
+
   public static String getFeedbackStringFromFeedbackType(AnomalyFeedbackType feedbackType) {
     String feedback = null;
     switch (feedbackType) {
       case ANOMALY:
         feedback = "Confirmed Anomaly";
         break;
-      case ANOMALY_NO_ACTION:
-        feedback = "Confirmed - Not Actionable";
+      case ANOMALY_NEW_TREND:
+        feedback = "Confirmed - New Trend";
         break;
       case NOT_ANOMALY:
         feedback = "False Alarm";
@@ -208,5 +255,21 @@ public class AnomalyDetails {
         break;
     }
     return feedback;
+  }
+
+  public String getIssueType() {
+    return issueType;
+  }
+
+  public void setIssueType(String issueType) {
+    this.issueType = issueType;
+  }
+
+  public String getAnomalyResultSource() {
+    return anomalyResultSource;
+  }
+
+  public void setAnomalyResultSource(String anomalyResultSource) {
+    this.anomalyResultSource = anomalyResultSource;
   }
 }

@@ -12,6 +12,7 @@ public class TimeSeriesCompareMetricView {
   long metricId;
   long start;
   long end;
+  boolean inverseMetric = false;
 
   List<Long> timeBucketsCurrent;
   List<Long> timeBucketsBaseline;
@@ -22,15 +23,20 @@ public class TimeSeriesCompareMetricView {
 
   }
   public TimeSeriesCompareMetricView(String metricName, long metricId, long start, long end) {
-    this(metricName, metricId, start, end, null, null);
+    this(metricName, metricId, start, end, false, null, null);
   }
 
-  public TimeSeriesCompareMetricView(String metricName, long metricId, long start, long end,
+  public TimeSeriesCompareMetricView(String metricName, long metricId, long start, long end, boolean inverseMetric) {
+    this(metricName, metricId, start, end, inverseMetric, null, null);
+  }
+
+  public TimeSeriesCompareMetricView(String metricName, long metricId, long start, long end, boolean inverseMetric,
       List<Long> currentTimeBuckets, List<Long> baselineTimeBuckets) {
     this.metricName = metricName;
     this.metricId = metricId;
     this.start = start;
     this.end = end;
+    this.inverseMetric = inverseMetric;
     this.timeBucketsCurrent = currentTimeBuckets;
     this.timeBucketsBaseline = baselineTimeBuckets;
   }
@@ -91,4 +97,12 @@ public class TimeSeriesCompareMetricView {
   public void setTimeBucketsCurrent(List<Long> timeBucketsCurrent) {
     this.timeBucketsCurrent = timeBucketsCurrent;
   }
+  public boolean isInverseMetric() {
+    return inverseMetric;
+  }
+  public void setInverseMetric(boolean inverseMetric) {
+    this.inverseMetric = inverseMetric;
+  }
+
+
 }

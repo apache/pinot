@@ -15,42 +15,28 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.OrBlock;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class OrOperator extends BaseFilterOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OrOperator.class);
   private static final String OPERATOR_NAME = "OrOperator";
 
-  private List<Operator> operators;
+  private List<BaseFilterOperator> operators;
   private OrBlock orBlock;
 
-  public OrOperator(List<Operator> operators) {
+  public OrOperator(List<BaseFilterOperator> operators) {
     this.operators = operators;
   }
 
   @Override
-  public boolean open() {
-    for (Operator operator : operators) {
-      operator.open();
-    }
-    return true;
-  }
-
-  @Override
-  public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
-    List<FilterBlockDocIdSet> blockDocIdSets = new ArrayList<FilterBlockDocIdSet>();
+  protected BaseFilterBlock getNextBlock() {
+    List<FilterBlockDocIdSet> blockDocIdSets = new ArrayList<>();
     for (Operator operator : operators) {
       Block block = operator.nextBlock();
       FilterBlockDocIdSet blockDocIdSet = (FilterBlockDocIdSet) block.getBlockDocIdSet();
@@ -61,9 +47,11 @@ public class OrOperator extends BaseFilterOperator {
   }
 
   @Override
-  public boolean close() {
-    for (Operator operator : operators) {
-      operator.close();
+  public boolean isResultEmpty() {
+    for (BaseFilterOperator operator : operators) {
+      if (!operator.isResultEmpty()) {
+        return false;
+      }
     }
     return true;
   }

@@ -5,18 +5,19 @@ public class TaskConstants {
   public enum TaskType {
     ANOMALY_DETECTION,
     MERGE,
-
-    // todo : mark ALERT deprecated
+    // TODO: deprecate ALERT task type
     ALERT,
     ALERT2,
-    MONITOR, 
-    DATA_COMPLETENESS
+    MONITOR,
+    DATA_COMPLETENESS,
+    CLASSIFICATION
   }
 
   public enum TaskStatus {
     WAITING,
     RUNNING,
     COMPLETED,
-    FAILED
+    FAILED,
+    TIMEOUT
   }
 }

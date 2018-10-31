@@ -15,42 +15,155 @@
  */
 package com.linkedin.pinot.core.operator.transform.function;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.DataSource;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.transform.TransformResultMetadata;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nonnull;
 
 
 /**
- * Interface for TransformFunction functions.
- * The transform function takes list of input values and applies a specific
- * transformation to generate a list of output values.
+ * Interface for transform functions.
  */
 public interface TransformFunction {
 
   /**
-   * The transform function takes an array of double values
-   * and returns a new array of double values.
-   *
-   * All input double[] are assumed to be of same length, and checks for the
-   * same can be skipped for performance reasons.
-   *
-   *
-   * @param length Length of doc ids to process
-   * @param input Array of input values
-   * @return BlockValSet containing transformed values.
-   */
-    <T> T transform(int length, BlockValSet... input);
-
-  /**
-   * Returns the data type of transform's output.
-   *
-   * @return Data type of the output.
-   */
-  FieldSpec.DataType getOutputType();
-
-  /**
-   * This method returns the name of the transform function.
+   * Returns the name of the transform function.
+   * <p>This name should be unique among all transform functions.
    *
    * @return Name of the transform function
    */
   String getName();
+
+  /**
+   * Initializes the transform function.
+   *
+   * @param arguments Arguments for the transform function
+   * @param dataSourceMap Map from column to data source
+   */
+  void init(@Nonnull List<TransformFunction> arguments, @Nonnull Map<String, DataSource> dataSourceMap);
+
+  /**
+   * Returns the metadata for the result of the transform function.
+   *
+   * @return Transform result metadata
+   */
+  TransformResultMetadata getResultMetadata();
+
+  /**
+   * DICTIONARY BASED APIs
+   */
+
+  /**
+   * Returns the dictionary that the dictionary Ids based on.
+   *
+   * @return Dictionary
+   */
+  Dictionary getDictionary();
+
+  /**
+   * Transforms the data from the given projection block to single-valued dictionary Ids.
+   *
+   * @param projectionBlock Projection block
+   * @return Transformation result
+   */
+  int[] transformToDictIdsSV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to multi-valued dictionary Ids.
+   *
+   * @param projectionBlock Projection block
+   * @return Transformation result
+   */
+  int[][] transformToDictIdsMV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * SINGLE-VALUED APIs
+   */
+
+  /**
+   * Transforms the data from the given projection block to single-valued int values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  int[] transformToIntValuesSV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to single-valued long values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  long[] transformToLongValuesSV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to single-valued float values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  float[] transformToFloatValuesSV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to single-valued double values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  double[] transformToDoubleValuesSV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to single-valued string values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  String[] transformToStringValuesSV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * MULTI-VALUED APIs
+   */
+
+  /**
+   * Transforms the data from the given projection block to multi-valued int values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  int[][] transformToIntValuesMV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to multi-valued long values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  long[][] transformToLongValuesMV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to multi-valued float values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  float[][] transformToFloatValuesMV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to multi-valued double values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  double[][] transformToDoubleValuesMV(@Nonnull ProjectionBlock projectionBlock);
+
+  /**
+   * Transforms the data from the given projection block to multi-valued string values.
+   *
+   * @param projectionBlock Projection result
+   * @return Transformation result
+   */
+  String[][] transformToStringValuesMV(@Nonnull ProjectionBlock projectionBlock);
 }

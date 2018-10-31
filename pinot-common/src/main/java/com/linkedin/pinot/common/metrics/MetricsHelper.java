@@ -242,6 +242,17 @@ public class MetricsHelper {
   }
 
   /**
+   * Removes an existing metric
+   */
+  public static void removeMetric(MetricsRegistry registry, MetricName name) {
+    if (registry != null) {
+      registry.removeMetric(name);
+    } else {
+      Metrics.defaultRegistry().removeMetric(name);
+    }
+  }
+
+  /**
    *
    * Return an existing aggregated long gauge if registry is not null and a aggregated long gauge already exist
    * with the same metric name. Otherwise, creates a new aggregated long gauge and registers (if registry not null)

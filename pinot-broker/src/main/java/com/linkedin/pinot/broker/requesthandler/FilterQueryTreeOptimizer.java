@@ -24,7 +24,7 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 public abstract class FilterQueryTreeOptimizer {
   private final String _optimizationName = OptimizationFlags.optimizationName(this.getClass());
 
-  public abstract FilterQueryTree optimize(FilterQueryTree filterQueryTree);
+  public abstract FilterQueryTree optimize(FilterQueryOptimizerRequest request);
 
   public String getOptimizationName() {
     return _optimizationName;

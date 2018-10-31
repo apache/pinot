@@ -15,54 +15,38 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.core.data.manager.TableDataManager;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import javax.annotation.Nonnull;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
- * Provide static function to get PartitionDataManager implementation.
- *
+ * Factory for {@link TableDataManager}.
  */
 public class TableDataManagerProvider {
-  private static ServerMetrics SERVER_METRICS;
-
-  private static Map<String, Class<? extends TableDataManager>> keyToFunction =
-      new ConcurrentHashMap<String, Class<? extends TableDataManager>>();
-
-  static {
-    keyToFunction.put("offline", OfflineTableDataManager.class);
-    keyToFunction.put("realtime", RealtimeTableDataManager.class);
+  private TableDataManagerProvider() {
   }
 
-  public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig,
-      String serverInstance) {
-    Preconditions.checkNotNull(SERVER_METRICS);
-
-    try {
-      Class<? extends TableDataManager> cls =
-          keyToFunction.get(tableDataManagerConfig.getTableDataManagerType().toLowerCase());
-      if (cls != null) {
-        TableDataManager tableDataManager = cls.newInstance();
-        tableDataManager.init(tableDataManagerConfig, SERVER_METRICS, serverInstance);
-        return tableDataManager;
-      } else {
-        throw new UnsupportedOperationException("No tableDataManager type found.");
-      }
-    } catch (Exception ex) {
-      throw new RuntimeException("Not support tableDataManager type with - "
-          + tableDataManagerConfig.getTableDataManagerType(), ex);
+  public static TableDataManager getTableDataManager(@Nonnull TableDataManagerConfig tableDataManagerConfig,
+      @Nonnull String instanceId, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull ServerMetrics serverMetrics) {
+    TableDataManager tableDataManager;
+    switch (CommonConstants.Helix.TableType.valueOf(tableDataManagerConfig.getTableDataManagerType())) {
+      case OFFLINE:
+        tableDataManager = new OfflineTableDataManager();
+        break;
+      case REALTIME:
+        tableDataManager = new RealtimeTableDataManager();
+        break;
+      default:
+        throw new IllegalStateException();
     }
-  }
-
-  public static void setServerMetrics(ServerMetrics serverMetrics) {
-    SERVER_METRICS = serverMetrics;
-  }
-
-  public static ServerMetrics getServerMetrics() {
-    return SERVER_METRICS;
+    tableDataManager.init(tableDataManagerConfig, instanceId, propertyStore, serverMetrics);
+    return tableDataManager;
   }
 }

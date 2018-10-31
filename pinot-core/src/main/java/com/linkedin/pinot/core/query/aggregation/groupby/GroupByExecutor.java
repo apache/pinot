@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -24,28 +25,17 @@ import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 public interface GroupByExecutor {
 
   /**
-   * Initializations that need to be performed before process can be called.
-   */
-  void init();
-
-  /**
-   * Performs the actual group-by aggregation on the given transform block.
+   * Performs the group-by aggregation on the given transform block.
    *
-   * @param transformBlock Block to process
+   * @param transformBlock Transform block
    */
-  void process(TransformBlock transformBlock);
+  void process(@Nonnull TransformBlock transformBlock);
 
   /**
-   * Post processing (if any) to be done after all docIdSets have been processed, and
-   * before getResult can be called.
-   */
-  void finish();
-
-  /**
-   * Returns the result of group-by aggregation, ensures that 'finish' has been
-   * called before calling getResult().
+   * Returns the result of group-by aggregation.
+   * <p>Should be called after all transform blocks has been processed.
    *
-   * @return Result of aggregation group-by.
+   * @return Result of aggregation
    */
   AggregationGroupByResult getResult();
 }

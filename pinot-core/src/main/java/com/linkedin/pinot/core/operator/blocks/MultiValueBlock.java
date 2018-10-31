@@ -15,89 +15,45 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
-import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.operator.docvalsets.MultiValueSet;
-import com.linkedin.pinot.core.segment.index.ColumnMetadata;
-import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
-public class MultiValueBlock implements Block {
+public final class MultiValueBlock implements Block {
+  private final BlockValSet _blockValSet;
+  private final BlockMetadata _blockMetadata;
 
-  final SingleColumnMultiValueReader mVReader;
-  private final BlockId id;
-  private final ImmutableDictionaryReader dictionary;
-  final ColumnMetadata columnMetadata;
-  private Predicate predicate;
-  private BlockMetadataImpl blockMetadata;
-
-  public MultiValueBlock(BlockId id, SingleColumnMultiValueReader multiValueReader, ImmutableDictionaryReader dict,
-      ColumnMetadata metadata) {
-    mVReader = multiValueReader;
-    this.id = id;
-    dictionary = dict;
-    columnMetadata = metadata;
-    this.blockMetadata = new BlockMetadataImpl(metadata, dict);
-  }
-
-  public boolean hasDictionary() {
-    return true;
-  }
-
-  public boolean hasInvertedIndex() {
-    return columnMetadata.hasInvertedIndex();
-  }
-
-  public boolean isSingleValued() {
-    return columnMetadata.isSingleValue();
-  }
-
-  public int getMaxNumberOfMultiValues() {
-    return columnMetadata.getMaxNumberOfMultiValues();
-  }
-
-  public ImmutableDictionaryReader getDictionary() {
-    return dictionary;
-  }
-
-  public DataType getDataType() {
-    return columnMetadata.getDataType();
-  }
-
-  @Override
-  public BlockId getId() {
-    return id;
-  }
-
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException("cannnot setPredicate on data source blocks");
+  public MultiValueBlock(SingleColumnMultiValueReader<? super ReaderContext> reader, int numDocs, int maxNumMultiValues,
+      FieldSpec.DataType dataType, Dictionary dictionary) {
+    _blockValSet = new MultiValueSet(reader, numDocs, dataType);
+    _blockMetadata = new BlockMetadataImpl(numDocs, false, maxNumMultiValues, dataType, dictionary);
   }
 
   @Override
   public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException("cannnot getBlockDocIdSet on data source blocks");
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockValSet getBlockValueSet() {
-    return new MultiValueSet(mVReader, columnMetadata);
+    return _blockValSet;
   }
 
   @Override
   public BlockDocIdValueSet getBlockDocIdValueSet() {
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public BlockMetadata getMetadata() {
-    return blockMetadata;
+    return _blockMetadata;
   }
 }

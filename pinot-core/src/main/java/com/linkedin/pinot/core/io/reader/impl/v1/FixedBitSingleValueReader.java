@@ -16,44 +16,43 @@
 package com.linkedin.pinot.core.io.reader.impl.v1;
 
 import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.FixedBitSingleValueMultiColReader;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
+import com.linkedin.pinot.core.io.util.FixedBitIntReaderWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
 
 
+public final class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {
+  private final FixedBitIntReaderWriter _reader;
 
-public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader {
-
-  private final FixedBitSingleValueMultiColReader dataFileReader;
-  private final int rows;
-
-  public FixedBitSingleValueReader(PinotDataBuffer indexDataBuffer, int rows,
-      int columnSize, boolean hasNulls) {
-    dataFileReader = new FixedBitSingleValueMultiColReader(indexDataBuffer, rows, 1,
-        new int[] { columnSize }, new boolean[] { hasNulls });
-    this.rows = rows;
-  }
-
-  public FixedBitSingleValueMultiColReader getDataFileReader() {
-    return dataFileReader;
-  }
-
-  public int getLength() {
-    return rows;
-  }
-
-  @Override
-  public void close() throws IOException {
-    dataFileReader.close();
+  public FixedBitSingleValueReader(PinotDataBuffer dataBuffer, int numRows, int numBitsPerValue) {
+    _reader = new FixedBitIntReaderWriter(dataBuffer, numRows, numBitsPerValue);
   }
 
   @Override
   public int getInt(int row) {
-    return dataFileReader.getInt(row, 0);
+    return _reader.readInt(row);
   }
 
   @Override
-  public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
-    dataFileReader.readValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+  public int getInt(int row, ReaderContext context) {
+    return _reader.readInt(row);
+  }
+
+  @Override
+  public void readValues(int[] rows, int rowsStartIndex, int rowSize, int[] values, int valuesStartIndex) {
+    int rowsEndIndex = rowsStartIndex + rowSize;
+    for (int i = rowsStartIndex; i < rowsEndIndex; i++) {
+      values[valuesStartIndex++] = getInt(rows[i]);
+    }
+  }
+
+  @Override
+  public ReaderContext createContext() {
+    return null;
+  }
+
+  @Override
+  public void close() {
+    _reader.close();
   }
 }

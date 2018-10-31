@@ -16,292 +16,148 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryRequest;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterQuery;
+import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.request.QuerySource;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.TableDataManager;
+import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
-import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
-import com.linkedin.pinot.util.TestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
+import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.*;
+
 
 public class QueryExecutorTest {
+  private static final String AVRO_DATA_PATH = "data/simpleData200001.avro";
+  private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
+  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "QueryExecutorTest");
+  private static final String TABLE_NAME = "testTable";
+  private static final int NUM_SEGMENTS_TO_GENERATE = 2;
+  private static final Pql2Compiler COMPILER = new Pql2Compiler();
+  private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
 
-  private final String SMALL_AVRO_DATA = "data/simpleData200001.avro";
-  private static File INDEXES_DIR = new File(FileUtils.getTempDirectory() + File.separator + "TestQueryExecutorList");
+  private final List<ImmutableSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
+  private final List<String> _segmentNames = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
 
-  private List<IndexSegment> _indexSegmentList = new ArrayList<IndexSegment>();
+  private ServerMetrics _serverMetrics;
+  private QueryExecutor _queryExecutor;
 
-  private static ServerQueryExecutorV1Impl _queryExecutor;
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(QueryExecutorTest.class);
-  public static final String PINOT_PROPERTIES = "pinot.properties";
-  private ServerMetrics serverMetrics;
   @BeforeClass
-  public void setup() throws Exception {
-    serverMetrics = new ServerMetrics(new MetricsRegistry());
-    TableDataManagerProvider.setServerMetrics(serverMetrics);
-
-    File confDir = new File(QueryExecutorTest.class.getClassLoader().getResource("conf").toURI());
-    setupSegmentList(2);
-    // ServerBuilder serverBuilder = new ServerBuilder(confDir.getAbsolutePath());
-    String configFilePath = confDir.getAbsolutePath();
-
-    // build _serverConf
-    PropertiesConfiguration serverConf = new PropertiesConfiguration();
-    serverConf.setDelimiterParsingDisabled(false);
-    serverConf.load(new File(configFilePath, PINOT_PROPERTIES));
-
-    FileBasedInstanceDataManager instanceDataManager = FileBasedInstanceDataManager.getInstanceDataManager();
-    instanceDataManager.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
-    instanceDataManager.start();
-
-    for (int i = 0; i < 2; ++i) {
-      instanceDataManager.getTableDataManager("midas");
-      instanceDataManager.getTableDataManager("midas").addSegment(_indexSegmentList.get(i));
-    }
-    _queryExecutor = new ServerQueryExecutorV1Impl();
-    _queryExecutor.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
-        new MetricsRegistry()));
-  }
-
-  @AfterClass
-  public void tearDown() {
-    if (INDEXES_DIR.exists()) {
-      FileUtils.deleteQuietly(INDEXES_DIR);
-    }
-    for (IndexSegment segment : _indexSegmentList) {
-      segment.destroy();
-    }
-    _indexSegmentList.clear();
-  }
-
-  private void setupSegmentList(int numberOfSegments) throws Exception {
-    final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(SMALL_AVRO_DATA));
-    _indexSegmentList.clear();
-    if (INDEXES_DIR.exists()) {
-      FileUtils.deleteQuietly(INDEXES_DIR);
-    }
-    INDEXES_DIR.mkdir();
-
-    for (int i = 0; i < numberOfSegments; ++i) {
-      final File segmentDir = new File(INDEXES_DIR, "segment_" + i);
-
-      final SegmentGeneratorConfig config =
-          SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), segmentDir, "dim" + i,
-              TimeUnit.DAYS, "midas");
-      config.setSegmentNamePostfix(String.valueOf(i));
-      final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+  public void setUp() throws Exception {
+    // Set up the segments
+    FileUtils.deleteQuietly(INDEX_DIR);
+    Assert.assertTrue(INDEX_DIR.mkdirs());
+    URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
+    Assert.assertNotNull(resourceUrl);
+    File avroFile = new File(resourceUrl.getFile());
+    for (int i = 0; i < NUM_SEGMENTS_TO_GENERATE; i++) {
+      SegmentGeneratorConfig config =
+          SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, INDEX_DIR, TABLE_NAME);
+      config.setSegmentNamePostfix(Integer.toString(i));
+      SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
       driver.init(config);
       driver.build();
-
-      File parent = new File(INDEXES_DIR, "segment_" + String.valueOf(i));
-      String segmentName = parent.list()[0];
-      _indexSegmentList.add(ColumnarSegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
-
-//      System.out.println("built at : " + segmentDir.getAbsolutePath());
+      _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, driver.getSegmentName()), ReadMode.mmap));
+      _segmentNames.add(driver.getSegmentName());
     }
+
+    // Mock the instance data manager
+    _serverMetrics = new ServerMetrics(new MetricsRegistry());
+    TableDataManagerConfig tableDataManagerConfig = mock(TableDataManagerConfig.class);
+    when(tableDataManagerConfig.getTableDataManagerType()).thenReturn("OFFLINE");
+    when(tableDataManagerConfig.getTableName()).thenReturn(TABLE_NAME);
+    when(tableDataManagerConfig.getDataDir()).thenReturn(FileUtils.getTempDirectoryPath());
+    @SuppressWarnings("unchecked")
+    TableDataManager tableDataManager =
+        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, "testInstance",
+            mock(ZkHelixPropertyStore.class), mock(ServerMetrics.class));
+    tableDataManager.start();
+    for (ImmutableSegment indexSegment : _indexSegments) {
+      tableDataManager.addSegment(indexSegment);
+    }
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    when(instanceDataManager.getTableDataManager(TABLE_NAME)).thenReturn(tableDataManager);
+
+    // Set up the query executor
+    resourceUrl = getClass().getClassLoader().getResource(QUERY_EXECUTOR_CONFIG_PATH);
+    Assert.assertNotNull(resourceUrl);
+    PropertiesConfiguration queryExecutorConfig = new PropertiesConfiguration();
+    queryExecutorConfig.setDelimiterParsingDisabled(false);
+    queryExecutorConfig.load(new File(resourceUrl.getFile()));
+    _queryExecutor = new ServerQueryExecutorV1Impl();
+    _queryExecutor.init(queryExecutorConfig, instanceDataManager, _serverMetrics);
   }
 
   @Test
   public void testCountQuery() {
-
-    BrokerRequest brokerRequest = getCountQuery();
-
-    QuerySource querySource = new QuerySource();
-    querySource.setTableName("midas");
-    brokerRequest.setQuerySource(querySource);
-    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
-    instanceRequest.setSearchSegments(new ArrayList<String>());
-    for (IndexSegment segment : _indexSegmentList) {
-      instanceRequest.getSearchSegments().add(segment.getSegmentName());
-    }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
-    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-    LOGGER.info("InstanceResponse is " + instanceResponse.getLong(0, 0));
+    String query = "SELECT COUNT(*) FROM " + TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
-    LOGGER.info(
-        "Time used for instanceResponse is " + instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
   }
 
   @Test
   public void testSumQuery() {
-    BrokerRequest brokerRequest = getSumQuery();
-
-    QuerySource querySource = new QuerySource();
-    querySource.setTableName("midas");
-    brokerRequest.setQuerySource(querySource);
-    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
-    instanceRequest.setSearchSegments(new ArrayList<String>());
-    for (IndexSegment segment : _indexSegmentList) {
-      instanceRequest.getSearchSegments().add(segment.getSegmentName());
-    }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
-    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-    LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+    String query = "SELECT SUM(met) FROM " + TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 40000200000.0);
-    LOGGER.info(
-        "Time used for instanceResponse is " + instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
   }
 
   @Test
   public void testMaxQuery() {
-
-    BrokerRequest brokerRequest = getMaxQuery();
-
-    QuerySource querySource = new QuerySource();
-    querySource.setTableName("midas");
-    brokerRequest.setQuerySource(querySource);
-    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
-    instanceRequest.setSearchSegments(new ArrayList<String>());
-    for (IndexSegment segment : _indexSegmentList) {
-      instanceRequest.getSearchSegments().add(segment.getSegmentName());
-    }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
-    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-    LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+    String query = "SELECT MAX(met) FROM " + TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
-    LOGGER.info(
-        "Time used for instanceResponse is " + instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
   }
 
   @Test
   public void testMinQuery() {
-    BrokerRequest brokerRequest = getMinQuery();
-
-    QuerySource querySource = new QuerySource();
-    querySource.setTableName("midas");
-    brokerRequest.setQuerySource(querySource);
-    InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
-    instanceRequest.setSearchSegments(new ArrayList<String>());
-    for (IndexSegment segment : _indexSegmentList) {
-      instanceRequest.getSearchSegments().add(segment.getSegmentName());
-    }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
-    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-    LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
+    String query = "SELECT MIN(met) FROM " + TABLE_NAME;
+    InstanceRequest instanceRequest = new InstanceRequest(0L, COMPILER.compileToBrokerRequest(query));
+    instanceRequest.setSearchSegments(_segmentNames);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, _serverMetrics);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, QUERY_RUNNERS);
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
-    LOGGER.info(
-        "Time used for instanceResponse is " + instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
   }
 
-  private BrokerRequest getCountQuery() {
-    BrokerRequest query = new BrokerRequest();
-    AggregationInfo aggregationInfo = getCountAggregationInfo();
-    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
-    aggregationsInfo.add(aggregationInfo);
-    query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
-    return query;
-  }
-
-  private BrokerRequest getSumQuery() {
-    BrokerRequest query = new BrokerRequest();
-    AggregationInfo aggregationInfo = getSumAggregationInfo();
-    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
-    aggregationsInfo.add(aggregationInfo);
-    query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
-    return query;
-  }
-
-  private BrokerRequest getMaxQuery() {
-    BrokerRequest query = new BrokerRequest();
-    AggregationInfo aggregationInfo = getMaxAggregationInfo();
-    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
-    aggregationsInfo.add(aggregationInfo);
-    query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
-    return query;
-  }
-
-  private BrokerRequest getMinQuery() {
-    BrokerRequest query = new BrokerRequest();
-    AggregationInfo aggregationInfo = getMinAggregationInfo();
-    List<AggregationInfo> aggregationsInfo = new ArrayList<AggregationInfo>();
-    aggregationsInfo.add(aggregationInfo);
-    query.setAggregationsInfo(aggregationsInfo);
-    FilterQuery filterQuery = getFilterQuery();
-    query.setFilterQuery(filterQuery);
-    return query;
-  }
-
-  private FilterQuery getFilterQuery() {
-    FilterQuery filterQuery = new FilterQuery();
-    return null;
-  }
-
-  private AggregationInfo getCountAggregationInfo() {
-    String type = "count";
-    Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met");
-
-    AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
-  }
-
-  private AggregationInfo getSumAggregationInfo() {
-    String type = "sum";
-    Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met");
-
-    AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
-  }
-
-  private AggregationInfo getMaxAggregationInfo() {
-    String type = "max";
-    Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met");
-
-    AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
-  }
-
-  private AggregationInfo getMinAggregationInfo() {
-    String type = "min";
-    Map<String, String> params = new HashMap<String, String>();
-    params.put("column", "met");
-
-    AggregationInfo aggregationInfo = new AggregationInfo();
-    aggregationInfo.setAggregationType(type);
-    aggregationInfo.setAggregationParams(params);
-    return aggregationInfo;
+  @AfterClass
+  public void tearDown() {
+    for (IndexSegment segment : _indexSegments) {
+      segment.destroy();
+    }
+    FileUtils.deleteQuietly(INDEX_DIR);
   }
 }

@@ -12,10 +12,6 @@ public class DataCompletenessConstants {
     CLEANUP
   }
 
-  public enum DataCompletenessAlgorithmName {
-    WO4W_AVERAGE
-  }
-
   public static int LOOKBACK_TIME_DURATION = 3;
   public static TimeUnit LOOKBACK_TIMEUNIT = TimeUnit.DAYS;
 

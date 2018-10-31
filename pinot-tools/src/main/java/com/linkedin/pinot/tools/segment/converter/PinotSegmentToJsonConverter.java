@@ -37,32 +37,26 @@ public class PinotSegmentToJsonConverter implements PinotSegmentConverter {
   }
 
   @Override
-  public void convert()
-      throws Exception {
-    PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
-    try {
-      recordReader.init();
+  public void convert() throws Exception {
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader(new File(_segmentDir));
+        BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
+      GenericRow row = new GenericRow();
+      while (recordReader.hasNext()) {
+        row = recordReader.next(row);
+        JSONObject record = new JSONObject();
 
-      try (BufferedWriter recordWriter = new BufferedWriter(new FileWriter(_outputFile))) {
-        while (recordReader.hasNext()) {
-          GenericRow row = recordReader.next();
-          JSONObject record = new JSONObject();
-
-          for (String field : row.getFieldNames()) {
-            Object value = row.getValue(field);
-            if (value instanceof Object[]) {
-              record.put(field, new JSONArray(value));
-            } else {
-              record.put(field, value);
-            }
+        for (String field : row.getFieldNames()) {
+          Object value = row.getValue(field);
+          if (value instanceof Object[]) {
+            record.put(field, new JSONArray(value));
+          } else {
+            record.put(field, value);
           }
-
-          recordWriter.write(record.toString());
-          recordWriter.newLine();
         }
+
+        recordWriter.write(record.toString());
+        recordWriter.newLine();
       }
-    } finally {
-      recordReader.close();
     }
   }
 }

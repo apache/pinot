@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -99,11 +99,16 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
       @Nonnull IntermediateResult intermediateResult2);
 
   /**
-   * Get the {@link FieldSpec.DataType} of the intermediate result.
-   * <p>This data type is used for transferring data in data table.
+   * Return whether the intermediate result is comparable.
+   */
+  boolean isIntermediateResultComparable();
+
+  /**
+   * Get the {@link DataSchema.ColumnDataType} of the intermediate result.
+   * <p>This column data type is used for transferring data in data table.
    */
   @Nonnull
-  FieldSpec.DataType getIntermediateResultDataType();
+  DataSchema.ColumnDataType getIntermediateResultColumnType();
 
   /**
    * Extract the final result used in the broker response from the given intermediate result.

@@ -15,26 +15,20 @@
  */
 package com.linkedin.pinot.core.common.predicate;
 
-import java.util.Arrays;
 import java.util.List;
 
-import com.linkedin.pinot.core.common.Predicate;
 
+/**
+ * This class implements the IN predicate.
+ */
+public class InPredicate extends BaseInPredicate {
 
-public class InPredicate extends Predicate {
-
+  /**
+   * Constructor for the class
+   * @param lhs LHS for the IN predicate (column name)
+   * @param rhs RHS for the IN predicate (list of values)
+   */
   public InPredicate(String lhs, List<String> rhs) {
     super(lhs, Type.IN, rhs);
   }
-
-  @Override
-  public String toString() {
-    return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : "
-        + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
-  }
-
-  public String[] getInRange() {
-    return getRhs().get(0).split("\t\t");
-  }
-
 }

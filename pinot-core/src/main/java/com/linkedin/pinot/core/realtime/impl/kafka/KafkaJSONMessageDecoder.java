@@ -15,23 +15,21 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.readers.AvroRecordReader;
+import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
+import java.util.Arrays;
+import java.util.Map;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
+public class KafkaJSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaJSONMessageDecoder.class);
 
   private Schema schema;
@@ -46,54 +44,49 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
     try {
       String text = new String(payload, "UTF-8");
       JSONObject message = new JSONObject(text);
+
       for (FieldSpec dimensionSpec : schema.getDimensionFieldSpecs()) {
-        if (message.has(dimensionSpec.getName())) {
-          Object entry;
-          if (dimensionSpec.isSingleValueField()) {
-            entry = stringToDataType(dimensionSpec, message.getString(dimensionSpec.getName()));
-          } else {
-            JSONArray jsonArray = message.getJSONArray(dimensionSpec.getName());
-            Object[] array = new Object[jsonArray.length()];
-            for (int i = 0; i < array.length; i++) {
-              array[i] = stringToDataType(dimensionSpec, jsonArray.getString(i));
-            }
-            if (array.length == 0) {
-              entry = new Object[] { AvroRecordReader.getDefaultNullValue(dimensionSpec) };
-            } else {
-              entry = array;
-            }
-          }
-          destination.putField(dimensionSpec.getName(), entry);
-        } else {
-          Object entry = AvroRecordReader.getDefaultNullValue(dimensionSpec);
-          destination.putField(dimensionSpec.getName(), entry);
-        }
+        readFieldValue(destination, message, dimensionSpec);
       }
 
       for (FieldSpec metricSpec : schema.getMetricFieldSpecs()) {
-        if (message.has(metricSpec.getName())) {
-          Object entry = stringToDataType(metricSpec, message.getString(metricSpec.getName()));
-          destination.putField(metricSpec.getName(), entry);
-        } else {
-          Object entry = AvroRecordReader.getDefaultNullValue(metricSpec);
-          destination.putField(metricSpec.getName(), entry);
-        }
+        readFieldValue(destination, message, metricSpec);
       }
 
       TimeFieldSpec timeSpec = schema.getTimeFieldSpec();
-      if (message.has(timeSpec.getName())) {
-        Object entry = stringToDataType(timeSpec, message.getString(timeSpec.getName()));
-        destination.putField(timeSpec.getName(), entry);
-      } else {
-        Object entry = AvroRecordReader.getDefaultNullValue(timeSpec);
-        destination.putField(timeSpec.getName(), entry);
-      }
+      readFieldValue(destination, message, timeSpec);
 
       return destination;
     } catch (Exception e) {
-      LOGGER.error("error decoding , ", e);
+      LOGGER.error("Caught exception while decoding row, discarding row.", e);
+      return null;
     }
-    return null;
+  }
+
+  private void readFieldValue(GenericRow destination, JSONObject message, FieldSpec dimensionSpec)
+      throws JSONException {
+    String columnName = dimensionSpec.getName();
+    if (message.has(columnName) && !message.isNull(columnName)) {
+      Object entry;
+      if (dimensionSpec.isSingleValueField()) {
+        entry = stringToDataType(dimensionSpec, message.getString(columnName));
+      } else {
+        JSONArray jsonArray = message.getJSONArray(columnName);
+        Object[] array = new Object[jsonArray.length()];
+        for (int i = 0; i < array.length; i++) {
+          array[i] = stringToDataType(dimensionSpec, jsonArray.getString(i));
+        }
+        if (array.length == 0) {
+          entry = new Object[]{dimensionSpec.getDefaultNullValue()};
+        } else {
+          entry = array;
+        }
+      }
+      destination.putField(columnName, entry);
+    } else {
+      Object entry = dimensionSpec.getDefaultNullValue();
+      destination.putField(columnName, entry);
+    }
   }
 
   @Override
@@ -103,23 +96,30 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
 
   private Object stringToDataType(FieldSpec spec, String inString) {
     if (inString == null) {
-      return AvroRecordReader.getDefaultNullValue(spec);
+      return spec.getDefaultNullValue();
     }
 
-    switch (spec.getDataType()) {
-      case INT:
-        return new Integer(Integer.parseInt(inString));
-      case LONG:
-        return new Long(Long.parseLong(inString));
-      case FLOAT:
-        return new Float(Float.parseFloat(inString));
-      case DOUBLE:
-        return new Double(Double.parseDouble(inString));
-      case BOOLEAN:
-      case STRING:
-        return inString.toString();
-      default:
-        return null;
+    try {
+      switch (spec.getDataType()) {
+        case INT:
+          return Integer.parseInt(inString);
+        case LONG:
+          return Long.parseLong(inString);
+        case FLOAT:
+          return Float.parseFloat(inString);
+        case DOUBLE:
+          return Double.parseDouble(inString);
+        case BOOLEAN:
+        case STRING:
+          return inString;
+        default:
+          return null;
+      }
+    } catch (NumberFormatException e) {
+      Object nullValue = spec.getDefaultNullValue();
+      LOGGER.warn("Failed to parse {} as a value of type {} for column {}, defaulting to {}", inString,
+          spec.getDataType(), spec.getName(), nullValue, e);
+      return nullValue;
     }
   }
 }

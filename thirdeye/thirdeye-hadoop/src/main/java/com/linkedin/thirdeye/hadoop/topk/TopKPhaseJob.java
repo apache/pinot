@@ -19,6 +19,7 @@ import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_IN
 import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_THIRDEYE_CONFIG;
 
+import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -27,15 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.Set;
-
-import com.linkedin.thirdeye.hadoop.config.MetricType;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -59,6 +51,14 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.MinMaxPriorityQueue;
+import com.linkedin.thirdeye.hadoop.config.DimensionType;
+import com.linkedin.thirdeye.hadoop.config.MetricType;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
+import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
+import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
 /**
  * This phase reads avro input, and produces a file with top k values for dimensions
@@ -79,7 +79,7 @@ import com.google.common.collect.MinMaxPriorityQueue;
  * We strictly use just 1 reducer.
  * Reduce phase receives Key=(DimensionName, DimensionValue)
  * and aggregates the metric values
- * The very first key received is (ALL, ALL) with total metric sum
+ * The very first key received is (ALL, ALL) with helps us compute total metric sum
  * These metric sums are used to check metric thresholds of other
  * (dimensionName, dimensionValue) pairs. If none of the metric
  * thresholds pass, the pair is discarded.
@@ -114,13 +114,12 @@ public class TopKPhaseJob extends Configured {
     private TopKPhaseConfig config;
     ThirdEyeConfig thirdeyeConfig;
     private List<String> dimensionNames;
+    private List<DimensionType> dimensionTypes;
     private List<String> metricNames;
     private List<MetricType> metricTypes;
     private int numMetrics;
     BytesWritable keyWritable;
     BytesWritable valWritable;
-    Map<String, Integer> dimensionNameToIndexMapping;
-    Map<String, Long> metricSums;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -130,19 +129,12 @@ public class TopKPhaseJob extends Configured {
         thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(TOPK_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
         config = TopKPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
         dimensionNames = config.getDimensionNames();
+        dimensionTypes = config.getDimensionTypes();
         metricNames = config.getMetricNames();
         metricTypes = config.getMetricTypes();
         numMetrics = metricNames.size();
         valWritable = new BytesWritable();
         keyWritable = new BytesWritable();
-        dimensionNameToIndexMapping = new HashMap<String, Integer>();
-        for (int i = 0; i < dimensionNames.size(); i++) {
-          dimensionNameToIndexMapping.put(dimensionNames.get(i), i);
-        }
-        metricSums = new HashMap<String, Long>();
-        for (String metricName : metricNames) {
-          metricSums.put(metricName, 0L);
-        }
       } catch (Exception e) {
         throw new IOException(e);
       }
@@ -168,19 +160,20 @@ public class TopKPhaseJob extends Configured {
       valWritable.set(valBytes, 0, valBytes.length);
 
       // read dimensions
-      for (String dimensionName : dimensionNames) {
-        String dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimensionName);
+      for (int i = 0; i < dimensionNames.size(); i++) {
+        String dimensionName = dimensionNames.get(i);
+        DimensionType dimensionType = dimensionTypes.get(i);
+        Object dimensionValue = ThirdeyeAvroUtils.getDimensionFromRecord(inputRecord, dimensionName);
 
-        TopKPhaseMapOutputKey keyWrapper = new TopKPhaseMapOutputKey(dimensionName, dimensionValue);
+        TopKPhaseMapOutputKey keyWrapper = new TopKPhaseMapOutputKey(dimensionName, dimensionValue, dimensionType);
         byte[] keyBytes = keyWrapper.toBytes();
         keyWritable.set(keyBytes, 0, keyBytes.length);
         context.write(keyWritable, valWritable);
-
-        keyWrapper = new TopKPhaseMapOutputKey(TOPK_ALL_DIMENSION_NAME, TOPK_ALL_DIMENSION_VALUE);
-        keyBytes = keyWrapper.toBytes();
-        keyWritable.set(keyBytes, 0, keyBytes.length);
-        context.write(keyWritable, valWritable);
       }
+      TopKPhaseMapOutputKey allKeyWrapper = new TopKPhaseMapOutputKey(TOPK_ALL_DIMENSION_NAME, TOPK_ALL_DIMENSION_VALUE, DimensionType.STRING);
+      byte[] allKeyBytes = allKeyWrapper.toBytes();
+      keyWritable.set(allKeyBytes, 0, allKeyBytes.length);
+      context.write(keyWritable, valWritable);
     }
 
     @Override
@@ -253,12 +246,11 @@ public class TopKPhaseJob extends Configured {
     BytesWritable keyWritable;
     BytesWritable valWritable;
     Number[] metricSums;
-    private Map<String, Map<String, Number[]>> dimensionNameToValuesMap;
+    private Map<String, Map<Object, Number[]>> dimensionNameToValuesMap;
     private TopKDimensionValues topkDimensionValues;
     private Map<String, Double> metricThresholds;
     private Map<String, Integer> thresholdPassCount;
     private Map<String, TopKDimensionToMetricsSpec> topKDimensionToMetricsSpecMap;
-    private Map<String, Set<String>> whitelist;
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
@@ -270,12 +262,12 @@ public class TopKPhaseJob extends Configured {
       try {
         thirdeyeConfig = OBJECT_MAPPER.readValue(configuration.get(TOPK_PHASE_THIRDEYE_CONFIG.toString()), ThirdEyeConfig.class);
         config = TopKPhaseConfig.fromThirdEyeConfig(thirdeyeConfig);
+        LOGGER.info("Metric Thresholds form config {}", config.getMetricThresholds());
         metricThresholds = config.getMetricThresholds();
         topKDimensionToMetricsSpecMap = config.getTopKDimensionToMetricsSpec();
         dimensionNames = config.getDimensionNames();
         metricNames = config.getMetricNames();
         metricTypes = config.getMetricTypes();
-        whitelist = config.getWhitelist();
 
         numMetrics = metricNames.size();
 
@@ -287,7 +279,7 @@ public class TopKPhaseJob extends Configured {
         dimensionNameToValuesMap = new HashMap<>();
         thresholdPassCount = new HashMap<>();
         for (String dimension : dimensionNames) {
-          dimensionNameToValuesMap.put(dimension, new HashMap<String, Number[]>());
+          dimensionNameToValuesMap.put(dimension, new HashMap<Object, Number[]>());
           thresholdPassCount.put(dimension, 0);
         }
         topkDimensionValues = new TopKDimensionValues();
@@ -306,7 +298,7 @@ public class TopKPhaseJob extends Configured {
 
       TopKPhaseMapOutputKey keyWrapper = TopKPhaseMapOutputKey.fromBytes(key.getBytes());
       String dimensionName = keyWrapper.getDimensionName();
-      String dimensionValue = keyWrapper.getDimensionValue();
+      Object dimensionValue = keyWrapper.getDimensionValue();
 
       // Get aggregate metric values for dimension name value pair
       Number[] aggMetricValues = new Number[numMetrics];
@@ -333,7 +325,7 @@ public class TopKPhaseJob extends Configured {
           double metricValue = aggMetricValues[i].doubleValue();
           double metricSum = metricSums[i].doubleValue();
           double metricThresholdPercentage = metricThresholds.get(metric);
-          if (metricValue > (metricSum * metricThresholdPercentage / 100)) {
+          if (metricValue >= (metricSum * metricThresholdPercentage / 100)) {
             isPassThreshold = true;
             thresholdPassCount.put(dimensionName, thresholdPassCount.get(dimensionName) + 1);
             break;
@@ -365,13 +357,13 @@ public class TopKPhaseJob extends Configured {
             int k = topKEntry.getValue();
             MinMaxPriorityQueue<DimensionValueMetricPair> topKQueue = MinMaxPriorityQueue.maximumSize(k).create();
 
-            Map<String, Number[]> dimensionToMetricsMap = dimensionNameToValuesMap.get(dimension);
-            for (Entry<String, Number[]> entry : dimensionToMetricsMap.entrySet()) {
+            Map<Object, Number[]> dimensionToMetricsMap = dimensionNameToValuesMap.get(dimension);
+            for (Entry<Object, Number[]> entry : dimensionToMetricsMap.entrySet()) {
               topKQueue.add(new DimensionValueMetricPair(entry.getKey(), entry.getValue()[metricToIndexMapping.get(metric)]));
             }
             LOGGER.info("Picking Top {} values for {} based on Metric {} : {}", k, dimension, metric, topKQueue);
             for (DimensionValueMetricPair pair : topKQueue) {
-              topkDimensionValues.addValue(dimension, pair.getDimensionValue());
+              topkDimensionValues.addValue(dimension, String.valueOf(pair.getDimensionValue()));
             }
           }
         }
@@ -382,7 +374,7 @@ public class TopKPhaseJob extends Configured {
         LOGGER.info("Writing top k values to {}",topkValuesPath);
         FSDataOutputStream topKDimensionValuesOutputStream = fileSystem.create(
             new Path(topkValuesPath + File.separator + ThirdEyeConstants.TOPK_VALUES_FILE));
-        OBJECT_MAPPER.writeValue(topKDimensionValuesOutputStream, topkDimensionValues);
+        OBJECT_MAPPER.writeValue((DataOutput) topKDimensionValuesOutputStream, topkDimensionValues);
         topKDimensionValuesOutputStream.close();
       }
     }
@@ -421,6 +413,9 @@ public class TopKPhaseJob extends Configured {
     LOGGER.info("Schema : {}", avroSchema.toString(true));
 
     // ThirdEyeConfig
+    String dimensionTypesProperty = ThirdeyeAvroUtils.getDimensionTypesProperty(
+        props.getProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_NAMES.toString()), avroSchema);
+    props.setProperty(ThirdEyeConfigProperties.THIRDEYE_DIMENSION_TYPES.toString(), dimensionTypesProperty);
     String metricTypesProperty = ThirdeyeAvroUtils.getMetricTypesProperty(
         props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_NAMES.toString()),
         props.getProperty(ThirdEyeConfigProperties.THIRDEYE_METRIC_TYPES.toString()), avroSchema);

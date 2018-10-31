@@ -15,28 +15,34 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
+import com.linkedin.pinot.core.data.manager.SegmentDataManager;
+import com.linkedin.pinot.core.data.manager.TableDataManager;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
-import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
-import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
@@ -44,227 +50,260 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * InstanceDataManager is the top level DataManger, Singleton.
+ * The class <code>HelixInstanceDataManager</code> is the instance data manager based on Helix.
  *
- *
+ * TODO: move SegmentFetcherAndLoader into this class to make this the top level manager
  */
+@ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
+  private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
+
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
-  private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<String, TableDataManager>();
-  private boolean _isStarted = false;
-  private SegmentMetadataLoader _segmentMetadataLoader;
-  private final Object _globalLock = new Object();
+  private String _instanceId;
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  private ServerMetrics _serverMetrics;
 
-  public HelixInstanceDataManager() {
-  }
+  @Override
+  public void init(Configuration config, ZkHelixPropertyStore<ZNRecord> propertyStore, ServerMetrics serverMetrics)
+      throws Exception {
+    LOGGER.info("Initializing Helix instance data manager");
 
-  public synchronized void init(HelixInstanceDataManagerConfig instanceDataManagerConfig)
-      throws ConfigurationException, InstantiationException, IllegalAccessException, ClassNotFoundException {
-    _instanceDataManagerConfig = instanceDataManagerConfig;
-    _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
+    _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(config);
+    LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig);
+    _instanceId = _instanceDataManagerConfig.getInstanceId();
+    _propertyStore = propertyStore;
+    _serverMetrics = serverMetrics;
+
+    File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
+    if (!instanceDataDir.exists()) {
+      Preconditions.checkState(instanceDataDir.mkdirs());
+    }
+    File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
+    if (!instanceSegmentTarDir.exists()) {
+      Preconditions.checkState(instanceSegmentTarDir.mkdirs());
+    }
+
+    LOGGER.info("Initialized Helix instance data manager");
   }
 
   @Override
-  public synchronized void init(Configuration dataManagerConfig) {
+  public void start() {
+    LOGGER.info("Starting Helix instance data manager");
+    LOGGER.info("Started Helix instance data manager");
+  }
+
+  @Override
+  public void shutDown() {
+    LOGGER.info("Shutting down Helix instance data manager");
+    LOGGER.info("Shut down Helix instance data manager");
+  }
+
+  @Override
+  public void addOfflineSegment(@Nonnull String offlineTableName, @Nonnull String segmentName, @Nonnull File indexDir)
+      throws Exception {
+    LOGGER.info("Adding segment: {} to table: {}", segmentName, offlineTableName);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, offlineTableName);
+    Preconditions.checkNotNull(tableConfig);
+    _tableDataManagerMap.computeIfAbsent(offlineTableName, k -> createTableDataManager(k, tableConfig))
+        .addSegment(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
+    LOGGER.info("Added segment: {} to table: {}", segmentName, offlineTableName);
+  }
+
+  @Override
+  public void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName) throws Exception {
+    LOGGER.info("Adding segment: {} to table: {}", segmentName, realtimeTableName);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, realtimeTableName);
+    Preconditions.checkNotNull(tableConfig);
+    _tableDataManagerMap.computeIfAbsent(realtimeTableName, k -> createTableDataManager(k, tableConfig))
+        .addSegment(segmentName, tableConfig, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
+    LOGGER.info("Added segment: {} to table: {}", segmentName, realtimeTableName);
+  }
+
+  private TableDataManager createTableDataManager(@Nonnull String tableNameWithType, @Nonnull TableConfig tableConfig) {
+    LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
+    TableDataManagerConfig tableDataManagerConfig =
+        TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableNameWithType);
+    tableDataManagerConfig.overrideConfigs(tableConfig);
+    TableDataManager tableDataManager =
+        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, _instanceId, _propertyStore,
+            _serverMetrics);
+    tableDataManager.start();
+    LOGGER.info("Created table data manager for table: {}", tableNameWithType);
+    return tableDataManager;
+  }
+
+  @Override
+  public void removeSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
+    LOGGER.info("Removing segment: {} from table: {}", segmentName, tableNameWithType);
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      tableDataManager.removeSegment(segmentName);
+      LOGGER.info("Removed segment: {} from table: {}", segmentName, tableNameWithType);
+    }
+  }
+
+  @Override
+  public void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) throws Exception {
+    LOGGER.info("Reloading single segment: {} in table: {}", segmentName, tableNameWithType);
+    SegmentMetadata segmentMetadata = getSegmentMetadata(tableNameWithType, segmentName);
+    if (segmentMetadata == null) {
+      return;
+    }
+
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    Preconditions.checkNotNull(tableConfig);
+
+    Schema schema = null;
+    // For OFFLINE table, try to get schema for default columns
+    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
+      schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    }
+
+    reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
+
+    LOGGER.info("Reloaded single segment: {} in table: {}", segmentName, tableNameWithType);
+  }
+
+  @Override
+  public void reloadAllSegments(@Nonnull String tableNameWithType) throws Exception {
+    LOGGER.info("Reloading all segments in table: {}", tableNameWithType);
+    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+    Preconditions.checkNotNull(tableConfig);
+
+    Schema schema = null;
+    // For OFFLINE table, try to get schema for default columns
+    if (TableNameBuilder.OFFLINE.tableHasTypeSuffix(tableNameWithType)) {
+      schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
+    }
+
+    for (SegmentMetadata segmentMetadata : getAllSegmentsMetadata(tableNameWithType)) {
+      reloadSegment(tableNameWithType, segmentMetadata, tableConfig, schema);
+    }
+
+    LOGGER.info("Reloaded all segments in table: {}", tableNameWithType);
+  }
+
+  private void reloadSegment(@Nonnull String tableNameWithType, @Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull TableConfig tableConfig, @Nullable Schema schema) throws Exception {
+    String segmentName = segmentMetadata.getName();
+    LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableNameWithType);
+
+    String indexDirString = segmentMetadata.getIndexDir();
+    if (indexDirString == null) {
+      LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableNameWithType);
+      return;
+    }
+
+    File indexDir = new File(indexDirString);
+    Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
+
+    File parentFile = indexDir.getParentFile();
+    File segmentBackupDir =
+        new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     try {
-      _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(dataManagerConfig);
-      LOGGER.info("InstanceDataManager Config:" + _instanceDataManagerConfig.toString());
-      File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
-      if (!instanceDataDir.exists()) {
-        instanceDataDir.mkdirs();
-      }
-      File instanceSegmentTarDir = new File(_instanceDataManagerConfig.getInstanceSegmentTarDir());
-      if (!instanceSegmentTarDir.exists()) {
-        instanceSegmentTarDir.mkdirs();
-      }
-      try {
-        _segmentMetadataLoader = getSegmentMetadataLoader(_instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-        LOGGER.info("Loaded SegmentMetadataLoader for class name : "
-            + _instanceDataManagerConfig.getSegmentMetadataLoaderClass());
-      } catch (Exception e) {
-        LOGGER
-            .error(
-                "Cannot initialize SegmentMetadataLoader for class name : "
-                    + _instanceDataManagerConfig.getSegmentMetadataLoaderClass() + "\nStackTrace is : "
-                    + e.getMessage(), e);
-      }
-    } catch (Exception e) {
-      _instanceDataManagerConfig = null;
-      LOGGER.error("Error in initializing HelixDataManager, StackTrace is : " + e.getMessage(), e);
+      // First rename index directory to segment backup directory so that original segment have all file descriptors
+      // point to the segment backup directory to ensure original segment serves queries properly
+
+      // Rename index directory to segment backup directory (atomic)
+      Preconditions.checkState(indexDir.renameTo(segmentBackupDir),
+          "Failed to rename index directory: %s to segment backup directory: %s", indexDir, segmentBackupDir);
+
+      // Copy from segment backup directory back to index directory
+      FileUtils.copyDirectory(segmentBackupDir, indexDir);
+
+      // Load from index directory
+      ImmutableSegment immutableSegment =
+          ImmutableSegmentLoader.load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
+              schema);
+
+      // Replace the old segment in memory
+      _tableDataManagerMap.get(tableNameWithType).addSegment(immutableSegment);
+
+      // Rename segment backup directory to segment temporary directory (atomic)
+      // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we
+      // rename the segment backup directory to segment temporary directory, we know the reload already succeeded, so
+      // that we can safely delete the segment temporary directory
+      File segmentTempDir = new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
+      Preconditions.checkState(segmentBackupDir.renameTo(segmentTempDir),
+          "Failed to rename segment backup directory: %s to segment temporary directory: %s", segmentBackupDir,
+          segmentTempDir);
+      LOGGER.info("Reloaded segment: {} in table: {}", segmentName, tableNameWithType);
+
+      // Delete segment temporary directory
+      FileUtils.deleteDirectory(segmentTempDir);
+    } finally {
+      LoaderUtils.reloadFailureRecovery(indexDir);
     }
-
   }
 
-  private SegmentMetadataLoader getSegmentMetadataLoader(String segmentMetadataLoaderClassName)
-      throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-    return (SegmentMetadataLoader) Class.forName(segmentMetadataLoaderClassName).newInstance();
-
-  }
-
+  @Nonnull
   @Override
-  public synchronized void start() {
-    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
-      tableDataManager.start();
-    }
-
-    _isStarted = true;
-//    LOGGER.info("InstanceDataManager is started! " + getServerInfo());
-    LOGGER.info("{} started!", this.getClass().getName());
-  }
-
-  @Override
-  public boolean isStarted() {
-    return _isStarted;
-  }
-
-  public synchronized void addTableDataManager(String tableName, TableDataManager tableDataManager) {
-    _tableDataManagerMap.put(tableName, tableDataManager);
-  }
-
-  @Override
-  public @Nonnull Collection<TableDataManager> getTableDataManagers() {
+  public Collection<TableDataManager> getTableDataManagers() {
     return _tableDataManagerMap.values();
   }
 
+  @Nullable
   @Override
-  public @Nullable TableDataManager getTableDataManager(String tableName) {
-    return _tableDataManagerMap.get(tableName);
+  public TableDataManager getTableDataManager(@Nonnull String tableNameWithType) {
+    return _tableDataManagerMap.get(tableNameWithType);
   }
 
-  @Override
-  public synchronized void shutDown() {
-
-    if (isStarted()) {
-      for (TableDataManager tableDataManager : getTableDataManagers()) {
-        tableDataManager.shutDown();
-      }
-      _isStarted = false;
-      LOGGER.info("InstanceDataManager is shutDown!");
-    } else {
-      LOGGER.warn("InstanceDataManager is already shutDown, won't do anything!");
-    }
-  }
-
-  // Called for offline segments only
-  @Override
-  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig, Schema schema)
-      throws Exception {
-    if (segmentMetadata == null || segmentMetadata.getTableName() == null) {
-      throw new RuntimeException("Error: adding invalid SegmentMetadata!");
-    }
-    LOGGER.info("Trying to add segment {} of table {}", segmentMetadata.getName(), segmentMetadata.getTableName());
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
-    }
-    String tableName = segmentMetadata.getTableName();
-    if (segmentMetadata.getIndexType().equalsIgnoreCase("realtime")) {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    } else {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    }
-    if (!_tableDataManagerMap.containsKey(tableName)) {
-      LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
-      synchronized (_globalLock) {
-        if (!_tableDataManagerMap.containsKey(tableName)) {
-          addTableIfNeed(tableConfig, tableName, null);
-        }
-      }
-    }
-    _tableDataManagerMap.get(tableName).addSegment(segmentMetadata, schema);
-    LOGGER.info("Successfully added a segment {} of table {}", segmentMetadata.getName(), segmentMetadata.getTableName());
-  }
-
-  // Called for real-time segments only
-  @Override
-  public synchronized void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata, String serverInstance) throws Exception {
-    if (segmentZKMetadata == null || segmentZKMetadata.getTableName() == null) {
-      throw new RuntimeException("Error: adding invalid SegmentMetadata!");
-    }
-    LOGGER.info("Trying to add segment with name: " + segmentZKMetadata.getSegmentName());
-    LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
-    String tableName = segmentZKMetadata.getTableName();
-    if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    }
-    if (!_tableDataManagerMap.containsKey(tableName)) {
-      LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
-      synchronized (_globalLock) {
-        if (!_tableDataManagerMap.containsKey(tableName)) {
-          addTableIfNeed(tableConfig, tableName, serverInstance);
-        }
-      }
-    }
-    _tableDataManagerMap.get(tableName).addSegment(propertyStore, tableConfig, instanceZKMetadata,
-        segmentZKMetadata);
-    LOGGER.info("Successfully added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
-
-  }
-
-  public synchronized void addTableIfNeed(AbstractTableConfig tableConfig, String tableName, String serverInstance)
-      throws ConfigurationException {
-    TableDataManagerConfig tableDataManagerConfig = getDefaultHelixTableDataManagerConfig(tableName);
-    if (tableConfig != null) {
-      tableDataManagerConfig.overrideConfigs(tableName, tableConfig);
-    }
-    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, serverInstance);
-    tableDataManager.start();
-    addTableDataManager(tableName, tableDataManager);
-  }
-
-  private TableDataManagerConfig getDefaultHelixTableDataManagerConfig(String tableName)
-      throws ConfigurationException {
-    return TableDataManagerConfig.getDefaultHelixTableDataManagerConfig(_instanceDataManagerConfig, tableName);
-  }
-
-  @Override
-  public synchronized void removeSegment(String segmentName) {
-    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
-      tableDataManager.removeSegment(segmentName);
-    }
-  }
-
-  @Override
-  public void refreshSegment(String oldSegmentName, SegmentMetadata newSegmentMetadata) {
-    throw new UnsupportedOperationException();
-  }
-
+  @Nonnull
   @Override
   public String getSegmentDataDirectory() {
     return _instanceDataManagerConfig.getInstanceDataDir();
   }
 
+  @Nonnull
   @Override
   public String getSegmentFileDirectory() {
     return _instanceDataManagerConfig.getInstanceSegmentTarDir();
   }
 
   @Override
-  public SegmentMetadataLoader getSegmentMetadataLoader() {
-    return _segmentMetadataLoader;
+  public int getMaxParallelRefreshThreads() {
+    return _instanceDataManagerConfig.getMaxParallelRefreshThreads();
   }
 
+  @Nullable
   @Override
-  public SegmentMetadata getSegmentMetadata(String table, String segmentName) {
-    SegmentDataManager segmentDataManager = null;
-    TableDataManager tableDataManager = _tableDataManagerMap.get(table);
-    try {
-      if (tableDataManager != null) {
-        segmentDataManager = tableDataManager.acquireSegment(segmentName);
-        if (segmentDataManager != null) {
-          return segmentDataManager.getSegment().getSegmentMetadata();
-        }
+  public SegmentMetadata getSegmentMetadata(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager != null) {
+      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      if (segmentDataManager == null) {
+        return null;
       }
-      return null;
-    } finally {
-      if (segmentDataManager != null) {
+      try {
+        return segmentDataManager.getSegment().getSegmentMetadata();
+      } finally {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
+    return null;
   }
 
+  @Nonnull
+  @Override
+  public List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType) {
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager == null) {
+      return Collections.emptyList();
+    } else {
+      List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+      try {
+        List<SegmentMetadata> segmentsMetadata = new ArrayList<>(segmentDataManagers.size());
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          segmentsMetadata.add(segmentDataManager.getSegment().getSegmentMetadata());
+        }
+        return segmentsMetadata;
+      } finally {
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          tableDataManager.releaseSegment(segmentDataManager);
+        }
+      }
+    }
+  }
 }
