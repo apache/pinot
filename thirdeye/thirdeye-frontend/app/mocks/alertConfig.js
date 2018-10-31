@@ -28,9 +28,9 @@ export default [
     },
     "alertGroupConfig": null,
     "receiverAddresses": {
-        "to": ["kopa@disney.com", "kiara@disney.com", "kion@disney.com"],
-        "cc": ["simba@disney.com, nala@disney.com"],
-        "bcc": ["scar@disney.com"]
+      "to": ["kopa@disney.com", "kiara@disney.com", "kion@disney.com"],
+      "cc": ["simba@disney.com, nala@disney.com"],
+      "bcc": ["scar@disney.com"]
     },
     "fromAddress": "mufasa@disney.com"
   }, {

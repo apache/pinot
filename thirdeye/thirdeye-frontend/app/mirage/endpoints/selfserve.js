@@ -37,11 +37,11 @@ export default function (server) {
     return {
       "Result":"OK",
       "Records":[
-      "thirdeye-demo::thirdeye_rec1",
-      "thirdeye-demo::Thirdeye_rec2",
-      "thirdeye-demo::Thirdeye_rec3",
-      "thirdeye-demo::Thirdeye_rec4",
-      "thirdeye-demo::Thirdeye_rec5"
+        "thirdeye-demo::thirdeye_rec1",
+        "thirdeye-demo::Thirdeye_rec2",
+        "thirdeye-demo::Thirdeye_rec3",
+        "thirdeye-demo::Thirdeye_rec4",
+        "thirdeye-demo::Thirdeye_rec5"
       ]
     };
   });

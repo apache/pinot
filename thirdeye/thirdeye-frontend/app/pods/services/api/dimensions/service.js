@@ -1,7 +1,7 @@
 import Service from '@ember/service';
 import { inject as service } from '@ember/service';
 import { assert } from '@ember/debug';
-import EmberObject, { computed, get } from '@ember/object';
+import EmberObject from '@ember/object';
 
 /**
  * @type {Ember.Service}

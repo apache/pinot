@@ -246,7 +246,7 @@ export function toMetricUrn(urn) {
  * @param {string} width - percent string
  */
 export function toWidthNumber(width) {
-  return Number(width.replace('%',''));
+  return Number(width.replace('%', ''));
 }
 
 /**

@@ -1,7 +1,6 @@
 import Service from '@ember/service';
 import { inject as service } from '@ember/service';
 import { assert } from '@ember/debug';
-import CryptoJS from 'cryptojs';
 
 /**
  * @type {Ember.Service}
@@ -36,7 +35,7 @@ export default Service.extend({
     //share-config is a modelName (must match your model's name)
     const modelName = 'share-config';
     const query = { appName };
-    let shareMetaData = {}
+    let shareMetaData = {};
     try{
       shareMetaData = await queryCache.queryRecord(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
     } catch (error) {
