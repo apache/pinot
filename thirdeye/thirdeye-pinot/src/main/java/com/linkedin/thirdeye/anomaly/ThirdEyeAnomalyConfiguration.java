@@ -46,7 +46,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
-  private Collection<String> emailWhitelist = new HashSet<>();
 
   public HolidayEventsLoaderConfiguration getHolidayEventsLoaderConfiguration() {
     return holidayEventsLoaderConfiguration;
@@ -198,13 +197,5 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setFailureToAddress(String failureToAddress) {
     this.failureToAddress = failureToAddress;
-  }
-
-  public Collection<String> getEmailWhitelist() {
-    return emailWhitelist;
-  }
-
-  public void setEmailWhitelist(Collection<String> emailWhitelist) {
-    this.emailWhitelist = emailWhitelist;
   }
 }
