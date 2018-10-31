@@ -16,16 +16,15 @@
 
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.TestDBResources;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
-
 import java.io.File;
 import java.io.FileReader;
+import java.io.PrintWriter;
 import java.net.URL;
 import java.sql.Connection;
-
+import org.apache.commons.io.output.NullWriter;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 public class DAOTestBase {
@@ -45,7 +44,7 @@ public class DAOTestBase {
 
   protected void init() {
     try {
-      URL url = TestDBResources.class.getResource("/persistence-local.yml");
+      URL url = DAOTestBase.class.getResource("/persistence-local.yml");
       File configFile = new File(url.toURI());
       PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
       initializeDs(configuration);
@@ -96,6 +95,7 @@ public class DAOTestBase {
     URL createSchemaUrl = getClass().getResource("/schema/create-schema.sql");
     ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
     scriptRunner.setDelimiter(";", true);
+    scriptRunner.setLogWriter(new PrintWriter(new NullWriter()));
     scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
   }
 
@@ -104,6 +104,7 @@ public class DAOTestBase {
     try (Connection conn = ds.getConnection()) {
       URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
       ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
+      scriptRunner.setLogWriter(new PrintWriter(new NullWriter()));
       scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
     }
     new File(dbUrlId).delete();
