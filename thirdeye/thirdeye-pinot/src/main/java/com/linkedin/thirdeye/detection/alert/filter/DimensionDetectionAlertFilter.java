@@ -47,14 +47,13 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";
+  private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_DIMENSION = "dimension";
   private static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   private static final String PROP_SEND_ONCE = "sendOnce";
 
   final String dimension;
-  final Set<String> to;
-  final Set<String> cc;
-  final Set<String> bcc;
+  final Map<String, Set<String>> recipients;
   final SetMultimap<String, String> dimensionRecipients;
   final List<Long> detectionConfigIds;
   final boolean sendOnce;
@@ -63,10 +62,8 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
     super(provider, config, endTime);
     Preconditions.checkNotNull(config.getProperties().get(PROP_DIMENSION), "Dimension name not specified");
 
+    this.recipients = ConfigUtils.getMap(this.config.getProperties().get(PROP_RECIPIENTS));
     this.dimension = MapUtils.getString(this.config.getProperties(), PROP_DIMENSION);
-    this.to = new HashSet<>(ConfigUtils.<String>getList(this.config.getProperties().get(PROP_TO)));
-    this.cc = new HashSet<>(ConfigUtils.<String>getList(this.config.getProperties().get(PROP_CC)));
-    this.bcc = new HashSet<>(ConfigUtils.<String>getList(this.config.getProperties().get(PROP_BCC)));
     this.dimensionRecipients = HashMultimap.create(ConfigUtils.<String, String>getMultimap(this.config.getProperties().get(PROP_DIMENSION_RECIPIENTS)));
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
@@ -90,15 +87,20 @@ public class DimensionDetectionAlertFilter extends StatefulDetectionAlertFilter 
 
     // generate recipients-anomalies mapping
     for (Map.Entry<String, Collection<MergedAnomalyResultDTO>> entry : grouped.asMap().entrySet()) {
-      result.addMapping(new DetectionAlertFilterRecipients(this.makeGroupRecipients(entry.getKey()), this.cc, this.bcc),
-          new HashSet<>(entry.getValue()));
+      result.addMapping(
+          new DetectionAlertFilterRecipients(
+              this.makeGroupRecipients(entry.getKey()),
+              this.recipients.get(PROP_CC),
+              this.recipients.get(PROP_BCC)),
+          new HashSet<>(entry.getValue())
+      );
     }
 
     return result;
   }
 
   protected Set<String> makeGroupRecipients(String key) {
-    Set<String> recipients = new HashSet<>(this.to);
+    Set<String> recipients = new HashSet<>(this.recipients.get(PROP_TO));
     if (this.dimensionRecipients.containsKey(key)) {
       recipients.addAll(this.dimensionRecipients.get(key));
     }

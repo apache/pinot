@@ -42,6 +42,7 @@ import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
 
 public class DimensionDetectionAlertFilterTest {
 
+  private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";
@@ -85,9 +86,11 @@ public class DimensionDetectionAlertFilterTest {
     this.alertConfig = new DetectionAlertConfigDTO();
 
     this.properties = new HashMap<>();
-    this.properties.put(PROP_TO, PROP_TO_VALUE);
-    this.properties.put(PROP_CC, PROP_CC_VALUE);
-    this.properties.put(PROP_BCC, PROP_BCC_VALUE);
+    Map<String, Set<String>> recipients = new HashMap<>();
+    recipients.put(PROP_TO, PROP_TO_VALUE);
+    recipients.put(PROP_CC, PROP_CC_VALUE);
+    recipients.put(PROP_BCC, PROP_BCC_VALUE);
+    this.properties.put(PROP_RECIPIENTS, recipients);
     this.properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
     this.properties.put(PROP_DIMENSION, PROP_DIMENSION_VALUE);
     this.properties.put(PROP_DIMENSION_TO, PROP_DIMENSION_TO_VALUE);

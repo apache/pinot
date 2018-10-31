@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import com.linkedin.thirdeye.detection.alert.StatefulDetectionAlertFilter;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,7 @@ import org.apache.commons.collections.MapUtils;
  * The detection alert filter that sends the anomaly email to all recipients
  */
 public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertFilter {
+  private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";
@@ -43,15 +45,14 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
   Set<String> to;
   Set<String> cc;
   Set<String> bcc;
+  final Map<String, Set<String>> recipients;
   List<Long> detectionConfigIds;
   boolean sendOnce;
 
   public ToAllRecipientsDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
 
-    this.to = new HashSet<>(ConfigUtils.<String>getList(this.config.getProperties().get(PROP_TO)));
-    this.cc = new HashSet<>(ConfigUtils.<String>getList(this.config.getProperties().get(PROP_CC)));
-    this.bcc = new HashSet<>(ConfigUtils.<String>getList(this.config.getProperties().get(PROP_BCC)));
+    this.recipients = ConfigUtils.getMap(this.config.getProperties().get(PROP_RECIPIENTS));
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
@@ -64,7 +65,11 @@ public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertF
 
     Set<MergedAnomalyResultDTO> anomalies = this.filter(this.makeVectorClocks(this.detectionConfigIds), minId);
 
-    return result.addMapping(new DetectionAlertFilterRecipients(this.to, this.cc, this.bcc), anomalies);
+    to = (this.recipients.get(PROP_TO) == null) ? Collections.emptySet() : new HashSet<>(this.recipients.get(PROP_TO));
+    cc = (this.recipients.get(PROP_CC) == null) ? Collections.emptySet() : new HashSet<>(this.recipients.get(PROP_CC));
+    bcc = (this.recipients.get(PROP_BCC) == null) ? Collections.emptySet() : new HashSet<>(this.recipients.get(PROP_BCC));
+
+    return result.addMapping(new DetectionAlertFilterRecipients(to, cc, bcc), anomalies);
   }
 
   private long getMinId(long highWaterMark) {
