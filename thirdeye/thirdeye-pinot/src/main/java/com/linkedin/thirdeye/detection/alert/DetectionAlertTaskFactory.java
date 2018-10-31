@@ -21,8 +21,10 @@ import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
 import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import java.lang.reflect.Constructor;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,14 +68,18 @@ public class DetectionAlertTaskFactory {
   public Set<DetectionAlertScheme> loadAlertSchemes(DetectionAlertConfigDTO alertConfig,
       ThirdEyeAnomalyConfiguration thirdeyeConfig, DetectionAlertFilterResult result) throws Exception {
     Preconditions.checkNotNull(alertConfig);
-    List<String> alertSchemes = alertConfig.getAlertSchemes();
+    Map<String, Map<String, Object>> alertSchemes = alertConfig.getAlertSchemes();
     if (alertSchemes == null || alertSchemes.isEmpty()) {
-      alertSchemes = Collections.singletonList(DEFAULT_ALERT_SCHEME);
+      Map<String, Object> emailScheme = new HashMap<>();
+      emailScheme.put("className", DEFAULT_ALERT_SCHEME);
+      alertSchemes = Collections.singletonMap("EmailScheme", emailScheme);
     }
     Set<DetectionAlertScheme> detectionAlertSchemeSet = new HashSet<>();
-    for (String alertSchemeClass : alertSchemes) {
-      LOG.debug("Loading Alert Scheme : {}", alertSchemeClass);
-      Constructor<?> constructor = Class.forName(alertSchemeClass.trim())
+    for (String alertSchemeType : alertSchemes.keySet()) {
+      LOG.debug("Loading Alert Scheme : {}", alertSchemeType);
+      Preconditions.checkNotNull(alertSchemes.get(alertSchemeType));
+      Preconditions.checkNotNull(alertSchemes.get(alertSchemeType).get("className"));
+      Constructor<?> constructor = Class.forName(alertSchemes.get(alertSchemeType).get("className").toString().trim())
           .getConstructor(DetectionAlertConfigDTO.class, ThirdEyeAnomalyConfiguration.class, DetectionAlertFilterResult.class);
       detectionAlertSchemeSet.add((DetectionAlertScheme) constructor.newInstance(alertConfig,
           thirdeyeConfig, result));
