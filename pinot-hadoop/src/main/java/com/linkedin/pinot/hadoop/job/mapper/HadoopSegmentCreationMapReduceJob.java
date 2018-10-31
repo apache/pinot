@@ -214,31 +214,6 @@ public class HadoopSegmentCreationMapReduceJob {
 
     protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
                                            Path hdfsAvroPath, File dataPath) {
-      Schema schema = segmentGeneratorConfig.getSchema();
-
-      if(schema == null ||
-        schema.getTimeFieldSpec() == null ||
-        schema.getTimeFieldSpec().getIncomingGranularitySpec() == null){
-        return;
-      }
-
-      String timeFormatStr = schema.getTimeFieldSpec().getIncomingGranularitySpec().getTimeFormat();
-
-      if (timeFormatStr.equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())) {
-        return;
-      }
-
-      String simpleDateTypeStr = timeFormatStr.split(":")[1];
-
-      // Throws illegal argument exception if invalid
-      try{
-        new SimpleDateFormat(simpleDateTypeStr);
-      }
-      catch (IllegalArgumentException e) {
-        throw new RuntimeException("Could not parse simple date format " + simpleDateTypeStr, e);
-      }
-      segmentGeneratorConfig.setSimpleDateFormat(simpleDateTypeStr);
-      segmentGeneratorConfig.setSegmentTimeUnit(TimeUnit.MILLISECONDS);
     }
 
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
