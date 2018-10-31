@@ -13,7 +13,9 @@ module('Acceptance | create alert', function(hooks) {
   const id = '1';
   const selectedConfigGroup = `test_alert_${id}`;
   const selectedMetric = `test_collection_${id}::test_metric_${id}`;
-  const groupRecipient = 'simba@disney.com';
+  const toRecipients = 'kopa@disney.com, kiara@disney.com, kion@disney.com';
+  const ccRecipients = 'simba@disney.com, nala@disney.com';
+  const bccRecipients = 'scar@disney.com';
   const newRecipient = 'duane@therock.com';
   const selectedApp = 'the-lion-king';
   const alertNameGeneric = `test_function_${id}`;
@@ -48,7 +50,7 @@ module('Acceptance | create alert', function(hooks) {
 
     // Fields are now enabled with defaults and load correct options, graph is loaded
     assert.equal(
-      $granularityDropdown.find(selfServeConst.SELECTED_ITEM).get(0).innerText,
+      $granularityDropdown.find(selfServeConst.SELECTED_ITEM).get(0).innerText.trim(),
       '5_MINUTES',
       'granularity field (representative) is enabled after metric is selected'
     );
@@ -111,28 +113,28 @@ module('Acceptance | create alert', function(hooks) {
 
     await click(selfServeConst.SUBGROUP_SELECT);
     assert.equal(
-      $(selfServeConst.OPTION_ITEM).get(0).innerText,
+      $(selfServeConst.OPTION_ITEM).get(0).innerText.trim(),
       selectedConfigGroup,
       'The config group associated with the selected app is found in the group selection options.'
     );
 
     await selectChoose(selfServeConst.SUBGROUP_SELECT, selectedConfigGroup);
     assert.equal(
-      $(selfServeConst.CONFIG_GROUP_ALERTS).get(0).innerText,
+      $(selfServeConst.CONFIG_GROUP_ALERTS).get(0).innerText.trim(),
       `See all alerts monitored by: ${selectedConfigGroup}`,
       'Custom accordion block with alert table for selected group appears'
     );
     assert.equal(
-      $(selfServeConst.CONFIG_BLOCK).find('.control-label').get(0).innerText.replace(/\r?\n?/g, ''),
-      `Recipients in subscription group ${selectedConfigGroup}:${groupRecipient}`,
+      $(selfServeConst.CONFIG_BLOCK).find('.control-label').get(0).innerText.trim().replace(/\r?\n?/g, ''),
+      `Recipients in subscription group ${selectedConfigGroup}:To: ${toRecipients}Cc: ${ccRecipients}`,
       'Label and email for recipients is correctly rendered'
     );
 
-    await fillIn(selfServeConst.CONFIG_RECIPIENTS_INPUT, groupRecipient);
+    await fillIn(selfServeConst.CONFIG_RECIPIENTS_INPUT, toRecipients);
     await triggerKeyEvent(selfServeConst.CONFIG_RECIPIENTS_INPUT, 'keyup', '8');
     assert.equal(
-      $(selfServeConst.EMAIL_WARNING).get(0).innerText,
-      `Warning: ${groupRecipient} is already included in this group.`,
+      $(selfServeConst.EMAIL_WARNING).get(0).innerText.trim(),
+      `Warning: ${toRecipients} is already included in this group.`,
       'Duplicate email warning appears correctly.'
     );
 
@@ -170,8 +172,8 @@ module('Acceptance | create alert', function(hooks) {
     );
 
     assert.equal(
-      $(selfServeConst.ALERT_ACTIVE_LABEL).get(0).innerText,
-      'Active',
+      $(selfServeConst.ALERT_ACTIVE_LABEL).get(0).innerText.trim(),
+      'ACTIVE',
       'Alert status label is set to active.'
     );
 

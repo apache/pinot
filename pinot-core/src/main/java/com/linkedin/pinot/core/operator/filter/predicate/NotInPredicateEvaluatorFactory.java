@@ -126,6 +126,11 @@ public class NotInPredicateEvaluatorFactory {
     }
 
     @Override
+    public int getNumNonMatchingDictIds() {
+      return _nonMatchingDictIdSet.size();
+    }
+
+    @Override
     public int[] getNonMatchingDictIds() {
       if (_nonMatchingDictIds == null) {
         _nonMatchingDictIds = _nonMatchingDictIdSet.toIntArray();

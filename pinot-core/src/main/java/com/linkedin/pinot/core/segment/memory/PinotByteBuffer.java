@@ -218,7 +218,7 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public void copyTo(long offset, byte[] buffer, int destOffset,  int size) {
+  public void copyTo(long offset, byte[] buffer, int destOffset, int size) {
     assert offset <= Integer.MAX_VALUE;
     int intOffset = (int) offset;
     if (size <= PinotDataBuffer.BULK_BYTES_PROCESSING_THRESHOLD) {
@@ -287,25 +287,30 @@ public class PinotByteBuffer extends PinotDataBuffer {
   }
 
   @Override
-  public PinotDataBuffer view(long start, long end) {
+  public ByteOrder order() {
+    return _buffer.order();
+  }
+
+  @Override
+  public PinotDataBuffer view(long start, long end, ByteOrder byteOrder) {
     assert start <= end;
     assert end <= Integer.MAX_VALUE;
     ByteBuffer duplicate = _buffer.duplicate();
     duplicate.position((int) start).limit((int) end);
     ByteBuffer buffer = duplicate.slice();
-    buffer.order(_buffer.order());
+    buffer.order(byteOrder);
     return new PinotByteBuffer(buffer, false, false);
   }
 
   @Override
-  public ByteBuffer toDirectByteBuffer(long offset, int size) {
+  public ByteBuffer toDirectByteBuffer(long offset, int size, ByteOrder byteOrder) {
     assert offset <= Integer.MAX_VALUE;
     int start = (int) offset;
     int end = start + size;
     ByteBuffer duplicate = _buffer.duplicate();
     duplicate.position(start).limit(end);
     ByteBuffer buffer = duplicate.slice();
-    buffer.order(_buffer.order());
+    buffer.order(byteOrder);
     return buffer;
   }
 

@@ -15,42 +15,36 @@
  */
 package com.linkedin.pinot.core.data.function;
 
-import java.util.List;
-
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import java.util.List;
+
 
 /**
- * Evaluates a function expression. This is optimized 
- * for evaluating the an expression multiple times with different inputs.
- * Overall idea 
- *  - Parse the function expression into an expression tree
- *  - Convert each node in the expression tree into and ExecutableNode
- *  - An ExecutableNode can be a 
- *      - FunctionNode - That executes another function
- *      - ColumnNode - fetches the value of the column from the input GenericRow
- *      - ConstantNode - returns the same value - typically constant function arguments are represented using a ConstantNode
+ * Evaluates a function expression.
+ * <p>This is optimized for evaluating the an expression multiple times with different inputs.
+ * <p>Overall idea
+ * <ul>
+ *   <li>Parse the function expression into an expression tree</li>
+ *   <li>Convert each node in the expression tree into and ExecutableNode</li>
+ * </ul>
+ * <p>An ExecutableNode can be a
+ * <ul>
+ *   <li>FunctionNode - executes another function</li>
+ *   <li>ColumnNode - fetches the value of the column from the input GenericRow</li>
+ *   <li>
+ *     ConstantNode - returns the same value
+ *     <p>Typically constant function arguments are represented using a ConstantNode
+ *   </li>
+ * </ul>
  */
 public class FunctionExpressionEvaluator {
-  /**
-   * PQL compilers are not thread safe. Creating one per thread
-   */
-  static ThreadLocal<Pql2Compiler> COMPILER_CACHE = new ThreadLocal<Pql2Compiler>() {
-    protected Pql2Compiler initialValue() {
-      return new Pql2Compiler();
-    };
-  };
-  /**
-   * Root of the execution tree
-   */
-  ExecutableNode _rootNode;
+  // Root of the execution tree
+  private final ExecutableNode _rootNode;
 
-  public FunctionExpressionEvaluator(String columnName, String expression) throws Exception {
-    TransformExpressionTree expressionTree;
-    expressionTree = COMPILER_CACHE.get().compileToExpressionTree(expression);
-    _rootNode = planExecution(expressionTree);
+  public FunctionExpressionEvaluator(String expression) throws Exception {
+    _rootNode = planExecution(TransformExpressionTree.compileToExpressionTree(expression));
   }
 
   private ExecutableNode planExecution(TransformExpressionTree expressionTree) throws Exception {
@@ -62,17 +56,17 @@ public class FunctionExpressionEvaluator {
       TransformExpressionTree childExpression = children.get(i);
       ExecutableNode childNode;
       switch (childExpression.getExpressionType()) {
-      case FUNCTION:
-        childNode = planExecution(childExpression);
-        break;
-      case IDENTIFIER:
-        childNode = new ColumnExecutionNode(childExpression.getValue());
-        break;
-      case LITERAL:
-        childNode = new ConstantExecutionNode(childExpression.getValue());
-        break;
-      default:
-        throw new UnsupportedOperationException("Unsupported expression type:" + childExpression.getExpressionType());
+        case FUNCTION:
+          childNode = planExecution(childExpression);
+          break;
+        case IDENTIFIER:
+          childNode = new ColumnExecutionNode(childExpression.getValue());
+          break;
+        case LITERAL:
+          childNode = new ConstantExecutionNode(childExpression.getValue());
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported expression type:" + childExpression.getExpressionType());
       }
       childNodes[i] = childNode;
       argumentTypes[i] = childNode.getReturnType();
@@ -86,20 +80,11 @@ public class FunctionExpressionEvaluator {
     return _rootNode.execute(row);
   }
 
-  private static interface ExecutableNode {
-    /**
-     * 
-     * @param row
-     * @return
-     */
+  private interface ExecutableNode {
+
     Object execute(GenericRow row);
 
-    /**
-     * 
-     * @return
-     */
     Class<?> getReturnType();
-
   }
 
   private static class FunctionExecutionNode implements ExecutableNode {
@@ -143,7 +128,6 @@ public class FunctionExpressionEvaluator {
     public Class<?> getReturnType() {
       return String.class;
     }
-
   }
 
   private static class ColumnExecutionNode implements ExecutableNode {
@@ -162,6 +146,5 @@ public class FunctionExpressionEvaluator {
     public Class<?> getReturnType() {
       return Object.class;
     }
-
   }
 }

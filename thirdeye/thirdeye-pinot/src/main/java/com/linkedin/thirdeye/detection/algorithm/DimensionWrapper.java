@@ -1,10 +1,25 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.algorithm;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -21,6 +36,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -32,130 +50,138 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 public class DimensionWrapper extends DetectionPipeline {
 
-  // exploration
-  private static final String PROP_METRIC_URN = "metricUrn";
-
-  private static final String PROP_DIMENSIONS = "dimensions";
-
-  private static final String PROP_MIN_VALUE = "minValue";
-  private static final double PROP_MIN_VALUE_DEFAULT = Double.NaN;
-
-  private static final String PROP_MIN_CONTRIBUTION = "minContribution";
-  private static final double PROP_MIN_CONTRIBUTION_DEFAULT = Double.NaN;
-
-  private static final String PROP_K = "k";
-  private static final int PROP_K_DEFAULT = -1;
-
-  private static final String PROP_LOOKBACK = "lookback";
-  private static final long PROP_LOOKBACK_DEFAULT = TimeUnit.DAYS.toMillis(7);
-
   // prototyping
   private static final String PROP_NESTED = "nested";
 
   private static final String PROP_NESTED_METRIC_URN_KEY = "nestedMetricUrnKey";
   private static final String PROP_NESTED_METRIC_URN_KEY_DEFAULT = "metricUrn";
 
-  private static final String PROP_NESTED_METRIC_URN = "nestedMetricUrn";
+  private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
 
   private static final String PROP_CLASS_NAME = "className";
 
   private final String metricUrn;
-  protected final List<String> dimensions;
   private final int k;
-  private final double minValue;
   private final double minContribution;
-  private final long lookback;
+  private final double minValue;
+  private final double minValueHourly;
+  private final double minValueDaily;
+  private final Period lookback;
+  private final DateTimeZone timezone;
 
-  private final String nestedMetricUrn;
   protected final String nestedMetricUrnKey;
-  private final List<Map<String, Object>> nestedProperties;
+  protected final List<String> dimensions;
+  protected final Collection<String> nestedMetricUrns;
+  protected final List<Map<String, Object>> nestedProperties;
 
   public DimensionWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
 
     // exploration
-    Preconditions.checkArgument(config.getProperties().containsKey(PROP_METRIC_URN), "Missing " + PROP_METRIC_URN);
-
-    this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
-    this.minValue = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN_VALUE, PROP_MIN_VALUE_DEFAULT);
-    this.minContribution = MapUtils.getDoubleValue(config.getProperties(), PROP_MIN_CONTRIBUTION, PROP_MIN_CONTRIBUTION_DEFAULT);
-    this.k = MapUtils.getIntValue(config.getProperties(), PROP_K, PROP_K_DEFAULT);
-    this.dimensions = ConfigUtils.getList(config.getProperties().get(PROP_DIMENSIONS));
-    this.lookback = MapUtils.getLongValue(config.getProperties(), PROP_LOOKBACK, PROP_LOOKBACK_DEFAULT);
+    this.metricUrn = MapUtils.getString(config.getProperties(), "metricUrn", null);
+    this.minContribution = MapUtils.getDoubleValue(config.getProperties(), "minContribution", Double.NaN);
+    this.minValue = MapUtils.getDoubleValue(config.getProperties(), "minValue", Double.NaN);
+    this.minValueHourly = MapUtils.getDoubleValue(config.getProperties(), "minValueHourly", Double.NaN);
+    this.minValueDaily = MapUtils.getDoubleValue(config.getProperties(), "minValueDaily", Double.NaN);
+    this.k = MapUtils.getIntValue(config.getProperties(), "k", -1);
+    this.dimensions = ConfigUtils.getList(config.getProperties().get("dimensions"));
+    this.lookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "lookback", "1w"));
+    this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "America/Los_Angeles"));
 
     // prototyping
-    Preconditions.checkArgument(config.getProperties().containsKey(PROP_NESTED), "Missing " + PROP_NESTED);
-
-    this.nestedMetricUrn = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN, this.metricUrn);
+    this.nestedMetricUrns = ConfigUtils.getList(config.getProperties().get(PROP_NESTED_METRIC_URNS), Collections.singletonList(this.metricUrn));
     this.nestedMetricUrnKey = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_DEFAULT);
     this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
   }
 
   @Override
   public DetectionPipelineResult run() throws Exception {
-    long startTime = this.startTime;
-    if (this.endTime - this.startTime < this.lookback) {
-      startTime = this.endTime - this.lookback;
-    }
-    MetricEntity metric = MetricEntity.fromURN(this.metricUrn, 1.0);
-    MetricSlice slice = MetricSlice.from(metric.getId(), startTime, this.endTime, metric.getFilters());
+    List<MetricEntity> nestedMetrics = new ArrayList<>();
 
-    DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
+    if (this.metricUrn != null) {
+      // metric and dimension exploration
 
-    if (aggregates.isEmpty()) {
-      return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
-    }
+      DateTime start = new DateTime(this.startTime, this.timezone);
+      DateTime end = new DateTime(this.endTime, this.timezone);
 
-    final double total = aggregates.getDoubles(COL_VALUE).sum().fillNull().doubleValue();
+      DateTime minStart = end.minus(this.lookback);
+      if (minStart.isBefore(start)) {
+        start = minStart;
+      }
 
-    // min value
-    if (!Double.isNaN(this.minValue)) {
-      aggregates = aggregates.filter(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return values[0] >= DimensionWrapper.this.minValue;
+      Period testPeriod = new Period(start, end);
+
+      MetricEntity metric = MetricEntity.fromURN(this.metricUrn);
+      MetricSlice slice = MetricSlice.from(metric.getId(), start.getMillis(), end.getMillis(), metric.getFilters());
+
+      DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
+
+      if (aggregates.isEmpty()) {
+        return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList());
+      }
+
+      final double total = aggregates.getDoubles(COL_VALUE).sum().fillNull().doubleValue();
+
+      // min contribution
+      if (!Double.isNaN(this.minContribution)) {
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).divide(total).gte(this.minContribution)).dropNull();
+      }
+
+      // min value
+      if (!Double.isNaN(this.minValue)) {
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).gte(this.minValue)).dropNull();
+      }
+
+      if (!Double.isNaN(this.minValueHourly)) {
+        double multiplier = TimeUnit.HOURS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueHourly)).dropNull();
+      }
+
+      if (!Double.isNaN(this.minValueDaily)) {
+        double multiplier = TimeUnit.DAYS.toMillis(1) / (double) testPeriod.toDurationFrom(start).getMillis();
+        aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).multiply(multiplier).gte(this.minValueDaily)).dropNull();
+      }
+
+      // top k
+      if (this.k > 0) {
+        aggregates = aggregates.sortedBy(COL_VALUE).tail(this.k).reverse();
+      }
+
+      for (String nestedMetricUrn : this.nestedMetricUrns) {
+        for (int i = 0; i < aggregates.size(); i++) {
+          Multimap<String, String> nestedFilter = ArrayListMultimap.create(metric.getFilters());
+
+          for (String dimName : this.dimensions) {
+            nestedFilter.removeAll(dimName); // clear any filters for explored dimension
+            nestedFilter.put(dimName, aggregates.getString(dimName, i));
+          }
+
+          nestedMetrics.add(MetricEntity.fromURN(nestedMetricUrn).withFilters(nestedFilter));
         }
-      }, COL_VALUE).dropNull();
-    }
+      }
 
-    // min contribution
-    if (!Double.isNaN(this.minContribution)) {
-      aggregates = aggregates.filter(new Series.DoubleConditional() {
-        @Override
-        public boolean apply(double... values) {
-          return values[0] / total >= DimensionWrapper.this.minContribution;
-        }
-      }, COL_VALUE).dropNull();
-    }
+    } else {
+      // metric exploration only
 
-    // top k
-    if (this.k > 0) {
-      aggregates = aggregates.sortedBy(COL_VALUE).tail(this.k).reverse();
-    }
-
-    if (aggregates.isEmpty()) {
-      return new DetectionPipelineResult(Collections.<MergedAnomalyResultDTO>emptyList(), -1);
+      for (String nestedMetricUrn : this.nestedMetricUrns) {
+        nestedMetrics.add(MetricEntity.fromURN(nestedMetricUrn));
+      }
     }
 
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    Map<String, Object> diagnostics = new HashMap<>();
 
-    for (int i = 0; i < aggregates.size(); i++) {
-      Multimap<String, String> filters = ArrayListMultimap.create(metric.getFilters());
-      for (String dimName : this.dimensions) {
-        filters.removeAll(dimName); // clear any filters for explored dimension
-        filters.put(dimName, aggregates.getString(dimName, i));
-      }
-
-      MetricEntity targetMetric = MetricEntity.fromURN(this.nestedMetricUrn, 1.0).withFilters(filters);
-
+    for (MetricEntity metric : nestedMetrics) {
       for (Map<String, Object> properties : this.nestedProperties) {
-        DetectionPipelineResult intermediate = this.runNested(targetMetric, properties);
+        DetectionPipelineResult intermediate = this.runNested(metric, properties);
 
         anomalies.addAll(intermediate.getAnomalies());
+        diagnostics.put(metric.getUrn(), intermediate.getDiagnostics());
       }
     }
 
-    return new DetectionPipelineResult(anomalies);
+    return new DetectionPipelineResult(anomalies)
+        .setDiagnostics(diagnostics);
   }
 
   protected DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {

@@ -24,11 +24,9 @@ import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.startree.OffHeapStarTree;
-import com.linkedin.pinot.core.startree.StarTree;
+import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +37,7 @@ import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
+
 public class SegmentDumpTool {
   @Argument
   private String segmentPath;
@@ -46,7 +45,7 @@ public class SegmentDumpTool {
   @Argument(index = 1, multiValued = true)
   private List<String> columnNames;
 
-  @Option(name="-dumpStarTree")
+  @Option(name = "-dumpStarTree")
   private boolean dumpStarTree;
 
   public void doMain(String[] args) throws Exception {
@@ -84,7 +83,6 @@ public class SegmentDumpTool {
     }
     System.out.println();
 
-
     for (int i = 0; i < indexSegment.getSegmentMetadata().getTotalDocs(); i++) {
       System.out.print(i);
       System.out.print("\t");
@@ -100,11 +98,16 @@ public class SegmentDumpTool {
     }
 
     if (dumpStarTree) {
-      System.out.println();
-      File starTreeFile = new File(segmentDir, V1Constants.STAR_TREE_INDEX_FILE);
-      StarTree tree = new OffHeapStarTree(starTreeFile, ReadMode.mmap);
-      tree.printTree(dictionaries);
+      List<StarTreeV2> starTrees = indexSegment.getStarTrees();
+      if (starTrees != null) {
+        for (StarTreeV2 starTree : starTrees) {
+          System.out.println();
+          starTree.getStarTree().printTree(dictionaries);
+        }
+      }
     }
+
+    indexSegment.destroy();
   }
 
   public static void main(String[] args) throws Exception {

@@ -23,6 +23,8 @@ import com.linkedin.pinot.common.utils.ClientSSLContextGenerator;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.linkedin.pinot.minion.events.EventObserverFactoryRegistry;
 import com.linkedin.pinot.minion.events.MinionEventObserverFactory;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutorFactory;
@@ -32,6 +34,7 @@ import com.linkedin.pinot.minion.metrics.MinionMetrics;
 import com.linkedin.pinot.minion.taskfactory.TaskFactoryRegistry;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
+import java.io.IOException;
 import javax.annotation.Nonnull;
 import javax.net.ssl.SSLContext;
 import org.apache.commons.configuration.Configuration;
@@ -129,9 +132,20 @@ public class MinionStarter {
     // TODO: set the correct minion version
     minionContext.setMinionVersion("1.0");
 
+    // Start all components
+    LOGGER.info("Initializing PinotFSFactory");
+    Configuration pinotFSConfig = _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    PinotFSFactory.init(pinotFSConfig);
+
     LOGGER.info("Initializing segment fetchers for all protocols");
-    SegmentFetcherFactory.getInstance()
-        .init(_config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
+    Configuration segmentFetcherFactoryConfig =
+        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+
+    LOGGER.info("Initializing pinot crypter");
+    Configuration pinotCrypterConfig =
+        _config.subset(CommonConstants.Minion.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+    PinotCrypterFactory.init(pinotCrypterConfig);
 
     // Need to do this before we start receiving state transitions.
     LOGGER.info("Initializing ssl context for segment uploader");
@@ -176,6 +190,12 @@ public class MinionStarter {
    * Stop the Pinot Minion instance.
    */
   public void stop() {
+    try {
+      LOGGER.info("Closing PinotFS classes");
+      PinotFSFactory.shutdown();
+    } catch (IOException e) {
+      LOGGER.warn("Caught exception closing PinotFS classes", e);
+    }
     LOGGER.info("Stopping Pinot minion: " + _instanceId);
     _helixManager.disconnect();
     LOGGER.info("Pinot minion stopped");

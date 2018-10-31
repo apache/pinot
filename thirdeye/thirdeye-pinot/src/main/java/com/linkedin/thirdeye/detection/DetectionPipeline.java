@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
@@ -10,6 +26,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -79,6 +96,7 @@ public abstract class DetectionPipeline {
     anomaly.setEndTime(slice.getEnd());
     anomaly.setMetric(metric.getName());
     anomaly.setCollection(metric.getDataset());
+    anomaly.setMetricUrn(MetricEntity.fromSlice(slice, 1.0).getUrn());
     anomaly.setDimensions(toFilterMap(slice.getFilters()));
     anomaly.setDetectionConfigId(this.config.getId());
     anomaly.setChildren(new HashSet<MergedAnomalyResultDTO>());

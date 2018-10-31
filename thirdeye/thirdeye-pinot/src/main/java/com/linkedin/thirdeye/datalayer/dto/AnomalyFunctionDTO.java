@@ -1,14 +1,29 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.dto;
 
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
-import java.io.ByteArrayInputStream;
+import com.linkedin.thirdeye.datalayer.util.StringUtils;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,7 +60,7 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
    * true if this function should get total metric
    */
   public boolean isToCalculateGlobalMetric() {
-    return StringUtils.isNotEmpty(this.getGlobalMetric());
+    return org.apache.commons.lang3.StringUtils.isNotEmpty(this.getGlobalMetric());
   }
 
   /**
@@ -59,7 +74,6 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
       props = toProperties(getProperties());
     } catch (IOException e) {
       LOGGER.warn("Failed to parse property string ({}) for anomaly function: {}", getProperties(), getId());
-
     }
     return props;
   }
@@ -70,30 +84,10 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
    * @return a Properties object corresponds to the properties String of this anomaly function.
    */
   public static Properties toProperties(String properties) throws IOException {
-    Properties props = new Properties();
-
-    if (properties != null) {
-      String[] tokens = properties.split(";");
-      for (String token : tokens) {
-        try {
-          props.load(new ByteArrayInputStream(token.getBytes()));
-        } catch (IOException e) {
-        }
-      }
+    if (properties == null || properties.isEmpty()) {
+      return new Properties();
     }
-    return props;
-  }
-
-  /**
-   * Convert Properties to String following the format in TE
-   */
-  public String propertiesToString(Properties props){
-    StringBuilder stringBuilder = new StringBuilder();
-    for(Map.Entry entry : props.entrySet()){
-      stringBuilder.append(entry.getKey() + "=" + entry.getValue() + ";");
-    }
-    stringBuilder.deleteCharAt(stringBuilder.length() - 1);
-    return stringBuilder.toString();
+    return StringUtils.decodeCompactedProperties(properties);
   }
 
   /**
@@ -106,6 +100,6 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
     for (Map.Entry<String, String> entry : config.entrySet()) {
       properties.setProperty(entry.getKey(), entry.getValue());
     }
-    setProperties(propertiesToString(properties));
+    setProperties(StringUtils.encodeCompactedProperties(properties));
   }
 }

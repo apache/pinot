@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
@@ -37,11 +38,12 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(BucketizedSegmentStrategy.class);
 
   @Override
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
+      int numReplicas, String tenantName) {
     String serverTenantName = TagNameUtils.getOfflineTagForTenant(tenantName);
 
-    List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
+    List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixManager, serverTenantName);
     List<String> selectedInstanceList = new ArrayList<>();
     if (segmentMetadata.getShardingKey() != null) {
       for (String instance : allInstances) {

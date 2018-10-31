@@ -15,50 +15,31 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.fwd;
 
-import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.io.util.PinotDataBitSet;
 import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import com.linkedin.pinot.core.io.writer.impl.v1.FixedBitSingleValueWriter;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
-import org.apache.commons.io.FileUtils;
 
 
 public class SingleValueUnsortedForwardIndexCreator implements SingleValueForwardIndexCreator {
-  private final File forwardIndexFile;
-  private final FieldSpec spec;
-  private int maxNumberOfBits = 0;
-  private SingleColumnSingleValueWriter sVWriter;
+  private final SingleColumnSingleValueWriter _writer;
 
-  public SingleValueUnsortedForwardIndexCreator(FieldSpec spec, File baseIndexDir, int cardinality, int numDocs,
-      int totalNumberOfValues, boolean hasNulls) throws Exception {
-    forwardIndexFile =
-        new File(baseIndexDir, spec.getName() + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
-    this.spec = spec;
-    FileUtils.touch(forwardIndexFile);
-    maxNumberOfBits = getNumOfBits(cardinality);
-    sVWriter = new FixedBitSingleValueWriter(forwardIndexFile, numDocs, maxNumberOfBits);
-  }
-
-  public static int getNumOfBits(int dictionarySize) {
-    if (dictionarySize < 2) {
-      return 1;
-    }
-    int ret = (int) Math.ceil(Math.log(dictionarySize) / Math.log(2));
-    if (ret == 0) {
-      ret = 1;
-    }
-    return ret;
+  public SingleValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs)
+      throws Exception {
+    File indexFile = new File(outputDir, column + V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION);
+    _writer = new FixedBitSingleValueWriter(indexFile, numDocs, PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
   }
 
   @Override
-  public void index(int docId, int dictionaryIndex) {
-    sVWriter.setInt(docId, dictionaryIndex);
+  public void index(int docId, int dictId) {
+    _writer.setInt(docId, dictId);
   }
 
   @Override
   public void close() throws IOException {
-    sVWriter.close();
+    _writer.close();
   }
 }

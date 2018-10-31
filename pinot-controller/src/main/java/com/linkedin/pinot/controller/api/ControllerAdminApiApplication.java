@@ -43,10 +43,12 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   private boolean started = false;
   private static final String RESOURCE_PACKAGE = "com.linkedin.pinot.controller.api.resources";
   private static String CONSOLE_WEB_PATH;
+  private final boolean _useHttps;
 
-  public ControllerAdminApiApplication(String consoleWebPath) {
+  public ControllerAdminApiApplication(String consoleWebPath, boolean useHttps) {
     super();
     CONSOLE_WEB_PATH = consoleWebPath;
+    _useHttps = useHttps;
     if (!CONSOLE_WEB_PATH.endsWith("/")) {
       CONSOLE_WEB_PATH += "/";
     }
@@ -114,7 +116,11 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot Controller information");
     beanConfig.setContact("https://github.com/linkedin/pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[]{"http"});
+    if (_useHttps) {
+      beanConfig.setSchemes(new String[]{"https"});
+    } else {
+      beanConfig.setSchemes(new String[]{"http"});
+    }
     beanConfig.setBasePath(baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);

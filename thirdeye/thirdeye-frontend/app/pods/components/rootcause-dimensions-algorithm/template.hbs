@@ -1,38 +1,46 @@
-{{#if fetchDimensionAnalysisData.isRunning}}
-  {{ember-spinner}}
-{{/if}}
+{{#if hasExclusion}}
+  <div class="rootcause-alert alert alert-warning fade in">
+    The algorithmic summary does not support metrics with exclusion filters yet.
+    Please remove the exclusion to generate the summary.
+  </div>
 
-<a class="te-self-serve__side-link te-self-serve__side-link--tall" {{action "onClickDimensionOptions" this}}>
-  <i class="glyphicon glyphicon-cog te-icon__inline-link"></i> Filter dimensions
-</a>
+{{else}}
+  {{#if fetchDimensionAnalysisData.isRunning}}
+    <div class="spinner-wrapper-self-serve">{{ember-spinner}}</div>
+  {{/if}}
 
-{{!-- Dimension table controls modal --}}
-{{#te-modal
-  isMicroModal=true
-  cancelButtonText="Cancel"
-  submitButtonText="Save"
-  submitAction=(action "onSave")
-  cancelAction=(action "onCancel")
-  isShowingModal=openSettingsModal
-  headerText="Dimension Analysis Settings"
-}}
-  {{rootcause-dimensions-settings
-    dimensionOptions=dimensionOptions
-    customTableSettings=customTableSettings
+  <a class="te-self-serve__side-link te-self-serve__side-link--tall" {{action "onClickDimensionOptions" this}}>
+    <i class="glyphicon glyphicon-cog te-icon__inline-link"></i> Configure analysis table
+  </a>
+
+  {{!-- Dimension table controls modal --}}
+  {{#te-modal
+    isMicroModal=true
+    cancelButtonText="Cancel"
+    submitButtonText="Save"
+    submitAction=(action "onSave")
+    cancelAction=(action "onCancel")
+    isShowingModal=openSettingsModal
+    headerText="Dimension Analysis Settings"
   }}
-{{/te-modal}}
+    {{rootcause-dimensions-settings
+      dimensionOptions=dimensionOptions
+      customTableSettings=customTableSettings
+    }}
+  {{/te-modal}}
 
-{{!-- Dimension analysis table --}}
-{{update-table
-  pageSize=25
-  data=dimensionTableData
-  columns=dimensionTableColumns
-  groupedHeaders=dimensionTableHeaders
-  showColumnsDropdown=false
-  showGlobalFilter=false
-  filteringIgnoreCase=true
-  multipleExpand=true
-  multipleSelect=true
-  customClasses=dimensionTableClasses
-  headerFilteringRowTemplate=headerFilteringRowTemplate
-}}
+  {{!-- Dimension analysis table --}}
+  {{update-table
+    pageSize=25
+    data=dimensionTableData
+    columns=dimensionTableColumns
+    groupedHeaders=dimensionTableHeaders
+    showColumnsDropdown=false
+    showGlobalFilter=false
+    filteringIgnoreCase=true
+    multipleExpand=true
+    multipleSelect=true
+    customClasses=dimensionTableClasses
+    headerFilteringRowTemplate=headerFilteringRowTemplate
+  }}
+{{/if}}

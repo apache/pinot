@@ -16,21 +16,39 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-
+import org.apache.commons.configuration.Configuration;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Base routing table builder class to share common methods between routing table builders.
  */
 public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseRoutingTableBuilder.class);
+
   protected final Random _random = new Random();
+  private BrokerMetrics _brokerMetrics;
+  private String _tableName;
 
   // Set variable as volatile so all threads can get the up-to-date routing tables
   private volatile List<Map<String, List<String>>> _routingTables;
+
+  @Override
+  public void init(
+      Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+    _tableName = tableConfig.getTableName();
+    _brokerMetrics = brokerMetrics;
+  }
 
   protected static String getServerWithLeastSegmentsAssigned(List<String> servers,
       Map<String, List<String>> routingTable) {
@@ -66,5 +84,12 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   @Override
   public List<Map<String, List<String>>> getRoutingTables() {
     return _routingTables;
+  }
+
+  protected void handleNoServingHost(String segmentName) {
+    LOGGER.error("Found no server hosting segment {} for table {}", segmentName, _tableName);
+    if (_brokerMetrics != null) {
+      _brokerMetrics.addMeteredTableValue(_tableName, BrokerMeter.NO_SERVING_HOST_FOR_SEGMENT, 1);
+    }
   }
 }

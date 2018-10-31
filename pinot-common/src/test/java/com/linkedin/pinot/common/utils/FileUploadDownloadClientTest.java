@@ -24,9 +24,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.IOUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicHeader;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.testng.Assert;
@@ -40,12 +45,13 @@ public class FileUploadDownloadClientTest {
   private static final String TEST_HOST = "localhost";
   private static final int TEST_PORT = new Random().nextInt(10000) + 10000;
   private static final String TEST_URI = "http://testhost/segments/testSegment";
+  private static final String TEST_CRYPTER = "testCrypter";
   private static HttpServer TEST_SERVER;
 
   @BeforeClass
   public void setUp() throws Exception {
     TEST_SERVER = HttpServer.create(new InetSocketAddress(TEST_PORT), 0);
-    TEST_SERVER.createContext("/segments", new testSegmentUploadHandler());
+    TEST_SERVER.createContext("/v2/segments", new testSegmentUploadHandler());
     TEST_SERVER.setExecutor(null); // creates a default executor
     TEST_SERVER.start();
   }
@@ -59,6 +65,8 @@ public class FileUploadDownloadClientTest {
       FileUploadType uploadType = FileUploadType.valueOf(uploadTypeStr);
 
       String downloadUri = null;
+      String crypter = null;
+
       if (uploadType == FileUploadType.JSON) {
         InputStream bodyStream = httpExchange.getRequestBody();
         try {
@@ -70,6 +78,8 @@ public class FileUploadDownloadClientTest {
         Assert.assertEquals(downloadUri, TEST_URI);
       } else if (uploadType == FileUploadType.URI) {
         downloadUri = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI);
+        crypter = requestHeaders.getFirst(FileUploadDownloadClient.CustomHeaders.CRYPTER);
+        Assert.assertEquals(crypter, TEST_CRYPTER);
       } else {
         Assert.fail();
       }
@@ -86,10 +96,17 @@ public class FileUploadDownloadClientTest {
   }
 
   @Test
-  public void testSendFileWithUri() throws Exception {
+  public void testSendFileWithUriAndCrypter() throws Exception {
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+      Header crypterClassHeader =
+          new BasicHeader(FileUploadDownloadClient.CustomHeaders.CRYPTER, TEST_CRYPTER);
+
+      List<Header> headers = Collections.singletonList(crypterClassHeader);
+      List<NameValuePair> params = null;
+
       SimpleHttpResponse response = fileUploadDownloadClient.sendSegmentUri(
-          FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI);
+          FileUploadDownloadClient.getUploadSegmentHttpURI(TEST_HOST, TEST_PORT), TEST_URI, headers, params,
+          FileUploadDownloadClient.DEFAULT_SOCKET_TIMEOUT_MS);
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }

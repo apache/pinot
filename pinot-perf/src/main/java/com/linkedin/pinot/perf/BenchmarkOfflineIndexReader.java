@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReaderImpl;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -82,7 +82,7 @@ public class BenchmarkOfflineIndexReader {
   // Forward index
   private int _numDocs;
   private FixedBitSingleValueReader _fixedBitSingleValueReader;
-  private SortedIndexReader _sortedForwardIndexReader;
+  private SortedIndexReaderImpl _sortedForwardIndexReader;
   private FixedBitMultiValueReader _fixedBitMultiValueReader;
   private int[] _buffer;
 
@@ -118,7 +118,7 @@ public class BenchmarkOfflineIndexReader {
         new FixedBitSingleValueReader(segmentReader.getIndexFor(SV_UNSORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
             _numDocs, segmentMetadata.getColumnMetadataFor(SV_UNSORTED_COLUMN_NAME).getBitsPerElement());
     _sortedForwardIndexReader =
-        new SortedIndexReader(segmentReader.getIndexFor(SV_SORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
+        new SortedIndexReaderImpl(segmentReader.getIndexFor(SV_SORTED_COLUMN_NAME, ColumnIndexType.FORWARD_INDEX),
             segmentMetadata.getColumnMetadataFor(SV_SORTED_COLUMN_NAME).getCardinality());
     ColumnMetadata mvColumnMetadata = segmentMetadata.getColumnMetadataFor(MV_COLUMN_NAME);
     _fixedBitMultiValueReader =
@@ -156,7 +156,7 @@ public class BenchmarkOfflineIndexReader {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int sortedForwardIndexReaderSequential() {
-    SortedIndexReader.Context context = _sortedForwardIndexReader.createContext();
+    SortedIndexReaderImpl.Context context = _sortedForwardIndexReader.createContext();
     int ret = 0;
     for (int i = 0; i < _numDocs; i++) {
       ret += _sortedForwardIndexReader.getInt(i, context);
@@ -168,7 +168,7 @@ public class BenchmarkOfflineIndexReader {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public int sortedForwardIndexReaderRandom() {
-    SortedIndexReader.Context context = _sortedForwardIndexReader.createContext();
+    SortedIndexReaderImpl.Context context = _sortedForwardIndexReader.createContext();
     int ret = 0;
     for (int i = 0; i < _numDocs; i++) {
       ret += _sortedForwardIndexReader.getInt(RANDOM.nextInt(_numDocs), context);

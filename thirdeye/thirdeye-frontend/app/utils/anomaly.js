@@ -18,19 +18,32 @@ export const anomalyResponseObj = [
     value: 'NO_FEEDBACK',
     status: 'Not Resolved'
   },
-  { name: 'True anomaly',
+  { name: 'Yes - unexpected',
     value: 'ANOMALY',
     status: 'Confirmed Anomaly'
   },
-  { name: 'False alarm',
-    value: 'NOT_ANOMALY',
-    status: 'False Alarm'
+  { name: 'Expected temporary change',
+    value: 'ANOMALY_EXPECTED',
+    status: 'Expected Anomaly'
   },
-  { name: 'Confirmed - New Trend',
+  { name: 'Expected permanent change',
     value: 'ANOMALY_NEW_TREND',
     status: 'New Trend'
+  },
+  { name: 'No change observed',
+    value: 'NOT_ANOMALY',
+    status: 'False Alarm'
   }
 ];
+
+/**
+ * Mapping for anomalyResponseObj 'status' to 'name' for easy lookup
+ */
+export let anomalyResponseMap = {};
+anomalyResponseObj.forEach((obj) => {
+  anomalyResponseMap[obj.status] = obj.name;
+});
+
 
 /**
  * Update feedback status on any anomaly
@@ -129,6 +142,7 @@ export function pluralizeTime(time, unit) {
 
 export default {
   anomalyResponseObj,
+  anomalyResponseMap,
   updateAnomalyFeedback,
   getFormatedDuration,
   verifyAnomalyFeedback,

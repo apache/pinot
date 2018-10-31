@@ -108,7 +108,7 @@ const metricDimensions = metricId => `/data/autocomplete/dimensions/metric/${met
  * GET | Validates whether the entered dashboard name exists in inGraphs
  * @param {String} dashboardName
  */
-const dashboardByName = dashboardName => `/autometrics/isIngraphDashboard/${dashboardName}`;
+const dashboardByName = (dashboardName, fabricGroup) => `/autometrics/isIngraphDashboard/${dashboardName}?fabricGroup=${fabricGroup}`;
 
 /**
  * GET all metrics that belong to a dataset
@@ -122,6 +122,11 @@ const metricsByDataset = dataSet => `/thirdeye-admin/metric-config/metrics?datas
  * @see {@link https://tinyurl.com/y9mezgdr|class AutoOnboardResource}
  */
 const triggerInstantOnboard = '/autoOnboard/runAdhoc/AutometricsThirdeyeDataSource';
+
+/**
+ * POST request to edit an existing alert function with properties payload
+ */
+const editAlert = '/thirdeye/entity?entityType=ANOMALY_FUNCTION';
 
 /**
  * POST | Add metric & dataset to thirdEye DB
@@ -163,6 +168,7 @@ export const selfServeApiOnboard = {
   createAlert,
   updateAlert,
   deleteAlert,
+  editAlert,
   dashboardByName,
   metricsByDataset,
   createNewDataset,

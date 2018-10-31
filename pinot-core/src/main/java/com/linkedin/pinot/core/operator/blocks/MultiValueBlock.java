@@ -21,7 +21,6 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.operator.docvalsets.MultiValueSet;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -31,7 +30,7 @@ public final class MultiValueBlock implements Block {
   private final BlockValSet _blockValSet;
   private final BlockMetadata _blockMetadata;
 
-  public MultiValueBlock(SingleColumnMultiValueReader<? super ReaderContext> reader, int numDocs, int maxNumMultiValues,
+  public MultiValueBlock(SingleColumnMultiValueReader reader, int numDocs, int maxNumMultiValues,
       FieldSpec.DataType dataType, Dictionary dictionary) {
     _blockValSet = new MultiValueSet(reader, numDocs, dataType);
     _blockMetadata = new BlockMetadataImpl(numDocs, false, maxNumMultiValues, dataType, dictionary);

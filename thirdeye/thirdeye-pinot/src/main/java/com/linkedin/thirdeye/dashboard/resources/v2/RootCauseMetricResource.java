@@ -1,17 +1,32 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.StringSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
+import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
@@ -38,6 +53,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
@@ -48,6 +64,8 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils.*;
+
 
 /**
  * <p>RootCauseMetricResource is a central endpoint for querying different views on metrics as used by the
@@ -55,7 +73,7 @@ import org.slf4j.LoggerFactory;
  * The endpoint parses metric urns and a unified set of "offsets", i.e. time-warped baseline of the
  * specified metric. It further aligns queried time stamps to sensibly match the raw dataset.</p>
  *
- * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+ * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
  */
 @Path(value = "/rootcause/metric")
 @Produces(MediaType.APPLICATION_JSON)
@@ -67,22 +85,15 @@ public class RootCauseMetricResource {
   private static final String COL_VALUE = TimeSeriesLoader.COL_VALUE;
   private static final String COL_DIMENSION_NAME = AggregationLoader.COL_DIMENSION_NAME;
   private static final String COL_DIMENSION_VALUE = AggregationLoader.COL_DIMENSION_VALUE;
-  public static final String TOP_K_POSTFIX = "_topk";
+
+  private static final String ROLLUP_NAME = "OTHER";
 
   private static final long TIMEOUT = 60000;
 
   private static final String OFFSET_DEFAULT = "current";
   private static final String TIMEZONE_DEFAULT = "UTC";
   private static final String GRANULARITY_DEFAULT = MetricSlice.NATIVE_GRANULARITY.toAggregationGranularityString();
-
-  private static final Pattern PATTERN_NONE = Pattern.compile("none");
-  private static final Pattern PATTERN_PREDICTED = Pattern.compile("predicted");
-  private static final Pattern PATTERN_CURRENT = Pattern.compile("current");
-  private static final Pattern PATTERN_WEEK_OVER_WEEK = Pattern.compile("wo([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MEAN = Pattern.compile("mean([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MEDIAN = Pattern.compile("median([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MIN = Pattern.compile("min([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MAX = Pattern.compile("max([1-9][0-9]*)w");
+  private static final int LIMIT_DEFAULT = 100;
 
   private final ExecutorService executor;
   private final AggregationLoader aggregationLoader;
@@ -109,7 +120,7 @@ public class RootCauseMetricResource {
    * @param offset offset identifier (e.g. "current", "wo2w")
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    *
-   * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
@@ -157,7 +168,7 @@ public class RootCauseMetricResource {
    * @param offsets A list of offset identifier (e.g. "current", "wo2w")
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    *
-   * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
@@ -225,9 +236,9 @@ public class RootCauseMetricResource {
    * @param end end time (in millis)
    * @param offset offset identifier (e.g. "current", "wo2w")
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
-   * @param rollup limit results to the top k elements, plus an 'OTHER' rollup element
+   * @param limit limit results to the top k elements, plus a rollup element
    *
-   * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
@@ -247,8 +258,8 @@ public class RootCauseMetricResource {
       @QueryParam("offset") String offset,
       @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")")
       @QueryParam("timezone") String timezone,
-      @ApiParam(value = "limit results to the top k elements, plus an 'OTHER' rollup element")
-      @QueryParam("rollup") Long rollup) throws Exception {
+      @ApiParam(value = "limit results to the top k elements, plus 'OTHER' rollup element")
+      @QueryParam("limit") Integer limit) throws Exception {
 
     if (StringUtils.isBlank(offset)) {
       offset = OFFSET_DEFAULT;
@@ -258,8 +269,8 @@ public class RootCauseMetricResource {
       timezone = TIMEZONE_DEFAULT;
     }
 
-    if (rollup != null) {
-      throw new IllegalArgumentException("rollup not implemented yet");
+    if (limit == null) {
+      limit = LIMIT_DEFAULT;
     }
 
     MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
@@ -268,11 +279,13 @@ public class RootCauseMetricResource {
     List<MetricSlice> slices = range.scatter(baseSlice);
     logSlices(baseSlice, slices);
 
-    Map<MetricSlice, DataFrame> data = fetchBreakdowns(slices);
+    Map<MetricSlice, DataFrame> dataBreakdown = fetchBreakdowns(slices, limit);
+    Map<MetricSlice, DataFrame> dataAggregate = fetchAggregates(slices);
 
-    DataFrame result = range.gather(baseSlice, data);
+    DataFrame resultBreakdown = range.gather(baseSlice, dataBreakdown);
+    DataFrame resultAggregate = range.gather(baseSlice, dataAggregate);
 
-    return makeBreakdownMap(result);
+    return makeBreakdownMap(resultBreakdown, resultAggregate);
   }
 
   /**
@@ -286,7 +299,7 @@ public class RootCauseMetricResource {
    * @param timezone timezone identifier (e.g. "America/Los_Angeles")
    * @param granularityString time granularity (e.g. "5_MINUTES", "1_HOURS")
    *
-   * @see RootCauseMetricResource#parseOffset(String, String) supported offsets
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
    *
    * @return aggregate value, or NaN if data not available
    * @throws Exception on catch-all execution failure
@@ -401,28 +414,43 @@ public class RootCauseMetricResource {
    * Returns a map of maps (keyed by dimension name, keyed by dimension value) derived from the
    * breakdown results dataframe.
    *
-   * @param data (transformed) query results
+   * @param dataBreakdown (transformed) breakdown query results
+   * @param dataAggregate (transformed) aggregate query results
    * @return map of maps of value (keyed by dimension name, keyed by dimension value)
    */
-  private static Map<String, Map<String, Double>> makeBreakdownMap(DataFrame data) {
+  private static Map<String, Map<String, Double>> makeBreakdownMap(DataFrame dataBreakdown, DataFrame dataAggregate) {
     Map<String, Map<String, Double>> output = new TreeMap<>();
 
-    data = data.dropNull();
+    dataBreakdown = dataBreakdown.dropNull();
+    dataAggregate = dataAggregate.dropNull();
 
-    StringSeries dimNames = data.getStrings(COL_DIMENSION_NAME);
-    for (int i = 0; i < data.size(); i++) {
-      final String dimName = data.getString(COL_DIMENSION_NAME, i);
-      final String dimValue = data.getString(COL_DIMENSION_VALUE, i);
-      final double value = data.getDouble(COL_VALUE, i);
-      // remove group by dimensions which also have topk
-      if (dimNames.contains(dimName + TOP_K_POSTFIX)) {
-        continue;
-      }
+    Map<String, Double> dimensionTotals = new HashMap<>();
+
+    for (int i = 0; i < dataBreakdown.size(); i++) {
+      final String dimName = dataBreakdown.getString(COL_DIMENSION_NAME, i);
+      final String dimValue = dataBreakdown.getString(COL_DIMENSION_VALUE, i);
+      final double value = dataBreakdown.getDouble(COL_VALUE, i);
+
+      // cell
       if (!output.containsKey(dimName)) {
         output.put(dimName, new HashMap<String, Double>());
       }
       output.get(dimName).put(dimValue, value);
+
+      // total
+      dimensionTotals.put(dimName, MapUtils.getDoubleValue(dimensionTotals, dimName, 0) + value);
     }
+
+    // add rollup column
+    if (!dataAggregate.isEmpty()) {
+      double total = dataAggregate.getDouble(COL_VALUE, 0);
+      for (Map.Entry<String, Double> entry : dimensionTotals.entrySet()) {
+        if (entry.getValue() < total) {
+          output.get(entry.getKey()).put(ROLLUP_NAME, total - entry.getValue());
+        }
+      }
+    }
+
     return output;
   }
 
@@ -440,7 +468,7 @@ public class RootCauseMetricResource {
       futures.put(slice, this.executor.submit(new Callable<Double>() {
         @Override
         public Double call() throws Exception {
-          DataFrame df = RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList());
+          DataFrame df = RootCauseMetricResource.this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1);
           if (df.isEmpty()) {
             return Double.NaN;
           }
@@ -466,18 +494,19 @@ public class RootCauseMetricResource {
    * Returns breakdowns (de-aggregations) for a given set of metric slices.
    *
    * @param slices metric slices
+   * @param limit top k elements limit
    * @return map of dataframes (keyed by metric slice,
    *         columns: [COL_TIME(1), COL_DIMENSION_NAME, COL_DIMENSION_VALUE, COL_VALUE])
    * @throws Exception on catch-all execution failure
    */
-  private Map<MetricSlice, DataFrame> fetchBreakdowns(List<MetricSlice> slices) throws Exception {
+  private Map<MetricSlice, DataFrame> fetchBreakdowns(List<MetricSlice> slices, final int limit) throws Exception {
     Map<MetricSlice, Future<DataFrame>> futures = new HashMap<>();
 
     for (final MetricSlice slice : slices) {
       futures.put(slice, this.executor.submit(new Callable<DataFrame>() {
         @Override
         public DataFrame call() throws Exception {
-          return RootCauseMetricResource.this.aggregationLoader.loadBreakdown(slice);
+          return RootCauseMetricResource.this.aggregationLoader.loadBreakdown(slice, limit);
         }
       }));
     }
@@ -524,73 +553,6 @@ public class RootCauseMetricResource {
   }
 
   /**
-   * Returns a configured instance of Baseline for the given, named offset. The method uses slice and
-   * timezone information to adjust for daylight savings time.
-   *
-   * <p>Supported offsets:</p>
-   * <pre>
-   *   current   the time range as specified by start and end)
-   *   none      empty time range
-   *   woXw      week-over-week data points with a lag of X weeks)
-   *   meanXw    average of data points from the the past X weeks, with a lag of 1 week)
-   *   medianXw  median of data points from the the past X weeks, with a lag of 1 week)
-   *   minXw     minimum of data points from the the past X weeks, with a lag of 1 week)
-   *   maxXw     maximum of data points from the the past X weeks, with a lag of 1 week)
-   * </pre>
-   *
-   * @param offset offset identifier
-   * @param timeZoneString timezone identifier (location long format)
-   * @return Baseline instance
-   * @throws IllegalArgumentException if the offset cannot be parsed
-   */
-  private Baseline parseOffset(String offset, String timeZoneString) {
-    DateTimeZone timeZone = DateTimeZone.forID(timeZoneString);
-
-    Matcher mCurrent = PATTERN_CURRENT.matcher(offset);
-    if (mCurrent.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, 0, timeZone);
-    }
-
-    Matcher mNone = PATTERN_NONE.matcher(offset);
-    if (mNone.find()) {
-      return new BaselineNone();
-    }
-
-    // TODO link with generic metric baseline prediction when available
-    Matcher mPredicted = PATTERN_PREDICTED.matcher(offset);
-    if (mPredicted.find()) {
-      return new BaselineNone();
-    }
-
-    Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
-    if (mWeekOverWeek.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, Integer.valueOf(mWeekOverWeek.group(1)), timeZone);
-    }
-
-    Matcher mMean = PATTERN_MEAN.matcher(offset);
-    if (mMean.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, Integer.valueOf(mMean.group(1)), 1, timeZone);
-    }
-
-    Matcher mMedian = PATTERN_MEDIAN.matcher(offset);
-    if (mMedian.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timeZone);
-    }
-
-    Matcher mMin = PATTERN_MIN.matcher(offset);
-    if (mMin.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MIN, Integer.valueOf(mMin.group(1)), 1, timeZone);
-    }
-
-    Matcher mMax = PATTERN_MAX.matcher(offset);
-    if (mMax.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MAX, Integer.valueOf(mMax.group(1)), 1, timeZone);
-    }
-
-    throw new IllegalArgumentException(String.format("Unknown offset '%s'", offset));
-  }
-
-  /**
    * Aligns a metric slice based on its granularity, or the dataset granularity.
    *
    * @param slice metric slice
@@ -627,7 +589,7 @@ public class RootCauseMetricResource {
   }
 
   private MetricSlice makeSlice(String urn, long start, long end, TimeGranularity granularity) {
-    MetricEntity metric = MetricEntity.fromURN(urn, 1.0);
+    MetricEntity metric = MetricEntity.fromURN(urn);
     return MetricSlice.from(metric.getId(), start, end, metric.getFilters(), granularity);
   }
 

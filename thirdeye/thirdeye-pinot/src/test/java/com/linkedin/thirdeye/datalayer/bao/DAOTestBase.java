@@ -1,16 +1,30 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.bao;
 
-import com.linkedin.thirdeye.TestDBResources;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-
 import java.io.File;
 import java.io.FileReader;
+import java.io.PrintWriter;
 import java.net.URL;
 import java.sql.Connection;
-
+import org.apache.commons.io.output.NullWriter;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 public class DAOTestBase {
@@ -30,7 +44,7 @@ public class DAOTestBase {
 
   protected void init() {
     try {
-      URL url = TestDBResources.class.getResource("/persistence-local.yml");
+      URL url = DAOTestBase.class.getResource("/persistence-local.yml");
       File configFile = new File(url.toURI());
       PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
       initializeDs(configuration);
@@ -81,6 +95,7 @@ public class DAOTestBase {
     URL createSchemaUrl = getClass().getResource("/schema/create-schema.sql");
     ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
     scriptRunner.setDelimiter(";", true);
+    scriptRunner.setLogWriter(new PrintWriter(new NullWriter()));
     scriptRunner.runScript(new FileReader(createSchemaUrl.getFile()));
   }
 
@@ -89,6 +104,7 @@ public class DAOTestBase {
     try (Connection conn = ds.getConnection()) {
       URL deleteSchemaUrl = getClass().getResource("/schema/drop-tables.sql");
       ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
+      scriptRunner.setLogWriter(new PrintWriter(new NullWriter()));
       scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
     }
     new File(dbUrlId).delete();

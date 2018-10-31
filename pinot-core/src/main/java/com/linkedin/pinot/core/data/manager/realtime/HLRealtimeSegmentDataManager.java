@@ -34,12 +34,12 @@ import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegment;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
-import com.linkedin.pinot.core.realtime.StreamProvider;
-import com.linkedin.pinot.core.realtime.StreamProviderConfig;
-import com.linkedin.pinot.core.realtime.StreamProviderFactory;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactoryProvider;
+import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
@@ -67,12 +67,13 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final PlainFieldExtractor extractor;
   private final RealtimeSegmentZKMetadata segmentMetatdaZk;
 
-  private final StreamProviderConfig kafkaStreamProviderConfig;
-  private final StreamProvider kafkaStreamProvider;
+  private final StreamConsumerFactory _streamConsumerFactory;
+  private final StreamLevelConsumer _streamLevelConsumer;
   private final File resourceDir;
   private final File resourceTmpDir;
   private final MutableSegmentImpl realtimeSegment;
   private final String tableStreamName;
+  private final StreamConfig _streamConfig;
 
   private final long start = System.currentTimeMillis();
   private long segmentEndTimeThreshold;
@@ -142,30 +143,28 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     // No DictionaryColumns
     noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
 
-    // create and init stream provider config
-    // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
-    this.kafkaStreamProviderConfig = new KafkaHighLevelStreamProviderConfig();
-    this.kafkaStreamProviderConfig.init(tableConfig, instanceMetadata, schema);
-    segmentLogger = LoggerFactory.getLogger(HLRealtimeSegmentDataManager.class.getName() +
-            "_" + segmentName +
-            "_" + kafkaStreamProviderConfig.getStreamName()
-    );
+    _streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+
+    segmentLogger = LoggerFactory.getLogger(
+        HLRealtimeSegmentDataManager.class.getName() + "_" + segmentName + "_" + _streamConfig.getTopicName());
     segmentLogger.info("Created segment data manager with Sorted column:{}, invertedIndexColumns:{}", sortedColumn,
         this.invertedIndexColumns);
 
-    segmentEndTimeThreshold = start + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+    segmentEndTimeThreshold = start + _streamConfig.getFlushThresholdTimeMillis();
 
     this.resourceDir = new File(resourceDataDir);
     this.resourceTmpDir = new File(resourceDataDir, "_tmp");
     if (!resourceTmpDir.exists()) {
       resourceTmpDir.mkdirs();
     }
-    // create and init stream provider
-    final String tableName = tableConfig.getTableName();
-    this.kafkaStreamProvider = StreamProviderFactory.buildStreamProvider();
-    this.kafkaStreamProvider.init(kafkaStreamProviderConfig, tableName, serverMetrics);
-    this.kafkaStreamProvider.start();
-    this.tableStreamName = tableName + "_" + kafkaStreamProviderConfig.getStreamName();
+    // create and init stream level consumer
+    _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
+    String clientId = HLRealtimeSegmentDataManager.class.getSimpleName() + "-" + _streamConfig.getTopicName();
+    _streamLevelConsumer =
+        _streamConsumerFactory.createStreamLevelConsumer(clientId, tableName, schema, instanceMetadata, serverMetrics);
+    _streamLevelConsumer.start();
+
+    tableStreamName = tableName + "_" + _streamConfig.getTopicName();
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     if (indexingConfig != null && indexingConfig.getAggregateMetrics()) {
@@ -174,9 +173,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // lets create a new realtime segment
     segmentLogger.info("Started kafka stream provider");
-    final int capacity = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
+    final int capacity = _streamConfig.getFlushThresholdRows();
     RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder().setSegmentName(segmentName)
-        .setStreamName(kafkaStreamProviderConfig.getStreamName())
+        .setStreamName(_streamConfig.getTopicName())
         .setSchema(schema)
         .setCapacity(capacity)
         .setAvgNumMultiValues(indexLoadingConfig.getRealtimeAvgMultiValueCount())
@@ -217,7 +216,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           GenericRow row = null;
           try {
             readRow = GenericRow.createOrReuseRow(readRow);
-            readRow = kafkaStreamProvider.next(readRow);
+            readRow = _streamLevelConsumer.next(readRow);
             row = readRow;
 
             if (readRow != null) {
@@ -306,9 +305,9 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           segmentLogger.info("Committing Kafka offsets");
           boolean commitSuccessful = false;
           try {
-            kafkaStreamProvider.commit();
+            _streamLevelConsumer.commit();
             commitSuccessful = true;
-            kafkaStreamProvider.shutdown();
+            _streamLevelConsumer.shutdown();
             segmentLogger.info("Successfully committed Kafka offsets, consumer release requested.");
           } catch (Throwable e) {
             // If we got here, it means that either the commit or the shutdown failed. Considering that the
@@ -362,7 +361,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
                 commitSuccessful, e);
             serverMetrics.addMeteredTableValue(tableName, ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS, 1L);
             if (!commitSuccessful) {
-              kafkaStreamProvider.shutdown();
+              _streamLevelConsumer.shutdown();
             }
           }
 
@@ -414,11 +413,10 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     if (keepIndexing) {
       segmentLogger.debug("Current indexed {} raw events", realtimeSegment.getNumDocsIndexed());
       if ((System.currentTimeMillis() >= segmentEndTimeThreshold)
-          || realtimeSegment.getNumDocsIndexed() >= kafkaStreamProviderConfig.getSizeThresholdToFlushSegment()) {
+          || realtimeSegment.getNumDocsIndexed() >= _streamConfig.getFlushThresholdRows()) {
         if (realtimeSegment.getNumDocsIndexed() == 0) {
           segmentLogger.info("no new events coming in, extending the end time by another hour");
-          segmentEndTimeThreshold =
-              System.currentTimeMillis() + kafkaStreamProviderConfig.getTimeThresholdToFlushSegment();
+          segmentEndTimeThreshold = System.currentTimeMillis() + _streamConfig.getFlushThresholdTimeMillis();
           return;
         }
         segmentLogger.info(
@@ -441,7 +439,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     LOGGER.info("Trying to shutdown RealtimeSegmentDataManager : {}!", this.segmentName);
     isShuttingDown = true;
     try {
-      kafkaStreamProvider.shutdown();
+      _streamLevelConsumer.shutdown();
     } catch (Exception e) {
       LOGGER.error("Failed to shutdown kafka stream provider!", e);
     }

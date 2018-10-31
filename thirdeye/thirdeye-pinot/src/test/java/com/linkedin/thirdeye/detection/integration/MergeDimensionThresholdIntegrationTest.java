@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +30,7 @@ import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.DetectionTestUtils;
 import com.linkedin.thirdeye.detection.MockDataProvider;
+import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URL;
@@ -95,7 +112,7 @@ public class MergeDimensionThresholdIntegrationTest {
     this.datasets.add(this.dataset);
 
     this.anomalies = new ArrayList<>();
-    this.anomalies.add(makeAnomaly(9500, 10800, Collections.<String, String>emptyMap()));
+    this.anomalies.add(makeAnomaly(9500, 10800, "thirdeye:metric:2"));
 
     this.provider = new MockDataProvider()
         .setLoader(this.loader)
@@ -117,16 +134,21 @@ public class MergeDimensionThresholdIntegrationTest {
     Assert.assertEquals(result.getAnomalies().size(), 3);
     Assert.assertEquals(result.getLastTimestamp(), 18000);
 
-    Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(9500, 18000, Collections.<String, String>emptyMap())));
-
-    Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(0, 7200, ONE_TWO)));
-    Assert.assertTrue(result.getAnomalies().contains(
-        makeAnomaly(14400, 18000, ONE_TWO)));
+    Assert.assertTrue(result.getAnomalies().contains(makeAnomaly(9500, 18000, "thirdeye:metric:2")));
+    Assert.assertTrue(result.getAnomalies().contains(makeAnomaly(0, 7200, "thirdeye:metric:2:a%3D1:b%3D2")));
+    Assert.assertTrue(result.getAnomalies().contains(makeAnomaly(14400, 18000, "thirdeye:metric:2:a%3D1:b%3D2")));
   }
 
-  private static MergedAnomalyResultDTO makeAnomaly(long start, long end, Map<String, String> dimensions) {
-    return DetectionTestUtils.makeAnomaly(null, start, end, METRIC, DATASET, dimensions);
+  private static MergedAnomalyResultDTO makeAnomaly(long start, long end, String metricUrn) {
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
+
+    Map<String, String> dimensions = new HashMap<>();
+    for (Map.Entry<String, String> entry : me.getFilters().entries()) {
+      dimensions.put(entry.getKey(), entry.getValue());
+    }
+
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(null, start, end, METRIC, DATASET, dimensions);
+    anomaly.setMetricUrn(metricUrn);
+    return anomaly;
   }
 }

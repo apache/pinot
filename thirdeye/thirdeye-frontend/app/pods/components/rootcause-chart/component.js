@@ -1,7 +1,6 @@
 import { computed } from '@ember/object';
 import { equal } from '@ember/object/computed';
 import Component from '@ember/component';
-import moment from 'moment';
 import d3 from 'd3';
 import buildTooltip from 'thirdeye-frontend/utils/build-tooltip';
 import {
@@ -10,7 +9,8 @@ import {
   filterPrefix,
   hasPrefix,
   toMetricLabel,
-  colorMapping
+  colorMapping,
+  makeTime
 } from 'thirdeye-frontend/utils/rca-utils';
 import _ from 'lodash';
 
@@ -78,7 +78,7 @@ export default Component.extend({
       return {
         grouped: true,
         contents: (items, defaultTitleFormat, defaultValueFormat, color) => {
-          const t = moment(items[0].x);
+          const t = makeTime(items[0].x);
           const hoverUrns = this._onHover(t.valueOf());
 
           const {
@@ -124,7 +124,14 @@ export default Component.extend({
           min: analysisRange[0],
           max: analysisRange[1],
           tick: {
-            fit: false
+            fit: false,
+            format: (d) => {
+              const t = makeTime(d);
+              if (t.valueOf() === t.clone().startOf('day').valueOf()) {
+                return t.format('MMM D (ddd)');
+              }
+              return t.format('h:mm a');
+            }
           }
         }
       };
@@ -234,7 +241,6 @@ export default Component.extend({
 
       return filterPrefix(displayableUrns, 'frontend:metric:current:')
         .map(urn => [toMetricLabel(toMetricUrn(urn), entities), urn])
-        .sort()
         .map(t => t[1]);
     }
   ),

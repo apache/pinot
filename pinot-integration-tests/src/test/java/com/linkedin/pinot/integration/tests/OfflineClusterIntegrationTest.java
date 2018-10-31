@@ -107,7 +107,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     ExecutorService executor = Executors.newCachedThreadPool();
 
     // Create segments from Avro data
-    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), false,
+    ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, getTableName(), false, null,
         getRawIndexColumns(), null, executor);
 
     // Load data into H2
@@ -122,6 +122,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Create the table
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
         getTaskConfig());
+
+    completeTableConfiguration();
 
     // Upload all segments
     uploadSegments(_tarDir);
@@ -148,6 +150,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
         UPDATED_INVERTED_INDEX_COLUMNS, getTaskConfig());
+
+    updateTableConfiguration();
+
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
     TestUtils.waitForCondition(new Function<Void, Boolean>() {
@@ -207,6 +212,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
     }
 
+    updateTableConfiguration();
+
     // Trigger reload
     sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
 
@@ -246,6 +253,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   private void testNewAddedColumns() throws Exception {
     long numTotalDocs = getCountStarResult();
+    double numTotalDocsInDouble = (double) numTotalDocs;
 
     String pqlQuery;
     String sqlQuery;
@@ -303,19 +311,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(pqlQuery);
     groupByResult =
         response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByResult.getInt("value"), 0);
+    Assert.assertEquals(groupByResult.getDouble("value"), 0.0);
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), "null");
     pqlQuery = "SELECT SUM(NewAddedDoubleMetric) FROM mytable GROUP BY NewAddedIntDimension";
     response = postQuery(pqlQuery);
     groupByResult =
         response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByResult.getInt("value"), 0);
+    Assert.assertEquals(groupByResult.getDouble("value"), 0.0);
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
     pqlQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable GROUP BY NewAddedLongDimension";
     response = postQuery(pqlQuery);
     groupByResult =
         response.getJSONArray("aggregationResults").getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByResult.getInt("value"), numTotalDocs);
+    Assert.assertEquals(groupByResult.getDouble("value"), numTotalDocsInDouble);
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Long.MIN_VALUE));
     pqlQuery =
         "SELECT SUM(NewAddedIntMetric), SUM(NewAddedLongMetric), SUM(NewAddedFloatMetric), SUM(NewAddedDoubleMetric) "
@@ -324,25 +332,25 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(pqlQuery);
     JSONArray groupByResultArray = response.getJSONArray("aggregationResults");
     groupByResult = groupByResultArray.getJSONObject(0).getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByResult.getInt("value"), numTotalDocs);
+    Assert.assertEquals(groupByResult.getDouble("value"), numTotalDocsInDouble);
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
     groupByResult = groupByResultArray.getJSONObject(1).getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByResult.getInt("value"), numTotalDocs);
+    Assert.assertEquals(groupByResult.getDouble("value"), numTotalDocsInDouble);
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
     groupByResult = groupByResultArray.getJSONObject(2).getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByResult.getInt("value"), 0);
+    Assert.assertEquals(groupByResult.getDouble("value"), 0.0);
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(3), String.valueOf(Double.NEGATIVE_INFINITY));
     groupByResult = groupByResultArray.getJSONObject(3).getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByResult.getInt("value"), 0);
+    Assert.assertEquals(groupByResult.getDouble("value"), 0.0);
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(0), String.valueOf(Integer.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(1), String.valueOf(Long.MIN_VALUE));
     Assert.assertEquals(groupByResult.getJSONArray("group").getString(2), String.valueOf(Float.NEGATIVE_INFINITY));
@@ -355,8 +363,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JSONObject response = postQuery(pqlQuery);
     JSONObject groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
     JSONObject groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByEntry.getInt("value"), 605);
-    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24 * 3600);
+    Assert.assertEquals(groupByEntry.getDouble("value"), 605.0);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), Integer.toString(16138 * 24 * 3600));
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
         "timeconvert(DaysSinceEpoch,'DAYS','SECONDS')");
 
@@ -365,8 +373,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(pqlQuery);
     groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
     groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByEntry.getInt("value"), 605);
-    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24);
+    Assert.assertEquals(groupByEntry.getDouble("value"), 605.0);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), Integer.toString(16138 * 24));
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
         "datetimeconvert(DaysSinceEpoch,'1:DAYS:EPOCH','1:HOURS:EPOCH','1:HOURS')");
 
@@ -374,8 +382,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(pqlQuery);
     groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
     groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByEntry.getInt("value"), 605);
-    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 + 16138 + 15);
+    Assert.assertEquals(groupByEntry.getDouble("value"), 605.0);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0),
+        Double.toString((double) (16138 + 16138 + 15)));
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0),
         "add(DaysSinceEpoch,DaysSinceEpoch,'15')");
 
@@ -383,31 +392,31 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     response = postQuery(pqlQuery);
     groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
     groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByEntry.getInt("value"), 605);
-    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 - 25);
+    Assert.assertEquals(groupByEntry.getDouble("value"), 605.0);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), Double.toString((double) 16138 - 25));
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "sub(DaysSinceEpoch,'25')");
 
     pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY mult(DaysSinceEpoch,24,3600)";
     response = postQuery(pqlQuery);
     groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
     groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByEntry.getInt("value"), 605);
-    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 * 24 * 3600);
+    Assert.assertEquals(groupByEntry.getDouble("value"), 605.0);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), Double.toString((double) 16138 * 24 * 3600));
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "mult(DaysSinceEpoch,'24','3600')");
 
     pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY div(DaysSinceEpoch,2)";
     response = postQuery(pqlQuery);
     groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
     groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByEntry.getInt("value"), 605);
-    Assert.assertEquals(groupByEntry.getJSONArray("group").getInt(0), 16138 / 2);
+    Assert.assertEquals(groupByEntry.getDouble("value"), 605.0);
+    Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), Double.toString((double) 16138 / 2));
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "div(DaysSinceEpoch,'2')");
 
     pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY valueIn(DivAirports,'DFW','ORD')";
     response = postQuery(pqlQuery);
     groupByResult = response.getJSONArray("aggregationResults").getJSONObject(0);
     groupByEntry = groupByResult.getJSONArray("groupByResult").getJSONObject(0);
-    Assert.assertEquals(groupByEntry.getInt("value"), 336);
+    Assert.assertEquals(groupByEntry.getDouble("value"), 336.0);
     Assert.assertEquals(groupByEntry.getJSONArray("group").getString(0), "ORD");
     Assert.assertEquals(groupByResult.getJSONArray("groupByColumns").getString(0), "valuein(DivAirports,'DFW','ORD')");
 
@@ -512,5 +521,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Check if '/CONFIGS/PARTICIPANT/<serverName>' has been erased correctly
     String configPath = "/" + _clusterName + "/CONFIGS/PARTICIPANT/" + serverName;
     Assert.assertFalse(_propertyStore.exists(configPath, 0));
+  }
+
+  @Override
+  protected boolean isUsingNewConfigFormat() {
+    return true;
   }
 }

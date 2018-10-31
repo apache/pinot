@@ -78,7 +78,11 @@ public class TableConfig {
   @NestedConfig
   private RoutingConfig _routingConfig;
 
-  public TableConfig() {}
+  public TableConfig() {
+    // TODO: currently these 2 fields are annotated as non-null. Revisit to see whether that's necessary
+    _tenantConfig = new TenantConfig();
+    _customConfig = new TableCustomConfig();
+  }
 
   private TableConfig(@Nonnull String tableName, @Nonnull TableType tableType,
       @Nonnull SegmentsValidationAndRetentionConfig validationConfig, @Nonnull TenantConfig tenantConfig,
@@ -195,24 +199,27 @@ public class TableConfig {
   }
 
   @Nonnull
-  public static ZNRecord toZnRecord(@Nonnull TableConfig tableConfig)
-      throws IOException {
+  public static ZNRecord toZnRecord(@Nonnull TableConfig tableConfig) {
     ZNRecord znRecord = new ZNRecord(tableConfig.getTableName());
     Map<String, String> simpleFields = new HashMap<>();
     simpleFields.put(TABLE_NAME_KEY, tableConfig._tableName);
     simpleFields.put(TABLE_TYPE_KEY, tableConfig._tableType.toString());
-    simpleFields.put(VALIDATION_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._validationConfig));
-    simpleFields.put(TENANT_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._tenantConfig));
-    simpleFields.put(INDEXING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._indexingConfig));
-    simpleFields.put(CUSTOM_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._customConfig));
-    if (tableConfig._quotaConfig != null) {
-      simpleFields.put(QUOTA_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._quotaConfig));
-    }
-    if (tableConfig._taskConfig != null) {
-      simpleFields.put(TASK_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._taskConfig));
-    }
-    if (tableConfig._routingConfig != null) {
-      simpleFields.put(ROUTING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._routingConfig));
+    try {
+      simpleFields.put(VALIDATION_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._validationConfig));
+      simpleFields.put(TENANT_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._tenantConfig));
+      simpleFields.put(INDEXING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._indexingConfig));
+      simpleFields.put(CUSTOM_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._customConfig));
+      if (tableConfig._quotaConfig != null) {
+        simpleFields.put(QUOTA_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._quotaConfig));
+      }
+      if (tableConfig._taskConfig != null) {
+        simpleFields.put(TASK_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._taskConfig));
+      }
+      if (tableConfig._routingConfig != null) {
+        simpleFields.put(ROUTING_CONFIG_KEY, OBJECT_MAPPER.writeValueAsString(tableConfig._routingConfig));
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
     znRecord.setSimpleFields(simpleFields);
     return znRecord;

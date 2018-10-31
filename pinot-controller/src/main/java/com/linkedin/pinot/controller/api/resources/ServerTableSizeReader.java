@@ -15,21 +15,16 @@
  */
 package com.linkedin.pinot.controller.api.resources;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.http.MultiGetRequest;
 import com.linkedin.pinot.common.restlet.resources.SegmentSizeInfo;
 import com.linkedin.pinot.common.restlet.resources.TableSizeInfo;
-import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import org.apache.commons.httpclient.ConnectTimeoutException;
-import org.apache.commons.httpclient.ConnectionPoolTimeoutException;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -43,36 +38,37 @@ import org.slf4j.LoggerFactory;
  * For servers returning errors (http error or otherwise), no entry is created in the return map
  */
 public class ServerTableSizeReader {
-  private static final Logger LOGGER = LoggerFactory.getLogger(
-      ServerTableSizeReader.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerTableSizeReader.class);
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private final Executor executor;
-  private final HttpConnectionManager connectionManager;
+  private final Executor _executor;
+  private final HttpConnectionManager _connectionManager;
 
   public ServerTableSizeReader(Executor executor, HttpConnectionManager connectionManager) {
-    this.executor = executor;
-    this.connectionManager = connectionManager;
+    _executor = executor;
+    _connectionManager = connectionManager;
   }
 
-  public Map<String, List<SegmentSizeInfo>> getSizeDetailsFromServers(BiMap<String, String> serverEndPoints,
-      String table, int timeoutMsec) {
+  public Map<String, List<SegmentSizeInfo>> getSegmentSizeInfoFromServers(BiMap<String, String> serverEndPoints,
+      String tableNameWithType, int timeoutMs) {
+    int numServers = serverEndPoints.size();
+    LOGGER.info("Reading segment sizes from {} servers for table: {} with timeout: {}ms", numServers, tableNameWithType,
+        timeoutMs);
 
-    List<String> serverUrls = new ArrayList<>(serverEndPoints.size());
+    List<String> serverUrls = new ArrayList<>(numServers);
     BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
     for (String endpoint : endpointsToServers.keySet()) {
-      String tableSizeUri = "http://" + endpoint + "/table/" + table + "/size";
+      String tableSizeUri = "http://" + endpoint + "/table/" + tableNameWithType + "/size";
       serverUrls.add(tableSizeUri);
     }
 
-    MultiGetRequest mget = new MultiGetRequest(executor, connectionManager);
-    LOGGER.info("Reading segment sizes from {} servers for table: {}, timeoutMsec: {}", serverUrls.size(), table, timeoutMsec);
-    CompletionService<GetMethod> completionService = mget.execute(serverUrls, timeoutMsec);
+    // TODO: use some service other than completion service so that we know which server encounters the error
+    CompletionService<GetMethod> completionService =
+        new MultiGetRequest(_executor, _connectionManager).execute(serverUrls, timeoutMs);
+    Map<String, List<SegmentSizeInfo>> serverToSegmentSizeInfoListMap = new HashMap<>();
 
-    Map<String, List<SegmentSizeInfo>> serverSegmentSizes = new HashMap<>(serverEndPoints.size());
-
-    for (int i = 0; i < serverUrls.size(); i++) {
+    for (int i = 0; i < numServers; i++) {
       GetMethod getMethod = null;
-      String url = serverUrls.get(i);
       try {
         getMethod = completionService.take().get();
         URI uri = getMethod.getURI();
@@ -81,29 +77,25 @@ public class ServerTableSizeReader {
           LOGGER.error("Server: {} returned error: {}", instance, getMethod.getStatusCode());
           continue;
         }
-        TableSizeInfo tableSizeInfo = new ObjectMapper().readValue(getMethod.getResponseBodyAsString(), TableSizeInfo.class);
-        serverSegmentSizes.put(instance, tableSizeInfo.segments);
-      } catch (InterruptedException e) {
-        LOGGER.warn("Interrupted exception while reading segment size for table: {}. Server: {}", table, url, e);
-      } catch (ExecutionException e) {
-        if (Throwables.getRootCause(e) instanceof SocketTimeoutException) {
-          LOGGER.warn("Server request to read table size was timed out for table: {}. Server: {}", table, url, e);
-        } else if (Throwables.getRootCause(e) instanceof ConnectTimeoutException) {
-          LOGGER.warn("Server request to read table size timed out waiting for connection. table: {}. Server: {}", table, url, e);
-        } else if (Throwables.getRootCause(e) instanceof ConnectionPoolTimeoutException) {
-          LOGGER.warn("Server request to read table size timed out on getting a connection from pool, table: {}. Server: {}", table, url, e);
-        } else {
-          LOGGER.warn("Execution exception while reading segment sizes for table: {}. Server: {}", table, url, e);
-        }
-      } catch(Exception e) {
-        LOGGER.warn("Error while reading segment sizes for table: {}. Server: {}", table, url);
+        TableSizeInfo tableSizeInfo = OBJECT_MAPPER.readValue(getMethod.getResponseBodyAsStream(), TableSizeInfo.class);
+        serverToSegmentSizeInfoListMap.put(instance, tableSizeInfo.segments);
+      } catch (Exception e) {
+        // Ignore individual exceptions because the exception has been logged in MultiGetRequest
+        // Log the number of failed servers after gathering all responses
       } finally {
         if (getMethod != null) {
           getMethod.releaseConnection();
         }
       }
     }
-    LOGGER.info("Finished reading segment sizes for table: {}", table);
-    return serverSegmentSizes;
+
+    int numServersResponded = serverToSegmentSizeInfoListMap.size();
+    if (numServersResponded != numServers) {
+      LOGGER.warn("Finish reading segment sizes for table: {} with {}/{} servers responded", tableNameWithType,
+          numServersResponded, numServers);
+    } else {
+      LOGGER.info("Finish reading segment sizes for table: {}", tableNameWithType);
+    }
+    return serverToSegmentSizeInfoListMap;
   }
 }

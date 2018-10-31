@@ -21,10 +21,7 @@ import com.google.gson.JsonPrimitive;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.config.ConfigNodeLifecycleAware;
-import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
-import java.nio.charset.Charset;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
 import org.apache.commons.codec.DecoderException;
@@ -40,16 +37,17 @@ import org.apache.commons.codec.binary.Hex;
  * <p>- <code>DataType</code>: type of the data stored (e.g. INTEGER, LONG, FLOAT, DOUBLE, STRING).
  * <p>- <code>IsSingleValueField</code>: single-value or multi-value field.
  * <p>- <code>DefaultNullValue</code>: when no value found for this field, use this value. Stored in string format.
+ * <p>- <code>VirtualColumnProvider</code>: the virtual column provider to use for this field.
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLifecycleAware {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
+  private static final byte[] NULL_BYTE_ARRAY_VALUE = new byte[0];
 
   private static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   private static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   private static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
   private static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
-  private static final ByteArray DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
+  private static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
 
   private static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   private static final Integer DEFAULT_METRIC_NULL_VALUE_OF_INT = 0;
@@ -57,7 +55,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   private static final Float DEFAULT_METRIC_NULL_VALUE_OF_FLOAT = 0.0F;
   private static final Double DEFAULT_METRIC_NULL_VALUE_OF_DOUBLE = 0.0D;
   private static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
-  private static final ByteArray DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new ByteArray(new byte[0]);
+  private static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = NULL_BYTE_ARRAY_VALUE;
 
   @ConfigKey("name")
   protected String _name;
@@ -76,6 +74,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   // Transform function to generate this column, can be based on other columns
   protected String _transformFunction;
 
+  @ConfigKey("virtualColumnProvider")
+  protected String _virtualColumnProvider;
+
   // Default constructor required by JSON de-serializer. DO NOT REMOVE.
   public FieldSpec() {
   }
@@ -92,7 +93,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
-    _stringDefaultNullValue = defaultNullValue.toString();
+    _stringDefaultNullValue = getStringValue(defaultNullValue);
     _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
 
@@ -129,9 +130,32 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     _isSingleValueField = isSingleValueField;
   }
 
+  public String getVirtualColumnProvider() {
+    return _virtualColumnProvider;
+  }
+
+  public void setVirtualColumnProvider(String virtualColumnProvider) {
+    _virtualColumnProvider = virtualColumnProvider;
+  }
+
   @Nonnull
   public Object getDefaultNullValue() {
     return _defaultNullValue;
+  }
+
+  /**
+   * Helper method to return the String value for the given object.
+   * This is required as not all data types have a toString() (eg byte[]).
+   *
+   * @param value Value for which String value needs to be returned
+   * @return String value for the object.
+   */
+  private String getStringValue(Object value) {
+    if (value instanceof byte[]) {
+      return Hex.encodeHexString((byte[]) value);
+    } else {
+      return value.toString();
+    }
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
@@ -158,7 +182,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
           return stringDefaultNullValue;
         case BYTES:
           try {
-            return new ByteArray(Hex.decodeHex(stringDefaultNullValue.toCharArray()));
+            return Hex.decodeHex(stringDefaultNullValue.toCharArray());
           } catch (DecoderException e) {
             Utils.rethrowException(e); // Re-throw to avoid handling exceptions in all callers.
           }
@@ -250,7 +274,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
       if (_defaultNullValue instanceof Number) {
         jsonObject.add("defaultNullValue", new JsonPrimitive((Number) _defaultNullValue));
       } else {
-        jsonObject.addProperty("defaultNullValue", _defaultNullValue.toString());
+        jsonObject.addProperty("defaultNullValue", getStringValue(_defaultNullValue));
       }
     }
   }
@@ -301,8 +325,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
     FieldSpec that = (FieldSpec) o;
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
-        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(_defaultNullValue,
-        that._defaultNullValue);
+        .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(
+        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue));
   }
 
   @Override
@@ -310,7 +334,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     int result = EqualityUtils.hashCodeOf(_name);
     result = EqualityUtils.hashCodeOf(result, _dataType);
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
-    result = EqualityUtils.hashCodeOf(result, _defaultNullValue);
+    result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
     return result;
   }
 

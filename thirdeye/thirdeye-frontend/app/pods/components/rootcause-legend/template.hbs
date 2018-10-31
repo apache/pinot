@@ -16,7 +16,11 @@
                 {{tooltip-on-element text="Toggle view"}}
               </span>
             </div>
-            <span class="rootcause-legend__label">{{label}}</span>
+            <span class="rootcause-legend__label">{{label}}
+              {{#if (get-safe isExclusionWarning urn)}}
+                {{partial 'partials/rootcause/exclusion-warning'}}
+              {{/if}}
+            </span>
           </div>
           <a class="rootcause-legend__remove-icon" {{action "removeUrn" urn}}>
             <i class="glyphicon glyphicon-remove">

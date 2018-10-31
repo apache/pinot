@@ -1,9 +1,23 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.alert;
 
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -21,8 +35,6 @@ import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
-import com.linkedin.thirdeye.detection.CurrentAndBaselineLoader;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -100,8 +112,11 @@ public class SendAlertTest {
     properties.put(PROP_RECIPIENTS, PROP_RECIPIENTS_VALUE);
     properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(this.detectionConfigId));
 
+    Map<String, Object> emailScheme = new HashMap<>();
+    emailScheme.put("className", "com.linkedin.thirdeye.detection.alert.scheme.DetectionEmailAlerter");
+    this.alertConfigDTO.setAlertSchemes(Collections.singletonMap("EmailScheme", emailScheme));
     this.alertConfigDTO.setProperties(properties);
-    this.alertConfigDTO.setFromAddress(FROM_ADDRESS_VALUE);
+    this.alertConfigDTO.setFrom(FROM_ADDRESS_VALUE);
     this.alertConfigDTO.setName(ALERT_NAME_VALUE);
     Map<Long, Long> vectorClocks = new HashMap<>();
     this.alertConfigDTO.setVectorClocks(vectorClocks);
@@ -134,15 +149,21 @@ public class SendAlertTest {
     DetectionAlertTaskInfo alertTaskInfo = new DetectionAlertTaskInfo();
     alertTaskInfo.setDetectionAlertConfigId(alertConfigId);
 
-    TaskContext taskContext = new TaskContext();
+    Map<String, Object> smtpProperties = new HashMap<>();
+    Map<String, Map<String, Object>> alerterProps = new HashMap<>();
+    alerterProps.put("smtpConfiguration", smtpProperties);
+
     ThirdEyeAnomalyConfiguration thirdEyeConfig = new ThirdEyeAnomalyConfiguration();
     thirdEyeConfig.setDashboardHost(DASHBOARD_HOST_VALUE);
+    thirdEyeConfig.setAlerterConfiguration(alerterProps);
+
+    TaskContext taskContext = new TaskContext();
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeConfig);
 
     taskRunner.execute(alertTaskInfo, taskContext);
 
     DetectionAlertConfigDTO alert = alertConfigDAO.findById(this.alertConfigId);
-    Assert.assertTrue(alert.getVectorClocks().get(this.detectionConfigId) == 2000L);
+    Assert.assertEquals((long) alert.getVectorClocks().get(this.detectionConfigId), 2000L);
   }
 
 

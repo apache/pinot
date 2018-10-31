@@ -19,11 +19,9 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LogUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
-import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
-import org.apache.log4j.Level;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -49,9 +46,6 @@ public class PinotResourceManagerTest {
 
   @BeforeClass
   public void setUp() throws Exception {
-    LogUtils.setLogLevel(
-        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
-        Level.INFO);
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
 
@@ -165,9 +159,5 @@ public class PinotResourceManagerTest {
     _pinotHelixResourceManager.stop();
     _zkClient.close();
     ZkStarter.stopLocalZkServer(_zookeeperInstance);
-
-    LogUtils.setLogLevel(
-        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
-        Level.WARN);
   }
 }

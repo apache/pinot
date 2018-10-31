@@ -2,7 +2,6 @@ import { inject as service } from '@ember/service';
 import Route from '@ember/routing/route';
 import RSVP from 'rsvp';
 import fetch from 'fetch';
-import moment from 'moment';
 import config from 'thirdeye-frontend/config/environment';
 import AuthenticatedRouteMixin from 'ember-simple-auth/mixins/authenticated-route-mixin';
 import {
@@ -10,7 +9,9 @@ import {
   toBaselineUrn,
   dateFormatFull,
   appendFilters,
-  filterPrefix
+  filterPrefix,
+  makeTime,
+  value2filter
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
@@ -52,7 +53,7 @@ const adjustGranularity = (attrGranularity) => {
  * adjusts metric max time based on metric granularity
  */
 const adjustMaxTime = (maxTime, metricGranularity) => {
-  const time = moment(parseInt(maxTime, 10));
+  const time = makeTime(parseInt(maxTime, 10));
   const [count, unit] = metricGranularity;
 
   const start = time.startOf(unit);
@@ -74,7 +75,7 @@ const toMetricGranularity = (attrGranularity) => {
  */
 const toAnomalyOffset = (granularity) => {
   const UNIT_MAPPING = {
-    minute: -30,
+    minute: -120,
     hour: -3,
     day: -1
   };
@@ -93,8 +94,32 @@ const toAnalysisOffset = (granularity) => {
   return UNIT_MAPPING[granularity[1]] || -1;
 };
 
+/**
+ * Returns a Set of urns augmented for virtual frontend metrics.
+ * @example ([thirdeye:metric:1, thirdeye:event:holiday:2]) =>
+ * [thirdeye:metric:1, frontend:metric:current:1, frontend:metric:baseline:1, thirdeye:event:holiday:2]
+ */
+const augmentFrontendMetrics = (urns) => {
+  return [...urns]
+    .filter(urn => urn.startsWith('thirdeye:metric:'))
+    .map(urn => [urn, toCurrentUrn(urn), toBaselineUrn(urn)])
+    .reduce((agg, urns) => agg.concat(urns), [])
+    .concat([...urns].filter(urn => !urn.startsWith('thirdeye:metric:')));
+};
+
+/**
+ * Returns the array for start/end dates of the analysis range
+ */
+const toAnalysisRangeArray = (anomalyStart, anomalyEnd, metricGranularity) => {
+  const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
+  const analysisRangeEnd = makeTime(anomalyEnd).startOf('day').add(1, 'day').valueOf();
+  const analysisRangeStart = makeTime(anomalyStart).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
+  return [analysisRangeStart, analysisRangeEnd];
+};
+
 export default Route.extend(AuthenticatedRouteMixin, {
   authService: service('session'),
+  session: service(),
 
   queryParams: {
     metricId: {
@@ -112,7 +137,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
   },
 
   model(params) {
-    const { metricId, sessionId, anomalyId } = params;
+    const { metricId, sessionId, anomalyId, anomalyRange, analysisRange, granularity, compareMode } = params;
+    let { contextUrnsInit, selectedUrnsInit, anomalyUrnsInit } = params;
     const isDevEnv = config.environment === 'development';
 
     let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions;
@@ -132,6 +158,31 @@ export default Route.extend(AuthenticatedRouteMixin, {
       session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => {});
     }
 
+    let anomalyRangeStart, anomalyRangeEnd;
+    if (anomalyRange) {
+      [anomalyRangeStart, anomalyRangeEnd] = anomalyRange.split(',').map(r => parseInt(r, 10));
+    }
+
+    let analysisRangeStart, analysisRangeEnd;
+    if (analysisRange) {
+      [analysisRangeStart, analysisRangeEnd] = analysisRange.split(',').map(r => parseInt(r, 10));
+    }
+
+    let contextUrnsPredefined;
+    if (contextUrnsInit) {
+      contextUrnsPredefined = new Set(contextUrnsInit.split(','));
+    }
+
+    let selectedUrnsPredefined;
+    if (selectedUrnsInit) {
+      selectedUrnsPredefined = new Set(augmentFrontendMetrics(selectedUrnsInit.split(',')));
+    }
+
+    let anomalyUrnsPredefined;
+    if (anomalyUrnsInit) {
+      anomalyUrnsPredefined = new Set(anomalyUrnsInit.split(','));
+    }
+
     return RSVP.hash({
       isDevEnv,
       metricId,
@@ -142,7 +193,16 @@ export default Route.extend(AuthenticatedRouteMixin, {
       anomalyId,
       anomalyUrn,
       anomalyEntity,
-      anomalySessions
+      anomalySessions,
+      contextUrnsPredefined,
+      selectedUrnsPredefined,
+      anomalyUrnsPredefined,
+      anomalyRangeStart,
+      anomalyRangeEnd,
+      analysisRangeStart,
+      analysisRangeEnd,
+      granularity,
+      compareMode
     });
   },
 
@@ -162,10 +222,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   afterModel(model, transition) {
     const defaultParams = {
-      anomalyRangeStart: moment().startOf('hour').subtract(3, 'hour').valueOf(),
-      anomalyRangeEnd: moment().startOf('hour').valueOf(),
-      analysisRangeStart: moment().startOf('day').subtract(6, 'day').valueOf(),
-      analysisRangeEnd: moment().startOf('day').add(1, 'day').valueOf(),
+      anomalyRangeStart: makeTime().startOf('hour').subtract(3, 'hour').valueOf(),
+      anomalyRangeEnd: makeTime().startOf('hour').valueOf(),
+      analysisRangeStart: makeTime().startOf('day').subtract(6, 'day').valueOf(),
+      analysisRangeEnd: makeTime().startOf('day').add(1, 'day').valueOf(),
       granularity: '1_HOURS',
       compareMode: 'WoW'
     };
@@ -200,10 +260,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
     const {
       analysisRangeStart,
       analysisRangeEnd,
-      granularity,
-      compareMode,
       anomalyRangeStart,
       anomalyRangeEnd,
+      granularity,
+      compareMode,
       metricId,
       metricUrn,
       metricEntity,
@@ -211,7 +271,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
       session,
       anomalyId,
       anomalyUrn,
-      anomalyEntity
+      anomalyEntity,
+      contextUrnsPredefined,
+      selectedUrnsPredefined,
+      anomalyUrnsPredefined
     } = model;
 
     const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
@@ -228,7 +291,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
     };
 
     let selectedUrns = new Set();
-    let sessionName = 'New Investigation (' + moment().format(dateFormatFull) + ')';
+    let sessionName = 'New Investigation (' + makeTime().format(dateFormatFull) + ')';
     let sessionText = '';
     let sessionOwner = this.get('authService.data.authenticated.name');
     let sessionPermissions = 'READ_WRITE';
@@ -245,15 +308,13 @@ export default Route.extend(AuthenticatedRouteMixin, {
         const metricGranularity = toMetricGranularity(granularity);
         const maxTime = adjustMaxTime(metricEntity.attributes.maxTime[0], metricGranularity);
 
-        const anomalyRangeEnd = moment(maxTime).startOf(metricGranularity[1]).valueOf();
+        const anomalyRangeEnd = makeTime(maxTime).startOf(metricGranularity[1]).valueOf();
         const anomalyRangeStartOffset = toAnomalyOffset(metricGranularity);
-        const anomalyRangeStart = moment(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
+        const anomalyRangeStart = makeTime(anomalyRangeEnd).add(anomalyRangeStartOffset, metricGranularity[1]).valueOf();
         const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
 
-        const analysisRangeEnd = moment(anomalyRangeEnd).startOf('day').add(1, 'day').valueOf();
-        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
-        const analysisRangeStart = moment(anomalyRangeEnd).add(analysisRangeStartOffset, 'day').valueOf();
-        const analysisRange = [analysisRangeStart, analysisRangeEnd];
+        // align to local end of day
+        const analysisRange = toAnalysisRangeArray(anomalyRangeEnd, anomalyRangeEnd, metricGranularity);
 
         context = {
           urns: new Set([metricUrn]),
@@ -274,20 +335,15 @@ export default Route.extend(AuthenticatedRouteMixin, {
       if (!_.isEmpty(anomalyEntity)) {
         const granularity = adjustGranularity(anomalyEntity.attributes.metricGranularity[0]);
         const metricGranularity = toMetricGranularity(granularity);
-
         const anomalyRange = [parseInt(anomalyEntity.start, 10), parseInt(anomalyEntity.end, 10)];
-
-        // align to local end of day
-        const analysisRangeEnd = moment(anomalyRange[1]).startOf('day').add(1, 'day').valueOf();
-        const analysisRangeStartOffset = toAnalysisOffset(metricGranularity);
-        const analysisRangeStart = moment(anomalyRange[0]).startOf('day').add(analysisRangeStartOffset, 'day').valueOf();
-        const analysisRange = [analysisRangeStart, analysisRangeEnd];
+        // align to local end of day (anomalyStart, anomalyEnd, metricGranularity)
+        const analysisRange = toAnalysisRangeArray(anomalyRange[0], anomalyRange[1], metricGranularity);
 
         const anomalyDimNames = anomalyEntity.attributes['dimensions'] || [];
         const anomalyFilters = [];
         anomalyDimNames.forEach(dimName => {
           anomalyEntity.attributes[dimName].forEach(dimValue => {
-            anomalyFilters.pushObject([dimName, dimValue]);
+            anomalyFilters.pushObject(value2filter(dimName, dimValue));
           });
         });
 
@@ -300,7 +356,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
           anomalyFunctionUrns.pushObject(appendFilters(anomalyFunctionUrnRaw, anomalyFilters));
         }
 
-
         context = {
           urns: new Set([anomalyMetricUrn]),
           anomalyRange,
@@ -311,7 +366,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         };
 
         selectedUrns = new Set([anomalyUrn, anomalyMetricUrn]);
-        sessionName = 'New Investigation of #' + anomalyId + ' (' + moment().format(dateFormatFull) + ')';
+        sessionName = 'New Investigation of #' + anomalyId + ' (' + makeTime().format(dateFormatFull) + ')';
         setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
         sessionText = anomalyEntity.attributes.comment[0];
       } else {
@@ -347,6 +402,22 @@ export default Route.extend(AuthenticatedRouteMixin, {
       }
     }
 
+    // overrides
+    if (!_.isEmpty(contextUrnsPredefined)) {
+      context.urns = contextUrnsPredefined;
+      setupMode = ROOTCAUSE_SETUP_MODE_NONE;
+    }
+
+    if (!_.isEmpty(selectedUrnsPredefined)) {
+      selectedUrns = selectedUrnsPredefined;
+      setupMode = ROOTCAUSE_SETUP_MODE_NONE;
+    }
+
+    if (!_.isEmpty(anomalyUrnsPredefined)) {
+      context.anomalyUrns = anomalyUrnsPredefined;
+      setupMode = ROOTCAUSE_SETUP_MODE_NONE;
+    }
+
     // update secondary metrics
     const sizeMetricUrns = new Set(filterPrefix(context.urns, 'thirdeye:metric:'));
 
@@ -365,7 +436,35 @@ export default Route.extend(AuthenticatedRouteMixin, {
       selectedUrns,
       sizeMetricUrns,
       setupMode,
-      context
+      context,
+
+      // reset overrides
+      contextUrnsInit: undefined,
+      selectedUrnsInit: undefined,
+      anomalyUrnsInit: undefined,
+      anomalyRange: undefined,
+      analysisRange: undefined,
+      granularity: undefined,
+      compareMode: undefined
     });
+  },
+
+  actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+    error() {
+      // The `error` hook is also provided the failed
+      // `transition`, which can be stored and later
+      // `.retry()`d if desired.
+      return true;
+    }
   }
 });

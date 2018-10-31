@@ -18,9 +18,10 @@ package com.linkedin.pinot.common.utils.request;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.FilterQueryMap;
-import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.common.request.HavingFilterQuery;
 import com.linkedin.pinot.common.request.HavingFilterQueryMap;
+import com.linkedin.pinot.common.request.Selection;
+import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -28,7 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
+import java.util.Stack;
 import org.apache.commons.lang.mutable.MutableInt;
 
 
@@ -149,18 +150,55 @@ public class RequestUtils {
   }
 
   /**
-   * Helper method to extract all column names from group-by expressions.
+   * Extracts all columns from the given filter query tree.
    */
-  public static Set<String> getAllGroupByColumns(@Nullable GroupBy groupBy) {
-    Set<String> allGroupByColumns = new HashSet<>();
-
-    if (groupBy != null) {
-      for (String expression : groupBy.getExpressions()) {
-        TransformExpressionTree expressionTree = TransformExpressionTree.compileToExpressionTree(expression);
-        expressionTree.getColumns(allGroupByColumns);
+  public static Set<String> extractFilterColumns(FilterQueryTree root) {
+    Set<String> filterColumns = new HashSet<>();
+    if (root.getChildren() == null) {
+      filterColumns.add(root.getColumn());
+    } else {
+      Stack<FilterQueryTree> stack = new Stack<>();
+      stack.add(root);
+      while (!stack.empty()) {
+        FilterQueryTree node = stack.pop();
+        for (FilterQueryTree child : node.getChildren()) {
+          if (child.getChildren() == null) {
+            filterColumns.add(child.getColumn());
+          } else {
+            stack.push(child);
+          }
+        }
       }
     }
+    return filterColumns;
+  }
 
-    return allGroupByColumns;
+  /**
+   * Extracts all columns from the given expressions.
+   */
+  public static Set<String> extractColumnsFromExpressions(Set<TransformExpressionTree> expressions) {
+    Set<String> expressionColumns = new HashSet<>();
+    for (TransformExpressionTree expression : expressions) {
+      expression.getColumns(expressionColumns);
+    }
+    return expressionColumns;
+  }
+
+  /**
+   * Extracts all columns from the given selection, '*' will be ignored.
+   */
+  public static Set<String> extractSelectionColumns(Selection selection) {
+    Set<String> selectionColumns = new HashSet<>();
+    for (String selectionColumn : selection.getSelectionColumns()) {
+      if (!selectionColumn.equals("*")) {
+        selectionColumns.add(selectionColumn);
+      }
+    }
+    if (selection.getSelectionSortSequence() != null) {
+      for (SelectionSort selectionSort : selection.getSelectionSortSequence()) {
+        selectionColumns.add(selectionSort.getColumn());
+      }
+    }
+    return selectionColumns;
   }
 }

@@ -103,7 +103,7 @@ class SegmentQueryProcessor {
         GroupBy groupBy = brokerRequest.getGroupBy();
         Aggregation aggregation =
             new Aggregation(_immutableSegment, _metadata, filteredDocIds, brokerRequest.getAggregationsInfo(),
-                groupBy.getColumns(), groupBy.getTopN());
+                groupBy.getExpressions(), groupBy.getTopN());
         result = aggregation.run();
       }
     } else {// Only Selection
@@ -154,7 +154,7 @@ class SegmentQueryProcessor {
 
         GroupBy groupBy = brokerRequest.getGroupBy();
         if (groupBy != null) {
-          for (String column : groupBy.getColumns()) {
+          for (String column : groupBy.getExpressions()) {
             if (!allColumns.contains(column)) {
               LOGGER.debug("Skipping segment '{}', as it does not have column '{}'", _metadata.getName(), column);
               return true;

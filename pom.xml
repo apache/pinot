@@ -39,6 +39,7 @@
     <module>pinot-minion</module>
     <module>pinot-filesystem</module>
     <module>pinot-hadoop-filesystem</module>
+    <module>pinot-azure-filesystem</module>
   </modules>
   <licenses>
     <license>
@@ -110,7 +111,7 @@
     <SKIP_INTEGRATION_TESTS>true</SKIP_INTEGRATION_TESTS>
     <!-- Configuration for unit/integration tests section 1 of 3 (properties) ENDS HERE.-->
     <avro.version>1.7.6</avro.version>
-    <helix.version>0.8.1</helix.version>
+    <helix.version>0.8.2</helix.version>
     <!-- jfim: for Kafka 0.9.0.0, use zkclient 0.7 -->
     <kafka.version>0.9.0.1</kafka.version>
     <zkclient.version>0.7</zkclient.version>
@@ -136,7 +137,10 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g -Dlog4j.configuration=log4j-nooutput.properties</argLine>
+        <argLine>-Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g
+          -Dlog4j.configuration=log4j-fatal-only.properties
+          -Djava.util.logging.config.file=logging-severe-only.properties
+        </argLine>
       </properties>
     </profile>
     <!-- jfim: this profile is overridden in pinot-integration-tests -->
@@ -257,6 +261,11 @@
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
+        <artifactId>pinot-azure-filesystem</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
         <artifactId>pinot-transport</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -307,6 +316,11 @@
         <version>19.0</version>
       </dependency>
       <dependency>
+        <groupId>com.microsoft.azure</groupId>
+        <artifactId>azure-data-lake-store-sdk</artifactId>
+        <version>2.1.5</version>
+      </dependency>
+      <dependency>
         <groupId>com.yammer.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>2.2.0</version>
@@ -349,7 +363,7 @@
       <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-all</artifactId>
-        <version>4.1.4.Final</version>
+        <version>4.1.28.Final</version>
       </dependency>
       <!-- zkclient & helix-core use netty -->
       <dependency>
@@ -391,7 +405,7 @@
       <dependency>
         <groupId>org.json</groupId>
         <artifactId>json</artifactId>
-        <version>20080701</version>
+        <version>20170516</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -604,6 +618,11 @@
         <groupId>com.clearspring.analytics</groupId>
         <artifactId>stream</artifactId>
         <version>2.7.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.tdunning</groupId>
+        <artifactId>t-digest</artifactId>
+        <version>3.2</version>
       </dependency>
       <dependency>
         <groupId>org.antlr</groupId>

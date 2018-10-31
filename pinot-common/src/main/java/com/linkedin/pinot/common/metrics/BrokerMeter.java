@@ -19,9 +19,8 @@ import com.linkedin.pinot.common.Utils;
 
 
 /**
-* Enumeration containing all the metrics exposed by the Pinot broker.
-*
-*/
+ * Enumeration containing all the metrics exposed by the Pinot broker.
+ */
 public enum BrokerMeter implements AbstractMetrics.Meter {
   UNCAUGHT_GET_EXCEPTIONS("exceptions", true),
   UNCAUGHT_POST_EXCEPTIONS("exceptions", true),
@@ -38,6 +37,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
   // Scatter phase.
   NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
+  REQUEST_SEND_EXCEPTIONS("exceptions", false),
   // Gather phase.
   RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
   // Response deserialize phase.
@@ -52,6 +52,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // This metric track the number of broker responses with not all servers responded.
   // (numServersQueried > numServersResponded)
   BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
+  // This metric track the number of broker responses with number of groups limit reached (potential bad responses).
+  BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED("badResponses", false),
 
   // These metrics track the cost of the query.
   DOCUMENTS_SCANNED("documents", false),
@@ -83,8 +85,16 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   GROUP_BY_SIZE("queries", false),
   TOTAL_SERVER_RESPONSE_SIZE("queries", false),
 
-  QUERY_QUOTA_EXCEEDED("exceptions", false);
+  QUERY_QUOTA_EXCEEDED("exceptions", false),
 
+  // tracks a case a segment is not hosted by any server
+  // this is different from NO_SERVER_FOUND_EXCEPTIONS which tracks unavailability across all segments
+  NO_SERVING_HOST_FOR_SEGMENT("badResponses", false),
+
+  // Netty connection metrics
+  NETTY_CONNECTION_REQUESTS_SENT("nettyConnection", true),
+  NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+  NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true);
 
   private final String brokerMeterName;
   private final String unit;

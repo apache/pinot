@@ -101,101 +101,34 @@
     {{#if paginatedSelectedAlerts}}
       <section class="te-search-header">
         <span class="te-search-title">
-          Alerts Found({{selectedAlerts.length}})
+          Alerts Found({{totalFilteredAlerts}})
         </span>
         <span class="pull-right">
           Showing {{paginatedSelectedAlerts.length}} of
-          {{selectedAlerts.length}} {{if (gt selectedAlerts.length 1) 'alerts' 'alert'}}
+          {{totalFilteredAlerts}} {{if (gt totalFilteredAlerts 1) 'alerts' 'alert'}}
         </span>
       </section>
     {{/if}}
     {{#if isLoading}}
       <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve--fixed">{{ember-spinner}}</div>
     {{/if}}
-      {{#each paginatedSelectedAlerts as |alert|}}
-        <section class="te-search-results">
-          <div class="te-search-results__header">
-            <div class="te-search-results__title-group">
-              <div class="te-search-results__title">
-                <span class="te-search-results__tag te-search-results__tag--list {{if alert.isActive "te-search-results__tag--active"}}">
-                  {{if alert.isActive "Active" "Inactive"}}
-                </span>
-                {{#link-to "manage.alert" alert.id}}
-                  <div class="te-search-results__title-name" title={{alert.functionName}}>{{alert.functionName}}</div>
-                {{/link-to}}
-              </div>
-            </div>
-              <div class="te-search-results__edit-button">
-                {{#if testMode}}
-                  <a href="#" {{action "removeThirdEyeFunction" alert.id}}><span class="glyphicon glyphicon-trash"></span></a>
-                {{/if}}
-              </div>
+
+    {{#each paginatedSelectedAlerts as |alert|}}
+      <section class="te-search-results">
+        {{#self-serve-alert-details
+          alertData=alert
+          isLoadError=false
+          displayMode="list"
+        }}
+          <div class="te-search-results__edit-button">
+            {{#if testMode}}
+              <a href="#" {{action "removeThirdEyeFunction" alert.id}}><span class="glyphicon glyphicon-trash"></span></a>
+            {{/if}}
           </div>
-          <ul class="te-search-results__list te-search-results__list--details-block row">
-            <div class="col-xs-12 col-sm-5">
-              <li class="te-search-results__row">
-                {{!-- TODO: Dry this out --}}
-                <div class="te-search-results__option te-search-results__option--list">Metric</div>
-                <div class="te-search-results__value" title={{alert.metric}}>{{alert.metric}}</div>
-              </li>
-              <li class="te-search-results__row">
-                <div class="te-search-results__option te-search-results__option--list">Dataset</div>
-                <div class="te-search-results__value" title={{alert.collection}}>
-                  <span class="{{unless alert.collection 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-                    {{if alert.collection alert.collection 'N/A'}}
-                  </span>
-                </div>
-              </li>
-              <li class="te-search-results__row">
-                <div class="te-search-results__option te-search-results__option--list">Application</div>
-                <div class="te-search-results__value" title={{alert.application}}>
-                  <span class="{{unless alert.application 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-                    {{if alert.application alert.application 'N/A'}}
-                  </span>
-                </div>
-              </li>
-              <li class="te-search-results__row">
-                <div class="te-search-results__option te-search-results__option--list">Watchers</div>
-                <div class="te-search-results__value" title={{alert.group}}>
-                  <span class="{{unless alert.group 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-                    {{if alert.group alert.group 'N/A'}}
-                  </span>
-                </div>
-              </li>
-            </div>
-            <div class="col-xs-12 col-sm-7">
-              <li class="te-search-results__row">
-                <div class="te-search-results__option te-search-results__option--list">Owner</div>
-                <div class="te-search-results__value" title={{alert.createdBy}}>
-                  <span class="{{unless alert.createdBy 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-                    {{if alert.createdBy alert.createdBy 'N/A'}}
-                  </span>
-                </div>
-              </li>
-              <li class="te-search-results__row">
-                <div class="te-search-results__option te-search-results__option--list">Type</div>
-                <div class="te-search-results__value" title={{alert.type}}>{{alert.type}}</div>
-              </li>
-              <li class="te-search-results__row">
-                <div class="te-search-results__option te-search-results__option--list">Data Filter</div>
-                <div class="te-search-results__value" title={{alert.filters}}>
-                  <span class="{{unless alert.filters 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-                    {{if alert.filters alert.filters 'N/A'}}
-                  </span>
-                </div>
-              </li>
-              <li class="te-search-results__row">
-                <div class="te-search-results__option te-search-results__option--list">Dimensions</div>
-                <div class="te-search-results__value" title={{alert.exploreDimensions}}>
-                  <span class="{{unless alert.exploreDimensions 'te-search-results__prop--missing' 'te-search-results__prop'}}">
-                    {{if alert.exploreDimensions alert.exploreDimensions 'N/A'}}
-                  </span>
-                </div>
-              </li>
-            </div>
-          </ul>
-        </section>
-      {{/each}}
+        {{/self-serve-alert-details}}
+      </section>
+    {{/each}}
+
   </div>
 
 {{!--pagination--}}

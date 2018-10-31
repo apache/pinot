@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.tools.anomaly.report;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -18,6 +34,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
@@ -41,6 +58,9 @@ import javax.validation.Validation;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
+
 public class GenerateAnomalyReport {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
   private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
@@ -53,11 +73,11 @@ public class GenerateAnomalyReport {
   List<String> collections;
   String dashboardUrl;
   SmtpConfiguration smtpConfiguration;
-  String emailRecipients;
+  DetectionAlertFilterRecipients emailRecipients;
 
   public GenerateAnomalyReport(Date startTime, Date endTime, File persistenceConfig,
       List<String> datasets, String dashboardUrl, SmtpConfiguration smtpConfiguration,
-      String emailRecipients) {
+      DetectionAlertFilterRecipients emailRecipients) {
     DaoProviderUtil.init(persistenceConfig);
     anomalyResultManager = DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
     metricConfigManager = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
@@ -232,7 +252,8 @@ public class GenerateAnomalyReport {
         new GenerateAnomalyReport(df.parse(config.getStartTimeIso()),
             df.parse(config.getEndTimeIso()), persistenceFile,
             Arrays.asList(config.getDatasets().split(",")), config.getTeBaseUrl(),
-            detectorConfig.getSmtpConfiguration(), config.getEmailRecipients());
+            SmtpConfiguration.createFromProperties(detectorConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+            config.getEmailRecipients());
 
     reportGenerator.buildReport();
     //    reportGenerator.listMetric();

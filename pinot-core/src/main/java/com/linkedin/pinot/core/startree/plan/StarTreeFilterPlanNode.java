@@ -19,8 +19,8 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.plan.PlanNode;
 import com.linkedin.pinot.core.startree.operator.StarTreeFilterOperator;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
+import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,17 +32,19 @@ public class StarTreeFilterPlanNode implements PlanNode {
   private final StarTreeV2 _starTreeV2;
   private final FilterQueryTree _rootFilterNode;
   private final Set<String> _groupByColumns;
+  private final Map<String, String> _debugOptions;
 
-  public StarTreeFilterPlanNode(@Nonnull StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
-      @Nullable Set<String> groupByColumns) {
+  public StarTreeFilterPlanNode(StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _rootFilterNode = rootFilterNode;
     _groupByColumns = groupByColumns;
+    _debugOptions = debugOptions;
   }
 
   @Override
   public StarTreeFilterOperator run() {
-    return new StarTreeFilterOperator(_starTreeV2, _rootFilterNode, _groupByColumns);
+    return new StarTreeFilterOperator(_starTreeV2, _rootFilterNode, _groupByColumns, _debugOptions);
   }
 
   @Override

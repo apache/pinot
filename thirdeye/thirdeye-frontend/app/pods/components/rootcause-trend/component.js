@@ -1,18 +1,26 @@
-import { computed, getProperties, set } from '@ember/object';
-import Component from '@ember/component';
+import {
+  get,
+  set,
+  computed,
+  getProperties
+} from '@ember/object';
 import {
   toCurrentUrn,
   toBaselineUrn,
   hasPrefix,
   filterPrefix,
   toMetricLabel,
+  toMetricDataset,
   isInverse,
   toColorDirection,
-  makeSortable
+  makeSortable,
+  makeTime,
+  isExclusionWarning
 } from 'thirdeye-frontend/utils/rca-utils';
+import Component from '@ember/component';
 import { humanizeChange } from 'thirdeye-frontend/utils/utils';
-import moment from 'moment';
 import _ from 'lodash';
+
 
 const ROOTCAUSE_TREND_MAX_COLUMNS = 12;
 
@@ -94,19 +102,19 @@ export default Component.extend({
    * @type {string}
    */
   startTimeFormatted: computed('startTime', function () {
-    const { startTime } = getProperties(this, 'startTime');
-    return this._formatTime(startTime);
+    const startTime = get(this, 'startTime');
+    return this._formatTimeTz(startTime);
   }),
 
   /**
    * Start time options for dropdown
    */
   startTimeOptions: computed('availableBuckets', function () {
-    const { availableBuckets } = getProperties(this, 'availableBuckets');
+    const availableBuckets = get(this, 'availableBuckets');
 
     const options = [];
     for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
-      options.push(this._formatTime(moment(availableBuckets[i])));
+      options.push(this._formatTimeTz(makeTime(availableBuckets[i])));
     }
 
     return options;
@@ -116,11 +124,11 @@ export default Component.extend({
    * Reverse lookup mapping for start time options for dropdown
    */
   startTimeOptionsMapping: computed('availableBuckets', function () {
-    const { availableBuckets } = getProperties(this, 'availableBuckets');
+    const availableBuckets = get(this, 'availableBuckets');
 
     const options = {};
     for (let i = 0; i < availableBuckets.length; i += ROOTCAUSE_TREND_MAX_COLUMNS) {
-      options[this._formatTime(moment(availableBuckets[i]))] = availableBuckets[i];
+      options[this._formatTimeTz(makeTime(availableBuckets[i]))] = availableBuckets[i];
     }
 
     return options;
@@ -131,12 +139,12 @@ export default Component.extend({
    * @type {int[]}
    */
   availableBuckets: computed('context', function () {
-    const { context } = getProperties(this, 'context');
+    const context = get(this, 'context');
 
     const buckets = [];
     const [stepSize, stepUnit] = context.granularity.split('_').map(s => s.toLowerCase());
-    const limit = moment(context.analysisRange[1]);
-    let time = moment(context.analysisRange[0]);
+    const limit = makeTime(context.analysisRange[1]);
+    let time = makeTime(context.analysisRange[0]);
     while (time < limit) {
       buckets.push(time.valueOf());
       time = time.add(stepSize, stepUnit);
@@ -167,7 +175,7 @@ export default Component.extend({
    * @type {object[]}
    */
   columns: computed('buckets', function () {
-    const { buckets } = getProperties(this, 'buckets');
+    const buckets = get(this, 'buckets');
 
     const columns = [
       {
@@ -180,6 +188,7 @@ export default Component.extend({
         className: 'metrics-table__column'
       }, {
         propertyName: 'label',
+        template: 'custom/metrics-table-metric',
         title: 'Metric',
         className: 'metrics-table__column metrics-table__column--large'
       }
@@ -273,8 +282,10 @@ export default Component.extend({
         const row = {
           urn,
           label: toMetricLabel(urn, entities),
+          dataset: toMetricDataset(urn, entities),
           isSelected: selectedUrns.has(urn),
-          links: links[urn]
+          links: links[urn],
+          isExclusionWarning: isExclusionWarning(urn, entities)
         };
 
         buckets.forEach((t, i) => {
@@ -307,7 +318,7 @@ export default Component.extend({
    * }
    */
   links: computed('entities', function() {
-    const { entities } = getProperties(this, 'entities');
+    const entities = get(this, 'entities');
     let metricUrlMapping = {};
 
     filterPrefix(Object.keys(entities), 'thirdeye:metric:')
@@ -334,7 +345,14 @@ export default Component.extend({
    * Keeps track of items that are selected in the table
    * @type {Array}
    */
-  preselectedItems: [], // FIXME: this is broken across all of RCA and works by accident only
+  preselectedItems: computed({
+    get () {
+      return [];
+    },
+    set () {
+      // ignore
+    }
+  }),
 
   /**
    * Helper to format time stamp specifically for trend table
@@ -343,7 +361,17 @@ export default Component.extend({
    * @private
    */
   _formatTime(t) {
-    return moment(t).format('MM/DD h:mm') + moment(t).format('a')[0];
+    return makeTime(t).format('MM/DD h:mm') + makeTime(t).format('a')[0];
+  },
+
+  /**
+   * Helper to format time stamp with time zone specifically for the time drop down
+   *
+   * @param {int} t timestamp
+   * @private
+   */
+  _formatTimeTz(t) {
+    return makeTime(t).format('MM/DD h:mm a z');
   },
 
   actions: {
@@ -376,7 +404,7 @@ export default Component.extend({
      * Triggered by drop down on change of selection
      */
     startTimeChanged(timestamp) {
-      const { lookup } = getProperties(this, 'startTimeOptionsMapping');
+      const lookup = get(this, 'startTimeOptionsMapping');
       set(this, 'desiredStartTime', lookup[timestamp]);
     }
   }

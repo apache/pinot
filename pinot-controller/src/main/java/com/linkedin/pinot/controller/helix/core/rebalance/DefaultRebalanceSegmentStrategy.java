@@ -16,7 +16,6 @@
 package com.linkedin.pinot.controller.helix.core.rebalance;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.OfflineTagConfig;
 import com.linkedin.pinot.common.config.RealtimeTagConfig;
@@ -29,8 +28,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.StateModel.Realtime
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,7 +37,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -53,7 +50,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Basic rebalance segments strategy, which rebalances offline segments using autorebalance strategy,
+ * Basic rebalance segments strategy, which rebalances offline segments using auto-rebalance strategy,
  * and consuming segments using the partition assignment strategy for the table
  */
 public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy {
@@ -89,8 +86,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
     PartitionAssignment newPartitionAssignment = new PartitionAssignment(tableNameWithType);
 
     if (tableConfig.getTableType().equals(CommonConstants.Helix.TableType.REALTIME)) {
-      StreamMetadata streamMetadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-      if (!streamMetadata.hasSimpleKafkaConsumerType()) {
+      StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+      if (!streamConfig.hasLowLevelConsumerType()) {
         LOGGER.info("Table {} does not have LLC and will have no partition assignment", tableNameWithType);
         return newPartitionAssignment;
       }
@@ -119,8 +116,8 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
   }
 
   /**
-   * If realtime table and includeConsuming=true, rebalance consuming segments. NewPartitionAssignment will be used only in this case
-   * Always rebalance completed (online) segments, NewPartitionAssignment unused in this case
+   * If realtime table and includeConsuming=true, rebalance consuming segments. NewPartitionAssignment will be used only
+   * in this case. Always rebalance completed (online) segments, NewPartitionAssignment unused in this case
    * @param idealState old ideal state
    * @param tableConfig table config of table tor rebalance
    * @param rebalanceUserConfig custom user configs for specific rebalance strategies
@@ -128,7 +125,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
    * @return
    */
   @Override
-  public IdealState rebalanceIdealState(IdealState idealState, TableConfig tableConfig,
+  public IdealState getRebalancedIdealState(IdealState idealState, TableConfig tableConfig,
       Configuration rebalanceUserConfig, PartitionAssignment newPartitionAssignment) {
 
     String tableNameWithType = tableConfig.getTableName();
@@ -148,43 +145,7 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       targetNumReplicas = Integer.parseInt(tableConfig.getValidationConfig().getReplication());
     }
 
-    // update if not dryRun
-    boolean dryRun = rebalanceUserConfig.getBoolean(RebalanceUserConfigConstants.DRYRUN, DEFAULT_DRY_RUN);
-    IdealState newIdealState;
-    if (!dryRun) {
-      LOGGER.info("Updating ideal state for table {}", tableNameWithType);
-      newIdealState = rebalanceAndUpdateIdealState(tableConfig, targetNumReplicas, rebalanceUserConfig,
-          newPartitionAssignment);
-    } else {
-      LOGGER.info("Dry run. Skip writing ideal state");
-      newIdealState = rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
-          newPartitionAssignment);
-    }
-    return newIdealState;
-  }
-
-  /**
-   * Rebalances the ideal state object and also updates it
-   * @param tableConfig
-   * @param targetNumReplicas
-   * @param rebalanceUserConfig
-   * @param newPartitionAssignment
-   */
-  private IdealState rebalanceAndUpdateIdealState(final TableConfig tableConfig,
-      final int targetNumReplicas, final Configuration rebalanceUserConfig,
-      final PartitionAssignment newPartitionAssignment) {
-
-    final Function<IdealState, IdealState> updaterFunction = new Function<IdealState, IdealState>() {
-      @Nullable
-      @Override
-      public IdealState apply(@Nullable IdealState idealState) {
-        return rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig,
-            newPartitionAssignment);
-      }
-    };
-    HelixHelper.updateIdealState(_helixManager, tableConfig.getTableName(), updaterFunction,
-        RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
-    return  _helixAdmin.getResourceIdealState(_helixClusterName, tableConfig.getTableName());
+    return rebalanceIdealState(idealState, tableConfig, targetNumReplicas, rebalanceUserConfig, newPartitionAssignment);
   }
 
   /**
@@ -369,7 +330,18 @@ public class DefaultRebalanceSegmentStrategy implements RebalanceSegmentStrategy
       OfflineTagConfig offlineTagConfig = new OfflineTagConfig(tableConfig);
       tag = offlineTagConfig.getOfflineServerTag();
     }
-    servingInstances.addAll(_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, tag));
-    enabledServingInstances.addAll(HelixHelper.getEnabledInstancesWithTag(_helixAdmin, _helixClusterName, tag));
+    servingInstances.addAll(getInstancesWithTag(tag));
+    enabledServingInstances.addAll(getEnabledInstancesWithTag(tag));
   }
+
+  @VisibleForTesting
+  protected List<String> getInstancesWithTag(String tag) {
+    return HelixHelper.getInstancesWithTag(_helixManager, tag);
+  }
+
+  @VisibleForTesting
+  protected List<String> getEnabledInstancesWithTag(String tag) {
+    return HelixHelper.getEnabledInstancesWithTag(_helixManager, tag);
+  }
+
 }

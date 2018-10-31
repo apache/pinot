@@ -26,12 +26,14 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobContext;
@@ -48,7 +50,6 @@ public class SegmentCreationJob extends Configured {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationJob.class);
 
   private static final String PATH_TO_DEPS_JAR = "path.to.deps.jar";
-  private static final String TEMP = "temp";
   private static final String APPEND = "APPEND";
 
   private final String _jobName;
@@ -60,6 +61,10 @@ public class SegmentCreationJob extends Configured {
   private final String _depsJarPath;
   private final String _outputDir;
   private final String _tableName;
+
+  private final String _readerConfigFile;
+
+  private final String _defaultPermissionsMask;
 
   private String[] _hosts;
   private int _port;
@@ -73,10 +78,14 @@ public class SegmentCreationJob extends Configured {
     _inputSegmentDir = _properties.getProperty(JobConfigConstants.PATH_TO_INPUT);
     String schemaFilePath = _properties.getProperty(JobConfigConstants.PATH_TO_SCHEMA);
     _outputDir = getOutputDir();
-    _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
+    _stagingDir = new File(_outputDir, UUID.randomUUID().toString()).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
+    _readerConfigFile = _properties.getProperty(JobConfigConstants.PATH_TO_READER_CONFIG);
     String hostsString = _properties.getProperty(JobConfigConstants.PUSH_TO_HOSTS);
     String portString = _properties.getProperty(JobConfigConstants.PUSH_TO_PORT);
+
+    _defaultPermissionsMask = _properties.getProperty(JobConfigConstants.DEFAULT_PERMISSIONS_MASK, null);
+    LOGGER.info("Default permissions mask is {}", _defaultPermissionsMask);
 
     // For backwards compatibility, we want to allow users to create segments without setting push location parameters
     // in their creation jobs.
@@ -93,6 +102,9 @@ public class SegmentCreationJob extends Configured {
     LOGGER.info("path.to.deps.jar: {}", _depsJarPath);
     LOGGER.info("path.to.output: {}", _outputDir);
     LOGGER.info("path.to.schema: {}", schemaFilePath);
+    if (_readerConfigFile != null) {
+      LOGGER.info("path.to.reader.config: {}", _readerConfigFile);
+    }
     if (schemaFilePath != null) {
       _dataSchema = Schema.fromFile(new File(schemaFilePath));
     } else {
@@ -119,19 +131,33 @@ public class SegmentCreationJob extends Configured {
 
     FileSystem fs = FileSystem.get(getConf());
     Path inputPathPattern = new Path(_inputSegmentDir);
+    Path stagingDir = new Path(_stagingDir);
+    Path outputDir = new Path(_outputDir);
 
-    if (fs.exists(new Path(_stagingDir))) {
-      LOGGER.warn("Found the temp folder, deleting it");
-      fs.delete(new Path(_stagingDir), true);
-    }
-    fs.mkdirs(new Path(_stagingDir));
-    fs.mkdirs(new Path(_stagingDir + "/input/"));
-
-    if (fs.exists(new Path(_outputDir))) {
+    if (fs.exists(outputDir)) {
       LOGGER.warn("Found the output folder {}, deleting it", _outputDir);
-      fs.delete(new Path(_outputDir), true);
+      fs.delete(outputDir, true);
     }
-    fs.mkdirs(new Path(_outputDir));
+    fs.mkdirs(outputDir);
+
+    if (fs.exists(stagingDir)) {
+      LOGGER.warn("Found the temp folder {}, deleting it", stagingDir);
+      fs.delete(stagingDir, true);
+    }
+    fs.mkdirs(stagingDir);
+
+    Path stagingDirInputPath = new Path(_stagingDir + "/input/");
+    fs.mkdirs(stagingDirInputPath);
+    LOGGER.info("Staging dir input path is {}", stagingDirInputPath);
+
+    if (_defaultPermissionsMask != null) {
+      FsPermission umask = new FsPermission(_defaultPermissionsMask);
+      FsPermission permission = FsPermission.getDirDefault().applyUMask(umask);
+
+      setDirPermission(stagingDir, permission, fs);
+      setDirPermission(stagingDirInputPath, permission, fs);
+      setDirPermission(outputDir, permission, fs);
+    }
 
     List<FileStatus> inputDataFiles = new ArrayList<FileStatus>();
     FileStatus[] fileStatusArr = fs.globStatus(inputPathPattern);
@@ -204,6 +230,11 @@ public class SegmentCreationJob extends Configured {
     LOGGER.info("Cleanup the working directory.");
     LOGGER.info("Deleting the dir: {}", _stagingDir);
     fs.delete(new Path(_stagingDir), true);
+  }
+
+  private void setDirPermission(Path directory, FsPermission permission, FileSystem fs) throws IOException {
+    fs.setPermission(directory, permission);
+    LOGGER.info("Setting permissions '{}' for directory: '{}'", permission, directory);
   }
 
   protected void setAdditionalJobProperties(Job job) throws Exception {

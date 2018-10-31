@@ -11,7 +11,9 @@ import {
   toOffsetUrn,
   toColorDirection,
   isInverse,
-  toMetricLabel
+  toMetricLabel,
+  makeTime,
+  dateFormatFull
 } from 'thirdeye-frontend/utils/rca-utils';
 import { humanizeChange, humanizeFloat } from 'thirdeye-frontend/utils/utils';
 import { equal, reads } from '@ember/object/computed';
@@ -25,10 +27,11 @@ const OFFSETS = ['current', 'predicted', 'wo1w', 'wo2w', 'wo3w', 'wo4w'];
  * @type {Object}
  */
 const ANOMALY_OPTIONS_MAPPING = {
-  ANOMALY: 'Yes (True Anomaly)',
-  ANOMALY_NEW_TREND: 'Yes (But New Trend)',
-  NOT_ANOMALY: 'No (False Alarm)',
-  NO_FEEDBACK: 'To Be Determined'
+  ANOMALY: 'Yes - unexpected',
+  ANOMALY_EXPECTED: 'Expected temporary change',
+  ANOMALY_NEW_TREND: 'Expected permanent change',
+  NOT_ANOMALY: 'No change observed',
+  NO_FEEDBACK: 'Not reviewed yet'
 };
 
 export default Component.extend({
@@ -144,9 +147,15 @@ export default Component.extend({
 
   /**
    * Anomaly baseline as computed by anomaly function
-   * @type {Float}
+   * @type {float}
    */
   predicted: reads('anomaly.attributes.baseline.firstObject'),
+
+  /**
+   * Anomaly aggregate multiplier
+   * @type {float}
+   */
+  aggregateMultiplier: reads('anomaly.attributes.aggregateMultiplier.firstObject'),
 
   /**
    * Anomaly unique identifier
@@ -187,7 +196,7 @@ export default Component.extend({
    * @type {string}
    */
   startFormatted: computed('anomaly', function () {
-    return moment(get(this, 'anomaly').start).format('MMM D YYYY, hh:mm a');
+    return makeTime(get(this, 'anomaly').start).format(dateFormatFull);
   }),
 
   /**
@@ -195,7 +204,7 @@ export default Component.extend({
    * @type {string}
    */
   endFormatted: computed('anomaly', function () {
-    return moment(get(this, 'anomaly').end).format('MMM D YYYY, hh:mm a');
+    return makeTime(get(this, 'anomaly').end).format(dateFormatFull);
   }),
 
   /**
@@ -280,16 +289,27 @@ export default Component.extend({
         const value = this._getAggregate(offset);
         const change = curr / value - 1;
 
-        anomalyInfo[offset] = {
-          value: humanizeFloat(value), // numerical value to display
-          change: humanizeChange(change), // text of % change with + or - sign
-          direction: toColorDirection(change, isInverse(metricUrn, entities))
-        };
+        if (!Number.isNaN(value)) {
+          anomalyInfo[offset] = {
+            value: humanizeFloat(value), // numerical value to display
+            change: humanizeChange(change), // text of % change with + or - sign
+            direction: toColorDirection(change, isInverse(metricUrn, entities))
+          };
+        }
       });
 
       return anomalyInfo;
     }
   ),
+
+  /**
+   * Returns any offset that has associated current and change values
+   * @type {Array}
+   */
+  availableOffsets: computed('offsets', 'anomalyInfo', function () {
+    const { offsets, anomalyInfo } = getProperties(this, 'offsets', 'anomalyInfo');
+    return offsets.filter(offset => offset in anomalyInfo);
+  }),
 
   /**
    * Returns the aggregate value for a given offset. Handles computed baseline special case.
@@ -299,13 +319,16 @@ export default Component.extend({
    * @private
    */
   _getAggregate(offset) {
-    const { metricUrn, aggregates, predicted } = getProperties(this, 'metricUrn', 'aggregates', 'predicted');
+    const { metricUrn, aggregates, predicted, aggregateMultiplier } =
+      getProperties(this, 'metricUrn', 'aggregates', 'predicted', 'aggregateMultiplier');
 
     if (offset === 'predicted') {
-      return parseFloat(predicted);
+      const value = parseFloat(predicted);
+      if (value === 0.0) { return Number.NaN; }
+      return value;
     }
 
-    return aggregates[toOffsetUrn(metricUrn, offset)];
+    return aggregates[toOffsetUrn(metricUrn, offset)] * (aggregateMultiplier || 1.0);
   },
 
   actions: {

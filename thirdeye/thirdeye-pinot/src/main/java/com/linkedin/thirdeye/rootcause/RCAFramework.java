@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.rootcause;
 
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
@@ -82,9 +98,9 @@ public class RCAFramework {
       Map<String, Future<PipelineResult>> flow = constructDAG(pipelines);
 
       Map<String, PipelineResult> results = new HashMap<>();
-      for(Map.Entry<String, Future<PipelineResult>> e : flow.entrySet()) {
+      for (Map.Entry<String, Future<PipelineResult>> e : flow.entrySet()) {
         PipelineResult r = e.getValue().get(TIMEOUT, TimeUnit.MILLISECONDS);
-        if(LOG.isDebugEnabled()) {
+        if (LOG.isDebugEnabled()) {
           LOG.debug("Results for pipeline '{}':", e.getKey());
           logResultDetails(r);
         }
@@ -92,6 +108,11 @@ public class RCAFramework {
       }
 
       return new RCAFrameworkExecutionResult(results.get(OUTPUT).getEntities(), results);
+
+    } catch (Exception e) {
+      ThirdeyeMetricsUtil.rcaFrameworkExceptionCounter.inc();
+      throw e;
+
     } finally {
       ThirdeyeMetricsUtil.rcaFrameworkCallCounter.inc();
       ThirdeyeMetricsUtil.rcaFrameworkDurationCounter.inc(System.nanoTime() - tStart);

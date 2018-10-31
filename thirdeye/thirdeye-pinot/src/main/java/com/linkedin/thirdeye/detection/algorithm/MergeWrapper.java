@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.algorithm;
 
 import com.google.common.base.Preconditions;
@@ -27,8 +43,9 @@ import org.apache.commons.collections.MapUtils;
 public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
+  private static final String PROP_MERGE_KEY = "mergeKey";
 
-  private static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
+  protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
     public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
       // earlier
@@ -44,9 +61,9 @@ public class MergeWrapper extends DetectionPipeline {
     }
   };
 
-  private final List<Map<String, Object>> nestedProperties;
-  private final long maxGap; // max time gap for merge
-  private final long maxDuration; // max overall duration of merged anomaly
+  protected final List<Map<String, Object>> nestedProperties;
+  protected final long maxGap; // max time gap for merge
+  protected final long maxDuration; // max overall duration of merged anomaly
   private final AnomalySlice slice;
 
   /**
@@ -68,9 +85,12 @@ public class MergeWrapper extends DetectionPipeline {
 
   @Override
   public DetectionPipelineResult run() throws Exception {
+    Map<String, Object> diagnostics = new HashMap<>();
+
     // generate anomalies
     List<MergedAnomalyResultDTO> generated = new ArrayList<>();
 
+    int i = 0;
     for (Map<String, Object> properties : this.nestedProperties) {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
@@ -85,6 +105,9 @@ public class MergeWrapper extends DetectionPipeline {
       DetectionPipelineResult intermediate = pipeline.run();
 
       generated.addAll(intermediate.getAnomalies());
+      diagnostics.put(String.valueOf(i), intermediate.getDiagnostics());
+
+      i++;
     }
 
     // retrieve anomalies
@@ -100,7 +123,7 @@ public class MergeWrapper extends DetectionPipeline {
     all.addAll(retrieved);
     all.addAll(generated);
 
-    return new DetectionPipelineResult(this.merge(all));
+    return new DetectionPipelineResult(this.merge(all)).setDiagnostics(diagnostics);
   }
 
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
@@ -165,19 +188,21 @@ public class MergeWrapper extends DetectionPipeline {
     return time;
   }
 
-  private static class AnomalyKey {
+  protected static class AnomalyKey {
     final String metric;
     final String collection;
     final DimensionMap dimensions;
+    final String mergeKey;
 
-    public AnomalyKey(String metric, String collection, DimensionMap dimensions) {
+    public AnomalyKey(String metric, String collection, DimensionMap dimensions, String mergeKey) {
       this.metric = metric;
       this.collection = collection;
       this.dimensions = dimensions;
+      this.mergeKey = mergeKey;
     }
 
     public static AnomalyKey from(MergedAnomalyResultDTO anomaly) {
-      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions());
+      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY));
     }
 
     @Override
@@ -185,18 +210,17 @@ public class MergeWrapper extends DetectionPipeline {
       if (this == o) {
         return true;
       }
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof AnomalyKey)) {
         return false;
       }
       AnomalyKey that = (AnomalyKey) o;
       return Objects.equals(metric, that.metric) && Objects.equals(collection, that.collection) && Objects.equals(
-          dimensions, that.dimensions);
+          dimensions, that.dimensions) && Objects.equals(mergeKey, that.mergeKey);
     }
 
     @Override
     public int hashCode() {
-
-      return Objects.hash(metric, collection, dimensions);
+      return Objects.hash(metric, collection, dimensions, mergeKey);
     }
   }
 }

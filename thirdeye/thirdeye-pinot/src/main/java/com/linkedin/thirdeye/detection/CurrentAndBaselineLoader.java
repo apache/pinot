@@ -1,22 +1,36 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
-import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregate;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -108,7 +122,7 @@ public class CurrentAndBaselineLoader {
 
   private double getAggregate(MetricSlice slice) {
     try {
-      return this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList()).getDouble(COL_VALUE, 0);
+      return this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1).getDouble(COL_VALUE, 0);
     } catch (Exception e) {
       return Double.NaN;
     }

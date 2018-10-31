@@ -41,7 +41,7 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegment.getSegmentPartitionConfig();
 
     // Create all column statistics
-    for (String columnName : realtimeSegment.getColumnNames()) {
+    for (String columnName : realtimeSegment.getPhysicalColumnNames()) {
       ColumnDataSource dataSource = realtimeSegment.getDataSource(columnName);
       if (dataSource.getDataSourceMetadata().hasDictionary()) {
         _columnStatisticsMap.put(columnName, new RealtimeColumnStatistics(realtimeSegment.getDataSource(columnName),

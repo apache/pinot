@@ -15,11 +15,9 @@
  */
 package com.linkedin.pinot.transport.conf;
 
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-
 import com.linkedin.pinot.transport.config.ConnectionPoolConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
+import org.apache.commons.configuration.Configuration;
 
 
 public class TransportClientConf {
@@ -47,7 +45,7 @@ public class TransportClientConf {
     _connPool = new ConnectionPoolConfig();
   }
 
-  public void init(Configuration cfg) throws ConfigurationException {
+  public void init(Configuration cfg) {
     if (cfg.containsKey(ROUTING_MODE_KEY)) {
       _routingMode = RoutingMode.valueOf(cfg.getString(ROUTING_MODE_KEY));
     }

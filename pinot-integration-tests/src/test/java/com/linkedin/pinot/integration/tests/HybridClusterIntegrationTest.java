@@ -76,7 +76,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     File schemaFile = getSchemaFile();
     _schema = Schema.fromFile(schemaFile);
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, 0, _segmentDir, _tarDir, getTableName(), false,
-        getRawIndexColumns(), _schema, executor);
+        null, getRawIndexColumns(), _schema, executor);
 
     // Push data into the Kafka topic
     pushAvroIntoKafka(realtimeAvroFiles, getKafkaTopic(), executor);
@@ -135,7 +135,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     addHybridTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME,
         TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(),
-        getTaskConfig());
+        getTaskConfig(), getStreamConsumerFactoryClassName());
+
+    completeTableConfiguration();
   }
 
   protected List<File> getAllAvroFiles() throws Exception {
@@ -247,6 +249,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
     super.testInstanceShutdown();
   }
 
+  @Test
+  @Override
+  public void testVirtualColumnQueries() {
+    super.testVirtualColumnQueries();
+  }
+
   @AfterClass
   public void tearDown() throws Exception {
     // Try deleting the tables and check that they have no routing table
@@ -284,5 +292,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
    */
   protected void cleanup() throws Exception {
     FileUtils.deleteDirectory(_tempDir);
+  }
+
+  @Override
+  protected boolean isUsingNewConfigFormat() {
+    return true;
   }
 }

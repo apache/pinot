@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.query.scheduler.fcfs;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.MultiLevelPriorityQueue;
 import com.linkedin.pinot.core.query.scheduler.PriorityScheduler;
 import com.linkedin.pinot.core.query.scheduler.SchedulerGroup;
@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.query.scheduler.SchedulerPriorityQueue;
 import com.linkedin.pinot.core.query.scheduler.TableBasedGroupMapper;
 import com.linkedin.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 import org.slf4j.Logger;
@@ -40,7 +41,7 @@ public class BoundedFCFSScheduler extends PriorityScheduler {
   private static Logger LOGGER = LoggerFactory.getLogger(BoundedFCFSScheduler.class);
 
   public static BoundedFCFSScheduler create(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull ServerMetrics serverMetrics) {
+      @Nonnull ServerMetrics serverMetrics, @Nonnull LongAccumulator latestQueryTime) {
     final ResourceManager rm = new PolicyBasedResourceManager(config);
     final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
@@ -49,12 +50,12 @@ public class BoundedFCFSScheduler extends PriorityScheduler {
       }
     };
     MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
-    return new BoundedFCFSScheduler(rm , queryExecutor, queue, serverMetrics);
+    return new BoundedFCFSScheduler(rm , queryExecutor, queue, serverMetrics, latestQueryTime);
   }
 
   private BoundedFCFSScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics) {
-    super(resourceManager, queryExecutor, queue, metrics);
+      @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics, @Nonnull LongAccumulator latestQueryTime) {
+    super(resourceManager, queryExecutor, queue, metrics, latestQueryTime);
   }
 
   @Override

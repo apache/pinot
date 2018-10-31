@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -21,6 +37,7 @@ import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import freemarker.template.Configuration;
@@ -53,6 +70,9 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
 
 public class AnomalyReportGenerator {
 
@@ -124,7 +144,8 @@ public class AnomalyReportGenerator {
    * @param emailSubjectName the name of this alert configuration.
    */
   public void buildReport(Long groupId, String groupName, List<MergedAnomalyResultDTO> anomalies,
-      ThirdEyeAnomalyConfiguration configuration, String recipients, String emailSubjectName, AlertConfigDTO alertConfig) {
+      ThirdEyeAnomalyConfiguration configuration, DetectionAlertFilterRecipients recipients, String emailSubjectName,
+      AlertConfigDTO alertConfig) {
     String subject = "Thirdeye Alert : " + emailSubjectName;
     long startTime = System.currentTimeMillis();
     long endTime = 0;
@@ -146,8 +167,8 @@ public class AnomalyReportGenerator {
   //
   public void buildReport(long startTime, long endTime, Long groupId, String groupName,
       List<MergedAnomalyResultDTO> anomalies, String subject, ThirdEyeAnomalyConfiguration configuration,
-      boolean includeSentAnomaliesOnly, String emailRecipients, String emailSubjectName, AlertConfigDTO alertConfig,
-      boolean includeSummary) {
+      boolean includeSentAnomaliesOnly, DetectionAlertFilterRecipients recipients, String emailSubjectName,
+      AlertConfigDTO alertConfig, boolean includeSummary) {
     if (anomalies == null || anomalies.size() == 0) {
       LOG.info("No anomalies found to send email, please check the parameters.. exiting");
     } else {
@@ -301,8 +322,9 @@ public class AnomalyReportGenerator {
       templateData.put("cid", cid);
 
       // TODO remove this code. It is dead (minus certain endpoints).
-      buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
-          emailRecipients, alertConfig.getFromAddress(), email);
+      buildEmailTemplateAndSendAlert(templateData,
+          SmtpConfiguration.createFromProperties(configuration.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+          subject, recipients, alertConfig.getFromAddress(), email);
 
       if (StringUtils.isNotBlank(imgPath)) {
         try {
@@ -315,8 +337,8 @@ public class AnomalyReportGenerator {
   }
 
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap,
-      SmtpConfiguration smtpConfiguration, String subject, String emailRecipients,
-      String fromEmail, HtmlEmail email) {
+      SmtpConfiguration smtpConfiguration, String subject, DetectionAlertFilterRecipients recipients, String fromEmail,
+      HtmlEmail email) {
     if (Strings.isNullOrEmpty(fromEmail)) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
@@ -332,8 +354,7 @@ public class AnomalyReportGenerator {
       template.process(paramMap, out);
 
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
-      EmailHelper.sendEmailWithHtml(email, smtpConfiguration, subject, alertEmailHtml, fromEmail,
-          emailRecipients);
+      EmailHelper.sendEmailWithHtml(email, smtpConfiguration, subject, alertEmailHtml, fromEmail, recipients);
     } catch (Exception e) {
       Throwables.propagate(e);
     }

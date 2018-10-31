@@ -26,12 +26,12 @@ import java.io.IOException;
 
 public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCreator {
   private static final int NUM_DOCS_PER_CHUNK = 1000; // TODO: Auto-derive this based on metadata.
-  VarByteChunkSingleValueWriter _indexWriter;
+
+  private final VarByteChunkSingleValueWriter _indexWriter;
 
   public SingleValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressorFactory.CompressionType compressionType,
       String column, int totalDocs, int maxLength) throws IOException {
     File file = new File(baseIndexDir, column + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-
     _indexWriter = new VarByteChunkSingleValueWriter(file, compressionType, totalDocs, NUM_DOCS_PER_CHUNK, maxLength);
   }
 
@@ -41,9 +41,16 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   }
 
   @Override
+  public void index(int docId, byte[] valueToIndex) {
+    _indexWriter.setBytes(docId, valueToIndex);
+  }
+
+  @Override
   public void index(int docId, Object valueToIndex) {
     if (valueToIndex instanceof String) {
       _indexWriter.setString(docId, (String) valueToIndex);
+    } else if (valueToIndex instanceof byte[]) {
+      _indexWriter.setBytes(docId, (byte[]) valueToIndex);
     } else if (valueToIndex instanceof ByteArray) {
       _indexWriter.setBytes(docId, ((ByteArray) valueToIndex).getBytes());
     } else {
@@ -53,8 +60,7 @@ public class SingleValueVarByteRawIndexCreator extends BaseSingleValueRawIndexCr
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _indexWriter.close();
   }
 }

@@ -11,21 +11,53 @@
     <article class="share-dashboard-container__share-configure">
       <h4 style="color: rgba(0,0,0,0.9);font-size: 18px;font-weight: bold;">Configure summary</h4>
       <section>
-        <div style="margin-left: 15px;margin-bottom: 15px;display: inline-block;">
-          <p><input type="checkbox" {{action 'toggleSelection' "dashboard_summary" on="change"}} checked> Add dashboard-level comments</p>
-          <p><input type="text" {{action 'updateComment' "dashboard_summary" on="change"}} value="{{dashboard_summary_comment}}" placeholder="Comment for dashboard summary" name="dashboard_summary" id="dashboard_summary" style="border: none;border-bottom: 1px solid grey;margin-left: 15px;width: 800px;"></p>
+        <div style="margin-left: 15px;display: inline-block;">
+          <p><input type="checkbox" {{action 'toggleSelection' "dashboard_summary" on="change"}}> Add dashboard-level comments</p>
+          {{#if showDashboardSummary}}
+            <p>
+              <textarea {{action 'updateComment' "dashboard_summary" on="change"}} value="{{dashboard_summary_comment}}" placeholder="Comment for dashboard summary" name="dashboard_summary" id="dashboard_summary" style="border: none;border-bottom: 1px solid grey;margin-left: 15px;width: 800px;">
+              </textarea>
+            </p>
+          {{/if}}
         </div>
-        {{#x-tree
-          chosenId=selectedNode
-          checkable=true
-          expandDepth=2
-          model=tree as |node|}}
-            {{node.name}}
-            {{#if node.isComment}}
-              <input type="text" {{action 'updateComment' node.id on="change"}} value="{{node.comment}}" placeholder="Comment for {{node.name}}" name="{{node.name}}" id="{{node.id}}" style="border: none;border-bottom: 1px solid grey;margin-left: 30px;width: 800px;">
+      </section>
+      <section>
+        <p>
+          {{#x-tree
+            chosenId=selectedNode
+            checkable=true
+            expandDepth=0
+            model=tree as |node|}}
+              {{node.name}}
+              {{#if node.isComment}}
+                <input type="text" {{action 'updateComment' node.id on="change"}} value="{{node.comment}}" placeholder="Customize metrics/alerts" name="{{node.name}}" id="{{node.id}}" style="border: none;border-bottom: 1px solid grey;margin-left: 30px;width: 800px;">
+              {{/if}}
+          {{/x-tree}}
+        </p>
+      </section>
+      <!-- Customize email template -->
+      <section>
+        <div style="margin-left: 15px;display: inline-block;">
+          <p><input type="checkbox" {{action 'toggleSelection' "customize_email" on="change"}}> Customize email template</p>
+          <p style="margin-left: 15px;">
+            {{#if showCustomizeEmailTemplate}}
+              {{!-- <select onchange={{action (mut field.value) value="target.value"}} class={{field.className}}> --}}
+              Compare current with
+              <select id="customizeEmail1" onchange={{action "onCustomizeEmail1" value="target.value"}}>
+              {{#each options as |option|}}
+                <option value={{option.value}}>{{option.label}}</option>
+              {{/each}}
+              </select>
+              and
+              <select id="customizeEmail2" onchange={{action "onCustomizeEmail2" value="target.value"}}>
+              {{#each options_two as |option|}}
+                <option value={{option.value}}>{{option.label}}</option>
+              {{/each}}
+              </select>
             {{/if}}
-        {{/x-tree}}
-    </section>
+          </p>
+        </div>
+      </section>
     </article>
     <article class="share-dashboard-container__share-body">
       <h4 style="color: rgba(0,0,0,0.9);font-size: 18px;">Preview dashboard summary</h4>
@@ -70,7 +102,7 @@
               {{#if dashboard_summary_comment}}
                 <div id="section_dashboard_summary">
                   <h5>Summary</h5>
-                  <p id="dashboardId_dashboard_summary">{{dashboard_summary_comment}}</p>
+                  <p id="dashboardId_dashboard_summary">{{markdown-to-html dashboard_summary_comment}}</p>
                 </div>
               {{/if}}
               {{#if shareUrl}}
@@ -82,6 +114,17 @@
               {{/if}}
             </div>
             <div class="email-preview__body" style="color: #262626;">
+              {{#if shareConfig}}
+                <!-- Custom header summary table -->
+                {{share-custom-template
+                  appName=appNameDisplay
+                  start=start
+                  end=end
+                  config=shareConfig
+                }}
+                <hr/>
+              {{/if}}
+
               <!-- Metric level -->
               {{#each-in filteredAnomalyMapping as |metric metricList|}}
                 <!-- html email tables -->
@@ -90,11 +133,12 @@
                   {{#if metricList.viewTreeNode.comment}}
                     <div id="section_{metricList.metricId}">
                       <h5 style="margin-left: 20px;font-weight: bold;">Metric summary</h5>
-                      <p style="margin-left: 20px;" id="metricId_{{metricList.metricId}}">{{metricList.viewTreeNode.comment}}</p>
+                      <p style="margin-left: 20px;" id="metricId_{{metricList.metricId}}">{{markdown-to-html metricList.viewTreeNode.comment}}</p>
                     </div>
                   {{/if}}
+
                   <!-- Alert level -->
-                  {{#each-in metricList.items as |alert alertList|}}
+                    {{#each-in metricList.items as |alert alertList|}}
                     {{#if alertList.viewTreeNode.isChecked}}
                       <h4 style="margin-left: 20px;word-wrap: break-word;">
                         <span style="height: 20px; width: 33px;font-size: 14px; color: #737373;color: #737373;margin-right:10px;">Alert</span>
@@ -102,19 +146,30 @@
                           {{alert}}
                         </a>
                       </h4>
-                      <table width="660" style="margin: 20px;">
+                      <table width="660" style="margin: 20px;{{unless (mod-check metricList.count) 'background-color: #F6F8FA;'}}">
                         <tr style="border-top: 1px solid #C7D1D8; border-bottom: 1px solid #C7D1D8; background-color: #F6F8FA; color: #383838; font-size: 12px;">
                           <th style="padding: 10px;">Start/Duration</th>
                           <th style="padding: 10px;">Dimensions</th>
                           <th style="padding: 10px;">Current/Predicted</th>
+                          {{#if showCustomizeEmailTemplate}}
+                            {{#if showWow}}
+                              <th style="padding: 10px;">WoW</th>
+                            {{/if}}
+                            {{#if showWo2w}}
+                              <th style="padding: 10px;">Wo2W</th>
+                            {{/if}}
+                            {{#if showMedian4w}}
+                              <th style="padding: 10px;">Median4w</th>
+                            {{/if}}
+                          {{/if}}
                           <th style="padding: 10px;">Resolution</th>
                         </tr>
                         <!-- Anomaly level -->
                         {{#each alertList.items as |record index|}}
-                          <tr style="border-bottom: 1px solid #C7D1D8;{{unless (mod-check index) 'background-color: #F6F8FA;'}}">
-                            <td style="padding: 10px;">
-                              <p>
-                                <label>
+                          <tr style="border-bottom: 1px solid #C7D1D8;{{if record.anomaly.comment 'border-bottom: none;'}}">
+                            <td style="padding: 0 3px 3px 10px;">
+                              <p style="margin: 0;">
+                                <label style="margin: 0;">
                                   <span style="color: #0073B1; font-size: 14px; line-height: 20px;">
                                     <a href="https://thirdeye.corp.linkedin.com/app/#/rootcause?anomalyId={{record.anomaly.id}}">
                                       {{moment-format record.anomaly.start 'MMM D, hh:mm A'}}
@@ -122,33 +177,57 @@
                                   </span>
                                 </label>
                               </p>
-                              <p style="color: rgba(0,0,0,0.6);font-size: 12px;">
+                              <p style="margin: 0;color: rgba(0,0,0,0.6);font-size: 12px;">
                                 {{record.duration}}
                               </p>
                             </td>
-                            <td style="padding: 10px;">
+                            <td style="padding: 0 3px 3px 10px;">
                               <ul style="list-style: none;padding: 0px;margin-bottom: 0;max-width: 180px;">
                                 {{#each-in record.anomaly.dimensions as |dimName dimList|}}
                                   <li style="color: rgba(0,0,0,0.6);font-size: 12px;">
-                                     {{dimName}}:<span style="margin-left: 5px;">{{dimList}}</span>
+                                     {{dimName}}:<span style="margin-left: 5px;word-break: break-all;">{{dimList}}</span>
                                   </li>
                                 {{else}}
                                     -
                                 {{/each-in}}
                               </ul>
                             </td>
-                            <td style="padding: 10px;">
-                              <p>{{record.current}}/{{record.baseline}}</p>
-                              <p class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calculate-direction record.change}}">
+                            <td style="padding: 0 3px 3px 10px;">
+                              <p style="margin: 0;">{{record.current}}/{{record.baseline}}</p>
+                              <p  style="margin: 0;" class="te-anomaly-table__value-label te-anomaly-table__value-label--{{calculate-direction record.change}}">
                                 ({{record.humanizedChangeDisplay}})
                               </p>
                             </td>
-                            <td style="padding: 10px;">{{record.anomalyFeedback}}</td>
+                            <!-- Customize email columns starts -->
+                            {{#if showCustomizeEmailTemplate}}
+                              {{#if showWow}}
+                                <td style="padding: 0 3px 3px 10px;">
+                                  <p style="margin: 0;">{{record.anomaly.offsets.wow}}</p>
+                                </td>
+                              {{/if}}
+                              {{#if showWo2w}}
+                                <td style="padding: 0 3px 3px 10px;">
+                                  <p style="margin: 0;">{{record.anomaly.offsets.wo2w}}</p>
+                                </td>
+                              {{/if}}
+                              {{#if showMedian4w}}
+                                <td style="padding: 0 3px 3px 10px;">
+                                  <p style="margin: 0;">{{record.anomaly.offsets.median4w}}</p>
+                                </td>
+                              {{/if}}
+                            {{/if}}
+                            <!-- Customize email columns ends -->
+
+                            {{#if (eq record.anomalyFeedback "True anomaly")}}
+                              <td style="padding: 0 3px 3px 10px;color: #FF2C33;">{{record.anomalyFeedback}}</td>
+                            {{else}}
+                              <td style="padding: 0 3px 3px 10px;">{{record.anomalyFeedback}}</td>
+                            {{/if}}
                           </tr>
                           {{#if record.anomaly.comment}}
                             <tr style="border-bottom: 1px solid #C7D1D8;{{unless (mod-check index) 'background-color: #F6F8FA;'}}">
-                              <td colspan="4" style="padding: 10px;">
-                                <h5 style="color:#737373;font-weight: bold;">Comment:</h5> {{record.anomaly.comment}}
+                              <td colspan="{{colspanNum}}" style="padding: 3px;padding-top: 0;">
+                                <strong style="margin-left: 5px;">Comment:</strong> {{record.anomaly.comment}}
                               </td>
                             </tr>
                           {{/if}}

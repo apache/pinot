@@ -15,16 +15,25 @@
  */
 package com.linkedin.pinot.common.segment.fetcher;
 
+import java.io.File;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
-
-import java.io.File;
 
 
 public interface SegmentFetcher {
 
+  /**
+   * Initializes configurations
+   * @param configs
+   */
   void init(Configuration configs);
 
+  /**
+   * Fetches segment from a uri location to the local filesystem. Can come from a remote fs or a local fs.
+   * @param uri current segment location
+   * @param tempFile location segment will be stored locally
+   * @throws Exception
+   */
   void fetchSegmentToLocal(String uri, File tempFile) throws Exception;
 
   /**

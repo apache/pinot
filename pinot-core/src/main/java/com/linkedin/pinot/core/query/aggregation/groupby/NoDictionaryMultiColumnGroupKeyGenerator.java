@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMap;
 import com.linkedin.pinot.core.query.aggregation.groupby.utils.ValueToIdMapFactory;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.util.FixedIntArray;
-import java.util.HashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -43,14 +43,16 @@ import javax.annotation.Nonnull;
 public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerator {
   private final TransformExpressionTree[] _groupByExpressions;
   private final int _numGroupByExpressions;
-  private FieldSpec.DataType[] _dataTypes;
-  private Dictionary[] _dictionaries;
-  private ValueToIdMap[] _onTheFlyDictionaries;
-  private final Map<FixedIntArray, Integer> _groupKeyMap = new HashMap<>();
-  private int _numGroupKeys = 0;
+  private final FieldSpec.DataType[] _dataTypes;
+  private final Dictionary[] _dictionaries;
+  private final ValueToIdMap[] _onTheFlyDictionaries;
+  private final Object2IntOpenHashMap<FixedIntArray> _groupKeyMap;
+  private final int _globalGroupIdUpperBound;
 
-  public NoDictionaryMultiColumnGroupKeyGenerator(@Nonnull TransformOperator transformOperator,
-      TransformExpressionTree[] groupByExpressions) {
+  private int _numGroups = 0;
+
+  public NoDictionaryMultiColumnGroupKeyGenerator(TransformOperator transformOperator,
+      TransformExpressionTree[] groupByExpressions, int numGroupsLimit) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
     _dataTypes = new FieldSpec.DataType[_numGroupByExpressions];
@@ -67,12 +69,15 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
         _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_dataTypes[i]);
       }
     }
+
+    _groupKeyMap = new Object2IntOpenHashMap<>();
+    _groupKeyMap.defaultReturnValue(INVALID_ID);
+    _globalGroupIdUpperBound = numGroupsLimit;
   }
 
   @Override
   public int getGlobalGroupKeyUpperBound() {
-    // Since there's no dictionary, we cannot find the cardinality
-    return Integer.MAX_VALUE;
+    return _globalGroupIdUpperBound;
   }
 
   @Override
@@ -142,12 +147,6 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     return new GroupKeyIterator(_groupKeyMap);
   }
 
-  @Override
-  public void purgeKeys(@Nonnull int[] keysToPurge) {
-    // TODO: Implement purging.
-    throw new UnsupportedOperationException("Purging keys not yet supported in GroupKeyGenerator without dictionary.");
-  }
-
   /**
    * Helper method to get or create group-id for a group key.
    *
@@ -155,10 +154,12 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
    * @return Group id
    */
   private int getGroupIdForKey(FixedIntArray keyList) {
-    Integer groupId = _groupKeyMap.get(keyList);
-    if (groupId == null) {
-      groupId = _numGroupKeys;
-      _groupKeyMap.put(keyList, _numGroupKeys++);
+    int groupId = _groupKeyMap.getInt(keyList);
+    if (groupId == INVALID_ID) {
+      if (_numGroups < _globalGroupIdUpperBound) {
+        groupId = _numGroups;
+        _groupKeyMap.put(keyList, _numGroups++);
+      }
     }
     return groupId;
   }

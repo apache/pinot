@@ -18,16 +18,19 @@ package com.linkedin.pinot.server.starter.helix;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.core.crypt.PinotCrypter;
+import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
+import com.linkedin.pinot.core.data.manager.InstanceDataManager;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nonnull;
@@ -43,18 +46,28 @@ import org.slf4j.LoggerFactory;
 public class SegmentFetcherAndLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherAndLoader.class);
 
+  private static final String TAR_GZ_SUFFIX = ".tar.gz";
+  private static final String ENCODED_SUFFIX = ".enc";
+
+  private final InstanceDataManager _instanceDataManager;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  private final DataManager _dataManager;
+  private final Configuration _crypterConfig;
 
-  public SegmentFetcherAndLoader(DataManager dataManager, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      Configuration pinotHelixProperties) throws Exception {
+  public SegmentFetcherAndLoader(@Nonnull Configuration config, @Nonnull InstanceDataManager instanceDataManager,
+      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore) throws Exception {
+    _instanceDataManager = instanceDataManager;
     _propertyStore = propertyStore;
-    _dataManager = dataManager;
 
+    Configuration pinotFSConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
     Configuration segmentFetcherFactoryConfig =
-        pinotHelixProperties.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+        config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    Configuration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
 
+    PinotFSFactory.init(pinotFSConfig);
     SegmentFetcherFactory.getInstance().init(segmentFetcherFactoryConfig);
+    PinotCrypterFactory.init(pinotCrypterConfig);
+
+    _crypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
   }
 
   public void addOrReplaceOfflineSegment(String tableNameWithType, String segmentName) {
@@ -72,7 +85,7 @@ public class SegmentFetcherAndLoader {
 
       // We lock the segment in order to get its metadata, and then release the lock, so it is possible
       // that the segment is dropped after we get its metadata.
-      SegmentMetadata localSegmentMetadata = _dataManager.getSegmentMetadata(tableNameWithType, segmentName);
+      SegmentMetadata localSegmentMetadata = _instanceDataManager.getSegmentMetadata(tableNameWithType, segmentName);
 
       if (localSegmentMetadata == null) {
         LOGGER.info("Segment {} of table {} is not loaded in memory, checking disk", segmentName, tableNameWithType);
@@ -97,7 +110,7 @@ public class SegmentFetcherAndLoader {
             if (!isNewSegmentMetadata(newSegmentZKMetadata, localSegmentMetadata)) {
               LOGGER.info("Segment metadata same as before, loading {} of table {} (crc {}) from disk", segmentName,
                   tableNameWithType, localSegmentMetadata.getCrc());
-              _dataManager.addOfflineSegment(tableNameWithType, segmentName, indexDir);
+              _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, indexDir);
               // TODO Update zk metadata with CRC for this instance
               return;
             }
@@ -132,10 +145,13 @@ public class SegmentFetcherAndLoader {
           LOGGER.info("Trying to refresh segment {} of table {} with new data.", segmentName, tableNameWithType);
         }
         String uri = newSegmentZKMetadata.getDownloadUrl();
+        String crypterName = newSegmentZKMetadata.getCrypterName();
+        PinotCrypter crypter = (crypterName != null) ? PinotCrypterFactory.create(crypterName) : null;
+
         // Retry will be done here.
-        String localSegmentDir = downloadSegmentToLocal(uri, tableNameWithType, segmentName);
+        String localSegmentDir = downloadSegmentToLocal(uri, crypter, tableNameWithType, segmentName);
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(new File(localSegmentDir));
-        _dataManager.addOfflineSegment(tableNameWithType, segmentName, new File(localSegmentDir));
+        _instanceDataManager.addOfflineSegment(tableNameWithType, segmentName, new File(localSegmentDir));
         LOGGER.info("Downloaded segment {} of table {} crc {} from controller", segmentName, tableNameWithType,
             segmentMetadata.getCrc());
       } else {
@@ -169,15 +185,24 @@ public class SegmentFetcherAndLoader {
   }
 
   @Nonnull
-  private String downloadSegmentToLocal(@Nonnull String uri, @Nonnull String tableName, @Nonnull String segmentName)
+  private String downloadSegmentToLocal(@Nonnull String uri, PinotCrypter crypter, @Nonnull String tableName, @Nonnull String segmentName)
       throws Exception {
-    File tempDir = new File(new File(_dataManager.getSegmentFileDirectory(), tableName),
+    File tempDir = new File(new File(_instanceDataManager.getSegmentFileDirectory(), tableName),
         "tmp_" + segmentName + "_" + System.nanoTime());
     FileUtils.forceMkdir(tempDir);
-    File tempTarFile = new File(tempDir, segmentName + ".tar.gz");
+    File tempDownloadFile = new File(tempDir, segmentName + ENCODED_SUFFIX);
+    File tempTarFile = new File(tempDir, segmentName + TAR_GZ_SUFFIX);
     File tempSegmentDir = new File(tempDir, segmentName);
     try {
-      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempTarFile);
+      SegmentFetcherFactory.getInstance().getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempDownloadFile);
+      if (crypter != null) {
+        // TODO: We should not need to initialize crypter each time, instead Factory should have an initialized version ready.
+        crypter.init(_crypterConfig);
+        crypter.decrypt(tempDownloadFile, tempTarFile);
+      } else {
+        tempTarFile = tempDownloadFile;
+      }
+
       LOGGER.info("Downloaded tarred segment: {} for table: {} from: {} to: {}, file length: {}", segmentName,
           tableName, uri, tempTarFile, tempTarFile.length());
 
@@ -189,7 +214,7 @@ public class SegmentFetcherAndLoader {
       Preconditions.checkState(files != null && files.length == 1);
       File tempIndexDir = files[0];
 
-      File indexDir = new File(new File(_dataManager.getSegmentDataDirectory(), tableName), segmentName);
+      File indexDir = new File(new File(_instanceDataManager.getSegmentDataDirectory(), tableName), segmentName);
       if (indexDir.exists()) {
         LOGGER.info("Deleting existing index directory for segment: {} for table: {}", segmentName, tableName);
         FileUtils.deleteDirectory(indexDir);
@@ -203,6 +228,6 @@ public class SegmentFetcherAndLoader {
   }
 
   public String getSegmentLocalDirectory(String tableName, String segmentId) {
-    return _dataManager.getSegmentDataDirectory() + "/" + tableName + "/" + segmentId;
+    return _instanceDataManager.getSegmentDataDirectory() + "/" + tableName + "/" + segmentId;
   }
 }

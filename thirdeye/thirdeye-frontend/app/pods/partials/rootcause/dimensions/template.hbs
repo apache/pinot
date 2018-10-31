@@ -37,17 +37,6 @@
     }}
   {{/subtab.tabpanel}}
 
-{{!--   {{#subtab.tabpanel name="algorithm"}}
-    {{rootcause-dimensions-algorithm
-      entities=entities
-      metricUrn=metricUrn
-      range=context.anomalyRange
-      mode=context.compareMode
-      selectedUrns=selectedUrns
-      onSelection=(action "onSelection")
-    }}
-  {{/subtab.tabpanel}} --}}
-
   {{#subtab.tabpanel name="algorithm"}}
     {{rootcause-dimensions-algorithm
       entities=entities
@@ -57,21 +46,9 @@
       range=context.anomalyRange
       mode=context.compareMode
       selectedUrns=selectedUrns
+      enableSubTotals=false
       onSelection=(action "onSelection")
     }}
   {{/subtab.tabpanel}}
-
-{{!--   {{#subtab.tabpanel name="table"}}
-    {{rootcause-dimensions
-      entities=entities
-      metricUrn=metricUrn
-      metricId=metricId
-      filters=filteredUrns
-      range=context.anomalyRange
-      mode=context.compareMode
-      selectedUrns=selectedUrns
-      onSelection=(action "onSelection")
-    }}
-  {{/subtab.tabpanel}} --}}
 
 {{/shared/common-tabs}}

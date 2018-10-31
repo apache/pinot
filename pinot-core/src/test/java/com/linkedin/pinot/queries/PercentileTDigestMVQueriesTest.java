@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -26,6 +25,7 @@ import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.query.aggregation.function.PercentileTDigestAggregationFunction;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.tdunning.math.stats.TDigest;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,7 +56,7 @@ public class PercentileTDigestMVQueriesTest extends PercentileTDigestQueriesTest
 
       int numMultiValues = RANDOM.nextInt(MAX_NUM_MULTI_VALUES) + 1;
       Double[] values = new Double[numMultiValues];
-      TDigest tDigest = new TDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       for (int j = 0; j < numMultiValues; j++) {
         double value = RANDOM.nextDouble() * VALUE_RANGE;
         values[j] = value;

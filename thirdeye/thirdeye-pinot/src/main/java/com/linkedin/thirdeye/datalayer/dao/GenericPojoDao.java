@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.dao;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -177,7 +193,6 @@ public class GenericPojoDao {
    * @throws SQLException
    */
   public Connection getConnection() throws SQLException {
-    ThirdeyeMetricsUtil.dbCallCounter.inc();
     // ensure to close the connection
     return dataSource.getConnection();
   }
@@ -762,6 +777,8 @@ public class GenericPojoDao {
   }
 
   <T> T runTask(QueryTask<T> task, T defaultReturnValue) {
+    ThirdeyeMetricsUtil.dbCallCounter.inc();
+
     Connection connection = null;
     try {
       connection = getConnection();
@@ -771,8 +788,11 @@ public class GenericPojoDao {
       // Commit this transaction
       connection.commit();
       return t;
+
     } catch (Exception e) {
       LOG.error("Exception while executing query task", e);
+      ThirdeyeMetricsUtil.dbExceptionCounter.inc();
+
       // Rollback transaction in case json table is updated but index table isn't due to any errors (duplicate key, etc.)
       if (connection != null) {
         try {
@@ -782,6 +802,7 @@ public class GenericPojoDao {
         }
       }
       return defaultReturnValue;
+
     } finally {
       // Always close connection before leaving
       if (connection != null) {

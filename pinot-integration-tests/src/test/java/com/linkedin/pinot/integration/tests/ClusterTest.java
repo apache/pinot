@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.TableConfig;
@@ -22,8 +23,6 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
 import com.linkedin.pinot.common.utils.CommonConstants.Minion;
 import com.linkedin.pinot.common.utils.CommonConstants.Server;
 import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
@@ -33,6 +32,9 @@ import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.realtime.stream.StreamMessageDecoder;
 import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.minion.MinionStarter;
@@ -46,6 +48,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,6 +75,7 @@ import org.testng.Assert;
  * Base class for integration tests that involve a complete Pinot cluster.
  */
 public abstract class ClusterTest extends ControllerTest {
+  private static final Random RANDOM = new Random();
   private static final int DEFAULT_BROKER_PORT = 18099;
 
   protected final String _clusterName = getHelixClusterName();
@@ -80,6 +84,10 @@ public abstract class ClusterTest extends ControllerTest {
   private List<HelixBrokerStarter> _brokerStarters = new ArrayList<>();
   private List<HelixServerStarter> _serverStarters = new ArrayList<>();
   private List<MinionStarter> _minionStarters = new ArrayList<>();
+
+  protected Schema _schema;
+  protected TableConfig _offlineTableConfig;
+  protected TableConfig _realtimeTableConfig;
 
   protected void startBroker() {
     startBrokers(1);
@@ -100,7 +108,12 @@ public abstract class ClusterTest extends ControllerTest {
       configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
       configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(basePort + i));
       configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
-      configuration.setProperty("pinot.broker.delayShutdownTimeMs", 0);
+      configuration.setProperty(BrokerServerBuilder.DELAY_SHUTDOWN_TIME_MS_CONFIG, 0);
+      // Randomly choose to use connection-pool or single-connection request handler
+      if (RANDOM.nextBoolean()) {
+        configuration.setProperty(BrokerServerBuilder.REQUEST_HANDLER_TYPE_CONFIG,
+            BrokerServerBuilder.SINGLE_CONNECTION_REQUEST_HANDLER_TYPE);
+      }
       overrideBrokerConf(configuration);
       _brokerStarters.add(BrokerTestUtils.startBroker(_clusterName, zkStr, configuration));
     }
@@ -142,6 +155,8 @@ public abstract class ClusterTest extends ControllerTest {
             Server.DEFAULT_INSTANCE_SEGMENT_TAR_DIR + "-" + i);
         configuration.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, baseAdminApiPort - i);
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT, baseNettyPort + i);
+        // Set check interval time to 5 seconds for cluster tests.
+        configuration.setProperty(Server.CONFIG_OF_INSTANCE_CHECK_INTERVAL_TIME, 5_000L);
         overrideServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(_clusterName, zkStr, configuration));
       }
@@ -216,9 +231,14 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void addSchema(File schemaFile, String schemaName) throws Exception {
-    try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
-      fileUploadDownloadClient.addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort),
-          schemaName, schemaFile);
+    if (!isUsingNewConfigFormat()) {
+      try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient()) {
+        fileUploadDownloadClient
+            .addSchema(FileUploadDownloadClient.getUploadSchemaHttpURI(LOCAL_HOST, _controllerPort), schemaName,
+                schemaFile);
+      }
+    } else {
+      _schema = Schema.fromFile(schemaFile);
     }
   }
 
@@ -268,7 +288,12 @@ public abstract class ClusterTest extends ControllerTest {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, taskConfig);
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+
+    if (!isUsingNewConfigFormat()) {
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+    } else {
+      _offlineTableConfig = tableConfig;
+    }
   }
 
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
@@ -277,7 +302,12 @@ public abstract class ClusterTest extends ControllerTest {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
             invertedIndexColumns, taskConfig);
-    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
+
+    if (!isUsingNewConfigFormat()) {
+      sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
+    } else {
+      _offlineTableConfig = tableConfig;
+    }
   }
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
@@ -299,6 +329,10 @@ public abstract class ClusterTest extends ControllerTest {
   protected void dropOfflineTable(String tableName) throws Exception {
     sendDeleteRequest(
         _controllerRequestURLBuilder.forTableDelete(TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
+  }
+
+  protected boolean isUsingNewConfigFormat() {
+    return false;
   }
 
   public static class AvroFileSchemaKafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
@@ -338,30 +372,40 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
-      String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
+      String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
       List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig,
-      String kafkaConsumerFactoryName) throws Exception {
+      String streamConsumerFactoryName) throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
-    streamConfigs.put("streamType", "kafka");
+    String streamType = "kafka";
+    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
     if (useLlc) {
       // LLC
-      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.simple.toString());
-      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
-      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_FACTORY, kafkaConsumerFactoryName);
+      streamConfigs.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.LOWLEVEL.toString());
+      streamConfigs.put(KafkaStreamConfigProperties.constructStreamProperty(
+          KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BROKER_LIST), kafkaBrokerList);
     } else {
       // HLC
-      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
-      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
-      streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
+      streamConfigs.put(
+          StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+          StreamConfig.ConsumerType.HIGHLEVEL.toString());
+      streamConfigs.put(KafkaStreamConfigProperties.constructStreamProperty(
+          KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_ZK_CONNECTION_STRING), kafkaZkUrl);
     }
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, kafkaTopic);
-    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
-        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
-    streamConfigs.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
+    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), streamConsumerFactoryName);
     streamConfigs.put(
-        DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET, "smallest");
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME),
+        kafkaTopic);
+    AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
+    streamConfigs.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
+    streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, Integer.toString(realtimeSegmentFlushRows));
+    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
 
     TableConfig tableConfig = new TableConfig.Builder(Helix.TableType.REALTIME).setTableName(tableName)
         .setLLC(useLlc)
@@ -377,7 +421,12 @@ public abstract class ClusterTest extends ControllerTest {
         .setStreamConfigs(streamConfigs)
         .setTaskConfig(taskConfig)
         .build();
-    sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+
+    if (!isUsingNewConfigFormat()) {
+      sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
+    } else {
+      _realtimeTableConfig = tableConfig;
+    }
   }
 
   protected void dropRealtimeTable(String tableName) throws Exception {
@@ -388,13 +437,13 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addHybridTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig)
-      throws Exception {
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig,
+      String streamConsumerFactoryName) throws Exception {
     addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, SegmentVersion.v1,
         invertedIndexColumns, taskConfig);
     addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
         timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
-        noDictionaryColumns, taskConfig, null);
+        noDictionaryColumns, taskConfig, streamConsumerFactoryName);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {

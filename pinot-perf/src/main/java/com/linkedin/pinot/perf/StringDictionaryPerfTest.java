@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import java.io.File;
 import java.util.ArrayList;
@@ -114,7 +115,7 @@ public class StringDictionaryPerfTest {
    */
   public void perfTestLookups(int numLookups) throws Exception {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, ReadMode.heap);
-    ImmutableDictionaryReader dictionary = immutableSegment.getDictionary(COLUMN_NAME);
+    Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);
 
     Random random = new Random(System.nanoTime());
     long start = System.currentTimeMillis();

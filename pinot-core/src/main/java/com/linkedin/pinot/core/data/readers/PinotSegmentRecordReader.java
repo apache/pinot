@@ -21,10 +21,10 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
-import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.data.readers.sort.PinotSegmentSorter;
 import com.linkedin.pinot.core.data.readers.sort.SegmentSorter;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
+import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
@@ -135,29 +135,7 @@ public class PinotSegmentRecordReader implements RecordReader {
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String fieldName = fieldSpec.getName();
       if (fieldSpec.isSingleValueField()) {
-        switch (fieldSpec.getDataType()) {
-          case INT:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readInt(docId));
-            break;
-          case LONG:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readLong(docId));
-            break;
-          case FLOAT:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readFloat(docId));
-            break;
-          case DOUBLE:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readDouble(docId));
-            break;
-          case STRING:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readString(docId));
-            break;
-          case BYTES:
-            reuse.putField(fieldName, _columnReaderMap.get(fieldName).readBytes(docId));
-            break;
-          default:
-            throw new IllegalStateException(
-                "Field: " + fieldName + " has illegal data type: " + fieldSpec.getDataType());
-        }
+        reuse.putField(fieldName, _columnReaderMap.get(fieldName).readSV(docId, fieldSpec.getDataType()));
       } else {
         reuse.putField(fieldName, _columnReaderMap.get(fieldName).readMV(docId));
       }

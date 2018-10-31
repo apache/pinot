@@ -54,15 +54,16 @@ import org.testng.annotations.Test;
  * </ul>
  */
 public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String DEFAULT_TABLE_NAME = "myTable";
-  private static final String STAR_TREE_TABLE_NAME = "myStarTable";
+  protected static final String DEFAULT_TABLE_NAME = "myTable";
+  protected static final String STAR_TREE_TABLE_NAME = "myStarTable";
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
   private static final String QUERY_FILE_NAME = "OnTimeStarTreeQueries.txt";
   private static final int NUM_QUERIES_TO_GENERATE = 100;
 
+  protected Schema _schema;
+  protected StarTreeQueryGenerator _queryGenerator;
   private String _currentTable;
-  private StarTreeQueryGenerator _queryGenerator;
 
   @Nonnull
   @Override
@@ -90,6 +91,18 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
     addOfflineTable(DEFAULT_TABLE_NAME);
     addOfflineTable(STAR_TREE_TABLE_NAME);
 
+    // Set up segments and query generator
+    _schema = Schema.fromFile(getSchemaFile());
+    setUpSegmentsAndQueryGenerator();
+
+    // Wait for all documents loaded
+    _currentTable = DEFAULT_TABLE_NAME;
+    waitForAllDocsLoaded(600_000L);
+    _currentTable = STAR_TREE_TABLE_NAME;
+    waitForAllDocsLoaded(600_000L);
+  }
+
+  protected void setUpSegmentsAndQueryGenerator() throws Exception {
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
@@ -104,12 +117,6 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create and upload segments with star tree indexes from Avro data
     createAndUploadSegments(avroFiles, STAR_TREE_TABLE_NAME, true);
-
-    // Wait for all documents loaded
-    _currentTable = DEFAULT_TABLE_NAME;
-    waitForAllDocsLoaded(600_000L);
-    _currentTable = STAR_TREE_TABLE_NAME;
-    waitForAllDocsLoaded(600_000L);
   }
 
   private void createAndUploadSegments(List<File> avroFiles, String tableName, boolean createStarTreeIndex)
@@ -118,7 +125,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     ExecutorService executor = Executors.newCachedThreadPool();
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(avroFiles, 0, _segmentDir, _tarDir, tableName,
-        createStarTreeIndex, null, Schema.fromFile(getSchemaFile()), executor);
+        createStarTreeIndex, null, null, _schema, executor);
     executor.shutdown();
     executor.awaitTermination(10, TimeUnit.MINUTES);
 

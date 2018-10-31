@@ -16,16 +16,15 @@
 package com.linkedin.pinot.core.data;
 
 import com.linkedin.pinot.common.data.RowEvent;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.type.TypeReference;
-
+import com.linkedin.pinot.common.utils.StringUtil;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.type.TypeReference;
 
 
 /**
@@ -111,7 +110,7 @@ public class GenericRow implements RowEvent {
   public byte[] toBytes() throws IOException {
     StringWriter writer = new StringWriter();
     OBJECT_MAPPER.writeValue(writer, _fieldMap);
-    return writer.toString().getBytes(Charset.forName("UTF-8"));
+    return StringUtil.encodeUtf8(writer.toString());
   }
 
   /**

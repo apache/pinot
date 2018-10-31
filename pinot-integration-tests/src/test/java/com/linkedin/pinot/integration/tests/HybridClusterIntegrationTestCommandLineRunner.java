@@ -275,7 +275,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       ExecutorService executor = Executors.newCachedThreadPool();
       Schema schema = Schema.fromFile(_schemaFile);
       ClusterIntegrationTestUtils.buildSegmentsFromAvro(_offlineAvroFiles, 0, _segmentDir, _tarDir, _tableName, false,
-          getRawIndexColumns(), schema, executor);
+          null, getRawIndexColumns(), schema, executor);
       executor.shutdown();
       executor.awaitTermination(10, TimeUnit.MINUTES);
 
@@ -289,7 +289,7 @@ public class HybridClusterIntegrationTestCommandLineRunner {
       String timeType = outgoingTimeUnit.toString();
       addHybridTable(_tableName, _useLlc, KAFKA_BROKER, KAFKA_ZK_STR, getKafkaTopic(), getRealtimeSegmentFlushSize(),
           _realtimeAvroFiles.get(0), timeColumnName, timeType, schemaName, TENANT_NAME, TENANT_NAME, "MMAP",
-          _sortedColumn, _invertedIndexColumns, null, null);
+          _sortedColumn, _invertedIndexColumns, null, null, getStreamConsumerFactoryClassName());
 
       // Upload all segments
       uploadSegments(_tarDir);

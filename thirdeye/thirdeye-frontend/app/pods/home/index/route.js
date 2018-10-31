@@ -18,6 +18,7 @@ const queryParamsConfig = {
 
 export default Route.extend(AuthenticatedRouteMixin, {
   anomaliesApiService: service('services/api/anomalies'),
+  session: service(),
 
   queryParams: {
     appName: queryParamsConfig,
@@ -82,15 +83,15 @@ export default Route.extend(AuthenticatedRouteMixin, {
     return new RSVP.Promise(async (resolve, reject) => {
       try {
         const anomalyMapping = appName ? await this.get('_getAnomalyMapping').perform(model) : [];//DEMO:
-        const anomalyPerformance = appName ? await this.get('anomaliesApiService').queryPerformanceByAppNameUrl(appName, moment(this.get('startDate')).startOf('day').utc().format(), moment(this.get('endDate')).startOf('day').utc().format()) : [];
+        const alertsByMetric = appName ? this.getAlertsByMetric() : [];
         const defaultParams = {
           anomalyMapping,
-          anomalyPerformance,
           appName,
           startDate,
           endDate,
           duration,
-          feedbackType
+          feedbackType,
+          alertsByMetric
         };
         // Update model
         resolve(Object.assign(model, { ...defaultParams }));
@@ -126,31 +127,25 @@ export default Route.extend(AuthenticatedRouteMixin, {
   }).drop(),
 
   /**
-   * Retrieves metrics to index anomalies
-   * @return {String[]} - array of strings, each of which is a metric
-   * TODO: not used now. Clean up to follow - lohuynh
+   * Retrieves alerts based on metric name
+   * @return {Object} - associative array of alerts by metric
    */
-  getMetrics() {
-    let metricSet = new Set();
+  getAlertsByMetric() {
+    const metricsObj = {};
     this.get('applicationAnomalies').forEach(anomaly => {
-      metricSet.add(anomaly.get('metric'));
+      let functionName = anomaly.get('functionName');
+      let functionId = anomaly.get('functionId');
+      let metricName = anomaly.get('metricName');
+      if (!metricsObj[metricName]) {
+        metricsObj[metricName] = { names: [], selectedIndex: 0, ids: [] };
+      }
+      //let alertIncluded = metricsObj[metricName].find(alert => { alert.id === functionId });
+      if (metricsObj[metricName] && !metricsObj[metricName].names.includes(functionName)) {
+        metricsObj[metricName].names.push(functionName);
+        metricsObj[metricName].ids.push(functionId);
+      }
     });
-    return [...metricSet];
-  },
-
-  /**
-   * Retrieves alerts to index anomalies
-   * @return {String[]} - array of strings, each of which is a alerts
-   */
-  getAlerts() {
-    let alertSet = new Set();
-    const applicationAnomalies = this.get('applicationAnomalies');
-    if (applicationAnomalies) {
-      applicationAnomalies.forEach(anomaly => {
-        alertSet.add(anomaly.get('functionName'));
-      });
-    }
-    return [...alertSet];
+    return metricsObj;
   },
 
   /**
@@ -162,10 +157,21 @@ export default Route.extend(AuthenticatedRouteMixin, {
     controller.setProperties({
       columns,
       appNameSelected: model.applications.findBy('application', this.get('appName')),
-      //metricList: this.getMetrics(),//TODO: clean up - lohuynh
-      // alertList: this.getAlerts(),
       appName: this.get('appName'),
       anomaliesCount: this.get('applicationAnomalies.content') ? this.get('applicationAnomalies.content').length : 0
     });
+  },
+
+  actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    }
   }
 });

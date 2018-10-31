@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.anomaly.onboard.tasks;
 
 import com.google.common.base.Preconditions;
@@ -123,13 +139,13 @@ public class NotificationOnboardingTask extends BaseDetectionOnboardTask {
     context.setEnd(end);
 
     emailContentFormatter.init(new Properties(), emailFormatterConfig);
-    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getRecipients(),
+    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, alertConfig.getReceiverAddresses(),
         subject, null, "", filteredAnomalyResults, context);
     try {
       EmailHelper.sendEmailWithEmailEntity(emailEntity, smtpConfiguration);
     } catch (EmailException e) {
       LOG.error("Unable to send out email to recipients");
-      throw new IllegalStateException("Unable to send out email to recipients");
+      throw new IllegalStateException("Unable to send out email to recipients", e);
     }
 
     // Set the alert to be active after everything is successful

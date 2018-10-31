@@ -23,7 +23,6 @@ import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,13 +34,14 @@ public class StarTreeProjectionPlanNode implements PlanNode {
   private final Map<String, DataSource> _dataSourceMap;
   private final StarTreeDocIdSetPlanNode _starTreeDocIdSetPlanNode;
 
-  public StarTreeProjectionPlanNode(@Nonnull StarTreeV2 starTreeV2, @Nonnull Set<String> projectionColumns,
-      @Nullable FilterQueryTree rootFilterNode, @Nullable Set<String> groupByColumns) {
+  public StarTreeProjectionPlanNode(StarTreeV2 starTreeV2, Set<String> projectionColumns,
+      @Nullable FilterQueryTree rootFilterNode, @Nullable Set<String> groupByColumns,
+      @Nullable Map<String, String> debugOptions) {
     _dataSourceMap = new HashMap<>(projectionColumns.size());
     for (String projectionColumn : projectionColumns) {
       _dataSourceMap.put(projectionColumn, starTreeV2.getDataSource(projectionColumn));
     }
-    _starTreeDocIdSetPlanNode = new StarTreeDocIdSetPlanNode(starTreeV2, rootFilterNode, groupByColumns);
+    _starTreeDocIdSetPlanNode = new StarTreeDocIdSetPlanNode(starTreeV2, rootFilterNode, groupByColumns, debugOptions);
   }
 
   @Override

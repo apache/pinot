@@ -1,7 +1,24 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.tools.anomaly.report;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
@@ -14,6 +31,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.validation.Validation;
 import org.quartz.CronExpression;
+
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
 
 public class AnomalyReportDriver {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
@@ -88,7 +108,8 @@ public class AnomalyReportDriver {
     GenerateAnomalyReport reportGenerator =
         new GenerateAnomalyReport(startDate, endDate, persistenceFile,
             Arrays.asList(config.getDatasets().split(",")), config.getTeBaseUrl(),
-            detectorConfig.getSmtpConfiguration(), config.getEmailRecipients());
+            SmtpConfiguration.createFromProperties(detectorConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+            config.getEmailRecipients());
 
     reportGenerator.buildReport();
   }

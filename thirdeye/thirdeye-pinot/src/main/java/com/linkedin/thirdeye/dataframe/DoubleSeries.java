@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
@@ -570,6 +586,20 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     });
   }
 
+  /**
+   * Returns a copy of the series with the natural log of values.
+   *
+   * @return series copy with log values
+   */
+  public DoubleSeries log() {
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return Math.log(values[0]);
+      }
+    });
+  }
+
   public DoubleSeries add(Series other) {
     if(other.size() == 1)
       return this.add(other.getDouble(0));
@@ -862,6 +892,19 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     if(isNull(find))
       return this.fillNull(by);
     return this.set(this.eq(find), by);
+  }
+
+  public int find(double value, double epsilon) {
+    return this.find(value, epsilon, 0);
+  }
+
+  public int find(double value, double epsilon, int startOffset) {
+    for(int i=startOffset; i<this.values.length; i++)
+      if((this.values[i] >= value - epsilon
+          && this.values[i] <= value + epsilon)
+          || isNull(this.values[i]) && isNull(value))
+        return i;
+    return -1;
   }
 
   @Override

@@ -28,6 +28,14 @@ export default function() {
   });
 
   /**
+   * Mocks related Metric Id endpoints
+   */
+  // this.get('/rootcause/metric/aggregate/batch', (server, request) => {
+  //   const { urn, start, end, offsets, timezone } = request.queryParams;
+  //   return end;
+  // });
+
+  /**
    * Mocks anomaly region endpoint
    */
   this.get('/data/anomalies/ranges', (server, request) => {

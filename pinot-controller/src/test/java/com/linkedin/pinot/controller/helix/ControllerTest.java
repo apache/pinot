@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.LogUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
@@ -34,7 +33,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Arrays;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.methods.PostMethod;
 import org.apache.commons.httpclient.methods.PutMethod;
@@ -42,12 +40,12 @@ import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
 import org.apache.commons.httpclient.methods.multipart.Part;
 import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.log4j.Level;
 import org.json.JSONException;
 import org.testng.Assert;
 
@@ -82,9 +80,6 @@ public abstract class ControllerTest {
   }
 
   protected void startZk() {
-    LogUtils.setLogLevel(
-        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
-        Level.INFO);
     _zookeeperInstance = ZkStarter.startLocalZkServer();
   }
 
@@ -95,10 +90,6 @@ public abstract class ControllerTest {
   protected void stopZk() {
     try {
       ZkStarter.stopLocalZkServer(_zookeeperInstance);
-
-      LogUtils.setLogLevel(
-          Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
-          Level.WARN);
     } catch (Exception e) {
       // Swallow exceptions
     }
@@ -111,8 +102,6 @@ public abstract class ControllerTest {
     config.setDataDir(DEFAULT_DATA_DIR);
     config.setZkStr(ZkStarter.DEFAULT_ZK_STR);
 
-    // Includes default local PinotFS class
-    config.setPinotFSFactoryClasses(null);
     return config;
   }
 
@@ -184,6 +173,10 @@ public abstract class ControllerTest {
 
   public static String sendGetRequest(String urlString) throws IOException {
     return constructResponse(new URL(urlString).openStream());
+  }
+
+  public static String sendGetRequestRaw(String urlString) throws IOException {
+    return IOUtils.toString(new URL(urlString).openStream());
   }
 
   public static String sendPostRequest(String urlString, String payload) throws IOException {

@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -20,14 +36,12 @@ import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.AggregationLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.aggregation.DefaultAggregationLoader;
+import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
+import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
-import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.DefaultTimeSeriesLoader;
-import com.linkedin.thirdeye.dashboard.resources.v2.timeseries.TimeSeriesLoader;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -51,6 +65,8 @@ import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
+import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
@@ -1101,10 +1117,10 @@ public class AnomaliesResource {
     Collection<MetricSlice> slicesAnomalyBaseline = baseline.scatter(sliceAnomalyCurrent);
     Map<MetricSlice, DataFrame> anomalyBaselineMap = new HashMap<>();
     for (MetricSlice slice : slicesAnomalyBaseline) {
-      anomalyBaselineMap.put(slice, fixTimestamp(this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList()), slice.getStart()));
+      anomalyBaselineMap.put(slice, fixTimestamp(this.aggregationLoader.loadAggregate(slice, Collections.<String>emptyList(), -1), slice.getStart()));
     }
 
-    details.setCurrent(makeStringValue(this.aggregationLoader.loadAggregate(sliceAnomalyCurrent, Collections.<String>emptyList())));
+    details.setCurrent(makeStringValue(this.aggregationLoader.loadAggregate(sliceAnomalyCurrent, Collections.<String>emptyList(), -1)));
     details.setBaseline(makeStringValue(baseline.gather(sliceAnomalyCurrent, anomalyBaselineMap)));
 
     AnomalyOffset offsets = BaseAnomalyFunction.getDefaultOffsets(dataset);

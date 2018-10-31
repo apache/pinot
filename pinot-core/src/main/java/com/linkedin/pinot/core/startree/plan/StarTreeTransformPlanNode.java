@@ -23,8 +23,8 @@ import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import com.linkedin.pinot.core.startree.v2.StarTreeV2;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,9 +36,10 @@ public class StarTreeTransformPlanNode implements PlanNode {
   private final Set<TransformExpressionTree> _groupByExpressions;
   private final StarTreeProjectionPlanNode _starTreeProjectionPlanNode;
 
-  public StarTreeTransformPlanNode(@Nonnull StarTreeV2 starTreeV2,
-      @Nonnull Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs,
-      @Nullable Set<TransformExpressionTree> groupByExpressions, @Nullable FilterQueryTree rootFilterNode) {
+  public StarTreeTransformPlanNode(StarTreeV2 starTreeV2,
+      Set<AggregationFunctionColumnPair> aggregationFunctionColumnPairs,
+      @Nullable Set<TransformExpressionTree> groupByExpressions, @Nullable FilterQueryTree rootFilterNode,
+      @Nullable Map<String, String> debugOptions) {
     Set<String> projectionColumns = new HashSet<>();
     for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
@@ -56,7 +57,7 @@ public class StarTreeTransformPlanNode implements PlanNode {
       groupByColumns = null;
     }
     _starTreeProjectionPlanNode =
-        new StarTreeProjectionPlanNode(starTreeV2, projectionColumns, rootFilterNode, groupByColumns);
+        new StarTreeProjectionPlanNode(starTreeV2, projectionColumns, rootFilterNode, groupByColumns, debugOptions);
   }
 
   @Override

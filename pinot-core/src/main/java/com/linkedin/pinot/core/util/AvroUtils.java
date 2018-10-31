@@ -21,10 +21,12 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -291,6 +293,14 @@ public class AvroUtils {
     }
     if (fieldSpec.getDataType() == FieldSpec.DataType.STRING) {
       return avroValue.toString();
+    } else if (fieldSpec.getDataType() == FieldSpec.DataType.BYTES && avroValue instanceof ByteBuffer) {
+      // Avro ByteBuffer maps to byte[].
+      ByteBuffer byteBuffer = (ByteBuffer) avroValue;
+
+      // Assumes byte-buffer is ready to read. Also, avoid getting underlying array, as it may be over-sized.
+      byte[] bytes = new byte[byteBuffer.remaining()];
+      byteBuffer.get(bytes);
+      return bytes;
     }
     return avroValue;
   }

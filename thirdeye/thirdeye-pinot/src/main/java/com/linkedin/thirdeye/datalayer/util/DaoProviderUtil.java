@@ -1,8 +1,25 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.util;
 
 import com.google.common.base.CaseFormat;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AbstractManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
@@ -34,11 +51,23 @@ import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 import java.io.File;
+import java.io.FileReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
 import java.sql.Connection;
 import javax.validation.Validation;
 import org.apache.tomcat.jdbc.pool.DataSource;
+import org.h2.store.fs.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public abstract class DaoProviderUtil {
+  private static final Logger LOG = LoggerFactory.getLogger(DaoProviderUtil.class);
+
+  private static final String DEFAULT_DATABASE_PATH = "jdbc:h2:./config/h2db";
+  private static final String DEFAULT_DATABASE_FILE = "./config/h2db.mv.db";
 
   private static DataSource dataSource;
   private static ManagerProvider provider;
@@ -64,6 +93,27 @@ public abstract class DaoProviderUtil {
     // Timeout before an abandoned(in use) connection can be removed.
     dataSource.setRemoveAbandonedTimeout(600_000);
     dataSource.setRemoveAbandoned(true);
+
+    // create schema for default database
+    if (configuration.getDatabaseConfiguration().getUrl().equals(DEFAULT_DATABASE_PATH)
+        && !FileUtils.exists(DEFAULT_DATABASE_FILE)) {
+      try {
+        LOG.info("Creating database schema for default URL '{}'", DEFAULT_DATABASE_PATH);
+        Connection conn = dataSource.getConnection();
+        ScriptRunner scriptRunner = new ScriptRunner(conn, false, false);
+        scriptRunner.setDelimiter(";", true);
+
+        InputStream createSchema = DaoProviderUtil.class.getResourceAsStream("/schema/create-schema.sql");
+        scriptRunner.runScript(new InputStreamReader(createSchema));
+
+      } catch (Exception e) {
+        LOG.error("Could not create database schema. Attempting to use existing.", e);
+      }
+
+    } else {
+      LOG.info("Using existing database at '{}'", configuration.getDatabaseConfiguration().getUrl());
+    }
+
     init(dataSource);
   }
 

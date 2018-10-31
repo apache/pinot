@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.alert.content;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
@@ -76,7 +92,9 @@ public class OnboardingNotificationEmailContentFormatter extends BaseEmailConten
       alertConfig = new AlertConfigDTO();
     }
     templateData.put("application", returnValueOrDefault(alertConfig.getApplication(), DEFAULT_NULL_STRING_VALUE));
-    templateData.put("recipients", returnValueOrDefault(alertConfig.getRecipients(), DEFAULT_NULL_STRING_VALUE));
+    templateData.put("recipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getTo(), ','), DEFAULT_NULL_STRING_VALUE));
+    templateData.put("ccRecipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getCc(), ','), DEFAULT_NULL_STRING_VALUE));
+    templateData.put("bccRecipients", returnValueOrDefault(StringUtils.join(alertConfig.getReceiverAddresses().getBcc(), ','), DEFAULT_NULL_STRING_VALUE));
   }
 
   private String returnValueOrDefault(String value, String defaultValue) {

@@ -22,12 +22,11 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.common.utils.time.TimeConverter;
 import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.function.FunctionExpressionEvaluator;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -131,7 +130,7 @@ public class PlainFieldExtractor implements FieldExtractor {
         String expression = fieldSpec.getTransformFunction();
         FunctionExpressionEvaluator functionEvaluator;
         try {
-          functionEvaluator = new FunctionExpressionEvaluator(column, expression);
+          functionEvaluator = new FunctionExpressionEvaluator(expression);
           _functionEvaluatorMap.put(column, functionEvaluator);
         } catch (Exception e) {
           LOGGER.error("Unable to instantiate function evaluator for {}", expression, e);
@@ -210,15 +209,6 @@ public class PlainFieldExtractor implements FieldExtractor {
             hasError = true;
             _errorCount.put(column, _errorCount.get(column) + 1);
           }
-        } else if (value instanceof ByteBuffer) { // TODO: Need better handle for ByteBuffers.
-          // ByteBuffer implementations are package private and cannot be put into TYPE_MAP.
-          ByteBuffer byteBuffer = (ByteBuffer) value;
-
-          // Assumes byte-buffer is ready to read. Also, avoid getting underlying array, as it may be over-sized.
-          byte[] bytes = new byte[byteBuffer.limit()];
-          byteBuffer.get(bytes);
-          value = bytes;
-          source = PinotDataType.BYTES;
         } else {
           // Single-value.
           source = SINGLE_VALUE_TYPE_MAP.get(value.getClass());

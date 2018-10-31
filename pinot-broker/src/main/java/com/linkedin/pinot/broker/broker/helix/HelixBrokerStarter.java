@@ -41,6 +41,7 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.PreConnectCallback;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.Message;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -67,6 +68,7 @@ public class HelixBrokerStarter {
   private final LiveInstancesChangeListenerImpl _liveInstancesListener;
   private final MetricsRegistry _metricsRegistry;
   private final TableQueryQuotaManager _tableQueryQuotaManager;
+  private final TimeboundaryRefreshMessageHandlerFactory _tbiMessageHandler;
 
   // Set after broker is started, which is actually in the constructor.
   private AccessControlFactory _accessControlFactory;
@@ -136,6 +138,14 @@ public class HelixBrokerStarter {
     stateMachineEngine.registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
         stateModelFactory);
     _helixManager.connect();
+    _tbiMessageHandler = new TimeboundaryRefreshMessageHandlerFactory
+            (_helixExternalViewBasedRouting,
+                    _pinotHelixProperties.getLong(
+                            CommonConstants.Broker.CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL,
+                            CommonConstants.Broker.DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS));
+    _helixManager.getMessagingService().registerMessageHandlerFactory(
+            Message.MessageType.USER_DEFINE_MSG.toString(), _tbiMessageHandler);
+
     addInstanceTagIfNeeded(helixClusterName, brokerId);
 
     // Register the service status handler
@@ -183,15 +193,12 @@ public class HelixBrokerStarter {
     }
   }
 
-  private BrokerServerBuilder startBroker(Configuration config) throws Exception {
+  private BrokerServerBuilder startBroker(Configuration config) {
     if (config == null) {
       config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     }
-    final BrokerServerBuilder brokerServerBuilder =
-        new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
-            _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener, _tableQueryQuotaManager);
-    brokerServerBuilder.buildNetwork();
-    brokerServerBuilder.buildHTTP();
+    BrokerServerBuilder brokerServerBuilder = new BrokerServerBuilder(config, _helixExternalViewBasedRouting,
+        _helixExternalViewBasedRouting.getTimeBoundaryService(), _liveInstancesListener, _tableQueryQuotaManager);
     _accessControlFactory = brokerServerBuilder.getAccessControlFactory();
     _helixExternalViewBasedRouting.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
     _tableQueryQuotaManager.setBrokerMetrics(brokerServerBuilder.getBrokerMetrics());
@@ -277,6 +284,10 @@ public class HelixBrokerStarter {
     if (_spectatorHelixManager != null) {
       LOGGER.info("Disconnecting spectator Helix manager");
       _spectatorHelixManager.disconnect();
+    }
+    if (_tbiMessageHandler != null) {
+      LOGGER.info("Shutting down timeboundary info refresh message handler");
+      _tbiMessageHandler.shutdown();
     }
   }
 

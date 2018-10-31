@@ -1,163 +1,174 @@
-ThirdEye
-========
+# Introduction to ThirdEye
+[![Build Status](https://travis-ci.org/linkedin/pinot.svg?branch=master)](https://travis-ci.org/linkedin/pinot) [![license](https://img.shields.io/github/license/linkedin/pinot.svg)](LICENSE)
 
-A system for efficient monitoring of and drill-down into business metrics.
+ThirdEye is an integrated tool for realtime monitoring of time series and interactive root-cause analysis. It enables anyone inside an organization to collaborate on effective identification and analysis of deviations in business and system metrics. ThirdEye supports the entire workflow from anomaly detection, over root-cause analysis, to issue resolution and post-mortem reporting.
 
-Introduction
-------------
+## What is it for? (key features)
 
-Consider the problem of computing aggregates on a set of data. There are two
-extremes in terms of complexity with respect to space and time: 
+Online monitoring and analysis of business and system metrics from multiple data sources. ThirdEye comes batteries included for both detection and analysis use cases. It aims to minimize the Mean-Time-To-Detection (MTTD) and Mean-Time-To-Recovery (MTTR) of production issues. ThirdEye improves its detection and analysis performance over time from incremental user feedback.
 
-* Pre-materialize no aggregates, and require a scan of the data at runtime
-* Or, pre-materialize all of the aggregates, and require a simple key/value lookup at runtime
+**Detection**
+* Detection toolkit based on business rules and exponential smoothing
+* Realtime monitoring of high-dimensional time series
+* Native support for seasonality and permanent change points in time series
+* Email alerts with 1-click feedback for automated tuning of detection algorithms
 
-The former optimizes for space, whereas the latter optimizes for time.
+**Root-Cause Analysis**
+* Collaborative root-cause analysis dashboards
+* Interactive slice-and-dice of data, correlation analysis, and event identification
+* Reporting and archiving tools for anomalies and analyses
+* Knowledge graph construction over time from user feedback
 
-ThirdEye attempts to occupy a sweet-spot between these two extremes by
-pre-materializing a subset of aggregates with the goal to bound the number of
-records that need to be scanned to answer any given aggregation query.
+**Integration**
+* Connectors for continuous time series data from Pinot and CSV 
+* Connectors for discrete event data sources, such as holidays from Google calendar
+* Plugin support for detection and analysis components
 
-Build
------
+## What isn't it? (limitations)
 
-To build the project:
+ThirdEye maintains a dedicated meta-data store to capture data sources, anomalies, and relationships between entities but does not store raw time series data. It relies on systems such as Pinot, RocksDB, and Kafka to obtain both realtime and historic time series data.
 
-```
-./build
-```
+ThirdEye does not replace your issue tracker - it integrates with it. ThirdEye supports collaboration but focuses on the data-integration aspect of anomaly detection and root-cause analysis. After all, your organization probably already has a well-oiled issue resolution process that we don't want to disrupt.
 
-Configuration
--------------
+ThirdEye is not a generic dashboard builder toolkit. ThirdEye attempts to bring overview data from different sources into one single place on-demand. In-depth data about events, such as A/B experiments and deployments, should be kept in their respective systems. ThirdEye can link to these directly.
 
-To configure ThirdEye, one must minimally specify
+## Quick start
 
-* Dimension field names
-* Metric field names (and types)
-* Time field name (granuarity and retention)
+ThirdEye supports an interactive demo mode for the analysis dashboard. These steps will guide you to get started.
 
-In addition to this, one can specify a custom rollup function (used in bootstrap)
-to obtain a form of [iceberg cubing](http://www2.cs.uregina.ca/~dbd/cs831/notes/dcubes/iceberg.html).
+### 1: Prerequisites
 
-Bootstrap
----------
+You'll need Java 8+, Maven 3+, and NPM 3.10+
 
-To generate ThirdEye data, we use Hadoop to process raw Avro data.
 
-Before running the job, ensure the following directory structure and files
-exist on HDFS:
+### 2: Build ThirdEye
 
 ```
-{rootDir}/
-  {collection}/
-    config.yml    # your collection configuration 
-    schema.avsc   # the schema for your raw Avro data
+git clone https://github.com/linkedin/pinot.git
+cd pinot/thirdeye
+chmod +x install.sh run-frontend.sh run-backend.sh reset.sh
+./install.sh
 ```
 
-After this exists, create a job properties configuration file, e.g.:
+Note: The build of thirdeye-frontend may take several minutes
+
+
+### 3: Run ThirdEye frontend
 
 ```
-thirdeye.root=thirdeye
-thirdeye.collection=abook
-input.paths=thirdeye-input/abook
+./run-frontend.sh
 ```
 
-The job will scan for avro files recursively in `input.paths`.
 
-First, we must generate the star tree data structure. We want to do this on a
-big enough sample of data such that we capture the majority of periodicity in
-the data. Also, this needs to be done relatively infrequently, as we can re-use
-the star tree on subsequent data.
+### 4: Start an analysis
 
-The `com.linkedin.thirdeye.bootstrap.ThirdEyeJob` class (the main class of the
-shaded JAR in `thirdeye-bootstrap`) should be run to accomplish this:
+Point your favorite browser to
 
 ```
-# Analyze the input data
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar analysis job.properties
-
-# Aggregate at the granularity specified for ThirdEye
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar aggregation job.properties
-
-# Splits input data into above / below threshold using function
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar rollup_phase1 job.properties
-
-# Aggregates all possible combinations of raw dimension combination below threshold
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar rollup_phase2 job.properties
-
-# Selects the rolled-up dimension key for each raw dimension combination
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar rollup_phase3 job.properties
-
-# Sums metric time series by the rolled-up dimension key
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar rollup_phase4 job.properties
-
-# Builds star tree index structure using rolled-up dimension combination and those above threshold
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar startree_generation job.properties
+http://localhost:1426/app/#/rootcause?metricId=1
 ```
 
-After this point, we have built the star tree data structure, but we haven't loaded any data yet. We now perform the following two steps to load the data:
+Note: ThirdEye in demo mode will accept any credentials
+
+
+### 5: Have fun
+
+Available metrics in demo mode are:
+* business::puchases
+* business::revenue
+* tracking::adImpressions
+* tracking::pageViews
+
+Note: These metrics are regenerated randomly every time you launch ThirdEye in demo mode
+
+
+### 6: Shutdown
+
+You can stop the ThirdEye dashboard server anytime by pressing **Ctrl + C** in the terminal
+
+
+## Start ThirdEye with Pinot
+
+### 0: Prerequisites
+
+Run through the **Quick Start** guide and shut down the frontend server process.
+
+
+### 1: Update the data sources configuration
+
+Insert the connector configuration for Pinot in `thirdeye-pinot/config/data-sources/data-sources-config.yml`. Your config should look like this:
 
 ```
-# Sums raw Avro time-series data by dimension key
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar startree_bootstrap_phase1 job.properties
+dataSourceConfigs:
+  - className: com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource
+    properties:
+        zookeeperUrl: 'myZkCluster.myDomain:12913/pinot-cluster'
+        clusterName: 'myDemoCluster'
+        controllerConnectionScheme: 'https'
+        controllerHost: 'myPinotController.myDomain'
+        controllerPort: 10611
+        cacheLoaderClassName: com.linkedin.thirdeye.datasource.pinot.PinotControllerResponseCacheLoader
+    metadataSourceConfigs:
+      - className: com.linkedin.thirdeye.auto.onboard.AutoOnboardPinotMetadataSource
 
-# Groups records by star tree leaf node and creates leaf buffers
-hadoop jar thirdeye-bootstrap-1.0-SNAPSHOT.jar startree_bootstrap_phase2 job.properties
+  - className: com.linkedin.thirdeye.datasource.mock.MockThirdEyeDataSource
+    ...
 ```
 
-_Note: for incremental updates, the `analysis` phase must be run before `startree_bootstrap_phase1`_
+Note: You'll have to change the host names and port numbers according to your setup
 
-Load
-----
 
-To load data _the first time_ from HDFS into a local directory, use the
-`DataLoadTool` available via `thirdeye-tools` shaded JAR, e.g.:
+### 2: Enable Pinot auto-onboarding
 
-```
-# Get config, star-tree, dimension stores for abook from app user's thirdeye root directory
-java -jar thirdeye-tools/target/thirdeye-tools-1.0-SNAPSHOT-shaded.jar DataLoadTool \
-  -krb5 ~/Desktop/krb5.conf \
-  -includeConfig \
-  -includeStarTree \
-  -includeDimensions \
-  http://hdfs-namenode-machine:50070/user/app/thirdeye
-  file:///tmp/thirdeye \
-  abook
-```
-
-Then to pull only metrics from incremental uploads
+Update the `thirdeye-pinot/config/detector.yml` file to enable auto onboarding of pinot data sets.
 
 ```
-java -jar thirdeye-tools/target/thirdeye-tools-1.0-SNAPSHOT-shaded.jar DataLoadTool \
-  -krb5 ~/Desktop/krb5.conf \
-  http://hdfs-namenode-machine:50070/user/app/thirdeye
-  file:///tmp/thirdeye \
-  abook
+autoload: true
 ```
 
-One can also use the `-minTime` and `-maxTime` CLI arguments to control which
-segments are downloaded.
 
-This tool uses Kerberos for WebHDFS authentication. For more information on
-krb5.conf file, please read
-[this](http://web.mit.edu/kerberos/krb5-1.5/krb5-1.5/doc/krb5-admin/krb5.conf.html).
-
-_TODO: Add REST endpoint to upload data_
-
-Serve
------
-
-A sample server config:
+### 3: Run the backend worker to load all supported Pinot data sets
 
 ```
-rootDir: /tmp/thirdeye
-autoRestore: true
+./run-backend.sh
 ```
 
-To run the server:
+Note: This process may take some time. The worker process will print log messages for each data set schema being processed. Schemas must contain a `timeFieldSpec` in order for ThirdEye to onboard it automatically
+
+
+### 4: Stop the backend worker
+
+By pressing **Ctrl-C** in the terminal
+
+
+### 5: Run ThirdEye frontend
 
 ```
-java -jar thirdeye-server/target/thirdeye-server-1.0-SNAPSHOT-shaded.jar server /tmp/server.yml
+./run-frontend.sh
 ```
 
-_For more information on server configuration, see [dropwizard.io](http://dropwizard.io/)_
+
+### 4: Start an analysis
+
+Point your favorite browser to
+
+```
+http://localhost:1426/app/#/rootcause
+```
+
+and type any data set or metric name (fragment) in the search box. Auto-complete will now list the names of matching metrics. Select any metric to start an investigation.
+
+**Welcome to ThirdEye**
+
+
+## ThirdEye for production settings
+
+ThirdEye relies on a central meta data store to coordinate its workers and frontend processes. The first step towards moving ThirdEye into production should therefore be the setup of a dedicated (MySQL) database instance. You can use the `thirdeye-pinot/src/resources/schema/create-schema.sql` script to create your tables. Then, update the `thirdeye-pinot/config/persistence.yml` file with path and credentials. Once you have a dedicated database instance, you can run backend and frontend servers in parallel. 
+
+The next step could be the configuration of the holiday auto-loader. The holiday auto loader connects to the Google Calendar API. Once you obtain an API token, place it in `thirdeye-pinot/config/holiday-loader-key.json` and in `thirdeye-pinot/config/detector.yml` set `holidayEventsLoader: true`. Once the backend worker is restarted, it will periodically update the local cache of holiday events for ThirdEye's detection and Root-Cause Analysis components.
+
+
+## More information
+
+More information coming. In the meantime, use your favorite web search engine to search for 'Pinot ThirdEye' articles and blog posts.
+

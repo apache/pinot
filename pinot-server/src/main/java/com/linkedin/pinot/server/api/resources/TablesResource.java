@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
+import com.linkedin.pinot.common.restlet.resources.ResourceUtils;
 import com.linkedin.pinot.common.restlet.resources.TableSegments;
 import com.linkedin.pinot.common.restlet.resources.TablesList;
 import com.linkedin.pinot.core.data.manager.InstanceDataManager;
@@ -28,7 +29,6 @@ import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -44,7 +44,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,14 +66,10 @@ public class TablesResource {
       @ApiResponse(code = 200, message = "Success", response = TablesList.class),
       @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
   })
-  public TablesList listTables() {
-    InstanceDataManager dataManager = checkGetInstanceDataManager();
-    Collection<TableDataManager> tableDataManagers = dataManager.getTableDataManagers();
-    List<String> tables = new ArrayList<>(tableDataManagers.size());
-    for (TableDataManager tableDataManager : tableDataManagers) {
-      tables.add(tableDataManager.getTableName());
-    }
-    return new TablesList(tables);
+  public String listTables() {
+    InstanceDataManager instanceDataManager = checkGetInstanceDataManager();
+    List<String> tables = new ArrayList<>(instanceDataManager.getAllTables());
+    return ResourceUtils.convertToJsonString(new TablesList(tables));
   }
 
   private InstanceDataManager checkGetInstanceDataManager() {
@@ -106,7 +101,7 @@ public class TablesResource {
       @ApiResponse(code = 200, message = "Success", response = TableSegments.class),
       @ApiResponse(code = 500, message = "Server initialization error", response = ErrorInfo.class)
   })
-  public TableSegments listTableSegments(
+  public String listTableSegments(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE") @PathParam("tableName") String tableName) {
     TableDataManager tableDataManager = checkGetTableDataManager(tableName);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
@@ -115,7 +110,7 @@ public class TablesResource {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         segments.add(segmentDataManager.getSegmentName());
       }
-      return new TableSegments(segments);
+      return ResourceUtils.convertToJsonString(new TableSegments(segments));
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
@@ -182,8 +177,7 @@ public class TablesResource {
             (SegmentMetadataImpl) segmentDataManager.getSegment().getSegmentMetadata();
         segmentCrcForTable.put(segmentDataManager.getSegmentName(), segmentMetadata.getCrc());
       }
-      ObjectMapper mapper = new ObjectMapper();
-      return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(segmentCrcForTable);
+      return ResourceUtils.convertToJsonString(segmentCrcForTable);
     } catch (Exception e) {
       throw new WebApplicationException("Failed to convert crc information to json",
           Response.Status.INTERNAL_SERVER_ERROR);

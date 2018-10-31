@@ -19,12 +19,9 @@ import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.utils.LogUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
@@ -35,7 +32,6 @@ import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.apache.log4j.Level;
 import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -54,12 +50,11 @@ public class TableQueryQuotaManagerTest {
   private static String RAW_TABLE_NAME = "testTable";
   private static String OFFLINE_TABLE_NAME = RAW_TABLE_NAME + "_OFFLINE";
   private static String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
+  private static final String BROKER_INSTANCE_ID = "broker_instance_1";
+
 
   @BeforeTest
   public void beforeTest() {
-    LogUtils.setLogLevel(
-        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
-        Level.INFO);
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     String helixClusterName = "TestTableQueryQuotaManagerService";
 
@@ -70,7 +65,7 @@ public class TableQueryQuotaManagerTest {
   }
 
   private HelixManager initHelixManager(String helixClusterName) {
-    return new FakeHelixManager(helixClusterName, helixClusterName + "_1", InstanceType.CONTROLLER, ZkStarter.DEFAULT_ZK_STR);
+    return new FakeHelixManager(helixClusterName, BROKER_INSTANCE_ID, InstanceType.PARTICIPANT, ZkStarter.DEFAULT_ZK_STR);
   }
 
   public class FakeHelixManager extends ZKHelixManager {
@@ -82,7 +77,6 @@ public class TableQueryQuotaManagerTest {
           ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
       _zkclient.deleteRecursive("/" + clusterName + "/PROPERTYSTORE");
       _zkclient.createPersistent("/" + clusterName + "/PROPERTYSTORE", true);
-      _zkclient.waitUntilExists("/" + clusterName + "/PROPERTYSTORE", TimeUnit.SECONDS, 10L);
       setPropertyStore(clusterName);
     }
 
@@ -112,10 +106,6 @@ public class TableQueryQuotaManagerTest {
       ((FakeHelixManager) _helixManager).closeZkClient();
     }
     ZkStarter.stopLocalZkServer(_zookeeperInstance);
-
-    LogUtils.setLogLevel(
-        Arrays.asList("com.linkedin.pinot.common.utils", "org.I0Itec.zkclient", "org.apache.zookeeper.server"),
-        Level.WARN);
   }
 
   @Test
@@ -125,6 +115,9 @@ public class TableQueryQuotaManagerTest {
     setQps(tableConfig);
     _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
+
+    // All the request should be passed.
+    runQueries(70, 10);
 
     _tableQueryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
@@ -192,7 +185,7 @@ public class TableQueryQuotaManagerTest {
   @Test
   public void testBothTableHaveQpsQuotaConfig() throws Exception {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
-    brokerResource.setState(REALTIME_TABLE_NAME, "broker_instance_1", "ONLINE");
+    brokerResource.setState(REALTIME_TABLE_NAME, BROKER_INSTANCE_ID, "ONLINE");
     brokerResource.setState(REALTIME_TABLE_NAME, "broker_instance_2", "OFFLINE");
 
     QuotaConfig quotaConfig = new QuotaConfig();
@@ -224,17 +217,15 @@ public class TableQueryQuotaManagerTest {
     ZKMetadataProvider.setRealtimeTableConfig(_testPropertyStore, REALTIME_TABLE_NAME, TableConfig.toZnRecord(realtimeTableConfig));
     ZKMetadataProvider.setOfflineTableConfig(_testPropertyStore, OFFLINE_TABLE_NAME, TableConfig.toZnRecord(offlineTableConfig));
 
+    // Since each table has 2 online brokers, per broker rate becomes 100.0 / 2 = 50.0
     _tableQueryQuotaManager.initTableQueryQuota(offlineTableConfig, brokerResource);
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
     _tableQueryQuotaManager.initTableQueryQuota(realtimeTableConfig, brokerResource);
     // The hash map now contains 2 entries for both of the tables.
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 2);
 
-    for (int i = 0; i < 70; i++) {
-      Assert.assertTrue(_tableQueryQuotaManager.acquire(RAW_TABLE_NAME));
-      // Rate limiter generates 1 token every 10 milliseconds, have to make it sleep for a while.
-      Thread.sleep(10);
-    }
+    // Rate limiter generates 1 token every 10 milliseconds, have to make it sleep for a while.
+    runQueries(70, 10L);
 
     _tableQueryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
     // Since real-time table still has the qps quota, the size of the hash map becomes 1.
@@ -252,6 +243,11 @@ public class TableQueryQuotaManagerTest {
     setQps(tableConfig);
     _tableQueryQuotaManager.initTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 1);
+
+    runQueries(70, 10L);
+
+    _tableQueryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
+    Assert.assertEquals(_tableQueryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
@@ -374,8 +370,29 @@ public class TableQueryQuotaManagerTest {
 
   private ExternalView generateBrokerResource(String tableName) {
     ExternalView brokerResource = new ExternalView(BROKER_RESOURCE_INSTANCE);
-    brokerResource.setState(tableName, "broker_instance_1", "ONLINE");
+    brokerResource.setState(tableName, BROKER_INSTANCE_ID, "ONLINE");
     brokerResource.setState(tableName, "broker_instance_2", "OFFLINE");
     return brokerResource;
+  }
+
+  private void runQueries(int numOfTimesToRun, long millis) throws InterruptedException {
+    int count = 0;
+    for (int i = 0; i < numOfTimesToRun; i++) {
+      Assert.assertTrue(_tableQueryQuotaManager.acquire(RAW_TABLE_NAME));
+      count++;
+      Thread.sleep(millis);
+    }
+    Assert.assertEquals(count, numOfTimesToRun);
+
+    //Reduce the time of sleeping and some of the queries should be throttled.
+    count = 0;
+    millis /= 2;
+    for (int i = 0; i < numOfTimesToRun; i++) {
+      if (!_tableQueryQuotaManager.acquire(RAW_TABLE_NAME)) {
+        count++;
+      }
+      Thread.sleep(millis);
+    }
+    Assert.assertTrue(count > 0 && count < numOfTimesToRun);
   }
 }

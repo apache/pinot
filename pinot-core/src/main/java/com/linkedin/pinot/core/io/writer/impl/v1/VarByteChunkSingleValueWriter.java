@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import javax.annotation.concurrent.NotThreadSafe;
 
 
@@ -45,7 +45,6 @@ import javax.annotation.concurrent.NotThreadSafe;
  */
 @NotThreadSafe
 public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int CURRENT_VERSION = 2;
 
   private final int _chunkHeaderSize;
@@ -76,7 +75,7 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
 
   @Override
   public void setString(int row, String string) {
-    byte[] bytes = string.getBytes(UTF_8);
+    byte[] bytes = StringUtil.encodeUtf8(string);
     setBytes(row, bytes);
   }
 

@@ -65,9 +65,19 @@ public interface PredicateEvaluator {
    */
 
   /**
+   * Get the number of matching dictionary ids.
+   */
+  int getNumMatchingDictIds();
+
+  /**
    * Get the matching dictionary ids.
    */
   int[] getMatchingDictIds();
+
+  /**
+   * Get the number of non-matching dictionary ids.
+   */
+  int getNumNonMatchingDictIds();
 
   /**
    * Get the non-matching dictionary ids.

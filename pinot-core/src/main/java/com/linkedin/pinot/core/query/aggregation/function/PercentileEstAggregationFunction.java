@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.query.aggregation.function;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.common.ObjectSerDeUtils;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
@@ -60,8 +61,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
 
   @Nonnull
   @Override
-  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
-    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
@@ -83,12 +84,8 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
       case BYTES:
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
-        try {
-          for (int i = 0; i < length; i++) {
-            quantileDigest.merge(QuantileDigest.Builder.build(bytesValues[i]));
-          }
-        } catch (Exception e) {
-          throw new RuntimeException("Caught exception while aggregating QuantileDigest", e);
+        for (int i = 0; i < length; i++) {
+          quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
         }
         break;
       default:
@@ -114,13 +111,9 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
       case BYTES:
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
-        try {
-          for (int i = 0; i < length; i++) {
-            QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
-            quantileDigest.merge(QuantileDigest.Builder.build(bytesValues[i]));
-          }
-        } catch (Exception e) {
-          throw new RuntimeException("Caught exception while aggregating QuantileDigest", e);
+        for (int i = 0; i < length; i++) {
+          QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKeyArray[i]);
+          quantileDigest.merge(ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]));
         }
         break;
       default:
@@ -145,19 +138,16 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
             quantileDigest.add((long) value);
           }
         }
+        break;
       case BYTES:
         // Serialized QuantileDigest
         byte[][] bytesValues = blockValSets[0].getBytesValuesSV();
-        try {
-          for (int i = 0; i < length; i++) {
-            QuantileDigest value = QuantileDigest.Builder.build(bytesValues[i]);
-            for (int groupKey : groupKeysArray[i]) {
-              QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
-              quantileDigest.merge(value);
-            }
+        for (int i = 0; i < length; i++) {
+          QuantileDigest value = ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            QuantileDigest quantileDigest = getQuantileDigest(groupByResultHolder, groupKey);
+            quantileDigest.merge(value);
           }
-        } catch (Exception e) {
-          throw new RuntimeException("Caught exception while aggregating QuantileDigest", e);
         }
         break;
       default:

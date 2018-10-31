@@ -1,8 +1,10 @@
 import { bool } from '@ember/object/computed';
 import Component from '@ember/component';
 import { get, getProperties, computed } from '@ember/object';
-import { dateFormatFull } from 'thirdeye-frontend/utils/rca-utils';
-import moment from 'moment';
+import {
+  makeTime,
+  dateFormatFull
+} from 'thirdeye-frontend/utils/rca-utils';
 
 export default Component.extend({
   classNames: ['rootcause-header'],
@@ -90,7 +92,7 @@ export default Component.extend({
    * @type {string}
    */
   sessionUpdatedTimeFormatted: computed('sessionUpdatedTime', function () {
-    return moment(get(this, 'sessionUpdatedTime')).format(dateFormatFull);
+    return makeTime(get(this, 'sessionUpdatedTime')).format(dateFormatFull);
   }),
 
   actions: {

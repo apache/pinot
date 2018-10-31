@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
@@ -47,7 +48,7 @@ public class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentS
   private static final Random RANDOM = new Random();
 
   @Override
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
+  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
       String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
 

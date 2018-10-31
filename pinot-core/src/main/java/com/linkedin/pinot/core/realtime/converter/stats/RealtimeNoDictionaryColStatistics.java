@@ -17,132 +17,35 @@ package com.linkedin.pinot.core.realtime.converter.stats;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.index.data.source.ColumnDataSource;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
 
+import static com.linkedin.pinot.core.common.Constants.*;
 
 public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   final BlockValSet _blockValSet;
   final int _numDocIds;
-  Object _minValue;
-  Object _maxValue;
+  final String _operatorName;
 
   public RealtimeNoDictionaryColStatistics(ColumnDataSource dataSource) {
+    _operatorName = dataSource.getOperatorName();
     Block block = dataSource.nextBlock();
     _numDocIds = block.getMetadata().getEndDocId() + 1;
     _blockValSet = block.getBlockValueSet();
   }
 
-  private void gatherStatistics() {
-    final int rows[] = new int[_numDocIds];
-    for (int i = 0; i < _numDocIds; i++) {
-      rows[i] = i;
-    }
-    switch (_blockValSet.getValueType()) {
-      case INT:
-        computeIntMinMax(rows);
-        break;
-      case LONG:
-        computeLongMinMax(rows);
-        break;
-      case FLOAT:
-        computeFloatMinMax(rows);
-        break;
-      case DOUBLE:
-        computeDoubleMinMax(rows);
-        break;
-      default:
-        throw new UnsupportedOperationException();
-    }
-  }
-
-  private void computeIntMinMax(int[] rows) {
-    int values[] = new int[_numDocIds];
-    _blockValSet.getIntValues(rows, 0, _numDocIds, values, 0);
-    int min = Integer.MAX_VALUE;
-    int max = Integer.MIN_VALUE;
-    for (int i = 0; i < _numDocIds; i++) {
-      if (values[i] < min) {
-        min = values[i];
-      }
-      if (values[i] > max) {
-        max = values[i];
-      }
-    }
-    _minValue = Integer.valueOf(min);
-    _maxValue = Integer.valueOf(max);
-  }
-
-  private void computeLongMinMax(int[] rows) {
-    long values[] = new long[_numDocIds];
-    _blockValSet.getLongValues(rows, 0, _numDocIds, values, 0);
-    long min = Long.MAX_VALUE;
-    long max = Long.MIN_VALUE;
-    for (int i = 0; i < _numDocIds; i++) {
-      if (values[i] < min) {
-        min = values[i];
-      }
-      if (values[i] > max) {
-        max = values[i];
-      }
-    }
-    _minValue = Long.valueOf(min);
-    _maxValue = Long.valueOf(max);
-  }
-
-  private void computeFloatMinMax(int[] rows) {
-    float values[] = new float[_numDocIds];
-    _blockValSet.getFloatValues(rows, 0, _numDocIds, values, 0);
-    float min = Float.MAX_VALUE;
-    float max = Float.MIN_VALUE;
-    for (int i = 0; i < _numDocIds; i++) {
-      if (values[i] < min) {
-        min = values[i];
-      }
-      if (values[i] > max) {
-        max = values[i];
-      }
-    }
-    _minValue = Float.valueOf(min);
-    _maxValue = Float.valueOf(max);
-  }
-
-  private void computeDoubleMinMax(int[] rows) {
-    double values[] = new double[_numDocIds];
-    _blockValSet.getDoubleValues(rows, 0, _numDocIds, values, 0);
-    double min = Double.MAX_VALUE;
-    double max = Double.MIN_VALUE;
-    for (int i = 0; i < _numDocIds; i++) {
-      if (values[i] < min) {
-        min = values[i];
-      }
-      if (values[i] > max) {
-        max = values[i];
-      }
-    }
-    _minValue = Double.valueOf(min);
-    _maxValue = Double.valueOf(max);
-  }
-
   @Override
   public Object getMinValue() {
-    if (_minValue == null) {
-      gatherStatistics();
-    }
-    return _minValue;
+    throw new RuntimeException("Cannot get min value for no dictionary column " + _operatorName);
   }
 
   @Override
   public Object getMaxValue() {
-    if (_maxValue == null) {
-      gatherStatistics();
-    }
-    return _maxValue;
+    throw new RuntimeException("Cannot get max value for no dictionary column " + _operatorName);
   }
 
   @Override
@@ -152,7 +55,7 @@ public class RealtimeNoDictionaryColStatistics implements ColumnStatistics {
 
   @Override
   public int getCardinality() {
-    return Constants.UNKNOWN_CARDINALITY;
+    return UNKNOWN_CARDINALITY;
   }
 
   @Override

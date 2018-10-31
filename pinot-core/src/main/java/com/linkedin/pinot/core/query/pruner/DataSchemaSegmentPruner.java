@@ -15,111 +15,26 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterQuery;
-import com.linkedin.pinot.common.request.FilterQueryMap;
-import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
-import java.util.HashSet;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 
 
 /**
- * An implementation of SegmentPruner.
- * Querying columns not appearing in the given segment will be pruned.
- *
- *
+ * The <code>DataSchemaSegmentPruner</code> class prunes segment based on whether the all the querying columns exist in
+ * the segment schema.
  */
 public class DataSchemaSegmentPruner implements SegmentPruner {
 
-  private static final String COLUMN_KEY = "column";
+  @Override
+  public void init(Configuration config) {
+  }
 
   @Override
   public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
-    BrokerRequest brokerRequest = queryRequest.getBrokerRequest();
-    Schema schema = segment.getSegmentMetadata().getSchema();
-
-    // Check filtering columns
-    if (brokerRequest.getFilterQuery() != null && !filterQueryMatchedSchema(schema, brokerRequest.getFilterQuery(),
-        brokerRequest.getFilterSubQueryMap())) {
-      return true;
-    }
-
-    // Aggregation queries
-    if (brokerRequest.isSetAggregationsInfo()) {
-      Set<String> columns = new HashSet<>();
-
-      // Add expressions in aggregation functions
-      for (AggregationInfo aggregationInfo : brokerRequest.getAggregationsInfo()) {
-        if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
-          String expression = AggregationFunctionUtils.getColumn(aggregationInfo);
-          TransformExpressionTree.compileToExpressionTree(expression).getColumns(columns);
-        }
-      }
-
-      // Add expressions in group-by clause
-      if (brokerRequest.isSetGroupBy()) {
-        for (String expression : brokerRequest.getGroupBy().getExpressions()) {
-          TransformExpressionTree.compileToExpressionTree(expression).getColumns(columns);
-        }
-      }
-
-      // Check whether schema contains all columns
-      for (String column : columns) {
-        if (!schema.hasColumn(column)) {
-          return true;
-        }
-      }
-
-      return false;
-    }
-
-    // Check selection columns
-    if (brokerRequest.getSelections() != null) {
-      if (brokerRequest.getSelections().getSelectionColumns() != null) {
-        for (String columnName : brokerRequest.getSelections().getSelectionColumns()) {
-          if ((!columnName.equalsIgnoreCase("*")) && (!schema.hasColumn(columnName))) {
-            return true;
-          }
-        }
-      }
-      // Check columns to do sorting,
-      if (brokerRequest.getSelections().getSelectionSortSequence() != null) {
-        for (SelectionSort selectionOrder : brokerRequest.getSelections().getSelectionSortSequence()) {
-          if (!schema.hasColumn(selectionOrder.getColumn())) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-    // unsupported query type.
-    return true;
-  }
-
-  private boolean filterQueryMatchedSchema(Schema schema, FilterQuery filterQuery, FilterQueryMap filterQueryMap) {
-    if (filterQuery.getNestedFilterQueryIds() == null || filterQuery.getNestedFilterQueryIds().isEmpty()) {
-      return schema.hasColumn(filterQuery.getColumn());
-    } else {
-      for (Integer queryId : filterQuery.getNestedFilterQueryIds()) {
-        FilterQuery fq = filterQueryMap.getFilterQueryMap().get(queryId);
-        if (!filterQueryMatchedSchema(schema, fq, filterQueryMap)) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  @Override
-  public void init(Configuration config) {
-
+    Set<String> columnsInSchema = segment.getSegmentMetadata().getSchema().getColumnNames();
+    return !columnsInSchema.containsAll(queryRequest.getAllColumns());
   }
 
   @Override

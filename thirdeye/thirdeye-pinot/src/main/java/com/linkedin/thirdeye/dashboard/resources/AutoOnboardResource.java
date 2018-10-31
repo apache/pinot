@@ -1,13 +1,33 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.auto.onboard.AutoOnboard;
+import com.linkedin.thirdeye.auto.onboard.AutoOnboardUtility;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.DataSources;
 import com.linkedin.thirdeye.datasource.DataSourcesLoader;
+import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import java.lang.reflect.Constructor;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -27,30 +47,11 @@ import org.slf4j.LoggerFactory;
 @Path(value = "/autoOnboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class AutoOnboardResource {
-  private Map<String, AutoOnboard> dataSourceToOnboardMap = new HashMap<>();
 
-  private static final Logger LOG = LoggerFactory.getLogger(AutoOnboardResource.class);
+  private Map<String, List<AutoOnboard>> dataSourceToOnboardMap;
 
   public AutoOnboardResource(ThirdEyeConfiguration thirdeyeConfig) {
-    URL dataSourcesUrl = thirdeyeConfig.getDataSourcesAsUrl();
-    DataSources dataSources = DataSourcesLoader.fromDataSourcesUrl(dataSourcesUrl);
-    if (dataSources == null) {
-      throw new IllegalStateException("Could not create data sources config from path " + dataSourcesUrl);
-    }
-    for (DataSourceConfig dataSourceConfig : dataSources.getDataSourceConfigs()) {
-      String autoLoadClassName = dataSourceConfig.getAutoLoadClassName();
-      if (StringUtils.isNotBlank(autoLoadClassName)) {
-        try {
-          Constructor<?> constructor = Class.forName(autoLoadClassName).getConstructor(DataSourceConfig.class);
-          AutoOnboard autoOnboardConstructor = (AutoOnboard) constructor.newInstance(dataSourceConfig);
-          String datasourceClassName = dataSourceConfig.getClassName();
-          String dataSource = datasourceClassName.substring(datasourceClassName.lastIndexOf(".") + 1, datasourceClassName.length());
-          dataSourceToOnboardMap.put(dataSource, autoOnboardConstructor);
-        } catch (Exception e) {
-          LOG.error("Exception in creating autoload constructor {}", autoLoadClassName);
-        }
-      }
-    }
+    dataSourceToOnboardMap = AutoOnboardUtility.getDataSourceToAutoOnboardMap(thirdeyeConfig.getDataSourcesAsUrl());
   }
 
   @POST
@@ -60,7 +61,10 @@ public class AutoOnboardResource {
       return Response.status(Status.INTERNAL_SERVER_ERROR)
           .entity(String.format("Data source %s does not exist in config", datasource)).build();
     }
-    dataSourceToOnboardMap.get(datasource).runAdhoc();
+
+    for (AutoOnboard autoOnboard : dataSourceToOnboardMap.get(datasource)) {
+      autoOnboard.runAdhoc();
+    }
     return Response.ok().build();
   }
 

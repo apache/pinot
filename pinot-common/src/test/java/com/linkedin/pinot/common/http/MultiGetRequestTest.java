@@ -150,10 +150,8 @@ public class MultiGetRequestTest {
       }
     }
 
-    Assert.assertEquals(2, success);
-    Assert.assertEquals(1, errors);
-    Assert.assertEquals(1, timeouts);
+    Assert.assertEquals(success, 2);
+    Assert.assertEquals(errors, 1);
+    Assert.assertEquals(timeouts, 1);
   }
-
-
 }

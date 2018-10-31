@@ -115,7 +115,7 @@ public class SegmentInfoProvider {
 
     // Add all single-value dimension columns.
     for (DimensionFieldSpec fieldSpec : schema.getDimensionFieldSpecs()) {
-      if (!fieldSpec.isSingleValueField()) {
+      if (!fieldSpec.isSingleValueField() || schema.isVirtualColumn(fieldSpec.getName())) {
         continue;
       }
       String column = fieldSpec.getName();

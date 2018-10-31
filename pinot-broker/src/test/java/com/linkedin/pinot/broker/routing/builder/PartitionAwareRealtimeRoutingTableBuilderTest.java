@@ -305,7 +305,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
       TableConfig tableConfig, ExternalView externalView, List<InstanceConfig> instanceConfigs) {
 
     PartitionAwareRealtimeRoutingTableBuilder routingTableBuilder = new PartitionAwareRealtimeRoutingTableBuilder();
-    routingTableBuilder.init(null, tableConfig, propertyStore);
+    routingTableBuilder.init(null, tableConfig, propertyStore, null);
     routingTableBuilder.computeRoutingTableFromExternalView(REALTIME_TABLE_NAME, externalView, instanceConfigs);
 
     return routingTableBuilder;

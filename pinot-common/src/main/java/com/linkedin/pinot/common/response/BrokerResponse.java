@@ -62,6 +62,16 @@ public interface BrokerResponse {
       throws Exception;
 
   /**
+   * Returns the number of servers queried.
+   */
+  int getNumServersQueried();
+
+  /**
+   * Returns the number of servers responded.
+   */
+  int getNumServersResponded();
+
+  /**
    * Get number of documents scanned while processing the query.
    */
   long getNumDocsScanned();
@@ -80,6 +90,11 @@ public interface BrokerResponse {
    * Get total number of documents within the table hit.
    */
   long getTotalDocs();
+
+  /**
+   * Returns whether the number of groups limit has been reached.
+   */
+  boolean isNumGroupsLimitReached();
 
   /**
    * Get number of exceptions recorded in the response.

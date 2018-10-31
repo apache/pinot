@@ -36,11 +36,11 @@ module('Integration | Component | rootcause-dimensions-settings', function(hooks
     const $selectErrorField = this.$('#dimension-select-error').find('.ember-power-select-selected-item').get(0);
 
     assert.ok(
-      $selectInclude.innerText.includes('Select a dimension to include')
+      $selectInclude.innerText.trim().includes('Select a dimension to include')
     );
 
     assert.ok(
-      $selectExclude.innerText.includes('Select a dimension to exclude')
+      $selectExclude.innerText.trim().includes('Select a dimension to exclude')
     );
 
     assert.ok(
@@ -48,23 +48,23 @@ module('Integration | Component | rootcause-dimensions-settings', function(hooks
     );
 
     assert.ok(
-      $settingsFields.innerText.includes('Levels of dimension (max 3)')
+      $settingsFields.innerText.trim().includes('Levels of dimension (max 3)')
     );
 
     assert.ok(
-      $settingsFields.innerText.includes('Levels of dimension to slice by')
+      $settingsFields.innerText.trim().includes('Levels of dimension to slice by')
     );
 
     assert.ok(
-      $selectErrorLabels.innerText.includes('One side error')
+      $selectErrorLabels.innerText.trim().includes('One side error')
     );
 
     assert.ok(
-      $selectErrorLabels.innerText.includes('One side error')
+      $selectErrorLabels.innerText.trim().includes('One side error')
     );
 
     assert.equal(
-      $selectErrorField.innerText,
+      $selectErrorField.innerText.trim(),
       'false',
       'One-side-error default value is false'
     );

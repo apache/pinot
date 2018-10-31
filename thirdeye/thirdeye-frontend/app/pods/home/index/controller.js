@@ -1,8 +1,9 @@
 import Controller from '@ember/controller';
 import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
-import { computed, set, get } from '@ember/object';
+import { computed, set, get, setProperties } from '@ember/object';
 import { isBlank } from '@ember/utils';
 import moment from 'moment';
+import _ from 'lodash';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
 
@@ -13,8 +14,8 @@ const DISPLAY_DATE_FORMAT = 'YYYY-MM-DD HH:mm'; // format used consistently acro
 const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
 
 export default Controller.extend({
-  anomalyResponseObj: anomalyUtil.anomalyResponseObj,
   toggleCollapsed: false, /* hide/show accordians */
+  isReportAnomalyEnabled: false,
 
   /**
    * Overrides ember-models-table's css classes
@@ -25,19 +26,18 @@ export default Controller.extend({
 
   init() {
     this._super(...arguments);
-    get(this, 'anomalyResponseObj').push({
+    // Add ALL option to copy of global anomaly response object
+    const anomalyResponseFilterTypes = _.cloneDeep(anomalyUtil.anomalyResponseObj);
+    anomalyResponseFilterTypes.push({
       name: 'All Resolutions',
       value: 'ALL',
       status: 'All Resolutions'
     });
+    setProperties(this, {
+      anomalyResponseFilterTypes,
+      anomalyResponseNames: anomalyResponseFilterTypes.mapBy('name')
+    });
   },
-
-  anomalyResponseNames: computed(
-    'anomalyResponseObj',
-    function() {
-      return anomalyUtil.anomalyResponseObj.mapBy('name');
-    }
-  ),
 
   filteredAnomalyMapping: computed(
     'model.{anomalyMapping,feedbackType}',
@@ -102,20 +102,43 @@ export default Controller.extend({
    * @type {Object[]} - array of objects, each of which represents a stats card
    */
   stats: computed(
-    'model.anomalyPerformance',
+    'model.anomalyMapping',
     function() {
-      if (!get(this, 'model.anomalyPerformance')) {
+      const anomalyMapping = get(this, 'model.anomalyMapping');
+      if (!anomalyMapping) {
         return {};
       }
+      let respondedAnomaliesCount = 0;
+      let truePositives = 0;
+      let falsePositives = 0;
+      let falseNegatives = 0;
+      Object.keys(anomalyMapping).forEach(function (key) {
+        anomalyMapping[key].forEach(function (attr) {
+          const classification = attr.anomaly.data.classification;
+          if (classification != 'NONE') {
+            respondedAnomaliesCount++;
+            if (classification == 'TRUE_POSITIVE') {
+              truePositives++;
+            } else if (classification == 'FALSE_POSITIVE') {
+              falsePositives++;
+            } else if (classification == 'FALSE_NEGATIVE') {
+              falseNegatives++;
+            }
+          }
+        });
+      });
 
-      const { responseRate, precision, recall } = get(this, 'model.anomalyPerformance').getProperties('responseRate', 'precision', 'recall');
+      const totalAnomaliesCount = get(this, 'anomaliesCount');
+      const responseRate = respondedAnomaliesCount / totalAnomaliesCount;
+      const precision = truePositives / (truePositives + falsePositives);
+      const recall = truePositives / (truePositives + falseNegatives);
       const totalAlertsDescription = 'Total number of anomalies that occured over a period of time';
       const responseRateDescription = '% of anomalies that are reviewed';
       const precisionDescription = '% of all anomalies detected by the system that are true';
       const recallDescription = '% of all anomalies detected by the system';
       //TODO: Since totalAlerts is not correct here. We will use anomaliesCount for now till backend api is fixed. - lohuynh
       const statsArray = [
-        ['Number of anomalies', totalAlertsDescription, get(this, 'anomaliesCount'), 'digit'],
+        ['Number of anomalies', totalAlertsDescription, totalAnomaliesCount, 'digit'],
         ['Response Rate', responseRateDescription, floatToPercent(responseRate), 'percent'],
         ['Precision', precisionDescription, floatToPercent(precision), 'percent'],
         ['Recall', recallDescription, floatToPercent(recall), 'percent']
@@ -131,12 +154,49 @@ export default Controller.extend({
    * @return {string}
    */
   _checkFeedback: function(selected) {
-    return get(this, 'anomalyResponseObj').find((type) => {
+    return get(this, 'anomalyResponseFilterTypes').find((type) => {
       return type.name === selected;
     });
   },
 
   actions: {
+
+    /**
+     * Sets the selected metric alert if user triggers power-select
+     * @param {String} metric - the metric group for the selection
+     * @param {String} alertNeme - name of selected alert
+     * @return {undefined}
+     */
+    onSelectAlert(metric, alertName) {
+      const targetMetricRecord = get(this.model, 'alertsByMetric')[metric];
+      if (targetMetricRecord.names.length > 1) {
+        targetMetricRecord.selectedIndex = targetMetricRecord.names.findIndex(alert => { return alert === alertName; });
+      }
+    },
+
+    /**
+     * Navigates to the alert page for selected alert for the purpose of reporting a missing anomaly
+     * @param {String} metric - the metric group for the selection
+     * @param {Array} anomalyList - array of anomalies for selected metric
+     * @return {undefined}
+     */
+    onClickReport(metric, anomalyList) {
+      const targetMetricRecord = get(this.model, 'alertsByMetric')[metric];
+      const targetId = targetMetricRecord.ids[targetMetricRecord.selectedIndex];
+      const duration = anomalyList[0].humanizedObject.queryDuration;
+      const startDate = anomalyList[0].humanizedObject.queryStart;
+      const endDate = anomalyList[0].humanizedObject.queryEnd;
+      // Navigate to alert page for selected alert
+      if (targetId) {
+        this.transitionToRoute('manage.alert', targetId, { queryParams: {
+          duration,
+          startDate,
+          endDate,
+          openReport: true
+        }});
+      }
+    },
+
     /**
      * Toggles the show/hide of the metric tables
      */

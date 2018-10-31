@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -42,15 +43,15 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
   private static final Logger LOGGER = LoggerFactory.getLogger(BalanceNumSegmentAssignmentStrategy.class);
 
   @Override
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      String helixClusterName, SegmentMetadata segmentMetadata, int numReplicas, String tenantName) {
+  public List<String> getAssignedInstances(HelixManager helixManager, HelixAdmin helixAdmin,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String helixClusterName, SegmentMetadata segmentMetadata,
+      int numReplicas, String tenantName) {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
     String serverTenantName = TagNameUtils.getOfflineTagForTenant(tenantName);
 
     List<String> selectedInstances = new ArrayList<>();
     Map<String, Integer> currentNumSegmentsPerInstanceMap = new HashMap<>();
-    List<String> allTaggedInstances =
-        HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
+    List<String> allTaggedInstances = HelixHelper.getEnabledInstancesWithTag(helixManager, serverTenantName);
 
     for (String instance : allTaggedInstances) {
       currentNumSegmentsPerInstanceMap.put(instance, 0);

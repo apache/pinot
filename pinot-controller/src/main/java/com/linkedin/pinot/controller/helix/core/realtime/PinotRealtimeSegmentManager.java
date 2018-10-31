@@ -22,7 +22,8 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -43,6 +44,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.apache.helix.ControllerChangeListener;
@@ -92,7 +94,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     String zkUrl = _pinotHelixResourceManager.getHelixZkURL();
     _zkClient = new ZkClient(zkUrl, ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT);
     _zkClient.setZkSerializer(new ZNRecordSerializer());
-    _zkClient.waitUntilConnected();
+    _zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS);
 
     // Subscribe to any data/child changes to property
     _zkClient.subscribeChildChanges(_tableConfigPath, this);
@@ -128,8 +130,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         continue;
       }
 
-      StreamMetadata metadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-      if (metadata.hasHighLevelKafkaConsumerType()) {
+      StreamConfig metadata = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+      if (metadata.hasHighLevelConsumerType()) {
         idealStateMap.put(realtimeTableName, _pinotHelixResourceManager.getHelixAdmin()
             .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), realtimeTableName));
       } else {
@@ -326,8 +328,8 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         String znRecordId = tableConfigZnRecord.getId();
         if (TableNameBuilder.getTableTypeFromTableName(znRecordId) == TableType.REALTIME) {
           TableConfig tableConfig = TableConfig.fromZnRecord(tableConfigZnRecord);
-          StreamMetadata metadata = new StreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-          if (metadata.hasHighLevelKafkaConsumerType()) {
+          StreamConfig metadata = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
+          if (metadata.hasHighLevelConsumerType()) {
             String realtimeTable = tableConfig.getTableName();
             String realtimeSegmentsPathForTable = _propertyStorePath + SEGMENTS_PATH + "/" + realtimeTable;
 

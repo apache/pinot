@@ -33,12 +33,12 @@ module('Acceptance | rootcause', async function(hooks) {
         '/rootcause?metricId=1',
         'link is correct');
       assert.equal(
-        $(rcEl.LABEL).get(0).innerText,
+        $(rcEl.LABEL).get(0).innerText.trim(),
         'pageViews',
         'metric label is correct'
       );
       assert.equal(
-        $(rcEl.SELECTED_METRIC).get(0).innerText,
+        $(rcEl.SELECTED_METRIC).get(0).innerText.trim(),
         'pageViews',
         'selected metric is correct'
       );
@@ -63,14 +63,14 @@ module('Acceptance | rootcause', async function(hooks) {
         'My Session',
         'session name is correct');
       assert.ok(
-        $(rcEl.LAST_SAVED).get(0).innerText.includes('Last saved by rootcauseuser'),
+        $(rcEl.LAST_SAVED).get(0).innerText.trim().includes('Last saved by rootcauseuser'),
         'last saved information is correct');
       assert.equal(
         $(rcEl.COMMENT_TEXT).get(1).value,
         'Cause of anomaly is unknown',
         'comments are correct');
       assert.equal(
-        $(rcEl.BASELINE).get(0).innerText,
+        $(rcEl.BASELINE).get(0).innerText.trim(),
         'WoW',
         'default baseline is correct');
     });
@@ -81,7 +81,7 @@ module('Acceptance | rootcause', async function(hooks) {
     const $tabLinks = $(`${rcEl.TABS} .thirdeye-link`);
 
     assert.equal(
-      $tabLinks.get(0).innerText,
+      $tabLinks.get(0).innerText.trim(),
       'Metrics',
       'default tab is correct');
     assert.ok(
@@ -95,7 +95,7 @@ module('Acceptance | rootcause', async function(hooks) {
       $(rcEl.HEATMAP_DROPDOWN).get(0),
       'heatmap dropdown exists');
     assert.equal(
-      $(rcEl.SELECTED_HEATMAP_MODE).get(4).innerText,
+      $(rcEl.SELECTED_HEATMAP_MODE).get(4).innerText.trim(),
       'Change in Contribution',
       'default heatmap mode is correct');
 

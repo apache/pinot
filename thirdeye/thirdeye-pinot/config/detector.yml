@@ -1,0 +1,79 @@
+logging:
+  level: INFO
+  loggers:
+    org.hibernate.engine.internal: WARN
+server:
+  type: default
+  rootPath: '/api/*'
+  applicationContextPath: /
+  adminContextPath: /admin
+  applicationConnectors:
+    - type: http
+      port: 1867
+  adminConnectors:
+    - type: http
+      port: 1868
+alert: false
+autoload: false
+classifier: false
+holidayEventsLoader: false
+monitor: false
+pinotProxy: false
+scheduler: false
+worker: false
+detectionPipeline: false
+detectionAlert: false
+dashboardHost: "http://localhost:1426"
+id: 0
+smtpConfiguration:
+  smtpHost: "localhost"
+  smtpPort: 25
+  smtpUser: ""
+  smtpPassword: ""
+failureFromAddress: "thirdeye@localhost"
+failureToAddress: "thirdeye@localhost"
+phantomJsPath: "/usr/local/bin/jstf"
+swagger:
+  resourcePackage: "com.linkedin.thirdeye.dashboard.resources,com.linkedin.thirdeye.dashboard.resources.v2,com.linkedin.thirdeye.anomaly.onboard"
+holidayEventsLoaderConfiguration:
+  calendars:
+       - "en.australian#holiday@group.v.calendar.google.com"
+       - "en.austrian#holiday@group.v.calendar.google.com"
+       - "en.brazilian#holiday@group.v.calendar.google.com"
+       - "en.canadian#holiday@group.v.calendar.google.com"
+       - "en.china#holiday@group.v.calendar.google.com"
+       - "en.christian#holiday@group.v.calendar.google.com"
+       - "en.danish#holiday@group.v.calendar.google.com"
+       - "en.dutch#holiday@group.v.calendar.google.com"
+       - "en.finnish#holiday@group.v.calendar.google.com"
+       - "en.french#holiday@group.v.calendar.google.com"
+       - "en.german#holiday@group.v.calendar.google.com"
+       - "en.greek#holiday@group.v.calendar.google.com"
+       - "en.hong_kong#holiday@group.v.calendar.google.com"
+       - "en.indian#holiday@group.v.calendar.google.com"
+       - "en.indonesian#holiday@group.v.calendar.google.com"
+       - "en.irish#holiday@group.v.calendar.google.com"
+       - "en.islamic#holiday@group.v.calendar.google.com"
+       - "en.italian#holiday@group.v.calendar.google.com"
+       - "en.japanese#holiday@group.v.calendar.google.com"
+       - "en.jewish#holiday@group.v.calendar.google.com"
+       - "en.malaysia#holiday@group.v.calendar.google.com"
+       - "en.mexican#holiday@group.v.calendar.google.com"
+       - "en.new_zealand#holiday@group.v.calendar.google.com"
+       - "en.norwegian#holiday@group.v.calendar.google.com"
+       - "en.philippines#holiday@group.v.calendar.google.com"
+       - "en.polish#holiday@group.v.calendar.google.com"
+       - "en.portuguese#holiday@group.v.calendar.google.com"
+       - "en.russian#holiday@group.v.calendar.google.com"
+       - "en.singapore#holiday@group.v.calendar.google.com"
+       - "en.sa#holiday@group.v.calendar.google.com"
+       - "en.south_korea#holiday@group.v.calendar.google.com"
+       - "en.spain#holiday@group.v.calendar.google.com"
+       - "en.swedish#holiday@group.v.calendar.google.com"
+       - "en.taiwan#holiday@group.v.calendar.google.com"
+       - "en.thai#holiday@group.v.calendar.google.com"
+       - "en.uk#holiday@group.v.calendar.google.com"
+       - "en.usa#holiday@group.v.calendar.google.com"
+       - "en.vietnamese#holiday@group.v.calendar.google.com"
+  holidayLoadRange: 2592000000
+  runFrequency: 7

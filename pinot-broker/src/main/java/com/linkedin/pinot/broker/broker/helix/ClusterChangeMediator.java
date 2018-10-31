@@ -26,9 +26,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.ExternalViewChangeListener;
-import org.apache.helix.InstanceConfigChangeListener;
-import org.apache.helix.LiveInstanceChangeListener;
+import org.apache.helix.api.listeners.ExternalViewChangeListener;
+import org.apache.helix.api.listeners.InstanceConfigChangeListener;
+import org.apache.helix.api.listeners.LiveInstanceChangeListener;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
@@ -93,7 +93,7 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
             if (externalViewUpdated) {
               try {
                 _helixExternalViewBasedRouting.processExternalViewChange();
-                // TODO: call processQueryQuotaChange
+                _tableQueryQuotaManager.processQueryQuotaChange();
               } catch (Exception e) {
                 LOGGER.warn("Caught exception while updating external view", e);
               }
@@ -132,6 +132,7 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
     } else {
       LOGGER.warn("Deferred cluster updater thread is null or stopped, not deferring external view routing table rebuild");
       _helixExternalViewBasedRouting.processExternalViewChange();
+      _tableQueryQuotaManager.processQueryQuotaChange();
     }
   }
 

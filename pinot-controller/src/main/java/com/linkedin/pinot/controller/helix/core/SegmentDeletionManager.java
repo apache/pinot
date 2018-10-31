@@ -15,9 +15,17 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.filesystem.PinotFS;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -40,10 +48,6 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.SegmentName;
 
 public class SegmentDeletionManager {
 
@@ -52,14 +56,14 @@ public class SegmentDeletionManager {
   private static final long DEFAULT_DELETION_DELAY_SECONDS = 2L;
 
   private final ScheduledExecutorService _executorService;
-  private final String _localDiskDir;
+  private final String _dataDir;
   private final String _helixClusterName;
   private final HelixAdmin _helixAdmin;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final String DELETED_SEGMENTS = "Deleted_Segments";
 
-  public SegmentDeletionManager(String localDiskDir, HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    _localDiskDir = localDiskDir;
+  public SegmentDeletionManager(String dataDir, HelixAdmin helixAdmin, String helixClusterName, ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    _dataDir = dataDir;
     _helixAdmin = helixAdmin;
     _helixClusterName = helixClusterName;
     _propertyStore = propertyStore;
@@ -168,37 +172,31 @@ public class SegmentDeletionManager {
 
   protected void removeSegmentFromStore(String tableNameWithType, String segmentId) {
     final String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-    if (_localDiskDir != null) {
-      File fileToMove = new File(new File(_localDiskDir, rawTableName), segmentId);
-      if (fileToMove.exists()) {
-        File targetDir = new File(new File(_localDiskDir, DELETED_SEGMENTS), rawTableName);
-        try {
+    if (_dataDir != null) {
+      URI fileToMoveURI;
+      PinotFS pinotFS;
+      URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
+      fileToMoveURI = ControllerConf.constructSegmentLocation(_dataDir, rawTableName, segmentId);
+      URI deletedSegmentDestURI = ControllerConf.constructSegmentLocation(
+          StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS), rawTableName, segmentId);
+      pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
+
+      try {
+        if (pinotFS.exists(fileToMoveURI)) {
           // Overwrites the file if it already exists in the target directory.
-          FileUtils.copyFileToDirectory(fileToMove, targetDir, false);
-          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(), targetDir.getAbsolutePath());
-          if (!fileToMove.delete()) {
-            LOGGER.warn("Could not delete file", segmentId, fileToMove.getAbsolutePath());
+          pinotFS.move(fileToMoveURI, deletedSegmentDestURI);
+          LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(), deletedSegmentDestURI.toString());
+        } else {
+          if (!SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
+            LOGGER.warn("Not found local segment file for segment {}" + fileToMoveURI.toString());
           }
-        } catch (IOException e) {
-          LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(), targetDir.getAbsolutePath(), e);
         }
-      } else {
-        CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-        switch (tableType) {
-          case OFFLINE:
-            LOGGER.warn("Not found local segment file for segment {}" + fileToMove.getAbsolutePath());
-            break;
-          case REALTIME:
-            if (SegmentName.isLowLevelConsumerSegmentName(segmentId)) {
-              LOGGER.warn("Not found local segment file for segment {}" + fileToMove.getAbsolutePath());
-            }
-            break;
-          default:
-            LOGGER.warn("Unsupported table type {} when deleting segment {}", tableType, segmentId);
-        }
+      } catch (IOException e) {
+        LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMoveURI.toString(),
+            deletedSegmentDestURI.toString(), e);
       }
     } else {
-      LOGGER.info("localDiskDir is not configured, won't delete segment {} from disk", segmentId);
+      LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
     }
   }
 
@@ -207,8 +205,8 @@ public class SegmentDeletionManager {
    * @param retentionInDays: retention for deleted segments in days
    */
   public void removeAgedDeletedSegments(int retentionInDays) {
-    if (_localDiskDir != null) {
-      File deletedDir = new File(_localDiskDir, DELETED_SEGMENTS);
+    if (_dataDir != null) {
+      File deletedDir = new File(_dataDir, DELETED_SEGMENTS);
       // Check that the directory for deleted segments exists
       if (!deletedDir.isDirectory()) {
         LOGGER.warn("Deleted segment directory {} does not exist or it is not directory.", deletedDir.getAbsolutePath());

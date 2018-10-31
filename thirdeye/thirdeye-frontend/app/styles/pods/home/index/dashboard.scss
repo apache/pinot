@@ -62,6 +62,21 @@
     }
   }
 
+  &__alert-selector {
+    margin: 0 0 10px 10px;
+    max-width: 800px;
+  }
+
+  &__icon {
+    font-size: 16px;
+    margin-right: 5px;
+  }
+
+  &__go-link {
+    line-height: 26px;
+    margin: 1px 0 0 10px;
+  }
+
   &__redirect-link{
     display: flex;
     justify-content: center;
@@ -83,6 +98,14 @@
         &--large-width {
           width: 280px;
         }
+    }
+
+    &__text {
+      margin-bottom: 0px;
+
+      &--stronger {
+        font-weight: bold;
+      }
     }
   }
 

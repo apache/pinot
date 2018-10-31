@@ -1,23 +1,45 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.wordnik.swagger.annotations.ApiOperation;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Set;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.node.ObjectNode;
 import org.slf4j.Logger;
@@ -201,6 +223,63 @@ public class MetricConfigResource {
       LOG.error("Exception in creating dataset config with payload {}", payload);
     }
     return id;
+  }
+
+  @PUT
+  @Path("{id}/create-tag")
+  @ApiOperation("Endpoint for tagging a metric")
+  public Response createMetricTag(
+      @PathParam("id") Long id,
+      @NotNull @QueryParam("tag") String tag) throws Exception {
+    if (StringUtils.isBlank(tag)) {
+      throw new IllegalArgumentException(String.format("Received a null/empty tag: ", tag));
+    }
+
+    Map<String, String> responseMessage = new HashMap<>();
+
+    MetricConfigDTO metricConfigDTO = metricConfigDao.findById(id);
+    if (metricConfigDTO == null) {
+      responseMessage.put("message", "cannot find the metric " + id + ".");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
+
+    Set<String> tags = new HashSet<String>(Arrays.asList(tag));
+    if (metricConfigDTO.getTags() == null) {
+      metricConfigDTO.setTags(tags);
+    } else {
+      metricConfigDTO.getTags().addAll(tags);
+    }
+
+    metricConfigDao.update(metricConfigDTO);
+    responseMessage.put("message", "successfully tagged metric" + id + " with tag " + tag);
+    return Response.ok(responseMessage).build();
+  }
+
+  @PUT
+  @Path("{id}/remove-tag")
+  @ApiOperation("Endpoint for removing a metric tag")
+  public Response removeMetricTag(
+      @PathParam("id") Long id,
+      @NotNull @QueryParam("tag") String tag) throws Exception {
+    if (StringUtils.isBlank(tag)) {
+      throw new IllegalArgumentException(String.format("Received a null/empty tag: ", tag));
+    }
+
+    Map<String, String> responseMessage = new HashMap<>();
+
+    MetricConfigDTO metricConfigDTO = metricConfigDao.findById(id);
+    if (metricConfigDTO == null) {
+      responseMessage.put("message", "cannot find the metric " + id + ".");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
+
+    if (metricConfigDTO.getTags() != null) {
+      metricConfigDTO.getTags().removeAll(Collections.singleton(tag));
+    }
+
+    metricConfigDao.update(metricConfigDTO);
+    responseMessage.put("message", "successfully removed tag " + tag + " from metric" + id);
+    return Response.ok(responseMessage).build();
   }
 
   public Long createMetricConfig(MetricConfigDTO metricConfig) {

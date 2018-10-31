@@ -19,11 +19,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
+import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
@@ -71,8 +74,21 @@ public class TableViewsTest extends ControllerTest {
     // add schema for realtime table
     addDummySchema(HYBRID_TABLE_NAME);
     Map<String, String> streamConfigs = new HashMap<>();
-    streamConfigs.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.CONSUMER_TYPE,
-        DataSource.Realtime.Kafka.ConsumerType.highLevel.toString());
+    String streamType = "kafka";
+    String topic = "aTopic";
+    String consumerFactoryClass = SimpleConsumerFactory.class.getName();
+    String decoderClass = KafkaAvroMessageDecoder.class.getName();
+    streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
+    streamConfigs.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);
+    streamConfigs.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
+        StreamConfig.ConsumerType.HIGHLEVEL.toString());
+    streamConfigs.put(StreamConfigProperties.constructStreamProperty(streamType,
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
+    streamConfigs.put(
+        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_DECODER_CLASS),
+        decoderClass);
     tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.REALTIME).setTableName(HYBRID_TABLE_NAME)
         .setNumReplicas(2)
         .setStreamConfigs(streamConfigs)

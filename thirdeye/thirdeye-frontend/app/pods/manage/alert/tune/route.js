@@ -59,10 +59,16 @@ const severityMap = {
  * If no filter data is set for sensitivity, use this
  */
 const sensitivityDefaults = {
+  defaultMttdVal: '5',
   selectedSeverityOption: 'Percentage of Change',
   selectedTunePattern: 'Up and Down',
   defaultPercentChange: '0.3',
-  defaultMttdChange: '5'
+  // Set granularity minimums in number of hours
+  mttdGranularityMinimums: {
+    days: 24,
+    hours: 1,
+    minutes: 0.25
+  }
 };
 
 /**
@@ -106,10 +112,11 @@ const anomalyTableStats = (anomalies) => {
  */
 const processDefaultTuningParams = (alertData) => {
   let {
+    defaultMttdVal,
     selectedSeverityOption,
     selectedTunePattern,
     defaultPercentChange,
-    defaultMttdChange
+    mttdGranularityMinimums
   } = sensitivityDefaults;
 
   // Cautiously derive tuning data from alert filter properties
@@ -120,6 +127,9 @@ const processDefaultTuningParams = (alertData) => {
   const isMttdPropFormatted =  _.has(alertFilterObj, 'mttd') && alertFilterObj.mttd.includes(`${featureString}=`);
   const alertFeatures = isFeaturesPropFormatted ? alertFilterObj.features.split(',')[1] : null;
   const alertMttd = isMttdPropFormatted ? alertFilterObj.mttd.split(';') : null;
+  const granularityBucket = alertData.bucketUnit ? alertData.bucketUnit.toLowerCase() : null;
+  const isBucketDefaultPresent = granularityBucket && mttdGranularityMinimums.hasOwnProperty(granularityBucket);
+  const defaultMttdChange = isBucketDefaultPresent ? mttdGranularityMinimums[granularityBucket] : defaultMttdVal;
 
   // Load saved pattern into pattern options
   const savedTunePattern = alertPattern ? alertPattern : 'UP,DOWN';
@@ -140,7 +150,7 @@ const processDefaultTuningParams = (alertData) => {
 
   // Load saved mttd
   const mttdValue = alertMttd ? alertMttd[0].split('=')[1] : 'N/A';
-  const customMttdChange = !isNaN(mttdValue) ? Number(mttdValue).toFixed(2) : defaultMttdChange;
+  const customMttdChange = !isNaN(mttdValue) ? Math.round(Number(mttdValue)) : defaultMttdChange;
 
   // Load saved severity value
   const severityValue = alertMttd ? alertMttd[1].split('=')[1] : 'N/A';
@@ -248,6 +258,7 @@ export default Route.extend({
    * Make duration service accessible
    */
   durationCache: service('services/duration'),
+  session: service(),
 
   beforeModel(transition) {
     const { duration, startDate } = transition.queryParams;
@@ -337,6 +348,7 @@ export default Route.extend({
       alertEvalMetrics,
       selectedTunePattern,
       selectedSeverityOption,
+      mttdMinimums: sensitivityDefaults.mttdGranularityMinimums,
       alertHasDimensions: isPresent(alertData.exploreDimensions),
       timeRangeOptions: setUpTimeRangeOptions([durationDefault], duration)
     });
@@ -414,6 +426,25 @@ export default Route.extend({
   }).cancelOn('deactivate').restartable(),
 
   actions: {
+    /**
+     * save session url for transition on login
+     * @method willTransition
+     */
+    willTransition(transition) {
+      //saving session url - TODO: add a util or service - lohuynh
+      if (transition.intent.name && transition.intent.name !== 'logout') {
+        this.set('session.store.fromUrl', {lastIntentTransition: transition});
+      }
+    },
+
+    /**
+     * Handle any errors occurring in model/afterModel in parent route
+     * https://www.emberjs.com/api/ember/2.16/classes/Route/events/error?anchor=error
+     * https://guides.emberjs.com/v2.18.0/routing/loading-and-error-substates/#toc_the-code-error-code-event
+     */
+    error() {
+      return true;
+    },
 
     // User clicks reset button
     resetPage() {

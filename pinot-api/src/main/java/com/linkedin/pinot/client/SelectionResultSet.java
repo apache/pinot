@@ -57,7 +57,7 @@ class SelectionResultSet extends AbstractResultSet {
   @Override
   public String getString(int rowIndex, int columnIndex) {
     try {
-      return _resultsArray.getJSONArray(rowIndex).getString(columnIndex);
+      return _resultsArray.getJSONArray(rowIndex).get(columnIndex).toString();
     } catch (JSONException e) {
       throw new PinotClientException(e);
     }
@@ -72,7 +72,7 @@ class SelectionResultSet extends AbstractResultSet {
   public String getGroupKeyString(int rowIndex, int groupKeyColumnIndex) {
     throw new AssertionError("No group key string for selection results");
   }
-  
+
   @Override
   public String getGroupKeyColumnName(int groupKeyColumnIndex) {
     throw new AssertionError("No group key column name for selection results");

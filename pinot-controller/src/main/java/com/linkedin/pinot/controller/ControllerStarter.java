@@ -38,14 +38,21 @@ import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrate
 import com.linkedin.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.linkedin.pinot.core.periodictask.PeriodicTask;
+import com.linkedin.pinot.core.periodictask.PeriodicTaskScheduler;
+import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
@@ -73,6 +80,7 @@ public class ControllerStarter {
   private final PinotRealtimeSegmentManager _realtimeSegmentsManager;
   private final SegmentStatusChecker _segmentStatusChecker;
   private final ExecutorService _executorService;
+  private final PeriodicTaskScheduler _periodicTaskScheduler;
 
   // Can only be constructed after resource manager getting started
   private ValidationManager _validationManager;
@@ -82,7 +90,7 @@ public class ControllerStarter {
 
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
-    _adminApp = new ControllerAdminApiApplication(_config.getQueryConsole());
+    _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
     _helixResourceManager = new PinotHelixResourceManager(_config);
     _retentionManager = new RetentionManager(_helixResourceManager, _config.getRetentionControllerFrequencyInSeconds(),
         _config.getDeletedSegmentsRetentionInDays());
@@ -93,6 +101,7 @@ public class ControllerStarter {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
     _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
+    _periodicTaskScheduler = new PeriodicTaskScheduler();
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -120,13 +129,32 @@ public class ControllerStarter {
     MetricsHelper.initializeMetrics(_config.subset(METRICS_REGISTRY_NAME));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
 
+    Configuration pinotFSConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY);
+    Configuration segmentFetcherFactoryConfig =
+        _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY);
+    Configuration pinotCrypterConfig = _config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
+
     // Start all components
+    LOGGER.info("Initializing PinotFSFactory");
+    try {
+      PinotFSFactory.init(pinotFSConfig);
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+
     LOGGER.info("Initializing SegmentFetcherFactory");
     try {
       SegmentFetcherFactory.getInstance()
-          .init(_config.subset(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY));
+          .init(segmentFetcherFactoryConfig);
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while initializing SegmentFetcherFactory", e);
+    }
+
+    LOGGER.info("Initializing PinotCrypterFactory");
+    try {
+      PinotCrypterFactory.init(pinotCrypterConfig);
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while initializing PinotCrypterFactory", e);
     }
 
     LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
@@ -136,34 +164,41 @@ public class ControllerStarter {
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixManager));
 
-    LOGGER.info("Starting task manager");
+    List<PeriodicTask> periodicTasks = new ArrayList<>();
+
     _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
-    int taskManagerFrequencyInSeconds = _config.getTaskManagerFrequencyInSeconds();
-    if (taskManagerFrequencyInSeconds > 0) {
-      LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);
-      _taskManager.startScheduler(taskManagerFrequencyInSeconds);
+    if (_taskManager.getIntervalInSeconds() > 0) {
+      LOGGER.info("Adding task manager to periodic task scheduler");
+      periodicTasks.add(_taskManager);
     }
 
-    LOGGER.info("Starting retention manager");
-    _retentionManager.start();
+    LOGGER.info("Adding retention manager to periodic task scheduler");
+    periodicTasks.add(_retentionManager);
 
-    LOGGER.info("Starting validation manager");
+    LOGGER.info("Adding validation manager to periodic task scheduler");
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
-    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-    _validationManager = new ValidationManager(validationMetrics, _helixResourceManager, _config,
-        PinotLLCRealtimeSegmentManager.getInstance());
-    _validationManager.start();
+    _validationManager =
+        new ValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
+            new ValidationMetrics(_metricsRegistry));
+    periodicTasks.add(_validationManager);
 
     LOGGER.info("Starting realtime segment manager");
     _realtimeSegmentsManager.start(_controllerMetrics);
     PinotLLCRealtimeSegmentManager.getInstance().start();
 
-    LOGGER.info("Starting segment status manager");
-    _segmentStatusChecker.start();
+    if (_segmentStatusChecker.getIntervalInSeconds() == -1L) {
+      LOGGER.warn("Segment status check interval is -1, status checks disabled.");
+    } else {
+      LOGGER.info("Adding segment status checker to periodic task scheduler");
+      periodicTasks.add(_segmentStatusChecker);
+    }
 
-    LOGGER.info("Starting realtime segment relocation manager");
-    _realtimeSegmentRelocator.start();
+    LOGGER.info("Adding realtime segment relocation manager to periodic task scheduler");
+    periodicTasks.add(_realtimeSegmentRelocator);
+
+    LOGGER.info("Starting periodic task scheduler");
+    _periodicTaskScheduler.start(periodicTasks);
 
     LOGGER.info("Creating rebalance segments factory");
     RebalanceSegmentStrategyFactory.createInstance(helixManager);
@@ -269,14 +304,8 @@ public class ControllerStarter {
 
   public void stop() {
     try {
-      LOGGER.info("Stopping validation manager");
-      _validationManager.stop();
-
-      LOGGER.info("Stopping realtime segment relocation manager");
-      _realtimeSegmentRelocator.stop();
-
-      LOGGER.info("Stopping retention manager");
-      _retentionManager.stop();
+      LOGGER.info("Closing PinotFS classes");
+      PinotFSFactory.shutdown();
 
       LOGGER.info("Stopping Jersey admin API");
       _adminApp.stop();
@@ -287,11 +316,8 @@ public class ControllerStarter {
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
 
-      LOGGER.info("Stopping segment status manager");
-      _segmentStatusChecker.stop();
-
-      LOGGER.info("Stopping task manager");
-      _taskManager.stopScheduler();
+      LOGGER.info("Stopping periodic task scheduler");
+      _periodicTaskScheduler.stop();
 
       _executorService.shutdownNow();
     } catch (final Exception e) {
@@ -332,6 +358,7 @@ public class ControllerStarter {
     conf.setRealtimeSegmentRelocatorFrequency("1h");
     conf.setStatusCheckerWaitForPushTimeInSeconds(10 * 60);
     conf.setTenantIsolationEnabled(true);
+
     final ControllerStarter starter = new ControllerStarter(conf);
 
     starter.start();

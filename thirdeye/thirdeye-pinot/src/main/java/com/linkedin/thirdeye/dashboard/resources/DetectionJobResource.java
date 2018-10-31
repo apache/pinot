@@ -1,9 +1,26 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.BaseAlertFilterAutoTune;
 import com.linkedin.thirdeye.api.Constants;
+import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
@@ -165,7 +182,7 @@ public class DetectionJobResource {
       @QueryParam("speedup") @DefaultValue("false") final Boolean speedup,
       @QueryParam("userDefinedPattern") @DefaultValue("UP") String userDefinedPattern,
       @QueryParam("sensitivity") @DefaultValue("MEDIUM") final String sensitivity, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
       @QueryParam("smtpPort") Integer smtpPort, @QueryParam("phantomJsPath") String phantomJsPath) {
 
@@ -194,8 +211,8 @@ public class DetectionJobResource {
       String replayFailureSubject =
           new StringBuilder("Replay failed on metric: " + anomalyFunctionDAO.findById(id).getMetric()).toString();
       String replayFailureText = new StringBuilder("Failed on Function: " + id + "with Job Id: " + jobId).toString();
-      emailResource.sendEmailWithText(null, null, replayFailureSubject, replayFailureText,
-          smtpHost, smtpPort);
+      emailResource.sendEmailWithText(null, null, null,  null, replayFailureSubject,
+          replayFailureText, smtpHost, smtpPort);
       return Response.status(Status.BAD_REQUEST).entity("Replay job error with job status: {}" + jobStatus).build();
     } else {
       numReplayedAnomalies =
@@ -217,8 +234,8 @@ public class DetectionJobResource {
     String subject = new StringBuilder(
         "Replay results for " + anomalyFunctionDAO.findById(id).getFunctionName() + " is ready for review!").toString();
 
-    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, subject,
-        false, true, teHost, smtpHost, smtpPort, phantomJsPath);
+    emailResource.generateAndSendAlertForFunctions(startTime, endTime, String.valueOf(id), fromAddr, toAddr, ccAddr,
+        bccAddr, subject, false, true, teHost, smtpHost, smtpPort, phantomJsPath);
     LOG.info("Sent out email");
 
     return Response.ok("Replay, Tuning and Notification finished!").build();
@@ -351,7 +368,7 @@ public class DetectionJobResource {
       }
       // if isRemoveAnomaliesInWindow is true, remove existing anomalies within same replay window
       if (isRemoveAnomaliesInWindow) {
-        OnboardResource onboardResource = new OnboardResource();
+        OnboardResource onboardResource = new OnboardResource(new ThirdEyeDashboardConfiguration());
         onboardResource.deleteExistingAnomalies(functionId, startTime.getMillis(), endTime.getMillis());
       }
 

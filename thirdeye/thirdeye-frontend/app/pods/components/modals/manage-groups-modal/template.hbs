@@ -179,18 +179,60 @@
 
   <div class="row te-modal__settings">
     <div class="col-md-2">
-      <span class="te-label te-label--bold te-label--dark">Recipients</span>
+      <span class="te-label te-label--bold te-label--dark">To</span>
     </div>
     <div class="col-md-10">
       {{textarea-autosize
         cols=80
         rows=3
+        placeholder="Enter recipients (comma separated). E.g., user1@linkedin.com, user2@linkedin.com"
         type="text"
-        id="recipients"
-        value=groupRecipients
+        id="to-addresses"
+        value=toAddresses
         class="te-modal__input te-modal__input--fullwidth"
         disabled=cannotEdit
-        change=(action "onRecipients")
+        key-up=(action "onToAddresses")
+      }}
+      {{#if toAddrWarning}}
+        ({{toAddrWarning}})
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Cc</span>
+    </div>
+    <div class="col-md-10">
+      {{textarea-autosize
+        cols=80
+        rows=1
+        placeholder="Enter recipients (comma separated). E.g., user1@linkedin.com, user2@linkedin.com"
+        type="text"
+        id="cc-addresses"
+        value=ccAddresses
+        class="te-modal__input te-modal__input--fullwidth"
+        disabled=cannotEdit
+        change=(action "onCcAddresses")
+      }}
+    </div>
+  </div>
+
+  <div class="row te-modal__settings">
+    <div class="col-md-2">
+      <span class="te-label te-label--bold te-label--dark">Bcc</span>
+    </div>
+    <div class="col-md-10">
+      {{textarea-autosize
+        cols=80
+        rows=1
+        placeholder="Enter recipients (comma separated). E.g., user1@linkedin.com, user2@linkedin.com"
+        type="text"
+        id="bcc-addresses"
+        value=bccAddresses
+        class="te-modal__input te-modal__input--fullwidth"
+        disabled=cannotEdit
+        change=(action "onBccAddresses")
       }}
     </div>
   </div>

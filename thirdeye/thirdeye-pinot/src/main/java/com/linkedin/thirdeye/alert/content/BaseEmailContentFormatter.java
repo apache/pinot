@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.alert.content;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -30,6 +46,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -128,7 +145,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
   }
 
   @Override
-  public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, String recipients, String subject,
+  public EmailEntity getEmailEntity(AlertConfigDTO alertConfigDTO, DetectionAlertFilterRecipients recipients, String subject,
       Long groupId, String groupName, Collection<AnomalyResult> anomalies, EmailContentFormatterContext context) {
     Map<String, Object> templateData = getTemplateData(alertConfigDTO, groupId, groupName, anomalies);
 
@@ -262,13 +279,13 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
    * Apply the parameter map to given email template, and format it as EmailEntity
    * @param paramMap
    * @param subject
-   * @param emailRecipients
+   * @param recipients
    * @param fromEmail
    * @param emailTemplate
    * @return
    */
-  public EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject, String emailRecipients,
-      String fromEmail, String emailTemplate) {
+  public EmailEntity buildEmailEntity(Map<String, Object> paramMap, String subject,
+      DetectionAlertFilterRecipients recipients, String fromEmail, String emailTemplate) {
     if (Strings.isNullOrEmpty(fromEmail)) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
@@ -298,7 +315,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunnerV2.CHARSET);
 
       emailEntity.setFrom(fromEmail);
-      emailEntity.setTo(EmailUtils.getValidEmailAddresses(emailRecipients));
+      emailEntity.setTo(recipients);
       emailEntity.setSubject(subject);
       email.setHtmlMsg(alertEmailHtml);
       emailEntity.setContent(email);

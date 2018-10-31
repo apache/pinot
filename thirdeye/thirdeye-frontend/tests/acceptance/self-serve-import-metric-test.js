@@ -19,7 +19,7 @@ module('Acceptance | import metric', function(hooks) {
     await visit(`/self-serve/create-alert`);
 
     assert.equal(
-      $(selfServeConst.SECONDARY_LINK).get(0).innerText,
+      $(selfServeConst.SECONDARY_LINK).get(0).innerText.trim(),
       importLinkText,
       'Import link appears.'
     );
@@ -67,7 +67,7 @@ module('Acceptance | import metric', function(hooks) {
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.equal(
-      $(selfServeConst.IMPORT_WARNING).get(0).innerText,
+      $(selfServeConst.IMPORT_WARNING).get(0).innerText.trim(),
       importWarning,
       'Non-existent dashboard name results in warning'
     );
@@ -90,7 +90,7 @@ module('Acceptance | import metric', function(hooks) {
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.ok(
-      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.includes(importSuccessMsgText1),
+      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.trim().includes(importSuccessMsgText1),
       'Import dashboard successful - success text displays)'
     );
     assert.ok(
@@ -98,7 +98,7 @@ module('Acceptance | import metric', function(hooks) {
       'At least one metric was imported'
     );
     assert.equal(
-      $(selfServeConst.SUBMIT_BUTTON).get(0).innerText,
+      $(selfServeConst.SUBMIT_BUTTON).get(0).innerText.trim(),
       'Onboard Another Dashboard',
       'Submit button mode changed correctly'
     );
@@ -111,7 +111,7 @@ module('Acceptance | import metric', function(hooks) {
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.equal(
-      $(selfServeConst.SUBMIT_BUTTON).get(0).innerText,
+      $(selfServeConst.SUBMIT_BUTTON).get(0).innerText.trim(),
       'Import Metrics',
       'Submit button mode changed correctly'
     );
@@ -162,7 +162,7 @@ module('Acceptance | import metric', function(hooks) {
     await click(selfServeConst.SUBMIT_BUTTON);
 
     assert.ok(
-      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.includes(importSuccessMsgText2),
+      $(selfServeConst.IMPORT_SUCCESS).get(0).innerText.trim().includes(importSuccessMsgText2),
       'Import dashboard successful - success text displays)'
     );
     assert.ok(
@@ -170,7 +170,7 @@ module('Acceptance | import metric', function(hooks) {
       'At least one metric was imported'
     );
     assert.equal(
-      $(selfServeConst.SUBMIT_BUTTON).get(0).innerText,
+      $(selfServeConst.SUBMIT_BUTTON).get(0).innerText.trim(),
       'Onboard Another Dashboard',
       'Submit button mode changed correctly'
     );

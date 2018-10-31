@@ -34,6 +34,9 @@ const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDispla
   severity: computed('anomaly.severity', function() {
     return humanizeFloat(get(this, 'anomaly.severity'));
   }),
+  source: computed('anomaly.source', function() {
+    return humanizeFloat(get(this, 'anomaly.source'));
+  }),
   anomalyFeedback: computed('anomaly.feedback', function() {
     return get(this, 'anomaly.feedback') ? anomalyResponseObj.find(res => res.value === get(this, 'anomaly.feedback')).name : '';
   }),
@@ -45,6 +48,9 @@ const HumanizedAnomaly = EmberObject.extend({// ex: record.humanizedChangeDispla
   }),
   queryEnd: computed('humanizedObject.queryEnd', function() {
     return get(this, 'humanizedObject.queryEnd');
+  }),
+  classification: computed('anomaly.classification', function () {
+    return get(this, 'anomaly.classification');
   })
 });
 
@@ -138,30 +144,5 @@ export default Service.extend({
     const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
     return anomalies;
   },
-
-  /**
-   * @summary Fetch the application performance details
-   * @method queryPerformanceByAppNameUrl
-   * @param {String} appName - the application name
-   * @param {Number} startStamp - the anomaly iso start time
-   * @param {Number} endStamp - the anomaly iso end time
-   * @return {Ember.RSVP.Promise}
-   * @example: /detection-job/eval/application/{someAppName}?start={2017-09-01T00:00:00Z}&end={2018-04-01T00:00:00Z}
-     usage: `this.get('anomaliesApiService').queryPerformanceByAppNameUrl(appName, moment(this.get('startDate')).startOf('day').utc().format(), moment(this.get('endDate')).startOf('day').utc().format());`
-   */
-  async queryPerformanceByAppNameUrl(appName, start, end) {
-    assert('you must pass appName param as an required argument.', appName);
-    assert('you must pass start param as an required argument.', start);
-    assert('you must pass end param as an required argument.', end);
-
-    const queryCache = this.get('queryCache');
-    const modelName = 'performance';
-    const query = { appName, start, end };
-    const cacheKey = queryCache.urlForQueryKey(modelName, query);
-    const performanceInfo = await queryCache.query(modelName, query, { reload: false, cacheKey });
-    return EmberObject.create(performanceInfo.meta);//Wrap it in an ember object for easier usage later (get/set etc).
-    // const url = anomalyApiUrls.getPerformanceByAppNameUrl(appName, startTime, endTime) ;//TODO: remove from the utils/api/anomaly.js
-    // return fetch(url).then(checkStatus).catch(() => {});//TODO: leave to document in RFC. Will remove. - lohuynh
-  }
 
 });

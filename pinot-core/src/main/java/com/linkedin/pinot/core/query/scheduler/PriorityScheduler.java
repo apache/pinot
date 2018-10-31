@@ -24,12 +24,13 @@ import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.query.scheduler.resources.QueryExecutorService;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
 import java.util.List;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -51,18 +52,18 @@ public abstract class PriorityScheduler extends QueryScheduler {
   Thread scheduler;
 
   public PriorityScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics) {
-    super(queryExecutor, resourceManager, metrics);
+      @Nonnull SchedulerPriorityQueue queue, @Nonnull ServerMetrics metrics, @Nonnull LongAccumulator latestQueryTime) {
+    super(queryExecutor, resourceManager, metrics, latestQueryTime);
     Preconditions.checkNotNull(queue);
     this.queryQueue = queue;
     this.numRunners = resourceManager.getNumQueryRunnerThreads();
     runningQueriesSemaphore = new Semaphore(numRunners);
   }
 
+  @Nonnull
   @Override
-  public ListenableFuture<byte[]> submit(@Nullable final ServerQueryRequest queryRequest) {
-    Preconditions.checkNotNull(queryRequest);
-    if (! isRunning) {
+  public ListenableFuture<byte[]> submit(@Nonnull ServerQueryRequest queryRequest) {
+    if (!isRunning) {
       return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
@@ -70,13 +71,12 @@ public abstract class PriorityScheduler extends QueryScheduler {
     try {
       queryQueue.put(schedQueryContext);
     } catch (OutOfCapacityException e) {
-      LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableName(), e.getMessage());
+      LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableNameWithType(), e.getMessage());
       return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
     }
-    serverMetrics.addMeteredTableValue(queryRequest.getTableName(), ServerMeter.QUERIES, 1);
+    serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.QUERIES, 1);
     return schedQueryContext.getResultFuture();
   }
-
 
   @Override
   public void start() {

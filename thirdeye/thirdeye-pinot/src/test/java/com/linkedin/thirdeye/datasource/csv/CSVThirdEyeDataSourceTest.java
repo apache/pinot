@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datasource.csv;
 
 import com.google.common.collect.ArrayListMultimap;
@@ -6,8 +22,6 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.Grouping;
-import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.datasource.MetricFunction;
 import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
@@ -29,7 +43,7 @@ public class CSVThirdEyeDataSourceTest {
   ThirdEyeDataSource dataSource;
 
   @BeforeMethod
-  public void beforeMethod(){
+  public void beforeMethod() {
 
     Map<String, DataFrame> sources = new HashMap<>();
     sources.put("source", new DataFrame()
@@ -105,7 +119,6 @@ public class CSVThirdEyeDataSourceTest {
         new HashSet<>(expectedMap.get("browser")));
     Assert.assertEquals(new HashSet<>(actualMap.get("country")),
         new HashSet<>(expectedMap.get("country")));
-
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -129,7 +142,6 @@ public class CSVThirdEyeDataSourceTest {
 
     ThirdEyeResponse response = dataSource.execute(request);
     Assert.assertEquals(response, expectedResponse);
-
   }
 
   @Test
@@ -149,7 +161,6 @@ public class CSVThirdEyeDataSourceTest {
 
     ThirdEyeResponse response = dataSource.execute(request);
     Assert.assertEquals(response, expectedResponse);
-
   }
 
   @Test
@@ -171,7 +182,6 @@ public class CSVThirdEyeDataSourceTest {
 
     ThirdEyeResponse response = dataSource.execute(request);
     Assert.assertEquals(response, expectedResponse);
-
   }
 
   @Test
@@ -192,7 +202,6 @@ public class CSVThirdEyeDataSourceTest {
 
     ThirdEyeResponse response = dataSource.execute(request);
     Assert.assertEquals(response, expectedResponse);
-
   }
 
   @Test
@@ -218,12 +227,62 @@ public class CSVThirdEyeDataSourceTest {
 
     ThirdEyeResponse response = dataSource.execute(request);
     Assert.assertEquals(response, expectedResponse);
-
   }
 
+  @Test
+  public void testExecuteMultiFilterAggregation() throws Exception {
+    Multimap<String, String> filter = ArrayListMultimap.create();
+    filter.put("country", "us");
+    filter.put("country", "cn");
+    filter.put("browser", "chrome");
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
+        .setDataSource("source")
+        .setFilterSet(filter)
+        .setStartTimeInclusive(3600000)
+        .setEndTimeExclusive(11000000)
+        .build("ref");
+
+    ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
+        request,
+        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
+        new DataFrame()
+            .addSeries("SUM_views", 7009d)
+            .addSeries("timestamp", -1L)
+    );
+
+    ThirdEyeResponse response = dataSource.execute(request);
+    Assert.assertEquals(response, expectedResponse);
+  }
 
   @Test
-  public void testExecuteGroupbyColumns() throws Exception {
+  public void testExecuteMultiFilterExclusionAggregation() throws Exception {
+    Multimap<String, String> filter = ArrayListMultimap.create();
+    filter.put("country", "us");
+    filter.put("country", "!cn");
+    filter.put("browser", "!safari");
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
+        .setDataSource("source")
+        .setFilterSet(filter)
+        .setStartTimeInclusive(3600000)
+        .setEndTimeExclusive(11000000)
+        .build("ref");
+
+    ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
+        request,
+        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
+        new DataFrame()
+            .addSeries("SUM_views", 3006d)
+            .addSeries("timestamp", -1L)
+    );
+
+    ThirdEyeResponse response = dataSource.execute(request);
+    Assert.assertEquals(response, expectedResponse);
+  }
+
+  @Test
+  public void testExecuteGroupByColumns() throws Exception {
 
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
         .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
@@ -235,18 +294,17 @@ public class CSVThirdEyeDataSourceTest {
         request,
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame()
-            .addSeries("country", "us", "cn", "cn")
+            .addSeries("country", "cn", "us", "cn")
             .addSeries("browser", "chrome", "chrome", "safari")
-            .addSeries("SUM_views", 4094, 6003, 2003)
+            .addSeries("SUM_views", 6003, 4094, 2003)
     );
 
     ThirdEyeResponse response = dataSource.execute(request);
     Assert.assertEquals(response, expectedResponse);
   }
 
-
   @Test
-  public void testExecuteGroupbyOneColumn() throws Exception {
+  public void testExecuteGroupByOneColumn() throws Exception {
 
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
         .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
@@ -258,17 +316,39 @@ public class CSVThirdEyeDataSourceTest {
         request,
         new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
         new DataFrame()
-            .addSeries("country", "us", "cn")
-            .addSeries("SUM_views", 4094, 8006)
+            .addSeries("country", "cn", "us")
+            .addSeries("SUM_views", 8006, 4094)
     );
 
     ThirdEyeResponse response = dataSource.execute(request);
     Assert.assertEquals(response, expectedResponse);
   }
 
+  @Test
+  public void testExecuteGroupByColumnsLimit() throws Exception {
+
+    ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
+        .addMetricFunction(new MetricFunction(MetricAggFunction.SUM, "views", 1L, "source", null, null))
+        .setDataSource("source")
+        .addGroupBy(Arrays.asList("country", "browser"))
+        .setLimit(2)
+        .build("ref");
+
+    ThirdEyeResponse expectedResponse = new CSVThirdEyeResponse(
+        request,
+        new TimeSpec("timestamp", new TimeGranularity(1, TimeUnit.HOURS), TimeSpec.SINCE_EPOCH_FORMAT),
+        new DataFrame()
+            .addSeries("country", "cn", "us")
+            .addSeries("browser", "chrome", "chrome")
+            .addSeries("SUM_views", 6003, 4094)
+    );
+
+    ThirdEyeResponse response = dataSource.execute(request);
+    Assert.assertEquals(response, expectedResponse);
+  }
 
   @Test
-  public void testExecuteGroupbyTimeGrandualityAndColumn() throws Exception {
+  public void testExecuteGroupByTimeGranularityAndColumns() throws Exception {
 
     Multimap<String, String> filter = ArrayListMultimap.create();
     filter.put("country", "cn");

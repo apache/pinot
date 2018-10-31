@@ -4,19 +4,22 @@
  * @exports manage/alert/edit
  */
 import { reads, or } from '@ember/object/computed';
-
-import _ from 'lodash';
-import RSVP from 'rsvp';
 import fetch from 'fetch';
 import Controller from '@ember/controller';
-import { later } from "@ember/runloop";
-import { computed, set, get } from '@ember/object';
-import { getWithDefault } from '@ember/object';
-import { isEmpty, isPresent } from "@ember/utils";
-import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import config from 'thirdeye-frontend/config/environment';
-import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
-import { formatConfigGroupProps } from 'thirdeye-frontend/utils/manage-alert-utils';
+import {
+  set,
+  get,
+  computed,
+  setProperties
+} from '@ember/object';
+import {
+  checkStatus,
+  postProps
+} from 'thirdeye-frontend/utils/utils';
+import {
+  selfServeApiCommon,
+  selfServeApiOnboard
+} from 'thirdeye-frontend/utils/api/self-serve';
 
 export default Controller.extend({
 
@@ -29,7 +32,6 @@ export default Controller.extend({
   /**
    * Important initializations
    */
-  isEditAlertError: false, // alert save failure
   isEditAlertSuccess: false, // alert save success
   isProcessingForm: false, // to trigger submit disable
   isExiting: false, // exit detection
@@ -96,7 +98,7 @@ export default Controller.extend({
    * @return {Promise}
    */
   _fetchAlertByName(functionName) {
-    const url = selfServeApiCommon.alertFunctionByName(functionName)
+    const url = selfServeApiCommon.alertFunctionByName(functionName);
     return fetch(url).then(checkStatus);
   },
 
@@ -121,7 +123,6 @@ export default Controller.extend({
       isSubmitDisabled: false,
       isEmailError: false,
       isDuplicateEmail: false,
-      isEditAlertError: false,
       isEditAlertSuccess: false,
       isNewConfigGroupSaved: false,
       isProcessingForm: false,
@@ -168,8 +169,9 @@ export default Controller.extend({
      * @returns {undefined}
      */
     onCancel() {
-      this.clearAll();
-      this.transitionToRoute('manage.alerts');
+      const alertId = get(this, 'alertId');
+      this.send('refreshModel');
+      this.transitionToRoute('manage.alert.explore', alertId);
     },
 
     /**
@@ -180,38 +182,34 @@ export default Controller.extend({
     onSubmit() {
       const {
         isActive,
-        alertId: currentId,
         alertFunctionName,
-        alertData: postFunctionBody,
+        alertData: postFunctionBody
       } = this.getProperties(
         'isActive',
-        'alertId',
         'alertFunctionName',
-        'alertData',
+        'alertData'
       );
 
-      const alertUrl = `/thirdeye/entity?entityType=ANOMALY_FUNCTION`;
-
       // Disable submit for now and make sure we're clear of email errors
-      this.setProperties({
-        isProcessingForm: true,
-      });
+      set(this, 'isProcessingForm', true);
 
       // Assign these fresh editable values to the Alert object currently being edited
-      set(postFunctionBody, 'functionName', alertFunctionName);
-      set(postFunctionBody, 'isActive', isActive);
-
-      // Prepare the POST payload to save an edited Alert object
-      const postProps = {
-        method: 'post',
-        body: JSON.stringify(postFunctionBody),
-        headers: { 'content-type': 'Application/Json' }
-      };
+      setProperties(postFunctionBody, {
+        isActive,
+        functionName: alertFunctionName
+      });
 
       // Step 1: Save any edits to the Alert entity in our DB
-      return fetch(alertUrl, postProps)
+      return fetch(selfServeApiOnboard.editAlert, postProps(postFunctionBody))
         .then(res => checkStatus(res, 'post'))
-        .catch(err => this.set('isEditAlertError', true));
+        .then(() => {
+          this.send('confirmSaveStatus', true);
+          set(this, 'isProcessingForm', false);
+        })
+        .catch(() => {
+          this.send('confirmSaveStatus', false);
+          this.clearAll();
+        });
     }
   }
 });

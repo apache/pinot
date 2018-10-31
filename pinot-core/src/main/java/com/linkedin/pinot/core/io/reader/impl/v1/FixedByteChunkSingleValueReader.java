@@ -38,7 +38,7 @@ public class FixedByteChunkSingleValueReader extends BaseChunkSingleValueReader 
    * @param pinotDataBuffer Data buffer to read from
    * @throws IOException
    */
-  public FixedByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer) throws IOException {
+  public FixedByteChunkSingleValueReader(PinotDataBuffer pinotDataBuffer) {
     super(pinotDataBuffer);
   }
 

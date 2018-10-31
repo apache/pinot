@@ -28,22 +28,8 @@ public class GroupByAstNode extends BaseAstNode {
   @Override
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
     GroupBy groupBy = new GroupBy();
-    for (AstNode astNode : getChildren()) {
-      if (astNode instanceof IdentifierAstNode) {
-        IdentifierAstNode node = (IdentifierAstNode) astNode;
-        groupBy.addToColumns(node.getName());
-
-        // List of expression contains columns as well as expressions to maintain ordering of group by columns.
-        groupBy.addToExpressions(node.getExpression());
-      } else {
-        // Standardize the expression string
-        // NOTE: the purpose is to ensure the function expression is valid, and stored in standard format.
-        // E.g. "  foo\t  ( bar  ('a'\t ,foobar(  b,  'c'\t, 123)  )   ,d  )\t" -> "foo(bar('a',foobar(b,'c','123')),d)"
-        // The standard format expressions will be used as "groupByColumns" in the broker response.
-        String expression =
-            TransformExpressionTree.standardizeExpression(((FunctionCallAstNode) astNode).getExpression());
-        groupBy.addToExpressions(expression);
-      }
+    for (AstNode child : getChildren()) {
+      groupBy.addToExpressions(TransformExpressionTree.getStandardExpression(child));
     }
     brokerRequest.setGroupBy(groupBy);
   }

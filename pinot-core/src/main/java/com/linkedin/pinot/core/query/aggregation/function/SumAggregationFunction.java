@@ -52,8 +52,8 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
 
   @Nonnull
   @Override
-  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
-    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, trimSize, DEFAULT_VALUE);
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, DEFAULT_VALUE);
   }
 
   @Override

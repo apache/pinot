@@ -1,8 +1,25 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dataframe;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.linkedin.thirdeye.dataframe.util.DataFrameSerializer;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.testng.Assert;
@@ -79,5 +96,36 @@ public class DataFrameSerializerTest {
 
     String serialized = this.mapper.writeValueAsString(map);
     Assert.assertEquals(serialized, "{\"first\":1,\"second\":\"Hi\",\"third\":{\"doubles\":[1.1,2.0,3.3,null,5.5]}}");
+  }
+
+  @Test
+  public void testSerializeNestedDeep() throws Exception {
+    MyPojo pojo = new MyPojo(Collections.singletonMap("one",
+        (Object) Collections.singletonMap("two",
+            Collections.singletonList(
+                new DataFrame().addSeries("doubles", 1.0, 2.2, DoubleSeries.NULL)
+            ))),
+        "test");
+
+    String serialized = this.mapper.writeValueAsString(pojo);
+    Assert.assertEquals(serialized, "{\"map\":{\"one\":{\"two\":[{\"doubles\":[1.0,2.2,null]}]}},\"value\":\"test\"}");
+  }
+
+  private static class MyPojo {
+    Map<String, Object> map;
+    String value;
+
+    public MyPojo(Map<String, Object> map, String value) {
+      this.map = map;
+      this.value = value;
+    }
+
+    public Map<String, Object> getMap() {
+      return map;
+    }
+
+    public String getValue() {
+      return value;
+    }
   }
 }

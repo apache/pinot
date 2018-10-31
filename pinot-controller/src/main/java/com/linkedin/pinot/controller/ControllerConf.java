@@ -16,29 +16,40 @@
 package com.linkedin.pinot.controller;
 
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.filesystem.LocalPinotFS;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class ControllerConf extends PropertiesConfiguration {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerConf.class);
+
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
   private static final String CONTROLLER_VIP_PORT = "controller.vip.port";
   private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
   private static final String DATA_DIR = "controller.data.dir";
+  // Potentially same as data dir if local
+  private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
   private static final String ZK_STR = "controller.zk.str";
   private static final String UPDATE_SEGMENT_STATE_MODEL = "controller.update_segment_state_model"; // boolean: Update the statemodel on boot?
   private static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
   private static final String CLUSTER_TENANT_ISOLATION_ENABLE = "cluster.tenant.isolation.enable";
   private static final String CONSOLE_WEBAPP_ROOT_PATH = "controller.query.console";
+  private static final String CONSOLE_WEBAPP_USE_HTTPS = "controller.query.console.useHttps";
   private static final String EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT = "controller.upload.onlineToOfflineTimeout";
   private static final String RETENTION_MANAGER_FREQUENCY_IN_SECONDS = "controller.retention.frequencyInSeconds";
   private static final String VALIDATION_MANAGER_FREQUENCY_IN_SECONDS = "controller.validation.frequencyInSeconds";
@@ -58,6 +69,8 @@ public class ControllerConf extends PropertiesConfiguration {
   // protection is enabled. If the upload does not finish within the timeout, next upload can override the previous one.
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
   private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = "controller.realtime.segment.metadata.commit.numLocks";
+  private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
+  private static final String ENABLE_SEGMENT_LEVEL_VALIDATION = "controller.enable.segment.level.validation";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
@@ -79,6 +92,8 @@ public class ControllerConf extends PropertiesConfiguration {
       "com.linkedin.pinot.controller.api.access.AllowAllAccessFactory";
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
+  private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
+  private static final boolean DEFAULT_ENABLE_SEGMENT_LEVEL_VALIDATION = true;
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
@@ -90,6 +105,33 @@ public class ControllerConf extends PropertiesConfiguration {
     super();
   }
 
+  /**
+   * Returns the URI for the given path, appends the local (file) scheme to the URI if no scheme exists.
+   */
+  public static URI getUriFromPath(String path) {
+    try {
+      URI uri = new URI(path);
+      if (uri.getScheme() != null) {
+        return uri;
+      } else {
+        return new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, path, null);
+      }
+    } catch (URISyntaxException e) {
+      LOGGER.error("Could not construct uri from path {}", path);
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static URI constructSegmentLocation(String baseDataDir, String tableName, String segmentName) {
+    try {
+      return new URI(StringUtil.join(File.separator, baseDataDir, tableName, URLEncoder.encode(segmentName, "UTF-8")));
+    } catch (UnsupportedEncodingException | URISyntaxException e) {
+      LOGGER.error("Could not construct segment location with baseDataDir {}, tableName {}, segmentName {}",
+          baseDataDir, tableName, segmentName);
+      throw new RuntimeException(e);
+    }
+  }
+
   public static String constructDownloadUrl(String tableName, String segmentName, String vip) {
     try {
       return StringUtil.join("/", vip, "segments", tableName, URLEncoder.encode(segmentName, "UTF-8"));
@@ -99,11 +141,20 @@ public class ControllerConf extends PropertiesConfiguration {
     }
   }
 
+  public void setLocalTempDir(String localTempDir) {
+    setProperty(LOCAL_TEMP_DIR, localTempDir);
+  }
+
+  public String getLocalTempDir() {
+    return getString(LOCAL_TEMP_DIR, null);
+  }
+
   public void setPinotFSFactoryClasses(Configuration pinotFSFactoryClasses) {
     setProperty(PINOT_FS_FACTORY_CLASS_LOCAL, DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL);
 
     if (pinotFSFactoryClasses != null) {
-      pinotFSFactoryClasses.getKeys().forEachRemaining(key -> setProperty((String) key, pinotFSFactoryClasses.getProperty((String) key)));
+      pinotFSFactoryClasses.getKeys()
+          .forEachRemaining(key -> setProperty((String) key, pinotFSFactoryClasses.getProperty((String) key)));
     }
   }
 
@@ -115,11 +166,19 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(CONSOLE_WEBAPP_ROOT_PATH, path);
   }
 
-  public String getQueryConsole() {
+  public String getQueryConsoleWebappPath() {
     if (containsKey(CONSOLE_WEBAPP_ROOT_PATH)) {
       return (String) getProperty(CONSOLE_WEBAPP_ROOT_PATH);
     }
     return ControllerConf.class.getClassLoader().getResource("webapp").toExternalForm();
+  }
+
+  public void setQueryConsoleUseHttps(boolean useHttps) {
+    setProperty(CONSOLE_WEBAPP_USE_HTTPS, useHttps);
+  }
+
+  public boolean getQueryConsoleUseHttps() {
+    return containsKey(CONSOLE_WEBAPP_USE_HTTPS) && getBoolean(CONSOLE_WEBAPP_USE_HTTPS);
   }
 
   public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
@@ -190,7 +249,7 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public int getSegmentCommitTimeoutSeconds() {
     if (containsKey(SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
-      return Integer.parseInt((String)getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS));
+      return Integer.parseInt((String) getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS));
     }
     return SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds();
   }
@@ -212,13 +271,13 @@ public class ControllerConf extends PropertiesConfiguration {
     // The set method converted comma separated string into ArrayList, so need to convert back to String here.
     if (zkAddressObj instanceof ArrayList) {
       List<String> zkAddressList = (ArrayList<String>) zkAddressObj;
-      String[] zkAddress =  zkAddressList.toArray(new String[0]);
+      String[] zkAddress = zkAddressList.toArray(new String[0]);
       return StringUtil.join(",", zkAddress);
     } else if (zkAddressObj instanceof String) {
       return (String) zkAddressObj;
     } else {
       throw new RuntimeException("Unexpected data type for zkAddress PropertiesConfiguration, expecting String but got "
-              + zkAddressObj.getClass().getName());
+          + zkAddressObj.getClass().getName());
     }
   }
 
@@ -250,7 +309,7 @@ public class ControllerConf extends PropertiesConfiguration {
   }
 
   public String getControllerVipProtocol() {
-    if (containsKey(CONTROLLER_VIP_PROTOCOL) && ((String) getProperty(CONTROLLER_VIP_PROTOCOL)).equals("https")) {
+    if (containsKey(CONTROLLER_VIP_PROTOCOL) && getProperty(CONTROLLER_VIP_PROTOCOL).equals("https")) {
       return "https";
     }
     return "http";
@@ -310,7 +369,6 @@ public class ControllerConf extends PropertiesConfiguration {
   public void setStatusCheckerWaitForPushTimeInSeconds(int statusCheckerWaitForPushTimeInSeconds) {
     setProperty(STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS, Integer.toString(statusCheckerWaitForPushTimeInSeconds));
   }
-
 
   public long getExternalViewOnlineToOfflineTimeout() {
     if (containsKey(EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT)) {
@@ -392,5 +450,13 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setRealtimeSegmentMetadataCommitNumLocks(int realtimeSegmentMetadataCommitNumLocks) {
     setProperty(REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS, realtimeSegmentMetadataCommitNumLocks);
+  }
+
+  public boolean getEnableStorageQuotaCheck() {
+    return getBoolean(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_ENABLE_STORAGE_QUOTA_CHECK);
+  }
+
+  public boolean getEnableSegmentLevelValidation() {
+    return getBoolean(ENABLE_SEGMENT_LEVEL_VALIDATION, DEFAULT_ENABLE_SEGMENT_LEVEL_VALIDATION);
   }
 }

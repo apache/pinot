@@ -22,7 +22,7 @@ import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import javax.annotation.Nonnull;
 
 
@@ -60,8 +60,8 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   @Nonnull
   @Override
-  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
-    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
   }
 
   @Override
@@ -145,11 +145,12 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     if (size == 0) {
       return DEFAULT_FINAL_RESULT;
     } else {
-      Collections.sort(intermediateResult);
+      double[] values = intermediateResult.elements();
+      Arrays.sort(values, 0, size);
       if (_percentile == 100) {
-        return intermediateResult.get(size - 1);
+        return values[size - 1];
       } else {
-        return intermediateResult.get((int) ((long) size * _percentile / 100));
+        return values[(int) ((long) size * _percentile / 100)];
       }
     }
   }

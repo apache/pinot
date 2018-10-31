@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.filesystem;
 
+import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import org.apache.commons.configuration.Configuration;
@@ -23,12 +25,17 @@ import org.apache.commons.configuration.Configuration;
  * The PinotFS is intended to be a thin wrapper on top of different filesystems. This interface is intended for internal
  * Pinot use only. This class will be implemented for each pluggable storage type.
  */
-public abstract class PinotFS {
+public abstract class PinotFS implements Closeable {
   /**
    * Initializes the configurations specific to that filesystem. For instance, any security related parameters can be
    * initialized here and will not be logged.
    */
   public abstract void init(Configuration config);
+
+  /**
+   * Creates a new directory. If parent directories are not created, it will create them.
+   */
+  public abstract boolean mkdir(URI uri) throws IOException;
 
   /**
    * Deletes the file at the location provided. If the segmentUri is a directory, it will delete the entire directory.
@@ -89,17 +96,33 @@ public abstract class PinotFS {
   /**
    * Copies a file from a remote filesystem to the local one. Keeps the original file.
    * @param srcUri location of current file on remote filesystem
-   * @param dstUri location of destination on local filesystem
-   * @throws IOException IO Failures
+   * @param dstFile location of destination on local filesystem
+   * @throws Exception
    */
-  public abstract void copyToLocalFile(URI srcUri, URI dstUri) throws IOException;
+  public abstract void copyToLocalFile(URI srcUri, File dstFile) throws Exception;
 
   /**
    * The src file is on the local disk. Add it to filesystem at the given dst name and the source is kept intact
    * afterwards.
-   * @param srcUri location of src file on local disk
+   * @param srcFile location of src file on local disk
    * @param dstUri location of dst on remote filesystem
    * @throws IOException for IO Error
    */
-  public abstract void copyFromLocalFile(URI srcUri, URI dstUri) throws IOException;
+  public abstract void copyFromLocalFile(File srcFile, URI dstUri) throws Exception;
+
+  /**
+   * Allows us the ability to determine whether the uri is a directory.
+   * @param uri location of file or directory
+   * @return true if uri is a directory, false otherwise.
+   */
+  public abstract boolean isDirectory(URI uri) throws IOException;
+
+  /**
+   * For certain filesystems, we may need to close the filesystem and do relevant operations to prevent leaks.
+   * By default, this method does nothing.
+   * @throws IOException
+   */
+  public void close() throws IOException {
+
+  }
 }

@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.google.common.base.Strings;
@@ -6,14 +22,21 @@ import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.anomaly.utils.EmailUtils;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ApplicationManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.ApplicationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.wordnik.swagger.annotations.ApiOperation;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -27,6 +50,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.*;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.*;
+
 
 @Path("thirdeye/email")
 @Produces(MediaType.APPLICATION_JSON)
@@ -34,6 +59,7 @@ public class EmailResource {
   private static final Logger LOG = LoggerFactory.getLogger(EmailResource.class);
 
   private final AlertConfigManager alertDAO;
+  private final AnomalyFunctionManager anomalyDAO;
   private final ApplicationManager appDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private AlertFilterFactory alertFilterFactory;
@@ -45,7 +71,8 @@ public class EmailResource {
   private SmtpConfiguration smtpConfiguration;
 
   public EmailResource(ThirdEyeConfiguration thirdEyeConfig) {
-    this(thirdEyeConfig.getSmtpConfiguration(), new AlertFilterFactory(thirdEyeConfig.getAlertFilterConfigPath()),
+    this(SmtpConfiguration.createFromProperties(thirdEyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+        new AlertFilterFactory(thirdEyeConfig.getAlertFilterConfigPath()),
         thirdEyeConfig.getFailureFromAddress(), thirdEyeConfig.getFailureToAddress(), thirdEyeConfig.getDashboardHost(),
         thirdEyeConfig.getPhantomJsPath(), thirdEyeConfig.getRootDir());
   }
@@ -55,6 +82,7 @@ public class EmailResource {
       String dashboardHost, String phantonJsPath, String rootDir) {
     this.smtpConfiguration = smtpConfiguration;
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.anomalyDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.appDAO = DAO_REGISTRY.getApplicationDAO();
     this.alertFilterFactory = alertFilterFactory;
     this.failureFromAddress = failureFromAddress;
@@ -163,6 +191,84 @@ public class EmailResource {
     return getAlertToSubscriberMapping().get(alertFunctionId);
   }
 
+  @POST
+  @Path("{id}/subscribe")
+  @ApiOperation("Endpoint for subscribing to an alert/alerts")
+  public Response subscribeAlert(
+      @PathParam("id") Long id,
+      @QueryParam("functionId") String functionIds,
+      @QueryParam("functionName") String functionName,
+      @QueryParam("metric") String metric,
+      @QueryParam("dataset") String dataset,
+      @DefaultValue("") @QueryParam("functionPrefix") String functionPrefix) throws Exception {
+    if (StringUtils.isBlank(functionIds) && StringUtils.isBlank(functionName)
+        && (StringUtils.isBlank(metric) || StringUtils.isBlank(dataset))) {
+      throw new IllegalArgumentException(String.format("Received null or emtpy String for the mandatory params. Please"
+          + " specify either functionIds or functionName or (metric & dataset). dataset: %s, metric: %s,"
+          + " functionName %s, functionIds: %s", dataset, metric, functionName, functionIds));
+    }
+
+    Map<String, String> responseMessage = new HashMap<>();
+
+    AlertConfigDTO alertConfigDTO = alertDAO.findById(id);
+    if (alertConfigDTO == null) {
+      responseMessage.put("message", "cannot find the alert group configuration entry " + id + ".");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
+
+    final List<Long> functionIdList = new ArrayList<>();
+    if (StringUtils.isNotBlank(functionIds)) {
+      for (String functionId : functionIds.split(",")) {
+        AnomalyFunctionDTO anomalyFunction = anomalyDAO.findById(Long.valueOf(functionId));
+        if (anomalyFunction != null) {
+          functionIdList.add(Long.valueOf(functionId));
+        } else {
+          responseMessage.put("skipped function " + functionId, "Cannot be found!");
+        }
+      }
+    } else if (StringUtils.isNotBlank(functionName)) {
+      AnomalyFunctionDTO anomalyFunctionDTO = anomalyDAO.findWhereNameEquals(functionName);
+      if (anomalyFunctionDTO == null) {
+        responseMessage.put("message", "function " + functionName + " cannot be found.");
+        return Response.ok(responseMessage).build();
+      }
+    } else {
+      Predicate predicate = Predicate.AND(
+          Predicate.EQ("metric", metric),
+          Predicate.EQ("collection", dataset));
+      List<AnomalyFunctionDTO> anomalyFunctionDTOS = anomalyDAO.findByPredicate(predicate);
+      if (anomalyFunctionDTOS == null) {
+        responseMessage.put("message", "no function found on metric " + metric + " & dataset " + dataset);
+        return Response.ok(responseMessage).build();
+      }
+
+      for (AnomalyFunctionDTO anomalyDTO : anomalyFunctionDTOS) {
+        if (anomalyDTO.getFunctionName().startsWith(functionPrefix)) {
+          functionIdList.add(anomalyDTO.getId());
+        } else {
+          responseMessage.put("skipped function " + anomalyDTO.getFunctionName(), "Doesn't match prefix."
+              + functionPrefix);
+        }
+      }
+    }
+
+    AlertConfigBean.EmailConfig emailConfig = alertConfigDTO.getEmailConfig();
+    if (emailConfig == null) {
+      AlertConfigBean.EmailConfig emailConf = new AlertConfigBean.EmailConfig();
+      emailConf.setFunctionIds(functionIdList);
+      alertConfigDTO.setEmailConfig(emailConf);
+    } else if (emailConfig.getFunctionIds() != null) {
+      emailConfig.getFunctionIds().addAll(functionIdList);
+    } else {
+      emailConfig.setFunctionIds(functionIdList);
+    }
+    alertDAO.update(alertConfigDTO);
+
+    responseMessage.put("message", "Alert group " + id + " successfully subscribed to following functions: "
+        + functionIdList);
+    return Response.ok(responseMessage).build();
+  }
+
   /**
    * Generate an instance of SmtpConfiguration
    * This smtp configuration will take the default setting from thirdeye configuration first. If there is user defined
@@ -192,19 +298,30 @@ public class EmailResource {
     return smtpConfiguration;
   }
 
+  private Map<String, Map<String, Object>> getSmtpAlerterConfig(String smtpHost, Integer smtpPort) {
+    Map<String, Map<String, Object>> alerterConf = new HashMap<>();
+    Map<String, Object> smtpProp = new HashMap<>();
+
+    smtpProp.put(SMTP_HOST_KEY, smtpHost);
+    smtpProp.put(SMTP_PORT_KEY, smtpPort.toString());
+    alerterConf.put(SMTP_CONFIG_KEY, smtpProp);
+
+    return alerterConf;
+  }
+
   private Response generateAnomalyReportForAnomalies(AnomalyReportGenerator anomalyReportGenerator,
-      List<MergedAnomalyResultDTO> anomalies, boolean applyFilter, long startTime, long endTime, Long groupId, String groupName,
-      String subject, boolean includeSentAnomaliesOnly, String toAddr, String fromAddr, String alertName,
-      boolean includeSummary, String teHost, String smtpHost, int smtpPort) {
-    if (Strings.isNullOrEmpty(toAddr)) {
-      throw new WebApplicationException("Empty : list of recipients" + toAddr);
+      List<MergedAnomalyResultDTO> anomalies, boolean applyFilter, long startTime, long endTime, Long groupId,
+      String groupName, String subject, boolean includeSentAnomaliesOnly, DetectionAlertFilterRecipients recipients,
+      String fromAddr, String alertName, boolean includeSummary, String teHost, String smtpHost, int smtpPort) {
+    if (recipients.getTo().isEmpty()) {
+      throw new WebApplicationException("Empty : list of recipients" + recipients.getTo());
     }
     if(applyFilter){
       anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
     }
 
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
-    configuration.setSmtpConfiguration(getSmtpConfiguration(smtpHost, smtpPort));
+    configuration.setAlerterConfiguration(getSmtpAlerterConfig(smtpHost, smtpPort));
     configuration.setDashboardHost(teHost);
     configuration.setPhantomJsPath(phantonJsPath);
     configuration.setRootDir(rootDir);
@@ -216,7 +333,7 @@ public class EmailResource {
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
         .buildReport(startTime, endTime, groupId, groupName, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, alertName, dummyAlertConfig, includeSummary);
+            includeSentAnomaliesOnly, recipients, alertName, dummyAlertConfig, includeSummary);
     return Response.ok("Request to generate report-email accepted ").build();
   }
 
@@ -239,7 +356,8 @@ public class EmailResource {
   @Path("generate/datasets/{startTime}/{endTime}")
   public Response generateAndSendAlertForDatasets(@PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime, @QueryParam("datasets") String datasets,
-      @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
+      @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
       @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
@@ -268,8 +386,12 @@ public class EmailResource {
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
 
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses(toAddr),
+        EmailUtils.getValidEmailAddresses(ccAddr),
+        EmailUtils.getValidEmailAddresses(bccAddr));
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
-        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        null, subject, includeSentAnomaliesOnly, recipients, fromAddr, "Thirdeye Anomaly Report", true,
         teHost, smtpHost, smtpPort);
   }
 
@@ -294,7 +416,8 @@ public class EmailResource {
   public Response generateAndSendAlertForMetrics(
       @PathParam("startTime") Long startTime, @PathParam("endTime") Long endTime,
       @QueryParam("metrics") String metrics, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
+      @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
@@ -312,8 +435,12 @@ public class EmailResource {
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForMetrics(Arrays.asList(metricsArr), startTime, endTime);
 
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses(toAddr),
+        EmailUtils.getValidEmailAddresses(ccAddr),
+        EmailUtils.getValidEmailAddresses(bccAddr));
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
-        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        null, subject, includeSentAnomaliesOnly, recipients, fromAddr, "Thirdeye Anomaly Report", true,
         teHost, smtpHost, smtpPort);
   }
 
@@ -323,7 +450,8 @@ public class EmailResource {
   public Response generateAndSendAlertForFunctions(
       @PathParam("startTime") Long startTime, @PathParam("endTime") Long endTime,
       @QueryParam("functions") String functions, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
+      @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
@@ -357,8 +485,12 @@ public class EmailResource {
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForFunctions(functionList, startTime, endTime);
 
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses(toAddr),
+        EmailUtils.getValidEmailAddresses(ccAddr),
+        EmailUtils.getValidEmailAddresses(bccAddr));
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
-        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true,
+        null, subject, includeSentAnomaliesOnly, recipients, fromAddr, "Thirdeye Anomaly Report", true,
         teHost, smtpConfiguration.getSmtpHost(), smtpConfiguration.getSmtpPort());
   }
 
@@ -367,7 +499,8 @@ public class EmailResource {
   @Path("generate/app/{app}/{startTime}/{endTime}")
   public Response sendEmailForApp(@PathParam("app") String application, @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime, @QueryParam("from") String fromAddr,
-      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
+      @QueryParam("to") String toAddr, @QueryParam("cc") String ccAddr, @QueryParam("bcc") String bccAddr,
+      @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
@@ -407,8 +540,12 @@ public class EmailResource {
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForFunctions(functionList, startTime, endTime);
 
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(
+        EmailUtils.getValidEmailAddresses(toAddr),
+        EmailUtils.getValidEmailAddresses(ccAddr),
+        EmailUtils.getValidEmailAddresses(bccAddr));
     return generateAnomalyReportForAnomalies(anomalyReportGenerator, anomalies, isApplyFilter, startTime, endTime, null,
-        null, subject, includeSentAnomaliesOnly, toAddr, fromAddr, application, true,
+        null, subject, includeSentAnomaliesOnly, recipients, fromAddr, application, true,
         teHost, smtpHost, smtpPort);
   }
 
@@ -416,6 +553,8 @@ public class EmailResource {
   public Response sendEmailWithText(
       @QueryParam("from") String fromAddr,
       @QueryParam("to") String toAddr,
+      @QueryParam("cc") String ccAddr,
+      @QueryParam("bcc") String bccAddr,
       @QueryParam("subject") String subject,
       @QueryParam("text") String text,
       @QueryParam("smtpHost") String smtpHost,
@@ -442,8 +581,11 @@ public class EmailResource {
     HtmlEmail email = new HtmlEmail();
 
     try {
-      EmailHelper.sendEmailWithTextBody(email, smtpConfiguration, subject, text,
-         fromAddr, toAddr
+      EmailHelper.sendEmailWithTextBody(email, smtpConfiguration, subject, text, fromAddr,
+          new DetectionAlertFilterRecipients(
+              EmailUtils.getValidEmailAddresses(toAddr),
+              EmailUtils.getValidEmailAddresses(ccAddr),
+              EmailUtils.getValidEmailAddresses(bccAddr))
       );
     } catch (EmailException e) {
       return Response.ok("Exception in sending out message").build();

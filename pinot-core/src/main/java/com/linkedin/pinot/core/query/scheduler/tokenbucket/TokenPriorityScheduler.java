@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.query.scheduler.tokenbucket;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.scheduler.MultiLevelPriorityQueue;
 import com.linkedin.pinot.core.query.scheduler.PriorityScheduler;
 import com.linkedin.pinot.core.query.scheduler.SchedulerGroup;
@@ -24,6 +24,7 @@ import com.linkedin.pinot.core.query.scheduler.SchedulerGroupFactory;
 import com.linkedin.pinot.core.query.scheduler.TableBasedGroupMapper;
 import com.linkedin.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import com.linkedin.pinot.core.query.scheduler.resources.ResourceManager;
+import java.util.concurrent.atomic.LongAccumulator;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 
@@ -38,7 +39,7 @@ public class TokenPriorityScheduler extends PriorityScheduler {
   private static final int DEFAULT_TOKEN_LIFETIME_MS = 100;
 
   public static TokenPriorityScheduler create(@Nonnull Configuration config, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull ServerMetrics metrics) {
+      @Nonnull ServerMetrics metrics, @Nonnull LongAccumulator latestQueryTime) {
     final ResourceManager rm = new PolicyBasedResourceManager(config);
     final SchedulerGroupFactory groupFactory =  new SchedulerGroupFactory() {
       @Override
@@ -54,12 +55,13 @@ public class TokenPriorityScheduler extends PriorityScheduler {
     };
 
     MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
-    return new TokenPriorityScheduler(rm, queryExecutor, queue, metrics);
+    return new TokenPriorityScheduler(rm, queryExecutor, queue, metrics, latestQueryTime);
   }
 
   private TokenPriorityScheduler(@Nonnull ResourceManager resourceManager, @Nonnull QueryExecutor queryExecutor,
-      @Nonnull MultiLevelPriorityQueue queue, @Nonnull ServerMetrics metrics) {
-    super(resourceManager, queryExecutor, queue, metrics);
+      @Nonnull MultiLevelPriorityQueue queue, @Nonnull ServerMetrics metrics,
+      @Nonnull LongAccumulator latestQueryTime) {
+    super(resourceManager, queryExecutor, queue, metrics, latestQueryTime);
   }
 
   @Override

@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
@@ -24,14 +40,12 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   private long id;
   private String dashboardHost;
-  private SmtpConfiguration smtpConfiguration;
   private HolidayEventsLoaderConfiguration holidayEventsLoaderConfiguration = new HolidayEventsLoaderConfiguration();
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
   private AutoOnboardConfiguration autoOnboardConfiguration = new AutoOnboardConfiguration();
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
-  private Collection<String> emailWhitelist = new HashSet<>();
 
   public HolidayEventsLoaderConfiguration getHolidayEventsLoaderConfiguration() {
     return holidayEventsLoaderConfiguration;
@@ -137,10 +151,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.alert = alert;
   }
 
-  public SmtpConfiguration getSmtpConfiguration() {
-    return smtpConfiguration;
-  }
-
   public boolean isAutoload() {
     return autoload;
   }
@@ -173,10 +183,6 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.pinotProxy = pinotProxy;
   }
 
-  public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
-    this.smtpConfiguration = smtpConfiguration;
-  }
-
   public String getFailureFromAddress() {
     return failureFromAddress;
   }
@@ -191,13 +197,5 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setFailureToAddress(String failureToAddress) {
     this.failureToAddress = failureToAddress;
-  }
-
-  public Collection<String> getEmailWhitelist() {
-    return emailWhitelist;
-  }
-
-  public void setEmailWhitelist(Collection<String> emailWhitelist) {
-    this.emailWhitelist = emailWhitelist;
   }
 }

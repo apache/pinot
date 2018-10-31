@@ -15,26 +15,111 @@
  */
 package com.linkedin.pinot.core.data.manager;
 
-import com.linkedin.pinot.common.data.DataManager;
-import java.util.Collection;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import java.io.File;
+import java.util.List;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
-// TODO: resolve the dependency issue between pinot-common and pinot-core, merge DataManager into InstanceDataManager
+/**
+ * The <code>InstanceDataManager</code> class is the instance level data manager, which manages all tables and segments
+ * served by the instance.
+ */
 @ThreadSafe
-public interface InstanceDataManager extends DataManager {
+public interface InstanceDataManager {
 
   /**
-   * Gets the table manager for the given table.
-   *
-   * @param tableNameWithType Table name with type suffix
-   * @return Table data manager for the given table, null if table does not exist
+   * Initializes the data manager.
+   * <p>Should be called only once and before calling any other method.
+   */
+  void init(@Nonnull Configuration config, @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull ServerMetrics serverMetrics) throws ConfigurationException;
+
+  /**
+   * Starts the data manager.
+   * <p>Should be called only once after data manager gets initialized but before calling any other method.
+   */
+  void start();
+
+  /**
+   * Shuts down the data manager.
+   * <p>Should be called only once. After calling shut down, no other method should be called.
+   */
+  void shutDown();
+
+  /**
+   * Adds a segment from local disk into an OFFLINE table.
+   */
+  void addOfflineSegment(@Nonnull String offlineTableName, @Nonnull String segmentName, @Nonnull File indexDir)
+      throws Exception;
+
+  /**
+   * Adds a segment into an REALTIME table.
+   * <p>The segment might be committed or under consuming.
+   */
+  void addRealtimeSegment(@Nonnull String realtimeTableName, @Nonnull String segmentName) throws Exception;
+
+  /**
+   * Removes a segment from a table.
+   */
+  void removeSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) throws Exception;
+
+  /**
+   * Reloads a segment in a table.
+   */
+  void reloadSegment(@Nonnull String tableNameWithType, @Nonnull String segmentName) throws Exception;
+
+  /**
+   * Reloads all segment in a table.
+   */
+  void reloadAllSegments(@Nonnull String tableNameWithType) throws Exception;
+
+  /**
+   * Returns all tables served by the instance.
+   */
+  @Nonnull
+  Set<String> getAllTables();
+
+  /**
+   * Returns the table data manager for the given table, or <code>null</code> if it does not exist.
    */
   @Nullable
   TableDataManager getTableDataManager(@Nonnull String tableNameWithType);
 
+  /**
+   * Returns the segment metadata for the given segment in the given table, or <code>null</code> if it does not exist.
+   */
+  @Nullable
+  SegmentMetadata getSegmentMetadata(@Nonnull String tableNameWithType, @Nonnull String segmentName);
+
+  /**
+   * Returns the metadata for all segments in the given table.
+   */
   @Nonnull
-  Collection<TableDataManager> getTableDataManagers();
+  List<SegmentMetadata> getAllSegmentsMetadata(@Nonnull String tableNameWithType);
+
+  /**
+   * Returns the directory for un-tarred segment data.
+   */
+  @Nonnull
+  String getSegmentDataDirectory();
+
+  /**
+   * Returns the directory for tarred segment file.
+   */
+  @Nonnull
+  String getSegmentFileDirectory();
+
+  /**
+   * Returns the maximum number of segments allowed to refresh in parallel.
+   */
+  int getMaxParallelRefreshThreads();
 }

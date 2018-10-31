@@ -1,7 +1,24 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datalayer.util;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +54,13 @@ public class StringUtils {
     Properties props = new Properties();
     for (String part : SEMICOLON_SPLITTER.split(propStr)) {
       List<String> kvPair = EQUALS_SPLITTER.splitToList(part);
-      props.setProperty(kvPair.get(0), kvPair.get(1));
+      if (kvPair.size() == 2) {
+        props.setProperty(kvPair.get(0).trim(), kvPair.get(1).trim());
+      } else if (kvPair.size() == 1) {
+        props.setProperty(kvPair.get(0).trim(), "");
+      } else {
+        throw new IllegalArgumentException(part + " is not a legal property string");
+      }
     }
     return props;
   }

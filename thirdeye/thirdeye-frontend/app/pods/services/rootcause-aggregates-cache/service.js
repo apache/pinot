@@ -1,12 +1,14 @@
 import Service from '@ember/service';
+import { inject as service } from '@ember/service';
 import {
   toAbsoluteUrn,
   toMetricUrn
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import fetch from 'fetch';
 import _ from 'lodash';
-import moment from 'moment';
+
+const ROOTCAUSE_AGGREGATES_ENDPOINT = '/rootcause/metric/aggregate/batch';
+const ROOTCAUSE_AGGREGATES_PRIORITY = 20;
 
 export default Service.extend({
   aggregates: null, // {}
@@ -17,9 +19,11 @@ export default Service.extend({
 
   errors: null, // Set({ urn, error })
 
+  fetcher: service('services/rootcause-fetcher'),
+
   init() {
     this._super(...arguments);
-    this.setProperties({aggregates: {}, context: {}, pending: new Set(), errors: new Set(), timezone: moment.tz.guess()});
+    this.setProperties({aggregates: {}, context: {}, pending: new Set(), errors: new Set()});
   },
 
   clearErrors() {
@@ -38,6 +42,8 @@ export default Service.extend({
     let newAggregates;
     if(!_.isEqual(context, requestContext)) {
       // new analysis range: evict all, reload, keep stale copy of incoming
+      this.get('fetcher').resetPrefix(ROOTCAUSE_AGGREGATES_ENDPOINT);
+
       missing = metrics;
       newPending = new Set(metrics);
       newAggregates = metrics.filter(urn => urn in aggregates).reduce((agg, urn) => { agg[urn] = aggregates[urn]; return agg; }, {});
@@ -63,8 +69,8 @@ export default Service.extend({
       metricUrnToOffestAndUrn[metricUrn] = offsetsAndUrns;
     });
 
-    Object.keys(metricUrnToOffestAndUrn).forEach(metricUrn => {
-      this._fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn);
+    [...Object.keys(metricUrnToOffestAndUrn)].sort().forEach((metricUrn, i) => {
+      this._fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn, i);
     });
   },
 
@@ -76,26 +82,28 @@ export default Service.extend({
    * @param {Object} metricUrnToOffestAndUrn Hash map from metric urn to offset and urn
    * @returns {undefined}
    */
-  async _fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn) {
+  async _fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn, index) {
+    const fetcher = this.get('fetcher');
+
     const [ start, end ] = requestContext.anomalyRange;
     const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
     const urns = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[1]);
     const timezone = 'America/Los_Angeles';
 
-    const url = `/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
+    const url = `${ROOTCAUSE_AGGREGATES_ENDPOINT}?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
     try {
-      const payload = await fetch(url);
+      const payload = await fetcher.fetch(url, ROOTCAUSE_AGGREGATES_PRIORITY, index);
       const json = await checkStatus(payload);
       const aggregates = this._extractAggregatesBatch(json, urns);
       this._complete(requestContext, aggregates);
 
     } catch (error) {
-      this._handleErrorBatch(urns, error)
+      this._handleErrorBatch(urns, error);
     }
   },
 
   _handleErrorBatch(urns, error) {
-    urns.forEach(urn => this._handleError(urn, error))
+    urns.forEach(urn => this._handleError(urn, error));
   },
 
   _extractAggregatesBatch(incoming, urns) {

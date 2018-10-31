@@ -37,6 +37,12 @@ public final class DimensionFieldSpec extends FieldSpec {
     super(name, dataType, isSingleValueField, defaultNullValue);
   }
 
+  public DimensionFieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
+      Class virtualColumnProviderClass) {
+    super(name, dataType, isSingleValueField);
+    _virtualColumnProvider = virtualColumnProviderClass.getName();
+  }
+
   @JsonIgnore
   @Nonnull
   @Override

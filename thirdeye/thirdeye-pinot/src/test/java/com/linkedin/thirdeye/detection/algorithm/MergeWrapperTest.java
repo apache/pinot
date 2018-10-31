@@ -1,17 +1,31 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.detection.algorithm;
 
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
-import com.linkedin.thirdeye.detection.DetectionTestUtils;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.MockPipeline;
 import com.linkedin.thirdeye.detection.MockPipelineLoader;
 import com.linkedin.thirdeye.detection.MockPipelineOutput;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +47,7 @@ public class MergeWrapperTest {
   private DataProvider provider;
   private List<MockPipeline> runs;
   private List<MockPipelineOutput> outputs;
+  private MockPipelineLoader mockLoader;
 
   private static final Long PROP_ID_VALUE = 1000L;
   private static final String PROP_NAME_VALUE = "myName";
@@ -87,11 +102,11 @@ public class MergeWrapperTest {
         makeAnomaly(2400, 2800)
     ), 3000));
 
-    MockPipelineLoader mockLoader = new MockPipelineLoader(this.runs, this.outputs);
+    this.mockLoader = new MockPipelineLoader(this.runs, this.outputs);
 
     this.provider = new MockDataProvider()
         .setAnomalies(existing)
-        .setLoader(mockLoader);
+        .setLoader(this.mockLoader);
   }
 
   @Test
@@ -251,4 +266,5 @@ public class MergeWrapperTest {
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2400, 2800, Collections.singletonMap("otherKey", "value"))));
     Assert.assertTrue(output.getAnomalies().contains(makeAnomaly(2700, 2900, Collections.singletonMap("otherKey", "otherValue"))));
   }
+
 }

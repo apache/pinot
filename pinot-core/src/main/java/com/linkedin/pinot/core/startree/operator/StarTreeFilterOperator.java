@@ -18,9 +18,9 @@ package com.linkedin.pinot.core.startree.operator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.EmptyFilterBlock;
-import com.linkedin.pinot.core.operator.filter.AndOperator;
+import com.linkedin.pinot.core.operator.blocks.FilterBlock;
+import com.linkedin.pinot.core.operator.filter.AndFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
@@ -127,12 +127,14 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   // Map from column to matching dictionary ids
   private final Map<String, IntSet> _matchingDictIdsMap;
 
+  private final Map<String, String> _debugOptions;
   boolean _resultEmpty = false;
 
-  public StarTreeFilterOperator(@Nonnull StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
-      @Nullable Set<String> groupByColumns) {
+  public StarTreeFilterOperator(StarTreeV2 starTreeV2, @Nullable FilterQueryTree rootFilterNode,
+      @Nullable Set<String> groupByColumns, @Nullable Map<String, String> debugOptions) {
     _starTreeV2 = starTreeV2;
     _groupByColumns = groupByColumns != null ? new HashSet<>(groupByColumns) : Collections.emptySet();
+    _debugOptions = debugOptions;
 
     if (rootFilterNode != null) {
       // Process the filter tree and get a map from column to a list of predicates applied to it
@@ -194,7 +196,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  public BaseFilterBlock getNextBlock() {
+  public FilterBlock getNextBlock() {
     if (_resultEmpty) {
       return EmptyFilterBlock.getInstance();
     }
@@ -205,8 +207,8 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     } else if (numChildFilterOperators == 1) {
       return childFilterOperators.get(0).nextBlock();
     } else {
-      FilterOperatorUtils.reOrderFilterOperators(childFilterOperators);
-      return new AndOperator(childFilterOperators).nextBlock();
+      FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, _debugOptions);
+      return new AndFilterOperator(childFilterOperators).nextBlock();
     }
   }
 

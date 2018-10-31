@@ -72,7 +72,7 @@ export function enhanceAnomalies(rawAnomalies, severityScores) {
     const isNullChangeRate = Number.isNaN(Number(changeRate));
     // Set 'not reviewed' label
     if (!anomaly.anomalyFeedback) {
-      anomaly.anomalyFeedback = 'Not reviewed yet';
+      anomaly.anomalyFeedback = 'Not Resolved';
     }
     // Add missing properties
     Object.assign(anomaly, {

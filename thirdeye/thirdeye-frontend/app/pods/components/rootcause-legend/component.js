@@ -1,4 +1,4 @@
-import { computed } from '@ember/object';
+import { computed, get, getProperties } from '@ember/object';
 import Component from '@ember/component';
 import {
   toCurrentUrn,
@@ -6,7 +6,8 @@ import {
   filterPrefix,
   hasPrefix,
   toMetricLabel,
-  toEventLabel
+  toEventLabel,
+  isExclusionWarning
 } from 'thirdeye-frontend/utils/rca-utils';
 import _ from 'lodash';
 
@@ -27,7 +28,7 @@ export default Component.extend({
     'entities',
     'selectedUrns',
     function () {
-      const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
+      const { selectedUrns, entities } = getProperties(this, 'selectedUrns', 'entities');
       return filterPrefix(selectedUrns, 'thirdeye:metric:')
         .reduce((agg, urn) => {
           agg[urn] = toMetricLabel(urn, entities);
@@ -45,7 +46,7 @@ export default Component.extend({
     'entities',
     'selectedUrns',
     function () {
-      const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
+      const { entities, selectedUrns } = getProperties(this, 'entities', 'selectedUrns');
       return filterPrefix(selectedUrns, 'thirdeye:event:')
         .reduce((agg, urn) => {
           const type = urn.split(':')[2];
@@ -63,7 +64,7 @@ export default Component.extend({
     'entities',
     'selectedUrns',
     function () {
-      const { entities, selectedUrns } = this.getProperties('entities', 'selectedUrns');
+      const { entities, selectedUrns } = getProperties(this, 'entities', 'selectedUrns');
       return [...selectedUrns]
         .filter(urn => entities[urn])
         .reduce((agg, urn) => {
@@ -76,19 +77,31 @@ export default Component.extend({
   hasMetrics: computed(
     'metrics',
     function () {
-      return Object.keys(this.get('metrics')).length > 0;
+      return Object.keys(get(this, 'metrics')).length > 0;
     }
   ),
 
   hasEvents: computed(
     'events',
     function () {
-      return Object.keys(this.get('events')).length > 0;
+      return Object.keys(get(this, 'events')).length > 0;
+    }
+  ),
+
+  isExclusionWarning: computed(
+    'metrics',
+    'entities',
+    function () {
+      const { metrics, entities } = getProperties(this, 'metrics', 'entities');
+      return Object.keys(metrics).reduce((agg, urn) => {
+        agg[urn] = isExclusionWarning(urn, entities);
+        return agg;
+      }, {});
     }
   ),
 
   _bulkVisibility(visible, other) {
-    const { onVisibility } = this.getProperties('onVisibility');
+    const { onVisibility } = getProperties(this, 'onVisibility');
     const updates = {};
     [...visible].forEach(urn => updates[urn] = true);
     [...other].forEach(urn => updates[urn] = false);
@@ -117,7 +130,7 @@ export default Component.extend({
 
 
     toggleVisibility(urn) {
-      const { onVisibility, invisibleUrns } = this.getProperties('onVisibility', 'invisibleUrns');
+      const { onVisibility, invisibleUrns } = getProperties(this, 'onVisibility', 'invisibleUrns');
       if (onVisibility) {
         const state = invisibleUrns.has(urn);
         const updates = { [urn]: state };
@@ -130,7 +143,7 @@ export default Component.extend({
     },
 
     removeUrn(urn) {
-      const { onSelection } = this.getProperties('onSelection');
+      const { onSelection } = getProperties(this, 'onSelection');
       if (onSelection) {
         const updates = { [urn]: false };
         if (hasPrefix(urn, 'thirdeye:metric:')) {
@@ -142,31 +155,31 @@ export default Component.extend({
     },
 
     visibleMetrics() {
-      const { selectedUrns } = this.getProperties('selectedUrns');
+      const { selectedUrns } = getProperties(this, 'selectedUrns');
       const visible = new Set(filterPrefix(selectedUrns, ['thirdeye:metric:', 'frontend:metric:', 'frontend:anomalyfunction:']));
       const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
       this._bulkVisibility(visible, other);
     },
 
     visibleEvents() {
-      const { selectedUrns } = this.getProperties('selectedUrns');
+      const { selectedUrns } = getProperties(this, 'selectedUrns');
       const visible = new Set(filterPrefix(selectedUrns, 'thirdeye:event:'));
       const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
       this._bulkVisibility(visible, other);
     },
 
     visibleAll() {
-      const { selectedUrns } = this.getProperties('selectedUrns');
+      const { selectedUrns } = getProperties(this, 'selectedUrns');
       this._bulkVisibility(selectedUrns, new Set());
     },
 
     visibleNone() {
-      const { selectedUrns } = this.getProperties('selectedUrns');
+      const { selectedUrns } = getProperties(this, 'selectedUrns');
       this._bulkVisibility(new Set(), selectedUrns);
     },
 
     visibleInvert() {
-      const { selectedUrns, invisibleUrns } = this.getProperties('selectedUrns', 'invisibleUrns');
+      const { selectedUrns, invisibleUrns } = getProperties(this, 'selectedUrns', 'invisibleUrns');
       const visible = new Set(invisibleUrns);
       const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
       this._bulkVisibility(visible, other);

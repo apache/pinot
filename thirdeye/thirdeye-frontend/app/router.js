@@ -9,7 +9,8 @@ const Router = EmberRouter.extend({
 Router.map(function() {
   this.route('login');
   this.route('logout');
-  //this.route('error'); disable for now
+  //page not found placeholder - lohuynh
+  //this.route('404', { path: '/*path' });
 
   this.route('home', function() {
     this.route('index', { path: '/' });
@@ -28,16 +29,6 @@ Router.map(function() {
     });
   });
 
-  this.route('rca', function() {
-    this.route('details', { path: '/:metric_id' }, function () {
-      this.route('metrics');
-      this.route('events');
-      this.route('dimensions', function() {
-        this.route('heatmap', {path: '/'});
-      });
-    });
-  });
-
   this.route('self-serve', function() {
     this.route('create-alert');
     this.route('import-metric');
@@ -45,6 +36,7 @@ Router.map(function() {
 
   this.route('screenshot', { path: 'screenshot/:anomaly_id' });
   this.route('rootcause');
+  this.route('rootcause2');
   this.route('preview');
   this.route('auto-onboard');
 });

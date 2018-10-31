@@ -128,8 +128,7 @@ public class AutoAddInvertedIndex {
     _maxNumInvertedIndexAdded = maxNumInvertedIndex;
   }
 
-  public void run()
-      throws Exception {
+  public void run() throws Exception {
     if (_strategy == Strategy.QUERY) {
       runQueryStrategy();
     } else {
@@ -137,8 +136,7 @@ public class AutoAddInvertedIndex {
     }
   }
 
-  private void runQueryStrategy()
-      throws Exception {
+  private void runQueryStrategy() throws Exception {
     // Get all resources in cluster
     List<String> resourcesInCluster = _helixAdmin.getResourcesInCluster(_clusterName);
 
@@ -249,7 +247,9 @@ public class AutoAddInvertedIndex {
 
       // Get each dimension's cardinality on one timestamp's data
       queryResponse = sendQuery("SELECT Max(" + timeColumnName + ") FROM " + tableNameWithType);
-      int maxTimeStamp = queryResponse.getJSONArray("aggregationResults").getJSONObject(0).getInt("value");
+      long maxTimeStamp =
+          new Double(queryResponse.getJSONArray("aggregationResults").getJSONObject(0).getDouble("value")).longValue();
+
       LOGGER.info("Table: {}, max time column {}: {}", tableNameWithType, timeColumnName, maxTimeStamp);
 
       // Query DISTINCTCOUNT on all dimensions in one query might cause timeout, so query them separately
@@ -312,8 +312,7 @@ public class AutoAddInvertedIndex {
     }
   }
 
-  private JSONObject sendQuery(String query)
-      throws Exception {
+  private JSONObject sendQuery(String query) throws Exception {
     URLConnection urlConnection = new URL("http://" + _brokerAddress + "/query").openConnection();
     urlConnection.setDoOutput(true);
 
@@ -325,8 +324,7 @@ public class AutoAddInvertedIndex {
     return new JSONObject(reader.readLine());
   }
 
-  private boolean updateIndexConfig(String tableName, TableConfig tableConfig)
-      throws Exception {
+  private boolean updateIndexConfig(String tableName, TableConfig tableConfig) throws Exception {
     String request =
         ControllerRequestURLBuilder.baseUrl("http://" + _controllerAddress).forTableUpdateIndexingConfigs(tableName);
     HttpURLConnection httpURLConnection = (HttpURLConnection) new URL(request).openConnection();

@@ -62,9 +62,11 @@ public class KafkaConsumerManager {
       CONSUMER_AND_ITERATOR_FOR_CONFIG_KEY = new HashMap<>();
   private static final IdentityHashMap<ConsumerAndIterator, Long> CONSUMER_RELEASE_TIME = new IdentityHashMap<>();
 
-  public static ConsumerAndIterator acquireConsumerAndIteratorForConfig(KafkaHighLevelStreamProviderConfig config) {
+  public static ConsumerAndIterator acquireConsumerAndIteratorForConfig(
+      KafkaHighLevelStreamConfig kafkaHighLevelStreamConfig) {
     final ImmutableTriple<String, String, String> configKey =
-        new ImmutableTriple<>(config.getTopicName(), config.getGroupId(), config.getZkString());
+        new ImmutableTriple<>(kafkaHighLevelStreamConfig.getKafkaTopicName(), kafkaHighLevelStreamConfig.getGroupId(),
+            kafkaHighLevelStreamConfig.getZkBrokerUrl());
 
     synchronized (KafkaConsumerManager.class) {
       // If we have the consumer and it's not already acquired, return it, otherwise error out if it's already acquired
@@ -79,14 +81,16 @@ public class KafkaConsumerManager {
         }
       }
 
-      LOGGER.info("Creating new kafka consumer and iterator for topic {}", config.getTopicName());
+      LOGGER.info("Creating new kafka consumer and iterator for topic {}",
+          kafkaHighLevelStreamConfig.getKafkaTopicName());
 
       // Create the consumer
-      ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(config.getKafkaConsumerConfig());
+      ConsumerConnector consumer =
+          kafka.consumer.Consumer.createJavaConsumerConnector(kafkaHighLevelStreamConfig.getKafkaConsumerConfig());
 
       // Create the iterator (can only be done once per consumer)
-      ConsumerIterator<byte[], byte[]> iterator = consumer.createMessageStreams(config.getTopicMap(1)).
-          get(config.getTopicName()).get(0).iterator();
+      ConsumerIterator<byte[], byte[]> iterator = consumer.createMessageStreams(kafkaHighLevelStreamConfig.getTopicMap(1)).
+          get(kafkaHighLevelStreamConfig.getKafkaTopicName()).get(0).iterator();
 
       // Mark both the consumer and iterator as acquired
       ConsumerAndIterator consumerAndIterator = new ConsumerAndIterator(consumer, iterator);
@@ -94,7 +98,7 @@ public class KafkaConsumerManager {
       CONSUMER_RELEASE_TIME.put(consumerAndIterator, IN_USE);
 
       LOGGER.info("Created consumer/iterator with id {} for topic {}", consumerAndIterator.getId(),
-          config.getTopicName());
+          kafkaHighLevelStreamConfig.getKafkaTopicName());
 
       return consumerAndIterator;
     }

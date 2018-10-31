@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -40,6 +39,7 @@ import com.linkedin.pinot.core.query.aggregation.function.PercentileTDigestAggre
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.tdunning.math.stats.TDigest;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -77,11 +77,11 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
   protected static final int NUM_ROWS = 1000;
   protected static final double VALUE_RANGE = Integer.MAX_VALUE;
-  protected static final double DELTA = 0.1 * VALUE_RANGE; // Allow 10% quantile error
+  protected static final double DELTA = 0.05 * VALUE_RANGE; // Allow 5% quantile error
   protected static final String DOUBLE_COLUMN = "doubleColumn";
   protected static final String TDIGEST_COLUMN = "tDigestColumn";
   protected static final String GROUP_BY_COLUMN = "groupByColumn";
-  protected static final String[] GROUPS = new String[]{"G1", "G2", "G3", "G4", "G5"};
+  protected static final String[] GROUPS = new String[]{"G1", "G2", "G3"};
   protected static final long RANDOM_SEED = System.nanoTime();
   protected static final Random RANDOM = new Random(RANDOM_SEED);
   protected static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
@@ -122,7 +122,7 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
       double value = RANDOM.nextDouble() * VALUE_RANGE;
       valueMap.put(DOUBLE_COLUMN, value);
 
-      TDigest tDigest = new TDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
+      TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestAggregationFunction.DEFAULT_TDIGEST_COMPRESSION);
       tDigest.add(value);
       ByteBuffer byteBuffer = ByteBuffer.allocate(tDigest.byteSize());
       tDigest.asBytes(byteBuffer);
@@ -156,25 +156,16 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testInnerSegmentAggregation() {
-    for (int percentile = 0; percentile <= 100; percentile++) {
-      AggregationOperator aggregationOperator = getOperatorForQuery(getAggregationQuery(percentile));
-      IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
-      List<Object> aggregationResult = resultsBlock.getAggregationResult();
-      Assert.assertNotNull(aggregationResult);
-      Assert.assertEquals(aggregationResult.size(), 3);
-      DoubleList doubleList = (DoubleList) aggregationResult.get(0);
-      Collections.sort(doubleList);
-      double expected;
-      if (percentile == 100) {
-        expected = doubleList.getDouble(doubleList.size() - 1);
-      } else {
-        expected = doubleList.getDouble(doubleList.size() * percentile / 100);
-      }
-      TDigest tDigestForDoubleColumn = (TDigest) aggregationResult.get(1);
-      Assert.assertEquals(tDigestForDoubleColumn.quantile(percentile / 100.0), expected, DELTA, ERROR_MESSAGE);
-      TDigest tDigestForTDigestColumn = (TDigest) aggregationResult.get(2);
-      Assert.assertEquals(tDigestForTDigestColumn.quantile(percentile / 100.0), expected, DELTA, ERROR_MESSAGE);
-    }
+    // For inner segment case, percentile does not affect the intermediate result
+    AggregationOperator aggregationOperator = getOperatorForQuery(getAggregationQuery(0));
+    IntermediateResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
+    Assert.assertNotNull(aggregationResult);
+    Assert.assertEquals(aggregationResult.size(), 3);
+    DoubleList doubleList = (DoubleList) aggregationResult.get(0);
+    Collections.sort(doubleList);
+    assertTDigest((TDigest) aggregationResult.get(1), doubleList);
+    assertTDigest((TDigest) aggregationResult.get(2), doubleList);
   }
 
   @Test
@@ -194,27 +185,18 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
   @Test
   public void testInnerSegmentGroupBy() {
-    for (int percentile = 0; percentile <= 100; percentile++) {
-      AggregationGroupByOperator groupByOperator = getOperatorForQuery(getGroupByQuery(percentile));
-      IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
-      AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
-      Assert.assertNotNull(groupByResult);
-      Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
-      while (groupKeyIterator.hasNext()) {
-        GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-        DoubleList doubleList = (DoubleList) groupByResult.getResultForKey(groupKey, 0);
-        Collections.sort(doubleList);
-        double expected;
-        if (percentile == 100) {
-          expected = doubleList.getDouble(doubleList.size() - 1);
-        } else {
-          expected = doubleList.getDouble(doubleList.size() * percentile / 100);
-        }
-        TDigest tDigestForDoubleColumn = (TDigest) groupByResult.getResultForKey(groupKey, 1);
-        Assert.assertEquals(tDigestForDoubleColumn.quantile(percentile / 100.0), expected, DELTA, ERROR_MESSAGE);
-        TDigest tDigestForTDigestColumn = (TDigest) groupByResult.getResultForKey(groupKey, 2);
-        Assert.assertEquals(tDigestForTDigestColumn.quantile(percentile / 100.0), expected, DELTA, ERROR_MESSAGE);
-      }
+    // For inner segment case, percentile does not affect the intermediate result
+    AggregationGroupByOperator groupByOperator = getOperatorForQuery(getGroupByQuery(0));
+    IntermediateResultsBlock resultsBlock = groupByOperator.nextBlock();
+    AggregationGroupByResult groupByResult = resultsBlock.getAggregationGroupByResult();
+    Assert.assertNotNull(groupByResult);
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
+    while (groupKeyIterator.hasNext()) {
+      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
+      DoubleList doubleList = (DoubleList) groupByResult.getResultForKey(groupKey, 0);
+      Collections.sort(doubleList);
+      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 1), doubleList);
+      assertTDigest((TDigest) groupByResult.getResultForKey(groupKey, 2), doubleList);
     }
   }
 
@@ -251,6 +233,19 @@ public class PercentileTDigestQueriesTest extends BaseQueriesTest {
 
   private String getGroupByQuery(int percentile) {
     return String.format("%s GROUP BY %s", getAggregationQuery(percentile), GROUP_BY_COLUMN);
+  }
+
+  private void assertTDigest(TDigest tDigest, DoubleList doubleList) {
+    for (int percentile = 0; percentile <= 100; percentile++) {
+      double expected;
+      if (percentile == 100) {
+        expected = doubleList.getDouble(doubleList.size() - 1);
+      } else {
+        expected = doubleList.getDouble(doubleList.size() * percentile / 100);
+      }
+      Assert.assertEquals(PercentileTDigestAggregationFunction.calculatePercentile(tDigest, percentile), expected,
+          DELTA, ERROR_MESSAGE);
+    }
   }
 
   @AfterClass

@@ -16,8 +16,6 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -29,7 +27,9 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
+import com.linkedin.pinot.core.query.executor.QueryExecutor;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
+import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;

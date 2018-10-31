@@ -31,6 +31,7 @@ import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
+import com.linkedin.pinot.core.startree.v2.builder.StarTreeV2BuilderConfig;
 import com.linkedin.pinot.core.util.AvroUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.io.File;
@@ -93,6 +94,7 @@ public class SegmentGeneratorConfig {
   private RecordReaderConfig _readerConfig = null;
   private boolean _enableStarTreeIndex = false;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
+  private List<StarTreeV2BuilderConfig> _starTreeV2BuilderConfigs = null;
   private String _creatorVersion = null;
   private HllConfig _hllConfig = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
@@ -100,7 +102,7 @@ public class SegmentGeneratorConfig {
   private int _sequenceId = -1;
   private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
   private String _simpleDateFormat = null;
-  // Use on-heap or off-heap memory to generate index (currently only affect inverted index)
+  // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
 
   public SegmentGeneratorConfig() {
@@ -118,6 +120,7 @@ public class SegmentGeneratorConfig {
     _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
     _rawIndexCompressionType.putAll(config._rawIndexCompressionType);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
+    _columnSortOrder.addAll(config._columnSortOrder);
     _dataDir = config._dataDir;
     _inputFilePath = config._inputFilePath;
     _format = config._format;
@@ -138,6 +141,7 @@ public class SegmentGeneratorConfig {
     _readerConfig = config._readerConfig;
     _enableStarTreeIndex = config._enableStarTreeIndex;
     _starTreeIndexSpec = config._starTreeIndexSpec;
+    _starTreeV2BuilderConfigs = config._starTreeV2BuilderConfigs;
     _creatorVersion = config._creatorVersion;
     _hllConfig = config._hllConfig;
     _segmentNameGenerator = config._segmentNameGenerator;
@@ -148,6 +152,12 @@ public class SegmentGeneratorConfig {
     _onHeap = config._onHeap;
   }
 
+  /**
+   * This constructor is used during offline data generation. Note that it has an option that will generate inverted
+   * index.
+   * @param tableConfig
+   * @param schema
+   */
   public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
     Preconditions.checkNotNull(schema);
     _schema = schema;
@@ -165,9 +175,11 @@ public class SegmentGeneratorConfig {
 
       if (noDictionaryColumnMap != null) {
         Map<String, ChunkCompressorFactory.CompressionType> serializedNoDictionaryColumnMap =
-            noDictionaryColumnMap.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey,
-                e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(e.getValue())));
+            noDictionaryColumnMap.entrySet()
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                    e -> (ChunkCompressorFactory.CompressionType) ChunkCompressorFactory.CompressionType.valueOf(
+                        e.getValue())));
         this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
       }
     }
@@ -176,12 +188,13 @@ public class SegmentGeneratorConfig {
     if (starTreeIndexSpec != null) {
       enableStarTreeIndex(starTreeIndexSpec);
     }
-    _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+    if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
+      _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
+    }
 
     SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
     _hllConfig = validationConfig.getHllConfig();
   }
-
 
   public SegmentGeneratorConfig(Schema schema) {
     _schema = schema;
@@ -358,7 +371,7 @@ public class SegmentGeneratorConfig {
       return _segmentTimeColumnName;
     }
     // TODO: if segmentTimeColumnName is null, getQualifyingFields DATETIME. If multiple found, throw exception "must specify primary timeColumnName"
-    return getQualifyingFields(FieldType.TIME);
+    return getQualifyingFields(FieldType.TIME, true);
   }
 
   public void setTimeColumnName(String timeColumnName) {
@@ -495,6 +508,14 @@ public class SegmentGeneratorConfig {
     setStarTreeIndexSpec(starTreeIndexSpec);
   }
 
+  public List<StarTreeV2BuilderConfig> getStarTreeV2BuilderConfigs() {
+    return _starTreeV2BuilderConfigs;
+  }
+
+  public void setStarTreeV2BuilderConfigs(List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs) {
+    _starTreeV2BuilderConfigs = starTreeV2BuilderConfigs;
+  }
+
   public HllConfig getHllConfig() {
     return _hllConfig;
   }
@@ -537,7 +558,7 @@ public class SegmentGeneratorConfig {
 
   @JsonIgnore
   public String getMetrics() {
-    return getQualifyingFields(FieldType.METRIC);
+    return getQualifyingFields(FieldType.METRIC, true);
   }
 
   /**
@@ -573,12 +594,12 @@ public class SegmentGeneratorConfig {
 
   @JsonIgnore
   public String getDimensions() {
-    return getQualifyingFields(FieldType.DIMENSION);
+    return getQualifyingFields(FieldType.DIMENSION, true);
   }
 
   @JsonIgnore
   public String getDateTimeColumnNames() {
-    return getQualifyingFields(FieldType.DATE_TIME);
+    return getQualifyingFields(FieldType.DATE_TIME, true);
   }
 
   public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
@@ -595,14 +616,19 @@ public class SegmentGeneratorConfig {
    * @return Comma separate qualifying fields names.
    */
   @JsonIgnore
-  private String getQualifyingFields(FieldType type) {
+  private String getQualifyingFields(FieldType type, boolean excludeVirtualColumns) {
     List<String> fields = new ArrayList<>();
 
     for (final FieldSpec spec : getSchema().getAllFieldSpecs()) {
+      if (excludeVirtualColumns && getSchema().isVirtualColumn(spec.getName())) {
+        continue;
+      }
+
       if (spec.getFieldType() == type) {
         fields.add(spec.getName());
       }
     }
+
     Collections.sort(fields);
     return StringUtils.join(fields, ",");
   }

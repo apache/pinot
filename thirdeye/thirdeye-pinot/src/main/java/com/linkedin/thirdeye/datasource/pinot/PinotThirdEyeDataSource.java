@@ -1,3 +1,19 @@
+/**
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.linkedin.thirdeye.datasource.pinot;
 
 import com.google.common.base.Preconditions;
@@ -55,6 +71,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   public static final String DATA_SOURCE_NAME = PinotThirdEyeDataSource.class.getSimpleName();
 
+  private static final long CONNECTION_TIMEOUT = 60000;
+
   public static final String CACHE_LOADER_CLASS_NAME_STRING = "cacheLoaderClassName";
   // TODO: make default cache size configurable
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
@@ -86,7 +104,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @param properties the property to initialize this data source.
    */
-  public PinotThirdEyeDataSource(Map<String, String> properties) throws Exception {
+  public PinotThirdEyeDataSource(Map<String, Object> properties) throws Exception {
     Preconditions.checkNotNull(properties, "Data source property cannot be empty.");
 
     PinotResponseCacheLoader pinotResponseCacheLoader = getCacheLoaderInstance(properties);
@@ -106,11 +124,11 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
    *
    * @throws Exception when an error occurs connecting to the Pinot controller.
    */
-  static PinotResponseCacheLoader getCacheLoaderInstance(Map<String, String> properties)
+  static PinotResponseCacheLoader getCacheLoaderInstance(Map<String, Object> properties)
       throws Exception {
     final String cacheLoaderClassName;
     if (properties.containsKey(CACHE_LOADER_CLASS_NAME_STRING)) {
-      cacheLoaderClassName = properties.get(CACHE_LOADER_CLASS_NAME_STRING);
+      cacheLoaderClassName = properties.get(CACHE_LOADER_CLASS_NAME_STRING).toString();
     } else {
       cacheLoaderClassName = PinotControllerResponseCacheLoader.class.getName();
     }
@@ -167,7 +185,8 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         String pql = null;
         MetricConfigDTO metricConfig = metricFunction.getMetricConfig();
         if (metricConfig != null && metricConfig.isDimensionAsMetric()) {
-          pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, dataTimeSpec, datasetConfig);
+          pql = PqlUtils.getDimensionAsMetricPql(request, metricFunction, decoratedFilterSet, dataTimeSpec,
+              datasetConfig);
         } else {
           pql = PqlUtils.getPql(request, metricFunction, decoratedFilterSet, dataTimeSpec);
         }
@@ -177,22 +196,27 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
         try {
           resultSetGroup = this.executePQL(new PinotQuery(pql, tableName));
           if (metricConfig != null) {
-            ThirdeyeMetricsUtil.getRequestLog().success(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime());
+            ThirdeyeMetricsUtil.getRequestLog()
+                .success(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime());
           }
         } catch (Exception e) {
           if (metricConfig != null) {
-            ThirdeyeMetricsUtil.getRequestLog().failure(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime(), e);
+            ThirdeyeMetricsUtil.getRequestLog()
+                .failure(this.getName(), metricConfig.getDataset(), metricConfig.getName(), tStartFunction, System.nanoTime(), e);
           }
           throw e;
         }
 
         metricFunctionToResultSetList.put(metricFunction, resultSetGroup.getResultSets());
-
       }
 
       List<String[]> resultRows = parseResultSets(request, metricFunctionToResultSetList);
-      PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, timeSpec);
-      return resp;
+      return new PinotThirdEyeResponse(request, resultRows, timeSpec);
+
+    } catch (Exception e) {
+      ThirdeyeMetricsUtil.pinotExceptionCounter.inc();
+      throw e;
+
     } finally {
       ThirdeyeMetricsUtil.pinotCallCounter.inc();
       ThirdeyeMetricsUtil.pinotDurationCounter.inc(System.nanoTime() - tStart);
@@ -421,17 +445,16 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   }
 
   static double reduce(double aggregate, double value, int prevCount, MetricAggFunction aggFunction) {
-    switch(aggFunction) {
-      case SUM:
-        return aggregate + value;
-      case AVG:
-        return (aggregate * prevCount + value) / (prevCount + 1);
-      case MAX:
-        return Math.max(aggregate, value);
-      case COUNT:
-        return aggregate + 1;
-      default:
-        throw new IllegalArgumentException(String.format("Unknown aggregation function '%s'", aggFunction));
+    if (aggFunction.equals(MetricAggFunction.SUM)) {
+      return aggregate + value;
+    } else if (aggFunction.equals(MetricAggFunction.AVG) || aggFunction.isPercentile()) {
+      return (aggregate * prevCount + value) / (prevCount + 1);
+    } else if (aggFunction.equals(MetricAggFunction.MAX)) {
+      return Math.max(aggregate, value);
+    } else if (aggFunction.equals(MetricAggFunction.COUNT)) {
+      return aggregate + 1;
+    } else {
+      throw new IllegalArgumentException(String.format("Unknown aggregation function '%s'", aggFunction));
     }
   }
 
@@ -556,7 +579,7 @@ public class PinotThirdEyeDataSource implements ThirdEyeDataSource {
   public static PinotThirdEyeDataSource fromZookeeper(String controllerHost, int controllerPort, String zkUrl) {
     ZkClient zkClient = new ZkClient(zkUrl);
     zkClient.setZkSerializer(new ZNRecordSerializer());
-    zkClient.waitUntilConnected();
+    zkClient.waitUntilConnected(CONNECTION_TIMEOUT, TimeUnit.MILLISECONDS);
     PinotThirdEyeDataSource pinotThirdEyeDataSource = new PinotThirdEyeDataSource(controllerHost, controllerPort);
     LOG.info("Created PinotThirdEyeDataSource to zookeeper: {} controller: {}:{}", zkUrl, controllerHost, controllerPort);
     return pinotThirdEyeDataSource;

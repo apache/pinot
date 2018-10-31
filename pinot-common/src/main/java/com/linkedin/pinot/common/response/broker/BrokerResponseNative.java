@@ -39,7 +39,9 @@ import org.json.JSONObject;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded",
+    "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "totalDocs", "numGroupsLimitReached",
+    "timeUsedMs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -53,6 +55,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numEntriesScannedInFilter = 0L;
   private long _numEntriesScannedPostFilter = 0L;
   private long _totalDocs = 0L;
+  private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
 
   private SelectionResults _selectionResults;
@@ -115,6 +118,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numServersQueried")
+  @Override
   public int getNumServersQueried() {
     return _numServersQueried;
   }
@@ -126,6 +130,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numServersResponded")
+  @Override
   public int getNumServersResponded() {
     return _numServersResponded;
   }
@@ -179,6 +184,17 @@ public class BrokerResponseNative implements BrokerResponse {
     _totalDocs = totalDocs;
   }
 
+  @JsonProperty("numGroupsLimitReached")
+  @Override
+  public boolean isNumGroupsLimitReached() {
+    return _numGroupsLimitReached;
+  }
+
+  @JsonProperty("numGroupsLimitReached")
+  public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
+    _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
   @JsonProperty("timeUsedMs")
   public long getTimeUsedMs() {
     return _timeUsedMs;
@@ -211,25 +227,21 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @Override
-  public String toJsonString()
-      throws IOException {
+  public String toJsonString() throws IOException {
     return OBJECT_MAPPER.writeValueAsString(this);
   }
 
   @Override
-  public JSONObject toJson()
-      throws IOException, JSONException {
+  public JSONObject toJson() throws IOException, JSONException {
     return new JSONObject(toJsonString());
   }
 
-  public static BrokerResponseNative fromJsonString(String jsonString)
-      throws IOException {
+  public static BrokerResponseNative fromJsonString(String jsonString) throws IOException {
     return OBJECT_MAPPER.readValue(jsonString, new TypeReference<BrokerResponseNative>() {
     });
   }
 
-  public static BrokerResponseNative fromJsonObject(JSONObject jsonObject)
-      throws IOException {
+  public static BrokerResponseNative fromJsonObject(JSONObject jsonObject) throws IOException {
     return fromJsonString(jsonObject.toString());
   }
 

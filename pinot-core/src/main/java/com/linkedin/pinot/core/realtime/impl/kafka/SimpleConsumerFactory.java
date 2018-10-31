@@ -15,22 +15,66 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadata;
-import com.linkedin.pinot.core.realtime.stream.PinotStreamConsumer;
-import javax.annotation.Nonnull;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
+import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 
 
-public class SimpleConsumerFactory extends PinotStreamConsumerFactory {
-  public PinotStreamConsumer buildConsumer(String clientId, int partition, StreamMetadata streamMetadata) {
-    KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(),
-        clientId, streamMetadata.getKafkaTopicName(), partition, streamMetadata.getKafkaConnectionTimeoutMillis());
+/**
+ * A {@link StreamConsumerFactory} implementation for consuming a kafka stream using Kafka's Simple Consumer
+ */
+// TODO: this should ideally be called KafkaConsumerFactory. It is not a factory for simple consumer.
+// We cannot change this because open source usages of this factory will need to change the class name defined in their stream configs inside table configs
+public class SimpleConsumerFactory extends StreamConsumerFactory {
+
+  /**
+   * Creates a partition level consumer for fetching from a partition of a kafka stream
+   * @param clientId
+   * @param partition
+   * @return
+   */
+  @Override
+  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
+    return new KafkaPartitionLevelConsumer(clientId, _streamConfig, partition);
   }
 
-  public PinotStreamConsumer buildMetadataFetcher(@Nonnull String clientId, StreamMetadata streamMetadata) {
-    KafkaSimpleConsumerFactoryImpl kafkaSimpleConsumerFactory = new KafkaSimpleConsumerFactoryImpl();
-    return new SimpleConsumerWrapper(kafkaSimpleConsumerFactory, streamMetadata.getBootstrapHosts(),
-        clientId, streamMetadata.getKafkaConnectionTimeoutMillis());
+  /**
+   * Creates a stream level consumer for a kafka stream
+   * @param clientId
+   * @param tableName
+   * @param schema
+   * @param instanceZKMetadata
+   * @param serverMetrics
+   * @return
+   */
+  @Override
+  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
+      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
+    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, instanceZKMetadata, serverMetrics);
+  }
+
+  /**
+   * Creates a partition metadata provider for a kafka stream
+   * @param clientId
+   * @param partition
+   * @return
+   */
+  @Override
+  public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
+    return new KafkaStreamMetadataProvider(clientId, _streamConfig, partition);
+  }
+
+  /**
+   * Creates a stream metadata provider for a kafka stream
+   * @param clientId
+   * @return
+   */
+  @Override
+  public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
+    return new KafkaStreamMetadataProvider(clientId, _streamConfig);
   }
 }

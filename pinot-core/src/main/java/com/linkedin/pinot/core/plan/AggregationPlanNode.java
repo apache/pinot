@@ -67,7 +67,8 @@ public class AggregationPlanNode implements PlanNode {
               rootFilterNode)) {
             _transformPlanNode = null;
             _starTreeTransformPlanNode =
-                new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null, rootFilterNode);
+                new StarTreeTransformPlanNode(starTreeV2, aggregationFunctionColumnPairs, null,
+                    rootFilterNode, brokerRequest.getDebugOptions());
             return;
           }
         }

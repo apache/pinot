@@ -15,10 +15,10 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.clearspring.analytics.stream.quantile.TDigest;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import com.tdunning.math.stats.TDigest;
 import javax.annotation.Nonnull;
 
 

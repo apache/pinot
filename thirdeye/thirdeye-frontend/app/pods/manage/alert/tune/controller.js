@@ -4,12 +4,14 @@
  * @exports manage/alert/tune
  */
 import _ from 'lodash';
-import Controller from '@ember/controller';
 import moment from 'moment';
+import Controller from '@ember/controller';
+import { later } from '@ember/runloop';
 import { isPresent } from "@ember/utils";
-import { computed, set } from '@ember/object';
+import { computed, set, get, getProperties, setProperties } from '@ember/object';
 import { inject as service } from '@ember/service';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
+import { anomalyResponseMap } from 'thirdeye-frontend/utils/anomaly';
 import { buildAnomalyStats } from 'thirdeye-frontend/utils/manage-alert-utils';
 
 export default Controller.extend({
@@ -25,6 +27,11 @@ export default Controller.extend({
    * Make duration service accessible
    */
   durationCache: service('services/duration'),
+
+  /**
+   * Make toast service accessible
+   */
+  notifications: service('toast'),
 
   /**
    * Set initial view values
@@ -50,7 +57,8 @@ export default Controller.extend({
       sortColumnChangeUp: false,
       isAnomalyTableLoading: false,
       sortColumnResolutionUp: false,
-      isPerformanceDataLoading: false
+      isPerformanceDataLoading: false,
+      customMttdClasses: 'form-control te-input'
     });
   },
 
@@ -262,6 +270,10 @@ export default Controller.extend({
       // Number the list
       filteredAnomalies.forEach((anomaly) => {
         set(anomaly, 'index', num);
+        setProperties(anomaly, {
+          index: num,
+          feedbackLabel: anomalyResponseMap[anomaly.anomalyFeedback] || anomaly.anomalyFeedback
+        });
         num++;
       });
 
@@ -386,7 +398,38 @@ export default Controller.extend({
      */
     onClickPreviewPerformance() {
       const defaultConfig = { configString: '' };
-      this.set('isPerformanceDataLoading', true);
+      const { customMttdClasses, mttdMinimums, alertData, notifications, customMttdChange } = getProperties(this,
+        'customMttdClasses',
+        'mttdMinimums',
+        'alertData',
+        'notifications',
+        'customMttdChange'
+      );
+      const granularityBucket = alertData.bucketUnit ? alertData.bucketUnit.toLowerCase() : null;
+      const isBucketDefaultPresent = granularityBucket && mttdMinimums.hasOwnProperty(granularityBucket);
+      const isMttdSetTooLow = isBucketDefaultPresent ? Number(customMttdChange) < Number(mttdMinimums[granularityBucket]) : false;
+      const currentMinimumMttd = mttdMinimums[granularityBucket];
+      const mttdUnit = granularityBucket === 'hours' ? 'hour' : 'hours';
+      const mttdErrMsg = `MTTD is set too low for metric granularity. Please enter a value of at least ${currentMinimumMttd} ${mttdUnit}.`;
+      const toastOptions = {
+        timeOut: '10000',
+        positionClass: 'toast-top-right'
+      };
+
+      // Check if MTTD is set below minimums and display error message
+      if (isMttdSetTooLow) {
+        set(this, 'customMttdClasses', `${customMttdClasses} te-input--error`);
+        notifications.error(mttdErrMsg, 'MTTD range error', toastOptions);
+        document.querySelector('#custom-tune-mttd').select();
+        return;
+      } else {
+        notifications.clear();
+        setProperties(this, {
+          customMttdClasses: 'form-control te-input',
+          isPerformanceDataLoading: true
+        });
+      }
+
       if (this.get('selectedTuneType') === 'custom') {
         // Trigger preview with custom params
         this.send('triggerTuningSequence', this.get('customTuneQueryString'));
@@ -394,6 +437,9 @@ export default Controller.extend({
         // When user wants to preview using "current" settings, our request does not contain custom params.
         this.send('triggerTuningSequence', defaultConfig);
       }
+
+      // Reset table filter
+      set(this, 'filterBy', 'All');
     }
   }
 
