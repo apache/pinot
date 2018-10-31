@@ -199,8 +199,8 @@ public class HadoopSegmentCreationMapReduceJob {
 
       try {
         String segmentName =
-          createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsInputFilePath, localInputDataDir,
-            fs);
+            createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]), hdfsInputFilePath, localInputDataDir,
+                fs);
         LOGGER.info(segmentName);
         LOGGER.info("Finished segment creation job successfully");
       } catch (Exception e) {
@@ -212,8 +212,7 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("Finished the job successfully");
     }
 
-    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
-                                           Path hdfsAvroPath, File dataPath) {
+    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId, Path hdfsAvroPath, File dataPath) {
     }
 
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
