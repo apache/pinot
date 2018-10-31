@@ -61,7 +61,7 @@ public class QuerySchedulerFactory {
     } else if (schedulerName.equals(TOKEN_BUCKET_ALGORITHM)) {
       LOGGER.info("Using Priority Token Bucket scheduler");
       return TokenPriorityScheduler.create(schedulerConfig, queryExecutor, serverMetrics);
-    } else if (schedulerConfig.equals(BOUNDED_FCFS_ALGORITHM)) {
+    } else if (schedulerName.equals(BOUNDED_FCFS_ALGORITHM)) {
       return BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics);
     }
 
