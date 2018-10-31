@@ -32,11 +32,11 @@ public interface StreamMetadataProvider extends Closeable {
 
   /**
    * Fetches the offset for a given partition and offset criteria
-   * @param requestedOffset
+   * @param offsetCriteria
    * @param timeoutMillis
    * @return
    * @throws java.util.concurrent.TimeoutException
    */
-  long fetchPartitionOffset(@Nonnull String requestedOffset, long timeoutMillis)
+  long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
       throws java.util.concurrent.TimeoutException;
 }
