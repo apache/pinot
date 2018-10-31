@@ -50,14 +50,13 @@ public class StreamConfig {
 
   protected static final long DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS = 30_000;
   protected static final int DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS = 5_000;
-  protected static final String DEFAULT_OFFSET_CRITERIA = "largest";
   protected static final String SIMPLE_CONSUMER_TYPE_STRING = "simple";
 
   final private String _type;
   final private String _topicName;
   final private List<ConsumerType> _consumerTypes = new ArrayList<>();
   final private String _consumerFactoryClassName;
-  final private String _offsetCriteria;
+  final private OffsetCriteria _offsetCriteria;
   final private String _decoderClass;
   final private Map<String, String> _decoderProperties = new HashMap<>();
 
@@ -108,11 +107,11 @@ public class StreamConfig {
 
     String offsetCriteriaKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA);
-    String offsetCriteria = streamConfigMap.get(offsetCriteriaKey);
-    if (offsetCriteria != null) {
-      _offsetCriteria = offsetCriteria;
+    String offsetCriteriaValue = streamConfigMap.get(offsetCriteriaKey);
+    if (offsetCriteriaValue != null) {
+      _offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetString(offsetCriteriaValue);
     } else {
-      _offsetCriteria = DEFAULT_OFFSET_CRITERIA;
+      _offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest();
     }
 
     String decoderClassKey =
@@ -226,7 +225,7 @@ public class StreamConfig {
     return _consumerFactoryClassName;
   }
 
-  public String getOffsetCriteria() {
+  public OffsetCriteria getOffsetCriteria() {
     return _offsetCriteria;
   }
 

@@ -52,6 +52,7 @@ import com.linkedin.pinot.controller.helix.core.realtime.segment.FlushThresholdU
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.realtime.segment.ConsumingSegmentAssignmentStrategy;
 import com.linkedin.pinot.core.realtime.segment.RealtimeSegmentAssignmentStrategy;
+import com.linkedin.pinot.core.realtime.stream.OffsetCriteria;
 import com.linkedin.pinot.core.realtime.stream.PartitionOffsetFetcher;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
@@ -95,7 +96,6 @@ import org.slf4j.LoggerFactory;
 
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
-  private static final String KAFKA_SMALLEST_OFFSET = "smallest";
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
 
@@ -700,12 +700,12 @@ public class PinotLLCRealtimeSegmentManager {
     return new LLCRealtimeSegmentZKMetadata(znRecord);
   }
 
-  protected long getPartitionOffset(StreamConfig streamConfig, final String offsetCriteria,
+  protected long getPartitionOffset(StreamConfig streamConfig, final OffsetCriteria offsetCriteria,
       int partitionId) {
     return fetchPartitionOffset(streamConfig, offsetCriteria, partitionId);
   }
 
-  private long fetchPartitionOffset(StreamConfig streamConfig, final String offsetCriteria, int partitionId) {
+  private long fetchPartitionOffset(StreamConfig streamConfig, final OffsetCriteria offsetCriteria, int partitionId) {
     PartitionOffsetFetcher partitionOffsetFetcher =
         new PartitionOffsetFetcher(offsetCriteria, partitionId, streamConfig);
     try {
@@ -977,7 +977,7 @@ public class PinotLLCRealtimeSegmentManager {
       newPartitions.add(partition);
     }
 
-    String offsetCriteria = streamConfig.getOffsetCriteria();
+    OffsetCriteria offsetCriteria = streamConfig.getOffsetCriteria();
     Set<String> consumingSegments =
         setupNewPartitions(tableConfig, streamConfig, offsetCriteria, partitionAssignment, newPartitions, now);
 
@@ -1159,8 +1159,7 @@ public class PinotLLCRealtimeSegmentManager {
 
             // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
             // depending on what the prev segment had.
-            // TODO: can add method fetchSmallestOffset to {@link StreamMetadataProvider} to be able to handle fetching smallest offset of generic stream
-            long startOffset = getPartitionOffset(streamConfig, KAFKA_SMALLEST_OFFSET, partition);
+            long startOffset = getPartitionOffset(streamConfig, OffsetCriteria.SMALLEST_OFFSET_CRITERIA, partition);
             LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType,
                 partition);
             startOffset = getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset,
@@ -1209,7 +1208,8 @@ public class PinotLLCRealtimeSegmentManager {
 
     if (!skipNewPartitions) {
       Set<String> newPartitionSegments =
-          setupNewPartitions(tableConfig, streamConfig, KAFKA_SMALLEST_OFFSET, partitionAssignment, newPartitions, now);
+          setupNewPartitions(tableConfig, streamConfig, OffsetCriteria.SMALLEST_OFFSET_CRITERIA, partitionAssignment,
+              newPartitions, now);
       consumingSegments.addAll(newPartitionSegments);
     }
 
@@ -1280,8 +1280,8 @@ public class PinotLLCRealtimeSegmentManager {
    * @param now the current timestamp in milliseconds
    * @return set of newly created segment names
    */
-  private Set<String> setupNewPartitions(TableConfig tableConfig, StreamConfig streamConfig, String offsetCriteria,
-      PartitionAssignment partitionAssignment, Set<Integer> newPartitions, long now) {
+  private Set<String> setupNewPartitions(TableConfig tableConfig, StreamConfig streamConfig,
+      OffsetCriteria offsetCriteria, PartitionAssignment partitionAssignment, Set<Integer> newPartitions, long now) {
 
     String tableName = tableConfig.getTableName();
     Set<String> newSegmentNames = new HashSet<>(newPartitions.size());

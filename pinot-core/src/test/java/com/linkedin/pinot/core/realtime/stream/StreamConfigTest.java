@@ -169,7 +169,7 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getConsumerFactoryClassName(), consumerFactoryClassName);
     Assert.assertEquals(streamConfig.getDecoderClass(), decoderClass);
     Assert.assertEquals(streamConfig.getDecoderProperties().size(), 0);
-    Assert.assertEquals(streamConfig.getOffsetCriteria(), StreamConfig.DEFAULT_OFFSET_CRITERIA);
+    Assert.assertEquals(streamConfig.getOffsetCriteria(), new OffsetCriteria.OffsetCriteriaBuilder().withOffsetLargest());
     Assert.assertEquals(streamConfig.getConnectionTimeoutMillis(),
         StreamConfig.DEFAULT_STREAM_CONNECTION_TIMEOUT_MILLIS);
     Assert.assertEquals(streamConfig.getFetchTimeoutMillis(), StreamConfig.DEFAULT_STREAM_FETCH_TIMEOUT_MILLIS);
@@ -213,7 +213,7 @@ public class StreamConfigTest {
     Assert.assertEquals(streamConfig.getDecoderClass(), decoderClass);
     Assert.assertEquals(streamConfig.getDecoderProperties().size(), 1);
     Assert.assertEquals(streamConfig.getDecoderProperties().get(decoderProp1Key), decoderProp1Value);
-    Assert.assertEquals(streamConfig.getOffsetCriteria(), offsetCriteria);
+    Assert.assertEquals(streamConfig.getOffsetCriteria().isSmallest(), true);
     Assert.assertEquals(streamConfig.getConnectionTimeoutMillis(), Long.parseLong(connectionTimeout));
     Assert.assertEquals(streamConfig.getFetchTimeoutMillis(), Integer.parseInt(fetchTimeout));
     Assert.assertEquals(streamConfig.getFlushThresholdRows(), Integer.parseInt(flushThresholdRows));
