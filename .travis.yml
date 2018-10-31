@@ -3,8 +3,11 @@ sudo: false
 dist: trusty
 
 env:
-  - RUN_INTEGRATION_TESTS=true
-  - RUN_INTEGRATION_TESTS=false
+  global:
+    - JOBS=1
+  matrix:
+    - RUN_INTEGRATION_TESTS=true
+    - RUN_INTEGRATION_TESTS=false
 
 jdk:
   - oraclejdk8

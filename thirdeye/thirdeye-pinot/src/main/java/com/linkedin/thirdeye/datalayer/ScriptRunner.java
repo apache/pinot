@@ -120,7 +120,7 @@ public class ScriptRunner {
         command.append(line).append(" ");
         if (line.endsWith(";")) {
           conn.prepareStatement(command.toString()).executeUpdate();
-          System.out.println(command);
+          this.logWriter.println(command);
           command = null;
         }
       }
@@ -149,7 +149,7 @@ public class ScriptRunner {
 
   private void print(Object o) {
     if (logWriter != null) {
-      System.out.print(o);
+      logWriter.print(o);
     }
   }
 
