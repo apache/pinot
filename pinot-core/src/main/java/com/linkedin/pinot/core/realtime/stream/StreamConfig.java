@@ -19,13 +19,12 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.DataSize;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +65,8 @@ public class StreamConfig {
   final private int _flushThresholdRows;
   final private long _flushThresholdTimeMillis;
   final private long _flushSegmentDesiredSizeBytes;
+
+  final private String _groupId;
 
   final private Map<String, String> _streamConfigMap = new HashMap<>();
 
@@ -198,6 +199,10 @@ public class StreamConfig {
       _flushSegmentDesiredSizeBytes = DEFAULT_DESIRED_SEGMENT_SIZE_BYTES;
     }
 
+    String groupIdKey = StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.GROUP_ID);
+    _groupId = streamConfigMap.get(groupIdKey);
+
+
     _streamConfigMap.putAll(streamConfigMap);
   }
 
@@ -273,6 +278,10 @@ public class StreamConfig {
     return _decoderProperties;
   }
 
+  public String getGroupId() {
+    return _groupId;
+  }
+
   public Map<String, String> getStreamConfigsMap() {
     return _streamConfigMap;
   }
@@ -284,7 +293,8 @@ public class StreamConfig {
         + _offsetCriteria + '\'' + ", _connectionTimeoutMillis=" + _connectionTimeoutMillis + ", _fetchTimeoutMillis="
         + _fetchTimeoutMillis + ", _flushThresholdRows=" + _flushThresholdRows + ", _flushThresholdTimeMillis="
         + _flushThresholdTimeMillis + ", _flushSegmentDesiredSizeBytes=" + _flushSegmentDesiredSizeBytes
-        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties + '}';
+        + ", _decoderClass='" + _decoderClass + '\'' + ", _decoderProperties=" + _decoderProperties
+        + ", _groupId='" + _groupId + '}';
   }
 
   @Override
@@ -307,7 +317,8 @@ public class StreamConfig {
         && EqualityUtils.isEqual(_consumerTypes, that._consumerTypes) && EqualityUtils.isEqual(
         _consumerFactoryClassName, that._consumerFactoryClassName) && EqualityUtils.isEqual(_offsetCriteria,
         that._offsetCriteria) && EqualityUtils.isEqual(_decoderClass, that._decoderClass) && EqualityUtils.isEqual(
-        _decoderProperties, that._decoderProperties) && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
+        _decoderProperties, that._decoderProperties) && EqualityUtils.isEqual(_groupId, that._groupId)
+        && EqualityUtils.isEqual(_streamConfigMap, that._streamConfigMap);
   }
 
   @Override
@@ -324,6 +335,7 @@ public class StreamConfig {
     result = EqualityUtils.hashCodeOf(result, _flushSegmentDesiredSizeBytes);
     result = EqualityUtils.hashCodeOf(result, _decoderClass);
     result = EqualityUtils.hashCodeOf(result, _decoderProperties);
+    result = EqualityUtils.hashCodeOf(result, _groupId);
     result = EqualityUtils.hashCodeOf(result, _streamConfigMap);
     return result;
   }

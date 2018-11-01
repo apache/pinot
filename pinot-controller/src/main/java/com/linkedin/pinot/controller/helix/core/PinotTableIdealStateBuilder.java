@@ -25,7 +25,6 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
 import com.linkedin.pinot.core.realtime.stream.PartitionCountFetcher;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.List;
@@ -163,13 +162,13 @@ public class PinotTableIdealStateBuilder {
   }
 
   private static void setupInstanceConfigForHighLevelConsumer(String realtimeTableName, int numDataInstances,
-      int numDataReplicas, Map<String, String> streamProviderConfig,
+      int numDataReplicas, Map<String, String> streamConfig,
       ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore, List<String> instanceList) {
     int numInstancesPerReplica = numDataInstances / numDataReplicas;
     int partitionId = 0;
     int replicaId = 0;
 
-    String groupId = getGroupIdFromRealtimeDataTable(realtimeTableName, streamProviderConfig);
+    String groupId = getGroupIdFromRealtimeDataTable(realtimeTableName, streamConfig);
     for (int i = 0; i < numInstancesPerReplica * numDataReplicas; ++i) {
       String instance = instanceList.get(i);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkHelixPropertyStore, instance);
@@ -192,12 +191,12 @@ public class PinotTableIdealStateBuilder {
   }
 
   private static String getGroupIdFromRealtimeDataTable(String realtimeTableName,
-      Map<String, String> streamProviderConfig) {
-    String keyOfGroupId = KafkaStreamConfigProperties.constructStreamProperty(
-        KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_GROUP_ID);
+      Map<String, String> streamConfigMap) {
     String groupId = StringUtil.join("_", realtimeTableName, System.currentTimeMillis() + "");
-    if (streamProviderConfig.containsKey(keyOfGroupId) && !streamProviderConfig.get(keyOfGroupId).isEmpty()) {
-      groupId = streamProviderConfig.get(keyOfGroupId);
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    String streamConfigGroupId = streamConfig.getGroupId();
+    if (streamConfigGroupId != null && !streamConfigGroupId.isEmpty()) {
+      groupId = streamConfigGroupId;
     }
     return groupId;
   }
