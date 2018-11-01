@@ -69,14 +69,14 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
       }
     }
 
-    // Gather all segments and group them by partition, sorted by sequence number
-    Map<String, SortedSet<SegmentName>> sortedSegmentsByPartition =
+    // Gather all segments and group them by stream partition id, sorted by sequence number
+    Map<String, SortedSet<SegmentName>> sortedSegmentsByStreamPartition =
         LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
 
     // Ensure that for each partition, we have at most one Helix partition (Pinot segment) in consuming state
     Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
         LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
-            sortedSegmentsByPartition);
+            sortedSegmentsByStreamPartition);
 
     RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
 

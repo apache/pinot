@@ -88,25 +88,25 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
     @Override
     public void init(ExternalView externalView, List<InstanceConfig> instanceConfigList) {
       // 1. Gather all segments and group them by partition, sorted by sequence number
-      Map<String, SortedSet<SegmentName>> sortedSegmentsByPartition =
+      Map<String, SortedSet<SegmentName>> sortedSegmentsByStreamPartition =
           LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
 
       // 2. Ensure that for each partition, we have at most one Helix partition (Pinot segment) in consuming state
       Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
           LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
-              sortedSegmentsByPartition);
+              sortedSegmentsByStreamPartition);
 
       // 3. Sort all the segments to be used during assignment in ascending order of replicas
 
       // PriorityQueue throws IllegalArgumentException when given a size of zero
       RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigList);
 
-      for (Map.Entry<String, SortedSet<SegmentName>> entry : sortedSegmentsByPartition.entrySet()) {
-        String partition = entry.getKey();
+      for (Map.Entry<String, SortedSet<SegmentName>> entry : sortedSegmentsByStreamPartition.entrySet()) {
+        String partitionId = entry.getKey();
         SortedSet<SegmentName> segmentNames = entry.getValue();
 
         // The only segment name which is allowed to be in CONSUMING state or null
-        SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(partition);
+        SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(partitionId);
 
         for (SegmentName segmentName : segmentNames) {
           List<String> validServers = new ArrayList<>();
