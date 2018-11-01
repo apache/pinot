@@ -36,6 +36,7 @@ public class StreamConfigProperties {
   public static final String STREAM_CONNECTION_TIMEOUT_MILLIS = "connection.timeout.millis";
   public static final String STREAM_DECODER_CLASS = "decoder.class.name";
   public static final String DECODER_PROPS_PREFIX = "decoder.prop";
+  public static final String GROUP_ID = "hlc.group.id";
 
   /**
    * Time threshold that will keep the realtime segment open for before we complete the segment

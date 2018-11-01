@@ -28,7 +28,6 @@ public class KafkaStreamConfigProperties {
 
   public static class HighLevelConsumer {
     public static final String KAFKA_HLC_ZK_CONNECTION_STRING = "kafka.hlc.zk.connect.string";
-    public static final String KAFKA_HLC_GROUP_ID = "kafka.hlc.group.id";
     public static final String ZK_SESSION_TIMEOUT_MS = "zookeeper.session.timeout.ms";
     public static final String ZK_CONNECTION_TIMEOUT_MS = "zookeeper.connection.timeout.ms";
     public static final String ZK_SYNC_TIME_MS = "zookeeper.sync.time.ms";
