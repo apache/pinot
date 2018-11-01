@@ -360,6 +360,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_currentOffset != lastUpdatedOffset) {
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, _currentOffset);
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _currentOffset;
       } else {

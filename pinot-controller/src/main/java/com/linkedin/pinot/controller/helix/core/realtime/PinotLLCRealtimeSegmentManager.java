@@ -738,6 +738,7 @@ public class PinotLLCRealtimeSegmentManager {
             oldestOffsetInStream, realtimeTableName, partition, nextSeqNum);
         // Start from the earliest offset in the stream
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
+        _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
       }
     } else {
       // Status must be DONE, so we have a valid end-offset for the previous segment
@@ -753,6 +754,7 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.warn("Data lost from offset {} to {} for table {} partition {} sequence {}", prevSegEndOffset,
             oldestOffsetInStream, realtimeTableName, partition, nextSeqNum);
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
+        _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1);
       } else {
         // The two happen to be equal. A rarity, so log it.
         LOGGER.info("Earliest offset {} is the same as new segment start offset", oldestOffsetInStream);
