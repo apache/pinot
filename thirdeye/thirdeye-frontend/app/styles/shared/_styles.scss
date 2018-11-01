@@ -681,11 +681,52 @@ body {
 .te-search-header {
   padding-bottom: $te-spacing;
   border-bottom: 1px app-shade(black, 1) solid;
+
+  &__titles {
+    border-bottom: none;
+    padding-bottom: 5px;
+  }
+
+  &__filters {
+    border-top: none;
+    font-size: 13px;
+    border-bottom: 1px app-shade(black, 1) solid;
+    padding-bottom: 10px;
+  }
+
+  &__displaynum {
+    margin-top: 10px;
+  }
+
+  &__icon {
+    display: inline-block;
+    margin-left: 3px;
+    vertical-align: top;
+  }
+
+  &__tooltip {
+    max-width: 600px;
+  }
+}
+
+.te-search-filters {
+  background: app-shade(black, 1);
+  padding: 2px 5px;
+  border-radius: 5px;
+  display: inline-block;
+  max-width: 525px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: text-bottom;
 }
 
 .te-search-title {
-  font-size: 21px;
+  font-size: 20px;
   color: app-shade(black, 0.85);
+  margin-right: 3px;
+  vertical-align: bottom;
 }
 
 .te-link--show {

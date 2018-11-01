@@ -30,7 +30,7 @@ module('Acceptance | tune alert settings', function(hooks) {
     // Verify default search results
     assert.equal(
       $(selfServeConst.RESULTS_TITLE).get(0).innerText.trim(),
-      'Alerts Found(5)',
+      'Alerts (5)',
       'Number of alerts displayed and title are correct.'
     );
 

@@ -1,5 +1,5 @@
 import moment from 'moment';
-import { isPresent } from "@ember/utils";
+import { isPresent, isBlank } from "@ember/utils";
 import { getWithDefault } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
@@ -31,6 +31,30 @@ export function formatEvalMetric(metric, isPercentage = false) {
 export function pluralizeTime(time, unit) {
   const unitStr = time > 1 ? unit + 's' : unit;
   return time ? time + ' ' + unitStr : '';
+}
+
+/**
+ * Performs a case-insensitive sort of a flat array or array of objects
+ * by property. If sorting flat array, pass "null" for targetProperty.
+ * @param {Array} targetArray
+ * @param {String} targetProperty
+ * @returns {Array}
+ */
+export function powerSort(targetArray, targetProperty) {
+  const cleanArray = [];
+  // Make sure we have a valid array
+  targetArray.forEach((item) => {
+    cleanArray.push(isBlank(item) ? 'undefined' : item);
+  });
+  // Do case-insensitive sort
+  const sortedArray = cleanArray.sort((a, b) => {
+    if (targetProperty) {
+      a = a[targetProperty];
+      b = b[targetProperty];
+    }
+    return a.toLowerCase().trim().localeCompare(b.toLowerCase().trim());
+  });
+  return sortedArray;
 }
 
 /**
@@ -326,5 +350,6 @@ export default {
   buildAnomalyStats,
   buildMetricDataUrl,
   extractSeverity,
+  powerSort,
   evalObj
 };
