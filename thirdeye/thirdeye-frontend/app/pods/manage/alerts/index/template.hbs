@@ -58,7 +58,7 @@
         <span class="te-search-title">Alerts ({{totalFilteredAlerts}})</span>
         {{#if allowFilterSummary}}
           <span class="te-search-filters">{{activeFiltersString}}</span>
-          {{#if isFilterStrLenMax}}
+          {{#if (gt activeFiltersString.length maxFilterStrngLength)}}
             <span class="te-search-header__icon">
               <i class="glyphicon glyphicon-resize-full"></i>
               {{#popover-on-element side="left" class="te-search-header__tooltip te-tooltip"}}{{activeFiltersString}}{{/popover-on-element}}

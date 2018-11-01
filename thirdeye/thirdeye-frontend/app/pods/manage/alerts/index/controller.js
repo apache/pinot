@@ -38,6 +38,7 @@ export default Controller.extend({
    */
   primaryFilterVal: 'All Alerts',
   isFilterStrLenMax: false,
+  maxFilterStrngLength: 84,
 
   /**
    * Used to trigger re-render of alerts list
@@ -149,7 +150,6 @@ export default Controller.extend({
             Object.assign(blockItem, { selected: alertFilters[blockItem.name] });
             // We are recalculating each field where options have not been selected
             if (inactiveFields.includes(blockItem.name) || !inactiveFields.length) {
-              console.log('recalculating for : ', blockItem.name);
               const alertPropsAsKeys = filteredAlerts.map(alert => alert[filterToPropertyMap[blockItem.name]]);
               const filterKeys = [ ...new Set(powerSort(alertPropsAsKeys, null)) ];
               Object.assign(blockItem, { filterKeys });
@@ -243,8 +243,6 @@ export default Controller.extend({
           filterStr = filterArr.join(' | ');
         }
       }
-      // If string exceeds 84 chars, show entire string in tooltip
-      set(this, 'isFilterStrLenMax', filterStr.length > 84);
       return filterStr;
     }
   ),
