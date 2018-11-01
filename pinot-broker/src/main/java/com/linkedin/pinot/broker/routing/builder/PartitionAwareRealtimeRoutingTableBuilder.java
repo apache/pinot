@@ -38,7 +38,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
- * Partition aware routing table builder for the Kafka low level consumer.
+ * Partition aware routing table builder for the low level consumer.
  *
  * In contrast to the offline partition aware routing builder where the replica group aware segment assignment can be
  * assumed, we do not use the concept of replica group for a realtime table. The routing look up table is simply built
@@ -69,14 +69,14 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
       }
     }
 
-    // Gather all segments and group them by Kafka partition, sorted by sequence number
-    Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition =
+    // Gather all segments and group them by partition, sorted by sequence number
+    Map<String, SortedSet<SegmentName>> sortedSegmentsByPartition =
         LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
 
-    // Ensure that for each Kafka partition, we have at most one Helix partition (Pinot segment) in consuming state
-    Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition =
-        KafkaLowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
-            sortedSegmentsByKafkaPartition);
+    // Ensure that for each partition, we have at most one Helix partition (Pinot segment) in consuming state
+    Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
+        LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
+            sortedSegmentsByPartition);
 
     RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
 
@@ -85,7 +85,7 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
     for (String segmentName : segmentSet) {
       int partitionId = getPartitionId(segmentName);
       SegmentName validConsumingSegment =
-          allowedSegmentInConsumingStateByKafkaPartition.get(Integer.toString(partitionId));
+          allowedSegmentInConsumingStateByPartition.get(Integer.toString(partitionId));
 
       Map<Integer, String> replicaToServerMap = new HashMap<>();
       int replicaId = 0;

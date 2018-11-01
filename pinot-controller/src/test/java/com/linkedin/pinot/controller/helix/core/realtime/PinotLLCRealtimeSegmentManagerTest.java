@@ -855,7 +855,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     TableConfig tableConfig = makeTableConfig(rtTableName, 3, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     segmentManager.addTableToStore(rtTableName, tableConfig, 8);
-    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, 10);
     try {
       segmentManager.setupNewTable(tableConfig, idealState);
       Assert.fail("Did not get expected exception when setting up new table with existing segments in ");
@@ -882,7 +882,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.addTableToStore(tableName, tableConfig, nPartitions);
 
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(tableName, nReplicas);
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(tableName, nReplicas);
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
     segmentManager.setupNewTable(tableConfig, idealState);
     // Now commit the first segment of partition 6.
@@ -1111,7 +1111,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     TableConfig tableConfig =
         makeTableConfig(rtTableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, nReplicas);
 
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);

@@ -172,7 +172,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     }
 
     // lets create a new realtime segment
-    segmentLogger.info("Started kafka stream provider");
+    segmentLogger.info("Started {} stream provider", _streamConfig.getType());
     final int capacity = _streamConfig.getFlushThresholdRows();
     RealtimeSegmentConfig realtimeSegmentConfig = new RealtimeSegmentConfig.Builder().setSegmentName(segmentName)
         .setStreamName(_streamConfig.getTopicName())
@@ -302,13 +302,13 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           ImmutableSegment segment =
               ImmutableSegmentLoader.load(new File(resourceDir, segmentMetatdaZk.getSegmentName()), indexLoadingConfig);
 
-          segmentLogger.info("Committing Kafka offsets");
+          segmentLogger.info("Committing {} offsets", _streamConfig.getType());
           boolean commitSuccessful = false;
           try {
             _streamLevelConsumer.commit();
             commitSuccessful = true;
             _streamLevelConsumer.shutdown();
-            segmentLogger.info("Successfully committed Kafka offsets, consumer release requested.");
+            segmentLogger.info("Successfully committed {} offsets, consumer release requested.", _streamConfig.getType());
           } catch (Throwable e) {
             // If we got here, it means that either the commit or the shutdown failed. Considering that the
             // KafkaConsumerManager delays shutdown and only adds the consumer to be released in a deferred way, this
@@ -441,7 +441,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     try {
       _streamLevelConsumer.shutdown();
     } catch (Exception e) {
-      LOGGER.error("Failed to shutdown kafka stream provider!", e);
+      LOGGER.error("Failed to shutdown stream consumer!", e);
     }
     keepIndexing = false;
     segmentStatusTask.cancel();

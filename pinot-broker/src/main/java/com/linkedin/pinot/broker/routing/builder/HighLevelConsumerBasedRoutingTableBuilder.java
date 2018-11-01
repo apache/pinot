@@ -26,7 +26,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 
 
-public class KafkaHighLevelConsumerBasedRoutingTableBuilder extends BaseRoutingTableBuilder {
+public class HighLevelConsumerBasedRoutingTableBuilder extends BaseRoutingTableBuilder {
 
   @Override
   public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,

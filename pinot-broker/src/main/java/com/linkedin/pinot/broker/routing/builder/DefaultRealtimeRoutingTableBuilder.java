@@ -41,8 +41,8 @@ public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder 
 
   @Override
   public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
-    _realtimeHLCRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
-    _realtimeLLCRoutingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
+    _realtimeHLCRoutingTableBuilder = new HighLevelConsumerBasedRoutingTableBuilder();
+    _realtimeLLCRoutingTableBuilder = new LowLevelConsumerRoutingTableBuilder();
     _realtimeHLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore, brokerMetrics);
     _realtimeLLCRoutingTableBuilder.init(configuration, tableConfig, propertyStore, brokerMetrics);
   }

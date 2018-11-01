@@ -222,8 +222,7 @@ public class PinotLLCRealtimeSegmentManager {
     if (currentSegments != null) {
       for (String segment : currentSegments) {
         if (!SegmentName.isHighLevelConsumerSegmentName(segment)) {
-          // For now, we don't support changing of kafka partitions, or otherwise re-creating the low-level
-          // realtime segments for any other reason.
+          // For now, we don't support re-creating the low-level realtime segments
           throw new RuntimeException("Low-level segments already exist for table " + tableConfig.getTableType());
         }
       }
@@ -441,8 +440,8 @@ public class PinotLLCRealtimeSegmentManager {
 
     // If an LLC table is dropped (or cleaned up), we will get null here. In that case we should not be creating a new segment
     if (partitionAssignment == null) {
-      LOGGER.warn("Kafka partition assignment not found for {}", realtimeTableName);
-      throw new RuntimeException("Kafka partition assignment not found. Not committing segment");
+      LOGGER.warn("Partition assignment not found for {}", realtimeTableName);
+      throw new RuntimeException("Partition assignment not found. Not committing segment");
     }
 
     // Step-1
@@ -720,43 +719,43 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private long getBetterStartOffsetIfNeeded(final String realtimeTableName, final int partition,
-      final LLCSegmentName latestSegment, final long oldestOffsetInKafka, final int nextSeqNum) {
+      final LLCSegmentName latestSegment, final long oldestOffsetInStream, final int nextSeqNum) {
     final LLCRealtimeSegmentZKMetadata oldSegMetadata =
         getRealtimeSegmentZKMetadata(realtimeTableName, latestSegment.getSegmentName(), null);
     CommonConstants.Segment.Realtime.Status status = oldSegMetadata.getStatus();
-    long segmentStartOffset = oldestOffsetInKafka;
+    long segmentStartOffset = oldestOffsetInStream;
     // Offset at which the prev segment intended to start consuming
     final long prevSegStartOffset = oldSegMetadata.getStartOffset();
     if (status.equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS)) {
-      if (oldestOffsetInKafka <= prevSegStartOffset) {
+      if (oldestOffsetInStream <= prevSegStartOffset) {
         // We still have the same start offset available, re-use it.
         segmentStartOffset = prevSegStartOffset;
         LOGGER.info("Choosing previous segment start offset {} for table {} for partition {}, sequence {}",
-            oldestOffsetInKafka, realtimeTableName, partition, nextSeqNum);
+            oldestOffsetInStream, realtimeTableName, partition, nextSeqNum);
       } else {
         // There is data loss.
-        LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}", prevSegStartOffset,
-            oldestOffsetInKafka, realtimeTableName, partition, nextSeqNum);
-        // Start from the earliest offset in kafka
+        LOGGER.warn("Data lost from offset {} to {} for table {} partition {} sequence {}", prevSegStartOffset,
+            oldestOffsetInStream, realtimeTableName, partition, nextSeqNum);
+        // Start from the earliest offset in the stream
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
       }
     } else {
       // Status must be DONE, so we have a valid end-offset for the previous segment
       final long prevSegEndOffset = oldSegMetadata.getEndOffset();  // Will be 0 if the prev segment was not completed.
-      if (oldestOffsetInKafka < prevSegEndOffset) {
+      if (oldestOffsetInStream < prevSegEndOffset) {
         // We don't want to create a segment that overlaps in data with the prev segment. We know that the previous
-        // segment's end offset is available in Kafka, so use that.
+        // segment's end offset is available, so use that.
         segmentStartOffset = prevSegEndOffset;
-        LOGGER.info("Choosing newer kafka offset {} for table {} for partition {}, sequence {}", oldestOffsetInKafka,
+        LOGGER.info("Choosing newer offset {} for table {} for partition {}, sequence {}", oldestOffsetInStream,
             realtimeTableName, partition, nextSeqNum);
-      } else if (oldestOffsetInKafka > prevSegEndOffset) {
-        // Kafka's oldest offset is greater than the end offset of the prev segment, so there is data loss.
-        LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}", prevSegEndOffset,
-            oldestOffsetInKafka, realtimeTableName, partition, nextSeqNum);
+      } else if (oldestOffsetInStream > prevSegEndOffset) {
+        // Stream's oldest offset is greater than the end offset of the prev segment, so there is data loss.
+        LOGGER.warn("Data lost from offset {} to {} for table {} partition {} sequence {}", prevSegEndOffset,
+            oldestOffsetInStream, realtimeTableName, partition, nextSeqNum);
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
       } else {
         // The two happen to be equal. A rarity, so log it.
-        LOGGER.info("Kafka earliest offset {} is the same as new segment start offset", oldestOffsetInKafka);
+        LOGGER.info("Earliest offset {} is the same as new segment start offset", oldestOffsetInStream);
       }
     }
     return segmentStartOffset;
@@ -784,7 +783,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * An instance is reporting that it has stopped consuming a kafka topic due to some error.
+   * An instance is reporting that it has stopped consuming a topic due to some error.
    * Mark the state of the segment to be OFFLINE in idealstate.
    * When all replicas of this segment are marked offline, the ValidationManager, in its next
    * run, will auto-create a new segment with the appropriate offset.
@@ -1157,10 +1156,10 @@ public class PinotLLCRealtimeSegmentManager {
             LOGGER.info("Creating CONSUMING segment {} for {} partition {}", newLLCSegmentName.getSegmentName(),
                 tableNameWithType, partition);
 
-            // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
+            // To begin with, set startOffset to the oldest available offset in the stream. Fix it to be the one we want,
             // depending on what the prev segment had.
             long startOffset = getPartitionOffset(streamConfig, OffsetCriteria.SMALLEST_OFFSET_CRITERIA, partition);
-            LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableNameWithType,
+            LOGGER.info("Found smallest offset {} for table {} for partition {}", startOffset, tableNameWithType,
                 partition);
             startOffset = getBetterStartOffsetIfNeeded(tableNameWithType, partition, segmentName, startOffset,
                 newLLCSegmentName.getSequenceNumber());
@@ -1293,7 +1292,7 @@ public class PinotLLCRealtimeSegmentManager {
           nextSeqNum);
       long startOffset = getPartitionOffset(streamConfig, offsetCriteria, partition);
 
-      LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, tableName, partition);
+      LOGGER.info("Found offset {} for table {} for partition {}", startOffset, tableName, partition);
 
       LLCSegmentName newLLCSegmentName = new LLCSegmentName(rawTableName, partition, nextSeqNum, now);
       CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
