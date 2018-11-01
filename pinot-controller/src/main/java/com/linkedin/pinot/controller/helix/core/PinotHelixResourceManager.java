@@ -1106,7 +1106,7 @@ public class PinotHelixResourceManager {
 
         /*
          * PinotRealtimeSegmentManager sets up watches on table and segment path. When a table gets created,
-         * it expects the INSTANCE path in propertystore to be set up so that it can get the kafka group ID and
+         * it expects the INSTANCE path in propertystore to be set up so that it can get the group ID and
          * create (high-level consumer) segments for that table.
          * So, we need to set up the instance first, before adding the table resource for HLC new table creation.
          *

@@ -18,8 +18,8 @@ package com.linkedin.pinot.broker.routing;
 import com.linkedin.pinot.broker.routing.builder.BalancedRandomRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.DefaultOfflineRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.DefaultRealtimeRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.broker.routing.builder.KafkaLowLevelConsumerRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.LowLevelConsumerRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.PartitionAwareOfflineRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.PartitionAwareRealtimeRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
@@ -47,8 +47,8 @@ public class RoutingTableBuilderFactory {
     DefaultOffline,
     DefaultRealtime,
     BalancedRandom,
-    KafkaLowLevel,
-    KafkaHighLevel,
+    KafkaLowLevel, // This should ideally be LowLevel and HighLevel. But we cannot rename these, else all tables which reference these in the configs will break
+    KafkaHighLevel,// We will keep these prefixed with "Kafka", but they are intended to work for any stream
     PartitionAwareOffline,
     PartitionAwareRealtime
   }
@@ -96,10 +96,10 @@ public class RoutingTableBuilderFactory {
         builder = new DefaultRealtimeRoutingTableBuilder();
         break;
       case KafkaHighLevel:
-        builder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
+        builder = new HighLevelConsumerBasedRoutingTableBuilder();
         break;
       case KafkaLowLevel:
-        builder = new KafkaLowLevelConsumerRoutingTableBuilder();
+        builder = new LowLevelConsumerRoutingTableBuilder();
         break;
       case PartitionAwareOffline:
         SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
@@ -124,7 +124,7 @@ public class RoutingTableBuilderFactory {
         }
         break;
       case PartitionAwareRealtime:
-        // Check that the table uses LLC kafka consumer.
+        // Check that the table uses LL consumer.
         StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
 
         if (streamConfig.getConsumerTypes().size() == 1 && streamConfig.hasLowLevelConsumerType()) {

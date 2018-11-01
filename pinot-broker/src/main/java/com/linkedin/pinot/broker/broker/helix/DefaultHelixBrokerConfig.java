@@ -32,7 +32,6 @@ public class DefaultHelixBrokerConfig {
 
     brokerConf.addProperty("pinot.broker.routing.table.builder.default.offline.class", "balanced");
     brokerConf.addProperty("pinot.broker.routing.table.builder.default.offline.numOfRoutingTables", "10");
-    brokerConf.addProperty("pinot.broker.routing.table.builder.default.realtime.class", "Kafkahighlevelconsumerbased");
     brokerConf.addProperty("pinot.broker.routing.table.builder.tables", "");
 
     //client properties

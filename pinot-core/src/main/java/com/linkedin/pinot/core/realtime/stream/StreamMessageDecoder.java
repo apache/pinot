@@ -28,7 +28,7 @@ public interface StreamMessageDecoder<T> {
    * @param props
    * @throws Exception
    */
-  void init(Map<String, String> props, Schema indexingSchema, String kafkaTopicName) throws Exception;
+  void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception;
 
   /**
    *

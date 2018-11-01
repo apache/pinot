@@ -63,7 +63,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Realtime segment manager, which assigns realtime segments to server instances so that they can consume from Kafka.
+ * Realtime segment manager, which assigns realtime segments to server instances so that they can consume from the stream.
  */
 public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkChildListener, IZkDataListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentManager.class);

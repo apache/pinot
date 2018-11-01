@@ -332,7 +332,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     final long _endOffset = Long.MAX_VALUE; // No upper limit on stream offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
     while(!_shouldStop && !endCriteriaReached()) {
-      // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
+      // Consume for the next readTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       MessageBatch messageBatch;
       try {
@@ -360,6 +360,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_currentOffset != lastUpdatedOffset) {
         // We consumed something. Update the highest stream offset as well as partition-consuming metric.
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, _currentOffset);
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
         lastUpdatedOffset = _currentOffset;
       } else {
@@ -405,7 +406,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         //    we hit the row limit.
         //    Throw an exception.
         //
-        // 2. We are in CATCHING_UP state, and we legally hit this error due to Kafka unclean leader election where
+        // 2. We are in CATCHING_UP state, and we legally hit this error due to unclean leader election where
         //    offsets get changed with higher generation numbers for some pinot servers but not others. So, if another
         //    server (who got a larger stream offset) asked us to catch up to that offset, but we are connected to a
         //    broker who has smaller offsets, then we may try to push more rows into the buffer than maximum. This
@@ -455,8 +456,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       segmentLogger.debug("Indexed {} messages ({} messages read from stream) current offset {}", indexedMessageCount,
           streamMessageCount, _currentOffset);
     } else {
-      // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
-      // Kafka broker
+      // If there were no messages to be fetched from stream, wait for a little bit as to avoid hammering the stream
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
   }

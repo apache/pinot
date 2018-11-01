@@ -149,7 +149,7 @@ public class SegmentCompletionManager {
   }
 
   /**
-   * This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in kafka
+   * This method is to be called when a server calls in with the segmentConsumed() API, reporting an offset in the stream
    * that it currently has (i.e. next offset that it will consume, if it continues to consume).
    */
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {

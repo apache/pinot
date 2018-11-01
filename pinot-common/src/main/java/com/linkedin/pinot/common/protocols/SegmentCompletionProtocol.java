@@ -20,13 +20,13 @@ import com.alibaba.fastjson.JSONObject;
 
 /*
  * This class encapsulates the segment completion protocol used by the server and the controller for
- * low-level kafka consumer realtime segments. The protocol has two requests: SegmentConsumedRequest
+ * low-level consumer realtime segments. The protocol has two requests: SegmentConsumedRequest
  * and SegmentCommitRequest.It has a response that may contain different status codes depending on the state machine
  * that the controller drives for that segment. All responses have two elements -- status and an offset.
  *
  * The overall idea is that when a server has completed consuming a segment until the "end criteria" that
  * is set (in the table configuration), it sends a SegmentConsumedRequest to the controller (leader).  The
- * controller may respond with a HOLD, asking the server to NOT consume any new kafka messages, but get back
+ * controller may respond with a HOLD, asking the server to NOT consume any new messages, but get back
  * to the controller after a while.
  *
  * Meanwhile, the controller co-ordinates the SegmentConsumedRequest messages from replicas and selects a server
@@ -43,7 +43,7 @@ public class SegmentCompletionProtocol {
 
   /**
    * MAX_HOLD_TIME_MS is the maximum time (msecs) for which a server will be in HOLDING state, after which it will
-   * send in a SegmentConsumedRequest with its current offset in kafka.
+   * send in a SegmentConsumedRequest with its current offset in the stream.
    */
   public static final long MAX_HOLD_TIME_MS = 3000;
   /**
@@ -63,7 +63,7 @@ public class SegmentCompletionProtocol {
     /** Server should send SegmentConsumedRequest after waiting for less than MAX_HOLD_TIME_MS */
     HOLD,
 
-    /** Server should consume kafka events to catch up to the offset contained in this response */
+    /** Server should consume stream events to catch up to the offset contained in this response */
     CATCH_UP,
 
     /** Server should discard the rows in memory */

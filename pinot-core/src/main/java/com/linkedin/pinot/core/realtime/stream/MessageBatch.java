@@ -16,33 +16,33 @@
 package com.linkedin.pinot.core.realtime.stream;
 
 /**
- * Interface wrapping Kafka consumer. Throws IndexOutOfBoundsException when trying to access a message at an
+ * Interface wrapping stream consumer. Throws IndexOutOfBoundsException when trying to access a message at an
  * invalid index.
  * @param <T>
  */
 public interface MessageBatch<T> {
     /**
      *
-     * @return number of messages returned from kafka
+     * @return number of messages returned from the stream
      */
     int getMessageCount();
 
     /**
-     * Returns the message at a particular index inside a set of messages returned from Kafka.
+     * Returns the message at a particular index inside a set of messages returned from the stream.
      * @param index
      * @return
      */
     T getMessageAtIndex(int index);
 
     /**
-     * Returns the offset of the message at a particular index inside a set of messages returned from Kafka.
+     * Returns the offset of the message at a particular index inside a set of messages returned from the stream.
      * @param index
      * @return
      */
     int getMessageOffsetAtIndex(int index);
 
     /**
-     * Returns the length of the message at a particular index inside a set of messages returned from Kafka.
+     * Returns the length of the message at a particular index inside a set of messages returned from the stream.
      * @param index
      * @return
      */

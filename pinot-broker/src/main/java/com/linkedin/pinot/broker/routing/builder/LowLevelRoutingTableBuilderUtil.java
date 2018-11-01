@@ -24,25 +24,25 @@ import org.apache.helix.model.ExternalView;
 
 
 /**
- * Util class for Kafka low level routing table builder.
+ * Util class for low level routing table builder.
  */
-public class KafkaLowLevelRoutingTableBuilderUtil {
+public class LowLevelRoutingTableBuilderUtil {
 
   /**
    * Compute the map of allowed 'consuming' segments for each partition.
    *
    * @param externalView helix external view
-   * @param sortedSegmentsByKafkaPartition map of Kafka partition to sorted set of segment names.
+   * @param sortedSegmentsByPartition map of partition to sorted set of segment names.
    * @return map of allowed consuming segment for each partition for routing.
    */
   public static Map<String, SegmentName> getAllowedConsumingStateSegments(ExternalView externalView,
-      Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition) {
-    Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition = new HashMap<>();
-    for (String kafkaPartition : sortedSegmentsByKafkaPartition.keySet()) {
-      SortedSet<SegmentName> sortedSegmentsForKafkaPartition = sortedSegmentsByKafkaPartition.get(kafkaPartition);
+      Map<String, SortedSet<SegmentName>> sortedSegmentsByPartition) {
+    Map<String, SegmentName> allowedSegmentInConsumingStateByPartition = new HashMap<>();
+    for (String partition : sortedSegmentsByPartition.keySet()) {
+      SortedSet<SegmentName> sortedSegmentsForPartition = sortedSegmentsByPartition.get(partition);
       SegmentName lastAllowedSegmentInConsumingState = null;
 
-      for (SegmentName segmentName : sortedSegmentsForKafkaPartition) {
+      for (SegmentName segmentName : sortedSegmentsForPartition) {
         Map<String, String> helixPartitionState = externalView.getStateMap(segmentName.getSegmentName());
         boolean allInConsumingState = true;
         int replicasInConsumingState = 0;
@@ -79,9 +79,9 @@ public class KafkaLowLevelRoutingTableBuilderUtil {
       }
 
       if (lastAllowedSegmentInConsumingState != null) {
-        allowedSegmentInConsumingStateByKafkaPartition.put(kafkaPartition, lastAllowedSegmentInConsumingState);
+        allowedSegmentInConsumingStateByPartition.put(partition, lastAllowedSegmentInConsumingState);
       }
     }
-    return allowedSegmentInConsumingStateByKafkaPartition;
+    return allowedSegmentInConsumingStateByPartition;
   }
 }
