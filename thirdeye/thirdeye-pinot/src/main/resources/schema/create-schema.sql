@@ -131,7 +131,7 @@ create index dataset_config_base_id_idx ON dataset_config_index(base_id);
 create table if not exists metric_config_index (
     name varchar(200) not null,
     dataset varchar(200) not null,
-    alias varchar(200) not null,
+    alias varchar(400) not null,
     active boolean,
     base_id bigint(20) not null,
     create_time timestamp,
