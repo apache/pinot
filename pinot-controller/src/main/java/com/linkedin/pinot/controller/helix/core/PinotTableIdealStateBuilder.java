@@ -102,12 +102,12 @@ public class PinotTableIdealStateBuilder {
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig);
     final List<String> realtimeInstances =
         HelixHelper.getInstancesWithTag(helixManager, realtimeTagConfig.getConsumingServerTag());
-    IdealState idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, 1);
+    IdealState idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, 1);
     if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
       throw new RuntimeException(
           "Number of instance in current tenant should be an integer multiples of the number of replications");
     }
-    setupInstanceConfigForKafkaHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
+    setupInstanceConfigForHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
         Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()),
         realtimeTableConfig.getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore, realtimeInstances);
     return idealState;
@@ -129,7 +129,7 @@ public class PinotTableIdealStateBuilder {
           "Invalid value for replicasPerPartition, expected a number: " + replicasPerPartitionStr, e);
     }
     if (idealState == null) {
-      idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, nReplicas);
+      idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, nReplicas);
     }
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     try {
@@ -151,7 +151,7 @@ public class PinotTableIdealStateBuilder {
     }
   }
 
-  public static IdealState buildEmptyKafkaConsumerRealtimeIdealStateFor(String realtimeTableName, int replicaCount) {
+  public static IdealState buildEmptyRealtimeIdealStateFor(String realtimeTableName, int replicaCount) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeTableName);
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
@@ -162,7 +162,7 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  private static void setupInstanceConfigForKafkaHighLevelConsumer(String realtimeTableName, int numDataInstances,
+  private static void setupInstanceConfigForHighLevelConsumer(String realtimeTableName, int numDataInstances,
       int numDataReplicas, Map<String, String> streamProviderConfig,
       ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore, List<String> instanceList) {
     int numInstancesPerReplica = numDataInstances / numDataReplicas;

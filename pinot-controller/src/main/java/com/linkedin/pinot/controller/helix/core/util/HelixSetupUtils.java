@@ -95,7 +95,7 @@ public class HelixSetupUtils {
           LOGGER.info("State model {} already updated to contain CONSUMING state", segmentStateModelName);
           return;
         } else {
-          LOGGER.info("Updating {} to add states for low level kafka consumers", segmentStateModelName);
+          LOGGER.info("Updating {} to add states for low level consumers", segmentStateModelName);
           StateModelDefinition newStateModelDef = PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition();
           ZkClient zkClient = new ZkClient(zkPath);
           zkClient.waitUntilConnected(CommonConstants.Helix.ZkClient.DEFAULT_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS);
@@ -130,7 +130,7 @@ public class HelixSetupUtils {
 
     // If this is a fresh cluster we are creating, then the cluster will see the CONSUMING state in the
     // state model. But then the servers will never be asked to go to that STATE (whether they have the code
-    // to handle it or not) unil we complete the feature using low-level kafka consumers and turn the feature on.
+    // to handle it or not) unil we complete the feature using low-level consumers and turn the feature on.
     admin.addStateModelDef(helixClusterName, segmentStateModelName,
         PinotHelixSegmentOnlineOfflineStateModelGenerator.generatePinotStateModelDefinition());
 

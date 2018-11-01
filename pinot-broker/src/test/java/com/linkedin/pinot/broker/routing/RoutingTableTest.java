@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.broker.routing;
 
-import com.linkedin.pinot.broker.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableConfig.Builder;
@@ -153,7 +153,7 @@ public class RoutingTableTest {
 
   @Test(enabled=false)
   public void testKafkaHighLevelConsumerBasedRoutingTable() throws Exception {
-    RoutingTableBuilder routingStrategy = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
+    RoutingTableBuilder routingStrategy = new HighLevelConsumerBasedRoutingTableBuilder();
     final String group0 = "testResource0_REALTIME_1433316466991_0";
     final String group1 = "testResource1_REALTIME_1433316490099_1";
     final String group2 = "testResource2_REALTIME_1436589344583_1";

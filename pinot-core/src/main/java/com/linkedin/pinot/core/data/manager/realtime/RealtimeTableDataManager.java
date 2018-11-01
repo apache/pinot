@@ -36,7 +36,6 @@ import com.linkedin.pinot.core.data.manager.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentStatsHistory;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
@@ -52,7 +51,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.FileUtils;
 
-import static com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema;
+import static com.linkedin.pinot.core.segment.virtualcolumn.VirtualColumnProviderFactory.*;
 
 
 @ThreadSafe
@@ -141,7 +140,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     for (SegmentDataManager segmentDataManager : _segmentDataManagerMap.values()) {
       segmentDataManager.destroy();
     }
-    KafkaConsumerManager.closeAllConsumers();
     if (_leaseExtender != null) {
       _leaseExtender.shutDown();
     }
@@ -188,10 +186,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    *   we treat it exactly like how OfflineTableDataManager would -- wrap it into an OfflineSegmentDataManager, and put it
    *   in the map.
    * - We are being asked to own up a new realtime segment. In this case, we wrap the segment with a RealTimeSegmentDataManager
-   *   (that kicks off Kafka consumption). When the segment is committed we get notified via the notifySegmentCommitted call, at
+   *   (that kicks off consumption). When the segment is committed we get notified via the notifySegmentCommitted call, at
    *   which time we replace the segment with the OfflineSegmentDataManager
    * For LL Segments:
-   * - We are being asked to start consuming from a kafka partition.
+   * - We are being asked to start consuming from a partition.
    * - We did not know about the segment and are being asked to download and own the segment (re-balancing, or
    *   replacing a realtime server with a fresh one, maybe). We need to look at segment metadata and decide whether
    *   to start consuming or download the segment.

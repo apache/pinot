@@ -35,10 +35,10 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Routing table builder for the Kafka low level consumer.
+ * Routing table builder for the low level consumer.
  */
-public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTableBuilder {
-  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaLowLevelConsumerRoutingTableBuilder.class);
+public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTableBuilder {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LowLevelConsumerRoutingTableBuilder.class);
 
   private int _targetNumServersPerQuery = 8;
 
@@ -63,15 +63,15 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
 
   @Override
   protected RoutingTableGenerator buildRoutingTableGenerator() {
-    return new KafkaLowLevelConsumerRoutingTableGenerator();
+    return new LowLevelConsumerRoutingTableGenerator();
   }
 
-  private class KafkaLowLevelConsumerRoutingTableGenerator extends BaseRoutingTableGenerator {
+  private class LowLevelConsumerRoutingTableGenerator extends BaseRoutingTableGenerator {
     // We build the routing table based off the external view here. What we want to do is to make sure that we uphold
     // the guarantees clients expect (no duplicate records, eventual consistency) and spreading the load as equally as
     // possible between the servers.
     //
-    // Each Kafka partition contains a fraction of the data, so we need to make sure that we query all partitions.
+    // Each partition contains a fraction of the data, so we need to make sure that we query all partitions.
     // Because in certain unlikely degenerate scenarios, we can consume overlapping data until segments are flushed (at
     // which point the overlapping data is discarded during the reconciliation process with the controller), we need to
     // ensure that the query that is sent has only one partition in CONSUMING state in order to avoid duplicate records.
@@ -81,32 +81,32 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
 
     private Map<String, List<String>> _segmentToServersMap = new HashMap<>();
 
-    public KafkaLowLevelConsumerRoutingTableGenerator() {
+    public LowLevelConsumerRoutingTableGenerator() {
       super(_targetNumServersPerQuery);
     }
 
     @Override
     public void init(ExternalView externalView, List<InstanceConfig> instanceConfigList) {
-      // 1. Gather all segments and group them by Kafka partition, sorted by sequence number
-      Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition =
+      // 1. Gather all segments and group them by partition, sorted by sequence number
+      Map<String, SortedSet<SegmentName>> sortedSegmentsByStreamPartition =
           LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
 
-      // 2. Ensure that for each Kafka partition, we have at most one Helix partition (Pinot segment) in consuming state
-      Map<String, SegmentName> allowedSegmentInConsumingStateByKafkaPartition =
-          KafkaLowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
-              sortedSegmentsByKafkaPartition);
+      // 2. Ensure that for each partition, we have at most one Helix partition (Pinot segment) in consuming state
+      Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
+          LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
+              sortedSegmentsByStreamPartition);
 
       // 3. Sort all the segments to be used during assignment in ascending order of replicas
 
       // PriorityQueue throws IllegalArgumentException when given a size of zero
       RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigList);
 
-      for (Map.Entry<String, SortedSet<SegmentName>> entry : sortedSegmentsByKafkaPartition.entrySet()) {
-        String kafkaPartition = entry.getKey();
+      for (Map.Entry<String, SortedSet<SegmentName>> entry : sortedSegmentsByStreamPartition.entrySet()) {
+        String partitionId = entry.getKey();
         SortedSet<SegmentName> segmentNames = entry.getValue();
 
         // The only segment name which is allowed to be in CONSUMING state or null
-        SegmentName validConsumingSegment = allowedSegmentInConsumingStateByKafkaPartition.get(kafkaPartition);
+        SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(partitionId);
 
         for (SegmentName segmentName : segmentNames) {
           List<String> validServers = new ArrayList<>();
@@ -143,8 +143,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilder extends GeneratorBasedRout
             handleNoServingHost(segmentNameStr);
           }
 
-          // If this segment is the segment allowed in CONSUMING state, don't process segments after it in that Kafka
-          // partition
+          // If this segment is the segment allowed in CONSUMING state, don't process segments after it in that partition
           if (segmentName.equals(validConsumingSegment)) {
             break;
           }

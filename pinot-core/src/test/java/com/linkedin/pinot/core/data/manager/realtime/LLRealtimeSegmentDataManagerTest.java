@@ -139,7 +139,7 @@ public class LLRealtimeSegmentDataManagerTest {
   public static class FakeStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
 
     @Override
-    public void init(Map<String, String> props, Schema indexingSchema, String kafkaTopicName) throws Exception {
+    public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
 
     }
 

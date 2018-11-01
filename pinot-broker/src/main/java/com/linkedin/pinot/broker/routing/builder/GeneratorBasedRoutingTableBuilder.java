@@ -31,7 +31,7 @@ import org.apache.helix.model.InstanceConfig;
 
 /**
  * Routing table builder that uses a random routing table generator to create multiple routing tables. See a more
- * detailed explanation of the algorithm in {@link KafkaLowLevelConsumerRoutingTableBuilder} and
+ * detailed explanation of the algorithm in {@link LowLevelConsumerRoutingTableBuilder} and
  * {@link LargeClusterRoutingTableBuilder}.
  */
 public abstract class GeneratorBasedRoutingTableBuilder extends BaseRoutingTableBuilder {
