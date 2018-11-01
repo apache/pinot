@@ -146,7 +146,7 @@ export default Route.extend({
    * @method _findAlertIdsByUserGroup
    * @param {String} user - current logged in user's email alias
    * @param {Array} subscriberGroups - all subscription groups in model
-   * @return {Promise}
+   * @return {Array} - array of alert Ids current user subscribes to
    */
   _findAlertIdsByUserGroup(user, subscriberGroups) {
     const isLookupLenient = true; // For 'alerts I subscribe to'

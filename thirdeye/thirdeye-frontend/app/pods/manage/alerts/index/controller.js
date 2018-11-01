@@ -34,6 +34,12 @@ export default Controller.extend({
   initialFiltersGlobal: reads('model.initialFiltersGlobal'),
 
   /**
+   * Used to help display filter settings in page header
+   */
+  primaryFilterVal: 'All Alerts',
+  isFilterStrLenMax: false,
+
+  /**
    * Used to trigger re-render of alerts list
    */
   filtersTriggered: false,
@@ -42,6 +48,11 @@ export default Controller.extend({
    * Used to surface newer features pre-launch
    */
   testMode: null,
+
+  /**
+   * Boolean to display or hide summary of all filters
+   */
+  allowFilterSummary: true,
 
   /**
    * Default Sort Mode
@@ -130,14 +141,15 @@ export default Controller.extend({
       if (alertFoundByName) {
         filteredAlerts = [alertFoundByName];
       } else if (alertFilters) {
+        // Do the filtering of alerts using the original model-fetched alerts array
         filteredAlerts = this._filterAlerts(initialAlerts, alertFilters);
-
         // Recalculate each select filter's options (based on available filters from current selection)
         if (canRecalcFilterOptions) {
           filtersToRecalculate.forEach((blockItem) => {
             Object.assign(blockItem, { selected: alertFilters[blockItem.name] });
             // We are recalculating each field where options have not been selected
             if (inactiveFields.includes(blockItem.name) || !inactiveFields.length) {
+              console.log('recalculating for : ', blockItem.name);
               const alertPropsAsKeys = filteredAlerts.map(alert => alert[filterToPropertyMap[blockItem.name]]);
               const filterKeys = [ ...new Set(powerSort(alertPropsAsKeys, null)) ];
               Object.assign(blockItem, { filterKeys });
@@ -198,6 +210,42 @@ export default Controller.extend({
       }
       // Return one page of sorted alerts
       return alerts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    }
+  ),
+
+  // String containing all selected filters for display
+  activeFiltersString: computed(
+    'alertFilters',
+    'filtersTriggered',
+    function() {
+      const alertFilters = get(this, 'alertFilters');
+      const filterAbbrevMap = {
+        application: 'app',
+        subscription: 'group'
+      };
+      let filterStr = 'All Alerts';
+      if (isPresent(alertFilters)) {
+        if (alertFilters.primary) {
+          filterStr = alertFilters.primary;
+          set(this, 'primaryFilterVal', filterStr);
+        } else {
+          let filterArr = [get(this, 'primaryFilterVal')];
+          Object.keys(alertFilters).forEach((filterKey) => {
+            const value = alertFilters[filterKey];
+            const isStatusAll = filterKey === 'status' && Array.isArray(value) && value.length > 1;
+            // Only display valid search filters
+            if (filterKey !== 'triggerType' && value !== null && value.length && !isStatusAll) {
+              let concatVal = filterKey === 'status' && !value.length ? 'Active' : value.join(', ');
+              let abbrevKey = filterAbbrevMap[filterKey] || filterKey;
+              filterArr.push(`${abbrevKey}: ${concatVal}`);
+            }
+          });
+          filterStr = filterArr.join(' | ');
+        }
+      }
+      // If string exceeds 84 chars, show entire string in tooltip
+      set(this, 'isFilterStrLenMax', filterStr.length > 84);
+      return filterStr;
     }
   ),
 

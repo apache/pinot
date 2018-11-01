@@ -55,10 +55,17 @@
   <div class="manage-alert-results">
     {{#if paginatedSelectedAlerts}}
       <section class="te-search-header">
-        <span class="te-search-title">
-          Alerts ({{totalFilteredAlerts}})
-        </span>
-        <span class="pull-right">
+        <span class="te-search-title">Alerts ({{totalFilteredAlerts}})</span>
+        {{#if allowFilterSummary}}
+          <span class="te-search-filters">{{activeFiltersString}}</span>
+          {{#if isFilterStrLenMax}}
+            <span class="te-search-header__icon">
+              <i class="glyphicon glyphicon-resize-full"></i>
+              {{#popover-on-element side="left" class="te-search-header__tooltip te-tooltip"}}{{activeFiltersString}}{{/popover-on-element}}
+            </span>
+          {{/if}}
+        {{/if}}
+        <span class="te-search-header__displaynum pull-right">
           Showing {{paginatedSelectedAlerts.length}} of
           {{totalFilteredAlerts}} {{if (gt totalFilteredAlerts 1) 'alerts' 'alert'}}
         </span>
