@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -51,8 +52,8 @@ public class RealtimeSegmentConverter {
   private StarTreeIndexSpec starTreeIndexSpec;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String timeColumnName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
-      List<String> noDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
+      String tableName, String timeColumnName, String segmentName, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
     }
@@ -137,14 +138,15 @@ public class RealtimeSegmentConverter {
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     RealtimeSegmentSegmentCreationDataSource dataSource =
         new RealtimeSegmentSegmentCreationDataSource(realtimeSegmentImpl, reader, dataSchema);
-    driver.init(genConfig, dataSource);
+    driver.init(genConfig, dataSource, CompoundTransformer.getPassThroughTransformer());
     driver.build();
 
     if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap() != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       for (String columnName : columnPartitionMap.keySet()) {
         int partitionRangeWidth = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitionRangeWidth();
-        serverMetrics.addValueToTableGauge(tableName, ServerGauge.REALTIME_SEGMENT_PARTITION_WIDTH, partitionRangeWidth);
+        serverMetrics.addValueToTableGauge(tableName, ServerGauge.REALTIME_SEGMENT_PARTITION_WIDTH,
+            partitionRangeWidth);
       }
     }
   }

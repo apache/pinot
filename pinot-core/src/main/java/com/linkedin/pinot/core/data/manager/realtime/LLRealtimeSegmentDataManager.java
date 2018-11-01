@@ -35,8 +35,8 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
-import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
+import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
+import com.linkedin.pinot.core.data.recordtransformer.RecordTransformer;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegment;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -60,7 +60,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -193,6 +192,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
   private volatile int _numRowsIndexed = 0; // Can be different from _numRowsConsumed when metrics update is enabled.
+  private volatile int _numRowsErrored = 0;
   private volatile int consecutiveErrorCount = 0;
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
@@ -215,7 +215,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final int _streamPartitionId;
   final String _clientId;
   private final LLCSegmentName _segmentName;
-  private final PlainFieldExtractor _fieldExtractor;
+  private final RecordTransformer _recordTransformer;
   private PartitionLevelConsumer _partitionLevelConsumer = null;
   private StreamMetadataProvider _streamMetadataProvider = null;
   private final File _resourceTmpDir;
@@ -320,7 +320,7 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   }
 
   protected boolean consumeLoop() throws Exception {
-    _fieldExtractor.resetCounters();
+    _numRowsErrored = 0;
     final long idlePipeSleepTimeMillis = 100;
     final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/(idlePipeSleepTimeMillis + _partitionLevelStreamConfig.getFetchTimeoutMillis());  // 3 minute count
     long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
@@ -374,14 +374,10 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       }
     }
 
-    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS,
-        (long) _fieldExtractor.getTotalErrors());
-    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_NEEDING_CONVERSIONS,
-        (long) _fieldExtractor.getTotalConversions());
-    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_NULL_VALUES,
-        (long) _fieldExtractor.getTotalNulls());
-    _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.COLUMNS_WITH_NULL_VALUES,
-        (long) _fieldExtractor.getTotalNullCols());
+    if (_numRowsErrored > 0) {
+      _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
+      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.ROWS_WITH_ERRORS, _numRowsErrored);
+    }
     return true;
   }
 
@@ -393,7 +389,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     int streamMessageCount = 0;
     boolean canTakeMore = true;
     GenericRow decodedRow = null;
-    GenericRow transformedRow = null;
     for (int index = 0; index < messagesAndOffsets.getMessageCount(); index ++) {
       if (_shouldStop || endCriteriaReached()) {
         break;
@@ -426,23 +421,28 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
               messagesAndOffsets.getMessageLengthAtIndex(index), decodedRow);
 
       if (decodedRow != null) {
-        transformedRow = GenericRow.createOrReuseRow(transformedRow);
-        transformedRow = _fieldExtractor.transform(decodedRow, transformedRow);
+        try {
+          GenericRow transformedRow = _recordTransformer.transform(decodedRow);
 
-        if (transformedRow != null) {
-          realtimeRowsConsumedMeter = _serverMetrics
-              .addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
-          indexedMessageCount++;
-        } else {
-          realtimeRowsDroppedMeter = _serverMetrics
-              .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
-                  realtimeRowsDroppedMeter);
+          if (transformedRow != null) {
+            realtimeRowsConsumedMeter =
+                _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
+                    realtimeRowsConsumedMeter);
+            indexedMessageCount++;
+          } else {
+            realtimeRowsDroppedMeter =
+                _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+                    realtimeRowsDroppedMeter);
+          }
+
+          canTakeMore = _realtimeSegment.index(transformedRow);
+        } catch (Exception e) {
+          segmentLogger.debug("Caught exception while transforming the record: {}", decodedRow, e);
+          _numRowsErrored++;
         }
-
-        canTakeMore = _realtimeSegment.index(transformedRow);
       } else {
-        realtimeRowsDroppedMeter = _serverMetrics
-            .addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
+        realtimeRowsDroppedMeter =
+            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1,
                 realtimeRowsDroppedMeter);
       }
 
@@ -635,7 +635,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
               _segmentZKMetadata.getTableName(), _timeColumnName, _segmentZKMetadata.getSegmentName(), _sortedColumn,
               _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
-      logStatistics();
       segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1061,8 +1060,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, _schema);
     _clientId = _streamPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
-    // Create field extractor
-    _fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
+    // Create record transformer
+    _recordTransformer = CompoundTransformer.getDefaultTransformer(schema);
     makeStreamConsumer("Starting");
     makeStreamMetadataProvider("Starting");
 
@@ -1094,35 +1093,6 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     segmentLogger.info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}",
         _segmentName, _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC).toString());
     start();
-  }
-
-  private void logStatistics() {
-    int numErrors, numConversions, numNulls, numNullCols;
-    if ((numErrors = _fieldExtractor.getTotalErrors()) > 0) {
-      _serverMetrics.addMeteredTableValue(_tableStreamName,
-          ServerMeter.ROWS_WITH_ERRORS, (long) numErrors);
-    }
-    Map<String, Integer> errorCount = _fieldExtractor.getErrorCount();
-    for (String column : errorCount.keySet()) {
-      if ((numErrors = errorCount.get(column)) > 0) {
-        segmentLogger.warn("Column {} had {} rows with errors", column, numErrors);
-      }
-    }
-    if ((numConversions = _fieldExtractor.getTotalConversions()) > 0) {
-      _serverMetrics.addMeteredTableValue(_tableStreamName,
-          ServerMeter.ROWS_NEEDING_CONVERSIONS, (long) numConversions);
-      segmentLogger.info("{} rows needed conversions ", numConversions);
-    }
-    if ((numNulls = _fieldExtractor.getTotalNulls()) > 0) {
-      _serverMetrics.addMeteredTableValue(_tableStreamName,
-          ServerMeter.ROWS_WITH_NULL_VALUES, (long) numNulls);
-      segmentLogger.info("{} rows had null columns", numNulls);
-    }
-    if ((numNullCols = _fieldExtractor.getTotalNullCols()) > 0) {
-      _serverMetrics.addMeteredTableValue(_tableStreamName,
-          ServerMeter.COLUMNS_WITH_NULL_VALUES, (long) numNullCols);
-      segmentLogger.info("{} columns had null values", numNullCols);
-    }
   }
 
   /**

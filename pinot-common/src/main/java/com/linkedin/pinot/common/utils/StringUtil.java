@@ -40,12 +40,9 @@ public class StringUtil {
 
   /**
    * Removes the null characters from a string.
+   * NOTE: call {@link #containsNullCharacter(String)} first to avoid the extra cost of removing null characters.
    */
   public static String removeNullCharacters(@Nonnull String input) {
-    if (!containsNullCharacter(input)) {
-      return input;
-    }
-
     char[] chars = input.toCharArray();
     int length = chars.length;
     int index = 0;

@@ -27,8 +27,8 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
-import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
+import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
+import com.linkedin.pinot.core.data.recordtransformer.RecordTransformer;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegment;
 import com.linkedin.pinot.core.indexsegment.immutable.ImmutableSegmentLoader;
@@ -44,7 +44,6 @@ import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.TimerTask;
 import java.util.concurrent.TimeUnit;
@@ -64,7 +63,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
   private final String segmentName;
   private final Schema schema;
   private final String timeColumnName;
-  private final PlainFieldExtractor extractor;
+  private final RecordTransformer _recordTransformer;
   private final RealtimeSegmentZKMetadata segmentMetatdaZk;
 
   private final StreamConsumerFactory _streamConsumerFactory;
@@ -103,7 +102,7 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
     super();
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     this.schema = schema;
-    this.extractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
+    _recordTransformer = CompoundTransformer.getDefaultTransformer(schema);
     this.serverMetrics =serverMetrics;
     this.segmentName = realtimeSegmentZKMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();
@@ -210,25 +209,24 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         long exceptionSleepMillis = 50L;
         segmentLogger.info("Starting to collect rows");
 
+        int numRowsErrored = 0;
+        GenericRow consumedRow = null;
         do {
-          GenericRow readRow = null;
-          GenericRow transformedRow = null;
-          GenericRow row = null;
           try {
-            readRow = GenericRow.createOrReuseRow(readRow);
-            readRow = _streamLevelConsumer.next(readRow);
-            row = readRow;
+            consumedRow = GenericRow.createOrReuseRow(consumedRow);
+            consumedRow = _streamLevelConsumer.next(consumedRow);
 
-            if (readRow != null) {
-              transformedRow = GenericRow.createOrReuseRow(transformedRow);
-              transformedRow = extractor.transform(readRow, transformedRow);
-              row = transformedRow;
-              notFull = realtimeSegment.index(transformedRow);
-              exceptionSleepMillis = 50L;
+            if (consumedRow != null) {
+              GenericRow transformedRow = _recordTransformer.transform(consumedRow);
+              if (transformedRow != null) {
+                notFull = realtimeSegment.index(transformedRow);
+                exceptionSleepMillis = 50L;
+              }
             }
           } catch (Exception e) {
             segmentLogger.warn("Caught exception while indexing row, sleeping for {} ms, row contents {}",
-                exceptionSleepMillis, row, e);
+                exceptionSleepMillis, consumedRow, e);
+            numRowsErrored++;
 
             // Sleep for a short time as to avoid filling the logs with exceptions too quickly
             Uninterruptibles.sleepUninterruptibly(exceptionSleepMillis, TimeUnit.MILLISECONDS);
@@ -244,31 +242,8 @@ public class HLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
           return;
         }
         try {
-          int numErrors, numConversions, numNulls, numNullCols;
-          if ((numErrors = extractor.getTotalErrors()) > 0) {
-            serverMetrics.addMeteredTableValue(tableStreamName,
-                ServerMeter.ROWS_WITH_ERRORS, (long) numErrors);
-          }
-          Map<String, Integer> errorCount = extractor.getErrorCount();
-          for (String column : errorCount.keySet()) {
-            if ((numErrors = errorCount.get(column)) > 0) {
-              segmentLogger.warn("Column {} had {} rows with errors", column, numErrors);
-            }
-          }
-          if ((numConversions = extractor.getTotalConversions()) > 0) {
-            serverMetrics.addMeteredTableValue(tableStreamName,
-                ServerMeter.ROWS_NEEDING_CONVERSIONS, (long) numConversions);
-            segmentLogger.info("{} rows needed conversions ", numConversions);
-          }
-          if ((numNulls = extractor.getTotalNulls()) > 0) {
-            serverMetrics.addMeteredTableValue(tableStreamName,
-                ServerMeter.ROWS_WITH_NULL_VALUES, (long) numNulls);
-            segmentLogger.info("{} rows had null columns", numNulls);
-          }
-          if ((numNullCols = extractor.getTotalNullCols()) > 0) {
-            serverMetrics.addMeteredTableValue(tableStreamName,
-                ServerMeter.COLUMNS_WITH_NULL_VALUES, (long) numNullCols);
-            segmentLogger.info("{} columns had null values", numNullCols);
+          if (numRowsErrored > 0) {
+            serverMetrics.addMeteredTableValue(tableStreamName, ServerMeter.ROWS_WITH_ERRORS, numRowsErrored);
           }
           segmentLogger.info("Indexing threshold reached, proceeding with index conversion");
           // kill the timer first

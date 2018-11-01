@@ -17,9 +17,9 @@ package com.linkedin.pinot.core.segment.creator;
 
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
-import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
+import com.linkedin.pinot.core.data.recordtransformer.RecordTransformer;
 import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,18 +42,20 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   @Override
   public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      PlainFieldExtractor fieldExtractor =
-          FieldExtractorFactory.getPlainFieldExtractor(statsCollectorConfig.getSchema());
+      RecordTransformer recordTransformer =
+          CompoundTransformer.getDefaultTransformer(statsCollectorConfig.getSchema());
 
       SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
       // Gather the stats
-      GenericRow readRow = new GenericRow();
-      GenericRow transformedRow = new GenericRow();
+      GenericRow readRow = null;
       while (_recordReader.hasNext()) {
-        transformedRow = fieldExtractor.transform(_recordReader.next(readRow), transformedRow);
-        collector.collectRow(transformedRow);
+        readRow = GenericRow.createOrReuseRow(readRow);
+        GenericRow transformedRow = recordTransformer.transform(_recordReader.next(readRow));
+        if (transformedRow != null) {
+          collector.collectRow(transformedRow);
+        }
       }
 
       collector.build();

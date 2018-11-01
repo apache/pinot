@@ -13,19 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.extractors;
+package com.linkedin.pinot.core.data.recordtransformer;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.data.GenericRow;
+import javax.annotation.Nullable;
 
 
-public class FieldExtractorFactory {
+/**
+ * The record transformer which takes a {@link GenericRow} and transform it based on some custom rules.
+ */
+public interface RecordTransformer {
 
-  public static PlainFieldExtractor getPlainFieldExtractor(final SegmentGeneratorConfig indexingConfig) {
-    return new PlainFieldExtractor(indexingConfig.getSchema());
-  }
-
-  public static PlainFieldExtractor getPlainFieldExtractor(final Schema schema) {
-    return new PlainFieldExtractor(schema);
-  }
+  /**
+   * Transforms a record based on some custom rules.
+   *
+   * @param record Record to transform
+   * @return Transformed record, or {@code null} if the record does not follow certain rules.
+   */
+  @Nullable
+  GenericRow transform(GenericRow record);
 }
