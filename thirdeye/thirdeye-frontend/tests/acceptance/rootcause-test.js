@@ -1,11 +1,27 @@
 import { module, test } from 'qunit';
 import { setupApplicationTest } from 'ember-qunit';
-import { visit, fillIn, click, currentURL } from '@ember/test-helpers';
+import { visit, fillIn, click, currentURL, waitFor } from '@ember/test-helpers';
 import { rootCauseConst as rcEl } from 'thirdeye-frontend/tests/utils/constants';
 import $ from 'jquery';
 
 module('Acceptance | rootcause', async function(hooks) {
   setupApplicationTest(hooks);
+
+  test(`visiting /rootcause on metricId shows correct header title`, async assert => {
+    await visit('/rootcause?metricId=1');
+
+    assert.ok(
+      $('.rootcause-header__major').get(0).value.includes('Investigation on pageViews'),
+      'title is correct');
+  });
+
+  test(`visiting /rootcause on anomalyId shows correct header title`, async assert => {
+    await visit('/rootcause?anomalyId=1');
+    
+    assert.ok(
+      $('.rootcause-header__major').get(0).value.includes('Investigation on pageViews'),
+      'title is correct');
+  });
 
   test('empty state of rootcause page should have a placeholder and no tabs', async (assert) => {
     await visit('/rootcause');

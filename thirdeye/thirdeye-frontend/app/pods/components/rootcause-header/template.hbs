@@ -1,6 +1,11 @@
 <div class="container">
   <div class="row">
     <div class="col-xs-11">
+      {{#tooltip-on-element
+        class="te-tooltip"
+        isShown=metricUrn}}
+          Click here to edit title
+      {{/tooltip-on-element}}
       {{textarea-autosize
         placeholder="Enter investigation title ..."
         value=sessionName
