@@ -132,7 +132,7 @@ export default Controller.extend({
         alertFoundByName,
         filterToPropertyMap,
         originalAlerts: initialAlerts
-      } = getProperties(this, 'alertFilters', 'filterBlocksLocal', 'alertFoundByName', 'originalAlerts', 'filterToPropertyMap');
+      } = getProperties(this, 'alertFilters', 'filterBlocksLocal', 'alertFoundByName', 'filterToPropertyMap', 'originalAlerts');
       const filterBlocksCopy = _.cloneDeep(filterBlocksLocal);
       const canRecalcFilterOptions = alertFilters && alertFilters.triggerType !== 'checkbox';
       const inactiveFields = alertFilters ? Object.keys(alertFilters).filter(key => isBlank(alertFilters[key])) : [];
@@ -194,8 +194,8 @@ export default Controller.extend({
         currentPage,
         selectedSortMode
       } = getProperties(this, 'pageSize', 'currentPage', 'selectedSortMode');
-      // Use only alerts containing valid metric data
-      let alerts = this.get('selectedAlerts').filter(alert => isPresent(alert.metric));
+      // Initial set of alerts
+      let alerts = this.get('selectedAlerts');
       // Alpha sort accounting for spaces in function name
       let alphaSortedAlerts = powerSort(alerts, 'functionName');
       // Handle selected sort order

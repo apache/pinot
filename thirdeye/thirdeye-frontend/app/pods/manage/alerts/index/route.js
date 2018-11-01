@@ -1,6 +1,7 @@
 import { hash } from 'rsvp';
 import Route from '@ember/routing/route';
 import fetch from 'fetch';
+import { isPresent } from '@ember/utils';
 import { get, getWithDefault } from '@ember/object';
 import { inject as service } from '@ember/service';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
@@ -23,7 +24,7 @@ export default Route.extend({
 
   model() {
     return hash({
-      alerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(checkStatus),
+      rawAlerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(checkStatus),
       subscriberGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(checkStatus),
       applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus)
     });
@@ -31,13 +32,14 @@ export default Route.extend({
 
   afterModel(model) {
     this._super(model);
-    const allAlerts = model.alerts;
+    // Work only with valid alerts - with metric association
+    const alerts = model.rawAlerts.filter(alert => isPresent(alert.metric));
 
     // Itereate through config groups to enhance all alerts with extra properties (group name, application)
     for (let config of model.subscriberGroups) {
       let groupFunctionIds = config.emailConfig && config.emailConfig.functionIds ? config.emailConfig.functionIds : [];
       for (let id of groupFunctionIds) {
-        let foundAlert = allAlerts.find(alert => alert.id === id);
+        let foundAlert = alerts.find(alert => alert.id === id);
         if (foundAlert) {
           Object.assign(foundAlert, {
             application: config.application,
@@ -50,11 +52,11 @@ export default Route.extend({
     // Perform initial filters for our 'primary' filter types and add counts
     const user = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
     const myAlertIds = user ? this._findAlertIdsByUserGroup(user, model.subscriberGroups) : [];
-    const ownedAlerts = allAlerts.filter(alert => alert.createdBy === user);
-    const subscribedAlerts = allAlerts.filter(alert => myAlertIds.includes(alert.id));
-    const totalCounts = [subscribedAlerts.length, ownedAlerts.length, allAlerts.length];
+    const ownedAlerts = alerts.filter(alert => alert.createdBy === user);
+    const subscribedAlerts = alerts.filter(alert => myAlertIds.includes(alert.id));
+    const totalCounts = [subscribedAlerts.length, ownedAlerts.length, alerts.length];
     // Add these filtered arrays to the model (they are only assigne once)
-    Object.assign(model, { ownedAlerts, subscribedAlerts, totalCounts });
+    Object.assign(model, { alerts, ownedAlerts, subscribedAlerts, totalCounts });
   },
 
   setupController(controller, model, transition) {
