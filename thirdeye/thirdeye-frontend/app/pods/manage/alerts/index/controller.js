@@ -137,6 +137,7 @@ export default Controller.extend({
       const canRecalcFilterOptions = alertFilters && alertFilters.triggerType !== 'checkbox';
       const inactiveFields = alertFilters ? Object.keys(alertFilters).filter(key => isBlank(alertFilters[key])) : [];
       const filtersToRecalculate = filterBlocksCopy.filter(block => block.type === 'select');
+      const nonSelectFilters = filterBlocksCopy.filter(block => block.type !== 'select');
       let filteredAlerts = initialAlerts;
 
       if (alertFoundByName) {
@@ -155,6 +156,14 @@ export default Controller.extend({
               Object.assign(blockItem, { filterKeys });
             }
           });
+
+          // Preserve selected state for filters that initially have a "selected" property
+          if (nonSelectFilters.length) {
+            nonSelectFilters.forEach((filter) => {
+              filter.selected = alertFilters[filter.name] ? alertFilters[filter.name] : filter.selected;
+            });
+          }
+
           // Be sure to update the filter options object once per pass
           once(() => {
             set(this, 'filterBlocksLocal', filterBlocksCopy);
@@ -164,7 +173,7 @@ export default Controller.extend({
 
       setProperties(this, {
         filtersTriggered: false, // reset filter trigger
-        alertFoundByName: null, // reset single found alert var
+        alertFoundByName: false, // reset single found alert var
         totalFilteredAlerts: filteredAlerts.length
       });
 
@@ -290,8 +299,6 @@ export default Controller.extend({
       // !filters.status.length forces an 'Active' default if user tries to de-select both
       // Depending on the desired UX, remove it if you want to allow user to select NO active and NO inactive.
       const concatStatus = filters.status.length ? filters.status.join().toLowerCase() : 'active';
-      //const filterForActive = concatStatus === 'active' || !filters.status.length;
-      //const filterForInactive = concatStatus === 'inactive';
       const requireAll = filters.status.includes('Active') && filters.status.includes('Inactive');
       const alertsByState = {
         active: filteredAlerts.filter(alert => alert.isActive),
