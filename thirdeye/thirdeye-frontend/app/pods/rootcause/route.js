@@ -15,6 +15,8 @@ import {
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
+import moment from 'moment';
+import { get } from '@ember/object';
 
 const ROOTCAUSE_SETUP_MODE_CONTEXT = "context";
 const ROOTCAUSE_SETUP_MODE_SELECTED = "selected";
@@ -134,6 +136,20 @@ export default Route.extend(AuthenticatedRouteMixin, {
       refreshModel: true,
       replace: false
     }
+  },
+
+  /**
+   * Helper for the RCA's default header title
+   * @param {String} metric's name
+   * @param {Array} timeRange is either the anomalyRange anomaly time range or analysisRange display time range
+   * @param {Object} entity is either anomalyEntity or metricEntity
+   * @return {Object} trimmed { anomalyRange, analysisRange }
+   */
+  _makeTitleHeader: function(metricName, timeRange, entity) {
+    const timeStart = timeRange[0] ? moment(timeRange[0]).format('MM/DD/YYYY') : moment(entity.start).format('MM/DD/YYYY');
+    const timeEnd = timeRange[1] ? moment(timeRange[1]).format('MM/DD/YYYY') : moment(entity.end).format('MM/DD/YYYY');
+    const timeDisplay = timeStart === timeEnd ? timeStart : `${timeStart} to ${timeEnd}`;//Show one for daily
+    return `Investigation on ${metricName} for ${timeDisplay}`;
   },
 
   model(params) {
@@ -326,6 +342,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
         };
 
         selectedUrns = new Set([metricUrn, toCurrentUrn(metricUrn), toBaselineUrn(metricUrn)]);
+        const metricName = metricEntity.label.split('::')[1];
+        sessionName = this._makeTitleHeader(metricName, anomalyRange, metricEntity);
         setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
       }
     }
@@ -366,7 +384,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
         };
 
         selectedUrns = new Set([anomalyUrn, anomalyMetricUrn]);
-        sessionName = 'New Investigation of #' + anomalyId + ' (' + makeTime().format(dateFormatFull) + ')';
+        const metricName = anomalyEntity.attributes.metric[0];
+        sessionName = this._makeTitleHeader(metricName, anomalyRange, anomalyEntity);
         setupMode = ROOTCAUSE_SETUP_MODE_SELECTED;
         sessionText = anomalyEntity.attributes.comment[0];
       } else {
