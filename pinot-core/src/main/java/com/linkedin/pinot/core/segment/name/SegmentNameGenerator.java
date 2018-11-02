@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment;
+package com.linkedin.pinot.core.segment.name;
 
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 
@@ -22,5 +22,5 @@ import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
  * An interface that allows generates names for segments depending on the naming scheme.
  */
 public interface SegmentNameGenerator {
-  public String generateSegmentName(ColumnStatistics timeColStatsCollector) throws Exception;
+  String generateSegmentName(ColumnStatistics timeColStatsCollector) throws Exception;
 }
