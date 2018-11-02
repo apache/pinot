@@ -27,6 +27,7 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.alert.AlertUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
@@ -38,11 +39,14 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
 public class DetectionEmailAlerter extends DetectionAlertScheme {
@@ -51,6 +55,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final Comparator<AnomalyResult> COMPARATOR_DESC =
       (o1, o2) -> -1 * Long.compare(o1.getStartTime(), o2.getStartTime());
   private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
+  private static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
 
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
@@ -64,7 +69,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   /** Sends email according to the provided config. */
   private void sendEmail(EmailEntity entity) throws EmailException {
     HtmlEmail email = entity.getContent();
-    SmtpConfiguration config = this.thirdeyeConfig.getSmtpConfiguration();
+    SmtpConfiguration config = SmtpConfiguration.createFromProperties(this.thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY));
 
     if (config == null) {
       LOG.error("No email configuration available. Skipping.");
@@ -88,10 +93,12 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
       DetectionAlertFilterRecipients recipients = entry.getKey();
       Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
 
-      if (!this.thirdeyeConfig.getEmailWhitelist().isEmpty()) {
-        recipients.getTo().retainAll(this.thirdeyeConfig.getEmailWhitelist());
-        recipients.getCc().retainAll(this.thirdeyeConfig.getEmailWhitelist());
-        recipients.getBcc().retainAll(this.thirdeyeConfig.getEmailWhitelist());
+      List<String> emailWhitelist = ConfigUtils.getList(
+          this.thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY).get(EMAIL_WHITELIST_KEY));
+      if (!emailWhitelist.isEmpty()) {
+        recipients.getTo().retainAll(emailWhitelist);
+        recipients.getCc().retainAll(emailWhitelist);
+        recipients.getBcc().retainAll(emailWhitelist);
       }
 
       if (recipients.getTo().isEmpty()) {

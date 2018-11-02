@@ -59,6 +59,9 @@ import com.linkedin.thirdeye.datasource.MetricExpression;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.cache.QueryCache;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
+
 /**
  * Stateless class to provide util methods to help build anomaly report
  */
@@ -229,7 +232,8 @@ public abstract class EmailHelper {
 
   public static void sendFailureEmailForScreenshot(String anomalyId, Throwable t, ThirdEyeConfiguration thirdeyeConfig)
       throws JobExecutionException {
-    sendFailureEmailForScreenshot(anomalyId, t, thirdeyeConfig.getSmtpConfiguration(),
+    sendFailureEmailForScreenshot(anomalyId, t,
+        SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
         thirdeyeConfig.getFailureFromAddress(),
         new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress())));
   }
@@ -266,8 +270,9 @@ public abstract class EmailHelper {
         thirdeyeConfig.getFailureToAddress(), subject, textBody.toString());
 
     try {
-      EmailHelper.sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody.toString(),
-          thirdeyeConfig.getFailureFromAddress(),
+      EmailHelper.sendEmailWithTextBody(email,
+          SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)),
+          subject, textBody.toString(), thirdeyeConfig.getFailureFromAddress(),
           new DetectionAlertFilterRecipients(EmailUtils.getValidEmailAddresses(thirdeyeConfig.getFailureToAddress())));
     } catch (EmailException e) {
       LOG.error("Exception in sending email notification for incomplete datasets", e);

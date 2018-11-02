@@ -34,6 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Baseline filling merger. This merger's merging behavior is the same as MergeWrapper. But add the capability
+ * of filling baseline & current values.
+ */
 public class BaselineFillingMergeWrapper extends MergeWrapper {
   private static final Logger LOG = LoggerFactory.getLogger(MergeWrapper.class);
 

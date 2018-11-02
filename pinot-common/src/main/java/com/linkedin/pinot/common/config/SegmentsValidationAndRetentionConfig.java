@@ -18,8 +18,6 @@ package com.linkedin.pinot.common.config;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.startree.hll.HllConfig;
 import java.lang.reflect.Field;
-import java.util.Set;
-import java.util.TreeSet;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.slf4j.Logger;
@@ -45,7 +43,7 @@ public class SegmentsValidationAndRetentionConfig {
   private String segmentPushType;
 
   @ConfigKey(value = "replication")
-  private String replication; // For high-level kafka consumers, the number of replicas should be same as num server instances
+  private String replication; // For high-level consumers, the number of replicas should be same as num server instances
 
   @ConfigKey(value = "schemaName")
   private String schemaName;
@@ -65,7 +63,7 @@ public class SegmentsValidationAndRetentionConfig {
   @NestedConfig
   private HllConfig hllConfig;
 
-  // Number of replicas per partition of low-level kafka consumers. This config is used for realtime tables only.
+  // Number of replicas per partition of low-level consumers. This config is used for realtime tables only.
   @ConfigKey(value = "replicasPerPartition")
   private String replicasPerPartition;
 

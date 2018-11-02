@@ -198,7 +198,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
             // Count number of online replicas. Ignore if state is CONSUMING.
             // It is possible for a segment to be ONLINE in idealstate, and CONSUMING in EV for a short period of time.
             // So, ignore this combination. If a segment exists in this combination for a long time, we will get
-            // kafka-partition-not-consuming alert anyway.
+            // low level-partition-not-consuming alert anyway.
             if (serverAndState.getValue().equals(ONLINE) || serverAndState.getValue().equals(CONSUMING)) {
               nReplicas++;
             }

@@ -79,23 +79,23 @@ export default Service.extend({
     return this._humanizedAnomaliesCache;
   },
 
-/**
- * @summary Return the cached humanized anomaly if exists, if not we store it into cache and return it.
-   1. Check for the existance of the entity (anomaly record) in the cache by cacheKey/id.
-   2. Add the entity (anomaly record) to the `HumanizedAnomaly` to be used later. This save us the need to directly access the store (find/findRecord).
-   3. Save to the cache the new HumanizedAnomaly ember object to cache. This contains all the display/humanized properties, including the anomaly record itself.
-      `HumanizedAnomaly.create({ entity })`
-   4. Assign to humanizedEntity the new HumanizedAnomaly ember object. This allow us not to mutate the actual anomaly record later.
-   5. Return the humanizedEntity - We now can access the raw data or humanized data
- * @method getHumanizedEntity
- * @param {object} anomaly - a raw anomaly record from the store cache (proxy model). This param name must match the name used in `HumanizedAnomaly`
- * @param {object} humanizedEntity - The object that contains any additional humanized items.
- * @return {Ember.Object}
- * @example:
-    const record = this.get('anomaliesApiService').getHumanizedEntity(entity);
-    const humanizedSeverity = record.severity;
-    const rawSeverity = record.anomaly.severity;
- */
+  /**
+   * @summary Return the cached humanized anomaly if exists, if not we store it into cache and return it.
+     1. Check for the existance of the entity (anomaly record) in the cache by cacheKey/id.
+     2. Add the entity (anomaly record) to the `HumanizedAnomaly` to be used later. This save us the need to directly access the store (find/findRecord).
+     3. Save to the cache the new HumanizedAnomaly ember object to cache. This contains all the display/humanized properties, including the anomaly record itself.
+        `HumanizedAnomaly.create({ entity })`
+     4. Assign to humanizedEntity the new HumanizedAnomaly ember object. This allow us not to mutate the actual anomaly record later.
+     5. Return the humanizedEntity - We now can access the raw data or humanized data
+   * @method getHumanizedEntity
+   * @param {object} anomaly - a raw anomaly record from the store cache (proxy model). This param name must match the name used in `HumanizedAnomaly`
+   * @param {object} humanizedEntity - The object that contains any additional humanized items.
+   * @return {Ember.Object}
+   * @example:
+      const record = this.get('anomaliesApiService').getHumanizedEntity(entity);
+      const humanizedSeverity = record.severity;
+      const rawSeverity = record.anomaly.severity;
+   */
   getHumanizedEntity(anomaly, humanizedObject) {
     assert('you must pass anomaly record.', anomaly);
 
@@ -143,6 +143,5 @@ export default Service.extend({
     const query = { application: appName, start, end };
     const anomalies = await queryCache.query(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
     return anomalies;
-  },
-
+  }
 });

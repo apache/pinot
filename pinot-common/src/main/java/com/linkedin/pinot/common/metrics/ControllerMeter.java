@@ -50,6 +50,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_AUTO_CREATED_PARTITIONS("creates", false),
   LLC_ZOOKEEPER_UPDATE_FAILURES("failures", false),
   LLC_KAFKA_DATA_LOSS("dataLoss", false),
+  // Introducing a new stream agnostic metric to replace LLC_KAFKA_DATA_LOSS.
+  // We can phase out LLC_KAFKA_DATA_LOSS once we have collected sufficient metrics for the new one
+  LLC_STREAM_DATA_LOSS("dataLoss", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
   NUMBER_SEGMENT_UPLOAD_TIMEOUT_EXCEEDED("SegmentUploadTimeouts", true),

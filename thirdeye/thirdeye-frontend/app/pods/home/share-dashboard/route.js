@@ -20,6 +20,7 @@ const queryParamsConfig = {
 export default Route.extend(AuthenticatedRouteMixin, {
   anomaliesApiService: service('services/api/anomalies'),
   shareDashboardApiService: service('services/api/share-dashboard'),
+  shareTemplateConfigApiService: service('services/api/share-template-config'),
   session: service(),
   queryParams: {
     appName: queryParamsConfig,
@@ -72,9 +73,11 @@ export default Route.extend(AuthenticatedRouteMixin, {
       try {
         const anomalyMapping = appName ? await get(this, '_getAnomalyMapping').perform(model) : [];//DEMO:
         const shareMetaData = shareId ? await get(this, 'shareDashboardApiService').queryShareMetaById(shareId) : [];
+        const shareTemplateConfig = appName ? await get(this, 'shareTemplateConfigApiService').queryShareTemplateConfigByAppName(appName) : {};
         const defaultParams = {
           anomalyMapping,
           shareMetaData,
+          shareTemplateConfig,
           appName,
           startDate,
           endDate,
@@ -151,7 +154,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
     this._super(...arguments);
     //set and reset controller props as needed
     controller.setProperties({
+      shareTemplateConfig: model.shareTemplateConfig.data || {},
       columns,
+      start: get(this, 'startDate'),
+      end: get(this, 'endDate'),
       startDateDisplay:  moment(get(this, 'startDate')).format('MM/DD/YYYY'),
       endDateDisplay: moment(get(this, 'endDate')).format('MM/DD/YYYY'),
       appNameDisplay: get(this, 'appName'),

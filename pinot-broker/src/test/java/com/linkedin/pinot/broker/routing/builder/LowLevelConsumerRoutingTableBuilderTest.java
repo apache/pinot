@@ -38,15 +38,15 @@ import static org.testng.Assert.*;
 /**
  * Test for the Kafka low level consumer routing table builder.
  */
-public class KafkaLowLevelConsumerRoutingTableBuilderTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaLowLevelConsumerRoutingTableBuilderTest.class);
+public class LowLevelConsumerRoutingTableBuilderTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LowLevelConsumerRoutingTableBuilderTest.class);
 
   @Test
   public void testAllOnlineRoutingTable() {
     final int ITERATIONS = 50;
     Random random = new Random();
 
-    KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
+    LowLevelConsumerRoutingTableBuilder routingTableBuilder = new LowLevelConsumerRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), new TableConfig(), null, null);
 
     long totalNanos = 0L;
@@ -154,7 +154,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
     final int ONLINE_SEGMENT_COUNT = 8;
     final int CONSUMING_SEGMENT_COUNT = SEGMENT_COUNT - ONLINE_SEGMENT_COUNT;
 
-    KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
+    LowLevelConsumerRoutingTableBuilder routingTableBuilder = new LowLevelConsumerRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), new TableConfig(), null, null);
 
     List<SegmentName> segmentNames = new ArrayList<SegmentName>();

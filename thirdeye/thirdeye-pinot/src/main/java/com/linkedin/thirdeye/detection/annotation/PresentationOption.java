@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment;
 
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
+package com.linkedin.thirdeye.detection.annotation;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 
-/**
- * An interface that allows generates names for segments depending on the naming scheme.
- */
-public interface SegmentNameGenerator {
-  public String generateSegmentName(ColumnStatistics timeColStatsCollector) throws Exception;
+@Target({ElementType.PARAMETER, ElementType.METHOD, ElementType.FIELD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface PresentationOption {
+
+  @JsonProperty String template() default "";
+
+  @JsonProperty String name() default "";
+
+  @JsonProperty String description() default "";
+
 }

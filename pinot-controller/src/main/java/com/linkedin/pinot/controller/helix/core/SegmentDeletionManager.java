@@ -184,7 +184,7 @@ public class SegmentDeletionManager {
       try {
         if (pinotFS.exists(fileToMoveURI)) {
           // Overwrites the file if it already exists in the target directory.
-          pinotFS.move(fileToMoveURI, deletedSegmentDestURI);
+          pinotFS.move(fileToMoveURI, deletedSegmentDestURI, true);
           LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMoveURI.toString(), deletedSegmentDestURI.toString());
         } else {
           if (!SegmentName.isHighLevelConsumerSegmentName(segmentId)) {

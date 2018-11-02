@@ -64,18 +64,20 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean move(URI srcUri, URI dstUri) throws IOException {
+  public boolean move(URI srcUri, URI dstUri, boolean overwrite) throws IOException {
     File srcFile = new File(decodeURI(srcUri.getRawPath()));
     File dstFile = new File(decodeURI(dstUri.getRawPath()));
     if (dstFile.exists()) {
-      FileUtils.deleteQuietly(dstFile);
+      if (overwrite) {
+        FileUtils.deleteQuietly(dstFile);
+      } else {
+        // dst file exists, returning
+        return false;
+      }
     }
-    if (!srcFile.isDirectory()) {
-      dstFile.getParentFile().mkdirs();
-      FileUtils.moveFile(srcFile, dstFile);
-    } else {
-      Files.move(srcFile.toPath(), dstFile.toPath());
-    }
+
+    Files.move(srcFile.toPath(), dstFile.toPath());
+
     return true;
   }
 

@@ -60,7 +60,7 @@ public class OnboardResourceTest {
     Assert.assertEquals(alertConfigDTOList.size(), 1);
     Assert.assertEquals(alertConfigDTOList.get(0).getName(), "auto_onboard_dataset_testDataset_alert");
     Assert.assertEquals(alertConfigDTOList.get(0).getApplication(), "others");
-    Assert.assertEquals(alertConfigDTOList.get(0).getCronExpression(), "0 0 12 ? * FRI *");
+    Assert.assertEquals(alertConfigDTOList.get(0).getCronExpression(), "0 0/5 * * * ? *");
 
     // Check if anomaly function is created
     List<AnomalyFunctionDTO> anomalyFunctionDTOList = this.daoRegistry.getAnomalyFunctionDAO().findAll();

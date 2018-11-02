@@ -2,8 +2,9 @@ import Service from '@ember/service';
 import { inject as service } from '@ember/service';
 import { assert } from '@ember/debug';
 
-  // set expiration to 1 day
-  const EXPIRATION = 60 * 60 * 24 * 1;
+// set expiration to 1 day
+// const EXPIRATION = 60 * 60 * 24 * 1;
+
 /**
  * @type {Ember.Service}
  * @summary This service is to also cached the query response data for `this.get('store').query()` calls. In general,
@@ -48,8 +49,31 @@ export default Service.extend({
     assert('you must include adapterOptions.cacheKey', cacheKey);
 
     let cached = this._cache[cacheKey];
+    if (!cached || adapterOptions.reload) { // TODO: Add `EXPIRATION` here to purge when possible - lohuynh
+      cached = this._cache[cacheKey] = await this.get('store').query(type, query, adapterOptions);
+    }
+    return cached;
+  },
+
+  /**
+   * @summary  This queryRecord method is a wrapper of the ember store `queryRecord`. It will add the dictionary caching that we need.
+   * @method query
+   * @param {String} type - modelName
+   * @param {Object} query - query object used to generate the
+   * @param {Object} adapterOptions - adapter options object (reload: true will enforces getting fresh data)
+   * @example
+       const query = { application: appName, start };
+       const anomalies = await queryCache.queryRecord(modelName, query, { reload: false, cacheKey: queryCache.urlForQueryKey(modelName, query) });
+   * @return {Object}
+   */
+  async queryRecord(type, query, adapterOptions) {
+    const cacheKey = adapterOptions.cacheKey;
+    assert('you must pass adapterOptions to queryCache.query', adapterOptions);
+    assert('you must include adapterOptions.cacheKey', cacheKey);
+
+    let cached = this._cache[cacheKey];
     if (!cached || adapterOptions.reload) {// TODO: Add `EXPIRATION` here to purge when possible - lohuynh
-       cached = this._cache[cacheKey] = await this.get('store').query(type, query, adapterOptions);
+      cached = this._cache[cacheKey] = await this.get('store').queryRecord(type, query, adapterOptions);
     }
     return cached;
   },

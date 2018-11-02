@@ -30,13 +30,18 @@ public class DetectionAlertTaskFactoryTest {
   private DAOTestBase testDAOProvider;
   private DetectionAlertConfigDTO alertConfigDTO;
   private DetectionAlertConfigManager alertConfigDAO;
-  private List<String> alerters;
+  private Map<String, Map<String, Object>> alerters;
 
   @BeforeMethod
   public void beforeClass() throws Exception {
-    alerters = new ArrayList<>();
-    alerters.add("com.linkedin.thirdeye.detection.alert.scheme.RandomAlerter");
-    alerters.add("com.linkedin.thirdeye.detection.alert.scheme.AnotherRandomAlerter");
+    Map<String, Object> randomAlerter = new HashMap<>();
+    randomAlerter.put("className", "com.linkedin.thirdeye.detection.alert.scheme.RandomAlerter");
+    Map<String, Object> anotherRandomAlerter = new HashMap<>();
+    anotherRandomAlerter.put("className", "com.linkedin.thirdeye.detection.alert.scheme.AnotherRandomAlerter");
+
+    alerters = new HashMap<>();
+    alerters.put("randomScheme", randomAlerter);
+    alerters.put("anotherRandomScheme", anotherRandomAlerter);
 
     this.testDAOProvider = DAOTestBase.getInstance();
     DAORegistry daoRegistry = DAORegistry.getInstance();
@@ -49,7 +54,7 @@ public class DetectionAlertTaskFactoryTest {
     testDAOProvider.cleanup();
   }
 
-  private DetectionAlertConfigDTO createAlertConfig(List<String> schemes, String filter) {
+  private DetectionAlertConfigDTO createAlertConfig(Map<String, Map<String, Object>> schemes, String filter) {
     Map<String, Object> properties = new HashMap<>();
     properties.put("className", filter);
     properties.put("detectionConfigIds", Collections.singletonList(1000));
@@ -107,7 +112,7 @@ public class DetectionAlertTaskFactoryTest {
    */
   @Test
   public void testLoadDefaultAlertSchemes() throws Exception {
-    DetectionAlertConfigDTO alertConfig = createAlertConfig(Collections.<String>emptyList(),
+    DetectionAlertConfigDTO alertConfig = createAlertConfig(Collections.emptyMap(),
         "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
     DetectionAlertTaskFactory detectionAlertTaskFactory = new DetectionAlertTaskFactory();
     Set<DetectionAlertScheme> detectionAlertSchemes = detectionAlertTaskFactory.loadAlertSchemes(alertConfig,

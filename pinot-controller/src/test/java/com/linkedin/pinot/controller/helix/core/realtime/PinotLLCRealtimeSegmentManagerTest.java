@@ -41,6 +41,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
+import com.linkedin.pinot.core.realtime.stream.OffsetCriteria;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -76,8 +77,6 @@ import static org.mockito.Mockito.*;
 public class PinotLLCRealtimeSegmentManagerTest {
   private static final String clusterName = "testCluster";
   private static final String DUMMY_HOST = "dummyHost:1234";
-  private static final String KAFKA_TEST_OFFSET = "testDummy";
-  private static final String KAFKA_LARGEST_OFFSET = "largest";
   private static final String DEFAULT_SERVER_TENANT = "freeTenant";
   private static final String SCHEME = LLCSegmentCompletionHandlers.getScheme();
   private String[] serverNames;
@@ -123,7 +122,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   /**
    * Test cases for new table being created, and initial segments setup that follows. The tables are
-   * set up with kafka offset to be the 'largest' and the corresponding ideal state offset is
+   * set up with stream offset to be the 'largest' and the corresponding ideal state offset is
    * accordingly verified.
    */
   @Test
@@ -140,7 +139,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(1);
 
     // insufficient instances
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_LARGEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    tableConfig = makeTableConfig(tableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 4;
     invalidConfig = true;
@@ -148,7 +147,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // noop path - 0 partitions
     badStream = false;
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_LARGEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    tableConfig = makeTableConfig(tableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 0;
     invalidConfig = false;
@@ -156,7 +155,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     testSetupNewTable(tableConfig, idealState, nPartitions, nReplicas, instances, invalidConfig, badStream);
 
     // noop path - ideal state disabled - this can happen in the code path only if there is already an idealstate with HLC segments in it, and it has been disabled.
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_LARGEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    tableConfig = makeTableConfig(tableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.disableIdealState().build();
     nPartitions = 4;
     invalidConfig = false;
@@ -165,7 +164,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // clear builder to enable ideal state
     idealStateBuilder.clear();
     // happy paths - new table config with nPartitions and sufficient instances
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_LARGEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    tableConfig = makeTableConfig(tableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 4;
     invalidConfig = false;
@@ -196,7 +195,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     } catch (InvalidConfigException e) {
       Assert.assertTrue(invalidConfig);
       return;
-    } catch (Exception e) { // Bad stream configs, kafka offset fetcher exception
+    } catch (Exception e) { // Bad stream configs, offset fetcher exception
       Assert.assertTrue(badStream);
       return;
     }
@@ -254,7 +253,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         final String path = segmentPathsMap.get(partition);
         final String segmentName = metadata.getSegmentName();
         // verify the expected offset is set to the largest as configured in the table config
-        Assert.assertEquals(metadata.getStartOffset(), segmentManager.getLargestKafkaOffset());
+        Assert.assertEquals(metadata.getStartOffset(), segmentManager.getLargestStreamOffset());
         Assert.assertEquals(path, "/SEGMENTS/" + tableConfig.getTableName() + "/" + segmentName);
         LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
         Assert.assertEquals(llcSegmentName.getPartitionId(), partition);
@@ -287,7 +286,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(5);
 
     // empty to 4 partitions
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_LARGEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    tableConfig = makeTableConfig(tableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     idealState = idealStateBuilder.build();
     nPartitions = 4;
     validateLLCPartitionsIncrease(segmentManager, idealState, tableConfig, nPartitions, nReplicas, instances,
@@ -419,7 +418,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
           }
           LLCRealtimeSegmentZKMetadata newPartitionMetadata = updatedMetadataMap.get(segment);
           // for newly added partitions, we expect offset to be the smallest even though the offset is set to be largest for these tables
-          Assert.assertEquals(newPartitionMetadata.getStartOffset(), segmentManager.getSmallestKafkaOffset());
+          Assert.assertEquals(newPartitionMetadata.getStartOffset(), segmentManager.getSmallestStreamOffset());
 
           Assert.assertNotNull(newPartitionMetadata);
           Assert.assertEquals(newPartitionMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
@@ -477,7 +476,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(5);
     final int[] numInstancesSet = new int[]{4, 6, 8, 10};
 
-    tableConfig = makeTableConfig(tableName, nReplicas, KAFKA_TEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    tableConfig = makeTableConfig(tableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     nPartitions = 4;
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
     PartitionAssignment expectedPartitionAssignment =
@@ -854,9 +853,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     final String rtTableName = "testPreExistingLLCSegments_REALTIME";
 
-    TableConfig tableConfig = makeTableConfig(rtTableName, 3, KAFKA_TEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+    TableConfig tableConfig = makeTableConfig(rtTableName, 3, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     segmentManager.addTableToStore(rtTableName, tableConfig, 8);
-    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, 10);
     try {
       segmentManager.setupNewTable(tableConfig, idealState);
       Assert.fail("Did not get expected exception when setting up new table with existing segments in ");
@@ -878,12 +877,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(nInstances);
     SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
     TableConfig tableConfig =
-        makeTableConfig(tableName, nReplicas, KAFKA_TEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+        makeTableConfig(tableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
 
     segmentManager.addTableToStore(tableName, tableConfig, nPartitions);
 
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(tableName, nReplicas);
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(tableName, nReplicas);
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
     segmentManager.setupNewTable(tableConfig, idealState);
     // Now commit the first segment of partition 6.
@@ -931,7 +930,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<String> instances = getInstanceList(nInstances);
     SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
     TableConfig tableConfig =
-        makeTableConfig(rtTableName, nReplicas, KAFKA_TEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+        makeTableConfig(rtTableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
 
     IdealStateBuilderUtil idealStateBuilder = new IdealStateBuilderUtil(rtTableName);
     IdealState idealState = idealStateBuilder.setNumReplicas(nReplicas).build();
@@ -1110,9 +1109,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int nReplicas = 3;
     List<String> instances = getInstanceList(nInstances);
     TableConfig tableConfig =
-        makeTableConfig(rtTableName, nReplicas, KAFKA_TEST_OFFSET, DUMMY_HOST, DEFAULT_SERVER_TENANT);
+        makeTableConfig(rtTableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, nReplicas);
 
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
@@ -1166,7 +1165,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   // Fake makers
   ///////////////////////////////////////////////////////////////////////////
 
-  private TableConfig makeTableConfig(String tableName, int nReplicas, String autoOffsetReset, String bootstrapHosts,
+  private TableConfig makeTableConfig(String tableName, int nReplicas, String bootstrapHosts,
       String serverTenant) {
     TableConfig mockTableConfig = mock(TableConfig.class);
     when(mockTableConfig.getTableName()).thenReturn(tableName);
@@ -1186,8 +1185,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES),
         "simple");
-    streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
-        StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), autoOffsetReset);
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), consumerFactoryClass);
     streamConfigMap.put(
@@ -1240,8 +1237,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public Map<String, LLCRealtimeSegmentZKMetadata> _metadataMap = new HashMap<>(4);
     private FakeStreamPartitionAssignmentGenerator _partitionAssignmentGenerator;
 
-    public static final long _kafkaLargestOffsetToReturn = Integer.MAX_VALUE;
-    public static final long _kafkaSmallestOffsetToReturn = 0;
+    public static final long _largestOffsetToReturn = Integer.MAX_VALUE;
+    public static final long _smallestOffsetToReturn = 0;
 
     public int _nCallsToUpdateHelix = 0;
     public int _nCallsToCreateNewSegmentMetadata = 0;
@@ -1299,8 +1296,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _tableConfigStore = new TableConfigStore();
     }
 
-    void addTableToStore(String tableName, TableConfig tableConfig, int nKafkaPartitions) {
-      _tableConfigStore.addTable(tableName, tableConfig, nKafkaPartitions);
+    void addTableToStore(String tableName, TableConfig tableConfig, int nStreamPartitions) {
+      _tableConfigStore.addTable(tableName, tableConfig, nStreamPartitions);
     }
 
     void removeTableFromStore(String tableName) {
@@ -1436,23 +1433,23 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected long getPartitionOffset(StreamConfig streamConfig, final String offsetCriteria,
+    protected long getPartitionOffset(StreamConfig streamConfig, final OffsetCriteria offsetCriteria,
         int partitionId) {
-      if (offsetCriteria.equals(KAFKA_LARGEST_OFFSET)) {
-        return _kafkaLargestOffsetToReturn;
+      if (offsetCriteria.isLargest()) {
+        return _largestOffsetToReturn;
       } else {
-        return _kafkaSmallestOffsetToReturn;
+        return _smallestOffsetToReturn;
       }
     }
 
     // package-private
-    long getSmallestKafkaOffset() {
-      return _kafkaSmallestOffsetToReturn;
+    long getSmallestStreamOffset() {
+      return _smallestOffsetToReturn;
     }
 
     //package-private
-    long getLargestKafkaOffset() {
-      return _kafkaLargestOffsetToReturn;
+    long getLargestStreamOffset() {
+      return _largestOffsetToReturn;
     }
 
     @Override
@@ -1483,7 +1480,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     protected int getPartitionCount(StreamConfig metadata) {
-      return _tableConfigStore.getNKafkaPartitions(_currentTable);
+      return _tableConfigStore.getNStreamPartitions(_currentTable);
     }
   }
 
@@ -1545,9 +1542,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _nPartitionsStore = new HashMap<>(1);
     }
 
-    void addTable(String tableName, TableConfig tableConfig, int nKafkaPartitions) {
+    void addTable(String tableName, TableConfig tableConfig, int nStreamPartitions) {
       _tableConfigsStore.put(tableName, tableConfig);
-      _nPartitionsStore.put(tableName, nKafkaPartitions);
+      _nPartitionsStore.put(tableName, nStreamPartitions);
     }
 
     void removeTable(String tableName) {
@@ -1559,7 +1556,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       return _tableConfigsStore.get(tableName);
     }
 
-    int getNKafkaPartitions(String tableName) {
+    int getNStreamPartitions(String tableName) {
       return _nPartitionsStore.get(tableName);
     }
 

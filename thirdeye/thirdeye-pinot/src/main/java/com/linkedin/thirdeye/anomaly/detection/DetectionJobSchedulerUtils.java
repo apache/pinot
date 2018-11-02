@@ -100,7 +100,7 @@ public class DetectionJobSchedulerUtils {
     return dateTime.getMillis();
   }
 
-  private static DateTime getBoundaryAlignedTimeForDataset(DateTime dateTime, TimeUnit unit) {
+  public static DateTime getBoundaryAlignedTimeForDataset(DateTime dateTime, TimeUnit unit) {
     switch (unit) {
       case DAYS:
         dateTime = dateTime.withTimeAtStartOfDay();
@@ -139,7 +139,7 @@ public class DetectionJobSchedulerUtils {
     return bucketSizePeriod;
   }
 
-  private static Period getBucketSizePeriodForUnit(TimeUnit unit) {
+  public static Period getBucketSizePeriodForUnit(TimeUnit unit) {
     Period bucketSizePeriod = null;
     switch (unit) {
       case DAYS:

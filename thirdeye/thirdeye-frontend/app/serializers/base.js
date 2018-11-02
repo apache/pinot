@@ -1,6 +1,10 @@
 import DS from 'ember-data';
 
 export default DS.JSONAPISerializer.extend({
+  typeClassToEntityName(typeClass) {
+    return typeClass && typeClass.modelName ? typeClass.modelName : typeClass;
+  },
+
   /*
    * @summary normalizing the payload from api response with array type ([{},{}..]) to correct json-api format spec. See  http://jsonapi.org/
    */
@@ -33,10 +37,10 @@ export default DS.JSONAPISerializer.extend({
     return json;
   }
 
-  /*
-   * serializing the data to send to the api server
-   */
-   //TODO: Will keep this as we will need it when we implement the save/post api methods. - lohuynh
+  // TODO: Will keep this as we will need it when we implement the save/post api methods. - lohuynh
+  // /*
+  //  * serializing the data to send to the api server
+  //  */
   // serialize(snapshot, options) {
   //   let json = this._super(...arguments);
   //

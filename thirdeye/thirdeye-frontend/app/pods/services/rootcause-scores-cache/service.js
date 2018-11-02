@@ -104,14 +104,11 @@ export default Service.extend({
   },
 
   _extractScores(res, urns) {
-    if (_.isEmpty(res)) {
-      return {};
-    }
     const template = [...urns].reduce((agg, urn) => {
       agg[urn] = Number.NaN;
       return agg;
     }, {});
-    const results = res.reduce((agg, e) => {
+    const results = (res || []).reduce((agg, e) => {
       agg[e.urn] = e.score;
       return agg;
     }, {});

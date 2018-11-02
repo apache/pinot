@@ -29,7 +29,7 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
   private static final int STREAM_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
 
   private final String _topicName;
-  private final String _offsetCriteria;
+  private final OffsetCriteria _offsetCriteria;
   private final int _partitionId;
 
   private Exception _exception = null;
@@ -37,7 +37,7 @@ public class PartitionOffsetFetcher implements Callable<Boolean> {
   private StreamConsumerFactory _streamConsumerFactory;
   StreamConfig _streamConfig;
 
-  public PartitionOffsetFetcher(final String offsetCriteria, int partitionId, StreamConfig streamConfig) {
+  public PartitionOffsetFetcher(final OffsetCriteria offsetCriteria, int partitionId, StreamConfig streamConfig) {
     _offsetCriteria = offsetCriteria;
     _partitionId = partitionId;
     _streamConfig = streamConfig;

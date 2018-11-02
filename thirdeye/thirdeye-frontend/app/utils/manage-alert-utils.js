@@ -1,5 +1,5 @@
 import moment from 'moment';
-import { isPresent } from "@ember/utils";
+import { isPresent, isBlank } from "@ember/utils";
 import { getWithDefault } from '@ember/object';
 import { buildDateEod } from 'thirdeye-frontend/utils/utils';
 import { getFormatedDuration } from 'thirdeye-frontend/utils/anomaly';
@@ -31,6 +31,30 @@ export function formatEvalMetric(metric, isPercentage = false) {
 export function pluralizeTime(time, unit) {
   const unitStr = time > 1 ? unit + 's' : unit;
   return time ? time + ' ' + unitStr : '';
+}
+
+/**
+ * Performs a case-insensitive sort of a flat array or array of objects
+ * by property. If sorting flat array, pass "null" for targetProperty.
+ * @param {Array} targetArray
+ * @param {String} targetProperty
+ * @returns {Array}
+ */
+export function powerSort(targetArray, targetProperty) {
+  const cleanArray = [];
+  // Make sure we have a valid array
+  targetArray.forEach((item) => {
+    cleanArray.push(isBlank(item) ? 'undefined' : item);
+  });
+  // Do case-insensitive sort
+  const sortedArray = cleanArray.sort((a, b) => {
+    if (targetProperty) {
+      a = a[targetProperty];
+      b = b[targetProperty];
+    }
+    return a.toLowerCase().trim().localeCompare(b.toLowerCase().trim());
+  });
+  return sortedArray;
 }
 
 /**
@@ -127,15 +151,16 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
     isActive: !datesKeys.includes(duration)
   };
 
-  const dateKeyMap = new Map([
-   [ '1m', ['Last 30 Days', 1, 'month'] ],
-   [ '3m', ['3 Months', 3, 'month'] ],
-   [ '2w', ['Last 2 Weeks', 2, 'week'] ],
-   [ '1w', ['Last Week', 1, 'week'] ],
-   [ '2d', ['Yesterday', 2, 'day'] ],
-   [ '1d', ['Last 24 hours', 1, 'day'] ],
-   [ 'today', ['Today'] ]
-   ]);
+  const dateKeyMap = new Map(
+    [
+      [ '1m', ['Last 30 Days', 1, 'month'] ],
+      [ '3m', ['3 Months', 3, 'month'] ],
+      [ '2w', ['Last 2 Weeks', 2, 'week'] ],
+      [ '1w', ['Last Week', 1, 'week'] ],
+      [ '2d', ['Yesterday', 2, 'day'] ],
+      [ '1d', ['Last 24 hours', 1, 'day'] ],
+      [ 'today', ['Today'] ]
+    ]);
 
    datesKeys.forEach((value) => {
      const currVal = dateKeyMap.get(value);
@@ -326,5 +351,6 @@ export default {
   buildAnomalyStats,
   buildMetricDataUrl,
   extractSeverity,
+  powerSort,
   evalObj
 };

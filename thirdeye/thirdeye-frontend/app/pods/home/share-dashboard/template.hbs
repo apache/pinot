@@ -114,6 +114,17 @@
               {{/if}}
             </div>
             <div class="email-preview__body" style="color: #262626;">
+              {{#if shareConfig}}
+                <!-- Custom header summary table -->
+                {{share-custom-template
+                  appName=appNameDisplay
+                  start=start
+                  end=end
+                  config=shareConfig
+                }}
+                <hr/>
+              {{/if}}
+
               <!-- Metric level -->
               {{#each-in filteredAnomalyMapping as |metric metricList|}}
                 <!-- html email tables -->

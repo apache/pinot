@@ -30,14 +30,14 @@ module('Acceptance | tune alert settings', function(hooks) {
     // Verify default search results
     assert.equal(
       $(selfServeConst.RESULTS_TITLE).get(0).innerText.trim(),
-      'Alerts Found(5)',
+      'Alerts (5)',
       'Number of alerts displayed and title are correct.'
     );
 
     // Click into Alert Page for first listed alert
     await click($targetAlertLink.get(0));
     const alertPropsElementArray = Object.values($(selfServeConst.ALERT_PROPS_ITEM)).filter(el => el.nodeName ==='DIV');
-    const alertPropLabelsArray = alertPropsElementArray.map(el => el.innerText);
+    const alertPropLabelsArray = alertPropsElementArray.map(el => el.innerText.trim());
 
     // Verify transition to Alert Page
     assert.ok(

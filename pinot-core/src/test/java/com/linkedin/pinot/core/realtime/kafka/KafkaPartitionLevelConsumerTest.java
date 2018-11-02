@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaPartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamMetadataProvider;
+import com.linkedin.pinot.core.realtime.stream.OffsetCriteria;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.Collections;
 import java.util.HashMap;
@@ -298,6 +299,7 @@ public class KafkaPartitionLevelConsumerTest {
     int partition = 0;
     KafkaStreamMetadataProvider kafkaStreamMetadataProvider =
         new KafkaStreamMetadataProvider(clientId, streamConfig, partition, mockKafkaSimpleConsumerFactory);
-    kafkaStreamMetadataProvider.fetchPartitionOffset("smallest", 10000);
+    kafkaStreamMetadataProvider.fetchPartitionOffset(new OffsetCriteria.OffsetCriteriaBuilder().withOffsetSmallest(),
+        10000);
   }
 }

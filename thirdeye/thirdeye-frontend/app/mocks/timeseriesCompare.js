@@ -1,7 +1,7 @@
 import metric from 'thirdeye-frontend/mocks/metric';
 const { name: metricName, id: metricId } = metric[0];
 const start = 1506459599999;
-const end = 1509048000000;
+// const end = 1509048000000;
 
 export default {
   metricName,

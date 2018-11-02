@@ -19,6 +19,8 @@ package com.linkedin.thirdeye.alert.content;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 
+import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
+
 
 public class EmailContentFormatterConfiguration{
   private String functionConfigPath;
@@ -104,7 +106,8 @@ public class EmailContentFormatterConfiguration{
     emailConfig.setFunctionConfigPath(thirdeyeConfig.getFunctionConfigPath());
     emailConfig.setAlertFilterConfigPath(thirdeyeConfig.getAlertFilterConfigPath());
     emailConfig.setPhantomJsPath(thirdeyeConfig.getPhantomJsPath());
-    emailConfig.setSmtpConfiguration(thirdeyeConfig.getSmtpConfiguration());
+    emailConfig.setSmtpConfiguration(
+        SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)));
 
     return emailConfig;
   }

@@ -222,7 +222,7 @@ public class RetentionManagerTest {
     List<RealtimeSegmentZKMetadata> allSegments = new ArrayList<>();
 
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(REALTIME_TABLE_NAME, replicaCount);
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(REALTIME_TABLE_NAME, replicaCount);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);

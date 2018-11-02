@@ -55,7 +55,7 @@ export function humanizeFloat(f) {
   if (!isValidForDisplay(f)) { return '-'; }
   const formattedNum = d3.format('.3s')(f);
   // Catch/replace meaningless micro value
-  const isMicroNum = (new RegExp(/0\.0+y$/)).test(formattedNum)
+  const isMicroNum = (new RegExp(/0\.0+y$/)).test(formattedNum);
   return isMicroNum ? 0 : formattedNum;
 }
 

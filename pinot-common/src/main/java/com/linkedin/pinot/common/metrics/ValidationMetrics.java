@@ -189,7 +189,7 @@ public class ValidationMetrics {
    * Updates the non consuming partition count metric.
    *
    * @param resource The resource for which the gauge is updated
-   * @param partitionCount Number of Kafka partitions that do not have any segment in CONSUMING state.
+   * @param partitionCount Number of partitions that do not have any segment in CONSUMING state.
    */
   public void updateNonConsumingPartitionCountMetric(final String resource, final int partitionCount) {
     final String fullGaugeName = makeGaugeName(resource, "NonConsumingPartitionCount");

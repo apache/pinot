@@ -130,7 +130,7 @@ public class PlainFieldExtractor implements FieldExtractor {
         String expression = fieldSpec.getTransformFunction();
         FunctionExpressionEvaluator functionEvaluator;
         try {
-          functionEvaluator = new FunctionExpressionEvaluator(column, expression);
+          functionEvaluator = new FunctionExpressionEvaluator(expression);
           _functionEvaluatorMap.put(column, functionEvaluator);
         } catch (Exception e) {
           LOGGER.error("Unable to instantiate function evaluator for {}", expression, e);

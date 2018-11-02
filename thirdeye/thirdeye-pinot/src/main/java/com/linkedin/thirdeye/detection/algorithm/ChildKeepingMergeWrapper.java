@@ -31,6 +31,7 @@ import java.util.Map;
  * The Child keeping Merge Wrapper. Merge anomalies and the anomalies before merging in the merged anomaly children set.
  * Useful when merging anomalies from different source, e.g, different algorithms/rules, this merger allows tracing back to anomalies before merging.
  * Will not merge anomalies if potential merged anomaly is beyond max duration. Will be able to fill in current and baseline value if configured.
+ * Merge anomalies regardless of anomaly merge key.
  */
 public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
   public ChildKeepingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
@@ -51,7 +52,7 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
         continue;
       }
 
-      AnomalyKey key = AnomalyKey.from(anomaly);
+      AnomalyKey key = new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), "");
       MergedAnomalyResultDTO parent = parents.get(key);
 
       if (parent == null || anomaly.getStartTime() - parent.getEndTime() > this.maxGap) {

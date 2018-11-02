@@ -69,17 +69,6 @@ public class CommonConstants {
         BucketizedSegmentAssignmentStrategy,
         ReplicaGroupSegmentAssignmentStrategy
       }
-
-      public enum RoutingTableBuilderName {
-        DefaultOffline,
-        DefaultRealtime,
-        BalancedRandom,
-        KafkaLowLevel,
-        KafkaHighLevel,
-        PartitionAwareOffline,
-        PartitionAwareRealtime
-      }
-
     }
 
     public static class Instance {

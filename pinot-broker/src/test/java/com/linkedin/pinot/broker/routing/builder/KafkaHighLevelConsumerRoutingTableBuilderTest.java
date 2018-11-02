@@ -46,8 +46,8 @@ public class KafkaHighLevelConsumerRoutingTableBuilderTest {
 
     Random random = new Random();
 
-    KafkaHighLevelConsumerBasedRoutingTableBuilder routingTableBuilder =
-        new KafkaHighLevelConsumerBasedRoutingTableBuilder();
+    HighLevelConsumerBasedRoutingTableBuilder routingTableBuilder =
+        new HighLevelConsumerBasedRoutingTableBuilder();
     routingTableBuilder.init(new BaseConfiguration(), new TableConfig(), null, null);
 
     String tableNameWithType = "table_REALTIME";

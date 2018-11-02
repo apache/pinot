@@ -151,5 +151,5 @@ export default [
         type: "dropdown"
       }
     ]
-  },
+  }
 ];

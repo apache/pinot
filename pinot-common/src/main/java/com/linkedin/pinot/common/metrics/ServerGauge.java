@@ -27,12 +27,18 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   SEGMENT_COUNT("segments", false),
   LLC_PARTITION_CONSUMING("state", false),
   HIGHEST_KAFKA_OFFSET_CONSUMED("messages", false),
+  // Introducing a new stream agnostic metric to replace HIGHEST_KAFKA_OFFSET_CONSUMED.
+  // We can phase out HIGHEST_KAFKA_OFFSET_CONSUMED once we have collected sufficient metrics for the new one
+  HIGHEST_STREAM_OFFSET_CONSUMED("messages", false),
   LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS("seconds", false),
   KAFKA_PARTITION_OFFSET_LAG("messages", false),
+  // Introducing a new stream agnostic metric to replace KAFKA_PARTITION_OFFSET_LAG.
+  // We can phase out KAFKA_PARTITION_OFFSET_LAG once we have collected sufficient metrics for the new one
+  STREAM_PARTITION_OFFSET_LAG("messages", false),
   REALTIME_OFFHEAP_MEMORY_USED("bytes", false),
   RUNNING_QUERIES("runningQueries", false),
   REALTIME_SEGMENT_PARTITION_WIDTH("realtimeSegmentPartitionWidth", false);

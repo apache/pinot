@@ -38,8 +38,10 @@ import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -50,7 +52,8 @@ import org.testng.annotations.Test;
 public class SendAlertTest {
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_RECIPIENTS = "recipients";
-  private static final List<String> PROP_RECIPIENTS_VALUE = Arrays.asList("test1@test.test", "test2@test.test");
+  private static final String PROP_TO = "to";
+  private static final Set<String> PROP_RECIPIENTS_VALUE = new HashSet<>(Arrays.asList("test1@test.test", "test2@test.test"));
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final String FROM_ADDRESS_VALUE = "test3@test.test";
   private static final String ALERT_NAME_VALUE = "alert_name";
@@ -109,10 +112,14 @@ public class SendAlertTest {
     this.alertConfigDTO = new DetectionAlertConfigDTO();
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, "com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter");
-    properties.put(PROP_RECIPIENTS, PROP_RECIPIENTS_VALUE);
+    Map<String, Set<String>> recipients = new HashMap<>();
+    recipients.put(PROP_TO, PROP_RECIPIENTS_VALUE);
+    properties.put(PROP_RECIPIENTS, recipients);
     properties.put(PROP_DETECTION_CONFIG_IDS, Collections.singletonList(this.detectionConfigId));
 
-    this.alertConfigDTO.setAlertSchemes(Collections.singletonList("com.linkedin.thirdeye.detection.alert.scheme.DetectionEmailAlerter"));
+    Map<String, Object> emailScheme = new HashMap<>();
+    emailScheme.put("className", "com.linkedin.thirdeye.detection.alert.scheme.RandomAlerter");
+    this.alertConfigDTO.setAlertSchemes(Collections.singletonMap("EmailScheme", emailScheme));
     this.alertConfigDTO.setProperties(properties);
     this.alertConfigDTO.setFrom(FROM_ADDRESS_VALUE);
     this.alertConfigDTO.setName(ALERT_NAME_VALUE);
@@ -147,9 +154,17 @@ public class SendAlertTest {
     DetectionAlertTaskInfo alertTaskInfo = new DetectionAlertTaskInfo();
     alertTaskInfo.setDetectionAlertConfigId(alertConfigId);
 
-    TaskContext taskContext = new TaskContext();
+    Map<String, Object> smtpProperties = new HashMap<>();
+    smtpProperties.put("smtpHost", "test");
+    smtpProperties.put("smtpPort", 25);
+    Map<String, Map<String, Object>> alerterProps = new HashMap<>();
+    alerterProps.put("smtpConfiguration", smtpProperties);
+
     ThirdEyeAnomalyConfiguration thirdEyeConfig = new ThirdEyeAnomalyConfiguration();
     thirdEyeConfig.setDashboardHost(DASHBOARD_HOST_VALUE);
+    thirdEyeConfig.setAlerterConfiguration(alerterProps);
+
+    TaskContext taskContext = new TaskContext();
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeConfig);
 
     taskRunner.execute(alertTaskInfo, taskContext);

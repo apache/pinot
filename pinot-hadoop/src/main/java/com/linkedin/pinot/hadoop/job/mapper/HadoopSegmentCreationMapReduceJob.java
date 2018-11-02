@@ -72,6 +72,8 @@ public class HadoopSegmentCreationMapReduceJob {
 
     private TableConfig _tableConfig = null;
 
+    private FileSystem _fileSystem = null;
+
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
       // Compute current working HDFS directory
@@ -81,6 +83,8 @@ public class HadoopSegmentCreationMapReduceJob {
       // Compute current working LOCAL DISK directory
       _currentDiskWorkDir = PINOT_HADOOP_TMP;
       _localDiskSegmentTarPath = _currentDiskWorkDir + SEGMENT_TAR;
+
+      _fileSystem = FileSystem.get(context.getConfiguration());
 
       // Create directory
       new File(_localDiskSegmentTarPath).mkdirs();
@@ -154,7 +158,8 @@ public class HadoopSegmentCreationMapReduceJob {
 
       // To inherit from from the Hadoop Mapper class, you can't directly throw a general exception.
       Schema schema;
-      final FileSystem fs = FileSystem.get(new Configuration());
+      Configuration conf = context.getConfiguration();
+      final FileSystem fs = FileSystem.get(conf);
       final Path hdfsInputFilePath = new Path(_inputFilePath);
 
       final File localInputDataDir = new File(_currentDiskWorkDir, "inputData");
@@ -204,9 +209,7 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("Finished the job successfully");
     }
 
-    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId,
-        Path hdfsAvroPath, File dataPath) {
-
+    protected void setSegmentNameGenerator(SegmentGeneratorConfig segmentGeneratorConfig, Integer seqId, Path hdfsAvroPath, File dataPath) {
     }
 
     protected String createSegment(String dataFilePath, Schema schema, Integer seqId, Path hdfsInputFilePath,
@@ -280,13 +283,14 @@ public class HadoopSegmentCreationMapReduceJob {
         case CSV:
           if(_readerConfigFile == null) {
             readerConfig = new CSVRecordReaderConfig();
-	  }
-	  else {
-	    LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
-	    readerConfig = new ObjectMapper().readValue(new File(_readerConfigFile), CSVRecordReaderConfig.class);
-	    LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
           }
-	  break;
+          else {
+            LOGGER.info("Reading CSV Record Reader Config from: {}", _readerConfigFile);
+            Path readerConfigPath = new Path(_readerConfigFile);
+            readerConfig = new ObjectMapper().readValue(_fileSystem.open(readerConfigPath), CSVRecordReaderConfig.class);
+            LOGGER.info("CSV Record Reader Config: {}", readerConfig.toString());
+          }
+          break;
         case AVRO:
           break;
         case JSON:

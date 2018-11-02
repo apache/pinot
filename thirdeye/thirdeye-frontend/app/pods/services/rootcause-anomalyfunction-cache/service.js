@@ -1,7 +1,6 @@
 import Service from '@ember/service';
 import {
   toFilters,
-  toFilterMap
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';

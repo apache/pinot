@@ -36,6 +36,7 @@ public class StreamConfigProperties {
   public static final String STREAM_CONNECTION_TIMEOUT_MILLIS = "connection.timeout.millis";
   public static final String STREAM_DECODER_CLASS = "decoder.class.name";
   public static final String DECODER_PROPS_PREFIX = "decoder.prop";
+  public static final String GROUP_ID = "hlc.group.id";
 
   /**
    * Time threshold that will keep the realtime segment open for before we complete the segment
@@ -49,12 +50,12 @@ public class StreamConfigProperties {
    * then a high level consumer would have a buffer size of two million.
    *
    * For LLC, this size is divided across all the segments assigned to a given server and is set on a per segment
-   * basis. Assuming a low level consumer server is assigned four Kafka partitions to consume from and a flush
+   * basis. Assuming a low level consumer server is assigned four stream partitions to consume from and a flush
    * size of two million, then each consuming segment would have a flush size of five hundred thousand rows, for a
    * total of two million rows in memory.
    *
    * Keep in mind that this NOT a hard threshold, as other tables can also be assigned to this server, and that in
-   * certain conditions (eg. if the number of servers, replicas of Kafka partitions changes) where Kafka partition
+   * certain conditions (eg. if the number of servers, replicas of partitions changes) where partition
    * to server assignment changes, it's possible to end up with more (or less) than this number of rows in memory.
    *
    * If this value is set to 0, then the consumers adjust the number of rows consumed by a partition such that

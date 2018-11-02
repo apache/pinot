@@ -25,7 +25,6 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
 import com.linkedin.pinot.core.realtime.stream.PartitionCountFetcher;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.List;
@@ -102,12 +101,12 @@ public class PinotTableIdealStateBuilder {
     RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(realtimeTableConfig);
     final List<String> realtimeInstances =
         HelixHelper.getInstancesWithTag(helixManager, realtimeTagConfig.getConsumingServerTag());
-    IdealState idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, 1);
+    IdealState idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, 1);
     if (realtimeInstances.size() % Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()) != 0) {
       throw new RuntimeException(
           "Number of instance in current tenant should be an integer multiples of the number of replications");
     }
-    setupInstanceConfigForKafkaHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
+    setupInstanceConfigForHighLevelConsumer(realtimeTableName, realtimeInstances.size(),
         Integer.parseInt(realtimeTableConfig.getValidationConfig().getReplication()),
         realtimeTableConfig.getIndexingConfig().getStreamConfigs(), zkHelixPropertyStore, realtimeInstances);
     return idealState;
@@ -129,7 +128,7 @@ public class PinotTableIdealStateBuilder {
           "Invalid value for replicasPerPartition, expected a number: " + replicasPerPartitionStr, e);
     }
     if (idealState == null) {
-      idealState = buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName, nReplicas);
+      idealState = buildEmptyRealtimeIdealStateFor(realtimeTableName, nReplicas);
     }
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
     try {
@@ -151,7 +150,7 @@ public class PinotTableIdealStateBuilder {
     }
   }
 
-  public static IdealState buildEmptyKafkaConsumerRealtimeIdealStateFor(String realtimeTableName, int replicaCount) {
+  public static IdealState buildEmptyRealtimeIdealStateFor(String realtimeTableName, int replicaCount) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(realtimeTableName);
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
@@ -162,14 +161,14 @@ public class PinotTableIdealStateBuilder {
     return idealState;
   }
 
-  private static void setupInstanceConfigForKafkaHighLevelConsumer(String realtimeTableName, int numDataInstances,
-      int numDataReplicas, Map<String, String> streamProviderConfig,
+  private static void setupInstanceConfigForHighLevelConsumer(String realtimeTableName, int numDataInstances,
+      int numDataReplicas, Map<String, String> streamConfig,
       ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore, List<String> instanceList) {
     int numInstancesPerReplica = numDataInstances / numDataReplicas;
     int partitionId = 0;
     int replicaId = 0;
 
-    String groupId = getGroupIdFromRealtimeDataTable(realtimeTableName, streamProviderConfig);
+    String groupId = getGroupIdFromRealtimeDataTable(realtimeTableName, streamConfig);
     for (int i = 0; i < numInstancesPerReplica * numDataReplicas; ++i) {
       String instance = instanceList.get(i);
       InstanceZKMetadata instanceZKMetadata = ZKMetadataProvider.getInstanceZKMetadata(zkHelixPropertyStore, instance);
@@ -192,12 +191,12 @@ public class PinotTableIdealStateBuilder {
   }
 
   private static String getGroupIdFromRealtimeDataTable(String realtimeTableName,
-      Map<String, String> streamProviderConfig) {
-    String keyOfGroupId = KafkaStreamConfigProperties.constructStreamProperty(
-        KafkaStreamConfigProperties.HighLevelConsumer.KAFKA_HLC_GROUP_ID);
+      Map<String, String> streamConfigMap) {
     String groupId = StringUtil.join("_", realtimeTableName, System.currentTimeMillis() + "");
-    if (streamProviderConfig.containsKey(keyOfGroupId) && !streamProviderConfig.get(keyOfGroupId).isEmpty()) {
-      groupId = streamProviderConfig.get(keyOfGroupId);
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+    String streamConfigGroupId = streamConfig.getGroupId();
+    if (streamConfigGroupId != null && !streamConfigGroupId.isEmpty()) {
+      groupId = streamConfigGroupId;
     }
     return groupId;
   }

@@ -18,11 +18,13 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.core.realtime.stream.OffsetCriteria;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.common.TopicAndPartition;
 import kafka.javaapi.OffsetRequest;
@@ -141,28 +143,26 @@ public class KafkaStreamMetadataProvider extends KafkaConnectionHandler implemen
   /**
    * Fetches the numeric Kafka offset for this partition for a symbolic name ("largest" or "smallest").
    *
-   * @param requestedOffset Either "largest" or "smallest"
+   * @param offsetCriteria
    * @param timeoutMillis Timeout in milliseconds
    * @throws java.util.concurrent.TimeoutException If the operation could not be completed within {@code timeoutMillis}
    * milliseconds
    * @return An offset
    */
   @Override
-  public synchronized long fetchPartitionOffset(String requestedOffset, long timeoutMillis)
+  public synchronized long fetchPartitionOffset(@Nonnull OffsetCriteria offsetCriteria, long timeoutMillis)
       throws java.util.concurrent.TimeoutException {
     Preconditions.checkState(isPartitionProvided,
         "Cannot fetch partition offset. StreamMetadataProvider created without partition information");
-    Preconditions.checkNotNull(requestedOffset);
+    Preconditions.checkNotNull(offsetCriteria);
 
     final long offsetRequestTime;
-    if (requestedOffset.equalsIgnoreCase("largest")) {
+    if (offsetCriteria.isLargest()) {
       offsetRequestTime = kafka.api.OffsetRequest.LatestTime();
-    } else if (requestedOffset.equalsIgnoreCase("smallest")) {
+    } else if (offsetCriteria.isSmallest()) {
       offsetRequestTime = kafka.api.OffsetRequest.EarliestTime();
-    } else if (requestedOffset.equalsIgnoreCase("testDummy")) {
-      return -1L;
     } else {
-      throw new IllegalArgumentException("Unknown initial offset value " + requestedOffset);
+      throw new IllegalArgumentException("Unknown initial offset value " + offsetCriteria.toString());
     }
 
     int kafkaErrorCount = 0;
