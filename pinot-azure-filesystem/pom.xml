@@ -20,7 +20,7 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>0.1.090</version>
+    <version>0.1.091-SNAPSHOT</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -43,7 +43,7 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-filesystem</artifactId>
-      <version>0.1.090</version>
+      <version>0.1.091-SNAPSHOT</version>
       <scope>compile</scope>
     </dependency>
     <dependency>
