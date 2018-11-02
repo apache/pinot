@@ -54,4 +54,4 @@ export const baseColumns = [
 export default {
   groupedHeaders,
   baseColumns
-}
+};

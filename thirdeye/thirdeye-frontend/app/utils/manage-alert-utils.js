@@ -151,15 +151,16 @@ export function setUpTimeRangeOptions(datesKeys, duration) {
     isActive: !datesKeys.includes(duration)
   };
 
-  const dateKeyMap = new Map([
-   [ '1m', ['Last 30 Days', 1, 'month'] ],
-   [ '3m', ['3 Months', 3, 'month'] ],
-   [ '2w', ['Last 2 Weeks', 2, 'week'] ],
-   [ '1w', ['Last Week', 1, 'week'] ],
-   [ '2d', ['Yesterday', 2, 'day'] ],
-   [ '1d', ['Last 24 hours', 1, 'day'] ],
-   [ 'today', ['Today'] ]
-   ]);
+  const dateKeyMap = new Map(
+    [
+      [ '1m', ['Last 30 Days', 1, 'month'] ],
+      [ '3m', ['3 Months', 3, 'month'] ],
+      [ '2w', ['Last 2 Weeks', 2, 'week'] ],
+      [ '1w', ['Last Week', 1, 'week'] ],
+      [ '2d', ['Yesterday', 2, 'day'] ],
+      [ '1d', ['Last 24 hours', 1, 'day'] ],
+      [ 'today', ['Today'] ]
+    ]);
 
    datesKeys.forEach((value) => {
      const currVal = dateKeyMap.get(value);

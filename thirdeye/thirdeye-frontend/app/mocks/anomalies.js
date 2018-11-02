@@ -56,7 +56,7 @@ export const anomalySet = (ids) => {
     'totalAnomalies': ids.length,
     'numAnomaliesOnPage': ids.length
   };
-}
+};
 
 export default {
   anomalySet

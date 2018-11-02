@@ -91,7 +91,6 @@ export default Service.extend({
     // evict unselected
     const { entities, pending } = this.getProperties('entities', 'pending');
     const stale = new Set(this._evictionCandidates(entities, framework));
-    const staleSelected = new Set([...stale].filter(urn => pinnedBaseUrns.has(urn)));
     const staleUnselected = new Set([...stale].filter(urn => !pinnedBaseUrns.has(urn)));
 
     // TODO dedicated _complete_identity() method?
