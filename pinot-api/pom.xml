@@ -21,10 +21,10 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>0.1.085-SNAPSHOT</version>
+    <version>0.1.085</version>
   </parent>
   <artifactId>pinot-api</artifactId>
-  <version>0.1.085-SNAPSHOT</version>
+  <version>0.1.085</version>
   <name>pinot-api</name>
   <url>http://maven.apache.org</url>
   <properties>
