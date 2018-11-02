@@ -26,7 +26,6 @@ public class YamlDetectionAlertConfigTranslatorTest {
     Assert.assertEquals(alertConfigDTO.getVectorClocks().get(ids.get(0)), new Long(0L));
     Assert.assertEquals(alertConfigDTO.getCronExpression(), "0 21 * * * ? *");
     Map<String, Object> properties = alertConfigDTO.getProperties();
-    Assert.assertEquals(properties.get("className"), ToAllRecipientsDetectionAlertFilter.class.getName());
     Assert.assertEquals(properties.get("detectionConfigIds"), ids);
     Assert.assertEquals(properties.get("to"), alertYamlConfigs.get("to"));
   }
@@ -46,7 +45,6 @@ public class YamlDetectionAlertConfigTranslatorTest {
     Assert.assertEquals(alertConfigDTO.getCronExpression(), "0 21 * * * ? *");
 
     Map<String, Object> properties = alertConfigDTO.getProperties();
-    Assert.assertEquals(properties.get("className"), ToAllRecipientsDetectionAlertFilter.class.getName());
     Assert.assertEquals(properties.get("detectionConfigIds"), ids);
     Assert.assertEquals(properties.get("to"), alertYamlConfigs.get("to"));
   }

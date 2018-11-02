@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -14,6 +15,7 @@ import org.apache.commons.collections.MapUtils;
 
 /**
  * The translator converts the alert yaml config into a detection alert config
+ * TODO Refactor this to support alert schemes
  */
 public class YamlDetectionAlertConfigTranslator {
   private static final String PROP_NAME = "name";
