@@ -20,12 +20,12 @@
   <parent>
     <artifactId>pinot</artifactId>
     <groupId>com.linkedin.pinot</groupId>
-    <version>0.1.092</version>
+    <version>0.1.093-SNAPSHOT</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>pinot-hadoop-filesystem</artifactId>
-  <version>0.1.092</version>
+  <version>0.1.093-SNAPSHOT</version>
   <name>pinot-hadoop-filesystem</name>
   <url>http://maven.apache.org</url>
   <build>
