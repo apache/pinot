@@ -14,7 +14,7 @@ import org.apache.commons.collections.MapUtils;
  * Calls training module for each stage.
  */
 public abstract class YamlDetectionConfigTranslator {
-  private static final String PROP_NAME = "alertName";
+  private static final String PROP_NAME = "detectionName";
   private static final String PROP_CRON = "cron";
 
   private static final String CRON_SCHEDULE_DEFAULT = "0 0 14 * * ? *";

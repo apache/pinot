@@ -42,7 +42,7 @@ import org.yaml.snakeyaml.Yaml;
 
 @Path("/yaml")
 public class YamlResource {
-  private static final String PROP_NAME = "alertName";
+  private static final String PROP_NAME = "detectionName";
   private static final String PROP_TYPE = "type";
   private static final String PROP_DETECTION_CONFIG_ID = "detectionConfigIds";
 

@@ -24,7 +24,7 @@ public class YamlDetectionConfigTranslatorTest {
     properties.put("className", "test.linkedin.thirdeye");
 
     Map<String, Object> yamlConfigs = new HashMap<>();
-    yamlConfigs.put("alertName", "testPipeline");
+    yamlConfigs.put("detectionName", "testPipeline");
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setName("a_daily_metric");
     metricConfigDTO.setDataset("a_test_dataset");
