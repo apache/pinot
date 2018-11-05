@@ -161,7 +161,7 @@ export default Route.extend({
     // Extract alert ids from these groups
     const myAlertIds = [ ...new Set(myGroups
       .map(group => getWithDefault(group, 'emailConfig.functionIds', []))
-      .reduce((a, b) => [...a, ...b])
+      .reduce((a, b) => [...a, ...b], [])
     )];
     return myAlertIds;
   },
