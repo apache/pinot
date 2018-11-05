@@ -1,17 +1,13 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.collect.ImmutableMap;
-import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.ConfigUtils;
-import com.linkedin.thirdeye.detection.algorithm.BaselineAlgorithm;
+import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.algorithm.BaselineFillingMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.ChildKeepingMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
-import com.linkedin.thirdeye.detection.algorithm.LegacyMergeWrapper;
-import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStageWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStageWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.BaselineRuleDetectionStage;
@@ -20,9 +16,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import org.yaml.snakeyaml.Yaml;
@@ -30,34 +24,29 @@ import org.yaml.snakeyaml.Yaml;
 
 public class CompositePipelineConfigTranslatorTest {
 
-  private DAOTestBase testDAOProvider;
-  private MetricConfigManager metricConfigDAO;
   private Long metricId;
   private Yaml yaml;
-  Map<String, Object> yamlConfig;
+  private Map<String, Object> yamlConfig;
+  private DataProvider provider;
 
   @BeforeMethod
   public void setUp() {
-    this.testDAOProvider = DAOTestBase.getInstance();
-    this.metricConfigDAO = DAORegistry.getInstance().getMetricConfigDAO();
     MetricConfigDTO metricConfig = new MetricConfigDTO();
     metricConfig.setAlias("alias");
     metricConfig.setName("test_metric");
     metricConfig.setDataset("test_dataset");
-    this.metricId = this.metricConfigDAO.save(metricConfig);
+    this.metricId = 1L;
+    metricConfig.setId(metricId);
     this.yaml = new Yaml();
     this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config.yaml"));
+    this.provider = new MockDataProvider().setMetrics(Collections.singletonList(metricConfig));
   }
 
-  @AfterMethod
-  public void tearDown() {
-    this.testDAOProvider.cleanup();
-  }
 
   @Test
   public void testBuildDetectionPropertiesMultipleRules() {
-    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator();
-    Map<String, Object> properties = translator.buildDetectionProperties(this.yamlConfig);
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
+    Map<String, Object> properties = translator.translateYaml().getProperties();
     List<Map<String, Object>> nestedProperties = ConfigUtils.getList(properties.get("nested"));
     Map<String, Object> dimensionProperties = nestedProperties.get(0);
     List<Map<String, Object>> dimensionNestedProperties = ConfigUtils.getList(dimensionProperties.get("nested"));
@@ -108,8 +97,8 @@ public class CompositePipelineConfigTranslatorTest {
     this.yamlConfig.put("anomalyDetection", Collections.singletonList(
         ImmutableMap.of("detection", Collections.singletonList(ImmutableMap.of("type", "BASELINE", "change", 0.3)),
             "filter", Collections.singletonList(ImmutableMap.of("type", "BUSINESS_RULE_FILTER", "siteWideImpactThreshold", 0.1)))));
-    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator();
-    Map<String, Object> properties = translator.buildDetectionProperties(this.yamlConfig);
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
+    Map<String, Object> properties = translator.translateYaml().getProperties();
     List<Map<String, Object>> nestedProperties = ConfigUtils.getList(properties.get("nested"));
     Map<String, Object> dimensionProperties = nestedProperties.get(0);
     List<Map<String, Object>> dimensionNestedProperties = ConfigUtils.getList(dimensionProperties.get("nested"));
@@ -144,8 +133,8 @@ public class CompositePipelineConfigTranslatorTest {
   public void testBuildDetectionPropertiesNoFilter() {
     this.yamlConfig.put("anomalyDetection", Collections.singletonList(
         ImmutableMap.of("detection", Collections.singletonList(ImmutableMap.of("type", "BASELINE", "change", 0.3)))));
-    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator();
-    Map<String, Object> properties = translator.buildDetectionProperties(this.yamlConfig);
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
+    Map<String, Object> properties = translator.translateYaml().getProperties();
     List<Map<String, Object>> nestedProperties = ConfigUtils.getList(properties.get("nested"));
     Map<String, Object> dimensionProperties = nestedProperties.get(0);
     List<Map<String, Object>> dimensionNestedProperties = ConfigUtils.getList(dimensionProperties.get("nested"));
@@ -174,8 +163,8 @@ public class CompositePipelineConfigTranslatorTest {
   public void testBuildDetectionPipelineMissModuleType() {
     this.yamlConfig.put("anomalyDetection", Collections.singletonList(
         ImmutableMap.of("detection", Collections.singletonList(ImmutableMap.of("change", 0.3)))));
-    YamlDetectionConfigTranslator translator = new CompositePipelineConfigTranslator();
+    CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
 
-    translator.generateDetectionConfig(this.yamlConfig);
+    translator.generateDetectionConfig();
   }
 }

@@ -16,25 +16,24 @@
 
 package com.linkedin.thirdeye.detection.tune;
 
-import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class TunerLoader {
-  private static final Logger LOG = LoggerFactory.getLogger(TunerLoader.class);
-  private static final String PROP_CLASS_NAME = "className";
+/**
+ * Loader for the training module
+ */
+public class TrainingModuleLoader {
+  private static final Logger LOG = LoggerFactory.getLogger(TrainingModuleLoader.class);
 
-  public PipelineTuner from(DetectionConfigDTO config, long startTime, long endTime) {
-    PipelineTuner tuner;
+  public StageTrainingModule from(String className) {
+    StageTrainingModule tuner;
     try {
-      String className = config.getTunerProperties().get(PROP_CLASS_NAME).toString();
-      tuner = (PipelineTuner) Class.forName(className).newInstance();
+      tuner = (StageTrainingModule) Class.forName(className).newInstance();
     } catch (Exception e) {
-      LOG.warn("Loading tuner for detection config {} failed, use dummy tuner", config.getId(), e);
-      tuner = new DummyTuner();
+      LOG.warn("Loading tuner for {} failed, use rule-based tuner", className, e);
+      tuner = new RuleDetectionTrainingModule();
     }
-    tuner.init(config.getTunerProperties(), config.getId(), startTime, endTime);
     return tuner;
   }
 }

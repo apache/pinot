@@ -2,15 +2,20 @@ package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.ConfigUtils;
+import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.algorithm.BaselineFillingMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.ChildKeepingMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStageWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStageWrapper;
 import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.tune.StageTrainingModule;
+import com.linkedin.thirdeye.detection.tune.TrainingModuleLoader;
+import com.linkedin.thirdeye.detection.tune.TrainingResult;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -21,6 +26,7 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 
 import static com.linkedin.thirdeye.detection.ConfigUtils.*;
+import static com.linkedin.thirdeye.detection.tune.StaticStageTrainingModule.*;
 
 
 /**
@@ -109,26 +115,33 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_ANOMALY_DETECTION = "anomalyDetection";
   private static final String PROP_NESTED = "nested";
+  private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
+  private static final TrainingModuleLoader TRAINING_MODULE_LOADER = new TrainingModuleLoader();
+  private final Map<String, Object> components = new HashMap<>();
+
+  public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
+    super(yamlConfig, provider);
+  }
 
   @Override
-  Map<String, Object> buildDetectionProperties(Map<String, Object> yamlConfig) {
+  YamlTranslationResult translateYaml() {
     String metricUrn = buildMetricUrn(yamlConfig);
 
-    List<Map<String, Object>> detectionYamls = getList(yamlConfig.get(PROP_ANOMALY_DETECTION));
+    List<Map<String, Object>> anomalyDetectionYamls = getList(yamlConfig.get(PROP_ANOMALY_DETECTION));
     List<Map<String, Object>> nestedPipelines = new ArrayList<>();
-    for (Map<String, Object> detectionYaml : detectionYamls) {
-      List<Map<String, Object>> filterYamls = ConfigUtils.getList(detectionYaml.get(PROP_FILTER));
-      Map<String, Object> detectionProperties = buildWrapperProperties(BaselineFillingMergeWrapper.class.getName(), buildListOfDetectionCoreProperties(
-          ConfigUtils.<Map<String, Object>>getList(detectionYaml.get(PROP_DETECTION))));
+    for (Map<String, Object> anomalyDetectionYaml : anomalyDetectionYamls) {
+      List<Map<String, Object>> filterYamls = ConfigUtils.getList(anomalyDetectionYaml.get(PROP_FILTER));
+      List<Map<String, Object>> detectionYamls = ConfigUtils.getList(anomalyDetectionYaml.get(PROP_DETECTION));
+      List<Map<String, Object>> detectionProperties = buildListOfMergeWrapperProperties(detectionYamls);
       if (filterYamls == null || filterYamls.isEmpty()) {
-        nestedPipelines.add(detectionProperties);
+        nestedPipelines.addAll(detectionProperties);
       } else {
-        List<Map<String, Object>> filterNestedProperties = Collections.singletonList(detectionProperties);
+        List<Map<String, Object>> filterNestedProperties = detectionProperties;
         for (Map<String, Object> filterProperties : filterYamls) {
-          filterNestedProperties = new ArrayList<>(buildStageWrapperProperties(AnomalyFilterStageWrapper.class.getName(),
-              filterProperties, filterNestedProperties));
+          filterNestedProperties = buildStageWrapperProperties(AnomalyFilterStageWrapper.class.getName(),
+              filterProperties, filterNestedProperties);
         }
         nestedPipelines.addAll(filterNestedProperties);
       }
@@ -136,11 +149,38 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
     dimensionWrapperProperties.putAll(MapUtils.getMap(yamlConfig, PROP_DIMENSION_EXPLORATION));
     dimensionWrapperProperties.put(PROP_METRIC_URN, metricUrn);
-    return buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(), Collections.singletonList(
+    Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(), Collections.singletonList(
         buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)));
+    return new YamlTranslationResult().withProperties(properties).withComponents(this.components);
   }
 
-  private Collection<Map<String, Object>> buildStageWrapperProperties(String wrapperClassName,
+  private List<Map<String, Object>>  buildListOfMergeWrapperProperties(List<Map<String, Object>> yamlConfigs) {
+    List<Map<String, Object>> properties = new ArrayList<>();
+    for (Map<String, Object> yamlConfig : yamlConfigs) {
+      properties.add(buildMergeWrapperProperties(yamlConfig));
+    }
+    return properties;
+  }
+
+  private Map<String, Object> buildMergeWrapperProperties(Map<String, Object> yamlConfig) {
+    Map<String, Object> nestedProperties = new HashMap<>();
+    nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectionStageWrapper.class.getName());
+
+    String type = MapUtils.getString(yamlConfig, PROP_TYPE);
+    String stageClassName = DETECTION_REGISTRY.lookup(type);
+    nestedProperties.put(PROP_STAGE_CLASSNAME, stageClassName);
+
+    TrainingResult result = trainStage(stageClassName, yamlConfig);
+    nestedProperties.put(PROP_SPEC, result.getStageSpecs());
+
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
+    properties.put(PROP_NESTED, Collections.singletonList(nestedProperties));
+    properties.put(PROP_BASELINE_PROVIDER, result.getBaselineProviderSpecs());
+    return properties;
+  }
+
+  private List<Map<String, Object>> buildStageWrapperProperties(String wrapperClassName,
       Map<String, Object> yamlConfig, List<Map<String, Object>> nestedProperties) {
     if (yamlConfig == null || yamlConfig.isEmpty()) {
       return nestedProperties;
@@ -153,9 +193,16 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     return Collections.singletonList(wrapperProperties);
   }
 
+  private void fillStageSpecs(Map<String, Object> properties, Map<String, Object> yamlConfig) {
+    String stageClassName = DETECTION_REGISTRY.lookup(MapUtils.getString(yamlConfig, PROP_TYPE));
+    properties.put(PROP_STAGE_CLASSNAME, stageClassName);
+    TrainingResult result = trainStage(stageClassName, yamlConfig);
+    properties.put(PROP_SPEC, result.getStageSpecs());
+  }
+
   private Map<String, Object> buildWrapperProperties(String wrapperClassName,
       List<Map<String, Object>> nestedProperties) {
-    return buildWrapperProperties(wrapperClassName, nestedProperties, Collections.<String, Object>emptyMap());
+    return buildWrapperProperties(wrapperClassName, nestedProperties, Collections.emptyMap());
   }
 
   private Map<String, Object> buildWrapperProperties(String wrapperClassName,
@@ -176,32 +223,10 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     return properties;
   }
 
-  private List<Map<String, Object>> buildListOfDetectionCoreProperties(List<Map<String, Object>> yamlConfigs) {
-    List<Map<String, Object>> properties = new ArrayList<>();
-    for (Map<String, Object> yamlConfig : yamlConfigs) {
-      properties.add(buildDetectionCoreProperties(AnomalyDetectionStageWrapper.class.getName(), yamlConfig));
-    }
-    return properties;
-  }
-
-  private Map<String, Object> buildDetectionCoreProperties(String wrapperClassName, Map<String, Object> yamlConfig) {
-    Map<String, Object> properties = new HashMap<>();
-    properties.put(PROP_CLASS_NAME, wrapperClassName);
-    fillStageSpecs(properties, yamlConfig);
-    return properties;
-  }
-
-  private void fillStageSpecs(Map<String, Object> properties, Map<String, Object> detectionCoreYamlConfigs) {
-    Map<String, Object> specs = new HashMap<>();
-    for (Map.Entry<String, Object> entry : detectionCoreYamlConfigs.entrySet()) {
-      if (entry.getKey().equals(PROP_TYPE)) {
-        properties.put(PROP_STAGE_CLASSNAME,
-            DETECTION_REGISTRY.lookup(MapUtils.getString(detectionCoreYamlConfigs, PROP_TYPE)));
-      } else {
-        specs.put(entry.getKey(), entry.getValue());
-      }
-    }
-    properties.put(PROP_SPEC, specs);
+  private TrainingResult trainStage(String stageClassName, Map<String, Object> yamlConfig) {
+    StageTrainingModule trainingModule = TRAINING_MODULE_LOADER.from(DETECTION_REGISTRY.lookupTrainingModule(stageClassName));
+    trainingModule.init(ImmutableMap.of(PROP_YAML_CONFIG, yamlConfig), this.startTime, this.endTime);
+    return trainingModule.fit(this.dataProvider);
   }
 
   private String buildMetricUrn(Map<String, Object> yamlConfig) {
@@ -213,7 +238,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         filters.putAll(entry.getKey(), entry.getValue());
       }
     }
-    MetricConfigDTO metricConfig = this.metricDAO.findByMetricAndDataset(MapUtils.getString(yamlConfig, PROP_METRIC),
+    MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
         MapUtils.getString(yamlConfig, PROP_DATASET));
     Preconditions.checkNotNull(metricConfig, "Metric not found");
 

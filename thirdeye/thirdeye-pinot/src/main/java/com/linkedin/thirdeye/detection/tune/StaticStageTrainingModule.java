@@ -20,16 +20,19 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.InputData;
 import com.linkedin.thirdeye.detection.InputDataSpec;
 import com.linkedin.thirdeye.detection.algorithm.stage.StageUtils;
-import java.util.Map;
 
+/**
+ * High level training module interface. Should implement this interface whenever possible.
+ */
+public abstract class StaticStageTrainingModule implements StageTrainingModule {
+  public static final String PROP_YAML_CONFIG = "yamlConfig";
+  static final String PROP_CLASS_NAME = "className";
 
-public abstract class StaticPipelineTuner implements PipelineTuner {
-  @Override
-  public final Map<String, Object> tune(Map<String, Object> pipelineProperties, DataProvider provider) {
-    return this.tune(pipelineProperties, StageUtils.getDataForSpec(provider, this.getInputDataSpec()));
+  public TrainingResult fit(DataProvider provider) {
+    return this.fit(StageUtils.getDataForSpec(provider, this.getInputDataSpec()));
   }
 
-  abstract Map<String, Object> tune(Map<String, Object> pipelineProperties, InputData data);
+  abstract TrainingResult fit(InputData data);
 
   abstract InputDataSpec getInputDataSpec();
 }

@@ -14,14 +14,22 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.tune;
+package com.linkedin.thirdeye.detection.annotation;
 
-import com.linkedin.thirdeye.detection.DataProvider;
-import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 
-public interface PipelineTuner {
-  void init(Map<String, Object> tunerProperties, long configId, long start, long end);
+@Target({ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Inherited
+public @interface Training {
 
-  Map<String, Object> tune(Map<String, Object> pipelineProperties, DataProvider provider);
+  @JsonProperty String trainingModule() default "";
+
+  @JsonProperty boolean tunable() default false;
 }

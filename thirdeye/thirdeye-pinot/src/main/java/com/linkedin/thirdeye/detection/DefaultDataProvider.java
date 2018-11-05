@@ -204,6 +204,11 @@ public class DefaultDataProvider implements DataProvider {
     return this.loader.from(this, config, start, end);
   }
 
+  @Override
+  public MetricConfigDTO fetchMetric(String metricName, String datasetName) {
+    return this.metricDAO.findByMetricAndDataset(metricName, datasetName);
+  }
+
   private static Predicate AND(Collection<Predicate> predicates) {
     return Predicate.AND(predicates.toArray(new Predicate[predicates.size()]));
   }

@@ -16,9 +16,13 @@
 
 package com.linkedin.thirdeye.detection.annotation;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.reflect.ClassPath;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStage;
+import com.linkedin.thirdeye.detection.tune.RuleDetectionTrainingModule;
+import com.linkedin.thirdeye.detection.tune.StaticStageTrainingModule;
+import com.linkedin.thirdeye.detection.tune.TrainingModuleLoader;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,6 +40,7 @@ import org.slf4j.LoggerFactory;
 public class DetectionRegistry {
 
   private static final Map<String, Map> REGISTRY_MAP = new HashMap<>();
+  private static final Map<String, Training> TRAINING_MODULE_MAP = new HashMap<>();
   private static final Logger LOG = LoggerFactory.getLogger(DetectionRegistry.class);
   private static final String KEY_CLASS_NAME = "className";
   private static final String KEY_ANNOTATION = "annotation";
@@ -55,11 +60,16 @@ public class DetectionRegistry {
       Set<ClassPath.ClassInfo> classInfos = ClassPath.from(Thread.currentThread().getContextClassLoader())
           .getTopLevelClasses(AnomalyDetectionStage.class.getPackage().getName());
       for (ClassPath.ClassInfo classInfo : classInfos) {
-        Class clazz = Class.forName(classInfo.getName());
+        String className = classInfo.getName();
+        Class clazz = Class.forName(className);
         for (Annotation annotation : clazz.getAnnotations()) {
           if (annotation instanceof Detection) {
             Detection detectionAnnotation = (Detection) annotation;
-            REGISTRY_MAP.put(detectionAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, classInfo.getName(), KEY_ANNOTATION, detectionAnnotation));
+            REGISTRY_MAP.put(detectionAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION, detectionAnnotation));
+          }
+          if (annotation instanceof Training) {
+            Training trainingAnnotation = (Training) annotation;
+            TRAINING_MODULE_MAP.put(className, trainingAnnotation);
           }
         }
       }
@@ -76,7 +86,18 @@ public class DetectionRegistry {
    * @return algorithm class name
    */
   public String lookup(String type) {
-    return MapUtils.getString(REGISTRY_MAP.get(type.toUpperCase()), KEY_CLASS_NAME);
+    String stageClassName = MapUtils.getString(REGISTRY_MAP.get(type.toUpperCase()), KEY_CLASS_NAME);
+    Preconditions.checkArgument(stageClassName != null, type + " not found");
+    return stageClassName;
+  }
+
+  /**
+   * Look up the class name for a given algorithm
+   * @param stageClassName the class name
+   * @return algorithm class name
+   */
+  public String lookupTrainingModule(String stageClassName) {
+    return StaticStageTrainingModule.class.getPackage().getName() + "." + TRAINING_MODULE_MAP.get(stageClassName).trainingModule();
   }
 
   /**

@@ -174,6 +174,16 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
+  public MetricConfigDTO fetchMetric(String metricName, String datasetName) {
+      for (MetricConfigDTO metric : this.metrics) {
+        if (metricName.equals(metric.getName()) && datasetName.equals(metric.getDataset())) {
+          return metric;
+        }
+      }
+      return null;
+  }
+
+  @Override
   public DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) throws Exception {
     return this.loader.from(this, config, start, end);
   }

@@ -36,14 +36,14 @@ public class DetectionConfigBean extends AbstractBean {
   Map<String, Object> properties;
   boolean active;
   String yaml;
-  Map<String, Object> tunerProperties;
+  Map<String, Object> components;
 
-  public Map<String, Object> getTunerProperties() {
-    return tunerProperties;
+  public Map<String, Object> getComponents() {
+    return components;
   }
 
-  public void setTunerProperties(Map<String, Object> tunerProperties) {
-    this.tunerProperties = tunerProperties;
+  public void setComponents(Map<String, Object> tunerProperties) {
+    this.components = tunerProperties;
   }
 
   public String getYaml() {

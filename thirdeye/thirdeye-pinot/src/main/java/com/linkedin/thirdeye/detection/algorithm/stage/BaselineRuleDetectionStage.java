@@ -28,6 +28,7 @@ import com.linkedin.thirdeye.detection.annotation.Detection;
 import com.linkedin.thirdeye.detection.annotation.DetectionParam;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.PresentationOption;
+import com.linkedin.thirdeye.detection.annotation.Training;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
         @DetectionParam(name = "change", placeholder = "value"),
         @DetectionParam(name = "difference", placeholder = "value")
     })
+@Training(trainingModule = "RuleDetectionTrainingModule")
 public class BaselineRuleDetectionStage extends StaticAnomalyDetectionStage {
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";

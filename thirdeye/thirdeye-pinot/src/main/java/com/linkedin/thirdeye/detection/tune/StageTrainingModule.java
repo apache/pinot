@@ -16,24 +16,14 @@
 
 package com.linkedin.thirdeye.detection.tune;
 
-import com.linkedin.thirdeye.detection.InputData;
-import com.linkedin.thirdeye.detection.InputDataSpec;
+import com.linkedin.thirdeye.detection.DataProvider;
 import java.util.Map;
 
+/**
+ * Low level training module interface, with access to data provider.
+ */
+public interface StageTrainingModule {
+  void init(Map<String, Object> properties, long startTime, long endTime);
 
-public class DummyTuner extends StaticPipelineTuner {
-  @Override
-  Map<String, Object> tune(Map<String, Object> pipelineProperties, InputData data) {
-    return pipelineProperties;
-  }
-
-  @Override
-  InputDataSpec getInputDataSpec() {
-    return new InputDataSpec();
-  }
-
-  @Override
-  public void init(Map<String, Object> tunerProperties, long configId, long start, long end) {
-  }
+  TrainingResult fit(DataProvider provider);
 }
-

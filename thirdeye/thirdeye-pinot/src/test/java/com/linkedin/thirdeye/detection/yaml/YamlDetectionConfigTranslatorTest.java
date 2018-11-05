@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.detection.MockDataProvider;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;
@@ -21,17 +22,17 @@ public class YamlDetectionConfigTranslatorTest {
   public void testGenerateDetectionConfig() {
     Map<String, Object> properties = new HashMap<>();
     properties.put("className", "test.linkedin.thirdeye");
-    YamlDetectionConfigTranslator translator = new MockYamlDetectionConfigTranslator();
 
     Map<String, Object> yamlConfigs = new HashMap<>();
-    yamlConfigs.put("name", "testPipeline");
+    yamlConfigs.put("alertName", "testPipeline");
     MetricConfigDTO metricConfigDTO = new MetricConfigDTO();
     metricConfigDTO.setName("a_daily_metric");
     metricConfigDTO.setDataset("a_test_dataset");
     metricConfigDTO.setAlias("alias");
     this.metricDAO.save(metricConfigDTO);
 
-    DetectionConfigDTO detectionConfigDTO = translator.generateDetectionConfig(yamlConfigs);
+    YamlDetectionConfigTranslator translator = new MockYamlDetectionConfigTranslator(yamlConfigs, new MockDataProvider());
+    DetectionConfigDTO detectionConfigDTO = translator.generateDetectionConfig();
     Assert.assertEquals(detectionConfigDTO.getName(), "testPipeline");
     Assert.assertEquals(detectionConfigDTO.getCron(), "0 0 14 * * ? *");
     Assert.assertEquals(detectionConfigDTO.getProperties().get("yamlConfigs"), yamlConfigs);

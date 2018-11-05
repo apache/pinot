@@ -27,6 +27,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 
 /**
@@ -94,6 +95,8 @@ public interface DataProvider {
    * @return map of metric configs (keyed by id)
    */
   Map<Long, MetricConfigDTO> fetchMetrics(Collection<Long> ids);
+
+  MetricConfigDTO fetchMetric(String metricName, String datasetName);
 
   /**
    * Returns a map of dataset configs (keyed by id) for a given set of dataset names.

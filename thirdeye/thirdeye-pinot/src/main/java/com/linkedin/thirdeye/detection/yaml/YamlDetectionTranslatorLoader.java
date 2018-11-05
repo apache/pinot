@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.detection.yaml;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.detection.DataProvider;
+import java.lang.reflect.Constructor;
 import java.util.Map;
 
 /**
@@ -14,10 +16,10 @@ public class YamlDetectionTranslatorLoader {
       .put("COMPOSITE", CompositePipelineConfigTranslator.class.getName())
       .build();
 
-  public YamlDetectionConfigTranslator from(Map<String, Object> yamlConfig) throws Exception {
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_PIPELINE_TYPE), "pipeline type not found, abort.");
-    String className = this.PIPELINE_TYPE_REGISTRY.get(yamlConfig.get(PROP_PIPELINE_TYPE).toString().toUpperCase());
-    return (YamlDetectionConfigTranslator) Class.forName(className).newInstance();
+  public YamlDetectionConfigTranslator from(Map<String, Object> yamlConfig, DataProvider provider) throws Exception {
+    String className = PIPELINE_TYPE_REGISTRY.get(yamlConfig.get(PROP_PIPELINE_TYPE).toString().toUpperCase());
+    Constructor<?> constructor = Class.forName(className).getConstructor(Map.class, DataProvider.class);
+    return (YamlDetectionConfigTranslator) constructor.newInstance(yamlConfig, provider);
   }
 
 }

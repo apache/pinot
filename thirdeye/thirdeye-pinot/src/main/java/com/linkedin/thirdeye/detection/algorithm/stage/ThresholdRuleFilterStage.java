@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.detection.annotation.Detection;
 import com.linkedin.thirdeye.detection.annotation.DetectionParam;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.PresentationOption;
+import com.linkedin.thirdeye.detection.annotation.Training;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.Map;
@@ -47,6 +48,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
         )},
     params = {@DetectionParam(name = "min", placeholder = "value"), @DetectionParam(name = "max", placeholder = "value")}
 )
+@Training(trainingModule = "RuleDetectionTrainingModule")
 public class ThresholdRuleFilterStage implements AnomalyFilterStage {
     private static final String PROP_MIN = "min";
     private static final double PROP_MIN_DEFAULT = Double.NaN;

@@ -1,49 +1,50 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import java.util.Collection;
-import java.util.List;
+import com.linkedin.thirdeye.detection.DataProvider;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 
-import static com.linkedin.thirdeye.detection.ConfigUtils.*;
-
 
 /**
- * The YAML config translator converts the yaml config into a detection config
+ * The YAML config translator converts the yaml config into a detection config.
+ * Calls training module for each stage.
  */
 public abstract class YamlDetectionConfigTranslator {
-  private static final String PROP_NAME = "name";
+  private static final String PROP_NAME = "alertName";
   private static final String PROP_CRON = "cron";
 
   private static final String CRON_SCHEDULE_DEFAULT = "0 0 14 * * ? *";
 
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  protected Map<String, Object> yamlConfig;
+  protected long startTime;
+  protected long endTime;
+  protected DataProvider dataProvider;
 
-  MetricConfigManager metricDAO;
+  public YamlDetectionConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
+    this.yamlConfig = yamlConfig;
+    this.dataProvider = provider;
+  }
 
-  public YamlDetectionConfigTranslator() {
-    this.metricDAO = DAO_REGISTRY.getMetricConfigDAO();
+  public YamlDetectionConfigTranslator withTrainingWindow(long startTime, long endTime) {
+    this.startTime = startTime;
+    this.endTime = endTime;
+    return this;
   }
 
   /**
    * Convert Yaml configurations into detection properties. Can be customized and override by different detection flow.
-   * @param yamlConfig yaml configuration of a detection pipeline flow type
    * @return properties of the detection pipeline
    */
-  abstract Map<String, Object> buildDetectionProperties(Map<String, Object> yamlConfig);
+  abstract YamlTranslationResult translateYaml();
 
   /**
    * Fill in common fields of detection config. Properties of the pipeline is filled by the subclass.
    */
-  DetectionConfigDTO generateDetectionConfig(Map<String, Object> yamlConfig) {
+  DetectionConfigDTO generateDetectionConfig() {
     validateYAML(yamlConfig);
 
     DetectionConfigDTO config = new DetectionConfigDTO();
@@ -51,9 +52,10 @@ public abstract class YamlDetectionConfigTranslator {
     config.setCron(MapUtils.getString(yamlConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     config.setLastTimestamp(System.currentTimeMillis());
     config.setActive(true);
-    Map<String, Object> properties = buildDetectionProperties(yamlConfig);
-    Preconditions.checkArgument(!properties.isEmpty(), "Empty detection property");
-    config.setProperties(properties);
+    YamlTranslationResult translationResult = translateYaml();
+    Preconditions.checkArgument(!translationResult.getProperties().isEmpty(), "Empty detection property");
+    config.setProperties(translationResult.getProperties());
+    config.setComponents(translationResult.getComponents());
     return config;
   }
 
