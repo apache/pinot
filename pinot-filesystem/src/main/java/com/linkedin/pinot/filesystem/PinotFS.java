@@ -55,6 +55,8 @@ public abstract class PinotFS implements Closeable {
    * and the dstUri are of the same type (both files or both directories). If srcUri is a file, it will move the file to
    * dstUri's location. If srcUri is a directory, it will move the directory to dstUri. Does not support moving a file under a
    * directory.
+   *
+   * For example, if a/b/c is moved to x/y/z, in the case of overwrite, a/b/c will be renamed to x/y/z.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @param overwrite true if we want to overwrite the dstURI, false otherwise
@@ -65,11 +67,8 @@ public abstract class PinotFS implements Closeable {
   public abstract boolean move(URI srcUri, URI dstUri, boolean overwrite) throws IOException;
 
   /**
-   * Copies a file from src to dst. Keeps the original file. If the dst has parent directories that haven't
-   * been created, this method will create all the necessary parent directories. If dst already exists, it will overwrite.
-   * Works both for copying a directory and a file. If srcUri is a file, it will copy the file to
-   * dstUri's location. If srcUri is a directory, it will copy the directory to dstUri. Does not support copying a file under a
-   * directory.
+   * Same as move except the srcUri is not retained. For example, if x/y/z is copied to a/b/c, x/y/z will be retained
+   * and x/y/z will also be present as a/b/c
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @return true if copy is successful
