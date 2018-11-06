@@ -66,14 +66,11 @@ public class SelectionOperatorUtils {
   private SelectionOperatorUtils() {
   }
 
-  private static final DecimalFormat INT_FORMAT =
-      new DecimalFormat("##########", DecimalFormatSymbols.getInstance(Locale.US));
-  private static final DecimalFormat LONG_FORMAT =
-      new DecimalFormat("####################", DecimalFormatSymbols.getInstance(Locale.US));
-  private static final DecimalFormat FLOAT_FORMAT =
-      new DecimalFormat("#########0.0####", DecimalFormatSymbols.getInstance(Locale.US));
-  private static final DecimalFormat DOUBLE_FORMAT =
-      new DecimalFormat("###################0.0#########", DecimalFormatSymbols.getInstance(Locale.US));
+  private static final String INT_PATTERN = "##########";
+  private static final String LONG_PATTERN = "####################";
+  private static final String FLOAT_PATTERN = "#########0.0####";
+  private static final String DOUBLE_PATTERN = "###################0.0#########";
+  private static final DecimalFormatSymbols DECIMAL_FORMAT_SYMBOLS = DecimalFormatSymbols.getInstance(Locale.US);
 
   /**
    * Expand <code>'SELECT *'</code> to select all columns with {@link IndexSegment}, order all columns alphabatically.
@@ -560,6 +557,30 @@ public class SelectionOperatorUtils {
     return row;
   }
 
+  @Nonnull
+  private static String intFormat(int value) {
+    DecimalFormat intFormatter = new DecimalFormat(INT_PATTERN, DECIMAL_FORMAT_SYMBOLS);
+    return intFormatter.format(value);
+  }
+
+  @Nonnull
+  private static String longFormat(long value) {
+    DecimalFormat longFormatter = new DecimalFormat(LONG_PATTERN, DECIMAL_FORMAT_SYMBOLS);
+    return longFormatter.format(value);
+  }
+
+  @Nonnull
+  private static String floatFormat(float value) {
+    DecimalFormat floatFormatter = new DecimalFormat(FLOAT_PATTERN, DECIMAL_FORMAT_SYMBOLS);
+    return floatFormatter.format(value);
+  }
+
+  @Nonnull
+  private static String doubleFormat(double value) {
+    DecimalFormat doubleFormatter = new DecimalFormat(DOUBLE_PATTERN, DECIMAL_FORMAT_SYMBOLS);
+    return doubleFormatter.format(value);
+  }
+
   /**
    * Format a {@link Serializable} value into a {@link String} or {@link String} array based on the data type.
    * (Broker side)
@@ -575,13 +596,13 @@ public class SelectionOperatorUtils {
     switch (dataType) {
       // Single-value column.
       case INT:
-        return INT_FORMAT.format(((Number) value).intValue());
+        return intFormat(((Number)value).intValue());
       case LONG:
-        return LONG_FORMAT.format(((Number) value).longValue());
+        return longFormat(((Number)value).longValue());
       case FLOAT:
-        return FLOAT_FORMAT.format(((Number) value).floatValue());
+        return floatFormat(((Number)value).floatValue());
       case DOUBLE:
-        return DOUBLE_FORMAT.format(((Number) value).doubleValue());
+        return doubleFormat(((Number)value).doubleValue());
 
       // Multi-value column.
       case INT_ARRAY:
@@ -589,7 +610,7 @@ public class SelectionOperatorUtils {
         int length = ints.length;
         String[] formattedValue = new String[length];
         for (int i = 0; i < length; i++) {
-          formattedValue[i] = INT_FORMAT.format(ints[i]);
+          formattedValue[i] = intFormat(ints[i]);
         }
         return formattedValue;
       case LONG_ARRAY:
@@ -599,14 +620,14 @@ public class SelectionOperatorUtils {
           length = ints.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = LONG_FORMAT.format(ints[i]);
+            formattedValue[i] = longFormat(ints[i]);
           }
         } else {
           long[] longs = (long[]) value;
           length = longs.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = LONG_FORMAT.format(longs[i]);
+            formattedValue[i] = longFormat(longs[i]);
           }
         }
         return formattedValue;
@@ -615,7 +636,7 @@ public class SelectionOperatorUtils {
         length = floats.length;
         formattedValue = new String[length];
         for (int i = 0; i < length; i++) {
-          formattedValue[i] = FLOAT_FORMAT.format(floats[i]);
+          formattedValue[i] = floatFormat(floats[i]);
         }
         return formattedValue;
       case DOUBLE_ARRAY:
@@ -625,7 +646,7 @@ public class SelectionOperatorUtils {
           length = ints.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = DOUBLE_FORMAT.format((double) ints[i]);
+            formattedValue[i] = doubleFormat((double) ints[i]);
           }
           return formattedValue;
         } else if (value instanceof long[]) {
@@ -633,7 +654,7 @@ public class SelectionOperatorUtils {
           length = longs.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = DOUBLE_FORMAT.format((double) longs[i]);
+            formattedValue[i] = doubleFormat((double) longs[i]);
           }
           return formattedValue;
         } else if (value instanceof float[]) {
@@ -641,7 +662,7 @@ public class SelectionOperatorUtils {
           length = floats.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = DOUBLE_FORMAT.format(floats[i]);
+            formattedValue[i] = doubleFormat(floats[i]);
           }
           return formattedValue;
         } else {
@@ -649,7 +670,7 @@ public class SelectionOperatorUtils {
           length = doubles.length;
           formattedValue = new String[length];
           for (int i = 0; i < length; i++) {
-            formattedValue[i] = DOUBLE_FORMAT.format(doubles[i]);
+            formattedValue[i] = doubleFormat(doubles[i]);
           }
           return formattedValue;
         }
