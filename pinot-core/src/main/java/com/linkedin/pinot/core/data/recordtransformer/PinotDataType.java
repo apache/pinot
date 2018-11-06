@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.data.extractors;
+package com.linkedin.pinot.core.data.recordtransformer;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 
@@ -51,12 +51,6 @@ public enum PinotDataType {
     public Double toDouble(Object value) {
       throw new UnsupportedOperationException("Cannot convert value: " + value + " from: BOOLEAN to: DOUBLE");
     }
-
-    @Override
-    public Boolean convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException(
-          "Cannot convert value: " + value + "from: " + sourceType + " to: BOOLEAN");
-    }
   },
 
   BYTE {
@@ -79,19 +73,10 @@ public enum PinotDataType {
     public Double toDouble(Object value) {
       return ((Byte) value).doubleValue();
     }
-
-    @Override
-    public Byte convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + "from: " + sourceType + " to: BYTE");
-    }
   },
 
   BYTES {
-    // TODO: Implement all other overrides.
-    @Override
-    public Object convert(Object value, PinotDataType sourceType) {
-      return sourceType.toBytes(value);
-    }
+    // TODO: Support conversion from BYTES to other data types
   },
 
   CHARACTER {
@@ -114,12 +99,6 @@ public enum PinotDataType {
     public Double toDouble(Object value) {
       return (double) ((Character) value);
     }
-
-    @Override
-    public Character convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException(
-          "Cannot convert value: " + value + "from: " + sourceType + " to: CHARACTER");
-    }
   },
 
   SHORT {
@@ -141,11 +120,6 @@ public enum PinotDataType {
     @Override
     public Double toDouble(Object value) {
       return ((Short) value).doubleValue();
-    }
-
-    @Override
-    public Short convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + "from: " + sourceType + " to: SHORT");
     }
   },
 
@@ -304,36 +278,13 @@ public enum PinotDataType {
     public Double toDouble(Object value) {
       throw new UnsupportedOperationException("Cannot convert value: " + value + " from: OBJECT to: DOUBLE");
     }
-
-    @Override
-    public Object convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException("Cannot convert value: " + value + "from: " + sourceType + " to: OBJECT");
-    }
   },
 
-  BYTE_ARRAY {
-    @Override
-    public Byte[] convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException(
-          "Cannot convert value: " + value + "from: " + sourceType + " to: BYTE_ARRAY");
-    }
-  },
+  BYTE_ARRAY,
 
-  CHARACTER_ARRAY {
-    @Override
-    public Character[] convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException(
-          "Cannot convert value: " + value + "from: " + sourceType + " to: CHARACTER_ARRAY");
-    }
-  },
+  CHARACTER_ARRAY,
 
-  SHORT_ARRAY {
-    @Override
-    public Short[] convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException(
-          "Cannot convert value: " + value + "from: " + sourceType + " to: SHORT_ARRAY");
-    }
-  },
+  SHORT_ARRAY,
 
   INTEGER_ARRAY {
     @Override
@@ -370,13 +321,7 @@ public enum PinotDataType {
     }
   },
 
-  OBJECT_ARRAY {
-    @Override
-    public Object[] convert(Object value, PinotDataType sourceType) {
-      throw new UnsupportedOperationException(
-          "Cannot convert value: " + value + "from: " + sourceType + " to: OBJECT_ARRAY");
-    }
-  };
+  OBJECT_ARRAY;
 
   public Integer toInteger(Object value) {
     return getSingleValueType().toInteger(((Object[]) value)[0]);
@@ -402,9 +347,9 @@ public enum PinotDataType {
     }
   }
 
-  // TODO: Support toBytes for all data-types.
+  // TODO: Support toBytes() for all data types
   public byte[] toBytes(Object value) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException("Cannot convert value: " + value + " form: " + this + " to: BYTES");
   }
 
   public Integer[] toIntegerArray(Object value) {
@@ -482,7 +427,9 @@ public enum PinotDataType {
     }
   }
 
-  public abstract Object convert(Object value, PinotDataType sourceType);
+  public Object convert(Object value, PinotDataType sourceType) {
+    throw new UnsupportedOperationException("Cannot convert value: " + value + " form: " + sourceType + " to: " + this);
+  }
 
   public boolean isSingleValue() {
     return this.ordinal() <= OBJECT.ordinal();
@@ -529,7 +476,7 @@ public enum PinotDataType {
       case BYTES:
         if (fieldSpec.isSingleValueField()) {
           return PinotDataType.BYTES;
-        }  else {
+        } else {
           throw new UnsupportedOperationException("Unsupported multi-valued type: BYTES");
         }
       default:

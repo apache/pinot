@@ -82,10 +82,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private int totalDocs;
   private int totalRawDocs;
   private int totalAggDocs;
-  private int totalErrors;
-  private int totalNulls;
-  private int totalConversions;
-  private int totalNullCols;
   private int docIdCounter;
 
   @Override
@@ -105,10 +101,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     this.totalDocs = segmentIndexCreationInfo.getTotalDocs();
     this.totalAggDocs = segmentIndexCreationInfo.getTotalAggDocs();
     this.totalRawDocs = segmentIndexCreationInfo.getTotalRawDocs();
-    this.totalErrors = segmentIndexCreationInfo.getTotalErrors();
-    this.totalNulls = segmentIndexCreationInfo.getTotalNulls();
-    this.totalConversions = segmentIndexCreationInfo.getTotalConversions();
-    this.totalNullCols = segmentIndexCreationInfo.getTotalNullCols();
 
     Collection<FieldSpec> fieldSpecs = schema.getAllFieldSpecs();
     Set<String> invertedIndexColumns = new HashSet<>();
@@ -315,10 +307,6 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(SEGMENT_TOTAL_AGGREGATE_DOCS, String.valueOf(totalAggDocs));
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(totalDocs));
     properties.setProperty(STAR_TREE_ENABLED, String.valueOf(config.isEnableStarTreeIndex()));
-    properties.setProperty(SEGMENT_TOTAL_ERRORS, String.valueOf(totalErrors));
-    properties.setProperty(SEGMENT_TOTAL_NULLS, String.valueOf(totalNulls));
-    properties.setProperty(SEGMENT_TOTAL_CONVERSIONS, String.valueOf(totalConversions));
-    properties.setProperty(SEGMENT_TOTAL_NULL_COLS, String.valueOf(totalNullCols));
 
     StarTreeIndexSpec starTreeIndexSpec = config.getStarTreeIndexSpec();
     if (starTreeIndexSpec != null) {

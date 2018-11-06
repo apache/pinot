@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.data.readers;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -43,12 +44,15 @@ public class GenericRowRecordReader implements RecordReader {
 
   @Override
   public GenericRow next() {
-    return _rows.get(_nextRowId++);
+    return next(new GenericRow());
   }
 
   @Override
   public GenericRow next(GenericRow reuse) {
-    return next();
+    for (Map.Entry<String, Object> entry : _rows.get(_nextRowId++).getEntrySet()) {
+      reuse.putField(entry.getKey(), entry.getValue());
+    }
+    return reuse;
   }
 
   @Override

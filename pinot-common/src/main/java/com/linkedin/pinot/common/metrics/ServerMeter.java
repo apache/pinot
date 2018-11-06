@@ -19,9 +19,8 @@ import com.linkedin.pinot.common.Utils;
 
 
 /**
-* Enumeration containing all the meters exposed by the Pinot server.
-*
-*/
+ * Enumeration containing all the meters exposed by the Pinot server.
+ */
 public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),
   UNCAUGHT_EXCEPTIONS("exceptions", true),
@@ -37,9 +36,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REALTIME_OFFSET_COMMITS("commits", true),
   REALTIME_OFFSET_COMMIT_EXCEPTIONS("exceptions", false),
   ROWS_WITH_ERRORS("rows", false),
-  ROWS_NEEDING_CONVERSIONS("rows", false),
-  ROWS_WITH_NULL_VALUES("rows", false),
-  COLUMNS_WITH_NULL_VALUES("columns", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
   LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
   LLC_CONTROLLER_RESPONSE_HOLD("messages", true),

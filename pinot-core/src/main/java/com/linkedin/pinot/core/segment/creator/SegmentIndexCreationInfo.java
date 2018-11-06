@@ -20,10 +20,6 @@ public class SegmentIndexCreationInfo {
   private int totalRawDocs;
   private int totalAggDocs;
   boolean starTreeEnabled;
-  private int totalErrors;
-  private int totalNulls;
-  private int totalConversions;
-  private int totalNullCols;
 
   public int getTotalDocs() {
     return totalDocs;
@@ -55,37 +51,5 @@ public class SegmentIndexCreationInfo {
 
   public void setStarTreeEnabled(boolean starTreeEnabled) {
     this.starTreeEnabled = starTreeEnabled;
-  }
-
-  public int getTotalConversions() {
-    return totalConversions;
-  }
-
-  public void setTotalConversions(int totalConversions) {
-    this.totalConversions = totalConversions;
-  }
-
-  public int getTotalErrors() {
-    return totalErrors;
-  }
-
-  public void setTotalErrors(int totalErrors) {
-    this.totalErrors = totalErrors;
-  }
-
-  public int getTotalNullCols() {
-    return totalNullCols;
-  }
-
-  public void setTotalNullCols(int totalNullCols) {
-    this.totalNullCols = totalNullCols;
-  }
-
-  public int getTotalNulls() {
-    return totalNulls;
-  }
-
-  public void setTotalNulls(int totalNulls) {
-    this.totalNulls = totalNulls;
   }
 }
