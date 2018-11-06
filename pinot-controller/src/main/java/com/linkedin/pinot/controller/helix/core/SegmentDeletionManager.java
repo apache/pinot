@@ -230,7 +230,7 @@ public class SegmentDeletionManager {
       for (String currentDir : deletedDirFiles) {
         URI currentURI = ControllerConf.getUriFromPath(currentDir);
         // Get files that are aged
-        String[] targetFiles = pinotFS.listFiles(currentURI, false);
+        final String[] targetFiles = pinotFS.listFiles(currentURI, false);
         int numFilesDeleted = 0;
         for (String targetFile : targetFiles) {
           URI targetURI = ControllerConf.getUriFromPath(targetFile);

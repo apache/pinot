@@ -85,16 +85,29 @@ public class LocalPinotFSTest {
     File thirdTestFile = new File(_absoluteTmpDirPath, "thirdTestFile");
     Assert.assertTrue(thirdTestFile.createNewFile(), "Could not create file " + thirdTestFile.getPath());
 
-    // Tests recursive move works
-    File testDir = new File(_absoluteTmpDirPath, "testDir");
+    File newAbsoluteTempDirPath = new File(_absoluteTmpDirPath, "absoluteTwo");
+    Assert.assertTrue(newAbsoluteTempDirPath.mkdir());
+
+    // Create a testDir and file underneath directory
+    File testDir = new File(newAbsoluteTempDirPath, "testDir");
     Assert.assertTrue(testDir.mkdir(), "Could not make directory " + testDir.getAbsolutePath());
     File testDirFile = new File(testDir, "testFile");
+    // Assert that recursive list files and nonrecursive list files are as expected
     Assert.assertTrue(testDirFile.createNewFile(), "Could not create file " + testDir.getAbsolutePath());
-    File testDir2 = new File(_absoluteTmpDirPath, "testDir2");
-    File testDirFile2 = new File(testDir2, "testFile");
-    Assert.assertFalse(localPinotFS.exists(testDirFile2.toURI()));
-    localPinotFS.move(testDir.toURI(), testDir2.toURI(), true);
-    Assert.assertTrue(localPinotFS.exists(testDirFile2.toURI()));
+    Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), false), new String[]{testDir.getAbsolutePath()});
+    Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), true),
+        new String[]{testDir.getAbsolutePath(), testDirFile.getAbsolutePath()});
+
+    // Create another parent dir so we can test recursive move
+    File newAbsoluteTempDirPath3 = new File(_absoluteTmpDirPath, "absoluteThree");
+    Assert.assertTrue(newAbsoluteTempDirPath3.mkdir());
+    Assert.assertEquals(newAbsoluteTempDirPath3.listFiles().length, 0);
+
+    localPinotFS.move(newAbsoluteTempDirPath.toURI(), newAbsoluteTempDirPath3.toURI(), true);
+    Assert.assertFalse(localPinotFS.exists(newAbsoluteTempDirPath.toURI()));
+    Assert.assertTrue(localPinotFS.exists(newAbsoluteTempDirPath3.toURI()));
+    Assert.assertTrue(localPinotFS.exists(new File(newAbsoluteTempDirPath3, "testDir").toURI()));
+    Assert.assertTrue(localPinotFS.exists(new File(new File(newAbsoluteTempDirPath3, "testDir"), "testFile").toURI()));
 
     // Check file copy to location where something already exists still works
     localPinotFS.copy(testFileUri, thirdTestFile.toURI());

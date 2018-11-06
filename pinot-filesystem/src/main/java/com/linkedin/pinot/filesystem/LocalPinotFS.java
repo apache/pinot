@@ -22,6 +22,8 @@ import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
@@ -117,13 +119,13 @@ public class LocalPinotFS extends PinotFS {
   public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     File file = new File(decodeURI(fileUri.getRawPath()));
     if (!recursive) {
-      return Arrays.stream(file.list()).map(s -> new File(file, s)).map(File::getAbsolutePath).toArray(String[]::new);
+      return Arrays.stream(file.list())
+          .map(s -> new File(file, s))
+          .map(File::getAbsolutePath).toArray(String[]::new);
     } else {
-      File[] files = file.listFiles();
-      if (files == null) {
-        return new String[0];
-      }
-      return Arrays.stream(files).map(File::getAbsolutePath).toArray(String[]::new);
+       return Files.walk(Paths.get(fileUri)).
+           filter(s -> !s.equals(file.toPath()))
+           .map(Path::toString).toArray(String[]::new);
     }
   }
 
