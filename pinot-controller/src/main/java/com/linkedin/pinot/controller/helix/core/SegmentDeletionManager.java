@@ -221,22 +221,22 @@ public class SegmentDeletionManager {
       }
 
     try {
-      String[] deletedDirFiles = pinotFS.listFiles(deletedDirURI, false);
-      if (deletedDirFiles == null) {
+      String[] tableNameDirs = pinotFS.listFiles(deletedDirURI, false);
+      if (tableNameDirs == null) {
         LOGGER.warn("Deleted segment directory {} does not exist.", deletedDirURI.toString());
         return;
       }
 
-      for (String currentDir : deletedDirFiles) {
-        URI currentURI = ControllerConf.getUriFromPath(currentDir);
+      for (String dir : tableNameDirs) {
+        URI uri = ControllerConf.getUriFromPath(dir);
         // Get files that are aged
-        final String[] targetFiles = pinotFS.listFiles(currentURI, false);
+        final String[] targetFiles = pinotFS.listFiles(uri, false);
         int numFilesDeleted = 0;
         for (String targetFile : targetFiles) {
           URI targetURI = ControllerConf.getUriFromPath(targetFile);
           Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
           if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
-            if (!pinotFS.delete(targetURI)) {
+            if (!pinotFS.delete(targetURI, false)) {
               LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
             } else {
               numFilesDeleted ++;
@@ -246,8 +246,8 @@ public class SegmentDeletionManager {
 
         if (numFilesDeleted == targetFiles.length) {
           // Delete directory if it's empty
-          if (!pinotFS.delete(currentURI)) {
-            LOGGER.warn("The directory {} cannot be removed.", currentDir);
+          if (!pinotFS.delete(uri, true)) {
+            LOGGER.warn("The directory {} cannot be removed.", dir);
           }
         }
       }

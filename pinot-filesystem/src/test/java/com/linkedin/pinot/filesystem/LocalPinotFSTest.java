@@ -124,7 +124,7 @@ public class LocalPinotFSTest {
     Assert.assertTrue(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), true));
     Assert.assertEquals(_absoluteTmpDirPath.length(), 0);
 
-    localPinotFS.delete(secondTestFileUri);
+    localPinotFS.delete(secondTestFileUri, true);
     // Check deletion from final location worked
     Assert.assertTrue(!localPinotFS.exists(secondTestFileUri));
 

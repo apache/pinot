@@ -53,9 +53,13 @@ public class LocalPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean delete(URI segmentUri) throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
     File file = new File(decodeURI(segmentUri.getRawPath()));
     if (file.isDirectory()) {
+      // Returns false if directory isn't empty
+      if (listFiles(segmentUri, false).length > 0 && !forceDelete) {
+        return false;
+      }
       // Throws an IOException if it is unable to delete
       FileUtils.deleteDirectory(file);
     } else {

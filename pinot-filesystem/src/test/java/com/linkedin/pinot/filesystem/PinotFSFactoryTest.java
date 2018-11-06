@@ -75,7 +75,7 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public boolean delete(URI segmentUri) throws IOException {
+    public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
       return true;
     }
 

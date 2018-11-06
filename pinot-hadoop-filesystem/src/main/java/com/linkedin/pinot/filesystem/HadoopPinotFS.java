@@ -70,7 +70,13 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean delete(URI segmentUri) throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
+    // Returns false if we are moving a directory and that directory is not empty
+    if (isDirectory(segmentUri)
+        && listFiles(segmentUri, false).length > 0
+        && !forceDelete) {
+      return false;
+    }
     return _hadoopFS.delete(new Path(segmentUri), true);
   }
 
@@ -117,18 +123,10 @@ public class HadoopPinotFS extends PinotFS {
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(fileUri);
     if (_hadoopFS.exists(path)) {
-      if (recursive) {
-        RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, true);
-        while (fileListItr != null && fileListItr.hasNext()) {
-          LocatedFileStatus file = fileListItr.next();
-          filePathStrings.add(file.getPath().toUri().toString());
-        }
-      } else {
-        RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, false);
-        while (fileListItr != null && fileListItr.hasNext()) {
-          LocatedFileStatus file = fileListItr.next();
-          filePathStrings.add(file.getPath().toUri().toString());
-        }
+      RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, recursive);
+      while (fileListItr != null && fileListItr.hasNext()) {
+        LocatedFileStatus file = fileListItr.next();
+        filePathStrings.add(file.getPath().toUri().toString());
       }
     } else {
       throw new IllegalArgumentException("segmentUri is not valid");

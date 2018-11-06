@@ -84,7 +84,13 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean delete(URI segmentUri) throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
+    // Returns false if directory we want to delete is not empty
+    if (isDirectory(segmentUri)
+        && listFiles(segmentUri, false).length > 0
+        && !forceDelete) {
+      return false;
+    }
     return _adlStoreClient.deleteRecursive(segmentUri.getPath());
   }
 
@@ -100,7 +106,7 @@ public class AzurePinotFS extends PinotFS {
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     if (exists(dstUri)) {
-      delete(dstUri);
+      delete(dstUri, true);
     }
 
     _adlStoreClient.createEmptyFile(dstUri.getPath());
@@ -151,7 +157,7 @@ public class AzurePinotFS extends PinotFS {
     }
 
     List<DirectoryEntry> directoryEntries = listFiles(rootDir);
-    List<String> fullFilePaths = new ArrayList<>();
+    List<String> fullFilePaths = new ArrayList<>(directoryEntries.size());
     for (DirectoryEntry directoryEntry : directoryEntries) {
       fullFilePaths.add(directoryEntry.fullName);
     }
