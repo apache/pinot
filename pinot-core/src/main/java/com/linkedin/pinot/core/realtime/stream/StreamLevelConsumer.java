@@ -30,12 +30,6 @@ public interface StreamLevelConsumer {
   void start() throws Exception;
 
   /**
-   * Set the offset to consume from
-   * @param offset
-   */
-  void setOffset(long offset);
-
-  /**
    * Get next row from the stream and decode it into a generic row
    * @param destination
    * @return
@@ -43,28 +37,9 @@ public interface StreamLevelConsumer {
   GenericRow next(GenericRow destination);
 
   /**
-   * Get decoded row from the stream at a given offset
-   * @param offset
-   * @return
-   */
-  GenericRow next(long offset);
-
-  /**
-   * Get the current offset for the stream
-   * @return
-   */
-  long currentOffset();
-
-  /**
-   * Checkpoint the stream at the current offset
+   * Commit the offsets
    */
   void commit();
-
-  /**
-   * Checkpoint the stream at the given offset
-   * @param offset
-   */
-  void commit(long offset);
 
   /**
    * Shutdown the stream consumer

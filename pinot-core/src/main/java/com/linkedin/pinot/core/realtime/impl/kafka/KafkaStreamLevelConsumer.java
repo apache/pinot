@@ -80,11 +80,6 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public void setOffset(long offset) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public GenericRow next(GenericRow destination) {
     if (kafkaIterator.hasNext()) {
       try {
@@ -122,25 +117,10 @@ public class KafkaStreamLevelConsumer implements StreamLevelConsumer {
   }
 
   @Override
-  public GenericRow next(long offset) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long currentOffset() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public void commit() {
     consumer.commitOffsets();
     _serverMetrics.addMeteredTableValue(_tableAndStreamName, ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_OFFSET_COMMITS, 1L);
-  }
-
-  @Override
-  public void commit(long offset) {
-    throw new UnsupportedOperationException();
   }
 
   @Override
