@@ -250,17 +250,7 @@
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>pinot-filesystem</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.linkedin.pinot</groupId>
-        <artifactId>pinot-hadoop-filesystem</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.linkedin.pinot</groupId>
-        <artifactId>pinot-azure-filesystem</artifactId>
+        <artifactId>pinot-storage</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

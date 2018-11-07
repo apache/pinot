@@ -217,6 +217,7 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-filesystem</artifactId>
+      <version>0.016</version>
     </dependency>
   </dependencies>
   <build>

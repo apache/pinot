@@ -68,14 +68,17 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-filesystem</artifactId>
+      <version>0.016</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-hadoop-filesystem</artifactId>
+      <version>0.016</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-azure-filesystem</artifactId>
+      <version>0.016</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
