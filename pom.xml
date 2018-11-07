@@ -37,7 +37,7 @@
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
     <module>pinot-minion</module>
-    <module>pinot-storage</module>
+    <module>pinot-filesystem</module>
   </modules>
   <licenses>
     <license>
@@ -250,7 +250,7 @@
       </dependency>
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
-        <artifactId>pinot-storage</artifactId>
+        <artifactId>pinot-filesystem</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

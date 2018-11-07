@@ -40,13 +40,13 @@ public class PinotFSFactoryTest {
   @Test
   public void testDefaultPinotFSFactory() {
     _pinotFSFactory.init(new PropertiesConfiguration());
-    Assert.assertTrue(_pinotFSFactory.create("file") instanceof LocalPinotFS);
+    Assert.assertTrue(_pinotFSFactory.create("file") instanceof com.linkedin.pinot.filesystem.LocalPinotFS);
   }
 
   @Test
   public void testCustomizedSegmentFetcherFactory() {
     Configuration config = new PropertiesConfiguration();
-    config.addProperty("class.file", LocalPinotFS.class.getName());
+    config.addProperty("class.file", com.linkedin.pinot.filesystem.LocalPinotFS.class.getName());
     config.addProperty("class.test", TestPinotFS.class.getName());
     PinotFSFactory.init(config);
     PinotFS testPinotFS = PinotFSFactory.create("test");

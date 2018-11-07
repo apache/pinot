@@ -20,22 +20,41 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
-    <artifactId>pinot</artifactId>
+    <artifactId>pinot-filesystem</artifactId>
     <groupId>com.linkedin.pinot</groupId>
     <version>0.016</version>
   </parent>
-
-  <groupId>com.linkedin.pinot</groupId>
-  <packaging>pom</packaging>
   <modelVersion>4.0.0</modelVersion>
-  <artifactId>pinot-storage</artifactId>
-  <name>pinot-storage</name>
-  <version>0.016</version>
-  <modules>
-    <module>pinot-filesystem</module>
-    <module>pinot-hadoop-filesystem</module>
-    <module>pinot-azure-filesystem</module>
-  </modules>
 
+  <artifactId>pinot-local-filesystem</artifactId>
+  <version>0.016</version>
+  <url>http://maven.apache.org</url>
+
+  <dependencies>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-configuration</groupId>
+      <artifactId>commons-configuration</artifactId>
+      <version>1.6</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-filesystem-spi</artifactId>
+      <version>0.016</version>
+      <scope>compile</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testng</groupId>
+      <artifactId>testng</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 
 </project>

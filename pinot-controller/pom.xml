@@ -216,7 +216,12 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-filesystem</artifactId>
+      <artifactId>pinot-filesystem-spi</artifactId>
+      <version>0.016</version>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-local-filesystem</artifactId>
       <version>0.016</version>
     </dependency>
   </dependencies>

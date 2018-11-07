@@ -20,7 +20,7 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
-    <artifactId>pinot-storage</artifactId>
+    <artifactId>pinot-filesystem</artifactId>
     <groupId>com.linkedin.pinot</groupId>
     <version>0.016</version>
   </parent>
@@ -70,7 +70,7 @@
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
-      <artifactId>pinot-filesystem</artifactId>
+      <artifactId>pinot-filesystem-spi</artifactId>
       <version>0.016</version>
       <scope>compile</scope>
     </dependency>

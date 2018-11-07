@@ -33,6 +33,7 @@ public class PinotFSFactory {
   private static final String DEFAULT_FS_SCHEME = "file";
   private static final String CLASS = "class";
 
+  private static final String DEFAULT_FS_CLASS = "com.linkedin.pinot.filesystem.LocalPinotFS";
   private static Map<String, PinotFS> _fileSystemMap = new HashMap<>();
 
   // Prevent factory from being instantiated.
@@ -64,8 +65,14 @@ public class PinotFSFactory {
     }
 
     if (!_fileSystemMap.containsKey(DEFAULT_FS_SCHEME)) {
+      PinotFS defaultClass;
+      try {
+        defaultClass = (PinotFS) Class.forName(DEFAULT_FS_CLASS).newInstance();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
       LOGGER.info("LocalPinotFS not configured, adding as default");
-      _fileSystemMap.put(DEFAULT_FS_SCHEME, new LocalPinotFS());
+      _fileSystemMap.put(DEFAULT_FS_SCHEME, defaultClass);
     }
   }
 
