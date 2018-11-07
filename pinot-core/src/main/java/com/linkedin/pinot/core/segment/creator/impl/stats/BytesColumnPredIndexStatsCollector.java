@@ -17,33 +17,31 @@ package com.linkedin.pinot.core.segment.creator.impl.stats;
 
 import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 
 /**
  * Extension of {@link AbstractColumnStatisticsCollector} for byte[] column type.
  */
 public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
-
-  private byte[] _min = EMPTY_BYTE_ARRAY;
-  private byte[] _max = EMPTY_BYTE_ARRAY;
+  private ByteArray _min = null;
+  private ByteArray _max = null;
 
   private int _lengthOfShortestEntry = Integer.MAX_VALUE;
   private int _lengthOfLongestEntry = 0;
 
-  private final ObjectSet<ByteArray> _rawBytesSet;
-  private final ObjectSet<ByteArray> _aggregateBytesSet;
+  private final Set<ByteArray> _rawBytesSet;
+  private final Set<ByteArray> _aggregateBytesSet;
 
   private ByteArray[] _sortedBytesList;
   private boolean _sealed = false;
 
   public BytesColumnPredIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
-    _rawBytesSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
-    _aggregateBytesSet = new ObjectOpenHashSet<>(INITIAL_HASH_SET_SIZE);
+    _rawBytesSet = new HashSet<>(INITIAL_HASH_SET_SIZE);
+    _aggregateBytesSet = new HashSet<>(INITIAL_HASH_SET_SIZE);
   }
 
   /**
@@ -56,27 +54,17 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
    * @param entry Entry value
    * @param set Set containing entries
    */
-  private void collectEntry(Object entry, ObjectSet<ByteArray> set) {
-    if (entry instanceof Object[]) {
-      throw new UnsupportedOperationException("Multi-valued column not supported for byte array data type.");
-    } else {
-      ByteArray value;
-      if (entry != null) {
-        value = (ByteArray) entry;
-      } else {
-        value = (ByteArray) fieldSpec.getDefaultNullValue();
-      }
+  private void collectEntry(byte[] entry, Set<ByteArray> set) {
+    ByteArray value = new ByteArray(entry);
+    addressSorted(value);
+    updatePartition(value);
+    set.add(value);
 
-      addressSorted(value);
-      updatePartition(value);
-      set.add(value);
+    int valueLength = value.length();
+    _lengthOfShortestEntry = Math.min(_lengthOfShortestEntry, valueLength);
+    _lengthOfLongestEntry = Math.max(_lengthOfLongestEntry, valueLength);
 
-      int valueLength = value.length();
-      _lengthOfShortestEntry = Math.min(_lengthOfShortestEntry, valueLength);
-      _lengthOfLongestEntry = Math.max(_lengthOfLongestEntry, valueLength);
-
-      totalNumberOfEntries++;
-    }
+    totalNumberOfEntries++;
   }
 
   /**
@@ -86,10 +74,11 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
    */
   @Override
   public void collect(Object entry, boolean isAggregated) {
+    assert entry instanceof byte[];
     if (isAggregated) {
-      collectEntry(entry, _aggregateBytesSet);
+      collectEntry((byte[]) entry, _aggregateBytesSet);
     } else {
-      collectEntry(entry, _rawBytesSet);
+      collectEntry((byte[]) entry, _rawBytesSet);
     }
   }
 
@@ -103,7 +92,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public byte[] getMinValue() {
+  public ByteArray getMinValue() {
     if (_sealed) {
       return _min;
     }
@@ -111,7 +100,7 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
   }
 
   @Override
-  public byte[] getMaxValue() {
+  public ByteArray getMaxValue() {
     if (_sealed) {
       return _max;
     }
@@ -154,29 +143,20 @@ public class BytesColumnPredIndexStatsCollector extends AbstractColumnStatistics
 
   @Override
   public void seal() {
-    _sealed = true;
-    _sortedBytesList = new ByteArray[_rawBytesSet.size()];
-    _rawBytesSet.toArray(_sortedBytesList);
-
+    _sortedBytesList = _rawBytesSet.toArray(new ByteArray[_rawBytesSet.size()]);
     Arrays.sort(_sortedBytesList);
 
-    if (_sortedBytesList.length == 0) {
-      _min = null;
-      _max = null;
-      return;
-    }
-
     // Update min/max based on raw docs.
-    _min = _sortedBytesList[0].getBytes();
-    _max = _sortedBytesList[_sortedBytesList.length - 1].getBytes();
+    _min = _sortedBytesList[0];
+    _max = _sortedBytesList[_sortedBytesList.length - 1];
 
     // Merge the raw and aggregated docs, so stats for dictionary creation are collected correctly.
-    int numAggregated = _aggregateBytesSet.size();
-    if (numAggregated > 0) {
+    if (!_aggregateBytesSet.isEmpty()) {
       _rawBytesSet.addAll(_aggregateBytesSet);
-      _sortedBytesList = new ByteArray[_rawBytesSet.size()];
-      _rawBytesSet.toArray(_sortedBytesList);
+      _sortedBytesList = _rawBytesSet.toArray(new ByteArray[_rawBytesSet.size()]);
       Arrays.sort(_sortedBytesList);
     }
+
+    _sealed = true;
   }
 }

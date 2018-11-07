@@ -46,7 +46,8 @@ public class MutableDictionaryTest {
   private static final int EST_CARDINALITY = NUM_ENTRIES / 3;
   private static final int NUM_READERS = 3;
   private static final FieldSpec.DataType[] DATA_TYPES =
-      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES};
+      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE,
+          FieldSpec.DataType.STRING, FieldSpec.DataType.BYTES};
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
 
@@ -168,13 +169,14 @@ public class MutableDictionaryTest {
     for (int i = 0; i < NUM_ENTRIES; i++) {
       // Special case first 'INT' type to be Integer.MIN_VALUE.
       Comparable value =
-          (i == 0 && FieldSpec.DataType.INT.equals(dataType)) ? Integer.MIN_VALUE : makeRandomObjectOfType(dataType);
+          (i == 0 && dataType == FieldSpec.DataType.INT) ? Integer.MIN_VALUE : makeRandomObjectOfType(dataType);
 
+      Object rawValue = dataType == FieldSpec.DataType.BYTES ? ((ByteArray) value).getBytes() : value;
       if (valueToDictId.containsKey(value)) {
-        Assert.assertEquals(dictionary.indexOf(value), (int) valueToDictId.get(value));
+        Assert.assertEquals(dictionary.indexOf(rawValue), (int) valueToDictId.get(value));
       } else {
-        dictionary.index(value);
-        int dictId = dictionary.indexOf(value);
+        dictionary.index(rawValue);
+        int dictId = dictionary.indexOf(rawValue);
         Assert.assertEquals(dictId, numEntries++);
         valueToDictId.put(value, dictId);
 
@@ -260,9 +262,9 @@ public class MutableDictionaryTest {
    * <p>We can assume that we always first get the index of a value, then use the index to fetch the value.
    */
   private class Reader implements Callable<Void> {
-
     private final MutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
+
     private Reader(MutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;
@@ -283,15 +285,15 @@ public class MutableDictionaryTest {
       }
       return null;
     }
-
   }
+
   /**
    * Writer to index value into dictionary, then check the index of the value.
    */
   private class Writer implements Callable<Void> {
-
     private final MutableDictionary _dictionary;
     private final FieldSpec.DataType _dataType;
+
     private Writer(MutableDictionary dictionary, FieldSpec.DataType dataType) {
       _dictionary = dictionary;
       _dataType = dataType;
@@ -309,8 +311,8 @@ public class MutableDictionaryTest {
       }
       return null;
     }
-
   }
+
   /**
    * Helper method to return an <code>Integer</code> or <code>String</code> based on the given int value and data type.
    */
@@ -341,8 +343,7 @@ public class MutableDictionaryTest {
     }
   }
 
-  private List<Comparable> primitiveArrayToList(FieldSpec.DataType dataType,
-      Object sortedValues) {
+  private List<Comparable> primitiveArrayToList(FieldSpec.DataType dataType, Object sortedValues) {
     List<Comparable> valueList;
     switch (dataType) {
       case INT:
