@@ -70,7 +70,10 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = "controller.segment.upload.timeoutInMillis";
   private static final String REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = "controller.realtime.segment.metadata.commit.numLocks";
   private static final String ENABLE_STORAGE_QUOTA_CHECK = "controller.enable.storage.quota.check";
-  private static final String ENABLE_SEGMENT_LEVEL_VALIDATION = "controller.enable.segment.level.validation";
+  // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation with a
+  // separate interval
+  private static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS =
+      "controller.segment.level.validation.intervalInSeconds";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
@@ -93,7 +96,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
-  private static final boolean DEFAULT_ENABLE_SEGMENT_LEVEL_VALIDATION = true;
+  private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
@@ -456,7 +459,7 @@ public class ControllerConf extends PropertiesConfiguration {
     return getBoolean(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_ENABLE_STORAGE_QUOTA_CHECK);
   }
 
-  public boolean getEnableSegmentLevelValidation() {
-    return getBoolean(ENABLE_SEGMENT_LEVEL_VALIDATION, DEFAULT_ENABLE_SEGMENT_LEVEL_VALIDATION);
+  public int getSegmentLevelValidationIntervalInSeconds() {
+    return getInt(SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS, DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS);
   }
 }
