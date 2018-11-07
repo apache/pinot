@@ -22,7 +22,7 @@ import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.ConfigKey;
 import com.linkedin.pinot.common.config.ConfigNodeLifecycleAware;
 import com.linkedin.pinot.common.utils.EqualityUtils;
-import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.avro.Schema.Type;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
@@ -41,6 +41,9 @@ import org.apache.commons.codec.binary.Hex;
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLifecycleAware {
+  private static final int DEFAULT_MAX_LENGTH = 512;
+
+  // TODO: revisit to see if we allow 0-length byte array
   private static final byte[] NULL_BYTE_ARRAY_VALUE = new byte[0];
 
   private static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
@@ -66,6 +69,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   @ConfigKey("singleValue")
   protected boolean _isSingleValueField = true;
 
+  // NOTE: for STRING column, this is the max number of characters; for BYTES column, this is the max number of bytes
+  @ConfigKey("maxLength")
+  private int _maxLength = DEFAULT_MAX_LENGTH;
+
   protected Object _defaultNullValue;
 
   @ConfigKey("defaultNullValue")
@@ -81,42 +88,40 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   public FieldSpec() {
   }
 
-  public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField) {
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField) {
+    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, null);
+  }
+
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, @Nullable Object defaultNullValue) {
+    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, defaultNullValue);
+  }
+
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+      @Nullable Object defaultNullValue) {
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
-    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, null);
+    _maxLength = maxLength;
+    setDefaultNullValue(defaultNullValue);
   }
 
-  public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
-      @Nonnull Object defaultNullValue) {
-    _name = name;
-    _dataType = dataType.getStoredType();
-    _isSingleValueField = isSingleValueField;
-    _stringDefaultNullValue = getStringValue(defaultNullValue);
-    _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
-  }
-
-  @Nonnull
   public abstract FieldType getFieldType();
 
-  @Nonnull
   public String getName() {
     return _name;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setName(@Nonnull String name) {
+  public void setName(String name) {
     _name = name;
   }
 
-  @Nonnull
   public DataType getDataType() {
     return _dataType;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setDataType(@Nonnull DataType dataType) {
+  public void setDataType(DataType dataType) {
     _dataType = dataType.getStoredType();
     _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
   }
@@ -130,6 +135,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     _isSingleValueField = isSingleValueField;
   }
 
+  public int getMaxLength() {
+    return _maxLength;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  public void setMaxLength(int maxLength) {
+    _maxLength = maxLength;
+  }
+
   public String getVirtualColumnProvider() {
     return _virtualColumnProvider;
   }
@@ -138,7 +152,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     _virtualColumnProvider = virtualColumnProvider;
   }
 
-  @Nonnull
   public Object getDefaultNullValue() {
     return _defaultNullValue;
   }
@@ -150,7 +163,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
    * @param value Value for which String value needs to be returned
    * @return String value for the object.
    */
-  private String getStringValue(Object value) {
+  protected static String getStringValue(Object value) {
     if (value instanceof byte[]) {
       return Hex.encodeHexString((byte[]) value);
     } else {
@@ -159,15 +172,17 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setDefaultNullValue(@Nonnull Object defaultNullValue) {
-    _stringDefaultNullValue = defaultNullValue.toString();
+  public void setDefaultNullValue(@Nullable Object defaultNullValue) {
+    if (defaultNullValue != null) {
+      _stringDefaultNullValue = getStringValue(defaultNullValue);
+    }
     if (_dataType != null) {
       _defaultNullValue = getDefaultNullValue(getFieldType(), _dataType, _stringDefaultNullValue);
     }
   }
 
-  private static Object getDefaultNullValue(@Nonnull FieldType fieldType, @Nonnull DataType dataType,
-      String stringDefaultNullValue) {
+  private static Object getDefaultNullValue(FieldType fieldType, DataType dataType,
+      @Nullable String stringDefaultNullValue) {
     if (stringDefaultNullValue != null) {
       switch (dataType) {
         case INT:
@@ -244,7 +259,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setTransformFunction(@Nonnull String transformFunction) {
+  public void setTransformFunction(String transformFunction) {
     _transformFunction = transformFunction;
   }
 
@@ -253,7 +268,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
    * <p>Only contains fields with non-default value.
    * <p>NOTE: here we use {@link JsonObject} to preserve the insertion order.
    */
-  @Nonnull
   public JsonObject toJsonObject() {
     JsonObject jsonObject = new JsonObject();
     jsonObject.addProperty("name", _name);
@@ -261,15 +275,15 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     if (!_isSingleValueField) {
       jsonObject.addProperty("singleValueField", false);
     }
+    if (_maxLength != DEFAULT_MAX_LENGTH) {
+      jsonObject.addProperty("maxLength", _maxLength);
+    }
     appendDefaultNullValue(jsonObject);
     return jsonObject;
   }
 
-  protected void appendDefaultNullValue(@Nonnull JsonObject jsonObject) {
-    if (_defaultNullValue == null) {
-      return;
-    }
-
+  protected void appendDefaultNullValue(JsonObject jsonObject) {
+    assert _defaultNullValue != null;
     if (!_defaultNullValue.equals(getDefaultNullValue(getFieldType(), _dataType, null))) {
       if (_defaultNullValue instanceof Number) {
         jsonObject.add("defaultNullValue", new JsonPrimitive((Number) _defaultNullValue));
@@ -279,7 +293,6 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     }
   }
 
-  @Nonnull
   public JsonObject toAvroSchemaJsonObject() {
     JsonObject jsonSchema = new JsonObject();
     jsonSchema.addProperty("name", _name);
@@ -326,7 +339,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     FieldSpec that = (FieldSpec) o;
     return EqualityUtils.isEqual(_name, that._name) && EqualityUtils.isEqual(_dataType, that._dataType) && EqualityUtils
         .isEqual(_isSingleValueField, that._isSingleValueField) && EqualityUtils.isEqual(
-        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue));
+        getStringValue(_defaultNullValue), getStringValue(that._defaultNullValue)) && EqualityUtils.isEqual(_maxLength,
+        that._maxLength);
   }
 
   @Override
@@ -335,6 +349,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     result = EqualityUtils.hashCodeOf(result, _dataType);
     result = EqualityUtils.hashCodeOf(result, _isSingleValueField);
     result = EqualityUtils.hashCodeOf(result, getStringValue(_defaultNullValue));
+    result = EqualityUtils.hashCodeOf(result, _maxLength);
     return result;
   }
 

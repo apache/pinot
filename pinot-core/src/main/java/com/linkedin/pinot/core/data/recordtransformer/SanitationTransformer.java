@@ -19,8 +19,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.GenericRow;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 
@@ -28,41 +27,45 @@ import java.util.Map;
  * The {@code SanitationTransformer} class will sanitize the values to follow certain rules including:
  * <ul>
  *   <li>No {@code null} characters in string values</li>
+ *   <li>Values are within the length limit</li>
+ *   TODO: add length limit to BYTES values if necessary
  * </ul>
  * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
  * {@link FieldSpec}.
  */
 public class SanitationTransformer implements RecordTransformer {
-  private final List<String> _stringColumns = new ArrayList<>();
+  private final Map<String, Integer> _stringColumnMaxLengthMap = new HashMap<>();
 
   public SanitationTransformer(Schema schema) {
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
-      FieldSpec.DataType dataType = entry.getValue().getDataType();
-      if (dataType == FieldSpec.DataType.STRING) {
-        _stringColumns.add(entry.getKey());
+      FieldSpec fieldSpec = entry.getValue();
+      if (fieldSpec.getDataType() == FieldSpec.DataType.STRING) {
+        _stringColumnMaxLengthMap.put(entry.getKey(), fieldSpec.getMaxLength());
       }
     }
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
-    for (String stringColumn : _stringColumns) {
+    for (Map.Entry<String, Integer> entry : _stringColumnMaxLengthMap.entrySet()) {
+      String stringColumn = entry.getKey();
+      int maxLength = entry.getValue();
       Object value = record.getValue(stringColumn);
       if (value instanceof String) {
         // Single-valued column
         String stringValue = (String) value;
-        if (StringUtil.containsNullCharacter(stringValue)) {
-          record.putField(stringColumn, StringUtil.removeNullCharacters(stringValue));
+        String sanitizedValue = StringUtil.sanitizeStringValue(stringValue, maxLength);
+        // NOTE: reference comparison
+        //noinspection StringEquality
+        if (sanitizedValue != stringValue) {
+          record.putField(stringColumn, sanitizedValue);
         }
       } else {
         // Multi-valued column
         Object[] values = (Object[]) value;
         int numValues = values.length;
         for (int i = 0; i < numValues; i++) {
-          String stringValue = (String) values[i];
-          if (StringUtil.containsNullCharacter(stringValue)) {
-            values[i] = StringUtil.removeNullCharacters(stringValue);
-          }
+          values[i] = StringUtil.sanitizeStringValue((String) values[i], maxLength);
         }
       }
     }
