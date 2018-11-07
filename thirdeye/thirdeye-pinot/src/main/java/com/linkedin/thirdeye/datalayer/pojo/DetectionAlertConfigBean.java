@@ -38,6 +38,7 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String application;
 
   Map<String, Map<String, Object>> alertSchemes;
+  Map<String, Map<String, Object>> alertSuppressors;
   AlertConfigBean.SubjectType subjectType = AlertConfigBean.SubjectType.ALERT;
 
   Map<Long, Long> vectorClocks;
@@ -123,6 +124,14 @@ public class DetectionAlertConfigBean extends AbstractBean {
 
   public void setAlertSchemes(Map<String, Map<String, Object>> alertSchemes) {
     this.alertSchemes = alertSchemes;
+  }
+
+  public Map<String, Map<String, Object>> getAlertSuppressors() {
+    return alertSuppressors;
+  }
+
+  public void setAlertSuppressors(Map<String, Map<String, Object>> alertSuppressors) {
+    this.alertSuppressors = alertSuppressors;
   }
 
   @Override
