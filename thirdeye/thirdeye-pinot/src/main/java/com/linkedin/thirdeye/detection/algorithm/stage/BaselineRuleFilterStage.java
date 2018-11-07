@@ -23,9 +23,8 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.annotation.Detection;
+import com.linkedin.thirdeye.detection.annotation.Components;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
-import com.linkedin.thirdeye.detection.annotation.Training;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import java.util.Arrays;
@@ -39,11 +38,10 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 /**
  * This filter stage filters the anomalies if either the absolute changeThreshold, percentage changeThreshold or site wide impact does not pass the threshold.
  */
-@Detection(name = "Baseline Filter",
+@Components(title = "Baseline Filter",
     type = "BUSINESS_RULE_FILTER",
     tags = {DetectionTag.RULE_FILTER},
     description = "Baseline rule filter. Filters the anomalies if percentage change, absolute difference or site wide impact is below certain threshold.")
-@Training(trainingModule = "RuleDetectionTrainingModule")
 public class BaselineRuleFilterStage implements AnomalyFilterStage {
   private static final String PROP_CHANGE = "changeThreshold";
   private static final double PROP_CHANGE_DEFAULT = Double.NaN;

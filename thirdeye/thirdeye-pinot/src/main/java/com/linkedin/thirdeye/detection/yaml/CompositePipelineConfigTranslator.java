@@ -2,20 +2,16 @@ package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
-import com.linkedin.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStageWrapper;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStageWrapper;
 import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
-import com.linkedin.thirdeye.detection.tune.StageTrainingModule;
-import com.linkedin.thirdeye.detection.tune.TrainingModuleLoader;
-import com.linkedin.thirdeye.detection.tune.TrainingResult;
+import com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
+import com.linkedin.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -26,7 +22,6 @@ import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 
 import static com.linkedin.thirdeye.detection.ConfigUtils.*;
-import static com.linkedin.thirdeye.detection.tune.StaticStageTrainingModule.*;
 
 
 /**
@@ -48,7 +43,7 @@ import static com.linkedin.thirdeye.detection.tune.StaticStageTrainingModule.*;
  *       |                |
  * +-----v----+     +-----v----+
  * | Rule     |     | Algorithm|
- * | detection|     | Detection|
+ * | detection|     | Components|
  * +-------------+  +-----+----+
  *       |                |
  * +-----v----+     +-----v----+
@@ -118,7 +113,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-  private static final TrainingModuleLoader TRAINING_MODULE_LOADER = new TrainingModuleLoader();
   private final Map<String, Object> components = new HashMap<>();
 
   public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
@@ -171,9 +165,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     nestedProperties.put(PROP_STAGE_CLASSNAME, stageClassName);
 
     Map<String, Object> properties = new HashMap<>();
-    TrainingResult result = trainStage(stageClassName, yamlConfig);
-    String componentKey = makeComponentKey(type);
-    nestedProperties.put(PROP_SPEC, result.getStageSpecs());
     properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
     properties.put(PROP_NESTED, Collections.singletonList(nestedProperties));
     return properties;
@@ -199,8 +190,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private void fillStageSpecs(Map<String, Object> properties, Map<String, Object> yamlConfig) {
     String stageClassName = DETECTION_REGISTRY.lookup(MapUtils.getString(yamlConfig, PROP_TYPE));
     properties.put(PROP_STAGE_CLASSNAME, stageClassName);
-    TrainingResult result = trainStage(stageClassName, yamlConfig);
-    properties.put(PROP_SPEC, result.getStageSpecs());
   }
 
   private Map<String, Object> buildWrapperProperties(String wrapperClassName,
@@ -226,11 +215,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     return properties;
   }
 
-  private TrainingResult trainStage(String stageClassName, Map<String, Object> yamlConfig) {
-    StageTrainingModule trainingModule = TRAINING_MODULE_LOADER.from(DETECTION_REGISTRY.lookupTrainingModule(stageClassName));
-    trainingModule.init(ImmutableMap.of(PROP_YAML_CONFIG, yamlConfig), this.startTime, this.endTime);
-    return trainingModule.fit(this.dataProvider);
-  }
 
   private String buildMetricUrn(Map<String, Object> yamlConfig) {
     Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);

@@ -20,8 +20,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.reflect.ClassPath;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStage;
-import com.linkedin.thirdeye.detection.algorithm.stage.ThresholdRuleFilterStage;
-import com.linkedin.thirdeye.detection.tune.StaticStageTrainingModule;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,7 +50,7 @@ public class DetectionRegistry {
   }
 
   /**
-   * Internal constructor. Read the Detection annotation from each stage implementation.
+   * Internal constructor. Read the Components annotation from each stage implementation.
    */
   private DetectionRegistry() {
     try {
@@ -62,9 +60,10 @@ public class DetectionRegistry {
         String className = classInfo.getName();
         Class clazz = Class.forName(className);
         for (Annotation annotation : clazz.getAnnotations()) {
-          if (annotation instanceof Detection) {
-            Detection detectionAnnotation = (Detection) annotation;
-            REGISTRY_MAP.put(detectionAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION, detectionAnnotation));
+          if (annotation instanceof Components) {
+            Components componentsAnnotation = (Components) annotation;
+            REGISTRY_MAP.put(componentsAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION,
+                componentsAnnotation));
           }
           if (annotation instanceof Training) {
             Training trainingAnnotation = (Training) annotation;
@@ -90,25 +89,17 @@ public class DetectionRegistry {
     return stageClassName;
   }
 
-  /**
-   * Look up the training module class name for a given algorithm
-   * @param stageClassName the class name
-   * @return training module class name
-   */
-  public String lookupTrainingModule(String stageClassName) {
-    return StaticStageTrainingModule.class.getPackage().getName() + "." + TRAINING_MODULE_MAP.get(stageClassName).trainingModule();
-  }
 
   /**
    * Return all stage implementation annotations
    * @return List of detection annotation
    */
-  public List<Detection> getAllAnnotation() {
-    List<Detection> annotations = new ArrayList<>();
+  public List<Components> getAllAnnotation() {
+    List<Components> annotations = new ArrayList<>();
     for (Map.Entry<String, Map> entry : REGISTRY_MAP.entrySet()){
       Map infoMap = entry.getValue();
       if (infoMap.containsKey(KEY_ANNOTATION)){
-        annotations.add((Detection) infoMap.get(KEY_ANNOTATION));
+        annotations.add((Components) infoMap.get(KEY_ANNOTATION));
       }
     }
     return annotations;

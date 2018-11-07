@@ -20,14 +20,12 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.annotation.Detection;
-import com.linkedin.thirdeye.detection.annotation.DetectionParam;
+import com.linkedin.thirdeye.detection.annotation.Components;
+import com.linkedin.thirdeye.detection.annotation.Param;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.PresentationOption;
-import com.linkedin.thirdeye.detection.annotation.Training;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 
@@ -37,7 +35,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 /**
  * This threshold rule filter stage filters the anomalies if either the min or max thresholds do not pass.
  */
-@Detection(name = "Aggregate Threshold Filter",
+@Components(title = "Aggregate Threshold Filter",
     type = "THRESHOLD_RULE_FILTER",
     tags = {DetectionTag.RULE_FILTER},
     description = "Threshold rule filter. filters the anomalies if either the min or max thresholds do not satisfied.",
@@ -47,9 +45,8 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
             description = "aggregated absolute value within a time period",
             template = "is between ${min} and ${max}"
         )},
-    params = {@DetectionParam(name = "min", placeholder = "value"), @DetectionParam(name = "max", placeholder = "value")}
+    params = {@Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")}
 )
-@Training(trainingModule = "RuleDetectionTrainingModule")
 public class ThresholdRuleFilterStage implements AnomalyFilterStage {
     private static final String PROP_MIN = "min";
     private static final double PROP_MIN_DEFAULT = Double.NaN;

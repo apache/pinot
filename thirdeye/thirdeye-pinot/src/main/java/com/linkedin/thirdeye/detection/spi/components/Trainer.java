@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.tune;
+package com.linkedin.thirdeye.detection.spi.components;
 
-import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.spec.AbstractSpec;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.Map;
+import org.joda.time.Interval;
 
-/**
- * Low level training module interface, with access to data provider.
- */
-public interface StageTrainingModule {
-  void init(Map<String, Object> properties, long startTime, long endTime);
 
-  TrainingResult fit(DataProvider provider);
+public interface Trainer<T extends AbstractSpec> extends BaseComponent<T> {
+  Map<String, Object> train(InputData data);
+
+  InputDataSpec getInputDataSpec(Interval trainingWindow);
 }

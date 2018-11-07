@@ -23,8 +23,9 @@ import java.util.Map;
 import org.joda.time.Interval;
 
 
-public interface Trainable<T extends AbstractSpec> extends BaseComponent<T> {
-  Map<String, Object> train(InputData data);
+public interface Tuner<T extends AbstractSpec> extends BaseComponent<T> {
+  Map<String, Object> tune(Map<String, Object> currentSpec, InputData data);
 
-  InputDataSpec getInputDataSpec(Interval trainingWindow);
+  InputDataSpec getInputDataSpec(Interval tuningWindow);
+
 }

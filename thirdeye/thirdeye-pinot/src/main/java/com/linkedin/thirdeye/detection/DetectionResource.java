@@ -48,6 +48,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,7 +102,8 @@ public class DetectionResource {
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setId(Long.MAX_VALUE);
     config.setName("preview");
-    config.setProperties(properties);
+    config.setProperties(MapUtils.getMap(properties, "properties"));
+    config.setComponentSpecs(MapUtils.getMap(properties, "componentSpecs"));
 
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
     DetectionPipelineResult result = pipeline.run();
@@ -146,7 +148,7 @@ public class DetectionResource {
 
     DetectionConfigDTO config = this.configDAO.findById(id);
     if (config == null) {
-      throw new IllegalArgumentException("Detection Config not exist");
+      throw new IllegalArgumentException("Components Config not exist");
     }
 
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);

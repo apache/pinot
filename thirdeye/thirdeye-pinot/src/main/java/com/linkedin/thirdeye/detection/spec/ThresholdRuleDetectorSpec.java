@@ -17,12 +17,22 @@
 package com.linkedin.thirdeye.detection.spec;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
 
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ThresholdRuleDetectorSpec extends AbstractSpec {
-  private double min;
-  private double max;
+  private double min = Double.NaN;
+  private double max = Double.NaN;
+  private RuleBaselineProvider baselineProvider;
+
+  public RuleBaselineProvider getRuleBaselineProvider() {
+    return baselineProvider;
+  }
+
+  public void setRuleBaselineProvider(RuleBaselineProvider ruleBaselineProvider) {
+    this.baselineProvider = ruleBaselineProvider;
+  }
 
   public double getMin() {
     return min;

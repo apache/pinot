@@ -18,24 +18,28 @@ package com.linkedin.thirdeye.detection.annotation;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 
-@Target({ElementType.PARAMETER, ElementType.METHOD, ElementType.FIELD})
+@Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface DetectionParam {
+@Inherited
+public @interface Components {
+  @JsonProperty String title() default "";
 
-  @JsonProperty String name() default "";
+  @JsonProperty DetectionTag[] tags() default {};
 
-  @JsonProperty String placeholder() default "";
-
-  @JsonProperty String defaultValue() default "";
-
-  @JsonProperty String[] allowableValues() default {};
-
-  @JsonProperty boolean required() default false;
+  @JsonProperty String type() default "";
 
   @JsonProperty String description() default "";
+
+  @JsonProperty boolean hidden() default false;
+
+  @JsonProperty PresentationOption[] presentation() default {};
+
+  @JsonProperty Param[] params() default {};
 }
+

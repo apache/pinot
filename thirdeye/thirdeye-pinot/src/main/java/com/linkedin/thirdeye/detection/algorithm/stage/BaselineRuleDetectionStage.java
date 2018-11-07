@@ -22,11 +22,10 @@ import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.annotation.Detection;
-import com.linkedin.thirdeye.detection.annotation.DetectionParam;
+import com.linkedin.thirdeye.detection.annotation.Components;
+import com.linkedin.thirdeye.detection.annotation.Param;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.PresentationOption;
-import com.linkedin.thirdeye.detection.annotation.Training;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
@@ -43,7 +42,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * Simple baseline algorithm. Computes a multi-week aggregate baseline and compares
  * the current value based on relative change or absolute difference.
  */
-@Detection(name = "Baseline rule detection",
+@Components(title = "Baseline rule detection",
     type = "BASELINE",
     tags = {DetectionTag.RULE_FILTER},
     description = "Simple baseline algorithm. Computes a multi-week aggregate baseline and compares the current value "
@@ -53,11 +52,10 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
       @PresentationOption(name = "percentage change", template = "comparing ${offset} is more than ${change}")
     },
     params = {
-        @DetectionParam(name = "offset", defaultValue = "wo1w"),
-        @DetectionParam(name = "change", placeholder = "value"),
-        @DetectionParam(name = "difference", placeholder = "value")
+        @Param(name = "offset", defaultValue = "wo1w"),
+        @Param(name = "change", placeholder = "value"),
+        @Param(name = "difference", placeholder = "value")
     })
-@Training(trainingModule = "RuleDetectionTrainingModule")
 public class BaselineRuleDetectionStage extends StaticAnomalyDetectionStage {
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";

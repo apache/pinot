@@ -35,6 +35,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -122,7 +125,7 @@ public class DetectionUtils {
     // end of current run
     if (lastStart >= 0) {
       long start = sTime.get(lastStart);
-      long end = start + 1;
+      long end = sTime.getLong(sTime.size() - 1);
 
       // truncate at analysis end time
       end = Math.min(end, endTime);
