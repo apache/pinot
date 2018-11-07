@@ -24,10 +24,10 @@ import java.util.Map;
  */
 public class TrainingResult {
   // specs of this stage
-  private Map<String, Object> stageSpecs;
+  private final Map<String, Object> stageSpecs;
 
   // specs for the baseline provider
-  private Map<String, Object> baselineProviderSpecs;
+  private final Map<String, Object> baselineProviderSpecs;
 
   public TrainingResult() {
     this.stageSpecs = new HashMap<>();

@@ -33,6 +33,7 @@ import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import com.linkedin.thirdeye.detection.finetune.TuningAlgorithm;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Collection;

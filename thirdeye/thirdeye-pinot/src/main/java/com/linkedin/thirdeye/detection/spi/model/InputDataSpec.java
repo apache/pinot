@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection;
+package com.linkedin.thirdeye.detection.spi.model;
 
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import java.util.Collection;
@@ -49,19 +49,27 @@ public class InputDataSpec {
   */
   final Collection<EventSlice> eventSlices;
 
+  final Collection<Long> metricIds;
+
+  final Collection<String> datasetNames;
+
   public InputDataSpec() {
     this.timeseriesSlices = Collections.emptyList();
     this.aggregateSlices = Collections.emptyList();
     this.anomalySlices = Collections.emptyList();
     this.eventSlices = Collections.emptyList();
+    this.metricIds = Collections.emptyList();
+    this.datasetNames = Collections.emptyList();
   }
 
   public InputDataSpec(Collection<MetricSlice> timeseriesSlices, Collection<MetricSlice> aggregateSlices,
-      Collection<AnomalySlice> anomalySlices, Collection<EventSlice> eventSlices) {
+      Collection<AnomalySlice> anomalySlices, Collection<EventSlice> eventSlices, Collection<Long> metricIds, Collection<String> datasetNames) {
     this.timeseriesSlices = timeseriesSlices;
     this.aggregateSlices = aggregateSlices;
     this.anomalySlices = anomalySlices;
     this.eventSlices = eventSlices;
+    this.metricIds = metricIds;
+    this.datasetNames = datasetNames;
   }
 
   public Collection<MetricSlice> getTimeseriesSlices() {
@@ -80,19 +88,36 @@ public class InputDataSpec {
     return eventSlices;
   }
 
+  public Collection<Long> getMetricIds() {
+    return metricIds;
+  }
+
+  public Collection<String> getDatasetNames() {
+    return datasetNames;
+  }
+
   public InputDataSpec withTimeseriesSlices(Collection<MetricSlice> timeseriesSlices) {
-    return new InputDataSpec(timeseriesSlices, this.aggregateSlices, this.anomalySlices, this.eventSlices);
+    return new InputDataSpec(timeseriesSlices, this.aggregateSlices, this.anomalySlices, this.eventSlices, this.metricIds, this.datasetNames);
   }
 
   public InputDataSpec withAggregateSlices(Collection<MetricSlice> aggregateSlices) {
-    return new InputDataSpec(this.timeseriesSlices, aggregateSlices, this.anomalySlices, this.eventSlices);
+    return new InputDataSpec(this.timeseriesSlices, aggregateSlices, this.anomalySlices, this.eventSlices, this.metricIds, this.datasetNames);
   }
 
   public InputDataSpec withAnomalySlices(Collection<AnomalySlice> anomalySlices) {
-    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, anomalySlices, this.eventSlices);
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, anomalySlices, this.eventSlices, this.metricIds, this.datasetNames);
   }
 
   public InputDataSpec withEventSlices(Collection<EventSlice> eventSlices) {
-    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices);
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, this.metricIds, this.datasetNames);
   }
+
+  public InputDataSpec withMetricIds(Collection<Long> metricIds) {
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, metricIds, this.datasetNames);
+  }
+
+  public InputDataSpec withDatasetNames(Collection<String> datasetNames) {
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, this.metricIds, datasetNames);
+  }
+
 }

@@ -170,14 +170,17 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     String stageClassName = DETECTION_REGISTRY.lookup(type);
     nestedProperties.put(PROP_STAGE_CLASSNAME, stageClassName);
 
-    TrainingResult result = trainStage(stageClassName, yamlConfig);
-    nestedProperties.put(PROP_SPEC, result.getStageSpecs());
-
     Map<String, Object> properties = new HashMap<>();
+    TrainingResult result = trainStage(stageClassName, yamlConfig);
+    String componentKey = makeComponentKey(type);
+    nestedProperties.put(PROP_SPEC, result.getStageSpecs());
     properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
     properties.put(PROP_NESTED, Collections.singletonList(nestedProperties));
-    properties.put(PROP_BASELINE_PROVIDER, result.getBaselineProviderSpecs());
     return properties;
+  }
+
+  private String makeComponentKey(String type) {
+    return "$REF_" + type;
   }
 
   private List<Map<String, Object>> buildStageWrapperProperties(String wrapperClassName,

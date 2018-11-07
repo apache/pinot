@@ -18,10 +18,14 @@ package com.linkedin.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.util.Collections;
 import java.util.Map;
 
@@ -71,10 +75,10 @@ public abstract class StaticDetectionPipeline extends DetectionPipeline {
   @Override
   public final DetectionPipelineResult run() throws Exception {
     InputDataSpec dataSpec = this.getInputDataSpec();
-    Map<MetricSlice, DataFrame> timeseries = this.provider.fetchTimeseries(dataSpec.timeseriesSlices);
-    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(dataSpec.aggregateSlices, Collections.<String>emptyList());
-    Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(dataSpec.anomalySlices);
-    Multimap<EventSlice, EventDTO> events = this.provider.fetchEvents(dataSpec.eventSlices);
+    Map<MetricSlice, DataFrame> timeseries = this.provider.fetchTimeseries(dataSpec.getTimeseriesSlices());
+    Map<MetricSlice, DataFrame> aggregates = this.provider.fetchAggregates(dataSpec.getAggregateSlices(), Collections.<String>emptyList());
+    Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(dataSpec.getAnomalySlices());
+    Multimap<EventSlice, EventDTO> events = this.provider.fetchEvents(dataSpec.getEventSlices());
 
     InputData data = new InputData(
         dataSpec, timeseries, aggregates, anomalies, events);

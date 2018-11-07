@@ -18,8 +18,8 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.InputData;
-import com.linkedin.thirdeye.detection.InputDataSpec;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.List;
 
 import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;

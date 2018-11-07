@@ -17,8 +17,8 @@
 package com.linkedin.thirdeye.detection.tune;
 
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.InputData;
-import com.linkedin.thirdeye.detection.InputDataSpec;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import com.linkedin.thirdeye.detection.algorithm.stage.StageUtils;
 
 /**

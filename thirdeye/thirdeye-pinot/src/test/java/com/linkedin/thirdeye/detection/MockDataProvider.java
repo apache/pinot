@@ -28,6 +28,8 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;

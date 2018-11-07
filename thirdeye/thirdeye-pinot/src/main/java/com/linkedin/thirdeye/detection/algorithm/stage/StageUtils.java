@@ -20,13 +20,15 @@ import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.EventSlice;
-import com.linkedin.thirdeye.detection.InputData;
-import com.linkedin.thirdeye.detection.InputDataSpec;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.Collections;
 import java.util.Map;
 
@@ -45,8 +47,9 @@ public class StageUtils {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> existingAnomalies =
         provider.fetchAnomalies(inputDataSpec.getAnomalySlices());
     Multimap<EventSlice, EventDTO> events = provider.fetchEvents(inputDataSpec.getEventSlices());
-
-    return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events);
+    Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIds());
+    Map<String, DatasetConfigDTO> datasets = provider.fetchDatasets(inputDataSpec.getDatasetNames());
+    return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events, metrics, datasets);
   }
 
   // TODO anomaly should support multimap
@@ -58,4 +61,11 @@ public class StageUtils {
     return map;
   }
 
+  public static boolean isReferenceName(String key) {
+    return key.startsWith("$");
+  }
+
+  public static String getReferenceKey(String str) {
+    return str.toString().substring(1);
+  }
 }

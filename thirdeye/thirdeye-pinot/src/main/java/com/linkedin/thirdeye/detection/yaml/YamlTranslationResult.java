@@ -21,8 +21,8 @@ import java.util.Map;
 
 
 public class YamlTranslationResult {
-  private Map<String, Object> properties;
-  private Map<String, Object> components;
+  private final Map<String, Object> properties;
+  private final Map<String, Object> components;
 
   public YamlTranslationResult() {
     this.properties = new HashMap<>();

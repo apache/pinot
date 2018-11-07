@@ -31,5 +31,4 @@ public @interface Training {
 
   @JsonProperty String trainingModule() default "";
 
-  @JsonProperty boolean tunable() default false;
 }

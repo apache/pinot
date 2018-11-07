@@ -32,6 +32,8 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -125,12 +127,12 @@ public class DefaultDataProvider implements DataProvider {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
-      if (slice.end >= 0)
-        predicates.add(Predicate.LT("startTime", slice.end));
-      if (slice.start >= 0)
-        predicates.add(Predicate.GT("endTime", slice.start));
-      if (slice.configId >= 0)
-        predicates.add(Predicate.EQ("detectionConfigId", slice.configId));
+      if (slice.getEnd() >= 0)
+        predicates.add(Predicate.LT("startTime", slice.getEnd()));
+      if (slice.getStart() >= 0)
+        predicates.add(Predicate.GT("endTime", slice.getStart()));
+      if (slice.getConfigId() >= 0)
+        predicates.add(Predicate.EQ("detectionConfigId", slice.getConfigId()));
 
       if (predicates.isEmpty())
         throw new IllegalArgumentException("Must provide at least one of start, end, or detectionConfigId");
@@ -153,10 +155,10 @@ public class DefaultDataProvider implements DataProvider {
     Multimap<EventSlice, EventDTO> output = ArrayListMultimap.create();
     for (EventSlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
-      if (slice.end >= 0)
-        predicates.add(Predicate.LT("startTime", slice.end));
-      if (slice.start >= 0)
-        predicates.add(Predicate.GT("endTime", slice.start));
+      if (slice.getEnd() >= 0)
+        predicates.add(Predicate.LT("startTime", slice.getEnd()));
+      if (slice.getStart() >= 0)
+        predicates.add(Predicate.GT("endTime", slice.getEnd()));
 
       if (predicates.isEmpty())
         throw new IllegalArgumentException("Must provide at least one of start, or end");

@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.DataProvider;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
@@ -55,7 +53,7 @@ public abstract class YamlDetectionConfigTranslator {
     YamlTranslationResult translationResult = translateYaml();
     Preconditions.checkArgument(!translationResult.getProperties().isEmpty(), "Empty detection property");
     config.setProperties(translationResult.getProperties());
-    config.setComponents(translationResult.getComponents());
+    config.setComponentSpecs(translationResult.getComponents());
     return config;
   }
 

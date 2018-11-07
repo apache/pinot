@@ -17,8 +17,19 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
 import com.linkedin.thirdeye.datalayer.pojo.DetectionConfigBean;
+import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
+import java.util.HashMap;
+import java.util.Map;
 
 
 public class DetectionConfigDTO extends DetectionConfigBean {
+  private Map<String, BaseComponent> components = new HashMap<>();
 
+  public Map<String, BaseComponent> getComponents() {
+    return components;
+  }
+
+  public void setComponents(Map<String, BaseComponent> components) {
+    this.components = components;
+  }
 }

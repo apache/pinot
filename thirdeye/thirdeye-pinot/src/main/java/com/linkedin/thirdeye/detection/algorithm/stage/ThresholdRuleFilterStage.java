@@ -27,6 +27,7 @@ import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.detection.annotation.Training;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
 

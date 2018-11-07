@@ -37,6 +37,8 @@ import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;

@@ -20,9 +20,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.reflect.ClassPath;
 import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStage;
-import com.linkedin.thirdeye.detection.tune.RuleDetectionTrainingModule;
+import com.linkedin.thirdeye.detection.algorithm.stage.ThresholdRuleFilterStage;
 import com.linkedin.thirdeye.detection.tune.StaticStageTrainingModule;
-import com.linkedin.thirdeye.detection.tune.TrainingModuleLoader;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -92,9 +91,9 @@ public class DetectionRegistry {
   }
 
   /**
-   * Look up the class name for a given algorithm
+   * Look up the training module class name for a given algorithm
    * @param stageClassName the class name
-   * @return algorithm class name
+   * @return training module class name
    */
   public String lookupTrainingModule(String stageClassName) {
     return StaticStageTrainingModule.class.getPackage().getName() + "." + TRAINING_MODULE_MAP.get(stageClassName).trainingModule();

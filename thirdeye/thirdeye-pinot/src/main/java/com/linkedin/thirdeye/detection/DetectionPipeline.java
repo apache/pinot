@@ -26,15 +26,24 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.detection.algorithm.stage.StageUtils;
+import com.linkedin.thirdeye.detection.spec.AbstractSpec;
+import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStageWrapper;
+import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -44,16 +53,25 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * for implementing (intermittently stateful) executable pipelines on top of it.
  */
 public abstract class DetectionPipeline {
+  private static String PROP_CLASS_NAME = "className";
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionPipeline.class);
+
   protected final DataProvider provider;
   protected final DetectionConfigDTO config;
   protected final long startTime;
   protected final long endTime;
 
-  protected DetectionPipeline(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
+  protected DetectionPipeline(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
+  {
     this.provider = provider;
     this.config = config;
     this.startTime = startTime;
     this.endTime = endTime;
+    try {
+      this.initComponents();
+    } catch (Exception e) {
+      LOG.error("initialize components failed", e);
+    }
   }
 
   /**
@@ -64,6 +82,38 @@ public abstract class DetectionPipeline {
    */
   public abstract DetectionPipelineResult run() throws Exception;
 
+  private String getSpecClassName(Class<BaseComponent> componentClass) {
+    ParameterizedType genericSuperclass = (ParameterizedType) componentClass.getGenericInterfaces()[0];
+    return (genericSuperclass.getActualTypeArguments()[0].getTypeName());
+  }
+
+  private final void initComponents() throws Exception {
+    Map<String, BaseComponent> instancesMap = config.getComponents();
+    Map<String, Object> componentSpecs = config.getComponentSpecs();
+    for (String componentName : componentSpecs.keySet()) {
+      Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
+      if (!instancesMap.containsKey(componentName)){
+        Class<BaseComponent> clazz = (Class<BaseComponent>) Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
+        BaseComponent component = clazz.newInstance();
+        instancesMap.put(componentName, component);
+      }
+    }
+
+    for (String componentName : componentSpecs.keySet()) {
+      Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
+      for (Map.Entry<String, Object> entry : componentSpec.entrySet()){
+        if (StageUtils.isReferenceName(entry.getValue().toString())) {
+          String refComponentName = StageUtils.getReferenceKey(entry.getValue().toString());
+          componentSpec.put(entry.getKey(), instancesMap.get(refComponentName));
+        }
+      }
+      Class clazz = Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
+      Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
+      AbstractSpec spec = AbstractSpec.fromProperties(componentSpec, specClazz);
+      instancesMap.get(componentName).init(spec);
+    }
+    config.setComponents(instancesMap);
+  }
   /**
    * Helper for creating an anomaly for a given metric slice. Injects properties such as
    * metric name, filter dimensions, etc.
