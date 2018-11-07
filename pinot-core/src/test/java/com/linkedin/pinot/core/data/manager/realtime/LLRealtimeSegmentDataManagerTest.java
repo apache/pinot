@@ -83,7 +83,7 @@ public class LLRealtimeSegmentDataManagerTest {
       + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
       + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
       + "      \"stream.kafka.consumer.type\": \"simple\", \n"
-      + "      \"stream.kafka.consumer.factory.class.name\": \"com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory\", \n"
+      + "      \"stream.kafka.consumer.factory.class.name\": \"com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory\", \n"
       + "      \"stream.kafka.decoder.class.name\": \"" + FakeStreamMessageDecoder.class.getName() + "\", \n"
       + "      \"stream.kafka.decoder.prop.schema.registry.rest.url\": \"http://schema-registry-host.corp.ceo:1766/schemas\", \n"
       + "      \"stream.kafka.decoder.prop.schema.registry.schema.name\": \"UnknownSchema\", \n"
