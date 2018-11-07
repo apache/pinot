@@ -85,7 +85,7 @@ public abstract class DetectionPipeline {
     return (genericSuperclass.getActualTypeArguments()[0].getTypeName());
   }
 
-  private final void initComponents() throws Exception {
+  private void initComponents() throws Exception {
     Map<String, BaseComponent> instancesMap = config.getComponents();
     Map<String, Object> componentSpecs = config.getComponentSpecs();
     if (componentSpecs != null) {

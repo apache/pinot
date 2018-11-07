@@ -16,16 +16,15 @@
 
 package com.linkedin.thirdeye.detection.spec;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
+import org.modelmapper.ModelMapper;
 
 
 public abstract class AbstractSpec {
-  protected static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  protected static final ModelMapper MODEL_MAPPER = new ModelMapper();
 
-  public static <T extends AbstractSpec> T fromProperties(Map<String, Object> properties, Class<T> specClass){
-    T spec = OBJECT_MAPPER.convertValue(properties, specClass);
+  public static <T extends AbstractSpec> T fromProperties(Map<String, Object> properties, Class<T> specClass) {
+    T spec = MODEL_MAPPER.map(properties, specClass);
     return spec;
   }
-
 }

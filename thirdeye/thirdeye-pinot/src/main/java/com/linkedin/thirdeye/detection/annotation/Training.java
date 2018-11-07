@@ -14,29 +14,14 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.spec;
+package com.linkedin.thirdeye.detection.annotation;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-public class ThresholdRuleDetectorSpec extends AbstractSpec {
-  private double min = Double.NaN;
-  private double max = Double.NaN;
+public @interface Training {
+  @JsonProperty String trainer() default "";
 
-  public double getMin() {
-    return min;
-  }
+  @JsonProperty String tuner() default "";
 
-  public void setMin(double min) {
-    this.min = min;
-  }
-
-  public double getMax() {
-    return max;
-  }
-
-  public void setMax(double max) {
-    this.max = max;
-  }
 }

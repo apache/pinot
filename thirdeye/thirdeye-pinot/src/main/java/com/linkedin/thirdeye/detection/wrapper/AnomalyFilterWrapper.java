@@ -76,6 +76,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
       nestedConfig.setProperties(properties);
+      nestedConfig.setComponents(this.config.getComponents());
       if (this.metricUrn != null){
         properties.put(PROP_METRIC_URN, this.metricUrn);
       }
@@ -86,13 +87,8 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
     }
 
     Collection<MergedAnomalyResultDTO> anomalies =
-        Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
-          @Override
-          public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomaly) {
-            return mergedAnomaly != null && !mergedAnomaly.isChild() && anomalyFilter.isQualified(
-                DetectionUtils.getDataForSpec(provider, anomalyFilter.getInputDataSpec(mergedAnomaly)));
-          }
-        });
+        Collections2.filter(candidates, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild() && anomalyFilter.isQualified(
+            DetectionUtils.getDataForSpec(provider, anomalyFilter.getInputDataSpec(mergedAnomaly))));
 
     return new DetectionPipelineResult(new ArrayList<>(anomalies));
   }

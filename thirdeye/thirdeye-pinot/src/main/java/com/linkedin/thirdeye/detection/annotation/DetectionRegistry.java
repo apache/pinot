@@ -18,8 +18,7 @@ package com.linkedin.thirdeye.detection.annotation;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.reflect.ClassPath;
-import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStage;
+import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.MapUtils;
+import org.reflections.Reflections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,20 +54,21 @@ public class DetectionRegistry {
    */
   private DetectionRegistry() {
     try {
-      Set<ClassPath.ClassInfo> classInfos = ClassPath.from(Thread.currentThread().getContextClassLoader())
-          .getTopLevelClasses(AnomalyDetectionStage.class.getPackage().getName());
-      for (ClassPath.ClassInfo classInfo : classInfos) {
-        String className = classInfo.getName();
-        Class clazz = Class.forName(className);
-        for (Annotation annotation : clazz.getAnnotations()) {
-          if (annotation instanceof Components) {
-            Components componentsAnnotation = (Components) annotation;
-            REGISTRY_MAP.put(componentsAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION,
-                componentsAnnotation));
-          }
-          if (annotation instanceof Training) {
-            Training trainingAnnotation = (Training) annotation;
-            TRAINING_MODULE_MAP.put(className, trainingAnnotation);
+      Reflections reflections = new Reflections();
+      Set<Class<? extends BaseComponent>> classes = reflections.getSubTypesOf(BaseComponent.class);
+      for (Class clazz : classes) {
+        String className = clazz.getName();
+        if(BaseComponent.class.isAssignableFrom(clazz)){
+          for (Annotation annotation : clazz.getAnnotations()) {
+            if (annotation instanceof Components) {
+              Components componentsAnnotation = (Components) annotation;
+              REGISTRY_MAP.put(componentsAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION,
+                  componentsAnnotation));
+            }
+            if (annotation instanceof Training) {
+              Training trainingAnnotation = (Training) annotation;
+              TRAINING_MODULE_MAP.put(className, trainingAnnotation);
+            }
           }
         }
       }

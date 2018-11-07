@@ -20,11 +20,15 @@ import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
+import com.linkedin.thirdeye.detection.annotation.Components;
+import com.linkedin.thirdeye.detection.annotation.DetectionTag;
+import com.linkedin.thirdeye.detection.annotation.Param;
+import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import com.linkedin.thirdeye.detection.spi.components.AnomalyDetector;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.List;
@@ -32,7 +36,17 @@ import org.joda.time.Interval;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
-
+@Components(title = "Threshold",
+    type = "THRESHOLD",
+    tags = { DetectionTag.RULE_DETECTION },
+    description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.",
+    presentation = {@PresentationOption(
+        name = "absolute value",
+        description = "aggregated absolute value within a time period",
+        template = "is lower than ${min} or higher than ${max}"
+    )},
+    params = {@Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")}
+)
 public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetectorSpec> {
   private final String COL_TOO_HIGH = "tooHigh";
   private final String COL_TOO_LOW = "tooLow";
@@ -44,6 +58,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
   private Long configId;
   private Long endTime;
   private MetricEntity me;
+
   @Override
   public InputDataSpec getInputDataSpec(Interval interval, String metricUrn, long configId) {
     this.me = MetricEntity.fromURN(metricUrn);
@@ -51,8 +66,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     this.endTime = interval.getEndMillis();
     this.slice = MetricSlice.from(me.getId(), interval.getStartMillis(), endTime, me.getFilters());
 
-    return new InputDataSpec()
-        .withTimeseriesSlices(Collections.singletonList(this.slice));
+    return new InputDataSpec().withTimeseriesSlices(Collections.singletonList(this.slice));
   }
 
   @Override
@@ -83,9 +97,4 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     this.min = spec.getMin();
     this.max = spec.getMax();
   }
-
-
-
-
-
 }
