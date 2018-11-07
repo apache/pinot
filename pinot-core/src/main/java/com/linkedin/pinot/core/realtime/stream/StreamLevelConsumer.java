@@ -23,19 +23,52 @@ import com.linkedin.pinot.core.data.GenericRow;
  */
 public interface StreamLevelConsumer {
 
+  /**
+   * Initialize and start the stream level consumer
+   * @throws Exception
+   */
   void start() throws Exception;
 
+  /**
+   * Set the offset to consume from
+   * @param offset
+   */
   void setOffset(long offset);
 
+  /**
+   * Get next row from the stream and decode it into a generic row
+   * @param destination
+   * @return
+   */
   GenericRow next(GenericRow destination);
 
+  /**
+   * Get decoded row from the stream at a given offset
+   * @param offset
+   * @return
+   */
   GenericRow next(long offset);
 
+  /**
+   * Get the current offset for the stream
+   * @return
+   */
   long currentOffset();
 
+  /**
+   * Checkpoint the stream at the current offset
+   */
   void commit();
 
+  /**
+   * Checkpoint the stream at the given offset
+   * @param offset
+   */
   void commit(long offset);
 
+  /**
+   * Shutdown the stream consumer
+   * @throws Exception
+   */
   void shutdown() throws Exception;
 }
