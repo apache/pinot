@@ -18,50 +18,24 @@ package com.linkedin.pinot.core.realtime.stream;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
+/**
+ * Interface for a consumer that consumes at stream level and is unaware of any partitions of the stream
+ */
 public interface StreamLevelConsumer {
 
-  /**
-   *
-   */
   void start() throws Exception;
 
-  /**
-   *
-   * @param offset
-   */
   void setOffset(long offset);
 
-  /**
-   * return GenericRow
-   */
   GenericRow next(GenericRow destination);
 
-  /**
-   *
-   * @param offset
-   * @return
-   */
   GenericRow next(long offset);
 
-  /**
-   *
-   * @return
-   */
   long currentOffset();
 
-  /**
-   *
-   */
   void commit();
 
-  /**
-   *
-   * @param offset
-   */
   void commit(long offset);
 
-  /**
-   *
-   */
   void shutdown() throws Exception;
 }

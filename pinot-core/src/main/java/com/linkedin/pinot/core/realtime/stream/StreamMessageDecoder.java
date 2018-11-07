@@ -21,17 +21,21 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
+/**
+ * Interface for a decoder of messages fetched from the stream
+ * @param <T>
+ */
 public interface StreamMessageDecoder<T> {
 
   /**
-   *
+   * Initialize the decoder with decoder properties map, the stream topic name and stream schema
    * @param props
    * @throws Exception
    */
   void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception;
 
   /**
-   *
+   * Decodes the payload received into a generic row
    * @param payload
    * @return
    */
