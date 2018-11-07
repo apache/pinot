@@ -220,40 +220,40 @@ public class SegmentDeletionManager {
         return;
       }
 
-    try {
-      String[] tableNameDirs = pinotFS.listFiles(deletedDirURI, false);
-      if (tableNameDirs == null) {
-        LOGGER.warn("Deleted segment directory {} does not exist.", deletedDirURI.toString());
-        return;
-      }
+      try {
+        String[] tableNameDirs = pinotFS.listFiles(deletedDirURI, false);
+        if (tableNameDirs == null) {
+          LOGGER.warn("Deleted segment directory {} does not exist.", deletedDirURI.toString());
+          return;
+        }
 
-      for (String tableNameDir : tableNameDirs) {
-        URI tableNameURI = ControllerConf.getUriFromPath(tableNameDir);
-        // Get files that are aged
-        final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
-        int numFilesDeleted = 0;
-        for (String targetFile : targetFiles) {
-          URI targetURI = ControllerConf.getUriFromPath(targetFile);
-          Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
-          if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
-            if (!pinotFS.delete(targetURI, true)) {
-              LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
-            } else {
-              numFilesDeleted ++;
+        for (String tableNameDir : tableNameDirs) {
+          URI tableNameURI = ControllerConf.getUriFromPath(tableNameDir);
+          // Get files that are aged
+          final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
+          int numFilesDeleted = 0;
+          for (String targetFile : targetFiles) {
+            URI targetURI = ControllerConf.getUriFromPath(targetFile);
+            Date dateToDelete = DateTime.now().minusDays(retentionInDays).toDate();
+            if (pinotFS.lastModified(targetURI) < dateToDelete.getTime()) {
+              if (!pinotFS.delete(targetURI, true)) {
+                LOGGER.warn("Cannot remove file {} from deleted directory.", targetURI.toString());
+              } else {
+                numFilesDeleted ++;
+              }
+            }
+          }
+
+          if (numFilesDeleted == targetFiles.length) {
+            // Delete directory if it's empty
+            if (!pinotFS.delete(tableNameURI, false)) {
+              LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
             }
           }
         }
-
-        if (numFilesDeleted == targetFiles.length) {
-          // Delete directory if it's empty
-          if (!pinotFS.delete(tableNameURI, false)) {
-            LOGGER.warn("The directory {} cannot be removed.", tableNameDir);
-          }
-        }
+      } catch (IOException e) {
+        LOGGER.error("Had trouble deleting directories", deletedDirURI.toString());
       }
-    } catch (IOException e){
-      LOGGER.error("Had trouble deleting directories", deletedDirURI.toString());
-    }
     } else {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
     }

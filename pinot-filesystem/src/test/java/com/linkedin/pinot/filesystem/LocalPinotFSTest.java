@@ -144,7 +144,6 @@ public class LocalPinotFSTest {
     Assert.assertTrue(newTestFile.createNewFile(), "Could not create file " + newTestFile.getPath());
 
     localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
-    localPinotFS.listFiles(secondTempDir.toURI(), true);
     Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI(), true).length, 1);
 
     // len of dir = exception
