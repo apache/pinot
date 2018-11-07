@@ -31,6 +31,7 @@ import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
 import com.linkedin.thirdeye.datasource.loader.DefaultAggregationLoader;
 import com.linkedin.thirdeye.detection.CurrentAndBaselineLoader;
 import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
+import com.linkedin.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -95,13 +96,22 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       long alertId = ((DetectionAlertTaskInfo) taskInfo).getDetectionAlertConfigId();
       DetectionAlertConfigDTO alertConfig = loadDetectionAlertConfig(alertId);
 
+      // Load all the anomalies along with their recipients
       DetectionAlertFilter alertFilter = detAlertTaskFactory.loadAlertFilter(alertConfig, System.currentTimeMillis());
       DetectionAlertFilterResult result = alertFilter.run();
+
+      // Suppress alerts if any and get the filtered anomalies to be notified
+      Set<DetectionAlertSuppressor> alertSuppressors =
+          detAlertTaskFactory.loadAlertSuppressors(alertConfig, taskContext.getThirdEyeAnomalyConfiguration());
+      for (DetectionAlertSuppressor alertSuppressor : alertSuppressors) {
+        result = alertSuppressor.run(result);
+      }
 
       // TODO: Cleanup currentAndBaselineLoader
       // In the new design, we have decided to move this function back to the detection pipeline.
       this.currentAndBaselineLoader.fillInCurrentAndBaselineValue(result.getAllAnomalies());
 
+      // Send out alert notifications (email and/or iris)
       Set<DetectionAlertScheme> alertSchemes =
           detAlertTaskFactory.loadAlertSchemes(alertConfig, taskContext.getThirdEyeAnomalyConfiguration(), result);
       for (DetectionAlertScheme alertScheme : alertSchemes) {
