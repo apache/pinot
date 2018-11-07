@@ -21,7 +21,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 
-import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
+import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
 
 
 /**

@@ -18,15 +18,14 @@ package com.linkedin.thirdeye.detection.components;
 
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
-import com.linkedin.thirdeye.dataframe.LongSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
 import com.linkedin.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import com.linkedin.thirdeye.detection.spi.components.AnomalyDetector;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.joda.time.Interval;
@@ -76,7 +75,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
 
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
 
-    return this.makeAnomalies(this.slice, df, COL_ANOMALY, this.endTime);
+    return DetectionUtils.makeAnomalies(this.slice, df, COL_ANOMALY, this.endTime);
   }
 
   @Override
@@ -85,78 +84,7 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     this.max = spec.getMax();
   }
 
-  /**
-   * Helper for creating a list of anomalies from a boolean series. Injects properties via
-   * {@code makeAnomaly(MetricSlice, MetricConfigDTO, Long)}.
-   *
-   * @param slice metric slice
-   * @param df time series with COL_TIME and at least one boolean value series
-   * @param seriesName name of the value series
-   * @param endTime end time of this detection window
-   * @return list of anomalies
-   */
-  protected final List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName, long endTime) {
-    if (df.isEmpty()) {
-      return Collections.emptyList();
-    }
 
-    df = df.filter(df.getLongs(COL_TIME).between(slice.getStart(), slice.getEnd())).dropNull(COL_TIME);
-
-    if (df.isEmpty()) {
-      return Collections.emptyList();
-    }
-
-    List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
-    LongSeries sTime = df.getLongs(COL_TIME);
-    BooleanSeries sVal = df.getBooleans(seriesName);
-
-    int lastStart = -1;
-    for (int i = 0; i < df.size(); i++) {
-      if (sVal.isNull(i) || !BooleanSeries.booleanValueOf(sVal.get(i))) {
-        // end of a run
-        if (lastStart >= 0) {
-          long start = sTime.get(lastStart);
-          long end = sTime.get(i);
-          anomalies.add(makeAnomaly(slice.withStart(start).withEnd(end)));
-        }
-        lastStart = -1;
-
-      } else {
-        // start of a run
-        if (lastStart < 0) {
-          lastStart = i;
-        }
-      }
-    }
-
-    // end of current run
-    if (lastStart >= 0) {
-      long start = sTime.get(lastStart);
-      long end = start + 1;
-
-      // truncate at analysis end time
-      end = Math.min(end, endTime);
-
-      anomalies.add(makeAnomaly(slice.withStart(start).withEnd(end)));
-    }
-
-    return anomalies;
-  }
-
-  /**
-   * Helper for creating an anomaly for a given metric slice. Injects properties such as
-   * metric name, filter dimensions, etc.
-   *
-   * @param slice metric slice
-   * @return anomaly template
-   */
-  protected final MergedAnomalyResultDTO makeAnomaly(MetricSlice slice) {
-    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
-    anomaly.setStartTime(slice.getStart());
-    anomaly.setEndTime(slice.getEnd());
-
-    return anomaly;
-  }
 
 
 

@@ -22,7 +22,7 @@ import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.List;
 
-import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
+import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
 
 /**
  * Static Grouper stage. High level interface for grouper stage.

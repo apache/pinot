@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package com.linkedin.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -27,7 +27,10 @@ import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.MockPipeline;
 import com.linkedin.thirdeye.detection.MockPipelineLoader;
 import com.linkedin.thirdeye.detection.MockPipelineOutput;
-import com.linkedin.thirdeye.detection.baseline.MockBaselineProvider;
+import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
+import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
+import com.linkedin.thirdeye.detection.spec.RuleBaselineProviderSpec;
+import com.linkedin.thirdeye.detection.spi.components.BaselineProvider;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -100,9 +103,10 @@ public class BaselineFillingMergeWrapperTest {
         provider = new MockDataProvider().setLoader(new MockPipelineLoader(this.runs, Collections.<MockPipelineOutput>emptyList())).setAnomalies(Collections.singletonList(anomaly)).setAggregates(aggregates);
 
     this.config.getProperties().put(PROP_MAX_GAP, 100);
-    this.config.getProperties().put(PROP_CURRENT_PROVIDER, ImmutableMap.of("className", MockBaselineProvider.class.getName()));
-    this.config.getProperties().put(PROP_BASELINE_PROVIDER, ImmutableMap.of("className", MockBaselineProvider.class.getName()));
-
+    this.config.getProperties().put(PROP_BASELINE_PROVIDER, "$baseline");
+    BaselineProvider baselineProvider = new RuleBaselineProvider();
+    baselineProvider.init(new RuleBaselineProviderSpec());
+    this.config.setComponents(ImmutableMap.of("baseline", baselineProvider));
     this.wrapper = new BaselineFillingMergeWrapper(provider, this.config, 2900, 3600);
     DetectionPipelineResult output = this.wrapper.run();
 

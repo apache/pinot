@@ -16,6 +16,7 @@
 
 package com.linkedin.thirdeye.detection.wrapper;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
@@ -26,7 +27,6 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
-import com.linkedin.thirdeye.detection.algorithm.stage.StageUtils;
 import com.linkedin.thirdeye.detection.spi.components.AnomalyDetector;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -50,8 +50,6 @@ import org.slf4j.LoggerFactory;
  * sliding window. Each sliding window start time and end time is aligned to the data granularity. Each window size is set by the spec.
  */
 public class AnomalyDetectorWrapper extends DetectionPipeline {
-  private static final String PROP_STAGE_CLASSNAME = "stageClassName";
-  private static final String PROP_SPECS = "specs";
   private static final String PROP_METRIC_URN = "metricUrn";
 
   // moving window detection properties
@@ -61,7 +59,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_WINDOW_SIZE = "windowSize";
   private static final String PROP_WINDOW_UNIT = "windowUnit";
   private static final String PROP_FREQUENCY = "frequency";
-
+  private static final String PROP_DETECTOR = "detector";
   private static final Logger LOG = LoggerFactory.getLogger(
       AnomalyDetectorWrapper.class);
 
@@ -83,7 +81,11 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
 
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
 
-    this.anomalyDetector = (AnomalyDetector) this.config.getComponents().get(StageUtils.getReferenceKey(MapUtils.getString(config.getProperties(), "detector")));
+    Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_DETECTOR));
+    String detectorReferenceKey = DetectionUtils.getReferenceKey(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
+    Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
+    this.anomalyDetector = (AnomalyDetector) this.config.getComponents().get(detectorReferenceKey);
+
     this.isMovingWindowDetection = MapUtils.getBooleanValue(config.getProperties(), PROP_MOVING_WINDOW_DETECTION, false);
     // delays to wait for data becomes available
     this.windowDelay = MapUtils.getIntValue(config.getProperties(), PROP_WINDOW_DELAY, 0);
@@ -100,7 +102,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (Interval window : monitoringWindows) {
-      anomalies.addAll(anomalyDetector.runDetection(StageUtils.getDataForSpec(provider, anomalyDetector.getInputDataSpec(window, this.metricUrn, config.getId()))));
+      anomalies.addAll(anomalyDetector.runDetection(
+          DetectionUtils.getDataForSpec(provider, anomalyDetector.getInputDataSpec(window, this.metricUrn, config.getId()))));
     }
 
     MetricEntity me = MetricEntity.fromURN(this.metricUrn);
@@ -111,7 +114,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setMetricUrn(this.metricUrn);
       anomaly.setMetric(metric.getName());
       anomaly.setCollection(metric.getDataset());
-      anomaly.setDimensions(StageUtils.toFilterMap(me.getFilters()));
+      anomaly.setDimensions(DetectionUtils.toFilterMap(me.getFilters()));
     }
     return new DetectionPipelineResult(anomalies);
   }

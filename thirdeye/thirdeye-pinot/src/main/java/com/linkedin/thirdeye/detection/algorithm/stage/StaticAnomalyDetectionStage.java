@@ -35,7 +35,7 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
-import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
+import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
 
 
 /**

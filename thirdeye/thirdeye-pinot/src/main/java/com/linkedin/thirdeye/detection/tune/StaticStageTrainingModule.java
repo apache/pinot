@@ -19,7 +19,7 @@ package com.linkedin.thirdeye.detection.tune;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
-import com.linkedin.thirdeye.detection.algorithm.stage.StageUtils;
+import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
 
 /**
  * High level training module interface. Should implement this interface whenever possible.
@@ -29,7 +29,7 @@ public abstract class StaticStageTrainingModule implements StageTrainingModule {
   static final String PROP_CLASS_NAME = "className";
 
   public TrainingResult fit(DataProvider provider) {
-    return this.fit(StageUtils.getDataForSpec(provider, this.getInputDataSpec()));
+    return this.fit(DetectionUtils.getDataForSpec(provider, this.getInputDataSpec()));
   }
 
   abstract TrainingResult fit(InputData data);

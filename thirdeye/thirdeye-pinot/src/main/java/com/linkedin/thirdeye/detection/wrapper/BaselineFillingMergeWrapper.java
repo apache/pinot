@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package com.linkedin.thirdeye.detection.wrapper;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.baseline.BaselineProvider;
-import com.linkedin.thirdeye.detection.baseline.BaselineProviderLoader;
-import com.linkedin.thirdeye.detection.baseline.RuleBaselineProvider;
+import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
+import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
+import com.linkedin.thirdeye.detection.spec.RuleBaselineProviderSpec;
+import com.linkedin.thirdeye.detection.spi.components.BaselineProvider;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
+import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,20 +50,27 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
 
   private BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
   private BaselineProvider currentValueProvider;
+  private Series.DoubleFunction aggregationFunction;
 
   public BaselineFillingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
-      throws Exception {
+  {
     super(provider, config, startTime, endTime);
+
     if (config.getProperties().containsKey(PROP_BASELINE_PROVIDER)) {
-      this.baselineValueProvider = BaselineProviderLoader.from(
-          MapUtils.getMap(config.getProperties(), PROP_BASELINE_PROVIDER));
+      String referenceKey = DetectionUtils.getReferenceKey(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
+      Preconditions.checkArgument(this.config.getComponents().containsKey(referenceKey));
+      this.baselineValueProvider = (BaselineProvider) this.config.getComponents().get(referenceKey);
     }
     if (config.getProperties().containsKey(PROP_CURRENT_PROVIDER)) {
-      this.currentValueProvider = BaselineProviderLoader.from(MapUtils.getMap(config.getProperties(), PROP_CURRENT_PROVIDER));
+      String detectorReferenceKey = DetectionUtils.getReferenceKey(MapUtils.getString(config.getProperties(), currentValueProvider));
+      Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
+      this.currentValueProvider = (BaselineProvider) this.config.getComponents().get(detectorReferenceKey);
     } else {
       // default current provider
       this.currentValueProvider = new RuleBaselineProvider();
-      this.currentValueProvider.init(Collections.<String, Object>singletonMap("offset", "current"));
+      RuleBaselineProviderSpec spec = new RuleBaselineProviderSpec();
+      spec.setOffset("current");
+      this.currentValueProvider.init(spec);
     }
     String nestedUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     if (nestedUrn != null){
@@ -68,6 +78,8 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         properties.put(PROP_METRIC_URN, nestedUrn);
       }
     }
+
+    this.aggregationFunction = BaselineAggregateType.valueOf(MapUtils.getString(config.getProperties(), "metricFunction", "MEAN")).getFunction();
   }
 
   @Override
@@ -88,26 +100,15 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         String metricUrn = anomaly.getMetricUrn();
         final MetricSlice slice = MetricSlice.from(MetricEntity.fromURN(metricUrn).getId(), anomaly.getStartTime(), anomaly.getEndTime(),
             MetricEntity.fromURN(metricUrn).getFilters());
-        metricSlicesToAnomaly.put(slice, anomaly);
+        anomaly.setAvgCurrentVal(this.currentValueProvider.computePredictedAggregates(
+            DetectionUtils.getDataForSpec(provider, this.currentValueProvider.getAggregateInputDataSpec(slice, this.config.getId())), aggregationFunction));
+        if (this.baselineValueProvider != null) {
+          anomaly.setAvgBaselineVal(this.baselineValueProvider.computePredictedAggregates(
+              DetectionUtils.getDataForSpec(provider, this.baselineValueProvider.getAggregateInputDataSpec(slice, this.config.getId())), aggregationFunction));
+        }
       } catch (Exception e) {
         // ignore
         LOG.warn("cannot get metric slice for anomaly {}", anomaly, e);
-      }
-    }
-
-    Map<MetricSlice, Double> currentValues = this.currentValueProvider.computeBaselineAggregates(metricSlicesToAnomaly.keySet(), this.provider);
-    Map<MetricSlice, Double> baselineValues = new HashMap<>();
-    if (this.baselineValueProvider != null) {
-      baselineValues = this.baselineValueProvider.computeBaselineAggregates(metricSlicesToAnomaly.keySet(), this.provider);
-    }
-    for (Map.Entry<MetricSlice, MergedAnomalyResultDTO> entry : metricSlicesToAnomaly.entrySet()) {
-      MergedAnomalyResultDTO anomaly = entry.getValue();
-      MetricSlice slice = entry.getKey();
-      if (currentValues.containsKey(slice)){
-        anomaly.setAvgCurrentVal(currentValues.get(slice));
-      }
-      if (baselineValues.containsKey(slice)){
-        anomaly.setAvgBaselineVal(baselineValues.get(slice));
       }
     }
     return mergedAnomalies;

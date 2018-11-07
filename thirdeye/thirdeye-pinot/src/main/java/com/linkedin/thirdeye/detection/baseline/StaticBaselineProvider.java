@@ -21,7 +21,7 @@ import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.algorithm.stage.StageUtils;
+import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
@@ -95,11 +95,11 @@ public abstract class StaticBaselineProvider implements BaselineProvider {
 
   @Override
   public final Map<MetricSlice, DataFrame> computeBaselineTimeSeries(Collection<MetricSlice> slices, DataProvider provider) {
-    return this.computeBaselineTimeSeries(slices, StageUtils.getDataForSpec(provider, this.getInputDataSpec(slices)));
+    return this.computeBaselineTimeSeries(slices, DetectionUtils.getDataForSpec(provider, this.getInputDataSpec(slices)));
   }
 
   @Override
   public final Map<MetricSlice, Double> computeBaselineAggregates(Collection<MetricSlice> slices, DataProvider provider) {
-    return this.computeBaselineAggregates(slices, StageUtils.getDataForSpec(provider, this.getAggregateInputDataSpec(slices)));
+    return this.computeBaselineAggregates(slices, DetectionUtils.getDataForSpec(provider, this.getAggregateInputDataSpec(slices)));
   }
 }

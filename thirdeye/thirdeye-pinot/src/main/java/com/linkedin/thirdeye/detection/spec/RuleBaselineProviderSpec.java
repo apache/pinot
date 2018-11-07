@@ -16,9 +16,21 @@
 
 package com.linkedin.thirdeye.detection.spec;
 
-public class RulebaselineProviderSpec extends AbstractSpec{
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class RuleBaselineProviderSpec extends AbstractSpec{
   private String timezone = "UTC";
   private String offset = "current";
+
+  public RuleBaselineProviderSpec(String timezone, String offset) {
+    this.timezone = timezone;
+    this.offset = offset;
+  }
+
+  public RuleBaselineProviderSpec() {
+  }
 
   public String getTimezone() {
     return timezone;

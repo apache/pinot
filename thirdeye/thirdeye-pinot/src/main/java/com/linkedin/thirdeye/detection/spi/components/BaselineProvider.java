@@ -17,29 +17,41 @@
 package com.linkedin.thirdeye.detection.spi.components;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.detection.spec.AbstractSpec;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 
+import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+
 
 /**
  * The baseline provider in the detection framework. Lower level interface with data provider.
  */
-public interface Predictor<T extends AbstractSpec> extends BaseComponent<T> {
+public interface BaselineProvider<T extends AbstractSpec> extends BaseComponent<T> {
   /**
    * Compute the baseline time series for the collection of metric slices.
    * @return the mapping of the metric slice to its time series data frame.
    */
   DataFrame computePredictedTimeSeries(InputData data);
 
-  InputDataSpec getInputDataSpec(MetricSlice slice);
+  InputDataSpec getInputDataSpec(MetricSlice slice, long configId);
 
-  default InputDataSpec getAggregateInputDataSpec(MetricSlice slice) {
-    return this.getInputDataSpec(slice);
+  default InputDataSpec getAggregateInputDataSpec(MetricSlice slice, long configId) {
+    return this.getInputDataSpec(slice, configId);
   }
 
   default Double computePredictedAggregates(InputData data){
     // default to average
+    return computePredictedAggregates(data, DoubleSeries.MEAN);
   }
+
+  default Double computePredictedAggregates(InputData data, Series.DoubleFunction aggregateFunction){
+    // default to be average
+    DataFrame baselineTimeSeries = this.computePredictedTimeSeries(data);
+    return baselineTimeSeries.getDoubles(COL_VALUE).aggregate(aggregateFunction).getDouble(0);
+  }
+
 }

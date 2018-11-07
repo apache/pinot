@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.algorithm;
+package com.linkedin.thirdeye.detection.wrapper;
 
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,17 +43,18 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
   @Override
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> input = new ArrayList<>(anomalies);
-    Collections.sort(input, COMPARATOR);
+    Collections.sort(input, MergeWrapper.COMPARATOR);
 
     List<MergedAnomalyResultDTO> output = new ArrayList<>();
 
-    Map<AnomalyKey, MergedAnomalyResultDTO> parents = new HashMap<>();
+    Map<MergeWrapper.AnomalyKey, MergedAnomalyResultDTO> parents = new HashMap<>();
     for (MergedAnomalyResultDTO anomaly : input) {
       if (anomaly.isChild()) {
         continue;
       }
 
-      AnomalyKey key = new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), "");
+      MergeWrapper.AnomalyKey
+          key = new MergeWrapper.AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), "");
       MergedAnomalyResultDTO parent = parents.get(key);
 
       if (parent == null || anomaly.getStartTime() - parent.getEndTime() > this.maxGap) {

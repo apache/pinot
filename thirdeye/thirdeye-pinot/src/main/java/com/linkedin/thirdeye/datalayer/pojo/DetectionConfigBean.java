@@ -42,8 +42,8 @@ public class DetectionConfigBean extends AbstractBean {
     return componentSpecs;
   }
 
-  public void setComponentSpecs(Map<String, Object> tunerProperties) {
-    this.componentSpecs = tunerProperties;
+  public void setComponentSpecs(Map<String, Object> componentSpecs) {
+    this.componentSpecs = componentSpecs;
   }
 
   public String getYaml() {

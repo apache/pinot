@@ -26,15 +26,13 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.algorithm.stage.StageUtils;
+import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
 import com.linkedin.thirdeye.detection.spec.AbstractSpec;
-import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyDetectionStageWrapper;
 import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -90,27 +88,29 @@ public abstract class DetectionPipeline {
   private final void initComponents() throws Exception {
     Map<String, BaseComponent> instancesMap = config.getComponents();
     Map<String, Object> componentSpecs = config.getComponentSpecs();
-    for (String componentName : componentSpecs.keySet()) {
-      Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
-      if (!instancesMap.containsKey(componentName)){
-        Class<BaseComponent> clazz = (Class<BaseComponent>) Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
-        BaseComponent component = clazz.newInstance();
-        instancesMap.put(componentName, component);
-      }
-    }
-
-    for (String componentName : componentSpecs.keySet()) {
-      Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
-      for (Map.Entry<String, Object> entry : componentSpec.entrySet()){
-        if (StageUtils.isReferenceName(entry.getValue().toString())) {
-          String refComponentName = StageUtils.getReferenceKey(entry.getValue().toString());
-          componentSpec.put(entry.getKey(), instancesMap.get(refComponentName));
+    if (componentSpecs != null) {
+      for (String componentName : componentSpecs.keySet()) {
+        Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
+        if (!instancesMap.containsKey(componentName)){
+          Class<BaseComponent> clazz = (Class<BaseComponent>) Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
+          BaseComponent component = clazz.newInstance();
+          instancesMap.put(componentName, component);
         }
       }
-      Class clazz = Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
-      Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
-      AbstractSpec spec = AbstractSpec.fromProperties(componentSpec, specClazz);
-      instancesMap.get(componentName).init(spec);
+
+      for (String componentName : componentSpecs.keySet()) {
+        Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
+        for (Map.Entry<String, Object> entry : componentSpec.entrySet()){
+          if (DetectionUtils.isReferenceName(entry.getValue().toString())) {
+            String refComponentName = DetectionUtils.getReferenceKey(entry.getValue().toString());
+            componentSpec.put(entry.getKey(), instancesMap.get(refComponentName));
+          }
+        }
+        Class clazz = Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
+        Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
+        AbstractSpec spec = AbstractSpec.fromProperties(componentSpec, specClazz);
+        instancesMap.get(componentName).init(spec);
+      }
     }
     config.setComponents(instancesMap);
   }
