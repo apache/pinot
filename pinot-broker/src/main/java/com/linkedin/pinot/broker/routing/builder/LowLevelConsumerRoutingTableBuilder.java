@@ -43,7 +43,8 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
   private int _targetNumServersPerQuery = 8;
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     super.init(configuration, tableConfig, propertyStore, brokerMetrics);
     // TODO jfim This is a broker-level configuration for now, until we refactor the configuration of the routing table to allow per-table routing settings
     if (configuration.containsKey("realtimeTargetServerCountPerQuery")) {
@@ -62,12 +63,9 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
   }
 
   @Override
-  protected RoutingTableGenerator buildRoutingTableGenerator() {
-    return new LowLevelConsumerRoutingTableGenerator();
-  }
-
-  private class LowLevelConsumerRoutingTableGenerator extends BaseRoutingTableGenerator {
-    // We build the routing table based off the external view here. What we want to do is to make sure that we uphold
+  protected Map<String, List<String>> computeSegmentToServersMapFromExternalView(ExternalView externalView,
+      List<InstanceConfig> instanceConfigs) {
+    // We build the segment to servers mapping here. What we want to do is to make sure that we uphold
     // the guarantees clients expect (no duplicate records, eventual consistency) and spreading the load as equally as
     // possible between the servers.
     //
@@ -79,81 +77,75 @@ public class LowLevelConsumerRoutingTableBuilder extends GeneratorBasedRoutingTa
     // The upstream code in BaseRoutingTableGenerator will generate routing tables based on taking a subset of servers
     // if the cluster is large enough as well as ensure that the best routing tables are used for routing.
 
-    private Map<String, List<String>> _segmentToServersMap = new HashMap<>();
+    Map<String, List<String>> segmentToServersMap = new HashMap<>();
 
-    public LowLevelConsumerRoutingTableGenerator() {
-      super(_targetNumServersPerQuery);
-    }
+    // 1. Gather all segments and group them by partition, sorted by sequence number
+    Map<String, SortedSet<SegmentName>> sortedSegmentsByStreamPartition =
+        LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
 
-    @Override
-    public void init(ExternalView externalView, List<InstanceConfig> instanceConfigList) {
-      // 1. Gather all segments and group them by partition, sorted by sequence number
-      Map<String, SortedSet<SegmentName>> sortedSegmentsByStreamPartition =
-          LLCUtils.sortSegmentsByStreamPartition(externalView.getPartitionSet());
+    // 2. Ensure that for each partition, we have at most one Helix partition (Pinot segment) in consuming state
+    Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
+        LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
+            sortedSegmentsByStreamPartition);
 
-      // 2. Ensure that for each partition, we have at most one Helix partition (Pinot segment) in consuming state
-      Map<String, SegmentName> allowedSegmentInConsumingStateByPartition =
-          LowLevelRoutingTableBuilderUtil.getAllowedConsumingStateSegments(externalView,
-              sortedSegmentsByStreamPartition);
+    // 3. Sort all the segments to be used during assignment in ascending order of replicas
 
-      // 3. Sort all the segments to be used during assignment in ascending order of replicas
+    // PriorityQueue throws IllegalArgumentException when given a size of zero
+    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
 
-      // PriorityQueue throws IllegalArgumentException when given a size of zero
-      RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigList);
+    for (Map.Entry<String, SortedSet<SegmentName>> entry : sortedSegmentsByStreamPartition.entrySet()) {
+      String partitionId = entry.getKey();
+      SortedSet<SegmentName> segmentNames = entry.getValue();
 
-      for (Map.Entry<String, SortedSet<SegmentName>> entry : sortedSegmentsByStreamPartition.entrySet()) {
-        String partitionId = entry.getKey();
-        SortedSet<SegmentName> segmentNames = entry.getValue();
+      // The only segment name which is allowed to be in CONSUMING state or null
+      SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(partitionId);
 
-        // The only segment name which is allowed to be in CONSUMING state or null
-        SegmentName validConsumingSegment = allowedSegmentInConsumingStateByPartition.get(partitionId);
+      for (SegmentName segmentName : segmentNames) {
+        List<String> validServers = new ArrayList<>();
+        String segmentNameStr = segmentName.getSegmentName();
+        Map<String, String> externalViewState = externalView.getStateMap(segmentNameStr);
 
-        for (SegmentName segmentName : segmentNames) {
-          List<String> validServers = new ArrayList<>();
-          String segmentNameStr = segmentName.getSegmentName();
-          Map<String, String> externalViewState = externalView.getStateMap(segmentNameStr);
+        for (Map.Entry<String, String> instanceAndStateEntry : externalViewState.entrySet()) {
+          String instance = instanceAndStateEntry.getKey();
+          String state = instanceAndStateEntry.getValue();
 
-          for (Map.Entry<String, String> instanceAndStateEntry : externalViewState.entrySet()) {
-            String instance = instanceAndStateEntry.getKey();
-            String state = instanceAndStateEntry.getValue();
-
-            // Skip pruned replicas (shutting down or otherwise disabled)
-            if (instancePruner.isInactive(instance)) {
-              continue;
-            }
-
-            // Replicas in ONLINE state are always allowed
-            if (state.equalsIgnoreCase(
-                CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
-              validServers.add(instance);
-              continue;
-            }
-
-            // Replicas in CONSUMING state are only allowed on the last segment
-            if (state.equalsIgnoreCase(
-                CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
-                && segmentName.equals(validConsumingSegment)) {
-              validServers.add(instance);
-            }
+          // Skip pruned replicas (shutting down or otherwise disabled)
+          if (instancePruner.isInactive(instance)) {
+            continue;
           }
 
-          if (!validServers.isEmpty()) {
-            _segmentToServersMap.put(segmentNameStr, validServers);
-          } else {
-            handleNoServingHost(segmentNameStr);
+          // Replicas in ONLINE state are always allowed
+          if (state.equalsIgnoreCase(
+              CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.ONLINE)) {
+            validServers.add(instance);
+            continue;
           }
 
-          // If this segment is the segment allowed in CONSUMING state, don't process segments after it in that partition
-          if (segmentName.equals(validConsumingSegment)) {
-            break;
+          // Replicas in CONSUMING state are only allowed on the last segment
+          if (state.equalsIgnoreCase(
+              CommonConstants.Helix.StateModel.RealtimeSegmentOnlineOfflineStateModel.CONSUMING)
+              && segmentName.equals(validConsumingSegment)) {
+            validServers.add(instance);
           }
+        }
+
+        if (!validServers.isEmpty()) {
+          segmentToServersMap.put(segmentNameStr, validServers);
+        } else {
+          handleNoServingHost(segmentNameStr);
+        }
+
+        // If this segment is the segment allowed in CONSUMING state, don't process segments after it in that partition
+        if (segmentName.equals(validConsumingSegment)) {
+          break;
         }
       }
     }
+    return segmentToServersMap;
+  }
 
-    @Override
-    protected Map<String, List<String>> getSegmentToServersMap() {
-      return _segmentToServersMap;
-    }
+  @Override
+  int getTargetNumServersPerQuery() {
+    return _targetNumServersPerQuery;
   }
 }

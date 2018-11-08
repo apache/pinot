@@ -33,7 +33,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 /**
  * Create a given number of routing tables based on random selections from ExternalView.
  */
-public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder {
+public class DefaultRealtimeRoutingTableBuilder implements RoutingTableBuilder {
   private RoutingTableBuilder _realtimeHLCRoutingTableBuilder;
   private RoutingTableBuilder _realtimeLLCRoutingTableBuilder;
   private boolean _hasHLC;
@@ -48,7 +48,7 @@ public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder 
   }
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+  public void computeOnExternalViewChange(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
     Set<String> segmentSet = externalView.getPartitionSet();
     for (String segmentName : segmentSet) {
@@ -60,10 +60,10 @@ public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder 
       }
     }
     if (_hasHLC) {
-      _realtimeHLCRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      _realtimeHLCRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
     }
     if (_hasLLC) {
-      _realtimeLLCRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      _realtimeLLCRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
     }
   }
 
