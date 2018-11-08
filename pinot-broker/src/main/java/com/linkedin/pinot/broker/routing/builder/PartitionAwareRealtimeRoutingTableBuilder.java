@@ -48,13 +48,14 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwareRoutingTableBuilder {
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     super.init(configuration, tableConfig, propertyStore, brokerMetrics);
     _numReplicas = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
   }
 
   @Override
-  public synchronized void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+  public synchronized void computeOnExternalViewChange(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
     // Update the cache for the segment ZK metadata
     Set<String> segmentSet = externalView.getPartitionSet();
@@ -113,6 +114,8 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
       // Update the final routing look up table.
       if (!replicaToServerMap.isEmpty()) {
         segmentToReplicaToServerMap.put(segmentName, replicaToServerMap);
+      } else {
+        handleNoServingHost(segmentName);
       }
     }
 
@@ -133,7 +136,8 @@ public class PartitionAwareRealtimeRoutingTableBuilder extends BasePartitionAwar
       _numReplicas = numReplicas;
     }
 
-    setSegmentToReplicaToServerMap(segmentToReplicaToServerMap);
+    // Update segment to replica to server mapping
+    _segmentToReplicaToServerMap = segmentToReplicaToServerMap;
   }
 
   /**

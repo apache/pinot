@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Create a given number of routing tables based on random selections from ExternalView.
  */
-public class DefaultOfflineRoutingTableBuilder extends BaseRoutingTableBuilder {
+public class DefaultOfflineRoutingTableBuilder implements RoutingTableBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultOfflineRoutingTableBuilder.class);
 
   private RoutingTableBuilder _largeClusterRoutingTableBuilder;
@@ -83,13 +83,13 @@ public class DefaultOfflineRoutingTableBuilder extends BaseRoutingTableBuilder {
   }
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+  public void computeOnExternalViewChange(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
     if (isLargeCluster(externalView)) {
-      _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      _largeClusterRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
       _routingTableBuilder = _largeClusterRoutingTableBuilder;
     } else {
-      _smallClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      _smallClusterRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
       _routingTableBuilder = _smallClusterRoutingTableBuilder;
     }
   }

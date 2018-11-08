@@ -247,7 +247,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
         buildExternalView(REALTIME_TABLE_NAME, fakePropertyStore, partitionToServerMapping, segmentList);
 
     // Compute routing table
-    routingTableBuilder.computeRoutingTableFromExternalView(REALTIME_TABLE_NAME, newExternalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(REALTIME_TABLE_NAME, newExternalView, instanceConfigs);
 
     Set<String> servers = new HashSet<>();
     for (int i = 0; i < 100; i++) {
@@ -306,7 +306,7 @@ public class PartitionAwareRealtimeRoutingTableBuilderTest {
 
     PartitionAwareRealtimeRoutingTableBuilder routingTableBuilder = new PartitionAwareRealtimeRoutingTableBuilder();
     routingTableBuilder.init(null, tableConfig, propertyStore, null);
-    routingTableBuilder.computeRoutingTableFromExternalView(REALTIME_TABLE_NAME, externalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(REALTIME_TABLE_NAME, externalView, instanceConfigs);
 
     return routingTableBuilder;
   }

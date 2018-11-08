@@ -43,12 +43,14 @@ import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class PartitionAwareOfflineRoutingTableBuilderTest {
   private static final String OFFLINE_TABLE_NAME = "myTable_OFFLINE";
   private static final String PARTITION_FUNCTION_NAME = "modulo";
   private static final String PARTITION_COLUMN = "memberId";
 
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
+
   private static final Random RANDOM = new Random();
 
   private int NUM_REPLICA;
@@ -93,7 +95,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       }
 
       // Update replica group mapping zk metadata
-      updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+      updateReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
 
       // Create the fake external view
       ExternalView externalView = buildExternalView(OFFLINE_TABLE_NAME, replicaToServerMapping);
@@ -131,7 +133,8 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       // Check the broker side server and segment pruning.
       for (int queryPartition = 0; queryPartition < 100; queryPartition++) {
         String filterQuery = "select count(*) from myTable where " + PARTITION_COLUMN + " = " + queryPartition;
-        routingTable = routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery));
+        routingTable =
+            routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery));
 
         // Check that the number of servers picked are always equal or less than the number of servers
         // in a single replica group.
@@ -177,7 +180,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     }
 
     // Update replica group mapping zk metadata
-    updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+    updateReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
 
     // Create the fake external view
     ExternalView externalView = buildExternalView(OFFLINE_TABLE_NAME, replicaToServerMapping);
@@ -202,14 +205,14 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     instanceConfigs.add(new InstanceConfig(newServerName));
 
     // Update replica group partition assignment
-    updatgeReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
+    updateReplicaGroupPartitionAssignment(OFFLINE_TABLE_NAME, fakePropertyStore);
 
     // Update external view
     Map<Integer, List<String>> newReplicaToServerMapping = buildReplicaGroupMapping();
     ExternalView newExternalView = buildExternalView(OFFLINE_TABLE_NAME, newReplicaToServerMapping);
 
     // Compute routing table and this should not throw null pointer exception
-    routingTableBuilder.computeRoutingTableFromExternalView(OFFLINE_TABLE_NAME, newExternalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(OFFLINE_TABLE_NAME, newExternalView, instanceConfigs);
 
     Set<String> servers = new HashSet<>();
     for (int i = 0; i < 100; i++) {
@@ -224,9 +227,10 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     Assert.assertEquals(servers.size(), 2);
   }
 
-  private void updatgeReplicaGroupPartitionAssignment(String tableNameWithType, FakePropertyStore propertyStore) {
+  private void updateReplicaGroupPartitionAssignment(String tableNameWithType, FakePropertyStore propertyStore) {
     // Create partition assignment mapping table.
-    ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment = new ReplicaGroupPartitionAssignment(tableNameWithType);
+    ReplicaGroupPartitionAssignment replicaGroupPartitionAssignment =
+        new ReplicaGroupPartitionAssignment(tableNameWithType);
 
     int partitionId = 0;
     for (int serverId = 0; serverId < NUM_SERVERS; serverId++) {
@@ -245,7 +249,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       TableConfig tableConfig, ExternalView externalView, List<InstanceConfig> instanceConfigs) throws Exception {
     PartitionAwareOfflineRoutingTableBuilder routingTableBuilder = new PartitionAwareOfflineRoutingTableBuilder();
     routingTableBuilder.init(null, tableConfig, propertyStore, null);
-    routingTableBuilder.computeRoutingTableFromExternalView(OFFLINE_TABLE_NAME, externalView, instanceConfigs);
+    routingTableBuilder.computeOnExternalViewChange(OFFLINE_TABLE_NAME, externalView, instanceConfigs);
 
     return routingTableBuilder;
   }

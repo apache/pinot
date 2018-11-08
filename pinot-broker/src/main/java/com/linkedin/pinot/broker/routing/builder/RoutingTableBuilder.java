@@ -35,14 +35,14 @@ public interface RoutingTableBuilder {
   /**
    * Initiate the routing table builder.
    */
-  void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics);
+  void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics);
 
   /**
    * Compute routing tables (map from server to list of segments) that are used for query routing from ExternalView.
    * <p>Should be called whenever there is an ExternalView change.
    */
-  void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigs);
+  void computeOnExternalViewChange(String tableName, ExternalView externalView, List<InstanceConfig> instanceConfigs);
 
   /**
    * Get the routing table based on the given lookup request.
