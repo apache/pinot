@@ -2,11 +2,16 @@
   {{#if isUserReported}}
     <div class="te-anomaly-table__text">User Reported</div>
   {{else}}
-    {{#if showResponseSaved}}
-      <i class="{{if showResponseSaved "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-ok-circle" ></i>
-    {{else}}
-      <i class="{{if showResponseFailed "te-anomaly-table__icon--status-no-margin" "te-anomaly-table__icon--hidden"}} glyphicon glyphicon-remove-circle" ></i>
-    {{/if}}
+    <div class="te-anomaly-table__icon-wrapper">
+      {{#if renderStatusIcon}}
+        {{#if showResponseSaved}}
+          <i class="te-anomaly-table__icon--status-no-margin glyphicon glyphicon-ok-circle"></i>
+        {{/if}}
+        {{#if showResponseFailed}}
+          <i class="te-anomaly-table__icon--status-no-margin te-anomaly-table__icon--error glyphicon glyphicon-remove-circle"></i>
+        {{/if}}
+      {{/if}}
+    </div>
 
     {{#if (eq record.anomalyFeedback "True anomaly")}}
       <div class="te-anomaly-table__value-label--down">
