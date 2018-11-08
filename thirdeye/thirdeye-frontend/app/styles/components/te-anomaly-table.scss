@@ -192,7 +192,6 @@
 
     &--status {
       position: absolute;
-      //font-size: 20px;
       margin: 14px 0 0 -26px;
       @extend %te-icon-animation;
     }
@@ -213,8 +212,6 @@
 
     &--error {
       color: #e75858;
-      /*font-size: 20px;
-      margin: 14px 0 0 -26px;*/
     }
   }
 

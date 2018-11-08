@@ -55,7 +55,7 @@ export default Component.extend({
      onChangeAnomalyResponse: async function(humanizedAnomaly, selectedResponse, inputObj) {
       const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
       set(inputObj, 'selected', selectedResponse);
-      set(this, 'renderStatusIcon', false);
+      // Reset icon display props
       setProperties(this, {
         renderStatusIcon: false,
         showResponseFailed: false,
