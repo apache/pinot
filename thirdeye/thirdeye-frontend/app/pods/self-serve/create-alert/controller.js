@@ -4,13 +4,12 @@
  * @exports create
  */
 import { reads } from '@ember/object/computed';
-
+import { inject as service } from '@ember/service';
 import RSVP from "rsvp";
-import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
-import { computed, set, getWithDefault } from '@ember/object';
+import { computed, set, get, getWithDefault } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import {
   isPresent,
@@ -30,6 +29,7 @@ import {
   getTopDimensions
 } from 'thirdeye-frontend/utils/manage-alert-utils';
 import config from 'thirdeye-frontend/config/environment';
+import { yamlAlertProps } from 'thirdeye-frontend/utils/constants';
 
 export default Controller.extend({
 
@@ -63,6 +63,9 @@ export default Controller.extend({
   availableDimensions: 0,
   metricLookupCache: [],
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
+  isForm: true,
+  isAlertYamlDisabled: true,
+  yamlAlertProps,
 
   /**
    * Component property initial settings
@@ -106,6 +109,8 @@ export default Controller.extend({
       'Absolute Value of Change': 'deviation'
     }
   },
+
+  notifications: service('toast'),
 
   /**
    * Severity display options (power-select) and values
@@ -754,6 +759,38 @@ export default Controller.extend({
    * Actions for create alert form view
    */
   actions: {
+
+    /**
+     * Navigate to Alert Page
+     */
+    onYMLSelector(value) {
+      set(this, 'isAlertYamlDisabled', !this.get('isAlertYamlDisabled'));
+      set(this, 'alertYamlContent', value);
+      //this.transitionToRoute('manage.alert.explore', this.get('id'));
+    },
+
+    /**
+     * Navigate to Alert Page
+     */
+    saveAlertYaml() {
+      set(this, 'isAlertYamlDisabled', !this.get('isAlertYamlDisabled'));
+      const content = get(this, 'alertYamlContent');
+      const url = 'yaml';
+      const postProps = {
+        method: 'post',
+        body: content,
+        headers: { 'content-type': 'text/plain' }
+      };
+      const notifications = this.get('notifications');
+
+      fetch(url, postProps).then(checkStatus).then((res) => {
+        if (res && res.active) {
+          notifications.success('Save alert yaml successfully.', 'Saved');
+        }
+      }).catch(() => {
+        notifications.error('Save alert yaml file failed.', 'Error');
+      });
+    },
 
     /**
      * When a metric is selected, fetch its props, and send them to the graph builder
