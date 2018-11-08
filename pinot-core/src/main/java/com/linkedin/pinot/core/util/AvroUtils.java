@@ -21,7 +21,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.io.File;
 import java.io.FileInputStream;

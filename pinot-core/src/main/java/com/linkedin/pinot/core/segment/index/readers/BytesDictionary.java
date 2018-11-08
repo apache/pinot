@@ -23,8 +23,8 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
  */
 public class BytesDictionary extends ImmutableDictionaryReader {
 
-  public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue, byte paddingByte) {
-    super(dataBuffer, length, numBytesPerValue, paddingByte);
+  public BytesDictionary(PinotDataBuffer dataBuffer, int length, int numBytesPerValue) {
+    super(dataBuffer, length, numBytesPerValue, (byte) 0);
   }
 
   @Override

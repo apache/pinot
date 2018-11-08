@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.data.recordtransformer;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,22 +28,18 @@ import java.util.Map;
  * The {@code SanitationTransformer} class will sanitize the values to follow certain rules including:
  * <ul>
  *   <li>No {@code null} characters in string values</li>
- *   <li>Bytes values are stored as {@link ByteArray}</li>
  * </ul>
  * <p>NOTE: should put this after the {@link DataTypeTransformer} so that all values follow the data types in
  * {@link FieldSpec}.
  */
 public class SanitationTransformer implements RecordTransformer {
-  List<String> _stringColumns = new ArrayList<>();
-  List<String> _bytesColumns = new ArrayList<>();
+  private final List<String> _stringColumns = new ArrayList<>();
 
   public SanitationTransformer(Schema schema) {
     for (Map.Entry<String, FieldSpec> entry : schema.getFieldSpecMap().entrySet()) {
       FieldSpec.DataType dataType = entry.getValue().getDataType();
       if (dataType == FieldSpec.DataType.STRING) {
         _stringColumns.add(entry.getKey());
-      } else if (dataType == FieldSpec.DataType.BYTES) {
-        _bytesColumns.add(entry.getKey());
       }
     }
   }
@@ -71,14 +66,6 @@ public class SanitationTransformer implements RecordTransformer {
         }
       }
     }
-
-    for (String bytesColumn : _bytesColumns) {
-      Object value = record.getValue(bytesColumn);
-      if (value instanceof byte[]) {
-        record.putField(bytesColumn, new ByteArray((byte[]) value));
-      }
-    }
-
     return record;
   }
 }

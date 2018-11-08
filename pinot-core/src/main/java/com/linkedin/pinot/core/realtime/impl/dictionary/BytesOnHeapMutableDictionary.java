@@ -29,23 +29,26 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
 
   @Override
   public int indexOf(Object rawValue) {
-    return getDictId(rawValue);
+    assert rawValue instanceof byte[];
+    return getDictId(new ByteArray((byte[]) rawValue));
+  }
+
+  @Override
+  public byte[] get(int dictId) {
+    return ((ByteArray) super.get(dictId)).getBytes();
+  }
+
+  @Override
+  public byte[] getBytesValue(int dictId) {
+    return get(dictId);
   }
 
   @Override
   public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof ByteArray) {
-      // Single value
-      indexValue(rawValue);
-      updateMinMax((ByteArray) rawValue);
-    } else {
-      // Multi value
-      Object[] values = (Object[]) rawValue;
-      for (Object value : values) {
-        indexValue(value);
-        updateMinMax((ByteArray) value);
-      }
-    }
+    assert rawValue instanceof byte[];
+    ByteArray byteArray = new ByteArray((byte[]) rawValue);
+    indexValue(byteArray);
+    updateMinMax(byteArray);
   }
 
   @Override
@@ -73,31 +76,11 @@ public class BytesOnHeapMutableDictionary extends BaseOnHeapMutableDictionary {
     ByteArray[] sortedValues = new ByteArray[numValues];
 
     for (int i = 0; i < numValues; i++) {
-      sortedValues[i] = (ByteArray) get(i);
+      sortedValues[i] = (ByteArray) super.get(i);
     }
 
     Arrays.sort(sortedValues);
     return sortedValues;
-  }
-
-  @Override
-  public int getIntValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getLongValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public float getFloatValue(int dictId) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public double getDoubleValue(int dictId) {
-    throw new UnsupportedOperationException();
   }
 
   private void updateMinMax(ByteArray value) {
