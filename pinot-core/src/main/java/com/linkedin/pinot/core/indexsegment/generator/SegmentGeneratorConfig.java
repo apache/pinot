@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.StarTreeIndexConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -184,10 +185,23 @@ public class SegmentGeneratorConfig {
       }
     }
     _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+
+    // Star-tree V1 config
     StarTreeIndexSpec starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
     if (starTreeIndexSpec != null) {
       enableStarTreeIndex(starTreeIndexSpec);
     }
+
+    // Star-tree V2 configs
+    List<StarTreeIndexConfig> starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
+    if (starTreeIndexConfigs != null && !starTreeIndexConfigs.isEmpty()) {
+      List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = new ArrayList<>(starTreeIndexConfigs.size());
+      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigs) {
+        starTreeV2BuilderConfigs.add(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig));
+      }
+      setStarTreeV2BuilderConfigs(starTreeV2BuilderConfigs);
+    }
+
     if (indexingConfig.isCreateInvertedIndexDuringSegmentGeneration()) {
       _invertedIndexCreationColumns = indexingConfig.getInvertedIndexColumns();
     }
