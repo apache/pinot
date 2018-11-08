@@ -62,7 +62,7 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final int NUM_QUERIES_TO_GENERATE = 100;
 
   protected Schema _schema;
-  protected StarTreeQueryGenerator _queryGenerator;
+  private StarTreeQueryGenerator _queryGenerator;
   private String _currentTable;
 
   @Nonnull
@@ -149,9 +149,12 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testGeneratedQueries() throws Exception {
     for (int i = 0; i < NUM_QUERIES_TO_GENERATE; i++) {
-      String starQuery = _queryGenerator.nextQuery();
-      testStarQuery(starQuery);
+      testStarQuery(generateQuery());
     }
+  }
+
+  protected String generateQuery() {
+    return _queryGenerator.nextQuery();
   }
 
   @Test
