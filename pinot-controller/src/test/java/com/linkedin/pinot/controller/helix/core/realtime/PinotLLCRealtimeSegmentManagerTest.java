@@ -39,8 +39,8 @@ import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegme
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.OffsetCriteria;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
@@ -1177,7 +1177,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String streamType = "kafka";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     String topic = "aTopic";
-    String consumerFactoryClass = SimpleConsumerFactory.class.getName();
+    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);

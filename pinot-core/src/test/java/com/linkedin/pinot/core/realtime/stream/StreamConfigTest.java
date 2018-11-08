@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.realtime.stream;
 import com.linkedin.pinot.common.utils.DataSize;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import java.util.HashMap;
 import java.util.Map;
 import org.testng.Assert;
@@ -37,7 +37,7 @@ public class StreamConfigTest {
     String streamType = "kafka";
     String topic = "aTopic";
     String consumerType = StreamConfig.ConsumerType.LOWLEVEL.toString();
-    String consumerFactoryClassName = SimpleConsumerFactory.class.getName();
+    String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
 
     try {
@@ -145,7 +145,7 @@ public class StreamConfigTest {
     String streamType = "kafka";
     String topic = "aTopic";
     String consumerType = "simple";
-    String consumerFactoryClassName = SimpleConsumerFactory.class.getName();
+    String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
 
     Map<String, String> streamConfigMap = new HashMap<>();
@@ -242,7 +242,7 @@ public class StreamConfigTest {
     String streamType = "kafka";
     String topic = "aTopic";
     String consumerType = "simple";
-    String consumerFactoryClassName = SimpleConsumerFactory.class.getName();
+    String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
 
     // All mandatory properties set
@@ -321,7 +321,7 @@ public class StreamConfigTest {
     String streamType = "kafka";
     String topic = "aTopic";
     String consumerType = "lowlevel";
-    String consumerFactoryClassName = SimpleConsumerFactory.class.getName();
+    String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
     String flushThresholdRows = "200";
     String flushThresholdRowsLLC = "400";
@@ -401,7 +401,7 @@ public class StreamConfigTest {
   public void testConsumerTypes() {
     String streamType = "kafka";
     String topic = "aTopic";
-    String consumerFactoryClassName = SimpleConsumerFactory.class.getName();
+    String consumerFactoryClassName = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
 
     Map<String, String> streamConfigMap = new HashMap<>();
