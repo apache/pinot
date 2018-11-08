@@ -87,6 +87,7 @@ export default Controller.extend({
       selectedTimeRange: '',
       selectedFilters: JSON.stringify({}),
       timePickerIncrement: 5,
+      renderStatusIcon: true,
       openReportModal: false,
       isAlertReady: false,
       isGraphReady: false,
@@ -583,19 +584,24 @@ export default Controller.extend({
       const labelMap = get(this, 'labelMap');
       const loadedResponsesArr = [];
       const newOptionsArr = [];
+      // Update select field
+      set(inputObj, 'selected', selectedResponse);
+      // Reset status icon
+      set(this, 'renderStatusIcon', false);
       try {
         // Save anomaly feedback
         await anomalyUtil.updateAnomalyFeedback(anomalyRecord.anomalyId, responseObj.value);
         // We make a call to ensure our new response got saved
         const anomaly = await anomalyUtil.verifyAnomalyFeedback(anomalyRecord.anomalyId, responseObj.status);
         const filterMap = getWithDefault(anomaly, 'searchFilters.statusFilterMap', null);
-        if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
+        // This verifies that the status change got saved as key in the anomaly statusFilterMap property
+        const keyPresent = filterMap && Object.keys(filterMap).find(key => responseObj.status.includes(key));
+        if (keyPresent) {
           setProperties(anomalyRecord, {
             anomalyFeedback: responseObj.status,
-            showResponseSaved: true
+            showResponseSaved: true,
+            showResponseFailed: false
           });
-          // Update select field
-          set(inputObj, 'selected', responseObj.status);
           // Collect all available new labels
           loadedResponsesArr.push(responseObj.status, ...get(this, 'anomalyData').mapBy('anomalyFeedback'));
           loadedResponsesArr.forEach((response) => {
@@ -604,7 +610,7 @@ export default Controller.extend({
           // Update resolutionOptions array - we may have a new option now
           set(this, 'resolutionOptions', [ ...new Set([ 'All Resolutions', ...newOptionsArr ])]);
         } else {
-          return Promise.reject(new Error('Response not saved'));
+          throw 'Response not saved';
         }
       } catch (err) {
         setProperties(anomalyRecord, {
@@ -612,6 +618,8 @@ export default Controller.extend({
           showResponseSaved: false
         });
       }
+      // Force status icon to refresh
+      set(this, 'renderStatusIcon', true);
     },
 
     /**

@@ -31,6 +31,7 @@ export default Component.extend({
   showResponseSaved: false,
   isUserReported: false,
   hasComment: false,
+  renderStatusIcon: true,
 
   didReceiveAttrs() {
     this._super(...arguments);
@@ -54,6 +55,12 @@ export default Component.extend({
      onChangeAnomalyResponse: async function(humanizedAnomaly, selectedResponse, inputObj) {
       const responseObj = anomalyUtil.anomalyResponseObj.find(res => res.name === selectedResponse);
       set(inputObj, 'selected', selectedResponse);
+      set(this, 'renderStatusIcon', false);
+      setProperties(this, {
+        renderStatusIcon: false,
+        showResponseFailed: false,
+        showResponseSaved: false
+      });
       try {
         const id = humanizedAnomaly.get('id');
         // Save anomaly feedback
@@ -63,11 +70,13 @@ export default Component.extend({
         // TODO: right now we will update the union wrapper cached record for this anomaly
         humanizedAnomaly.set('anomaly.feedback', responseObj.value);
         const filterMap = getWithDefault(savedAnomaly, 'searchFilters.statusFilterMap', null);
-        if (filterMap && filterMap.hasOwnProperty(responseObj.status)) {
+        // This verifies that the status change got saved as key in the anomaly statusFilterMap property
+        const keyPresent = filterMap && Object.keys(filterMap).find(key => responseObj.status.includes(key));
+        if (keyPresent) {
           humanizedAnomaly.set('anomalyFeedback', selectedResponse);
           set(this, 'showResponseSaved', true);
         } else {
-          return Promise.reject(new Error('Response not saved'));
+          throw 'Response not saved';
         }
       } catch (err) {
         setProperties(this, {
@@ -75,6 +84,7 @@ export default Component.extend({
           showResponseSaved: false
         });
       }
+      set(this, 'renderStatusIcon', true);
     }
   }
 });

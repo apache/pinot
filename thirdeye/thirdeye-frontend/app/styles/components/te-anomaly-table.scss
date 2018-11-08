@@ -181,22 +181,24 @@
     font-weight: normal;
   }
 
+  &__icon-wrapper {
+    width: 20px;
+    height: 30px;
+  }
+
   &__icon {
     font-size: 14px;
     margin-left: 5px;
 
     &--status {
-      -webkit-animation: fadeinout 4s linear forwards;
-      animation: fadeinout 4s linear forwards;
       position: absolute;
-      font-size: 20px;
+      //font-size: 20px;
       margin: 14px 0 0 -26px;
+      @extend %te-icon-animation;
     }
 
     &--status-no-margin {
-      -webkit-animation: fadeinout 4s linear forwards;
-      animation: fadeinout 4s linear forwards;
-      font-size: 20px;
+      @extend %te-icon-animation;
     }
 
     &--hidden {
@@ -207,6 +209,12 @@
     &--small {
       font-size: 11px;
       margin-left: 0px;
+    }
+
+    &--error {
+      color: #e75858;
+      /*font-size: 20px;
+      margin: 14px 0 0 -26px;*/
     }
   }
 
