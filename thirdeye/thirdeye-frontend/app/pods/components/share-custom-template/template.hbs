@@ -3,7 +3,7 @@
     <h4 style="margin-left: 20px;word-wrap: break-word;">
       <span style="color: #737373;margin-right:10px;font-weight: bold;">{{config.title}} for {{startDateDisplay}}</span>
     </h4>
-    <table border="1" width="660" style="margin: 20px;background-color: #F6F8FA;font-size: 18px;">
+    <table width="660" style="margin: 20px;border:1px solid #C7D1D8;background-color: #F6F8FA;font-size: 18px;">
       <!-- Custom template table -->
       {{#each customHeaderMappingComplete as |row index|}}
         <!-- Custom headers -->
@@ -17,11 +17,11 @@
           <tr>
           {{#each row as |column index|}}
             {{#if (eq index 0)}}
-              <td style="padding: 0 3px 3px 10px;">
+              <td style="border:1px solid #C7D1D8;padding: 0 3px 3px 10px;">
                 <p style="margin: 0;">{{column.value}}</p>
               </td>
             {{else}}
-              <td style="padding: 0 3px 3px 10px;">
+              <td style="border:1px solid #C7D1D8;padding: 0 3px 3px 10px;">
                 <p style="margin: 0;">{{column.summary.[0]}}</p>
                 <p  style="margin: 0;" class="te-anomaly-table__value-label--{{calculate-direction column.summary.[1]}}">
                   ({{column.summary.[1]}}%)

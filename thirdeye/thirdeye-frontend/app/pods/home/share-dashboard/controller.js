@@ -295,7 +295,7 @@ export default Controller.extend({
             map[metricName].items[functionName] = { 'functionId': functionId, items: [] };
           }
 
-          const filteredDimensions = Object.keys(dimensions).map(key => [key, dimensions[key]]);
+          const filteredDimensions = Object.keys(dimensions).map(key => [key, '=', dimensions[key]]);
           //build new urn
           const metricUrn = appendFilters(`thirdeye:metric:${metricId}`, filteredDimensions);
           //Get all in the following order - current,wo2w,median4w
