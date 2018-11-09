@@ -255,22 +255,22 @@ public class AnomalyDetails {
     this.anomalyFeedbackComments = anomalyFeedbackComments;
   }
 
+  // TODO remove this unnecessary translation. Warning - this is not trivial. It extensively touches frontend and search filters
   public static String getFeedbackStringFromFeedbackType(AnomalyFeedbackType feedbackType) {
-    String feedback = null;
     switch (feedbackType) {
       case ANOMALY:
-        feedback = "Confirmed Anomaly";
-        break;
+        return "Confirmed Anomaly";
       case ANOMALY_NEW_TREND:
-        feedback = "Confirmed - New Trend";
-        break;
+        return "Confirmed - New Trend";
       case NOT_ANOMALY:
-        feedback = "False Alarm";
-        break;
+        return "False Alarm";
+      case ANOMALY_EXPECTED:
+        return "Expected Anomaly";
+      case NO_FEEDBACK:
+        return "Not Resolved";
       default:
-        break;
+        return "(unknown)";
     }
-    return feedback;
   }
 
   public String getIssueType() {

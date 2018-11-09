@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.core.startree.v2.builder;
 
+import com.linkedin.pinot.common.config.StarTreeIndexConfig;
 import com.linkedin.pinot.core.startree.v2.AggregationFunctionColumnPair;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -33,6 +35,25 @@ public class StarTreeV2BuilderConfig {
   private final Set<String> _skipStarNodeCreationForDimensions;
   private final Set<AggregationFunctionColumnPair> _functionColumnPairs;
   private final int _maxLeafRecords;
+
+  public static StarTreeV2BuilderConfig fromIndexConfig(StarTreeIndexConfig indexConfig) {
+    Builder builder = new Builder();
+    builder.setDimensionsSplitOrder(indexConfig.getDimensionsSplitOrder());
+    List<String> skipStarNodeCreationForDimensions = indexConfig.getSkipStarNodeCreationForDimensions();
+    if (skipStarNodeCreationForDimensions != null && !skipStarNodeCreationForDimensions.isEmpty()) {
+      builder.setSkipStarNodeCreationForDimensions(new HashSet<>(skipStarNodeCreationForDimensions));
+    }
+    Set<AggregationFunctionColumnPair> functionColumnPairs = new HashSet<>();
+    for (String functionColumnPair : indexConfig.getFunctionColumnPairs()) {
+      functionColumnPairs.add(AggregationFunctionColumnPair.fromColumnName(functionColumnPair));
+    }
+    builder.setFunctionColumnPairs(functionColumnPairs);
+    int maxLeafRecords = indexConfig.getMaxLeafRecords();
+    if (maxLeafRecords > 0) {
+      builder.setMaxLeafRecords(maxLeafRecords);
+    }
+    return builder.build();
+  }
 
   private StarTreeV2BuilderConfig(List<String> dimensionsSplitOrder, Set<String> skipStarNodeCreationForDimensions,
       Set<AggregationFunctionColumnPair> functionColumnPairs, int maxLeafRecords) {
@@ -95,7 +116,7 @@ public class StarTreeV2BuilderConfig {
 
     public StarTreeV2BuilderConfig build() {
       if (_dimensionsSplitOrder == null || _dimensionsSplitOrder.isEmpty()) {
-        throw new IllegalStateException("Illegal _dimensions split order: " + _dimensionsSplitOrder);
+        throw new IllegalStateException("Illegal dimensions split order: " + _dimensionsSplitOrder);
       }
       if (_skipStarNodeCreationForDimensions == null) {
         _skipStarNodeCreationForDimensions = Collections.emptySet();

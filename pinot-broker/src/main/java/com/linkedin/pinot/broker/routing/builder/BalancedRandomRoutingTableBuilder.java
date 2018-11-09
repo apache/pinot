@@ -17,15 +17,13 @@ package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
@@ -39,41 +37,25 @@ public class BalancedRandomRoutingTableBuilder extends BaseRoutingTableBuilder {
   private int _numRoutingTables = DEFAULT_NUM_ROUTING_TABLES;
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     super.init(configuration, tableConfig, propertyStore, brokerMetrics);
     _numRoutingTables = configuration.getInt(NUM_ROUTING_TABLES_KEY, DEFAULT_NUM_ROUTING_TABLES);
   }
 
-  @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
-      List<InstanceConfig> instanceConfigs) {
+  protected List<Map<String, List<String>>> computeRoutingTablesFromSegmentToServersMap(
+      Map<String, List<String>> segmentToServersMap) {
     List<Map<String, List<String>>> routingTables = new ArrayList<>(_numRoutingTables);
+    Set<String> segmentsToQuery = segmentToServersMap.keySet();
+
     for (int i = 0; i < _numRoutingTables; i++) {
-      routingTables.add(new HashMap<String, List<String>>());
-    }
-
-    RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
-    for (String segmentName : externalView.getPartitionSet()) {
-      // List of servers that are active and are serving the segment
-      List<String> servers = new ArrayList<>();
-      for (Map.Entry<String, String> entry : externalView.getStateMap(segmentName).entrySet()) {
-        String serverName = entry.getKey();
-        if (entry.getValue().equals(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.ONLINE)
-            && !instancePruner.isInactive(serverName)) {
-          servers.add(serverName);
-        }
+      Map<String, List<String>> routingTable = new HashMap<>();
+      for (String segmentName : segmentsToQuery) {
+        List<String> servers = segmentToServersMap.get(segmentName);
+        routingTable.get(getServerWithLeastSegmentsAssigned(servers, routingTable)).add(segmentName);
       }
-      int numServers = servers.size();
-      if (numServers != 0) {
-        for (Map<String, List<String>> routingTable : routingTables) {
-          // Assign the segment to the server with least segments assigned
-          routingTable.get(getServerWithLeastSegmentsAssigned(servers, routingTable)).add(segmentName);
-        }
-      } else {
-        handleNoServingHost(segmentName);
-      }
+      routingTables.add(routingTable);
     }
-
-    setRoutingTables(routingTables);
+    return routingTables;
   }
 }

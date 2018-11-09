@@ -5,7 +5,6 @@
  */
 import fetch from 'fetch';
 import RSVP from 'rsvp';
-import _ from 'lodash';
 import moment from 'moment';
 import Route from '@ember/routing/route';
 import { task, timeout } from 'ember-concurrency';

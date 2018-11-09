@@ -20,7 +20,7 @@ import javax.annotation.Nonnull;
 
 
 /**
- * Interface for provider of stream metadata
+ * Interface for provider of stream metadata such as partition count, partition offsets
  */
 public interface StreamMetadataProvider extends Closeable {
   /**

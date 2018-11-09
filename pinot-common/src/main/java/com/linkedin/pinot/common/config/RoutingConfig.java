@@ -28,32 +28,27 @@ import org.slf4j.LoggerFactory;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RoutingConfig {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(RoutingConfig.class);
 
+  public static final String ENABLE_DYNAMIC_COMPUTING_KEY = "enableDynamicComputing";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @ConfigKey("routingTableBuilderName")
   private String _routingTableBuilderName;
 
-  // TODO jfim: This seems unused, maybe remove it?
   private Map<String,String> _routingTableBuilderOptions = new HashMap<>();
-
 
   public String getRoutingTableBuilderName() {
     return _routingTableBuilderName;
   }
 
-
   public void setRoutingTableBuilderName(String routingTableBuilderName) {
     _routingTableBuilderName = routingTableBuilderName;
   }
 
-
   public Map<String, String> getRoutingTableBuilderOptions() {
     return _routingTableBuilderOptions;
   }
-
 
   public void setRoutingTableBuilderOptions(Map<String, String> routingTableBuilderOptions) {
     _routingTableBuilderOptions = routingTableBuilderOptions;

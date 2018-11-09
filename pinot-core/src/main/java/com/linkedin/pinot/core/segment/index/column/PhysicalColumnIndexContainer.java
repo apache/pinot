@@ -119,7 +119,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   private static ImmutableDictionaryReader loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
-      boolean loadOnHeap) throws IOException {
+      boolean loadOnHeap) {
     FieldSpec.DataType dataType = metadata.getDataType();
     if (loadOnHeap) {
       String columnName = metadata.getColumnName();
@@ -152,8 +152,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
-        paddingByte = (byte) metadata.getPaddingCharacter();
-        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue);
 
       default:
         throw new IllegalStateException("Illegal data type for dictionary: " + dataType);
@@ -161,7 +160,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   private static SingleColumnSingleValueReader loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
-      FieldSpec.DataType dataType) throws IOException {
+      FieldSpec.DataType dataType) {
 
     switch (dataType) {
       case INT:

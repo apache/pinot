@@ -70,7 +70,13 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean delete(URI segmentUri) throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
+    // Returns false if we are moving a directory and that directory is not empty
+    if (isDirectory(segmentUri)
+        && listFiles(segmentUri, false).length > 0
+        && !forceDelete) {
+      return false;
+    }
     return _hadoopFS.delete(new Path(segmentUri), true);
   }
 
@@ -113,11 +119,11 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public String[] listFiles(URI fileUri) throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(fileUri);
     if (_hadoopFS.exists(path)) {
-      RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, true);
+      RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, recursive);
       while (fileListItr != null && fileListItr.hasNext()) {
         LocatedFileStatus file = fileListItr.next();
         filePathStrings.add(file.getPath().toUri().toString());
@@ -166,10 +172,20 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri) throws IOException {
+  public boolean isDirectory(URI uri) {
     FileStatus fileStatus = new FileStatus();
     fileStatus.setPath(new Path(uri));
     return fileStatus.isDirectory();
+  }
+
+  @Override
+  public long lastModified(URI uri) {
+    try {
+      return _hadoopFS.getFileStatus(new Path(uri)).getModificationTime();
+    } catch (IOException e) {
+      LOGGER.error("Could not get file status for {}", uri);
+      throw new RuntimeException(e);
+    }
   }
 
   private void authenticate(org.apache.hadoop.conf.Configuration hadoopConf, org.apache.commons.configuration.Configuration configs) {

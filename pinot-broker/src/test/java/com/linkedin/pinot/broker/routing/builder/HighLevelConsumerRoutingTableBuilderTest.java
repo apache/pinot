@@ -33,7 +33,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class KafkaHighLevelConsumerRoutingTableBuilderTest {
+public class HighLevelConsumerRoutingTableBuilderTest {
 
   public static final String ALL_PARTITIONS = "ALL";
 
@@ -90,7 +90,7 @@ public class KafkaHighLevelConsumerRoutingTableBuilderTest {
       }
 
       // Compute routing table
-      routingTableBuilder.computeRoutingTableFromExternalView(tableNameWithType, externalView, instanceConfigs);
+      routingTableBuilder.computeOnExternalViewChange(tableNameWithType, externalView, instanceConfigs);
 
       // Check if the routing table result is correct
       for (int run = 0; run < MAX_NUM_GROUPS * 10; run++) {

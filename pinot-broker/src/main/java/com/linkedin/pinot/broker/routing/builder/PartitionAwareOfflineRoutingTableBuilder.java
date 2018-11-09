@@ -71,7 +71,8 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
   private boolean _isPartitionLevelReplicaGroupAssignment;
 
   @Override
-  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore, BrokerMetrics brokerMetrics) {
+  public void init(Configuration configuration, TableConfig tableConfig, ZkHelixPropertyStore<ZNRecord> propertyStore,
+      BrokerMetrics brokerMetrics) {
     super.init(configuration, tableConfig, propertyStore, brokerMetrics);
     String partitionColumn = tableConfig.getValidationConfig().getReplicaGroupStrategyConfig().getPartitionColumn();
     _isPartitionLevelReplicaGroupAssignment = (partitionColumn != null);
@@ -79,7 +80,7 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
   }
 
   @Override
-  public synchronized void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+  public synchronized void computeOnExternalViewChange(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
     RoutingTableInstancePruner instancePruner = new RoutingTableInstancePruner(instanceConfigs);
     Set<String> segmentSet = externalView.getPartitionSet();
@@ -158,6 +159,8 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
       // Update the final routing look up table.
       if (!replicaToServerMap.isEmpty()) {
         segmentToReplicaToServerMap.put(segmentName, replicaToServerMap);
+      } else {
+        handleNoServingHost(segmentName);
       }
     }
 
@@ -168,7 +171,8 @@ public class PartitionAwareOfflineRoutingTableBuilder extends BasePartitionAware
       }
     }
 
-    setSegmentToReplicaToServerMap(segmentToReplicaToServerMap);
+    // Update segment to replica to server mapping
+    _segmentToReplicaToServerMap = segmentToReplicaToServerMap;
   }
 
   /**

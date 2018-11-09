@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.data.recordtransformer;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.primitive.ByteArray;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,7 +43,6 @@ public class DataTypeTransformer implements RecordTransformer {
     SINGLE_VALUE_TYPE_MAP.put(Double.class, PinotDataType.DOUBLE);
     SINGLE_VALUE_TYPE_MAP.put(String.class, PinotDataType.STRING);
     SINGLE_VALUE_TYPE_MAP.put(byte[].class, PinotDataType.BYTES);
-    SINGLE_VALUE_TYPE_MAP.put(ByteArray.class, PinotDataType.BYTES);
 
     MULTI_VALUE_TYPE_MAP.put(Byte.class, PinotDataType.BYTE_ARRAY);
     MULTI_VALUE_TYPE_MAP.put(Character.class, PinotDataType.CHARACTER_ARRAY);

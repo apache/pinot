@@ -236,7 +236,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     try {
       Map<String, InstanceConfig> relevantInstanceConfigs = new HashMap<>();
 
-      routingTableBuilder.computeRoutingTableFromExternalView(tableNameWithType, externalView, instanceConfigs);
+      routingTableBuilder.computeOnExternalViewChange(tableNameWithType, externalView, instanceConfigs);
 
       // Keep track of the instance configs that are used in that routing table
       updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs, externalView);

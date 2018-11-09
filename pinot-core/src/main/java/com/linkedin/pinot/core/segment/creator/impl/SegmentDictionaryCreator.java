@@ -173,15 +173,10 @@ public class SegmentDictionaryCreator implements Closeable {
         Preconditions.checkState(numValues > 0);
         _bytesValueToIndexMap = new Object2IntOpenHashMap<>(numValues);
 
-        // Get the maximum length of all entries
-        byte[][] sortedValues = new byte[numValues][];
-
         for (int i = 0; i < numValues; i++) {
           ByteArray value = sortedBytes[i];
           _bytesValueToIndexMap.put(value, i);
-          byte[] valueBytes = value.getBytes();
-          sortedValues[i] = valueBytes;
-          _numBytesPerEntry = Math.max(_numBytesPerEntry, valueBytes.length);
+          _numBytesPerEntry = Math.max(_numBytesPerEntry, value.getBytes().length);
         }
 
         // Backward-compatible: index file is always big-endian
@@ -195,8 +190,7 @@ public class SegmentDictionaryCreator implements Closeable {
         }
         LOGGER.info(
             "Created dictionary for BYTES column: {} with cardinality: {}, max length in bytes: {}, range: {} to {}",
-            _fieldSpec.getName(), numValues, _numBytesPerEntry, Arrays.asList(sortedValues[0]),
-            Arrays.asList(sortedValues[numValues - 1]));
+            _fieldSpec.getName(), numValues, _numBytesPerEntry, sortedBytes[0], sortedBytes[numValues - 1]);
         return;
 
       default:
@@ -221,7 +215,7 @@ public class SegmentDictionaryCreator implements Closeable {
       case STRING:
         return _stringValueToIndexMap.getInt(value);
       case BYTES:
-        return _bytesValueToIndexMap.get(value);
+        return _bytesValueToIndexMap.get(new ByteArray((byte[]) value));
       default:
         throw new UnsupportedOperationException("Unsupported data type : " + _fieldSpec.getDataType());
     }
