@@ -30,7 +30,7 @@ public interface AnomalyDetector<T extends AbstractSpec> extends BaseComponent<T
    * Data is retrieved in one pass and cached between executions if possible.
    * @return input data spec
    */
-  InputDataSpec getInputDataSpec(Interval window, String metricUrn, long configId);
+  InputDataSpec getInputDataSpec(Interval window, String metricUrn);
 
   /**
    * Run detection in the specified time range and return a list of anomalies

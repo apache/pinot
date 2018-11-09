@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public class DetectionRegistry {
 
   private static final Map<String, Map> REGISTRY_MAP = new HashMap<>();
-  private static final Map<String, Training> TRAINING_MODULE_MAP = new HashMap<>();
+  private static final Map<String, Tune> TRAINING_MODULE_MAP = new HashMap<>();
   private static final Logger LOG = LoggerFactory.getLogger(DetectionRegistry.class);
   private static final String KEY_CLASS_NAME = "className";
   private static final String KEY_ANNOTATION = "annotation";
@@ -65,8 +65,8 @@ public class DetectionRegistry {
               REGISTRY_MAP.put(componentsAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION,
                   componentsAnnotation));
             }
-            if (annotation instanceof Training) {
-              Training trainingAnnotation = (Training) annotation;
+            if (annotation instanceof Tune) {
+              Tune trainingAnnotation = (Tune) annotation;
               TRAINING_MODULE_MAP.put(className, trainingAnnotation);
             }
           }
@@ -90,6 +90,9 @@ public class DetectionRegistry {
     return stageClassName;
   }
 
+  public boolean isTrainable(String className) {
+    return TRAINING_MODULE_MAP.containsKey(className);
+  }
 
   /**
    * Return all stage implementation annotations

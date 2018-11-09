@@ -74,9 +74,9 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
       long startTime = MapUtils.getLong(this.vectorClocks, detectionConfigId, 0L);
 
       AnomalySlice slice =
-          new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
+          new AnomalySlice().withStart(startTime).withEnd(this.endTime);
       Collection<MergedAnomalyResultDTO> candidates =
-          this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
+          this.provider.fetchAnomalies(Collections.singletonList(slice), detectionConfigId).get(slice);
 
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {

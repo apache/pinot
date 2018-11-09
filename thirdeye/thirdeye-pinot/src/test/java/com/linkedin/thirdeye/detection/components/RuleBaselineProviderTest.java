@@ -65,7 +65,7 @@ public class RuleBaselineProviderTest {
 
   @Test
   public void testFetchBaselineTimeSeries() {
-    DataFrame df = baselineProvider.computePredictedTimeSeries(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getInputDataSpec(slice1, -1)));
+    DataFrame df = baselineProvider.computePredictedTimeSeries(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getInputDataSpec(slice1), -1));
     Assert.assertEquals(df.getDoubles(COL_VALUE).get(0), 100.0);
     Assert.assertEquals(df.getDoubles(COL_VALUE).get(1), 200.0);
   }
@@ -74,12 +74,12 @@ public class RuleBaselineProviderTest {
   @Test
   public void testFetchBaselineAggregates() {
     Assert.assertEquals(
-        this.baselineProvider.computePredictedAggregates(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getAggregateInputDataSpec(slice1, -1))), 100.0);
+        this.baselineProvider.computePredictedAggregates(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getAggregateInputDataSpec(slice1), -1)), 100.0);
   }
 
   @Test
   public void testFetchBaselineAggregatesNaN() {
     Assert.assertEquals(
-        this.baselineProvider.computePredictedAggregates(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getAggregateInputDataSpec(slice2, -1))), Double.NaN);
+        this.baselineProvider.computePredictedAggregates(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getAggregateInputDataSpec(slice2), -1)), Double.NaN);
   }
 }

@@ -82,7 +82,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
 
     Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_DETECTOR));
-    String detectorReferenceKey = DetectionUtils.getReferenceKey(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
+    String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
     Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
     this.anomalyDetector = (AnomalyDetector) this.config.getComponents().get(detectorReferenceKey);
 
@@ -103,7 +103,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (Interval window : monitoringWindows) {
       anomalies.addAll(anomalyDetector.runDetection(
-          DetectionUtils.getDataForSpec(provider, anomalyDetector.getInputDataSpec(window, this.metricUrn, config.getId()))));
+          DetectionUtils.getDataForSpec(provider, anomalyDetector.getInputDataSpec(window, this.metricUrn), config.getId()))
+      );
     }
 
     MetricEntity me = MetricEntity.fromURN(this.metricUrn);
@@ -117,10 +118,6 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setDimensions(DetectionUtils.toFilterMap(me.getFilters()));
     }
     return new DetectionPipelineResult(anomalies);
-  }
-
-  private AnomalyDetector loadAnomalyDetectorStage(String className) throws Exception {
-    return (AnomalyDetector) Class.forName(className).newInstance();
   }
 
   List<Interval> getMonitoringWindows() {

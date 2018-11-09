@@ -124,11 +124,14 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> result = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       for (MergedAnomalyResultDTO anomaly : this.anomalies) {
         if (slice.match(anomaly)) {
+          if (configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)){
+            continue;
+          }
           result.put(slice, anomaly);
         }
       }

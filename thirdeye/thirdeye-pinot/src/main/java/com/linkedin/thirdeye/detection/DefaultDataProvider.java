@@ -123,7 +123,7 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
@@ -131,8 +131,8 @@ public class DefaultDataProvider implements DataProvider {
         predicates.add(Predicate.LT("startTime", slice.getEnd()));
       if (slice.getStart() >= 0)
         predicates.add(Predicate.GT("endTime", slice.getStart()));
-      if (slice.getConfigId() >= 0)
-        predicates.add(Predicate.EQ("detectionConfigId", slice.getConfigId()));
+      if (configId >= 0)
+        predicates.add(Predicate.EQ("detectionConfigId", configId));
 
       if (predicates.isEmpty())
         throw new IllegalArgumentException("Must provide at least one of start, end, or detectionConfigId");
@@ -140,7 +140,12 @@ public class DefaultDataProvider implements DataProvider {
       List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
       Iterator<MergedAnomalyResultDTO> itAnomaly = anomalies.iterator();
       while (itAnomaly.hasNext()) {
-        if (!slice.match(itAnomaly.next())) {
+        MergedAnomalyResultDTO anomaly = itAnomaly.next();
+        if (configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)){
+          itAnomaly.remove();
+        }
+
+        if (!slice.match(anomaly)) {
           itAnomaly.remove();
         }
       }
@@ -158,7 +163,7 @@ public class DefaultDataProvider implements DataProvider {
       if (slice.getEnd() >= 0)
         predicates.add(Predicate.LT("startTime", slice.getEnd()));
       if (slice.getStart() >= 0)
-        predicates.add(Predicate.GT("endTime", slice.getEnd()));
+        predicates.add(Predicate.GT("endTime", slice.getStart()));
 
       if (predicates.isEmpty())
         throw new IllegalArgumentException("Must provide at least one of start, or end");

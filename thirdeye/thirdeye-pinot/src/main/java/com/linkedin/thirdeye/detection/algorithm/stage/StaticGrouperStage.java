@@ -21,6 +21,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.List;
+import java.util.Map;
 
 import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
 
@@ -28,6 +29,13 @@ import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
  * Static Grouper stage. High level interface for grouper stage.
  */
 public abstract class StaticGrouperStage implements GrouperStage {
+  private long configId;
+
+  @Override
+  public void init(Map<String, Object> specs, Long configId, long startTime, long endTime) {
+    this.configId = configId;
+  }
+
   /**
    * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to perform a stage.
    * Data is retrieved in one pass and cached between executions if possible.
@@ -45,6 +53,6 @@ public abstract class StaticGrouperStage implements GrouperStage {
 
   @Override
   public final List<MergedAnomalyResultDTO> group(List<MergedAnomalyResultDTO> anomalies, DataProvider provider) {
-    return this.group(anomalies, getDataForSpec(provider, this.getInputDataSpec()));
+    return this.group(anomalies, getDataForSpec(provider, this.getInputDataSpec(), configId));
   }
 }

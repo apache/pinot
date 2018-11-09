@@ -96,20 +96,17 @@ public class YamlResource {
     }
     Map<String, Object> yamlConfig = (Map<String, Object>) this.YAML_READER.load(payload);
 
-    DetectionConfigDTO detectionConfig;
-    // translate yaml to detection config
-    YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
-    detectionConfig = translator.withTrainingWindow(startTime, endTime).generateDetectionConfig();
-
-
+    Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "missing " + PROP_NAME);
     // retrieve id if detection config already exists
     List<DetectionConfigDTO> detectionConfigDTOs =
         this.detectionConfigDAO.findByPredicate(Predicate.EQ("name", MapUtils.getString(yamlConfig, PROP_NAME)));
+    DetectionConfigDTO existingDetectionConfig = null;
     if (!detectionConfigDTOs.isEmpty()) {
-      DetectionConfigDTO existingDetectionConfig = detectionConfigDTOs.get(0);
-      detectionConfig.setId(detectionConfigDTOs.get(0).getId());
-      detectionConfig.setLastTimestamp(existingDetectionConfig.getLastTimestamp());
+      existingDetectionConfig = detectionConfigDTOs.get(0);
     }
+
+    YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
+    DetectionConfigDTO detectionConfig = translator.withTrainingWindow(startTime, endTime).withExistingDetectionConfig(existingDetectionConfig).generateDetectionConfig();
     detectionConfig.setYaml(payload);
     Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");

@@ -57,12 +57,12 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
     super(provider, config, startTime, endTime);
 
     if (config.getProperties().containsKey(PROP_BASELINE_PROVIDER)) {
-      String referenceKey = DetectionUtils.getReferenceKey(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
+      String referenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
       Preconditions.checkArgument(this.config.getComponents().containsKey(referenceKey));
       this.baselineValueProvider = (BaselineProvider) this.config.getComponents().get(referenceKey);
     }
     if (config.getProperties().containsKey(PROP_CURRENT_PROVIDER)) {
-      String detectorReferenceKey = DetectionUtils.getReferenceKey(MapUtils.getString(config.getProperties(), currentValueProvider));
+      String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), currentValueProvider));
       Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
       this.currentValueProvider = (BaselineProvider) this.config.getComponents().get(detectorReferenceKey);
     } else {
@@ -101,10 +101,10 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         final MetricSlice slice = MetricSlice.from(MetricEntity.fromURN(metricUrn).getId(), anomaly.getStartTime(), anomaly.getEndTime(),
             MetricEntity.fromURN(metricUrn).getFilters());
         anomaly.setAvgCurrentVal(this.currentValueProvider.computePredictedAggregates(
-            DetectionUtils.getDataForSpec(provider, this.currentValueProvider.getAggregateInputDataSpec(slice, this.config.getId())), aggregationFunction));
+            DetectionUtils.getDataForSpec(provider, this.currentValueProvider.getAggregateInputDataSpec(slice), this.config.getId()), aggregationFunction));
         if (this.baselineValueProvider != null) {
           anomaly.setAvgBaselineVal(this.baselineValueProvider.computePredictedAggregates(
-              DetectionUtils.getDataForSpec(provider, this.baselineValueProvider.getAggregateInputDataSpec(slice, this.config.getId())), aggregationFunction));
+              DetectionUtils.getDataForSpec(provider, this.baselineValueProvider.getAggregateInputDataSpec(slice), this.config.getId()), aggregationFunction));
         }
       } catch (Exception e) {
         // ignore

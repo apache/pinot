@@ -26,27 +26,20 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
  * dimension filters.
  */
 public class AnomalySlice {
-  final long configId;
   final long start;
   final long end;
   final Multimap<String, String> filters;
 
   public AnomalySlice() {
-    this.configId = -1;
     this.start = -1;
     this.end = -1;
     this.filters = ArrayListMultimap.create();
   }
 
-  public AnomalySlice(long configId, long start, long end, Multimap<String, String> filters) {
-    this.configId = configId;
+  public AnomalySlice(long start, long end, Multimap<String, String> filters) {
     this.start = start;
     this.end = end;
     this.filters = filters;
-  }
-
-  public long getConfigId() {
-    return configId;
   }
 
   public long getStart() {
@@ -61,32 +54,22 @@ public class AnomalySlice {
     return filters;
   }
 
-  public AnomalySlice withConfigId(long configId) {
-    return new AnomalySlice(configId, this.start, this.end, this.filters);
-  }
-
-  public AnomalySlice withConfigId(Long configId) {
-    return new AnomalySlice(configId != null ? configId : -1, this.start, this.end, this.filters);
-  }
-
   public AnomalySlice withStart(long start) {
-    return new AnomalySlice(this.configId, start, this.end, this.filters);
+    return new AnomalySlice(start, this.end, this.filters);
   }
 
   public AnomalySlice withEnd(long end) {
-    return new AnomalySlice(this.configId, this.start, end, this.filters);
+    return new AnomalySlice(this.start, end, this.filters);
   }
 
   public AnomalySlice withFilters(Multimap<String, String> filters) {
-    return new AnomalySlice(this.configId, this.start, this.end, filters);
+    return new AnomalySlice(this.start, this.end, filters);
   }
 
   public boolean match(MergedAnomalyResultDTO anomaly) {
     if (this.start >= 0 && anomaly.getEndTime() <= this.start)
       return false;
     if (this.end >= 0 && anomaly.getStartTime() >= this.end)
-      return false;
-    if (this.configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != this.configId))
       return false;
 
     for (String dimName : this.filters.keySet()) {

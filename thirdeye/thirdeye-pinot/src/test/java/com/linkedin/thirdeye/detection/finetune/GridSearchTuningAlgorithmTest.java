@@ -125,7 +125,7 @@ public class GridSearchTuningAlgorithmTest {
   @Test
   public void testGridSearch() throws Exception {
     AnomalySlice slice = new AnomalySlice().withStart(1525211842000L).withEnd(1527890242000L);
-    gridSearch.fit(slice);
+    gridSearch.fit(slice, -1);
     DetectionConfigDTO config = gridSearch.bestDetectionConfig();
     Assert.assertEquals(MapUtils.getDouble(config.getProperties(), "change"), 0.05);
   }

@@ -95,11 +95,11 @@ public abstract class StaticBaselineProvider implements BaselineProvider {
 
   @Override
   public final Map<MetricSlice, DataFrame> computeBaselineTimeSeries(Collection<MetricSlice> slices, DataProvider provider) {
-    return this.computeBaselineTimeSeries(slices, DetectionUtils.getDataForSpec(provider, this.getInputDataSpec(slices)));
+    return this.computeBaselineTimeSeries(slices, DetectionUtils.getDataForSpec(provider, this.getInputDataSpec(slices), -1));
   }
 
   @Override
   public final Map<MetricSlice, Double> computeBaselineAggregates(Collection<MetricSlice> slices, DataProvider provider) {
-    return this.computeBaselineAggregates(slices, DetectionUtils.getDataForSpec(provider, this.getAggregateInputDataSpec(slices)));
+    return this.computeBaselineAggregates(slices, DetectionUtils.getDataForSpec(provider, this.getAggregateInputDataSpec(slices), -1));
   }
 }

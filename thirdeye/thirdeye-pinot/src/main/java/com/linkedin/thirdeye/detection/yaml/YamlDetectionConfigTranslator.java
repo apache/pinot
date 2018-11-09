@@ -21,6 +21,8 @@ public abstract class YamlDetectionConfigTranslator {
   protected long startTime;
   protected long endTime;
   protected DataProvider dataProvider;
+  protected DetectionConfigDTO existingConfig;
+  protected Map<String, Object> existingComponentSpecs;
 
   public YamlDetectionConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     this.yamlConfig = yamlConfig;
@@ -30,6 +32,12 @@ public abstract class YamlDetectionConfigTranslator {
   public YamlDetectionConfigTranslator withTrainingWindow(long startTime, long endTime) {
     this.startTime = startTime;
     this.endTime = endTime;
+    return this;
+  }
+
+  public YamlDetectionConfigTranslator withExistingDetectionConfig(DetectionConfigDTO existingDTO) {
+    this.existingConfig = existingDTO;
+    this.existingComponentSpecs = existingDTO.getComponentSpecs();
     return this;
   }
 
@@ -54,6 +62,12 @@ public abstract class YamlDetectionConfigTranslator {
     Preconditions.checkArgument(!translationResult.getProperties().isEmpty(), "Empty detection property");
     config.setProperties(translationResult.getProperties());
     config.setComponentSpecs(translationResult.getComponents());
+
+    if (existingConfig != null) {
+      config.setId(existingConfig.getId());
+      config.setLastTimestamp(existingConfig.getLastTimestamp());
+    }
+
     return config;
   }
 

@@ -121,6 +121,7 @@ public class MergeDimensionThresholdIntegrationTest {
 
     this.config = new DetectionConfigDTO();
     this.config.setProperties(this.properties);
+    this.config.setId(-1L);
   }
 
   @Test
@@ -144,7 +145,7 @@ public class MergeDimensionThresholdIntegrationTest {
       dimensions.put(entry.getKey(), entry.getValue());
     }
 
-    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(null, start, end, METRIC, DATASET, dimensions);
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(-1L, start, end, METRIC, DATASET, dimensions);
     anomaly.setMetricUrn(metricUrn);
     return anomaly;
   }

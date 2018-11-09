@@ -130,10 +130,10 @@ public class DetectionResource {
 
     LinkedHashMap<String, List<Number>> parameters = (LinkedHashMap<String, List<Number>>) json.get("parameters");
 
-    AnomalySlice slice = new AnomalySlice().withConfigId(configId).withStart(start).withEnd(end);
+    AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
 
     TuningAlgorithm gridSearch = new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(json.get("properties")), parameters);
-    gridSearch.fit(slice);
+    gridSearch.fit(slice, configId);
 
     return Response.ok(gridSearch.bestDetectionConfig().getProperties()).build();
   }
@@ -174,8 +174,8 @@ public class DetectionResource {
     }
 
     // clear existing anomalies
-    AnomalySlice slice = new AnomalySlice().withConfigId(configId).withStart(start).withEnd(end);
-    Collection<MergedAnomalyResultDTO> existing = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
+    AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
+    Collection<MergedAnomalyResultDTO> existing = this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
 
     List<Long> existingIds = new ArrayList<>();
     for (MergedAnomalyResultDTO anomaly : existing) {

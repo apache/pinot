@@ -110,8 +110,8 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
     try {
       Collection<MergedAnomalyResultDTO> historyMergedAnomalies;
       if (this.anomalyFunction.useHistoryAnomaly() && config.getId() != null) {
-        AnomalySlice slice = new AnomalySlice().withConfigId(config.getId()).withStart(this.startTime).withEnd(this.endTime);
-        historyMergedAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
+        AnomalySlice slice = new AnomalySlice().withStart(this.startTime).withEnd(this.endTime);
+        historyMergedAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice), config.getId()).get(slice);
       } else {
         historyMergedAnomalies = Collections.emptyList();
       }

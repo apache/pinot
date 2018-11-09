@@ -17,7 +17,6 @@
 package com.linkedin.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -30,7 +29,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 
 
@@ -54,7 +52,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
     this.nestedProperties = ConfigUtils.getList(properties.get(PROP_NESTED));
 
     Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_FILTER));
-    String detectorReferenceKey = DetectionUtils.getReferenceKey(MapUtils.getString(config.getProperties(), PROP_FILTER));
+    String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_FILTER));
     Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
     this.anomalyFilter = (AnomalyFilter) this.config.getComponents().get(detectorReferenceKey);
 
@@ -88,7 +86,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
 
     Collection<MergedAnomalyResultDTO> anomalies =
         Collections2.filter(candidates, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild() && anomalyFilter.isQualified(
-            DetectionUtils.getDataForSpec(provider, anomalyFilter.getInputDataSpec(mergedAnomaly))));
+            DetectionUtils.getDataForSpec(provider, anomalyFilter.getInputDataSpec(mergedAnomaly), this.config.getId())));
 
     return new DetectionPipelineResult(new ArrayList<>(anomalies));
   }

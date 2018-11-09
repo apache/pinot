@@ -19,6 +19,7 @@ package com.linkedin.thirdeye.detection.components;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.annotation.Components;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
@@ -55,18 +56,16 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
   private double min;
   private double max;
   private MetricSlice slice;
-  private Long configId;
   private Long endTime;
   private MetricEntity me;
 
   @Override
-  public InputDataSpec getInputDataSpec(Interval interval, String metricUrn, long configId) {
+  public InputDataSpec getInputDataSpec(Interval interval, String metricUrn) {
     this.me = MetricEntity.fromURN(metricUrn);
-    this.configId = configId;
     this.endTime = interval.getEndMillis();
     this.slice = MetricSlice.from(me.getId(), interval.getStartMillis(), endTime, me.getFilters());
 
-    return new InputDataSpec().withTimeseriesSlices(Collections.singletonList(this.slice));
+    return new InputDataSpec().withTimeseriesSlices(Collections.singletonList(this.slice)).withMetricIdsForDataset(Collections.singletonList(me.getId()));
   }
 
   @Override
@@ -89,7 +88,8 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
 
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
 
-    return DetectionUtils.makeAnomalies(this.slice, df, COL_ANOMALY, this.endTime);
+    DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
+    return DetectionUtils.makeAnomalies(this.slice, df, COL_ANOMALY, this.endTime, datasetConfig);
   }
 
   @Override

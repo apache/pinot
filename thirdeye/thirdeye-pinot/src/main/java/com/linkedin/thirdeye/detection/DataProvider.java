@@ -74,7 +74,7 @@ public interface DataProvider {
    * @param slices anomaly slice
    * @return multimap of anomalies (keyed by slice)
    */
-  Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices);
+  Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId);
 
   /**
    * Returns a multimap of events (keyed by slice) for a given set of slices.

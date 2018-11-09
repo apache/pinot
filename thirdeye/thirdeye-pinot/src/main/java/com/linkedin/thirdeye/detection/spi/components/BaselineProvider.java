@@ -37,10 +37,10 @@ public interface BaselineProvider<T extends AbstractSpec> extends BaseComponent<
    */
   DataFrame computePredictedTimeSeries(InputData data);
 
-  InputDataSpec getInputDataSpec(MetricSlice slice, long configId);
+  InputDataSpec getInputDataSpec(MetricSlice slice);
 
-  default InputDataSpec getAggregateInputDataSpec(MetricSlice slice, long configId) {
-    return this.getInputDataSpec(slice, configId);
+  default InputDataSpec getAggregateInputDataSpec(MetricSlice slice) {
+    return this.getInputDataSpec(slice);
   }
 
   default Double computePredictedAggregates(InputData data){

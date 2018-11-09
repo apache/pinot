@@ -14,14 +14,17 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.annotation;
+package com.linkedin.thirdeye.detection.spi.components;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.linkedin.thirdeye.detection.spec.AbstractSpec;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import java.util.Map;
+import org.joda.time.Interval;
 
 
-public @interface Training {
-  @JsonProperty String trainer() default "";
+public interface Tunable<T extends AbstractSpec> extends BaseComponent<T> {
+  Map<String, Object> tune(Map<String, Object> currentSpec, InputData data);
 
-  @JsonProperty String tuner() default "";
-
+  InputDataSpec getInputDataSpec(Interval trainingWindow);
 }

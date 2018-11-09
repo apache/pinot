@@ -26,15 +26,20 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -49,16 +54,32 @@ public class DetectionUtils {
    * @param inputDataSpec the spec of input data for the detection stage
    * @return data
    */
-  public static InputData getDataForSpec(DataProvider provider, InputDataSpec inputDataSpec) {
+  public static InputData getDataForSpec(DataProvider provider, InputDataSpec inputDataSpec, long configId) {
     Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(inputDataSpec.getTimeseriesSlices());
     Map<MetricSlice, DataFrame> aggregates =
         provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList());
     Multimap<AnomalySlice, MergedAnomalyResultDTO> existingAnomalies =
-        provider.fetchAnomalies(inputDataSpec.getAnomalySlices());
+        provider.fetchAnomalies(inputDataSpec.getAnomalySlices(), configId);
     Multimap<EventSlice, EventDTO> events = provider.fetchEvents(inputDataSpec.getEventSlices());
     Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIds());
     Map<String, DatasetConfigDTO> datasets = provider.fetchDatasets(inputDataSpec.getDatasetNames());
-    return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events, metrics, datasets);
+
+    Map<Long, DatasetConfigDTO> datasetForMetricId = fetchDatasetForMetricId(provider, inputDataSpec);
+    return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events, metrics, datasets, datasetForMetricId);
+  }
+
+  private static Map<Long, DatasetConfigDTO> fetchDatasetForMetricId(DataProvider provider, InputDataSpec inputDataSpec) {
+    Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIdsForDatasets());
+    Map<Long, String> metricIdToDataSet = new HashMap<>();
+    for (Map.Entry<Long, MetricConfigDTO> entry : metrics.entrySet()){
+      metricIdToDataSet.put(entry.getKey(), entry.getValue().getDataset());
+    }
+    Map<String, DatasetConfigDTO> datasets = provider.fetchDatasets(metricIdToDataSet.values());
+    Map<Long, DatasetConfigDTO> result = new HashMap<>();
+    for (Map.Entry<Long, MetricConfigDTO> entry : metrics.entrySet()){
+        result.put(entry.getKey(), datasets.get(entry.getValue().getDataset()));
+    }
+    return result;
   }
 
   // TODO anomaly should support multimap
@@ -74,8 +95,8 @@ public class DetectionUtils {
     return key.startsWith("$");
   }
 
-  public static String getReferenceKey(String str) {
-    return str.substring(1);
+  public static String getComponentName(String key) {
+    return key.substring(1);
   }
 
   /**
@@ -88,7 +109,7 @@ public class DetectionUtils {
    * @param endTime end time of this detection window
    * @return list of anomalies
    */
-  public static List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName, long endTime) {
+  public static List<MergedAnomalyResultDTO> makeAnomalies(MetricSlice slice, DataFrame df, String seriesName, long endTime, DatasetConfigDTO dataset) {
     if (df.isEmpty()) {
       return Collections.emptyList();
     }
@@ -125,7 +146,17 @@ public class DetectionUtils {
     // end of current run
     if (lastStart >= 0) {
       long start = sTime.get(lastStart);
-      long end = sTime.getLong(sTime.size() - 1);
+      long end = start + 1;
+
+      // guess-timate of next time series timestamp
+      if (dataset != null) {
+        Period period = dataset.bucketTimeGranularity().toPeriod();
+        DateTimeZone timezone = DateTimeZone.forID(dataset.getTimezone());
+
+        long lastTimestamp = sTime.getLong(sTime.size() - 1);
+
+        end = new DateTime(lastTimestamp, timezone).plus(period).getMillis();
+      }
 
       // truncate at analysis end time
       end = Math.min(end, endTime);

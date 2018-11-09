@@ -50,8 +50,8 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
     for (Long detectionConfigId : vectorClocks.keySet()) {
       long startTime = vectorClocks.get(detectionConfigId);
 
-      AnomalySlice slice = new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
-      Collection<MergedAnomalyResultDTO> candidates = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
+      AnomalySlice slice = new AnomalySlice().withStart(startTime).withEnd(this.endTime);
+      Collection<MergedAnomalyResultDTO> candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), detectionConfigId).get(slice);
 
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {

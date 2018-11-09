@@ -86,12 +86,12 @@ public class ThresholdRuleDetectorTest {
   public void testThresholdAlgorithmRun() throws Exception {
     DetectionPipelineResult result = this.detectionPipeline.run();
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
-    Assert.assertEquals(result.getLastTimestamp(), 9);
+    Assert.assertEquals(result.getLastTimestamp(), 10);
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 0);
     Assert.assertEquals(anomalies.get(0).getEndTime(), 2);
     Assert.assertEquals(anomalies.get(1).getStartTime(), 8);
-    Assert.assertEquals(anomalies.get(1).getEndTime(), 9);
+    Assert.assertEquals(anomalies.get(1).getEndTime(), 10);
   }
 
 }

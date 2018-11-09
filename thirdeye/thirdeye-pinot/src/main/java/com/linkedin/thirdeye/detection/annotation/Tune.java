@@ -14,18 +14,11 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.spi.components;
+package com.linkedin.thirdeye.detection.annotation;
 
-import com.linkedin.thirdeye.detection.spec.AbstractSpec;
-import com.linkedin.thirdeye.detection.spi.model.InputData;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
-import java.util.Map;
-import org.joda.time.Interval;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-public interface Tuner<T extends AbstractSpec> extends BaseComponent<T> {
-  Map<String, Object> tune(Map<String, Object> currentSpec, InputData data);
-
-  InputDataSpec getInputDataSpec(Interval tuningWindow);
-
+public @interface Tune {
+  @JsonProperty String tunable() default "";
 }

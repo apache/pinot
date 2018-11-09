@@ -76,7 +76,7 @@ public class BaselineAlgorithmTest {
 
     this.config = new DetectionConfigDTO();
     this.config.setProperties(properties);
-
+    this.config.setId(-1L);
     this.provider = new MockDataProvider()
         .setTimeseries(timeseries)
         .setMetrics(Collections.singletonList(metricConfigDTO));
@@ -100,7 +100,7 @@ public class BaselineAlgorithmTest {
   public void testWeekOverWeekChange() throws Exception {
     this.properties.put(PROP_CHANGE, 0.4);
     this.algorithm = new BaselineAlgorithm(this.provider, this.config, 1814400000L, 2419200000L);
-
+    this.config.setId(-1L);
     DetectionPipelineResult result = this.algorithm.run();
 
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();
@@ -117,8 +117,8 @@ public class BaselineAlgorithmTest {
     this.properties.put(PROP_WEEKS, 3);
     this.properties.put(PROP_AGGREGATION, BaselineAggregateType.MEDIAN.toString());
     this.properties.put(PROP_CHANGE, 0.3);
+    this.config.setId(-1L);
     this.algorithm = new BaselineAlgorithm(this.provider, this.config, 1814400000L, 2419200000L);
-
     DetectionPipelineResult result = this.algorithm.run();
 
     List<MergedAnomalyResultDTO> anomalies = result.getAnomalies();

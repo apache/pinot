@@ -14,17 +14,25 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.spi.components;
+package com.linkedin.thirdeye.detection.spec;
 
-import com.linkedin.thirdeye.detection.spec.AbstractSpec;
-import com.linkedin.thirdeye.detection.spi.model.InputData;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
-import java.util.Map;
-import org.joda.time.Interval;
+public class ThresholdRuleFilterSpec extends AbstractSpec {
+  private double min = Double.NaN;
+  private double max = Double.NaN;
 
+  public double getMin() {
+    return min;
+  }
 
-public interface Trainer<T extends AbstractSpec> extends BaseComponent<T> {
-  Map<String, Object> train(InputData data);
+  public void setMin(double min) {
+    this.min = min;
+  }
 
-  InputDataSpec getInputDataSpec(Interval trainingWindow);
+  public double getMax() {
+    return max;
+  }
+
+  public void setMax(double max) {
+    this.max = max;
+  }
 }

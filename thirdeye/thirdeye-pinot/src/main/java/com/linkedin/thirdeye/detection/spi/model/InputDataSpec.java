@@ -53,6 +53,8 @@ public class InputDataSpec {
 
   final Collection<String> datasetNames;
 
+  final Collection<Long> metricIdsForDatasets;
+
   public InputDataSpec() {
     this.timeseriesSlices = Collections.emptyList();
     this.aggregateSlices = Collections.emptyList();
@@ -60,16 +62,19 @@ public class InputDataSpec {
     this.eventSlices = Collections.emptyList();
     this.metricIds = Collections.emptyList();
     this.datasetNames = Collections.emptyList();
+    this.metricIdsForDatasets = Collections.emptyList();
   }
 
   public InputDataSpec(Collection<MetricSlice> timeseriesSlices, Collection<MetricSlice> aggregateSlices,
-      Collection<AnomalySlice> anomalySlices, Collection<EventSlice> eventSlices, Collection<Long> metricIds, Collection<String> datasetNames) {
+      Collection<AnomalySlice> anomalySlices, Collection<EventSlice> eventSlices, Collection<Long> metricIds, Collection<String> datasetNames,
+      Collection<Long> metricIdsForDatasets) {
     this.timeseriesSlices = timeseriesSlices;
     this.aggregateSlices = aggregateSlices;
     this.anomalySlices = anomalySlices;
     this.eventSlices = eventSlices;
     this.metricIds = metricIds;
     this.datasetNames = datasetNames;
+    this.metricIdsForDatasets = metricIdsForDatasets;
   }
 
   public Collection<MetricSlice> getTimeseriesSlices() {
@@ -96,28 +101,36 @@ public class InputDataSpec {
     return datasetNames;
   }
 
+  public Collection<Long> getMetricIdsForDatasets() {
+    return metricIdsForDatasets;
+  }
+
   public InputDataSpec withTimeseriesSlices(Collection<MetricSlice> timeseriesSlices) {
-    return new InputDataSpec(timeseriesSlices, this.aggregateSlices, this.anomalySlices, this.eventSlices, this.metricIds, this.datasetNames);
+    return new InputDataSpec(timeseriesSlices, this.aggregateSlices, this.anomalySlices, this.eventSlices, this.metricIds, this.datasetNames, this.metricIdsForDatasets);
   }
 
   public InputDataSpec withAggregateSlices(Collection<MetricSlice> aggregateSlices) {
-    return new InputDataSpec(this.timeseriesSlices, aggregateSlices, this.anomalySlices, this.eventSlices, this.metricIds, this.datasetNames);
+    return new InputDataSpec(this.timeseriesSlices, aggregateSlices, this.anomalySlices, this.eventSlices, this.metricIds, this.datasetNames, this.metricIdsForDatasets);
   }
 
   public InputDataSpec withAnomalySlices(Collection<AnomalySlice> anomalySlices) {
-    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, anomalySlices, this.eventSlices, this.metricIds, this.datasetNames);
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, anomalySlices, this.eventSlices, this.metricIds, this.datasetNames, this.metricIdsForDatasets);
   }
 
   public InputDataSpec withEventSlices(Collection<EventSlice> eventSlices) {
-    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, this.metricIds, this.datasetNames);
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, this.metricIds, this.datasetNames, this.metricIdsForDatasets);
   }
 
   public InputDataSpec withMetricIds(Collection<Long> metricIds) {
-    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, metricIds, this.datasetNames);
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, metricIds, this.datasetNames, this.metricIdsForDatasets);
   }
 
   public InputDataSpec withDatasetNames(Collection<String> datasetNames) {
-    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, this.metricIds, datasetNames);
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, this.metricIds, datasetNames, this.metricIdsForDatasets);
   }
 
+  public InputDataSpec withMetricIdsForDataset(Collection<Long> metricIdsForDatasets) {
+    return new InputDataSpec(this.timeseriesSlices, this.aggregateSlices, this.anomalySlices, eventSlices, this.metricIds, this.datasetNames, metricIdsForDatasets);
+
+  }
 }
