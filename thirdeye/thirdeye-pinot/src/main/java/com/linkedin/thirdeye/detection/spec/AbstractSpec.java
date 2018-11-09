@@ -20,6 +20,9 @@ import java.util.Map;
 import org.modelmapper.ModelMapper;
 
 
+/**
+ * Base class for component specs
+ */
 public abstract class AbstractSpec {
   protected static final ModelMapper MODEL_MAPPER = new ModelMapper();
 

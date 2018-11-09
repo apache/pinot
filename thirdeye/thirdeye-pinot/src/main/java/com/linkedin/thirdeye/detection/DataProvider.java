@@ -72,6 +72,7 @@ public interface DataProvider {
    * @see AnomalySlice
    *
    * @param slices anomaly slice
+   * @param configId configId
    * @return multimap of anomalies (keyed by slice)
    */
   Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId);
@@ -97,7 +98,6 @@ public interface DataProvider {
    */
   Map<Long, MetricConfigDTO> fetchMetrics(Collection<Long> ids);
 
-  MetricConfigDTO fetchMetric(String metricName, String datasetName);
 
   /**
    * Returns a map of dataset configs (keyed by id) for a given set of dataset names.
@@ -108,6 +108,17 @@ public interface DataProvider {
    * @return map of dataset configs (keyed by dataset name)
    */
   Map<String, DatasetConfigDTO> fetchDatasets(Collection<String> datasetNames);
+
+  /**
+   * Returns a metricConfigDTO for a given metric name.
+   *
+   * @see MetricConfigDTO
+   *
+   * @param metricName metric name
+   * @param datasetName dataset name
+   * @return map of dataset configs (keyed by dataset name)
+   */
+  MetricConfigDTO fetchMetric(String metricName, String datasetName);
 
   /**
    * Returns an initialized instance of a detection pipeline for the given config. Injects this

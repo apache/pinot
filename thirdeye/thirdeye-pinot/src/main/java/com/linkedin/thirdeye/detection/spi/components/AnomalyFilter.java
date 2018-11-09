@@ -24,7 +24,7 @@ import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 
 public interface AnomalyFilter<T extends AbstractSpec> extends BaseComponent<T> {
   /**
-   * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to perform a stage.
+   * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to run this component.
    * Data is retrieved in one pass and cached between executions if possible.
    * @return input data spec
    */

@@ -169,7 +169,7 @@ public class LegacyMergeWrapper extends DetectionPipeline {
         .withEnd(this.getEndTime(generated) + this.maxGap);
 
     List<MergedAnomalyResultDTO> retrieved = new ArrayList<>();
-    retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), -1).get(effectiveSlice));
+    retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), config.getId()).get(effectiveSlice));
 
     return new DetectionPipelineResult(this.merge(generated, retrieved));
   }

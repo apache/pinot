@@ -48,11 +48,11 @@
         .done(function() {
           var metric_config_template = $("#metric-config-template").html();
           metric_config_template_compiled = Handlebars.compile(metric_config_template);
-      
+
           var job_info_template = $("#job-info-template").html();
           job_info_template_compiled = Handlebars.compile(job_info_template);
-      
-          //register callbacks on tabs
+
+          //registerComponent callbacks on tabs
           $('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
             e.target // newly activated tab
             e.relatedTarget // previous active tab

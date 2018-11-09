@@ -6,6 +6,10 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.MockDataProvider;
+import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
+import com.linkedin.thirdeye.detection.components.ThresholdRuleAnomalyFilter;
+import com.linkedin.thirdeye.detection.components.ThresholdRuleDetector;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +40,10 @@ public class CompositePipelineConfigTranslatorTest {
     datasetConfigDTO.setTimeUnit(TimeUnit.DAYS);
     datasetConfigDTO.setTimeDuration(1);
     this.yaml = new Yaml();
+    DetectionRegistry.getInstance();
+    DetectionRegistry.registerComponent(ThresholdRuleDetector.class.getName(), "THRESHOLD");
+    DetectionRegistry.registerComponent(ThresholdRuleAnomalyFilter.class.getName(), "THRESHOLD_RULE_FILTER");
+    DetectionRegistry.registerComponent(RuleBaselineProvider.class.getName(), "RULE_BASELINE");
     this.provider = new MockDataProvider().setMetrics(Collections.singletonList(metricConfig)).setDatasets(Collections.singletonList(datasetConfigDTO));
   }
 
@@ -60,8 +68,9 @@ public class CompositePipelineConfigTranslatorTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testBuildDetectionPipelineMissModuleType() {
-    this.yamlConfig.put("anomalyDetection", Collections.singletonList(
-        ImmutableMap.of("detection", Collections.singletonList(ImmutableMap.of("change", 0.3)))));
+    this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-1.yaml"));
+    this.yamlConfig.put("rules", Collections.singletonList(
+        ImmutableMap.of("name", "rule2","detection", Collections.singletonList(ImmutableMap.of("change", 0.3)))));
     CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
 
     translator.generateDetectionConfig();

@@ -148,7 +148,7 @@ public class DetectionResource {
 
     DetectionConfigDTO config = this.configDAO.findById(id);
     if (config == null) {
-      throw new IllegalArgumentException("Components Config not exist");
+      throw new IllegalArgumentException("Detection Config not exist");
     }
 
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);

@@ -19,10 +19,11 @@ package com.linkedin.thirdeye.detection.spi.model;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.LongSeries;
-import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.DataFrameUtils;
 
-
+/**
+ * Time series. wrapper object of data frame. Used by baselineProvider to return the predicted time series
+ */
 public class TimeSeries {
   private DataFrame df;
 
@@ -30,13 +31,20 @@ public class TimeSeries {
     this.df = new DataFrame();
   }
 
-  public void addPredictedBaseline(LongSeries timestamps, DoubleSeries baselineValues) {
+  /**
+   * Add the time stamps into the timeseries
+   * @param timestamps
+   */
+  public void addTimeStamps(LongSeries timestamps) {
     this.df.addSeries(DataFrameUtils.COL_TIME, timestamps);
-    this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
 
-  public DoubleSeries getPredictedBaseline() {
-    return this.df.getDoubles(DataFrameUtils.COL_VALUE);
+  /**
+   * Add the predicted baseline into the timeseries
+   * @param baselineValues predicted baseline values
+   */
+  public void addPredictedBaseline(DoubleSeries baselineValues) {
+    this.df.addSeries(DataFrameUtils.COL_VALUE, baselineValues);
   }
 
   public static TimeSeries fromDataFrame(DataFrame df) {
@@ -44,6 +52,10 @@ public class TimeSeries {
     ts.df.addSeries(DataFrameUtils.COL_TIME, df.get(DataFrameUtils.COL_TIME));
     ts.df.addSeries(DataFrameUtils.COL_VALUE, df.get(DataFrameUtils.COL_VALUE));
     return ts;
+  }
+
+  public DoubleSeries getPredictedBaseline() {
+    return this.df.getDoubles(DataFrameUtils.COL_VALUE);
   }
 
   public DataFrame getDataFrame() {

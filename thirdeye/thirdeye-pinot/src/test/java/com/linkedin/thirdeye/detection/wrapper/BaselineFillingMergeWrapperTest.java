@@ -46,7 +46,6 @@ import static com.linkedin.thirdeye.detection.DetectionTestUtils.*;
 
 public class BaselineFillingMergeWrapperTest {
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
-  private static final String PROP_CURRENT_PROVIDER = "currentValueProvider";
 
   private DetectionConfigDTO config;
   private MergeWrapper wrapper;
@@ -105,7 +104,9 @@ public class BaselineFillingMergeWrapperTest {
     this.config.getProperties().put(PROP_MAX_GAP, 100);
     this.config.getProperties().put(PROP_BASELINE_PROVIDER, "$baseline");
     BaselineProvider baselineProvider = new RuleBaselineProvider();
-    baselineProvider.init(new RuleBaselineProviderSpec());
+    RuleBaselineProviderSpec spec = new RuleBaselineProviderSpec();
+    spec.setOffset("current");
+    baselineProvider.init(spec);
     this.config.setComponents(ImmutableMap.of("baseline", baselineProvider));
     this.wrapper = new BaselineFillingMergeWrapper(provider, this.config, 2900, 3600);
     DetectionPipelineResult output = this.wrapper.run();

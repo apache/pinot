@@ -16,6 +16,10 @@
 
 package com.linkedin.thirdeye.detection.spec;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ThresholdRuleFilterSpec extends AbstractSpec {
   private double min = Double.NaN;
   private double max = Double.NaN;

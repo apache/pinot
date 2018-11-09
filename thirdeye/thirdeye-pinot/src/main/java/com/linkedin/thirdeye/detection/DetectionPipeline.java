@@ -92,9 +92,7 @@ public abstract class DetectionPipeline {
       for (String componentName : componentSpecs.keySet()) {
         Map<String, Object> componentSpec = MapUtils.getMap(componentSpecs, componentName);
         if (!instancesMap.containsKey(componentName)){
-          Class<BaseComponent> clazz = (Class<BaseComponent>) Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
-          BaseComponent component = clazz.newInstance();
-          instancesMap.put(componentName, component);
+          instancesMap.put(componentName, createComponent(componentSpec));
         }
       }
 
@@ -106,14 +104,24 @@ public abstract class DetectionPipeline {
             componentSpec.put(entry.getKey(), instancesMap.get(refComponentName));
           }
         }
-        Class clazz = Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
-        Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
-        AbstractSpec spec = AbstractSpec.fromProperties(componentSpec, specClazz);
-        instancesMap.get(componentName).init(spec);
+        instancesMap.get(componentName).init(getComponentSpec(componentSpec));
       }
     }
     config.setComponents(instancesMap);
   }
+
+  private BaseComponent createComponent(Map<String, Object> componentSpec)
+      throws Exception {
+    Class<BaseComponent> clazz = (Class<BaseComponent>) Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
+    return clazz.newInstance();
+  }
+
+  private AbstractSpec getComponentSpec(Map<String, Object> componentSpec) throws Exception {
+    Class clazz = Class.forName(MapUtils.getString(componentSpec, PROP_CLASS_NAME));
+    Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
+    return AbstractSpec.fromProperties(componentSpec, specClazz);
+  }
+
   /**
    * Helper for creating an anomaly for a given metric slice. Injects properties such as
    * metric name, filter dimensions, etc.

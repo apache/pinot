@@ -26,21 +26,22 @@ import com.linkedin.thirdeye.detection.spi.model.TimeSeries;
 
 
 /**
- * The baseline provider in the detection framework. Lower level interface with data provider.
+ * The baseline provider to calculate predicted baseline.
  */
 public interface BaselineProvider<T extends AbstractSpec> extends BaseComponent<T> {
   /**
-   * Compute the baseline time series for the collection of metric slices.
-   * @return the mapping of the metric slice to its time series data frame.
+   * Compute the baseline time series for the metric slice.
+   * @return the time series contains predicted baseline.
    */
   TimeSeries computePredictedTimeSeries(InputData data);
 
   InputDataSpec getInputDataSpec(MetricSlice slice);
 
-  default InputDataSpec getAggregateInputDataSpec(MetricSlice slice) {
-    return this.getInputDataSpec(slice);
-  }
-
+  /**
+   * Compute the baseline time series for the metric slice.
+   * default implementation is to call computePredictedTimeSeries and aggregate
+   * @return the predicted value.
+   */
   default Double computePredictedAggregates(InputData data){
     // default to average
     return computePredictedAggregates(data, DoubleSeries.MEAN);
@@ -50,6 +51,10 @@ public interface BaselineProvider<T extends AbstractSpec> extends BaseComponent<
     // default to be average
     TimeSeries baselineTimeSeries = this.computePredictedTimeSeries(data);
     return baselineTimeSeries.getPredictedBaseline().aggregate(aggregateFunction).getDouble(0);
+  }
+
+  default InputDataSpec getAggregateInputDataSpec(MetricSlice slice) {
+    return this.getInputDataSpec(slice);
   }
 
 }

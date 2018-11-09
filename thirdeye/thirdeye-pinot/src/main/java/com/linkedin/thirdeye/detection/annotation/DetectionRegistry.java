@@ -53,33 +53,36 @@ public class DetectionRegistry {
     return INSTANCE;
   }
 
+  public static void registerComponent(String className, String type) {
+    REGISTRY_MAP.put(type, ImmutableMap.of(KEY_CLASS_NAME, className));
+  }
+
   /**
    * Internal constructor. Read the Components annotation from each stage implementation.
    */
   private DetectionRegistry() {
     try {
       Reflections reflections = new Reflections();
+      // registerComponent components
       Set<Class<? extends BaseComponent>> classes = reflections.getSubTypesOf(BaseComponent.class);
       for (Class clazz : classes) {
         String className = clazz.getName();
-        if(BaseComponent.class.isAssignableFrom(clazz)){
-          for (Annotation annotation : clazz.getAnnotations()) {
-            if (annotation instanceof Components) {
-              Components componentsAnnotation = (Components) annotation;
-              REGISTRY_MAP.put(componentsAnnotation.type(), ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION,
-                  componentsAnnotation));
-            }
-            if (annotation instanceof Tune) {
-              Tune trainingAnnotation = (Tune) annotation;
-              TUNE_MAP.put(className, trainingAnnotation);
-            }
+        for (Annotation annotation : clazz.getAnnotations()) {
+          if (annotation instanceof Components) {
+            Components componentsAnnotation = (Components) annotation;
+            REGISTRY_MAP.put(componentsAnnotation.type(),
+                ImmutableMap.of(KEY_CLASS_NAME, className, KEY_ANNOTATION, componentsAnnotation));
+          }
+          if (annotation instanceof Tune) {
+            Tune trainingAnnotation = (Tune) annotation;
+            TUNE_MAP.put(className, trainingAnnotation);
           }
         }
       }
-
-      Set<Class<? extends YamlDetectionConfigTranslator>> yamlConverterClasses = reflections.getSubTypesOf(YamlDetectionConfigTranslator.class);
-      for (Class clazz : yamlConverterClasses){
-        Annotation[] annotations = clazz.getAnnotations();
+      // registerComponent yaml translators
+      Set<Class<? extends YamlDetectionConfigTranslator>> yamlConverterClasses =
+          reflections.getSubTypesOf(YamlDetectionConfigTranslator.class);
+      for (Class clazz : yamlConverterClasses) {
         for (Annotation annotation : clazz.getAnnotations()) {
           if (annotation instanceof Yaml) {
             YAML_MAP.put(((Yaml) annotation).pipelineType(), clazz.getName());
@@ -99,9 +102,8 @@ public class DetectionRegistry {
    * @return component class name
    */
   public String lookup(String type) {
-    String stageClassName = MapUtils.getString(REGISTRY_MAP.get(type.toUpperCase()), KEY_CLASS_NAME);
-    Preconditions.checkArgument(stageClassName != null, type + " not found");
-    return stageClassName;
+    Preconditions.checkArgument(REGISTRY_MAP.containsKey(type.toUpperCase()), type + " not found in registry");
+    return MapUtils.getString(REGISTRY_MAP.get(type.toUpperCase()), KEY_CLASS_NAME);
   }
 
   /**
@@ -109,6 +111,7 @@ public class DetectionRegistry {
    * @return tunable class name
    */
   public String lookupTunable(String className) {
+    Preconditions.checkArgument(TUNE_MAP.containsKey(className), className + " not found in registry");
     return TUNE_MAP.get(className).tunable();
   }
 
@@ -117,6 +120,7 @@ public class DetectionRegistry {
    * @return yaml converter class name
    */
   public String lookupYamlConverter(String pipelineType) {
+    Preconditions.checkArgument(YAML_MAP.containsKey(pipelineType), pipelineType + " not found in registry");
     return YAML_MAP.get(pipelineType);
   }
 
@@ -125,14 +129,14 @@ public class DetectionRegistry {
   }
 
   /**
-   * Return all stage implementation annotations
-   * @return List of detection annotation
+   * Return all component implementation annotations
+   * @return List of component annotation
    */
   public List<Components> getAllAnnotation() {
     List<Components> annotations = new ArrayList<>();
-    for (Map.Entry<String, Map> entry : REGISTRY_MAP.entrySet()){
+    for (Map.Entry<String, Map> entry : REGISTRY_MAP.entrySet()) {
       Map infoMap = entry.getValue();
-      if (infoMap.containsKey(KEY_ANNOTATION)){
+      if (infoMap.containsKey(KEY_ANNOTATION)) {
         annotations.add((Components) infoMap.get(KEY_ANNOTATION));
       }
     }

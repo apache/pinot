@@ -1,4 +1,4 @@
-name: testPipeline
+detectionName: testPipeline
 metric: test_metric
 dataset: test_dataset
 pipelineType: Composite

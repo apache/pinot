@@ -93,14 +93,17 @@ public class DetectionUtils {
     return map;
   }
 
+  // Check if a string is a component reference
   public static boolean isReferenceName(String key) {
     return key.startsWith("$");
   }
 
+  // get the component name from the reference key
   public static String getComponentName(String key) {
     return key.substring(1);
   }
 
+  // get the spec class name for a component class
   public static String getSpecClassName(Class<BaseComponent> componentClass) {
     ParameterizedType genericSuperclass = (ParameterizedType) componentClass.getGenericInterfaces()[0];
     return (genericSuperclass.getActualTypeArguments()[0].getTypeName());
@@ -108,8 +111,7 @@ public class DetectionUtils {
 
 
   /**
-   * Helper for creating a list of anomalies from a boolean series. Injects properties via
-   * {@code makeAnomaly(MetricSlice, MetricConfigDTO, Long)}.
+   * Helper for creating a list of anomalies from a boolean series.
    *
    * @param slice metric slice
    * @param df time series with COL_TIME and at least one boolean value series

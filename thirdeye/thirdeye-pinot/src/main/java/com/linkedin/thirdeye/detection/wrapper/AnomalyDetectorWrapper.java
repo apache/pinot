@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Anomaly Detection Stage Wrapper. This wrapper runs a anomaly detection stage and return the anomalies.
+ * Anomaly Detector Wrapper. This wrapper runs a anomaly detector and return the anomalies.
  * Optionally set the detection window to be moving window fashion. This wrapper will call detection multiple times with
  * sliding window. Each sliding window start time and end time is aligned to the data granularity. Each window size is set by the spec.
  */
