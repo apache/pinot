@@ -19,6 +19,7 @@ package com.linkedin.thirdeye.detection.annotation;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
+import com.linkedin.thirdeye.detection.yaml.YamlDetectionConfigTranslator;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,9 +36,12 @@ import org.slf4j.LoggerFactory;
  * The detection registry.
  */
 public class DetectionRegistry {
-
+  // component type to component class name and annotation
   private static final Map<String, Map> REGISTRY_MAP = new HashMap<>();
+  // component class name to tuner annotation
   private static final Map<String, Tune> TUNE_MAP = new HashMap<>();
+  // yaml pipeline type to yaml converter class name
+  private static final Map<String, String> YAML_MAP = new HashMap<>();
   private static final Logger LOG = LoggerFactory.getLogger(DetectionRegistry.class);
   private static final String KEY_CLASS_NAME = "className";
   private static final String KEY_ANNOTATION = "annotation";
@@ -72,6 +76,16 @@ public class DetectionRegistry {
           }
         }
       }
+
+      Set<Class<? extends YamlDetectionConfigTranslator>> yamlConverterClasses = reflections.getSubTypesOf(YamlDetectionConfigTranslator.class);
+      for (Class clazz : yamlConverterClasses){
+        Annotation[] annotations = clazz.getAnnotations();
+        for (Annotation annotation : clazz.getAnnotations()) {
+          if (annotation instanceof Yaml) {
+            YAML_MAP.put(((Yaml) annotation).pipelineType(), clazz.getName());
+          }
+        }
+      }
     } catch (Exception e) {
       LOG.warn("Build detection registry error", e);
     }
@@ -80,9 +94,9 @@ public class DetectionRegistry {
   private static final DetectionRegistry INSTANCE = new DetectionRegistry();
 
   /**
-   * Look up the class name for a given algorithm
+   * Look up the class name for a given component
    * @param type the type used in the YAML configs
-   * @return algorithm class name
+   * @return component class name
    */
   public String lookup(String type) {
     String stageClassName = MapUtils.getString(REGISTRY_MAP.get(type.toUpperCase()), KEY_CLASS_NAME);
@@ -91,13 +105,20 @@ public class DetectionRegistry {
   }
 
   /**
-   * Look up the class name for a given algorithm
-   * @return algorithm class name
+   * Look up the tunable class name for a component class name
+   * @return tunable class name
    */
   public String lookupTunable(String className) {
     return TUNE_MAP.get(className).tunable();
   }
 
+  /**
+   * Look up the yaml converter class name for a pipeline type
+   * @return yaml converter class name
+   */
+  public String lookupYamlConverter(String pipelineType) {
+    return YAML_MAP.get(pipelineType);
+  }
 
   public boolean isTunable(String className) {
     return TUNE_MAP.containsKey(className);

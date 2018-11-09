@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.annotation.Yaml;
 import com.linkedin.thirdeye.detection.spec.AbstractSpec;
 import com.linkedin.thirdeye.detection.spi.components.Tunable;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
@@ -106,6 +107,7 @@ import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
  * +-----------------------------------------+
  *
  */
+@Yaml(pipelineType = "COMPOSITE")
 public class CompositePipelineConfigTranslator extends YamlDetectionConfigTranslator {
   private static final String PROP_DIMENSION_EXPLORATION = "dimensionExploration";
 
