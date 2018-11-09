@@ -40,10 +40,16 @@ public class RecordTransformerTest {
       .addMultiValueDimension("mvDouble", FieldSpec.DataType.DOUBLE)
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", FieldSpec.DataType.STRING)
+      .addSingleValueDimension("svStringWithLengthLimit", FieldSpec.DataType.STRING)
       // For time conversion
       .addTime("incoming", 6, TimeUnit.HOURS, FieldSpec.DataType.INT, "outgoing", 1, TimeUnit.MILLISECONDS,
           FieldSpec.DataType.LONG)
       .build();
+
+  static {
+    SCHEMA.getFieldSpecFor("svStringWithLengthLimit").setMaxLength(2);
+  }
+
   // Transform multiple times should return the same result
   private static final int NUM_ROUNDS = 5;
 
@@ -60,6 +66,7 @@ public class RecordTransformerTest {
     fields.put("mvFloat", new Object[]{123d});
     fields.put("mvDouble", new Object[]{123});
     fields.put("svStringWithNullCharacters", "1\0002\0003");
+    fields.put("svStringWithLengthLimit", "123");
     fields.put("incoming", "123");
     record.init(fields);
     return record;
@@ -95,6 +102,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvFloat"), new Object[]{123f});
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
       assertEquals(record.getValue("svStringWithNullCharacters"), "1\0002\0003");
+      assertEquals(record.getValue("svStringWithLengthLimit"), "123");
       // Incoming time field won't be converted (it's ignored in this transformer)
       assertEquals(record.getValue("incoming"), "123");
       // Outgoing time field will be converted (without time transformer, this field will be null before transform, and
@@ -110,7 +118,8 @@ public class RecordTransformerTest {
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
       assertNotNull(record);
-      assertEquals(record.getValue("svStringWithNullCharacters"), "123");
+      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
+      assertEquals(record.getValue("svStringWithLengthLimit"), "12");
     }
   }
 
@@ -130,7 +139,8 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvLong"), new Object[]{123L});
       assertEquals(record.getValue("mvFloat"), new Object[]{123f});
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
-      assertEquals(record.getValue("svStringWithNullCharacters"), "123");
+      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
+      assertEquals(record.getValue("svStringWithLengthLimit"), "12");
       assertEquals(record.getValue("incoming"), "123");
       assertEquals(record.getValue("outgoing"), 123 * 6 * 3600 * 1000L);
     }
