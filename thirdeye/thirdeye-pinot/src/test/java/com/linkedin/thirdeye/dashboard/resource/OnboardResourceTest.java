@@ -53,7 +53,7 @@ public class OnboardResourceTest {
     ThirdEyeDashboardConfiguration config = new ThirdEyeDashboardConfiguration();
     config.setFailureFromAddress("thirdeye@test");
     OnboardResource onboardResource = new OnboardResource(config);
-    Response response = onboardResource.bulkOnboardAlert("test_tag", "test_prefix_", true, null, null, null);
+    Response response = onboardResource.bulkOnboardAlert("test_tag", null, "test_prefix_", true, null, null, null, null);
 
     // Check if the alert group is automatically created
     List<AlertConfigDTO> alertConfigDTOList = this.daoRegistry.getAlertConfigDAO().findAll();
@@ -83,7 +83,7 @@ public class OnboardResourceTest {
   @Test
   public void testBulkOnboardWithInvalidAlertGroup() throws Exception {
     OnboardResource onboardResource = new OnboardResource(null);
-    Response response = onboardResource.bulkOnboardAlert("test_tag", null, true, "group_name", null, null);
+    Response response = onboardResource.bulkOnboardAlert("test_tag", null, null, true, "group_name", null, null, null);
     Assert.assertEquals(response.getStatus(), 400);
     Map<String, String> responseMap = (Map<String, String>) response.getEntity();
     Assert.assertEquals(responseMap.get("message"), "cannot find an alert group with name group_name.");
@@ -92,7 +92,7 @@ public class OnboardResourceTest {
   @Test
   public void testSoftBulkOnboardWithNoAlertGroup() throws Exception {
     OnboardResource onboardResource = new OnboardResource(null);
-    Response response = onboardResource.bulkOnboardAlert("test_tag", null, false, null, null, null);
+    Response response = onboardResource.bulkOnboardAlert("test_tag", null, null, false, null, null, null, null);
     Assert.assertEquals(response.getStatus(), 400);
     Map<String, String> responseMap = (Map<String, String>) response.getEntity();
     Assert.assertEquals(responseMap.get("message"), "cannot find an alert group for metric test_metric.");
