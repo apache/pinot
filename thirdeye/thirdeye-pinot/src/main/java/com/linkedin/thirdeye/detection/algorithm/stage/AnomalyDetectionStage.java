@@ -29,9 +29,7 @@ public interface AnomalyDetectionStage extends BaseDetectionStage {
   /**
    * Run detection in the specified time range and return a list of anomalies
    * @param provider centralized data source for time series, anomalies, events, etc.
-   * @return list of anomaliesTrain
+   * @return list of anomalies
    */
   List<MergedAnomalyResultDTO> runDetection(DataProvider provider);
-
 }
-
