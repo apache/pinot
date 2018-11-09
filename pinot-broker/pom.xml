@@ -24,7 +24,6 @@
     <groupId>com.linkedin.pinot</groupId>
     <version>0.016</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-broker</artifactId>
   <version>0.016</version>
   <name>pinot-broker</name>

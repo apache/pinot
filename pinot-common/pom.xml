@@ -310,7 +310,7 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-filesystem-spi</artifactId>
-      <version>0.016</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>

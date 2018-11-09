@@ -25,7 +25,6 @@
     <groupId>com.linkedin.pinot</groupId>
     <version>0.016</version>
   </parent>
-  <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot-distribution</artifactId>
   <packaging>pom</packaging>
   <version>0.016</version>
@@ -68,22 +67,22 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-filesystem-spi</artifactId>
-      <version>0.016</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-local-filesystem</artifactId>
-      <version>0.016</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-hadoop-filesystem</artifactId>
-      <version>0.016</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-azure-filesystem</artifactId>
-      <version>0.016</version>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>com.linkedin.pinot</groupId>

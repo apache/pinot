@@ -19,14 +19,19 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot-filesystem</artifactId>
     <groupId>com.linkedin.pinot</groupId>
     <version>0.016</version>
   </parent>
-  <modelVersion>4.0.0</modelVersion>
-
   <artifactId>pinot-azure-filesystem</artifactId>
+  <version>0.016</version>
+  <name>pinot-azure-filesystem</name>
+  <url>http://maven.apache.org</url>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>com.microsoft.azure</groupId>
@@ -53,5 +58,4 @@
       <artifactId>pinot-common</artifactId>
     </dependency>
 </dependencies>
-
 </project>

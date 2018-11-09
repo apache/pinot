@@ -27,8 +27,11 @@
   </parent>
   <artifactId>pinot-filesystem-spi</artifactId>
   <version>0.016</version>
-  <name>pinot-filesystem</name>
+  <name>pinot-filesystem-spi</name>
   <url>http://maven.apache.org</url>
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
   <build>
     <plugins>
       <plugin>

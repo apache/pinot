@@ -28,8 +28,11 @@
 
   <artifactId>pinot-local-filesystem</artifactId>
   <version>0.016</version>
+  <name>pinot-local-filesystem</name>
   <url>http://maven.apache.org</url>
-
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
   <dependencies>
     <dependency>
       <groupId>commons-io</groupId>
@@ -47,8 +50,7 @@
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-filesystem-spi</artifactId>
-      <version>0.016</version>
-      <scope>compile</scope>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
       <groupId>org.testng</groupId>
