@@ -55,7 +55,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
   private static final String DEFAULT_MERGE_TYPE = "CONCATENATE";
   private static final int DEFAULT_SEQUENCE_ID = 0;
 
-  @Option(name = "-inputSegments", required = true, metaVar = "<String>", usage = "Comma separated input segment paths that need to be merged")
+  @Option(name = "-inputPaths", required = true, metaVar = "<String>", usage = "Comma separated input segment files or directories that contains input segments to be merged")
   private String _inputSegmentPaths;
 
   @Option(name = "-outputPath", required = true, metaVar = "<String>", usage = "Output segment path. This should be different from working directory.")
@@ -66,9 +66,6 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
 
   @Option(name = "-schemaFilePath", required = true, metaVar = "<String>", usage = "Schema file path")
   private String _schemaFilePath;
-
-  @Option(name = "-inputSegmentTarred", required = true, metaVar = "<String>", usage = "Indicate whether the input segment is tarred (true, false)")
-  private String _inputSegmentTarred;
 
   @Option(name = "-tarOutputSegment", required = true, metaVar = "<String>", usage = "Indicate whether to tar output segment (true, false)")
   private String _tarOutputSegment;
@@ -112,33 +109,39 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       workingDir = new File(_workingDirectory);
     }
 
+    // Check if the input path is directory or comma separated files
+    String[] paths = _inputSegmentPaths.split(INPUT_SEGMENT_SEPARATOR);
+    List<String> inputPaths = new ArrayList<>();
+    for (String path : paths) {
+      addFilePath(inputPaths, path.trim());
+    }
+    Preconditions.checkState(inputPaths.size() > 1, "Input paths has to contain at least 2 segments");
+    LOGGER.info("Input segments: " + inputPaths);
+
     try {
       // Get the list of input segment index directories
       List<File> inputIndexDirs = new ArrayList<>();
-      boolean inputSegmentTarred = Boolean.valueOf(_inputSegmentTarred);
-      if (inputSegmentTarred) {
-        File untarredSegments = new File(workingDir, "untarredSegments");
-        Preconditions.checkState(untarredSegments.mkdirs());
-        int segmentNum = 0;
-        for (String tarredSegmentPath : _inputSegmentPaths.split(INPUT_SEGMENT_SEPARATOR)) {
-          File tarredSegmentFile = new File(tarredSegmentPath.trim());
+      File untarredSegments = new File(workingDir, "untarredSegments");
+      Preconditions.checkState(untarredSegments.mkdirs());
+      int segmentNum = 0;
+      for (String segmentPath : inputPaths) {
+        File segmentFile = new File(segmentPath);
+        if (segmentFile.isDirectory() && isPinotSegment(segmentFile)) {
+          inputIndexDirs.add(segmentFile);
+        } else {
           File segmentDir = new File(untarredSegments, "segmentDir_" + segmentNum++);
-          TarGzCompressionUtils.unTar(tarredSegmentFile, segmentDir);
+          TarGzCompressionUtils.unTar(segmentFile, segmentDir);
           File[] files = segmentDir.listFiles();
           Preconditions.checkState(files != null && files.length == 1);
           File indexDir = files[0];
           inputIndexDirs.add(indexDir);
         }
-      } else {
-        // Simply add the given input paths when the input directories are not tarred
-        for (String path : _inputSegmentPaths.split(INPUT_SEGMENT_SEPARATOR)) {
-          inputIndexDirs.add(new File(path.trim()));
-        }
       }
-      LOGGER.info("Processed input segment paths: {}", inputIndexDirs);
+      LOGGER.info("Input segment paths for segment generator: {}", inputIndexDirs);
 
       // Read table config
-      String tableConfigString = new String(Files.readAllBytes(Paths.get(_tableConfigFilePath)), StandardCharsets.UTF_8);
+      String tableConfigString =
+          new String(Files.readAllBytes(Paths.get(_tableConfigFilePath)), StandardCharsets.UTF_8);
       JSONObject tableConfigJson = new JSONObject(tableConfigString);
       TableConfig tableConfig = TableConfig.fromJSONConfig(tableConfigJson);
 
@@ -172,7 +175,7 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       // Make sure to create output directory
       File outputDir = new File(_outputPath);
       if (!outputDir.exists()) {
-        outputDir.mkdirs();
+        Preconditions.checkState(outputDir.mkdirs());
       }
 
       // Get segment name from segment metadata
@@ -185,9 +188,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       if (tarOutputSegment) {
         File tarredOutputSegmentsDir = new File(workingDir, "tarredOutputSegments");
         Preconditions.checkState(tarredOutputSegmentsDir.mkdir());
-        File tarredOutputFile = new File(TarGzCompressionUtils.createTarGzOfDirectory(outputSegment.getPath(),
+        outputSegment = new File(TarGzCompressionUtils.createTarGzOfDirectory(outputSegment.getPath(),
             new File(tarredOutputSegmentsDir, outputSegment.getName()).getPath()));
-        outputSegment = tarredOutputFile;
         FileUtils.moveFile(outputSegment, finalOutputPath);
       } else {
         FileUtils.moveDirectory(outputSegment, finalOutputPath);
@@ -210,8 +212,8 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
 
     // Compute mix/max time from segment metadata
-    long minStartTime = Integer.MAX_VALUE;
-    long maxEndTime = Integer.MIN_VALUE;
+    long minStartTime = Long.MAX_VALUE;
+    long maxEndTime = Long.MIN_VALUE;
     for (File indexDir : inputIndexDirs) {
       SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
       long currentStartTime = segmentMetadata.getStartTime();
@@ -237,5 +239,44 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
             null, null, timeFormat);
 
     return segmentNameGenerator.generateSegmentName(minStartTime, maxEndTime);
+  }
+
+  private boolean isPinotSegment(File path) {
+    try {
+      SegmentMetadata segmentMetadata = new SegmentMetadataImpl(path);
+      LOGGER.info("Path ({}) is a valid segment ({})", path.getAbsolutePath(), segmentMetadata.getName());
+      return true;
+    } catch (Exception e) {
+      LOGGER.info("Path ({}) is a not valid segment", path.getAbsolutePath());
+      return false;
+    }
+  }
+
+  private void addFilePath(List<String> inputPaths, String path) throws Exception {
+    File pathFile = new File(path);
+
+    if (!pathFile.exists()) {
+      throw new InvalidConfigException("Invalid input path: " + pathFile);
+    }
+
+    if (pathFile.isFile()) {
+      // If the input is file, add to input path list
+      inputPaths.add(pathFile.getAbsolutePath());
+      return;
+    }
+
+    if (pathFile.isDirectory()) {
+      if (isPinotSegment(pathFile)) {
+        // If the directory is pinot index dir, add to input path list
+        inputPaths.add(pathFile.getAbsolutePath());
+      } else {
+        // If the directory is not pinot index dir, recursively find the pinot segment file or directory
+        File[] files = pathFile.listFiles();
+        assert files != null;
+        for (File file : files) {
+          addFilePath(inputPaths, file.getAbsolutePath());
+        }
+      }
+    }
   }
 }
