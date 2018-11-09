@@ -105,6 +105,7 @@ public class OnboardResource {
    * recipients and send out email alerts.
    *
    * @param tag the tag belonging to the metrics which you would like to onboard
+   * @param dataset the dataset belonging to the metrics which you would like to onboard
    * @param functionPrefix (optional, DEFAULT_FUNCTION_PREFIX) a custom anomaly function prefix
    * @param forceSyncAlertGroup (optional, true) force create alert groups based on dataset owners
    * @param alertGroupName (optional) subscribe to a custom subscription alert group
@@ -115,7 +116,8 @@ public class OnboardResource {
   @Path("/bulk-onboard")
   @ApiOperation("Endpoint used for bulk on-boarding alerts leveraging the create-job endpoint.")
   public Response bulkOnboardAlert(
-      @NotNull @QueryParam("tag") String tag,
+      @QueryParam("tag") String tag,
+      @QueryParam("dataset") String dataset,
       @DefaultValue(DEFAULT_FUNCTION_PREFIX) @QueryParam("functionPrefix") String functionPrefix,
       @DefaultValue("true") @QueryParam("forceSyncAlertGroup") boolean forceSyncAlertGroup,
       @QueryParam("alertGroupName") String alertGroupName, @QueryParam("alertGroupCron") String alertGroupCron,
@@ -123,6 +125,11 @@ public class OnboardResource {
       throws Exception {
     Map<String, String> responseMessage = new HashMap<>();
     Counter counter = new Counter();
+
+    if (StringUtils.isBlank(tag) && StringUtils.isBlank(dataset)) {
+      responseMessage.put("message", "Must provide either tag or dataset");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
 
     AlertConfigDTO alertConfigDTO = null;
     if (StringUtils.isNotEmpty(alertGroupName)) {
@@ -133,8 +140,19 @@ public class OnboardResource {
       }
     }
 
-    List<MetricConfigDTO> metrics = fetchMetrics(tag);
-    LOG.info("Number of metrics with tag {} fetched is {}.", tag, metrics.size());
+    List<MetricConfigDTO> metrics = new ArrayList<>();
+
+    if (StringUtils.isNotBlank(tag)) {
+      List<MetricConfigDTO> tagMetrics = fetchMetricsByTag(tag);
+      LOG.info("Number of metrics with tag {} fetched is {}.", tag, tagMetrics.size());
+      metrics.addAll(tagMetrics);
+    }
+
+    if (StringUtils.isNotBlank(dataset)) {
+      List<MetricConfigDTO> datasetMetrics = fetchMetricsByDataset(dataset);
+      LOG.info("Number of metrics with dataset {} fetched is {}.", dataset, datasetMetrics.size());
+      metrics.addAll(datasetMetrics);
+    }
 
     // For each metric create a new anomaly function & replay it
     List<Long> ids = new ArrayList<>();
@@ -274,7 +292,7 @@ public class OnboardResource {
     return this.emailConfigurationDAO.save(alertConfigDTO);
   }
 
-  private List<MetricConfigDTO> fetchMetrics(String tag) {
+  private List<MetricConfigDTO> fetchMetricsByTag(String tag) {
     List<MetricConfigDTO> results = new ArrayList<>();
     for (MetricConfigDTO metricConfigDTO : this.metricConfigDAO.findAll()) {
       if (metricConfigDTO.getTags() != null) {
@@ -284,6 +302,10 @@ public class OnboardResource {
       }
     }
     return results;
+  }
+
+  private List<MetricConfigDTO> fetchMetricsByDataset(String dataset) {
+    return this.metricConfigDAO.findByDataset(dataset);
   }
 
   // endpoint clone function Ids to append a name defined in nameTags
