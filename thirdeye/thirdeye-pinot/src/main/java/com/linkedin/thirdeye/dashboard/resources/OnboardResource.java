@@ -58,6 +58,7 @@ import java.util.Map;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 import javax.validation.constraints.NotNull;
+import scala.Int;
 
 import static com.linkedin.thirdeye.anomaly.onboard.tasks.FunctionCreationOnboardingTask.*;
 import static com.linkedin.thirdeye.dashboard.resources.EntityManagerResource.*;
@@ -121,7 +122,8 @@ public class OnboardResource {
       @DefaultValue(DEFAULT_FUNCTION_PREFIX) @QueryParam("functionPrefix") String functionPrefix,
       @DefaultValue("true") @QueryParam("forceSyncAlertGroup") boolean forceSyncAlertGroup,
       @QueryParam("alertGroupName") String alertGroupName, @QueryParam("alertGroupCron") String alertGroupCron,
-      @QueryParam("application") String application)
+      @QueryParam("application") String application,
+      @QueryParam("sleep") Long sleep)
       throws Exception {
     Map<String, String> responseMessage = new HashMap<>();
     Counter counter = new Counter();
@@ -192,6 +194,14 @@ public class OnboardResource {
         responseMessage.put("metric " + metric.getName(), "success! onboarded and added function id " + functionId
             + " to subscription alertGroup = " + alertConfigDTO.getName());
         counter.inc();
+
+        if (sleep != null) {
+          Thread.sleep(sleep);
+        }
+
+      } catch (InterruptedException e) {
+        // ignore
+
       } catch (Exception e) {
         LOG.error("[bulk-onboard] There was an exception onboarding metric {} function {}.", metric, functionName, e);
         responseMessage.put("skipped " + metric.getName(), "Exception onboarding metric : " + e);
