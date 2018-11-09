@@ -3,8 +3,12 @@ package com.linkedin.thirdeye.detection.yaml;
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.DetectionPipeline;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -12,10 +16,9 @@ import org.apache.commons.collections.MapUtils;
  * Calls training module for each stage.
  */
 public abstract class YamlDetectionConfigTranslator {
+  protected static final Logger LOG = LoggerFactory.getLogger(YamlDetectionConfigTranslator.class);
   private static final String PROP_NAME = "detectionName";
-  private static final String PROP_CRON = "cron";
 
-  private static final String CRON_SCHEDULE_DEFAULT = "0 0 14 * * ? *";
 
   protected Map<String, Object> yamlConfig;
   protected long startTime;
@@ -27,6 +30,7 @@ public abstract class YamlDetectionConfigTranslator {
   public YamlDetectionConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     this.yamlConfig = yamlConfig;
     this.dataProvider = provider;
+    this.existingComponentSpecs = new HashMap<>();
   }
 
   public YamlDetectionConfigTranslator withTrainingWindow(long startTime, long endTime) {
@@ -55,14 +59,13 @@ public abstract class YamlDetectionConfigTranslator {
 
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setName(MapUtils.getString(yamlConfig, PROP_NAME));
-    config.setCron(MapUtils.getString(yamlConfig, PROP_CRON, CRON_SCHEDULE_DEFAULT));
     config.setLastTimestamp(System.currentTimeMillis());
     config.setActive(true);
     YamlTranslationResult translationResult = translateYaml();
     Preconditions.checkArgument(!translationResult.getProperties().isEmpty(), "Empty detection property");
     config.setProperties(translationResult.getProperties());
     config.setComponentSpecs(translationResult.getComponents());
-
+    config.setCron(translationResult.getCron());
     if (existingConfig != null) {
       config.setId(existingConfig.getId());
       config.setLastTimestamp(existingConfig.getLastTimestamp());

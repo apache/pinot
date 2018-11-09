@@ -37,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public class DetectionRegistry {
 
   private static final Map<String, Map> REGISTRY_MAP = new HashMap<>();
-  private static final Map<String, Tune> TRAINING_MODULE_MAP = new HashMap<>();
+  private static final Map<String, Tune> TUNE_MAP = new HashMap<>();
   private static final Logger LOG = LoggerFactory.getLogger(DetectionRegistry.class);
   private static final String KEY_CLASS_NAME = "className";
   private static final String KEY_ANNOTATION = "annotation";
@@ -67,7 +67,7 @@ public class DetectionRegistry {
             }
             if (annotation instanceof Tune) {
               Tune trainingAnnotation = (Tune) annotation;
-              TRAINING_MODULE_MAP.put(className, trainingAnnotation);
+              TUNE_MAP.put(className, trainingAnnotation);
             }
           }
         }
@@ -90,8 +90,17 @@ public class DetectionRegistry {
     return stageClassName;
   }
 
-  public boolean isTrainable(String className) {
-    return TRAINING_MODULE_MAP.containsKey(className);
+  /**
+   * Look up the class name for a given algorithm
+   * @return algorithm class name
+   */
+  public String lookupTunable(String className) {
+    return TUNE_MAP.get(className).tunable();
+  }
+
+
+  public boolean isTunable(String className) {
+    return TUNE_MAP.containsKey(className);
   }
 
   /**

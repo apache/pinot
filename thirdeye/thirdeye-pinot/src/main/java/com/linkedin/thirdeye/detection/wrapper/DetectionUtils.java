@@ -28,10 +28,12 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
 import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -98,6 +100,12 @@ public class DetectionUtils {
   public static String getComponentName(String key) {
     return key.substring(1);
   }
+
+  public static String getSpecClassName(Class<BaseComponent> componentClass) {
+    ParameterizedType genericSuperclass = (ParameterizedType) componentClass.getGenericInterfaces()[0];
+    return (genericSuperclass.getActualTypeArguments()[0].getTypeName());
+  }
+
 
   /**
    * Helper for creating a list of anomalies from a boolean series. Injects properties via

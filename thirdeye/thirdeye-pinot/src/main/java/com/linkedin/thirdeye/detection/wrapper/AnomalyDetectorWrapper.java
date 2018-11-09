@@ -134,7 +134,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
         for (long monitoringEndTime : monitoringWindowEndTimes) {
           long endTime = monitoringEndTime - TimeUnit.MILLISECONDS.convert(windowDelay, windowDelayUnit);
           long startTime = endTime - TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-          monitoringWindows.add(new Interval(startTime, endTime));
+          monitoringWindows.add(new Interval(startTime, endTime, dateTimeZone));
         }
         return monitoringWindows;
       } catch (Exception e) {

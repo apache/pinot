@@ -4,11 +4,15 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.spec.AbstractSpec;
+import com.linkedin.thirdeye.detection.spi.components.Tunable;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import com.linkedin.thirdeye.detection.wrapper.AnomalyFilterWrapper;
 import com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
@@ -19,11 +23,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.collections.MapUtils;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Interval;
 
 import static com.linkedin.thirdeye.detection.ConfigUtils.*;
+import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
 
 
 /**
@@ -119,6 +128,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of();
 
   private final Map<String, Object> components = new HashMap<>();
+  private MetricConfigDTO metricConfig;
+  private DatasetConfigDTO datasetConfig;
 
   public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     super(yamlConfig, provider);
@@ -126,7 +137,16 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
   @Override
   YamlTranslationResult translateYaml() {
+    this.metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
+        MapUtils.getString(yamlConfig, PROP_DATASET));
+    Preconditions.checkNotNull(this.metricConfig, "Metric not found");
+
+    this.datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
+        .get(metricConfig.getDataset());
+    Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
+
     String metricUrn = buildMetricUrn(yamlConfig);
+    String cron = buildCron();
 
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
     List<Map<String, Object>> nestedPipelines = new ArrayList<>();
@@ -140,8 +160,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       } else {
         List<Map<String, Object>> filterNestedProperties = detectionProperties;
         for (Map<String, Object> filterProperties : filterYamls) {
-          filterNestedProperties = buildFilterWrapperProperties(AnomalyFilterWrapper.class.getName(),
-              filterProperties, filterNestedProperties, ruleName);
+          filterNestedProperties = buildFilterWrapperProperties(AnomalyFilterWrapper.class.getName(), filterProperties,
+              filterNestedProperties, ruleName);
         }
         nestedPipelines.addAll(filterNestedProperties);
       }
@@ -149,12 +169,14 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
     dimensionWrapperProperties.putAll(MapUtils.getMap(yamlConfig, PROP_DIMENSION_EXPLORATION));
     dimensionWrapperProperties.put(PROP_METRIC_URN, metricUrn);
-    Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(), Collections.singletonList(
-        buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)));
-    return new YamlTranslationResult().withProperties(properties).withComponents(this.components);
+    Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(),
+        Collections.singletonList(
+            buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)));
+    return new YamlTranslationResult().withProperties(properties).withComponents(this.components).withCron(cron);
   }
 
-  private List<Map<String, Object>>  buildListOfMergeWrapperProperties(String ruleName, List<Map<String, Object>> yamlConfigs) {
+  private List<Map<String, Object>> buildListOfMergeWrapperProperties(String ruleName,
+      List<Map<String, Object>> yamlConfigs) {
     List<Map<String, Object>> properties = new ArrayList<>();
     for (Map<String, Object> yamlConfig : yamlConfigs) {
       properties.add(buildMergeWrapperProperties(ruleName, yamlConfig));
@@ -176,7 +198,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
     properties.put(PROP_NESTED, Collections.singletonList(nestedProperties));
     String baselineProviderType = "RULE_BASELINE";
-    if (DETECTOR_TO_BASELINE.containsKey(detectorType)){
+    if (DETECTOR_TO_BASELINE.containsKey(detectorType)) {
       baselineProviderType = DETECTOR_TO_BASELINE.get(detectorType);
     }
     String baselineProviderKey = makeComponentKey(ruleName, baselineProviderType);
@@ -184,23 +206,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
 
     return properties;
-  }
-
-  private void buildComponentSpec(Map<String, Object> yamlConfig, String type, String componentKey) {
-    String componentClassName = DETECTION_REGISTRY.lookup(type);
-    Map<String, Object> detectorSpecs = new HashMap<>();
-    detectorSpecs.put(PROP_CLASS_NAME, componentClassName);
-    Map<String, Object> params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
-    if (DETECTION_REGISTRY.isTrainable(componentClassName)){
-      // TODO get trainer and train
-    } else {
-      detectorSpecs.putAll(params);
-    }
-    this.components.put(DetectionUtils.getComponentName(componentKey), detectorSpecs);
-  }
-
-  private String makeComponentKey(String name, String type) {
-    return "$" + name + "_" + type;
   }
 
   private List<Map<String, Object>> buildFilterWrapperProperties(String wrapperClassName,
@@ -219,7 +224,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
     return Collections.singletonList(wrapperProperties);
   }
-
 
   private Map<String, Object> buildWrapperProperties(String wrapperClassName,
       List<Map<String, Object>> nestedProperties) {
@@ -244,6 +248,18 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     return properties;
   }
 
+  private String buildCron() {
+    switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
+      case MINUTES:
+        return "0 0/15 * * * ? *";
+      case HOURS:
+        return "0 0 * * * ? *";
+      case DAYS:
+        return "0 0 14 * * ? *";
+      default:
+        return "0 0 0 * * ?";
+    }
+  }
 
   private String buildMetricUrn(Map<String, Object> yamlConfig) {
     Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
@@ -254,12 +270,55 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         filters.putAll(entry.getKey(), entry.getValue());
       }
     }
-    MetricConfigDTO metricConfig = this.dataProvider.fetchMetric(MapUtils.getString(yamlConfig, PROP_METRIC),
-        MapUtils.getString(yamlConfig, PROP_DATASET));
-    Preconditions.checkNotNull(metricConfig, "Metric not found");
 
-    MetricEntity me = MetricEntity.fromMetric(1.0, metricConfig.getId(), filters);
+    MetricEntity me = MetricEntity.fromMetric(1.0, this.metricConfig.getId(), filters);
     return me.getUrn();
+  }
+
+  private void buildComponentSpec(Map<String, Object> yamlConfig, String type, String componentKey) {
+    String componentName = DetectionUtils.getComponentName(componentKey);
+    String componentClassName = DETECTION_REGISTRY.lookup(type);
+    Map<String, Object> componentSpecs = new HashMap<>();
+    componentSpecs.put(PROP_CLASS_NAME, componentClassName);
+    Map<String, Object> params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
+
+    if (DETECTION_REGISTRY.isTunable(componentClassName)) {
+      try {
+        componentSpecs.putAll(getTunedSpecs(componentName, componentClassName, params));
+      } catch (Exception e) {
+        LOG.error("Tuning failed for component " + type, e);
+      }
+    } else {
+      componentSpecs.putAll(params);
+    }
+    this.components.put(componentName, componentSpecs);
+  }
+
+  private Map<String, Object> getTunedSpecs(String componentName, String componentClassName, Map<String, Object> params)
+      throws Exception {
+    Tunable tunable = getTunable(componentClassName, params);
+    InputDataSpec dataSpec = tunable.getInputDataSpec(
+        new Interval(this.startTime, this.endTime, DateTimeZone.forID(this.datasetConfig.getTimezone())));
+    long configId = this.existingConfig == null ? -1 : this.existingConfig.getId();
+    Map<String, Object> existingComponentSpec =
+        this.existingComponentSpecs.containsKey(componentName) ? MapUtils.getMap(this.existingComponentSpecs,
+            componentName) : Collections.emptyMap();
+    return tunable.tune(existingComponentSpec, DetectionUtils.getDataForSpec(dataProvider, dataSpec, configId));
+  }
+
+  private Tunable getTunable(String componentClassName, Map<String, Object> params)
+      throws Exception {
+    String tunableClassName = DETECTION_REGISTRY.lookupTunable(componentClassName);
+    Class clazz = Class.forName(tunableClassName);
+    Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
+    AbstractSpec spec = AbstractSpec.fromProperties(params, specClazz);
+    Tunable tunable = (Tunable) clazz.newInstance();
+    tunable.init(spec);
+    return tunable;
+  }
+
+  private String makeComponentKey(String name, String type) {
+    return "$" + name + "_" + type;
   }
 
   @Override
@@ -268,19 +327,26 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_METRIC), "Property missing " + PROP_METRIC);
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_DATASET), "Property missing " + PROP_DATASET);
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_RULES), "Property missing " + PROP_RULES);
-
-    List<Map<String, Object>> detectionYamls = getList(yamlConfig.get(PROP_RULES));
-    for (int i = 0; i < detectionYamls.size(); i++) {
-      Map<String, Object> detectionYaml = detectionYamls.get(i);
-      Preconditions.checkArgument(detectionYaml.containsKey(PROP_DETECTION), "In rule No." + (i+1) + ", detection stage property missing. ");
-      List<Map<String, Object>> detectionStageYamls = ConfigUtils.getList(detectionYaml.get(PROP_DETECTION));
+    Set<String> names = new HashSet<>();
+    List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
+    for (int i = 0; i < ruleYamls.size(); i++) {
+      Map<String, Object> ruleYaml = ruleYamls.get(i);
+      Preconditions.checkArgument(ruleYaml.containsKey(PROP_NAME), "In rule No." + (i + 1) + ", rule name property missing. ");
+      String name = MapUtils.getString(ruleYaml, PROP_NAME);
+      Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) + ", found duplicated rule name: " + name, ". Rule name must be unique.");
+      names.add(name);
+      Preconditions.checkArgument(ruleYaml.containsKey(PROP_DETECTION),
+          "In rule No." + (i + 1) + ", detection stage property missing. ");
+      List<Map<String, Object>> detectionStageYamls = ConfigUtils.getList(ruleYaml.get(PROP_DETECTION));
       for (Map<String, Object> detectionStageYaml : detectionStageYamls) {
-        Preconditions.checkArgument(detectionStageYaml.containsKey(PROP_TYPE), "In rule No." + (i+1) + ", detection stage type missing. ");
+        Preconditions.checkArgument(detectionStageYaml.containsKey(PROP_TYPE),
+            "In rule No." + (i + 1) + ", detection stage type missing. ");
       }
-      if (detectionYaml.containsKey(PROP_FILTER)) {
-        List<Map<String, Object>> filterStageYamls = ConfigUtils.getList(MapUtils.getMap(detectionYaml, PROP_FILTER));
+      if (ruleYaml.containsKey(PROP_FILTER)) {
+        List<Map<String, Object>> filterStageYamls = ConfigUtils.getList(MapUtils.getMap(ruleYaml, PROP_FILTER));
         for (Map<String, Object> filterStageYaml : filterStageYamls) {
-          Preconditions.checkArgument(filterStageYaml.containsKey(PROP_TYPE), "In rule No." + (i+1) + ", filter stage type missing. ");
+          Preconditions.checkArgument(filterStageYaml.containsKey(PROP_TYPE),
+              "In rule No." + (i + 1) + ", filter stage type missing. ");
         }
       }
     }

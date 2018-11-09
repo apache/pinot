@@ -93,8 +93,6 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
    * @return anomalies with current and baseline value filled
    */
   List<MergedAnomalyResultDTO> fillCurrentAndBaselineValue(List<MergedAnomalyResultDTO> mergedAnomalies) {
-    Map<MetricSlice, MergedAnomalyResultDTO> metricSlicesToAnomaly = new HashMap<>();
-
     for (MergedAnomalyResultDTO anomaly : mergedAnomalies) {
       try {
         String metricUrn = anomaly.getMetricUrn();

@@ -17,6 +17,7 @@
 package com.linkedin.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -28,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -81,9 +83,10 @@ public class AnomalyDetectorWrapperTest {
     AnomalyDetectorWrapper detectionPipeline =
         new AnomalyDetectorWrapper(this.provider, this.config, 1540147725000L, 1540493325000L);
     List<Interval> monitoringWindows = detectionPipeline.getMonitoringWindows();
+    DateTimeZone timeZone = DateTimeZone.forID(TimeSpec.DEFAULT_TIMEZONE);
     Assert.assertEquals(monitoringWindows,
-        Arrays.asList(new Interval(1540080000000L, 1540166400000L), new Interval(1540166400000L, 1540252800000L),
-            new Interval(1540252800000L, 1540339200000L), new Interval(1540339200000L, 1540425600000L)));
+        Arrays.asList(new Interval(1540080000000L, 1540166400000L, timeZone), new Interval(1540166400000L, 1540252800000L, timeZone),
+            new Interval(1540252800000L, 1540339200000L, timeZone), new Interval(1540339200000L, 1540425600000L, timeZone)));
   }
 
 }

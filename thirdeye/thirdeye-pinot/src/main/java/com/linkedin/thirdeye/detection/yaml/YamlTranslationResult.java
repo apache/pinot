@@ -21,17 +21,22 @@ import java.util.Map;
 
 
 public class YamlTranslationResult {
+  private static final String CRON_SCHEDULE_DEFAULT = "0 0 14 * * ? *";
+
   private final Map<String, Object> properties;
   private final Map<String, Object> components;
+  private final String cron;
 
   public YamlTranslationResult() {
     this.properties = new HashMap<>();
     this.components = new HashMap<>();
+    this.cron = CRON_SCHEDULE_DEFAULT;
   }
 
-  public YamlTranslationResult(Map<String, Object> properties, Map<String, Object> components) {
+  public YamlTranslationResult(Map<String, Object> properties, Map<String, Object> components, String cron) {
     this.properties = properties;
     this.components = components;
+    this.cron = cron;
   }
 
   public Map<String, Object> getProperties() {
@@ -42,11 +47,19 @@ public class YamlTranslationResult {
     return components;
   }
 
+  public String getCron() {
+    return cron;
+  }
+
   YamlTranslationResult withProperties(Map<String, Object> properties) {
-    return new YamlTranslationResult(properties, this.components);
+    return new YamlTranslationResult(properties, this.components, this.cron);
   }
 
   YamlTranslationResult withComponents(Map<String, Object> components) {
-    return new YamlTranslationResult(this.properties, components);
+    return new YamlTranslationResult(this.properties, components, this.cron);
+  }
+
+  YamlTranslationResult withCron(String cron) {
+    return new YamlTranslationResult(this.properties, components, cron);
   }
 }

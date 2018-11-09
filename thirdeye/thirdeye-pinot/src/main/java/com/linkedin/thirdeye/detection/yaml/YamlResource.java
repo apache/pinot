@@ -106,7 +106,12 @@ public class YamlResource {
     }
 
     YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
-    DetectionConfigDTO detectionConfig = translator.withTrainingWindow(startTime, endTime).withExistingDetectionConfig(existingDetectionConfig).generateDetectionConfig();
+    DetectionConfigDTO detectionConfig;
+    try{
+      detectionConfig = translator.withTrainingWindow(startTime, endTime).withExistingDetectionConfig(existingDetectionConfig).generateDetectionConfig();
+    } catch (Exception e) {
+      return Response.status(400).entity(ImmutableMap.of("status", "400", "message", e.getMessage())).build();
+    }
     detectionConfig.setYaml(payload);
     Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");

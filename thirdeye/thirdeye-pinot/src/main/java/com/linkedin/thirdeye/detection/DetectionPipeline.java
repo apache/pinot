@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
+import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
 
 
 /**
@@ -80,11 +81,10 @@ public abstract class DetectionPipeline {
    */
   public abstract DetectionPipelineResult run() throws Exception;
 
-  private String getSpecClassName(Class<BaseComponent> componentClass) {
-    ParameterizedType genericSuperclass = (ParameterizedType) componentClass.getGenericInterfaces()[0];
-    return (genericSuperclass.getActualTypeArguments()[0].getTypeName());
-  }
-
+  /**
+   * Initialize all components in the pipeline
+   * @throws Exception
+   */
   private void initComponents() throws Exception {
     Map<String, BaseComponent> instancesMap = config.getComponents();
     Map<String, Object> componentSpecs = config.getComponentSpecs();

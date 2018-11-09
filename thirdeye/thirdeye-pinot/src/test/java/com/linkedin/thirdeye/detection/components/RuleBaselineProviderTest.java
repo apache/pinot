@@ -65,7 +65,7 @@ public class RuleBaselineProviderTest {
 
   @Test
   public void testFetchBaselineTimeSeries() {
-    DataFrame df = baselineProvider.computePredictedTimeSeries(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getInputDataSpec(slice1), -1));
+    DataFrame df = baselineProvider.computePredictedTimeSeries(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getInputDataSpec(slice1), -1)).getDataFrame();
     Assert.assertEquals(df.getDoubles(COL_VALUE).get(0), 100.0);
     Assert.assertEquals(df.getDoubles(COL_VALUE).get(1), 200.0);
   }
