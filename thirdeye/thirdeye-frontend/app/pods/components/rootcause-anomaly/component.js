@@ -152,6 +152,12 @@ export default Component.extend({
   predicted: reads('anomaly.attributes.baseline.firstObject'),
 
   /**
+   * Anomaly current as computed by anomaly function
+   * @type {float}
+   */
+  current: reads('anomaly.attributes.current.firstObject'),
+
+  /**
    * Anomaly aggregate multiplier
    * @type {float}
    */
@@ -312,6 +318,31 @@ export default Component.extend({
   }),
 
   /**
+   * Returns humanized version of current value
+   * @type {String}
+   */
+  humanizedAnomalyCurrent: computed('current', function () {
+    const oldCurrent = get(this, 'current');
+    return humanizeFloat(parseFloat(oldCurrent));
+  }),
+
+  /**
+   * Checks if param values and displayed values differ by 5% or more
+   * @type {Boolean}
+   */
+  isWarning: computed('anomalyInfo', function () {
+    const anomalyInfo = get(this, 'anomalyInfo');
+    let oldCurrent = parseFloat(get(this, 'current'));
+    const newCurrent = this._getAggregate('current');
+
+    if (newCurrent && oldCurrent){
+      const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
+      return (diffCurrent > 0.01);
+    }
+    return false;
+  }),
+
+  /**
    * Returns the aggregate value for a given offset. Handles computed baseline special case.
    *
    * @param {string} offset metric offset
@@ -321,7 +352,6 @@ export default Component.extend({
   _getAggregate(offset) {
     const { metricUrn, aggregates, predicted, aggregateMultiplier } =
       getProperties(this, 'metricUrn', 'aggregates', 'predicted', 'aggregateMultiplier');
-
     if (offset === 'predicted') {
       const value = parseFloat(predicted);
       if (value === 0.0) { return Number.NaN; }
