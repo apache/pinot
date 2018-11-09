@@ -17,18 +17,13 @@ package com.linkedin.pinot.common.utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.util.Random;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-
-/**
- * Nov 12, 2014
- */
 
 public class FileUtils {
-
-  public static Logger LOGGER = LoggerFactory.getLogger(FileUtils.class);
+  private FileUtils() {
+  }
 
   private static final Random RANDOM = new Random();
 
@@ -46,5 +41,22 @@ public class FileUtils {
       org.apache.commons.io.FileUtils.deleteQuietly(destFile);
     }
     org.apache.commons.io.FileUtils.moveFile(srcFile, destFile);
+  }
+
+  /**
+   * Transfers bytes from the source file to the destination file. This method can handle transfer size larger than 2G.
+   *
+   * @param src Source file channel
+   * @param position Position in source file
+   * @param count Number of bytes to transfer
+   * @param dest Destination file channel
+   * @throws IOException
+   */
+  public static void transferBytes(FileChannel src, long position, long count, FileChannel dest) throws IOException {
+    long numBytesTransferred;
+    while ((numBytesTransferred = src.transferTo(position, count, dest)) < count) {
+      position += numBytesTransferred;
+      count -= numBytesTransferred;
+    }
   }
 }
