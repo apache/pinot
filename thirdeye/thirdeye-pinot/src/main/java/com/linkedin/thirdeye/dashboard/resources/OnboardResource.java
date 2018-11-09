@@ -163,6 +163,8 @@ public class OnboardResource {
           + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getName()) + "_"
           + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getDataset());
 
+      LOG.info("[bulk-onboard] Onboarding anomaly function {}.", functionName);
+
       if (alertConfigDTO == null) {
         alertConfigDTO = getAlertConfigGroupForMetric(metric, forceSyncAlertGroup, application, alertGroupCron);
         if (alertConfigDTO == null) {
@@ -200,7 +202,8 @@ public class OnboardResource {
         }
 
       } catch (InterruptedException e) {
-        // ignore
+        responseMessage.put("message", "Operation interrupted");
+        return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
 
       } catch (Exception e) {
         LOG.error("[bulk-onboard] There was an exception onboarding metric {} function {}.", metric, functionName, e);
