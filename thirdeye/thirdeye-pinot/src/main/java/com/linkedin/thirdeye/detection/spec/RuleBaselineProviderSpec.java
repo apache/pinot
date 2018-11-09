@@ -22,7 +22,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class RuleBaselineProviderSpec extends AbstractSpec{
   private String timezone = "UTC";
-  private String offset = "current";
+  private String offset = "wo1w";
 
   public RuleBaselineProviderSpec(String timezone, String offset) {
     this.timezone = timezone;

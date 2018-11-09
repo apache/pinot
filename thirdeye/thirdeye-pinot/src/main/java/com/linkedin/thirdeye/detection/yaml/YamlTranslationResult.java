@@ -18,6 +18,7 @@ package com.linkedin.thirdeye.detection.yaml;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 
 public class YamlTranslationResult {
@@ -61,5 +62,23 @@ public class YamlTranslationResult {
 
   YamlTranslationResult withCron(String cron) {
     return new YamlTranslationResult(this.properties, components, cron);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof YamlTranslationResult)) {
+      return false;
+    }
+    YamlTranslationResult that = (YamlTranslationResult) o;
+    return Objects.equals(properties, that.properties) && Objects.equals(components, that.components) && Objects.equals(
+        cron, that.cron);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(properties, components, cron);
   }
 }

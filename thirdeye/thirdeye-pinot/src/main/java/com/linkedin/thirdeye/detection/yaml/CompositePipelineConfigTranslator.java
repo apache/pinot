@@ -199,11 +199,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_CLASS_NAME, BaselineFillingMergeWrapper.class.getName());
     properties.put(PROP_NESTED, Collections.singletonList(nestedProperties));
-    String baselineProviderType = "RULE_BASELINE";
+    String baselineProviderType =  "RULE_BASELINE";
     if (DETECTOR_TO_BASELINE.containsKey(detectorType)) {
       baselineProviderType = DETECTOR_TO_BASELINE.get(detectorType);
     }
-    String baselineProviderKey = makeComponentKey(ruleName, baselineProviderType);
+    String baselineProviderKey = makeComponentKey(ruleName + "_" + detectorType,  baselineProviderType);
     properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
 
