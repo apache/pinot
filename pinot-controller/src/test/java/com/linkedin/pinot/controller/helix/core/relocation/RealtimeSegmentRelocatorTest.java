@@ -103,6 +103,7 @@ public class RealtimeSegmentRelocatorTest {
     ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
 
     // no consuming instances found
+    // TODO: this should not be tested anymore
     _realtimeSegmentRelocator.setTagToInstance(serverTenantConsuming, new ArrayList<>());
     _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
     boolean exception = false;
@@ -116,7 +117,7 @@ public class RealtimeSegmentRelocatorTest {
 
     // no completed instances found
     _realtimeSegmentRelocator.setTagToInstance(serverTenantConsuming, consumingInstanceList);
-    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, new ArrayList<String>());
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, new ArrayList<>());
     try {
       _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     } catch (Exception e) {
@@ -229,6 +230,8 @@ public class RealtimeSegmentRelocatorTest {
     segmentNameToExpectedNumCompletedInstances.put("segment2", 1);
     verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
         nReplicas, segmentNameToExpectedNumCompletedInstances);
+
+    // add test to check that segments not on consuming tag also relocate
   }
 
   private void verifySegmentAssignment(IdealState updatedIdealState,
