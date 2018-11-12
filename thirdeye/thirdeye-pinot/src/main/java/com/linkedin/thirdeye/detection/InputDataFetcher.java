@@ -32,6 +32,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 
+/**
+ * Input data fetcher.
+ * For components to fetch the input data it need.
+ */
 public class InputDataFetcher {
   private DataProvider provider;
   private long configId;
@@ -41,6 +45,9 @@ public class InputDataFetcher {
     this.configId = configId;
   }
 
+  /**
+   * Fetch data for input data spec
+   */
   public InputData fetchData(InputDataSpec inputDataSpec) {
     Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(inputDataSpec.getTimeseriesSlices());
     Map<MetricSlice, DataFrame> aggregates =

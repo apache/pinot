@@ -85,7 +85,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
  *
  * 4. Errors: there are few ways to handle server side errors
  *    a. catch exception and throw as WebApplicationException : its a REST library exception, you can pass your error response etc into this exception
- *    b. Add a ExceptionMapper and registerComponent it in the dw environment
+ *    b. Add a ExceptionMapper and register it in the dw environment
  *    c. Add a web filter / intercepter to catch and convert RTEs to web exception
  */
 @Path(value = "/data")

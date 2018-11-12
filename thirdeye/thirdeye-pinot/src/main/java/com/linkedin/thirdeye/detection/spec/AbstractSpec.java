@@ -26,7 +26,7 @@ import org.modelmapper.ModelMapper;
 public abstract class AbstractSpec {
 
   public static <T extends AbstractSpec> T fromProperties(Map<String, Object> properties, Class<T> specClass) {
-    // don't reuse model mapper instance. It caches typeMaps and will result
+    // don't reuse model mapper instance. It caches typeMaps and will result in unexpected mappings
     ModelMapper modelMapper = new ModelMapper();
     return modelMapper.map(properties, specClass);
   }

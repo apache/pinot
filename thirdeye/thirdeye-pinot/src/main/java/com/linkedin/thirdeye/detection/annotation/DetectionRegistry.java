@@ -63,7 +63,7 @@ public class DetectionRegistry {
   private DetectionRegistry() {
     try {
       Reflections reflections = new Reflections();
-      // registerComponent components
+      // register components
       Set<Class<? extends BaseComponent>> classes = reflections.getSubTypesOf(BaseComponent.class);
       for (Class clazz : classes) {
         String className = clazz.getName();
@@ -79,7 +79,7 @@ public class DetectionRegistry {
           }
         }
       }
-      // registerComponent yaml translators
+      // register yaml translators
       Set<Class<? extends YamlDetectionConfigTranslator>> yamlConverterClasses =
           reflections.getSubTypesOf(YamlDetectionConfigTranslator.class);
       for (Class clazz : yamlConverterClasses) {

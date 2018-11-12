@@ -49,10 +49,19 @@ public class InputDataSpec {
   */
   final Collection<EventSlice> eventSlices;
 
+  /*
+    Metric ids to fetch the MetricConfigDTO for.
+   */
   final Collection<Long> metricIds;
 
+  /*
+    Dataset names to fetch the DatasetConfigDTO for.
+  */
   final Collection<String> datasetNames;
 
+  /*
+    Metric ids to fetch the DatasetConfigDTO for.
+  */
   final Collection<Long> metricIdsForDatasets;
 
   public InputDataSpec() {

@@ -34,11 +34,10 @@ public interface BaselineProvider<T extends AbstractSpec> extends BaseComponent<
 
   /**
    * Compute the baseline time series for the metric slice.
-   * default implementation is to call computePredictedTimeSeries and aggregate
+   * default implementation is to call computePredictedTimeSeries and aggregate using the aggregate function
    * @return the predicted value.
    */
   default Double computePredictedAggregates(MetricSlice slice, Series.DoubleFunction aggregateFunction){
-    // default to be average
     TimeSeries baselineTimeSeries = this.computePredictedTimeSeries(slice);
     return baselineTimeSeries.getPredictedBaseline().aggregate(aggregateFunction).getDouble(0);
   }
