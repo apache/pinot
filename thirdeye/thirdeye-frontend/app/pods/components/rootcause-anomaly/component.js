@@ -355,10 +355,10 @@ export default Component.extend({
     if (offset === 'predicted') {
       const value = parseFloat(predicted);
       if (value === 0.0) { return Number.NaN; }
-      return value;
+      return value / (aggregateMultiplier || 1.0);
     }
 
-    return aggregates[toOffsetUrn(metricUrn, offset)] * (aggregateMultiplier || 1.0);
+    return aggregates[toOffsetUrn(metricUrn, offset)];
   },
 
   actions: {
