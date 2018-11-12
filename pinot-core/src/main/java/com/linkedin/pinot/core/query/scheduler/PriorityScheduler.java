@@ -43,6 +43,8 @@ import org.slf4j.LoggerFactory;
 public abstract class PriorityScheduler extends QueryScheduler {
   private static Logger LOGGER = LoggerFactory.getLogger(PriorityScheduler.class);
 
+  private ServerMetrics _serverMetrics;
+
   protected final SchedulerPriorityQueue queryQueue;
 
   @VisibleForTesting
@@ -56,6 +58,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
     super(queryExecutor, resourceManager, metrics, latestQueryTime);
     Preconditions.checkNotNull(queue);
     this.queryQueue = queue;
+    this._serverMetrics = metrics;
     this.numRunners = resourceManager.getNumQueryRunnerThreads();
     runningQueriesSemaphore = new Semaphore(numRunners);
   }
@@ -71,6 +74,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
     try {
       queryQueue.put(schedQueryContext);
     } catch (OutOfCapacityException e) {
+      _serverMetrics.addMeteredQueryValue(queryRequest.getBrokerRequest(), ServerMeter.SERVER_OUT_OF_CAPACITY_EXCEPTIONS, 1);
       LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableNameWithType(), e.getMessage());
       return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
     }

@@ -27,6 +27,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
   SCHEDULING_TIMEOUT_EXCEPTIONS("exceptions", true),
+  SERVER_OUT_OF_CAPACITY_EXCEPTIONS("exceptions", true),
   QUERY_EXECUTION_EXCEPTIONS("exceptions", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
   DELETED_SEGMENT_COUNT("segments", false),
