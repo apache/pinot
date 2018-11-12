@@ -114,7 +114,7 @@ public class ThirdEyeAnomalyApplication
     }
 
     // instantiate detection registry
-    DetectionRegistry.getInstance();
+    DetectionRegistry.init();
 
     environment.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     environment.getObjectMapper().registerModule(makeMapperModule());

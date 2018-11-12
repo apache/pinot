@@ -58,9 +58,9 @@ public class DetectionRegistry {
   }
 
   /**
-   * Internal constructor. Read the Components annotation from each stage implementation.
+   * Read all the components, tune, and yaml annotations and initialize the registry.
    */
-  private DetectionRegistry() {
+  public static void init() {
     try {
       Reflections reflections = new Reflections();
       // register components
@@ -90,7 +90,7 @@ public class DetectionRegistry {
         }
       }
     } catch (Exception e) {
-      LOG.warn("Build detection registry error", e);
+      LOG.warn("initialize detection registry error", e);
     }
   }
 

@@ -40,7 +40,6 @@ public class CompositePipelineConfigTranslatorTest {
     datasetConfigDTO.setTimeUnit(TimeUnit.DAYS);
     datasetConfigDTO.setTimeDuration(1);
     this.yaml = new Yaml();
-    DetectionRegistry.getInstance();
     DetectionRegistry.registerComponent(ThresholdRuleDetector.class.getName(), "THRESHOLD");
     DetectionRegistry.registerComponent(ThresholdRuleAnomalyFilter.class.getName(), "THRESHOLD_RULE_FILTER");
     DetectionRegistry.registerComponent(RuleBaselineProvider.class.getName(), "RULE_BASELINE");

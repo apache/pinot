@@ -152,7 +152,7 @@ public class ThirdEyeDashboardApplication
     }
 
     // instantiate detection registry
-    DetectionRegistry.getInstance();
+    DetectionRegistry.init();
 
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
