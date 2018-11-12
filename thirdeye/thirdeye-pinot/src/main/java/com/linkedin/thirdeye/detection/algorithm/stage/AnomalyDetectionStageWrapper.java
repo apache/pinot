@@ -27,6 +27,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
+import com.linkedin.thirdeye.detection.DetectionUtils;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
@@ -119,7 +120,7 @@ public class AnomalyDetectionStageWrapper extends DetectionPipeline {
       anomaly.setMetricUrn(this.metricUrn);
       anomaly.setMetric(metric.getName());
       anomaly.setCollection(metric.getDataset());
-      anomaly.setDimensions(StageUtils.toFilterMap(me.getFilters()));
+      anomaly.setDimensions(DetectionUtils.toFilterMap(me.getFilters()));
     }
     return new DetectionPipelineResult(anomalies);
   }

@@ -32,6 +32,8 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -121,16 +123,16 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
-      if (slice.end >= 0)
-        predicates.add(Predicate.LT("startTime", slice.end));
-      if (slice.start >= 0)
-        predicates.add(Predicate.GT("endTime", slice.start));
-      if (slice.configId >= 0)
-        predicates.add(Predicate.EQ("detectionConfigId", slice.configId));
+      if (slice.getEnd() >= 0)
+        predicates.add(Predicate.LT("startTime", slice.getEnd()));
+      if (slice.getStart() >= 0)
+        predicates.add(Predicate.GT("endTime", slice.getStart()));
+      if (configId >= 0)
+        predicates.add(Predicate.EQ("detectionConfigId", configId));
 
       if (predicates.isEmpty())
         throw new IllegalArgumentException("Must provide at least one of start, end, or detectionConfigId");
@@ -138,7 +140,12 @@ public class DefaultDataProvider implements DataProvider {
       List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
       Iterator<MergedAnomalyResultDTO> itAnomaly = anomalies.iterator();
       while (itAnomaly.hasNext()) {
-        if (!slice.match(itAnomaly.next())) {
+        MergedAnomalyResultDTO anomaly = itAnomaly.next();
+        if (configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)){
+          itAnomaly.remove();
+        }
+
+        if (!slice.match(anomaly)) {
           itAnomaly.remove();
         }
       }
@@ -153,10 +160,10 @@ public class DefaultDataProvider implements DataProvider {
     Multimap<EventSlice, EventDTO> output = ArrayListMultimap.create();
     for (EventSlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
-      if (slice.end >= 0)
-        predicates.add(Predicate.LT("startTime", slice.end));
-      if (slice.start >= 0)
-        predicates.add(Predicate.GT("endTime", slice.start));
+      if (slice.getEnd() >= 0)
+        predicates.add(Predicate.LT("startTime", slice.getEnd()));
+      if (slice.getStart() >= 0)
+        predicates.add(Predicate.GT("endTime", slice.getStart()));
 
       if (predicates.isEmpty())
         throw new IllegalArgumentException("Must provide at least one of start, or end");
@@ -202,6 +209,11 @@ public class DefaultDataProvider implements DataProvider {
   @Override
   public DetectionPipeline loadPipeline(DetectionConfigDTO config, long start, long end) throws Exception {
     return this.loader.from(this, config, start, end);
+  }
+
+  @Override
+  public MetricConfigDTO fetchMetric(String metricName, String datasetName) {
+    return this.metricDAO.findByMetricAndDataset(metricName, datasetName);
   }
 
   private static Predicate AND(Collection<Predicate> predicates) {

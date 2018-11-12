@@ -28,6 +28,8 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -122,11 +124,14 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices) {
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> result = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       for (MergedAnomalyResultDTO anomaly : this.anomalies) {
         if (slice.match(anomaly)) {
+          if (configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)){
+            continue;
+          }
           result.put(slice, anomaly);
         }
       }
@@ -171,6 +176,16 @@ public class MockDataProvider implements DataProvider {
       }
     }
     return result;
+  }
+
+  @Override
+  public MetricConfigDTO fetchMetric(String metricName, String datasetName) {
+      for (MetricConfigDTO metric : this.metrics) {
+        if (metricName.equals(metric.getName()) && datasetName.equals(metric.getDataset())) {
+          return metric;
+        }
+      }
+      return null;
   }
 
   @Override

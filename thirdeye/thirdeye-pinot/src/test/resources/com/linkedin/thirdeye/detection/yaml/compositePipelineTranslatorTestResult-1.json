@@ -1,0 +1,61 @@
+{
+  "properties" : {
+    "className" : "com.linkedin.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
+    "nested" : [ {
+      "className" : "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper",
+      "metricUrn" : "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3",
+      "nested" : [ {
+        "filter" : "$rule1_THRESHOLD_RULE_FILTER",
+        "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyFilterWrapper",
+        "nested" : [ {
+          "baselineValueProvider" : "$rule1_THRESHOLD_RULE_BASELINE",
+          "className" : "com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
+          "nested" : [ {
+            "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
+            "detector" : "$rule1_THRESHOLD"
+          } ]
+        } ]
+      }, {
+        "filter" : "$rule2_THRESHOLD_RULE_FILTER",
+        "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyFilterWrapper",
+        "nested" : [ {
+          "baselineValueProvider" : "$rule2_THRESHOLD_RULE_BASELINE",
+          "className" : "com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
+          "nested" : [ {
+            "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
+            "detector" : "$rule2_THRESHOLD"
+          } ]
+        } ]
+      } ],
+      "minContribution" : 0.05,
+      "dimensions" : [ "D1", "D2" ]
+    } ]
+  },
+  "components" : {
+    "rule1_THRESHOLD" : {
+      "max" : 100,
+      "className" : "com.linkedin.thirdeye.detection.components.ThresholdRuleDetector"
+    },
+    "rule2_THRESHOLD" : {
+      "max" : 100,
+      "className" : "com.linkedin.thirdeye.detection.components.ThresholdRuleDetector"
+    },
+    "rule1_THRESHOLD_RULE_FILTER" : {
+      "min" : 50,
+      "className" : "com.linkedin.thirdeye.detection.components.ThresholdRuleAnomalyFilter"
+    },
+    "rule2_THRESHOLD_RULE_BASELINE" : {
+      "max" : 100,
+      "className" : "com.linkedin.thirdeye.detection.components.RuleBaselineProvider"
+    },
+    "rule1_THRESHOLD_RULE_BASELINE" : {
+      "max" : 100,
+      "className" : "com.linkedin.thirdeye.detection.components.RuleBaselineProvider"
+    },
+    "rule2_THRESHOLD_RULE_FILTER" : {
+      "min" : 50,
+      "className" : "com.linkedin.thirdeye.detection.components.ThresholdRuleAnomalyFilter"
+    }
+  },
+  "cron" : "0 0 14 * * ? *"
+}

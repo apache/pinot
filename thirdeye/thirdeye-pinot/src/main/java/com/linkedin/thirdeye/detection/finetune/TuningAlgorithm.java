@@ -17,7 +17,7 @@
 package com.linkedin.thirdeye.detection.finetune;
 
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 
 
 /**
@@ -30,7 +30,7 @@ public interface TuningAlgorithm {
    * @param slice anomaly slice
    * @throws Exception the exception
    */
-  void fit(AnomalySlice slice) throws Exception;
+  void fit(AnomalySlice slice, long configId) throws Exception;
 
   /**
    * Return the best detection config detection config dto.

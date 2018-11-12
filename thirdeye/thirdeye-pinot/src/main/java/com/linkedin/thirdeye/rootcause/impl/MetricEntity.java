@@ -23,7 +23,6 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.util.EntityUtils;
 import com.linkedin.thirdeye.rootcause.util.ParsedUrn;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;

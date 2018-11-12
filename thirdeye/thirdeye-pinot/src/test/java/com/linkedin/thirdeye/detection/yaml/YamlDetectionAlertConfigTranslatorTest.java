@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detection.yaml;
 
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
+import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,10 +52,11 @@ public class YamlDetectionAlertConfigTranslatorTest {
 
   @BeforeMethod
   public void setUp() {
+    DetectionRegistry.registerComponent("testclassname", "TO_ALL_RECIPIENTS");
     this.alertYamlConfigs = new HashMap<>();
     alertYamlConfigs.put("name", "test_alert");
     alertYamlConfigs.put("type", "TO_ALL_RECIPIEnts");
-    alertYamlConfigs.put("to", Arrays.asList("jihzhang", "apucher"));
+    alertYamlConfigs.put("to", Arrays.asList("test1", "test2"));
     alertYamlConfigs.put("application", "TestApplication");
     this.translator = new YamlDetectionAlertConfigTranslator();
   }

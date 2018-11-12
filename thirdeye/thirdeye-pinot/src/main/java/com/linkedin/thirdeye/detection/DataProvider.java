@@ -24,6 +24,8 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -70,9 +72,10 @@ public interface DataProvider {
    * @see AnomalySlice
    *
    * @param slices anomaly slice
+   * @param configId configId
    * @return multimap of anomalies (keyed by slice)
    */
-  Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices);
+  Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId);
 
   /**
    * Returns a multimap of events (keyed by slice) for a given set of slices.
@@ -95,6 +98,7 @@ public interface DataProvider {
    */
   Map<Long, MetricConfigDTO> fetchMetrics(Collection<Long> ids);
 
+
   /**
    * Returns a map of dataset configs (keyed by id) for a given set of dataset names.
    *
@@ -104,6 +108,17 @@ public interface DataProvider {
    * @return map of dataset configs (keyed by dataset name)
    */
   Map<String, DatasetConfigDTO> fetchDatasets(Collection<String> datasetNames);
+
+  /**
+   * Returns a metricConfigDTO for a given metric name.
+   *
+   * @see MetricConfigDTO
+   *
+   * @param metricName metric name
+   * @param datasetName dataset name
+   * @return map of dataset configs (keyed by dataset name)
+   */
+  MetricConfigDTO fetchMetric(String metricName, String datasetName);
 
   /**
    * Returns an initialized instance of a detection pipeline for the given config. Injects this

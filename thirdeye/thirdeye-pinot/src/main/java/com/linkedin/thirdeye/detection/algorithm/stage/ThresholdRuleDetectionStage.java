@@ -20,10 +20,10 @@ import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.InputData;
-import com.linkedin.thirdeye.detection.InputDataSpec;
-import com.linkedin.thirdeye.detection.annotation.Detection;
-import com.linkedin.thirdeye.detection.annotation.DetectionParam;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import com.linkedin.thirdeye.detection.annotation.Components;
+import com.linkedin.thirdeye.detection.annotation.Param;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.PresentationOption;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
@@ -38,7 +38,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 /**
  * Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.
  */
-@Detection(name = "Threshold",
+@Components(title = "Threshold",
     type = "THRESHOLD",
     tags = { DetectionTag.RULE_DETECTION },
     description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.",
@@ -47,7 +47,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
         description = "aggregated absolute value within a time period",
         template = "is lower than ${min} or higher than ${max}"
     )},
-    params = {@DetectionParam(name = "min", placeholder = "value"), @DetectionParam(name = "max", placeholder = "value")}
+    params = {@Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")}
 )
 public class ThresholdRuleDetectionStage extends StaticAnomalyDetectionStage {
   private final String COL_TOO_HIGH = "tooHigh";

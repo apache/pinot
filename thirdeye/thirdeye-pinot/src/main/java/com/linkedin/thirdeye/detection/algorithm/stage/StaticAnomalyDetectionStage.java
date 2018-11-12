@@ -24,8 +24,9 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.InputData;
-import com.linkedin.thirdeye.detection.InputDataSpec;
+import com.linkedin.thirdeye.detection.InputDataFetcher;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +36,6 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
-import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
 
 
 /**
@@ -43,6 +43,12 @@ import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
  */
 public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionStage {
   private DataProvider provider;
+  private long configId;
+
+  @Override
+  public void init(Map<String, Object> specs, Long configId, long startTime, long endTime) {
+    this.configId = configId;
+  }
 
   /**
    * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to perform a stage.
@@ -61,7 +67,8 @@ public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionSta
   @Override
   public final List<MergedAnomalyResultDTO> runDetection(DataProvider provider) {
     this.provider = provider;
-    return this.runDetection(getDataForSpec(provider, this.getInputDataSpec()));
+    InputDataFetcher dataFetcher = new InputDataFetcher(this.provider, this.configId);
+    return this.runDetection(dataFetcher.fetchData(this.getInputDataSpec()));
   }
 
   /**

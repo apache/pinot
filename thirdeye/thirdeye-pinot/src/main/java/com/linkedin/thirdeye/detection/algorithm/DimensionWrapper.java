@@ -195,6 +195,7 @@ public class DimensionWrapper extends DetectionPipeline {
     nestedConfig.setId(this.config.getId());
     nestedConfig.setName(this.config.getName());
     nestedConfig.setProperties(properties);
+    nestedConfig.setComponents(this.config.getComponents());
 
     DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 

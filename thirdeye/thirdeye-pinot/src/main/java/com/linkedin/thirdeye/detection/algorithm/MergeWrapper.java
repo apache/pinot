@@ -20,7 +20,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
@@ -79,7 +79,7 @@ public class MergeWrapper extends DetectionPipeline {
 
     this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", 0);
     this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", Long.MAX_VALUE);
-    this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime).withConfigId(config.getId());
+    this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime);
     this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
   }
 
@@ -99,6 +99,7 @@ public class MergeWrapper extends DetectionPipeline {
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
       nestedConfig.setProperties(properties);
+      nestedConfig.setComponents(this.config.getComponents());
 
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 
@@ -116,7 +117,7 @@ public class MergeWrapper extends DetectionPipeline {
         .withEnd(this.getEndTime(generated) + this.maxGap + 1);
 
     List<MergedAnomalyResultDTO> retrieved = new ArrayList<>();
-    retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice));
+    retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), this.config.getId()).get(effectiveSlice));
 
     // merge
     List<MergedAnomalyResultDTO> all = new ArrayList<>();

@@ -36,6 +36,15 @@ public class DetectionConfigBean extends AbstractBean {
   Map<String, Object> properties;
   boolean active;
   String yaml;
+  Map<String, Object> componentSpecs;
+
+  public Map<String, Object> getComponentSpecs() {
+    return componentSpecs;
+  }
+
+  public void setComponentSpecs(Map<String, Object> componentSpecs) {
+    this.componentSpecs = componentSpecs;
+  }
 
   public String getYaml() {
     return yaml;

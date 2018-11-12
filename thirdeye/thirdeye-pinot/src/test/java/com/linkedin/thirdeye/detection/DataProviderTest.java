@@ -37,6 +37,8 @@ import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.datasource.csv.CSVThirdEyeDataSource;
 import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -277,14 +279,14 @@ public class DataProviderTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testAnomalyInvalid() {
-    this.provider.fetchAnomalies(Collections.singleton(new AnomalySlice()));
+    this.provider.fetchAnomalies(Collections.singleton(new AnomalySlice()), -1);
   }
 
   @Test
   public void testAnomalySingle() {
-    AnomalySlice slice = makeAnomalySlice(-1, 1209000000L, -1, Collections.<String>emptyList());
+    AnomalySlice slice = makeAnomalySlice(1209000000L, -1, Collections.<String>emptyList());
 
-    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
+    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice), -1).get(slice);
 
     Assert.assertEquals(anomalies.size(), 1);
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(2), 200L, 604800000L, 1209600000L, Collections.<String>emptyList())));
@@ -292,9 +294,9 @@ public class DataProviderTest {
 
   @Test
   public void testAnomalyDimension() {
-    AnomalySlice slice = makeAnomalySlice(-1, 0, -1, Arrays.asList("a=1", "c=3"));
+    AnomalySlice slice = makeAnomalySlice(0, -1, Arrays.asList("a=1", "c=3"));
 
-    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
+    Collection<MergedAnomalyResultDTO> anomalies = this.provider.fetchAnomalies(Collections.singleton(slice), -1).get(slice);
 
     Assert.assertEquals(anomalies.size(), 3);
     Assert.assertTrue(anomalies.contains(makeAnomaly(this.anomalyIds.get(0), 100L, 4000000L, 8000000L, Arrays.asList("a=1", "c=3", "b=2"))));
@@ -361,13 +363,13 @@ public class DataProviderTest {
     return new EventSlice(start, end, filters);
   }
 
-  private static AnomalySlice makeAnomalySlice(long configId, long start, long end, Iterable<String> filterStrings) {
+  private static AnomalySlice makeAnomalySlice(long start, long end, Iterable<String> filterStrings) {
     SetMultimap<String, String> filters = HashMultimap.create();
     for (String fs : filterStrings) {
       String[] parts = fs.split("=");
       filters.put(parts[0], parts[1]);
     }
-    return new AnomalySlice(configId, start, end, filters);
+    return new AnomalySlice(start, end, filters);
   }
 
   private static MetricConfigDTO makeMetric(Long id, String metric, String dataset) {

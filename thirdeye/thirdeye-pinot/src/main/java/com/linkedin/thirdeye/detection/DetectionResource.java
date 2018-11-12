@@ -33,6 +33,7 @@ import com.linkedin.thirdeye.datasource.loader.DefaultTimeSeriesLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import com.linkedin.thirdeye.detection.finetune.TuningAlgorithm;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,6 +48,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,7 +102,8 @@ public class DetectionResource {
     DetectionConfigDTO config = new DetectionConfigDTO();
     config.setId(Long.MAX_VALUE);
     config.setName("preview");
-    config.setProperties(properties);
+    config.setProperties(MapUtils.getMap(properties, "properties"));
+    config.setComponentSpecs(MapUtils.getMap(properties, "componentSpecs"));
 
     DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
     DetectionPipelineResult result = pipeline.run();
@@ -127,10 +130,10 @@ public class DetectionResource {
 
     LinkedHashMap<String, List<Number>> parameters = (LinkedHashMap<String, List<Number>>) json.get("parameters");
 
-    AnomalySlice slice = new AnomalySlice().withConfigId(configId).withStart(start).withEnd(end);
+    AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
 
     TuningAlgorithm gridSearch = new GridSearchTuningAlgorithm(OBJECT_MAPPER.writeValueAsString(json.get("properties")), parameters);
-    gridSearch.fit(slice);
+    gridSearch.fit(slice, configId);
 
     return Response.ok(gridSearch.bestDetectionConfig().getProperties()).build();
   }
@@ -171,8 +174,8 @@ public class DetectionResource {
     }
 
     // clear existing anomalies
-    AnomalySlice slice = new AnomalySlice().withConfigId(configId).withStart(start).withEnd(end);
-    Collection<MergedAnomalyResultDTO> existing = this.provider.fetchAnomalies(Collections.singleton(slice)).get(slice);
+    AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
+    Collection<MergedAnomalyResultDTO> existing = this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
 
     List<Long> existingIds = new ArrayList<>();
     for (MergedAnomalyResultDTO anomaly : existing) {
@@ -199,4 +202,4 @@ public class DetectionResource {
 
     return Response.ok(result).build();
   }
-}
+  }

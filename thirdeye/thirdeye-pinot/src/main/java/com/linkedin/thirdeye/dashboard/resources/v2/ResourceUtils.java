@@ -19,7 +19,6 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.TreeMultimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyClassificationType;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;

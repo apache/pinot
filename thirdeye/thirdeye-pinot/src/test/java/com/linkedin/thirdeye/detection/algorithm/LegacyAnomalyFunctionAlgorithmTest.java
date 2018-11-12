@@ -35,7 +35,6 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
-import static org.testng.Assert.*;
 
 
 public class LegacyAnomalyFunctionAlgorithmTest {

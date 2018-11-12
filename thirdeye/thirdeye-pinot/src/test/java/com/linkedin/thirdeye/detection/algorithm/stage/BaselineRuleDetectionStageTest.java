@@ -26,7 +26,6 @@ import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.algorithm.AlgorithmUtils;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Collections;
