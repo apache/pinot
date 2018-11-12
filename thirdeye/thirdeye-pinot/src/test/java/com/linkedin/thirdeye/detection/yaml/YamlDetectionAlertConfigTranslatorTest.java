@@ -52,7 +52,6 @@ public class YamlDetectionAlertConfigTranslatorTest {
 
   @BeforeMethod
   public void setUp() {
-    DetectionRegistry.getInstance();
     DetectionRegistry.registerComponent("testclassname", "TO_ALL_RECIPIENTS");
     this.alertYamlConfigs = new HashMap<>();
     alertYamlConfigs.put("name", "test_alert");
