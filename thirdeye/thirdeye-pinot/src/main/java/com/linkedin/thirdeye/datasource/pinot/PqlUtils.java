@@ -21,6 +21,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
@@ -347,12 +348,28 @@ public class PqlUtils {
     return AND.join(components);
   }
 
+  private static String convertEpochToAggGranularity(String timeColumnName, TimeSpec timeSpec, TimeGranularity aggregationGranularity) {
+    String groupByTimeColumnName = String.format("dateTimeConvert(%s,'%d:%s:%s','%d:%s:%s','%d:%s')", timeColumnName,
+        timeSpec.getDataGranularity().getSize(), timeSpec.getDataGranularity().getUnit(), timeSpec.getFormat(),
+        timeSpec.getDataGranularity().getSize(), timeSpec.getDataGranularity().getUnit(), timeSpec.getFormat(),
+        aggregationGranularity.getSize(), aggregationGranularity.getUnit());
+    return groupByTimeColumnName;
+  }
+
   private static String getDimensionGroupByClause(List<String> groupBy,
-      TimeGranularity aggregationGranulity, TimeSpec timeSpec) {
+      TimeGranularity aggregationGranularity, TimeSpec timeSpec) {
     String timeColumnName = timeSpec.getColumnName();
-    List<String> groups = new LinkedList<String>();
-    if (aggregationGranulity != null && !groups.contains(timeColumnName)) {
-      groups.add(timeColumnName);
+    List<String> groups = new LinkedList<>();
+    if (aggregationGranularity != null && !groups.contains(timeColumnName)) {
+      // Convert the time column to aggregation granularity if it is epoch.
+      // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','15:MINUTES')
+      if (timeSpec.getFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
+          && !timeSpec.getDataGranularity().equals(aggregationGranularity)) {
+        String groupByTimeColumnName = convertEpochToAggGranularity(timeColumnName, timeSpec, aggregationGranularity);
+        groups.add(groupByTimeColumnName);
+      } else {
+        groups.add(timeColumnName);
+      }
     }
     if (groupBy != null) {
       groups.addAll(groupBy);
