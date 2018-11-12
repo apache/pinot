@@ -19,8 +19,7 @@ package com.linkedin.thirdeye.detection.components;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.algorithm.stage.AnomalyFilterStage;
+import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.annotation.Components;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.Param;
@@ -32,7 +31,6 @@ import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -47,19 +45,16 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFilterSpec> {
   private double min;
   private double max;
-  private MetricSlice currentSlice;
+  private InputDataFetcher dataFetcher;
 
   @Override
-  public InputDataSpec getInputDataSpec(MergedAnomalyResultDTO anomaly) {
+  public boolean isQualified(MergedAnomalyResultDTO anomaly) {
     MetricEntity me = MetricEntity.fromURN(anomaly.getMetricUrn());
-    this.currentSlice = MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
-    return new InputDataSpec().withAggregateSlices(Collections.singleton(currentSlice));
-  }
+    MetricSlice currentSlice = MetricSlice.from(me.getId(), anomaly.getStartTime(), anomaly.getEndTime(), me.getFilters());
+    InputData data = dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(Collections.singleton(currentSlice)));
 
-  @Override
-  public boolean isQualified(InputData data) {
     Map<MetricSlice, DataFrame> aggregates = data.getAggregates();
-    double currentValue = getValueFromAggregates(this.currentSlice, aggregates);
+    double currentValue = getValueFromAggregates(currentSlice, aggregates);
     if (!Double.isNaN(this.min) && currentValue < this.min) {
       return false;
     }
@@ -70,9 +65,10 @@ public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFi
   }
 
   @Override
-  public void init(ThresholdRuleFilterSpec spec) {
+  public void init(ThresholdRuleFilterSpec spec, InputDataFetcher dataFetcher) {
     this.min = spec.getMin();
     this.max = spec.getMax();
+    this.dataFetcher = dataFetcher;
   }
 
   double getValueFromAggregates(MetricSlice slice, Map<MetricSlice, DataFrame> aggregates) {

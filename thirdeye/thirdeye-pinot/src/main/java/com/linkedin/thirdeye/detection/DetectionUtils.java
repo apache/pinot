@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.wrapper;
+package com.linkedin.thirdeye.detection;
 
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -50,40 +50,6 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 
 public class DetectionUtils {
-  /**
-   * Get the data for a data spec from provider
-   * @param provider the data provider
-   * @param inputDataSpec the spec of input data for the detection stage
-   * @return data
-   */
-  public static InputData getDataForSpec(DataProvider provider, InputDataSpec inputDataSpec, long configId) {
-    Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(inputDataSpec.getTimeseriesSlices());
-    Map<MetricSlice, DataFrame> aggregates =
-        provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList());
-    Multimap<AnomalySlice, MergedAnomalyResultDTO> existingAnomalies =
-        provider.fetchAnomalies(inputDataSpec.getAnomalySlices(), configId);
-    Multimap<EventSlice, EventDTO> events = provider.fetchEvents(inputDataSpec.getEventSlices());
-    Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIds());
-    Map<String, DatasetConfigDTO> datasets = provider.fetchDatasets(inputDataSpec.getDatasetNames());
-
-    Map<Long, DatasetConfigDTO> datasetForMetricId = fetchDatasetForMetricId(provider, inputDataSpec);
-    return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events, metrics, datasets, datasetForMetricId);
-  }
-
-  private static Map<Long, DatasetConfigDTO> fetchDatasetForMetricId(DataProvider provider, InputDataSpec inputDataSpec) {
-    Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIdsForDatasets());
-    Map<Long, String> metricIdToDataSet = new HashMap<>();
-    for (Map.Entry<Long, MetricConfigDTO> entry : metrics.entrySet()){
-      metricIdToDataSet.put(entry.getKey(), entry.getValue().getDataset());
-    }
-    Map<String, DatasetConfigDTO> datasets = provider.fetchDatasets(metricIdToDataSet.values());
-    Map<Long, DatasetConfigDTO> result = new HashMap<>();
-    for (Map.Entry<Long, MetricConfigDTO> entry : metrics.entrySet()){
-        result.put(entry.getKey(), datasets.get(entry.getValue().getDataset()));
-    }
-    return result;
-  }
-
   // TODO anomaly should support multimap
   public static DimensionMap toFilterMap(Multimap<String, String> filters) {
     DimensionMap map = new DimensionMap();

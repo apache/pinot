@@ -16,9 +16,10 @@
 
 package com.linkedin.thirdeye.detection.spi.components;
 
+import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.spec.AbstractSpec;
 
 
 public interface BaseComponent<T extends AbstractSpec> {
-  void init(T spec);
+  void init(T spec, InputDataFetcher dataFetcher);
 }

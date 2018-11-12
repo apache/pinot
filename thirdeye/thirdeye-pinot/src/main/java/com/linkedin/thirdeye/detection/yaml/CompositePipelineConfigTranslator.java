@@ -8,17 +8,17 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
 import com.linkedin.thirdeye.detection.annotation.Yaml;
 import com.linkedin.thirdeye.detection.spec.AbstractSpec;
 import com.linkedin.thirdeye.detection.spi.components.Tunable;
-import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
 import com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper;
 import com.linkedin.thirdeye.detection.wrapper.AnomalyFilterWrapper;
 import com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper;
 import com.linkedin.thirdeye.detection.wrapper.ChildKeepingMergeWrapper;
-import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
+import com.linkedin.thirdeye.detection.DetectionUtils;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,7 +33,7 @@ import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 
 import static com.linkedin.thirdeye.detection.ConfigUtils.*;
-import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
+import static com.linkedin.thirdeye.detection.DetectionUtils.*;
 
 
 /**
@@ -298,24 +298,25 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
   private Map<String, Object> getTunedSpecs(String componentName, String componentClassName, Map<String, Object> params)
       throws Exception {
-    Tunable tunable = getTunable(componentClassName, params);
-    InputDataSpec dataSpec = tunable.getInputDataSpec(
-        new Interval(this.startTime, this.endTime, DateTimeZone.forID(this.datasetConfig.getTimezone())));
     long configId = this.existingConfig == null ? -1 : this.existingConfig.getId();
+    InputDataFetcher dataFetcher = new InputDataFetcher(this.dataProvider, configId);
+    Tunable tunable = getTunable(componentClassName, params, dataFetcher);
+    Interval window = new Interval(this.startTime, this.endTime, DateTimeZone.forID(this.datasetConfig.getTimezone()));
     Map<String, Object> existingComponentSpec =
         this.existingComponentSpecs.containsKey(componentName) ? MapUtils.getMap(this.existingComponentSpecs,
             componentName) : Collections.emptyMap();
-    return tunable.tune(existingComponentSpec, DetectionUtils.getDataForSpec(dataProvider, dataSpec, configId));
+
+    return tunable.tune(existingComponentSpec, window);
   }
 
-  private Tunable getTunable(String componentClassName, Map<String, Object> params)
+  private Tunable getTunable(String componentClassName, Map<String, Object> params, InputDataFetcher dataFetcher)
       throws Exception {
     String tunableClassName = DETECTION_REGISTRY.lookupTunable(componentClassName);
     Class clazz = Class.forName(tunableClassName);
     Class<AbstractSpec> specClazz = (Class<AbstractSpec>) Class.forName(getSpecClassName(clazz));
     AbstractSpec spec = AbstractSpec.fromProperties(params, specClazz);
     Tunable tunable = (Tunable) clazz.newInstance();
-    tunable.init(spec);
+    tunable.init(spec, dataFetcher);
     return tunable;
   }
 

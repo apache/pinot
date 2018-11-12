@@ -69,6 +69,7 @@ import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detection.DetectionMigrationResource;
 import com.linkedin.thirdeye.detection.DetectionResource;
 import com.linkedin.thirdeye.detection.annotation.DetectionConfigurationResource;
+import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
 import com.linkedin.thirdeye.detection.yaml.YamlResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -149,6 +150,9 @@ public class ThirdEyeDashboardApplication
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
+
+    // instantiate detection registry
+    DetectionRegistry.getInstance();
 
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());

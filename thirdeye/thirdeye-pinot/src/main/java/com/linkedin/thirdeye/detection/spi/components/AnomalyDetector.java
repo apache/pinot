@@ -26,17 +26,9 @@ import org.joda.time.Interval;
 
 public interface AnomalyDetector<T extends AbstractSpec> extends BaseComponent<T> {
   /**
-   * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to run this component.
-   * Data is retrieved in one pass and cached between executions if possible.
-   * @return input data spec
-   */
-  InputDataSpec getInputDataSpec(Interval window, String metricUrn);
-
-  /**
    * Run detection in the specified time range and return a list of anomalies
-   * @param data data(time series, anomalies, etc.) as described by data spec
    * @return list of anomalies
    */
-  List<MergedAnomalyResultDTO> runDetection(InputData data);
+  List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn);
 
 }

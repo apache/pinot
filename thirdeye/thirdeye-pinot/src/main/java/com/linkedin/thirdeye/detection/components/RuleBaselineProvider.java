@@ -19,6 +19,7 @@ package com.linkedin.thirdeye.detection.components;
 import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.annotation.Components;
 import com.linkedin.thirdeye.detection.spec.RuleBaselineProviderSpec;
 import com.linkedin.thirdeye.detection.spi.components.BaselineProvider;
@@ -36,45 +37,32 @@ public class RuleBaselineProvider implements BaselineProvider<RuleBaselineProvid
   private Baseline baseline;
   private String timezone;
   private String offset;
-  private MetricSlice slice;
-  private MetricSlice aggregateSlice;
+  private InputDataFetcher dataFetcher;
+
   @Override
-  public TimeSeries computePredictedTimeSeries(InputData data) {
+  public TimeSeries computePredictedTimeSeries(MetricSlice slice) {
+    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withTimeseriesSlices(this.baseline.scatter(slice)));
     return TimeSeries.fromDataFrame(this.baseline.gather(slice, data.getTimeseries()));
   }
 
   @Override
-  public InputDataSpec getInputDataSpec(MetricSlice slice) {
-    this.slice = slice;
-    return new InputDataSpec().withTimeseriesSlices(this.baseline.scatter(slice));
-  }
-
-  @Override
-  public InputDataSpec getAggregateInputDataSpec(MetricSlice slice) {
-    this.aggregateSlice = slice;
-    return new InputDataSpec().withAggregateSlices(this.baseline.scatter(slice));
-  }
-
-  @Override
-  public Double computePredictedAggregates(InputData data) {
-      double value;
-      try {
-        value = data.getAggregates().get(this.baseline.scatter(aggregateSlice).get(0)).getDouble(COL_VALUE, 0);
-      } catch (Exception e) {
-        value = Double.NaN;
-      }
+  public Double computePredictedAggregates(MetricSlice slice, Series.DoubleFunction aggregateFunction) {
+    InputData data = this.dataFetcher.fetchData(new InputDataSpec().withAggregateSlices(this.baseline.scatter(slice)));
+    double value;
+    try {
+      value = data.getAggregates().get(this.baseline.scatter(slice).get(0)).getDouble(COL_VALUE, 0);
+    } catch (Exception e) {
+      value = Double.NaN;
+    }
     return value;
   }
 
-  @Override
-  public Double computePredictedAggregates(InputData data, Series.DoubleFunction aggregateFunction) {
-    return this.computePredictedAggregates(data);
-  }
 
   @Override
-  public void init(RuleBaselineProviderSpec spec) {
+  public void init(RuleBaselineProviderSpec spec, InputDataFetcher dataFetcher) {
     this.offset = spec.getOffset();
     this.timezone = spec.getTimezone();
     this.baseline = BaselineParsingUtils.parseOffset(this.offset, this.timezone);
+    this.dataFetcher = dataFetcher;
   }
 }

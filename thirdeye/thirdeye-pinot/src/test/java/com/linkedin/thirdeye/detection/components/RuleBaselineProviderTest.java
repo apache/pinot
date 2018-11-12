@@ -17,10 +17,11 @@
 package com.linkedin.thirdeye.detection.components;
 
 import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.spec.RuleBaselineProviderSpec;
-import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -42,7 +43,6 @@ public class RuleBaselineProviderTest {
     baselineProvider = new RuleBaselineProvider();
     slice1 = MetricSlice.from(1L, 1538520728000L, 1538607128000L);
     slice2 = MetricSlice.from(1L, 1538524800000L, 1538611200000L);
-    baselineProvider.init(new RuleBaselineProviderSpec("UTC", "wo1w"));
     dataProvider = new MockDataProvider();
     MetricSlice slice1Wow = MetricSlice.from(1L, 1537915928000L, 1538002328000L);
     MetricSlice slice2Wow = MetricSlice.from(1L, 1537920000000L, 1538006400000L);
@@ -54,6 +54,9 @@ public class RuleBaselineProviderTest {
     aggregates.put(slice2Wow, DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE")
         .build()
         .setIndex(COL_TIME));
+    InputDataFetcher dataFetcher = new InputDataFetcher(dataProvider, -1);
+
+    baselineProvider.init(new RuleBaselineProviderSpec("UTC", "wo1w"), dataFetcher);
 
     dataProvider.setTimeseries(Collections.singletonMap(slice1Wow,
         DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE")
@@ -65,7 +68,7 @@ public class RuleBaselineProviderTest {
 
   @Test
   public void testFetchBaselineTimeSeries() {
-    DataFrame df = baselineProvider.computePredictedTimeSeries(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getInputDataSpec(slice1), -1)).getDataFrame();
+    DataFrame df = baselineProvider.computePredictedTimeSeries(slice1).getDataFrame();
     Assert.assertEquals(df.getDoubles(COL_VALUE).get(0), 100.0);
     Assert.assertEquals(df.getDoubles(COL_VALUE).get(1), 200.0);
   }
@@ -74,12 +77,12 @@ public class RuleBaselineProviderTest {
   @Test
   public void testFetchBaselineAggregates() {
     Assert.assertEquals(
-        this.baselineProvider.computePredictedAggregates(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getAggregateInputDataSpec(slice1), -1)), 100.0);
+        this.baselineProvider.computePredictedAggregates(slice1, DoubleSeries.MEAN), 100.0);
   }
 
   @Test
   public void testFetchBaselineAggregatesNaN() {
     Assert.assertEquals(
-        this.baselineProvider.computePredictedAggregates(DetectionUtils.getDataForSpec(dataProvider, baselineProvider.getAggregateInputDataSpec(slice2), -1)), Double.NaN);
+        this.baselineProvider.computePredictedAggregates(slice2, DoubleSeries.MEAN), Double.NaN);
   }
 }

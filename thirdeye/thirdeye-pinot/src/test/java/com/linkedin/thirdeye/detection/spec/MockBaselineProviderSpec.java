@@ -16,18 +16,28 @@
 
 package com.linkedin.thirdeye.detection.spec;
 
+import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.detection.spi.model.TimeSeries;
 import java.util.Map;
-import org.modelmapper.ModelMapper;
 
 
-/**
- * Base class for component specs
- */
-public abstract class AbstractSpec {
+public class MockBaselineProviderSpec extends AbstractSpec {
+  private Map<MetricSlice, TimeSeries> baselineTimeseries;
+  private Map<MetricSlice, Double> aggregates;
 
-  public static <T extends AbstractSpec> T fromProperties(Map<String, Object> properties, Class<T> specClass) {
-    // don't reuse model mapper instance. It caches typeMaps and will result
-    ModelMapper modelMapper = new ModelMapper();
-    return modelMapper.map(properties, specClass);
+  public Map<MetricSlice, TimeSeries> getBaselineTimeseries() {
+    return baselineTimeseries;
+  }
+
+  public void setBaselineTimeseries(Map<MetricSlice, TimeSeries> baselineTimeseries) {
+    this.baselineTimeseries = baselineTimeseries;
+  }
+
+  public Map<MetricSlice, Double> getAggregates() {
+    return aggregates;
+  }
+
+  public void setAggregates(Map<MetricSlice, Double> aggregates) {
+    this.aggregates = aggregates;
   }
 }

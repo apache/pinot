@@ -26,11 +26,9 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
 import com.linkedin.thirdeye.detection.spec.AbstractSpec;
 import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -44,7 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
-import static com.linkedin.thirdeye.detection.wrapper.DetectionUtils.*;
+import static com.linkedin.thirdeye.detection.DetectionUtils.*;
 
 
 /**
@@ -86,6 +84,7 @@ public abstract class DetectionPipeline {
    * @throws Exception
    */
   private void initComponents() throws Exception {
+    InputDataFetcher dataFetcher = new InputDataFetcher(this.provider, this.config.getId());
     Map<String, BaseComponent> instancesMap = config.getComponents();
     Map<String, Object> componentSpecs = config.getComponentSpecs();
     if (componentSpecs != null) {
@@ -104,7 +103,7 @@ public abstract class DetectionPipeline {
             componentSpec.put(entry.getKey(), instancesMap.get(refComponentName));
           }
         }
-        instancesMap.get(componentName).init(getComponentSpec(componentSpec));
+        instancesMap.get(componentName).init(getComponentSpec(componentSpec), dataFetcher);
       }
     }
     config.setComponents(instancesMap);

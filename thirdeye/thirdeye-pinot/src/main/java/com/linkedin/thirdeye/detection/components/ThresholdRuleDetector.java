@@ -21,6 +21,7 @@ import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.annotation.Components;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.Param;
@@ -29,7 +30,7 @@ import com.linkedin.thirdeye.detection.spec.ThresholdRuleDetectorSpec;
 import com.linkedin.thirdeye.detection.spi.components.AnomalyDetector;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
-import com.linkedin.thirdeye.detection.wrapper.DetectionUtils;
+import com.linkedin.thirdeye.detection.DetectionUtils;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import java.util.Collections;
 import java.util.List;
@@ -37,17 +38,11 @@ import org.joda.time.Interval;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
-@Components(title = "Threshold",
-    type = "THRESHOLD",
-    tags = { DetectionTag.RULE_DETECTION },
-    description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.",
-    presentation = {@PresentationOption(
-        name = "absolute value",
-        description = "aggregated absolute value within a time period",
-        template = "is lower than ${min} or higher than ${max}"
-    )},
-    params = {@Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")}
-)
+
+@Components(title = "Threshold", type = "THRESHOLD", tags = {
+    DetectionTag.RULE_DETECTION}, description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.", presentation = {
+    @PresentationOption(name = "absolute value", description = "aggregated absolute value within a time period", template = "is lower than ${min} or higher than ${max}")}, params = {
+    @Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")})
 public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetectorSpec> {
   private final String COL_TOO_HIGH = "tooHigh";
   private final String COL_TOO_LOW = "tooLow";
@@ -55,22 +50,18 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
 
   private double min;
   private double max;
-  private MetricSlice slice;
-  private Long endTime;
-  private MetricEntity me;
+  private InputDataFetcher dataFetcher;
 
   @Override
-  public InputDataSpec getInputDataSpec(Interval interval, String metricUrn) {
-    this.me = MetricEntity.fromURN(metricUrn);
-    this.endTime = interval.getEndMillis();
-    this.slice = MetricSlice.from(me.getId(), interval.getStartMillis(), endTime, me.getFilters());
+  public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
+    MetricEntity me = MetricEntity.fromURN(metricUrn);
+    Long endTime = window.getEndMillis();
+    MetricSlice slice = MetricSlice.from(me.getId(), window.getStartMillis(), endTime, me.getFilters());
 
-    return new InputDataSpec().withTimeseriesSlices(Collections.singletonList(this.slice)).withMetricIdsForDataset(Collections.singletonList(me.getId()));
-  }
-
-  @Override
-  public List<MergedAnomalyResultDTO> runDetection(InputData data) {
-    DataFrame df = data.getTimeseries().get(this.slice);
+    InputData data = this.dataFetcher.fetchData(
+        new InputDataSpec().withTimeseriesSlices(Collections.singletonList(slice))
+            .withMetricIdsForDataset(Collections.singletonList(me.getId())));
+    DataFrame df = data.getTimeseries().get(slice);
 
     // defaults
     df.addSeries(COL_TOO_HIGH, BooleanSeries.fillValues(df.size(), false));
@@ -89,12 +80,13 @@ public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetec
     df.mapInPlace(BooleanSeries.HAS_TRUE, COL_ANOMALY, COL_TOO_HIGH, COL_TOO_LOW);
 
     DatasetConfigDTO datasetConfig = data.getDatasetForMetricId().get(me.getId());
-    return DetectionUtils.makeAnomalies(this.slice, df, COL_ANOMALY, this.endTime, datasetConfig);
+    return DetectionUtils.makeAnomalies(slice, df, COL_ANOMALY, endTime, datasetConfig);
   }
 
   @Override
-  public void init(ThresholdRuleDetectorSpec spec) {
+  public void init(ThresholdRuleDetectorSpec spec, InputDataFetcher dataFetcher) {
     this.min = spec.getMin();
     this.max = spec.getMax();
+    this.dataFetcher = dataFetcher;
   }
 }

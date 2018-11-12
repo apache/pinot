@@ -29,15 +29,7 @@ public interface Tunable<T extends AbstractSpec> extends BaseComponent<T> {
   /**
    * Returns the new spec for the component it's tuning
    * @param currentSpec current spec for the component. empty if not exist
-   * @param data input data
    * @return input data spec
    */
-  Map<String, Object> tune(Map<String, Object> currentSpec, InputData data);
-
-  /**
-   * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to run this component.
-   * Data is retrieved in one pass and cached between executions if possible.
-   * @return input data spec
-   */
-  InputDataSpec getInputDataSpec(Interval trainingWindow);
+  Map<String, Object> tune(Map<String, Object> currentSpec, Interval trainingWindow);
 }

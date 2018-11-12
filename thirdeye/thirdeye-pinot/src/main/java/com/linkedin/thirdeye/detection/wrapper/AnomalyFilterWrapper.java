@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
+import com.linkedin.thirdeye.detection.DetectionUtils;
 import com.linkedin.thirdeye.detection.spi.components.AnomalyFilter;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -85,8 +86,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
     }
 
     Collection<MergedAnomalyResultDTO> anomalies =
-        Collections2.filter(candidates, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild() && anomalyFilter.isQualified(
-            DetectionUtils.getDataForSpec(provider, anomalyFilter.getInputDataSpec(mergedAnomaly), this.config.getId())));
+        Collections2.filter(candidates, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.isChild() && anomalyFilter.isQualified(mergedAnomaly));
 
     return new DetectionPipelineResult(new ArrayList<>(anomalies));
   }

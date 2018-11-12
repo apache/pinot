@@ -25,17 +25,10 @@ import java.util.List;
 
 public interface Grouper<T extends AbstractSpec> extends BaseComponent<T> {
   /**
-   * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to run this component.
-   * Data is retrieved in one pass and cached between executions if possible.
-   * @return input data spec
-   */
-  InputDataSpec getInputDataSpec(List<MergedAnomalyResultDTO> anomalies);
-
-  /**
    * group anomalies.
    *
    * @return list of anomalies, with grouped dimensions
    */
-  List<MergedAnomalyResultDTO> group(InputData data);
+  List<MergedAnomalyResultDTO> group(List<MergedAnomalyResultDTO> anomalies);
 
 }

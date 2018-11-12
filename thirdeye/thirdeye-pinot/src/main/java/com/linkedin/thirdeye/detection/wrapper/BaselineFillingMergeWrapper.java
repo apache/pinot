@@ -22,6 +22,8 @@ import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.DetectionUtils;
+import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
 import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
 import com.linkedin.thirdeye.detection.spec.RuleBaselineProviderSpec;
@@ -29,7 +31,6 @@ import com.linkedin.thirdeye.detection.spi.components.BaselineProvider;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
@@ -70,7 +71,8 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
       this.currentValueProvider = new RuleBaselineProvider();
       RuleBaselineProviderSpec spec = new RuleBaselineProviderSpec();
       spec.setOffset("current");
-      this.currentValueProvider.init(spec);
+      InputDataFetcher dataFetcher = new InputDataFetcher(this.provider, this.config.getId());
+      this.currentValueProvider.init(spec, dataFetcher);
     }
     String nestedUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
     if (nestedUrn != null){
@@ -98,11 +100,9 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         String metricUrn = anomaly.getMetricUrn();
         final MetricSlice slice = MetricSlice.from(MetricEntity.fromURN(metricUrn).getId(), anomaly.getStartTime(), anomaly.getEndTime(),
             MetricEntity.fromURN(metricUrn).getFilters());
-        anomaly.setAvgCurrentVal(this.currentValueProvider.computePredictedAggregates(
-            DetectionUtils.getDataForSpec(provider, this.currentValueProvider.getAggregateInputDataSpec(slice), this.config.getId()), aggregationFunction));
+        anomaly.setAvgCurrentVal(this.currentValueProvider.computePredictedAggregates(slice, aggregationFunction));
         if (this.baselineValueProvider != null) {
-          anomaly.setAvgBaselineVal(this.baselineValueProvider.computePredictedAggregates(
-              DetectionUtils.getDataForSpec(provider, this.baselineValueProvider.getAggregateInputDataSpec(slice), this.config.getId()), aggregationFunction));
+          anomaly.setAvgBaselineVal(this.baselineValueProvider.computePredictedAggregates(slice, aggregationFunction));
         }
       } catch (Exception e) {
         // ignore

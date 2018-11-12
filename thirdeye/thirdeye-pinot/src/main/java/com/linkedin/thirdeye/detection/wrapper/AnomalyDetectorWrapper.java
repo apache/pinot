@@ -27,6 +27,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
+import com.linkedin.thirdeye.detection.DetectionUtils;
 import com.linkedin.thirdeye.detection.spi.components.AnomalyDetector;
 import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -102,9 +103,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (Interval window : monitoringWindows) {
-      anomalies.addAll(anomalyDetector.runDetection(
-          DetectionUtils.getDataForSpec(provider, anomalyDetector.getInputDataSpec(window, this.metricUrn), config.getId()))
-      );
+      anomalies.addAll(anomalyDetector.runDetection(window, this.metricUrn));
     }
 
     MetricEntity me = MetricEntity.fromURN(this.metricUrn);
