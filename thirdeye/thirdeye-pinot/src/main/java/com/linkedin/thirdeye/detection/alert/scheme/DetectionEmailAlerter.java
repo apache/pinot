@@ -137,6 +137,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     alertConfig.setName(this.config.getName());
     alertConfig.setFromAddress(this.config.getFrom());
     alertConfig.setSubjectType(this.config.getSubjectType());
+    alertConfig.setReferenceLinks(this.config.getReferenceLinks());
 
     EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
         "Thirdeye Alert : " + this.config.getName(), null, null, anomalyResultListOfGroup,

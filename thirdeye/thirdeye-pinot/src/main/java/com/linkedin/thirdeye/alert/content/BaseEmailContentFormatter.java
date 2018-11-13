@@ -271,6 +271,9 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       templateData.put("recall", precisionRecallEvaluator.getRecall());
       templateData.put("falseNegative", precisionRecallEvaluator.getFalseNegativeRate());
     }
+    if (alertConfigDTO.getReferenceLinks() != null) {
+      templateData.put("referenceLinks", alertConfigDTO.getReferenceLinks());
+    }
 
     return templateData;
   }

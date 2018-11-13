@@ -46,6 +46,8 @@ public class DetectionAlertConfigBean extends AbstractBean {
 
   Map<String, Object> properties;
 
+  Map<String, String> refLinks;
+
   public boolean isActive() {
     return active;
   }
@@ -132,6 +134,14 @@ public class DetectionAlertConfigBean extends AbstractBean {
 
   public void setAlertSuppressors(Map<String, Map<String, Object>> alertSuppressors) {
     this.alertSuppressors = alertSuppressors;
+  }
+
+  public Map<String, String> getReferenceLinks() {
+    return refLinks;
+  }
+
+  public void setReferenceLinks(Map<String, String> refLinks) {
+    this.refLinks = refLinks;
   }
 
   @Override
