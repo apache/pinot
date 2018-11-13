@@ -17,6 +17,7 @@
 package com.linkedin.thirdeye.detection.spec;
 
 import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
+import java.util.Map;
 
 
 public class TestSpec extends AbstractSpec{
@@ -24,6 +25,15 @@ public class TestSpec extends AbstractSpec{
   private double b = 456.7;
   private String c = "default";
   private RuleBaselineProvider baselineProvider;
+  private Map<String, String> configuration;
+
+  public Map<String, String> getConfiguration() {
+    return configuration;
+  }
+
+  public void setConfiguration(Map<String, String> configuration) {
+    this.configuration = configuration;
+  }
 
   public RuleBaselineProvider getBaselineProvider() {
     return baselineProvider;
