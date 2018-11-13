@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionUtils;
+import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
 import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
@@ -71,7 +72,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
       this.currentValueProvider = new RuleBaselineProvider();
       RuleBaselineProviderSpec spec = new RuleBaselineProviderSpec();
       spec.setOffset("current");
-      InputDataFetcher dataFetcher = new InputDataFetcher(this.provider, this.config.getId());
+      InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.provider, this.config.getId());
       this.currentValueProvider.init(spec, dataFetcher);
     }
     String nestedUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);

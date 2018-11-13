@@ -19,6 +19,7 @@ package com.linkedin.thirdeye.detection.components;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.spec.RuleBaselineProviderSpec;
@@ -54,7 +55,7 @@ public class RuleBaselineProviderTest {
     aggregates.put(slice2Wow, DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE")
         .build()
         .setIndex(COL_TIME));
-    InputDataFetcher dataFetcher = new InputDataFetcher(dataProvider, -1);
+    InputDataFetcher dataFetcher = new DefaultInputDataFetcher(dataProvider, -1);
 
     baselineProvider.init(new RuleBaselineProviderSpec("UTC", "wo1w"), dataFetcher);
 

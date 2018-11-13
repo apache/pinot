@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
@@ -67,7 +68,7 @@ public abstract class StaticAnomalyDetectionStage implements AnomalyDetectionSta
   @Override
   public final List<MergedAnomalyResultDTO> runDetection(DataProvider provider) {
     this.provider = provider;
-    InputDataFetcher dataFetcher = new InputDataFetcher(this.provider, this.configId);
+    InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.provider, this.configId);
     return this.runDetection(dataFetcher.fetchData(this.getInputDataSpec()));
   }
 

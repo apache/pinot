@@ -18,6 +18,7 @@ package com.linkedin.thirdeye.detection.components;
 
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
+import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.spec.MockBaselineProviderSpec;
 import com.linkedin.thirdeye.detection.spi.components.BaselineProvider;
