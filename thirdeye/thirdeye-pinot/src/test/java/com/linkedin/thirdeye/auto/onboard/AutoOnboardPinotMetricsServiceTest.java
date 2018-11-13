@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.datalayer.bao.DAOTestBase;
@@ -140,6 +141,19 @@ public class AutoOnboardPinotMetricsServiceTest {
       Assert.assertTrue(datasetCustomConfigs.containsKey(configKey));
       Assert.assertEquals(datasetCustomConfigs.get(configKey), configValue);
     }
+
+    TimeFieldSpec timeFieldSpec = new TimeFieldSpec("timestampInEpoch", DataType.LONG, TimeUnit.MILLISECONDS);
+    schema.removeField(schema.getTimeColumnName());
+    schema.addField(timeFieldSpec);
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, new HashMap<>(pinotCustomConfigs), newDatasetConfig1);
+    Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
+    datasetConfig = datasetConfigDAO.findByDataset(dataset);
+    TimeGranularitySpec timeGranularitySpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
+    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getUnit(), timeGranularitySpec.getTimeType());
+    Assert.assertEquals(datasetConfig.bucketTimeGranularity().getSize(), timeGranularitySpec.getTimeUnitSize());
+    Assert.assertEquals(datasetConfig.getTimeFormat(), timeGranularitySpec.getTimeFormat());
+    Assert.assertEquals(datasetConfig.getTimezone(), "UTC");
+    Assert.assertEquals(datasetConfig.getExpectedDelay().getUnit(), TimeUnit.HOURS);
   }
 
   @Test (dependsOnMethods={"testRefreshDataset"})
