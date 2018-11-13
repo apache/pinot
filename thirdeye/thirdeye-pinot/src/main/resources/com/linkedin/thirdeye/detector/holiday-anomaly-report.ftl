@@ -1,3 +1,5 @@
+<#import "lib/utils.ftl" as utils>
+
 <head>
   <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
 </head>
@@ -58,8 +60,7 @@
           </#if>
 
           <#list metricAnomalyDetails?keys as metric>
-            <tr>
-              <td style="border-bottom: 1px solid rgba(0,0,0,0.15); padding: 24px; font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;" colspan="2" align="left">
+            <@utils.addRow title="" align="left">
                 <p style="margin-left: 24px;">
                   <span style="color: #606060; font-size: 20px; line-height: 24px; margin-right: 16px;">Metric</span>
                   <span style="color: #1D1D1D; font-size: 20px; font-weight: bold; line-height: 24px;">${metric}</span>
@@ -113,15 +114,22 @@
                     </#list>
                   </table>
                 </#list>
-              </td>
-            </tr>
+            </@utils.addRow>
           </#list>
 
+          <#if referenceLinks?has_content>
+            <@utils.addRow title="Useful Links" align="center">
+              <#list referenceLinks?keys as referenceLinkKey>
+                <div style="padding-top: 16px;">
+                  <a href="${referenceLinks[referenceLinkKey]}" style="text-decoration: none; color:#0073B1; font-size:14px; font-weight:bold; line-height:20px; margin-bottom: 0;">${referenceLinkKey}</a>
+                </div>
+              </#list>
+            </@utils.addRow>
+          </#if>
+
           <#if holidays?has_content>
-            <tr>
-              <td style="padding: 24px; font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;" colspan="2" align="center">
-                <p style="font-size:20px; line-height:24px; color:#1D1D1D; font-weight: 500; margin:0; padding:0;">Holidays</p>
-                <#list holidays as holiday>
+            <@utils.addRow title="Holidays" align="center">
+              <#list holidays as holiday>
                   <div style="padding-top: 16px;">
                     <a href="https://www.google.com/search?q=${holiday.name}" style="text-decoration: none; color:#0073B1; font-size:14px; font-weight:bold; line-height:20px; margin-bottom: 0;">${holiday.name}</a>
                     <span style="font-size: 14px; color:#606060; line-height:20px;">(${holiday.startTime?number_to_date})</span>
@@ -131,11 +139,9 @@
                         <span style="color: rgba(0,0,0,0.6); line-height:16px; font-size: 12px;">${holiday.targetDimensionMap[dimension]?join(",")}</span>
                     </#list>
                   </#if>
-                </#list>
-              </td>
-            </tr>
+              </#list>
+            </@utils.addRow>
           </#if>
-
 
         <tr>
           <td colspan="2" style="border-bottom: 1px solid #E9E9E9;">

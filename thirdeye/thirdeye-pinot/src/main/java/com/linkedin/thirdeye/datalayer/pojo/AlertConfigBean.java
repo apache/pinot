@@ -49,6 +49,7 @@ public class AlertConfigBean extends AbstractBean {
   DetectionAlertFilterRecipients receiverAddresses;
   String fromAddress;
   SubjectType subjectType = SubjectType.ALERT;
+  Map<String, String> refLinks;
 
   public String getApplication() {
     return application;
@@ -152,6 +153,14 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setSubjectType(SubjectType subjectType) {
     this.subjectType = subjectType;
+  }
+
+  public Map<String, String> getReferenceLinks() {
+    return refLinks;
+  }
+
+  public void setReferenceLinks(Map<String, String> refLinks) {
+    this.refLinks = refLinks;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
