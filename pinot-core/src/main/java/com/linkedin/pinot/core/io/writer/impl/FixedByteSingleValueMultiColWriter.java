@@ -24,14 +24,10 @@ import java.nio.ByteOrder;
 
 public class FixedByteSingleValueMultiColWriter {
   private int[] columnOffsets;
-  private int rows;
   private PinotDataBuffer indexDataBuffer;
   private int rowSizeInBytes;
 
-  public FixedByteSingleValueMultiColWriter(File file, int rows, int cols,
-      int[] columnSizes)
-      throws IOException {
-    this.rows = rows;
+  public FixedByteSingleValueMultiColWriter(File file, int rows, int cols, int[] columnSizes) throws IOException {
     this.columnOffsets = new int[cols];
     rowSizeInBytes = 0;
     for (int i = 0; i < columnSizes.length; i++) {
@@ -45,9 +41,7 @@ public class FixedByteSingleValueMultiColWriter {
         PinotDataBuffer.mapFile(file, false, 0, totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
   }
 
-  public FixedByteSingleValueMultiColWriter(PinotDataBuffer dataBuffer, int rows, int cols,
-      int[] columnSizes) {
-    this.rows = rows;
+  public FixedByteSingleValueMultiColWriter(PinotDataBuffer dataBuffer, int cols, int[] columnSizes) {
     this.columnOffsets = new int[cols];
     rowSizeInBytes = 0;
     for (int i = 0; i < columnSizes.length; i++) {

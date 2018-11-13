@@ -156,8 +156,7 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
   }
 
   @Override
-  public void close()
-      throws IOException {
+  public void close() throws IOException {
     _capacityInRows = 0;
     _writers.clear();
     _readers.clear();
@@ -196,7 +195,7 @@ public class FixedByteSingleValueMultiColumnReaderWriter extends BaseSingleValue
         new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, _columnSizesInBytes);
 
     FixedByteSingleValueMultiColWriter writer =
-        new FixedByteSingleValueMultiColWriter(buffer, _numRowsPerChunk, _numColumns, _columnSizesInBytes);
+        new FixedByteSingleValueMultiColWriter(buffer, _numColumns, _columnSizesInBytes);
 
     _writers.add(writer);
 

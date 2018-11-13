@@ -95,7 +95,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private static final int NUM_COLS_IN_HEADER = 3;
 
   private static final int INCREMENT_PERCENTAGE = 100;
-      //Increments the Initial size by 100% of initial capacity every time we runs out of capacity
+  //Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
   private PinotDataBuffer _headerBuffer;
   private List<PinotDataBuffer> _dataBuffers = new ArrayList<>();
@@ -140,8 +140,8 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
     LOGGER.info("Allocating header buffer of size {} for: {}", _headerSize, _context);
     _headerBuffer = _memoryManager.allocate(_headerSize, _context);
     // dataBufferId, startIndex, length
-    _curHeaderWriter = new FixedByteSingleValueMultiColWriter(_headerBuffer, _rowCountPerChunk, 3,
-        new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
+    _curHeaderWriter =
+        new FixedByteSingleValueMultiColWriter(_headerBuffer, 3, new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
     FixedByteSingleValueMultiColReader curHeaderReader =
         new FixedByteSingleValueMultiColReader(_headerBuffer, _rowCountPerChunk,
             new int[]{SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT});
@@ -153,18 +153,15 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   /**
    * This method automatically computes the space needed based on the _columnSizeInBytes
    * @param rowCapacity Additional capacity to be added in terms of number of rows
-   * @throws RuntimeException
    */
-  private void addDataBuffers(int rowCapacity)
-      throws RuntimeException {
+  private void addDataBuffers(int rowCapacity) {
     PinotDataBuffer dataBuffer;
     try {
       final long size = rowCapacity * _columnSizeInBytes;
       LOGGER.info("Allocating data buffer of size {} for column {}", size, _context);
       dataBuffer = _memoryManager.allocate(size, _context);
       _dataBuffers.add(dataBuffer);
-      _currentDataWriter =
-          new FixedByteSingleValueMultiColWriter(dataBuffer, rowCapacity, 1, new int[]{_columnSizeInBytes});
+      _currentDataWriter = new FixedByteSingleValueMultiColWriter(dataBuffer, 1, new int[]{_columnSizeInBytes});
       _dataWriters.add(_currentDataWriter);
 
       FixedByteSingleValueMultiColReader dataFileReader =
