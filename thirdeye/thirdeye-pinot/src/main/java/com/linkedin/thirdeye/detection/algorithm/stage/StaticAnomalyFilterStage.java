@@ -18,6 +18,7 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
@@ -52,7 +53,7 @@ public abstract class StaticAnomalyFilterStage implements AnomalyFilterStage {
 
   @Override
   public final boolean isQualified(MergedAnomalyResultDTO anomaly, DataProvider provider) {
-    InputDataFetcher dataFetcher = new InputDataFetcher(provider, -1);
+    InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, -1);
     return isQualified(anomaly, dataFetcher.fetchData(this.getInputDataSpec()));
   }
 }

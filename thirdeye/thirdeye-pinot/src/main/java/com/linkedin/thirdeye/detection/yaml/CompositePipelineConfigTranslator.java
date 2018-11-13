@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
 import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
@@ -299,7 +300,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private Map<String, Object> getTunedSpecs(String componentName, String componentClassName, Map<String, Object> params)
       throws Exception {
     long configId = this.existingConfig == null ? -1 : this.existingConfig.getId();
-    InputDataFetcher dataFetcher = new InputDataFetcher(this.dataProvider, configId);
+    InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.dataProvider, configId);
     Tunable tunable = getTunable(componentClassName, params, dataFetcher);
     Interval window = new Interval(this.startTime, this.endTime, DateTimeZone.forID(this.datasetConfig.getTimezone()));
     Map<String, Object> existingComponentSpec =

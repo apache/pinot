@@ -84,7 +84,7 @@ public abstract class DetectionPipeline {
    * @throws Exception
    */
   private void initComponents() throws Exception {
-    InputDataFetcher dataFetcher = new InputDataFetcher(this.provider, this.config.getId());
+    InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.provider, this.config.getId());
     Map<String, BaseComponent> instancesMap = config.getComponents();
     Map<String, Object> componentSpecs = config.getComponentSpecs();
     if (componentSpecs != null) {
