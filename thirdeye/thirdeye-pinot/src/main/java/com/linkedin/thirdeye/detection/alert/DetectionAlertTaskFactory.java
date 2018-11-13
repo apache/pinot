@@ -85,8 +85,7 @@ public class DetectionAlertTaskFactory {
     return detectionAlertSchemeSet;
   }
 
-  public Set<DetectionAlertSuppressor> loadAlertSuppressors(DetectionAlertConfigDTO alertConfig,
-      ThirdEyeAnomalyConfiguration thirdeyeConfig) throws Exception {
+  public Set<DetectionAlertSuppressor> loadAlertSuppressors(DetectionAlertConfigDTO alertConfig) throws Exception {
     Preconditions.checkNotNull(alertConfig);
     Set<DetectionAlertSuppressor> detectionAlertSuppressors = new HashSet<>();
     Map<String, Map<String, Object>> alertSuppressors = alertConfig.getAlertSuppressors();
@@ -99,8 +98,8 @@ public class DetectionAlertTaskFactory {
       Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor));
       Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor).get("className"));
       Constructor<?> constructor = Class.forName(alertSuppressors.get(alertSuppressor).get("className").toString().trim())
-          .getConstructor(DetectionAlertConfigDTO.class, ThirdEyeAnomalyConfiguration.class);
-      detectionAlertSuppressors.add((DetectionAlertSuppressor) constructor.newInstance(alertConfig, thirdeyeConfig));
+          .getConstructor(DetectionAlertConfigDTO.class);
+      detectionAlertSuppressors.add((DetectionAlertSuppressor) constructor.newInstance(alertConfig));
     }
 
     return detectionAlertSuppressors;

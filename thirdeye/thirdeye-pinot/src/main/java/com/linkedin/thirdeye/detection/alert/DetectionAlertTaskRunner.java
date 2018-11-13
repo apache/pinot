@@ -101,8 +101,7 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       DetectionAlertFilterResult result = alertFilter.run();
 
       // Suppress alerts if any and get the filtered anomalies to be notified
-      Set<DetectionAlertSuppressor> alertSuppressors =
-          detAlertTaskFactory.loadAlertSuppressors(alertConfig, taskContext.getThirdEyeAnomalyConfiguration());
+      Set<DetectionAlertSuppressor> alertSuppressors = detAlertTaskFactory.loadAlertSuppressors(alertConfig);
       for (DetectionAlertSuppressor alertSuppressor : alertSuppressors) {
         result = alertSuppressor.run(result);
       }
