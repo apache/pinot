@@ -15,18 +15,48 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import junit.framework.Assert;
 import org.testng.annotations.Test;
 
 
 public class CombinePlanNodeTest {
   private ExecutorService _executorService = Executors.newFixedThreadPool(10);
+
+  /**
+   * Tests that the tasks are executed as expected in parallel mode.
+   */
+  @Test
+  public void testParallelExecution() {
+    AtomicInteger count = new AtomicInteger(0);
+    int numPlans = 42;
+    List<PlanNode> planNodes = new ArrayList<>();
+    for (int i = 0; i < numPlans; i++) {
+      planNodes.add(new PlanNode() {
+        @Override
+        public Operator run() {
+          count.incrementAndGet();
+          return null;
+        }
+
+        @Override
+        public void showTree(String prefix) {
+        }
+      });
+    }
+    CombinePlanNode combinePlanNode =
+        new CombinePlanNode(planNodes, new BrokerRequest(), _executorService, 1000,
+            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+    combinePlanNode.run();
+    Assert.assertEquals(numPlans, count.get());
+  }
 
   @Test
   public void testSlowPlanNode() {

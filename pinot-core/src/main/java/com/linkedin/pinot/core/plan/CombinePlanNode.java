@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.zookeeper.Op;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,7 +37,7 @@ import org.slf4j.LoggerFactory;
 public class CombinePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
 
-  private static final int NUM_PLAN_NODES_THRESHOLD_FOR_PARALLEL_RUN = 10;
+  private static final int MAX_PLAN_TASKS = Math.min(10, (int) (Runtime.getRuntime().availableProcessors() * .5));
   private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 10_000;
 
   private final List<PlanNode> _planNodes;
@@ -67,7 +68,7 @@ public class CombinePlanNode implements PlanNode {
     int numPlanNodes = _planNodes.size();
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
-    if (numPlanNodes < NUM_PLAN_NODES_THRESHOLD_FOR_PARALLEL_RUN) {
+    if (numPlanNodes < MAX_PLAN_TASKS) {
       // Small number of plan nodes, run them sequentially
       for (PlanNode planNode : _planNodes) {
         operators.add(planNode.run());
@@ -79,13 +80,17 @@ public class CombinePlanNode implements PlanNode {
       long endTime = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
 
       // Submit all jobs
-      Future[] futures = new Future[numPlanNodes];
-      for (int i = 0; i < numPlanNodes; i++) {
+      Future[] futures = new Future[MAX_PLAN_TASKS];
+      for (int i = 0; i < MAX_PLAN_TASKS; i++) {
         final int index = i;
-        futures[i] = _executorService.submit(new TraceCallable<Operator>() {
+        futures[i] = _executorService.submit(new TraceCallable<List<Operator>>() {
           @Override
-          public Operator callJob() throws Exception {
-            return _planNodes.get(index).run();
+          public List<Operator> callJob() throws Exception {
+            List<Operator> operators = new ArrayList<>();
+            for(int count = index; count < numPlanNodes; count = count + MAX_PLAN_TASKS) {
+              operators.add(_planNodes.get(count).run());
+            }
+            return operators;
           }
         });
       }
@@ -93,7 +98,8 @@ public class CombinePlanNode implements PlanNode {
       // Get all results
       try {
         for (Future future : futures) {
-          operators.add((Operator) future.get(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS));
+          List<Operator> ops = (List<Operator>) future.get(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          operators.addAll(ops);
         }
       } catch (Exception e) {
         // Future object will throw ExecutionException for execution exception, need to check the cause to determine
