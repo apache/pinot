@@ -3,7 +3,9 @@ package com.linkedin.thirdeye.detection.yaml;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.ConfigUtils;
@@ -29,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
@@ -126,9 +129,16 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   private static final String PROP_NAME = "name";
   private static final String PROP_DETECTOR = "detector";
+  private static final String PROP_MOVING_WINDOW_DETECTION = "isMovingWindowDetection";
+  private static final String PROP_WINDOW_DELAY = "windowDelay";
+  private static final String PROP_WINDOW_DELAY_UNIT = "windowDelayUnit";
+  private static final String PROP_WINDOW_SIZE = "windowSize";
+  private static final String PROP_WINDOW_UNIT = "windowUnit";
+  private static final String PROP_FREQUENCY = "frequency";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of();
+  private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
   private MetricConfigDTO metricConfig;
@@ -171,7 +181,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
     }
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
-    dimensionWrapperProperties.putAll(MapUtils.getMap(yamlConfig, PROP_DIMENSION_EXPLORATION));
+    if (yamlConfig.containsKey(PROP_DIMENSION_EXPLORATION)) {
+      dimensionWrapperProperties.putAll(MapUtils.getMap(yamlConfig, PROP_DIMENSION_EXPLORATION));
+    }
     dimensionWrapperProperties.put(PROP_METRIC_URN, metricUrn);
     Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(),
         Collections.singletonList(
@@ -194,7 +206,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectorWrapper.class.getName());
     String detectorKey = makeComponentKey(ruleName, detectorType);
     nestedProperties.put(PROP_DETECTOR, detectorKey);
-    // TODO insert window size & unit
+
+    fillInWindowSizeAndUnit(nestedProperties, yamlConfig, detectorType);
 
     buildComponentSpec(yamlConfig, detectorType, detectorKey);
 
@@ -210,6 +223,45 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
 
     return properties;
+  }
+
+  // fill in window size and unit if detector requires this
+  private void fillInWindowSizeAndUnit(Map<String, Object> properties, Map<String, Object> yamlConfig, String detectorType) {
+    if (MOVING_WINDOW_DETECTOR_TYPES.contains(detectorType)) {
+      properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+      switch (this.datasetConfig.bucketTimeGranularity().getUnit()) {
+        case MINUTES:
+          properties.put(PROP_WINDOW_SIZE, 6);
+          properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
+          properties.put(PROP_FREQUENCY, new TimeGranularity(15, TimeUnit.MINUTES));
+          break;
+        case HOURS:
+          properties.put(PROP_WINDOW_SIZE, 24);
+          properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
+          break;
+        case DAYS:
+          properties.put(PROP_WINDOW_SIZE, 1);
+          properties.put(PROP_WINDOW_UNIT, TimeUnit.DAYS);
+          // completeness checker true
+          break;
+        default:
+          properties.put(PROP_WINDOW_SIZE, 6);
+          properties.put(PROP_WINDOW_UNIT, TimeUnit.HOURS);
+      }
+      // override from yaml
+      if (yamlConfig.containsKey(PROP_WINDOW_SIZE)) {
+        properties.put(PROP_WINDOW_SIZE, MapUtils.getString(yamlConfig, PROP_WINDOW_SIZE));
+      }
+      if (yamlConfig.containsKey(PROP_WINDOW_UNIT)) {
+        properties.put(PROP_WINDOW_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_UNIT));
+      }
+      if (yamlConfig.containsKey(PROP_WINDOW_DELAY)) {
+        properties.put(PROP_WINDOW_DELAY, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY));
+      }
+      if (yamlConfig.containsKey(PROP_WINDOW_DELAY_UNIT)) {
+        properties.put(PROP_WINDOW_DELAY_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY_UNIT));
+      }
+    }
   }
 
   private List<Map<String, Object>> buildFilterWrapperProperties(String wrapperClassName,
