@@ -242,9 +242,8 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
 
         chosenServer.setValue(chosenServer.getValue() + 1);
         completedServersQueue.add(chosenServer);
-        LOGGER.info("Relocating segment {} from consuming server {} (tag {}) to completed server {} (tag {})",
-            segmentName, instance, realtimeTagConfig.getConsumingServerTag(), chosenServer,
-            realtimeTagConfig.getCompletedServerTag());
+        LOGGER.info("Relocating segment {} from server {} to completed server {} (tag {})", segmentName, instance,
+            chosenServer, realtimeTagConfig.getCompletedServerTag());
         break;
       }
     }
