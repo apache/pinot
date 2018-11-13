@@ -22,6 +22,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.algorithm.AlgorithmUtils;
@@ -81,7 +82,7 @@ public class PercentageChangeRuleDetectorTest {
     PercentageChangeRuleDetector detector = new PercentageChangeRuleDetector();
     PercentageChangeRuleDetectorSpec spec = new PercentageChangeRuleDetectorSpec();
     spec.setPercentageChange(0.4);
-    detector.init(spec, new InputDataFetcher(this.provider, -1));
+    detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
     Assert.assertEquals(anomalies.size(), 2);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2372400000L);
@@ -96,7 +97,7 @@ public class PercentageChangeRuleDetectorTest {
     PercentageChangeRuleDetectorSpec spec = new PercentageChangeRuleDetectorSpec();
     spec.setPercentageChange(0.3);
     spec.setOffset("median3w");
-    detector.init(spec, new InputDataFetcher(this.provider, -1));
+    detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
     Assert.assertEquals(anomalies.size(), 5);
     Assert.assertEquals(anomalies.get(0).getStartTime(), 2005200000L);
