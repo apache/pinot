@@ -102,21 +102,11 @@ public class RealtimeSegmentRelocatorTest {
     Map<String, Integer> segmentNameToExpectedNumCompletedInstances = new HashMap<>(1);
     ZNRecordSerializer znRecordSerializer = new ZNRecordSerializer();
 
-    // no consuming instances found
-    _realtimeSegmentRelocator.setTagToInstance(serverTenantConsuming, new ArrayList<>());
-    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, completedInstanceList);
     boolean exception = false;
-    try {
-      _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
-    } catch (Exception e) {
-      exception = true;
-    }
-    Assert.assertTrue(exception);
-    exception = false;
 
     // no completed instances found
     _realtimeSegmentRelocator.setTagToInstance(serverTenantConsuming, consumingInstanceList);
-    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, new ArrayList<String>());
+    _realtimeSegmentRelocator.setTagToInstance(serverTenantCompleted, new ArrayList<>());
     try {
       _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     } catch (Exception e) {
@@ -164,8 +154,7 @@ public class RealtimeSegmentRelocatorTest {
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 1);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
-        nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
 
     // 2 replicas ONLINE on consuming servers, and 1 already relocated. relocate 1 replica from consuming to completed
     prevIdealState = new IdealState(
@@ -173,8 +162,7 @@ public class RealtimeSegmentRelocatorTest {
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 2);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
-        nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
 
     // 1 replica ONLINE on consuming, 2 already relocated. relocate the 3rd replica.
     // However, only 2 completed servers, which is less than num replicas
@@ -198,8 +186,7 @@ public class RealtimeSegmentRelocatorTest {
     _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment0", 3);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
-        nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
 
     // new segment, all CONSUMING, no move necessary
     Map<String, String> instanceStateMap1 = new HashMap<>(3);
@@ -227,29 +214,42 @@ public class RealtimeSegmentRelocatorTest {
     Assert.assertNotSame(idealState, prevIdealState);
     segmentNameToExpectedNumCompletedInstances.put("segment1", 1);
     segmentNameToExpectedNumCompletedInstances.put("segment2", 1);
-    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, consumingInstanceList,
-        nReplicas, segmentNameToExpectedNumCompletedInstances);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
+
+    // a segment with instances that are not consuming tagged instances. Relocate them as well
+    Map<String, String> instanceStateMap3 = new HashMap<>(3);
+    instanceStateMap3.put("notAConsumingServer_0", "ONLINE");
+    instanceStateMap3.put("notAConsumingServer_1", "ONLINE");
+    instanceStateMap3.put("notAConsumingServer_2", "ONLINE");
+    idealState.setInstanceStateMap("segment3", instanceStateMap3);
+    prevIdealState = new IdealState(
+        (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
+    _realtimeSegmentRelocator.relocateSegments(realtimeTagConfig, idealState);
+    Assert.assertNotSame(idealState, prevIdealState);
+    segmentNameToExpectedNumCompletedInstances.put("segment1", 2);
+    segmentNameToExpectedNumCompletedInstances.put("segment2", 2);
+    segmentNameToExpectedNumCompletedInstances.put("segment3", 1);
+    verifySegmentAssignment(idealState, prevIdealState, completedInstanceList, nReplicas, segmentNameToExpectedNumCompletedInstances);
   }
 
-  private void verifySegmentAssignment(IdealState updatedIdealState,
-      IdealState prevIdealState, List<String> completedInstanceList, List<String> consumingInstanceList, int nReplicas,
-      Map<String, Integer> segmentNameToNumCompletedInstances) {
+  private void verifySegmentAssignment(IdealState updatedIdealState, IdealState prevIdealState,
+      List<String> completedInstanceList, int nReplicas, Map<String, Integer> segmentNameToNumCompletedInstances) {
     Assert.assertEquals(updatedIdealState.getPartitionSet().size(), prevIdealState.getPartitionSet().size());
     Assert.assertTrue(prevIdealState.getPartitionSet().containsAll(updatedIdealState.getPartitionSet()));
     for (String segmentName : updatedIdealState.getPartitionSet()) {
       Map<String, String> newInstanceStateMap = updatedIdealState.getInstanceStateMap(segmentName);
-      int completed = 0;
-      int consuming = 0;
+      int onCompleted = 0;
+      int notOnCompleted = 0;
       for (String instance : newInstanceStateMap.keySet()) {
         if (completedInstanceList.contains(instance)) {
-          completed++;
-        } else if (consumingInstanceList.contains(instance)) {
-          consuming++;
+          onCompleted++;
+        } else {
+          notOnCompleted++;
         }
       }
       int expectedOnCompletedServers = segmentNameToNumCompletedInstances.get(segmentName).intValue();
-      Assert.assertEquals(completed, expectedOnCompletedServers);
-      Assert.assertEquals(consuming, nReplicas - expectedOnCompletedServers);
+      Assert.assertEquals(onCompleted, expectedOnCompletedServers);
+      Assert.assertEquals(notOnCompleted, nReplicas - expectedOnCompletedServers);
     }
   }
 
