@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.io.writer.impl.v1;
 
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import java.io.File;
-import java.io.IOException;
+import java.io.FileNotFoundException;
 import javax.annotation.concurrent.NotThreadSafe;
 
 
@@ -61,10 +61,10 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
    * @param totalDocs Total number of docs to write.
    * @param numDocsPerChunk Number of documents per chunk.
    * @param sizeOfEntry Size of entry (in bytes).
-   * @throws IOException
+   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
   public FixedByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType,
-      int totalDocs, int numDocsPerChunk, int sizeOfEntry) throws IOException {
+      int totalDocs, int numDocsPerChunk, int sizeOfEntry) throws FileNotFoundException {
 
     super(file, compressionType, totalDocs, numDocsPerChunk, (sizeOfEntry * numDocsPerChunk), sizeOfEntry,
         CURRENT_VERSION);

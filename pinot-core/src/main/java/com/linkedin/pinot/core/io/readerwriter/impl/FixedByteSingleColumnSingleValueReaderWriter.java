@@ -170,7 +170,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     FixedByteSingleValueMultiColReader reader =
         new FixedByteSingleValueMultiColReader(buffer, _numRowsPerChunk, new int[]{_columnSizesInBytes});
     FixedByteSingleValueMultiColWriter writer =
-        new FixedByteSingleValueMultiColWriter(buffer, _numRowsPerChunk, /*cols=*/1, new int[]{_columnSizesInBytes});
+        new FixedByteSingleValueMultiColWriter(buffer, /*cols=*/1, new int[]{_columnSizesInBytes});
 
     final int startRowId = _numRowsPerChunk * (_dataBuffers.size() - 1);
     _writers.add(new WriterWithOffset(writer, startRowId));
