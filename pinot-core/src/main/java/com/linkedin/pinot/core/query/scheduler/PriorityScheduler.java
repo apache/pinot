@@ -74,7 +74,7 @@ public abstract class PriorityScheduler extends QueryScheduler {
     try {
       queryQueue.put(schedQueryContext);
     } catch (OutOfCapacityException e) {
-      _serverMetrics.addMeteredQueryValue(queryRequest.getBrokerRequest(), ServerMeter.SERVER_OUT_OF_CAPACITY_EXCEPTIONS, 1);
+      _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(), ServerMeter.SERVER_OUT_OF_CAPACITY_EXCEPTIONS, 1);
       LOGGER.error("Out of capacity for table {}, message: {}", queryRequest.getTableNameWithType(), e.getMessage());
       return immediateErrorResponse(queryRequest, QueryException.SERVER_OUT_OF_CAPACITY_ERROR);
     }
