@@ -18,7 +18,9 @@ import java.util.Map;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
-
+/**
+ * Site-wide impact anomaly filter
+ */
 @Components(type = "SITEWIDE_IMPACT_FILTER")
 public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideImpactRuleAnomalyFilterSpec> {
   private double threshold;

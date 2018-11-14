@@ -16,6 +16,9 @@
 
 package com.linkedin.thirdeye.detection;
 
+/**
+ * Up or down detection pattern
+ */
 public enum Pattern {
   UP,
   DOWN
