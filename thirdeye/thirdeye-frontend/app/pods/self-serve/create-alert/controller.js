@@ -775,7 +775,7 @@ export default Controller.extend({
     saveAlertYaml() {
       set(this, 'isAlertYamlDisabled', !this.get('isAlertYamlDisabled'));
       const content = get(this, 'alertYamlContent');
-      const url = 'yaml';
+      const url = '/yaml';
       const postProps = {
         method: 'post',
         body: content,
