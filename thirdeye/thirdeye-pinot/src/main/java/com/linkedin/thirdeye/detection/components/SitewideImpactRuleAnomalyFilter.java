@@ -59,7 +59,7 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
     this.siteWideMetricUrn = spec.getSitewideMetricUrn();
   }
 
-  double getValueFromAggregates(MetricSlice slice, Map<MetricSlice, DataFrame> aggregates) {
+  private double getValueFromAggregates(MetricSlice slice, Map<MetricSlice, DataFrame> aggregates) {
     return aggregates.get(slice).getDouble(COL_VALUE, 0);
   }
 }
