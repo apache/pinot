@@ -78,10 +78,11 @@ public class AbsoluteChangeRuleDetectorTest {
   }
 
   @Test
-  public void testWeekOverWeekDifference() throws Exception {
+  public void testWeekOverWeekDifference() {
     AbsoluteChangeRuleDetector detector = new AbsoluteChangeRuleDetector();
     AbsoluteChangeRuleDetectorSpec spec = new AbsoluteChangeRuleDetectorSpec();
-    spec.setAbsoluteChangeChange(400);
+    spec.setAbsoluteChange(400);
+    spec.setPattern("up");
     detector.init(spec, new DefaultInputDataFetcher(this.provider, -1));
     List<MergedAnomalyResultDTO> anomalies = detector.runDetection(new Interval(1814400000L, 2419200000L), "thirdeye:metric:1");
 

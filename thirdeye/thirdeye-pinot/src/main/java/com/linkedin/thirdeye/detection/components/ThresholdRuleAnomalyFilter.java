@@ -40,7 +40,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  */
 @Components(title = "Aggregate Threshold Filter", type = "THRESHOLD_RULE_FILTER", tags = {
     DetectionTag.RULE_FILTER}, description = "Threshold rule filter. filters the anomalies if either the min or max thresholds do not satisfied.", presentation = {
-    @PresentationOption(name = "absolute value", description = "aggregated absolute value within a time period", template = "is between ${min} and ${max}")}, params = {
+    @PresentationOption(name = "absolute value", description = "aggregated absolute value within a time period", template = "is higher than ${min} and lower than ${max}")}, params = {
     @Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")})
 public class ThresholdRuleAnomalyFilter implements AnomalyFilter<ThresholdRuleFilterSpec> {
   private double min;

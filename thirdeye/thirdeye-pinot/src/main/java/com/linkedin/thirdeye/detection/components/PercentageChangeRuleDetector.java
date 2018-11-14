@@ -25,6 +25,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DetectionUtils;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
+import com.linkedin.thirdeye.detection.Pattern;
 import com.linkedin.thirdeye.detection.annotation.Components;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.Param;
@@ -49,20 +50,24 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
     description = "Computes a multi-week aggregate baseline and compares the current value "
         + "based on relative change.",
     presentation = {
-        @PresentationOption(name = "percentage change", template = "comparing ${offset} is more than ${change}")
+        @PresentationOption(name = "percentage change", template = "comparing ${offset} is ${pattern} more than ${change}")
     },
     params = {
         @Param(name = "offset", defaultValue = "wo1w"),
-        @Param(name = "change", placeholder = "value")
+        @Param(name = "change", placeholder = "value"),
+        @Param(name = "pattern", allowableValues = {"up", "down"})
     })
 public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageChangeRuleDetectorSpec> {
   private double percentageChange;
   private InputDataFetcher dataFetcher;
   private Baseline baseline;
+  private Pattern pattern;
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";
   private static final String COL_CHANGE = "change";
   private static final String COL_ANOMALY = "anomaly";
+  private static final String COL_PATTERN = "pattern";
+  private static final String COL_CHANGE_VIOLATION = "change_violation";
 
   @Override
   public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
@@ -89,7 +94,9 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
 
     // relative change
     if (!Double.isNaN(this.percentageChange)) {
-      df.addSeries(COL_ANOMALY, df.getDoubles(COL_CHANGE).abs().gte(this.percentageChange));
+      df.addSeries(COL_PATTERN, this.pattern.equals(Pattern.UP) ? df.getDoubles(COL_CHANGE).gt(0) : df.getDoubles(COL_CHANGE).lt(0));
+      df.addSeries(COL_CHANGE_VIOLATION, df.getDoubles(COL_CHANGE).abs().gte(this.percentageChange));
+      df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_CHANGE_VIOLATION);
     }
 
     // anomalies
@@ -104,5 +111,6 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
     String timezone = spec.getTimezone();
     String offset = spec.getOffset();
     this.baseline = BaselineParsingUtils.parseOffset(offset, timezone);
+    this.pattern = Pattern.valueOf(spec.getPattern().toUpperCase());
   }
 }

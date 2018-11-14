@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DetectionUtils;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
+import com.linkedin.thirdeye.detection.Pattern;
 import com.linkedin.thirdeye.detection.annotation.Components;
 import com.linkedin.thirdeye.detection.annotation.DetectionTag;
 import com.linkedin.thirdeye.detection.annotation.Param;
@@ -46,21 +47,24 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
     type = "ABSOLUTE_CHANGE_RULE",
     tags = {DetectionTag.RULE_DETECTION},
     presentation = {
-        @PresentationOption(name = "absolute value", template = "comparing ${offset} is more than ${difference}"),
+        @PresentationOption(name = "absolute value", template = "comparing ${offset} is ${pattern} more than ${difference}"),
     },
     params = {
         @Param(name = "offset", defaultValue = "wo1w"),
-        @Param(name = "change", placeholder = "value")
+        @Param(name = "change", placeholder = "value"),
+        @Param(name = "pattern", allowableValues = {"up", "down"})
     })
 public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChangeRuleDetectorSpec> {
   private double absoluteChange;
   private InputDataFetcher dataFetcher;
   private Baseline baseline;
+  private Pattern pattern;
   private static final String COL_CURR = "current";
   private static final String COL_BASE = "baseline";
-  private static final String COL_CHANGE = "change";
   private static final String COL_ANOMALY = "anomaly";
   private static final String COL_DIFF = "diff";
+  private static final String COL_PATTERN = "pattern";
+  private static final String COL_DIFF_VIOLATION = "diff_violation";
 
   @Override
   public List<MergedAnomalyResultDTO> runDetection(Interval window, String metricUrn) {
@@ -82,7 +86,9 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
 
     // absolute change
     if (!Double.isNaN(this.absoluteChange)) {
-      df.addSeries(COL_ANOMALY, df.getDoubles(COL_DIFF).abs().gte(this.absoluteChange));
+      df.addSeries(COL_PATTERN, this.pattern.equals(Pattern.UP) ? df.getDoubles(COL_DIFF).gt(0) : df.getDoubles(COL_DIFF).lt(0));
+      df.addSeries(COL_DIFF_VIOLATION, df.getDoubles(COL_DIFF).abs().gte(this.absoluteChange));
+      df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_DIFF_VIOLATION);
     }
 
     // make anomalies
@@ -92,10 +98,11 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
 
   @Override
   public void init(AbsoluteChangeRuleDetectorSpec spec, InputDataFetcher dataFetcher) {
-    this.absoluteChange = spec.getAbsoluteChangeChange();
+    this.absoluteChange = spec.getAbsoluteChange();
     this.dataFetcher = dataFetcher;
     String timezone = spec.getTimezone();
     String offset = spec.getOffset();
     this.baseline = BaselineParsingUtils.parseOffset(offset, timezone);
+    this.pattern = Pattern.valueOf(spec.getPattern().toUpperCase());
   }
 }
