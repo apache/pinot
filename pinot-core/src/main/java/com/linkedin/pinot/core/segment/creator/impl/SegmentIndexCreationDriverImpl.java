@@ -107,7 +107,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) {
-    init(config, dataSource, CompoundTransformer.getDefaultTransformer(dataSource.getRecordReader().getSchema()));
+    init(config, dataSource, CompoundTransformer.getOfflineTransformer(dataSource.getRecordReader().getSchema()));
   }
 
   public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,

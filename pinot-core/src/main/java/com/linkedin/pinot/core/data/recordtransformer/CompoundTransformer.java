@@ -30,12 +30,30 @@ public class CompoundTransformer implements RecordTransformer {
   private final List<RecordTransformer> _transformers;
 
   /**
-   * Returns a record transformer that performs time transform, expressions transform and data type transform.
+   * Returns a record transformer for OFFLINE segment generation that performs expressions transform and data type
+   * transform.
+   * <p>NOTE: NO TIME TRANSFORMATION
+   * <p>NOTE: DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS
+   * <ul>
+   *   <li>
+   *     We put {@link SanitationTransformer} after {@link DataTypeTransformer} so that before sanitation, all values
+   *     follow the data types defined in the {@link Schema}.
+   *   </li>
+   * </ul>
+   */
+  public static CompoundTransformer getOfflineTransformer(Schema schema) {
+    return new CompoundTransformer(Arrays.asList(new ExpressionTransformer(schema), new DataTypeTransformer(schema),
+        new SanitationTransformer(schema)));
+  }
+
+  /**
+   * Returns a record transformer for REALTIME segment consumption that performs time transform, expressions transform
+   * and data type transform.
    * <p>NOTE: DO NOT CHANGE THE ORDER OF THE RECORD TRANSFORMERS
    * <ul>
    *   <li>
    *     We put {@link ExpressionTransformer} after {@link TimeTransformer} so that expression can work on outgoing time
-   *     column
+   *     column.
    *   </li>
    *   <li>
    *     We put {@link SanitationTransformer} after {@link DataTypeTransformer} so that before sanitation, all values
@@ -43,7 +61,7 @@ public class CompoundTransformer implements RecordTransformer {
    *   </li>
    * </ul>
    */
-  public static CompoundTransformer getDefaultTransformer(Schema schema) {
+  public static CompoundTransformer getRealtimeTransformer(Schema schema) {
     return new CompoundTransformer(
         Arrays.asList(new TimeTransformer(schema), new ExpressionTransformer(schema), new DataTypeTransformer(schema),
             new SanitationTransformer(schema)));

@@ -86,6 +86,20 @@ public class RecordTransformerTest {
   }
 
   @Test
+  public void testTimeTransformerWithSameIncomingOutgoingColumnName() {
+    Schema schema = new Schema.SchemaBuilder().addTime("time", 6, TimeUnit.HOURS, FieldSpec.DataType.INT, "time", 1,
+        TimeUnit.MILLISECONDS, FieldSpec.DataType.LONG).build();
+    RecordTransformer transformer = new TimeTransformer(schema);
+    GenericRow record = new GenericRow();
+    record.putField("time", 123);
+
+    // With the same incoming and outgoing column name, transform multiple times will return different results
+    record = transformer.transform(record);
+    assertNotNull(record);
+    assertEquals(record.getValue("time"), 123 * 6 * 3600 * 1000L);
+  }
+
+  @Test
   public void testDataTypeTransformer() {
     RecordTransformer transformer = new DataTypeTransformer(SCHEMA);
     GenericRow record = getRecord();
@@ -124,8 +138,32 @@ public class RecordTransformerTest {
   }
 
   @Test
-  public void testDefaultTransformer() {
-    RecordTransformer transformer = CompoundTransformer.getDefaultTransformer(SCHEMA);
+  public void testOfflineTransformer() {
+    RecordTransformer transformer = CompoundTransformer.getOfflineTransformer(SCHEMA);
+    GenericRow record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      record = transformer.transform(record);
+      assertNotNull(record);
+      assertEquals(record.getValue("svInt"), 123);
+      assertEquals(record.getValue("svLong"), 123L);
+      assertEquals(record.getValue("svFloat"), 123f);
+      assertEquals(record.getValue("svDouble"), 123d);
+      assertEquals(record.getValue("svBytes"), new byte[]{123, 123});
+      assertEquals(record.getValue("mvInt"), new Object[]{123});
+      assertEquals(record.getValue("mvLong"), new Object[]{123L});
+      assertEquals(record.getValue("mvFloat"), new Object[]{123f});
+      assertEquals(record.getValue("mvDouble"), new Object[]{123d});
+      assertEquals(record.getValue("svStringWithNullCharacters"), "1");
+      assertEquals(record.getValue("svStringWithLengthLimit"), "12");
+      assertEquals(record.getValue("incoming"), "123");
+      // No time conversion for OFFLINE transformer
+      assertEquals(record.getValue("outgoing"), Long.MIN_VALUE);
+    }
+  }
+
+  @Test
+  public void testRealtimeTransformer() {
+    RecordTransformer transformer = CompoundTransformer.getRealtimeTransformer(SCHEMA);
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
