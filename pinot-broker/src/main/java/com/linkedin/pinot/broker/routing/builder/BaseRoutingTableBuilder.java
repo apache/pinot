@@ -24,7 +24,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.Map;
@@ -47,7 +46,7 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
   protected final Random _random = new Random();
   private BrokerMetrics _brokerMetrics;
   private String _tableName;
-  private boolean _enableDyanmicComputing;
+  private boolean _enableDynamicComputing;
 
   // Set variable as volatile so all threads can get the up-to-date routing tables
   // Routing tables are used for storing pre-computed routing table
@@ -66,8 +65,8 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
     RoutingConfig routingConfig = tableConfig.getRoutingConfig();
     if (routingConfig != null) {
       Map<String, String> routingOption = routingConfig.getRoutingTableBuilderOptions();
-      _enableDyanmicComputing = Boolean.valueOf(routingOption.get(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY));
-      if (_enableDyanmicComputing) {
+      _enableDynamicComputing = Boolean.valueOf(routingOption.get(RoutingConfig.ENABLE_DYNAMIC_COMPUTING_KEY));
+      if (_enableDynamicComputing) {
         LOGGER.info("Dynamic routing table computation is enabled for table {}", _tableName);
       }
     }
@@ -114,7 +113,7 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
     Map<String, List<String>> segmentToServersMap =
         computeSegmentToServersMapFromExternalView(externalView, instanceConfigs);
 
-    if (_enableDyanmicComputing) {
+    if (_enableDynamicComputing) {
       // When dynamic computing is enabled, cache the mapping
       _segmentToServersMap = segmentToServersMap;
     } else {
@@ -126,7 +125,7 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
 
   @Override
   public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
-    if (_enableDyanmicComputing) {
+    if (_enableDynamicComputing) {
       // Copy the pointer for snapshot since the pointer for segment to servers map can change at anytime
       Map<String, List<String>> segmentToServersMap = _segmentToServersMap;
 
