@@ -324,20 +324,20 @@ public class FunctionCreationOnboardingTask extends BaseDetectionOnboardTask {
     AnomalyFunctionDTO anomalyFunctionSpec = new AnomalyFunctionDTO();
     switch (timeGranularity.getUnit()) {
       case MINUTES:
-        anomalyFunctionSpec.setType("CONFIDENCE_INTERVAL_SIGN_TEST");
+        anomalyFunctionSpec.setType("SIGN_TEST_WRAPPER");
         anomalyFunctionSpec.setCron("0 0/15 * * * ? *");
         anomalyFunctionSpec.setWindowSize(6);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
         anomalyFunctionSpec.setFrequency(new TimeGranularity(15, TimeUnit.MINUTES));
-        anomalyFunctionSpec.setProperties("signTestWindowSize=24");
+        anomalyFunctionSpec.setProperties("variables.seasonalPeriod=P7D;module.training=nonparametric.SeasonalSlidingWindowTrainingModule;variables.slidingWindowWidth=8;variables.pattern=UP,DOWN;variables.anomalyRemovalThreshold=0.6,-0.6;module.data=SeasonalDataModule;variables.signTestStepSize=1;variables.pValueThreshold=0.05;function=ConfigurableAnomalyDetectionFunction;module.testingPreprocessors=DummyPreprocessModule;variables.seasonalCount=3;variables.signTestWindowSize=24;module.detection=SignTestDetectionModule;variables.decayRate=0.5;variables.confidenceLevel=0.99;module.trainingPreprocessors=AnomalyRemovalByWeight;variables.trainPadding=PT20M,PT25M");
         anomalyFunctionSpec.setRequiresCompletenessCheck(false);
         break;
       case HOURS:
-        anomalyFunctionSpec.setType("REGRESSION_GAUSSIAN_SCAN");
+        anomalyFunctionSpec.setType("REGRESSION_GAUSSIAN_SCAN_WRAPPER");
         anomalyFunctionSpec.setCron("0 0 * * * ? *");
         anomalyFunctionSpec.setWindowSize(24);
         anomalyFunctionSpec.setWindowUnit(TimeUnit.HOURS);
-        anomalyFunctionSpec.setProperties("");
+        anomalyFunctionSpec.setProperties("variables.isMajor=false;downgrade.variables.seasonalities=;function=SelfRecoverableAnomalyDetectionFunction;variables.pValueThreshold=0.01;variables.continuumOffset=P60D;module.detection=GaussianScanDetectionModule;variables.anomalyRemovalThreshold=1.0,-1.0;workflow=RegressionWorkflow;module.training=parametric.NullBasisRegressionTrainingModule;variables.seasonalities=HOURLY_SEASONALITY,DAILY_SEASONALITY;module.data=ContinuumDataModule;variables.scanNumSimulations=500;variables.scanTargetNumAnomalies=1;module.trainingPreprocessors=AnomalyRemovalByWeight;variables.scanMaxWindowSize=48;variables.scanMinWindowSize=1;variables.scanStepSize=1;module.testingPreprocessors=DummyPreprocessModule;variables.scanUseBootStrap=true");
         anomalyFunctionSpec.setRequiresCompletenessCheck(false);
         break;
       case DAYS:
