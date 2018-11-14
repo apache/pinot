@@ -60,8 +60,7 @@ public class ValidationManager extends ControllerPeriodicTask {
 
   public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
-    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(),
-        config.getValidationControllerFrequencyInSeconds() / 2, pinotHelixResourceManager);
+    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(), pinotHelixResourceManager);
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
@@ -75,15 +74,16 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> allTableNames) {
-    runValidation(allTableNames);
+  public void process(List<String> tables) {
+    runValidation(tables);
   }
 
   /**
-   * Runs a validation pass over the currently loaded tables.
-   * @param allTableNames List of all the table names
+   * Runs a validation pass over the given tables.
+   *
+   * @param tables List of table names
    */
-  private void runValidation(List<String> allTableNames) {
+  private void runValidation(List<String> tables) {
     // Run segment level validation using a separate interval
     boolean runSegmentLevelValidation = false;
     long currentTimeMs = System.currentTimeMillis();
@@ -97,7 +97,7 @@ public class ValidationManager extends ControllerPeriodicTask {
     // Cache instance configs to reduce ZK access
     List<InstanceConfig> instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
 
-    for (String tableNameWithType : allTableNames) {
+    for (String tableNameWithType : tables) {
       try {
         TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
         if (tableConfig == null) {
