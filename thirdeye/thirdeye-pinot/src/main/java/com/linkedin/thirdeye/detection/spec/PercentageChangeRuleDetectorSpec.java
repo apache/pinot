@@ -20,6 +20,15 @@ public class PercentageChangeRuleDetectorSpec extends AbstractSpec {
   private double percentageChange = Double.NaN;
   private String offset = "wo1w";
   private String timezone = "UTC";
+  private String pattern;
+
+  public String getPattern() {
+    return pattern;
+  }
+
+  public void setPattern(String pattern) {
+    this.pattern = pattern;
+  }
 
   public String getTimezone() {
     return timezone;

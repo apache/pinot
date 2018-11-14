@@ -16,10 +16,30 @@
 
 package com.linkedin.thirdeye.detection.spec;
 
+import com.linkedin.thirdeye.detection.Pattern;
+
+
 public class AbsoluteChangeRuleDetectorSpec extends AbstractSpec {
   private double absoluteChange = Double.NaN;
   private String offset = "wo1w";
   private String timezone = "UTC";
+  private String pattern;
+
+  public double getAbsoluteChange() {
+    return absoluteChange;
+  }
+
+  public void setAbsoluteChange(double absoluteChange) {
+    this.absoluteChange = absoluteChange;
+  }
+
+  public String getPattern() {
+    return pattern;
+  }
+
+  public void setPattern(String pattern) {
+    this.pattern = pattern;
+  }
 
   public String getTimezone() {
     return timezone;
@@ -35,13 +55,5 @@ public class AbsoluteChangeRuleDetectorSpec extends AbstractSpec {
 
   public void setOffset(String offset) {
     this.offset = offset;
-  }
-
-  public double getAbsoluteChangeChange() {
-    return absoluteChange;
-  }
-
-  public void setAbsoluteChangeChange(double absoluteChange) {
-    this.absoluteChange = absoluteChange;
   }
 }
