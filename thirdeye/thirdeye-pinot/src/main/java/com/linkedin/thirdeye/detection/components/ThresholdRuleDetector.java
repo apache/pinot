@@ -41,7 +41,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 @Components(title = "Threshold", type = "THRESHOLD", tags = {
     DetectionTag.RULE_DETECTION}, description = "Simple threshold rule algorithm with (optional) upper and lower bounds on a metric value.", presentation = {
-    @PresentationOption(name = "absolute value", description = "aggregated absolute value within a time period", template = "is lower than ${min} or higher than ${max}")}, params = {
+    @PresentationOption(name = "absolute value", template = "is lower than ${min} or higher than ${max}")}, params = {
     @Param(name = "min", placeholder = "value"), @Param(name = "max", placeholder = "value")})
 public class ThresholdRuleDetector implements AnomalyDetector<ThresholdRuleDetectorSpec> {
   private final String COL_TOO_HIGH = "tooHigh";

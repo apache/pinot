@@ -50,10 +50,8 @@ public class DefaultInputDataFetcher implements InputDataFetcher {
    */
   public InputData fetchData(InputDataSpec inputDataSpec) {
     Map<MetricSlice, DataFrame> timeseries = provider.fetchTimeseries(inputDataSpec.getTimeseriesSlices());
-    Map<MetricSlice, DataFrame> aggregates =
-        provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList());
-    Multimap<AnomalySlice, MergedAnomalyResultDTO> existingAnomalies =
-        provider.fetchAnomalies(inputDataSpec.getAnomalySlices(), configId);
+    Map<MetricSlice, DataFrame> aggregates = provider.fetchAggregates(inputDataSpec.getAggregateSlices(), Collections.<String>emptyList());
+    Multimap<AnomalySlice, MergedAnomalyResultDTO> existingAnomalies = provider.fetchAnomalies(inputDataSpec.getAnomalySlices(), configId);
     Multimap<EventSlice, EventDTO> events = provider.fetchEvents(inputDataSpec.getEventSlices());
     Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIds());
     Map<String, DatasetConfigDTO> datasets = provider.fetchDatasets(inputDataSpec.getDatasetNames());
