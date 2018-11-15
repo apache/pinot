@@ -43,7 +43,6 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 public class SitewideImpactRuleAnomalyFilterTest {
   private static final String METRIC_URN = "thirdeye:metric:123";
 
-  private List<MergedAnomalyResultDTO> anomalies;
   private DataProvider testDataProvider;
   private Baseline baseline;
 
@@ -62,8 +61,6 @@ public class SitewideImpactRuleAnomalyFilterTest {
     aggregates.put(slice2, new DataFrame().addSeries(COL_VALUE, 500));
     aggregates.put(baselineSlice2, new DataFrame().addSeries(COL_VALUE, 1000));
 
-    this.anomalies = Arrays.asList(makeAnomaly(0, 2), makeAnomaly(4, 6));
-
     this.testDataProvider = new MockDataProvider().setAggregates(aggregates);
   }
 
@@ -77,7 +74,7 @@ public class SitewideImpactRuleAnomalyFilterTest {
     filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, 125L));
 
     List<Boolean> results =
-        this.anomalies.stream().map(anomaly -> filter.isQualified(anomaly)).collect(Collectors.toList());
+        Arrays.asList(makeAnomaly(0, 2), makeAnomaly(4, 6)).stream().map(anomaly -> filter.isQualified(anomaly)).collect(Collectors.toList());
     Assert.assertEquals(results, Arrays.asList(false, true));
   }
 
@@ -86,5 +83,23 @@ public class SitewideImpactRuleAnomalyFilterTest {
     MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(125L, start, end, dimensions);
     anomaly.setMetricUrn(METRIC_URN);
     return anomaly;
+  }
+
+  @Test
+  public void testSiteWideImpactFilterNoOffset() {
+    SitewideImpactRuleAnomalyFilterSpec spec = new SitewideImpactRuleAnomalyFilterSpec();
+    spec.setThreshold(0.5);
+    spec.setPattern("down");
+    SitewideImpactRuleAnomalyFilter filter = new SitewideImpactRuleAnomalyFilter();
+    filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, 125L));
+    List<MergedAnomalyResultDTO> anomalyResultDTOs = Arrays.asList(makeAnomaly(0, 2), makeAnomaly(4, 6));
+    anomalyResultDTOs.get(0).setAvgCurrentVal(150);
+    anomalyResultDTOs.get(0).setAvgBaselineVal(200);
+    anomalyResultDTOs.get(1).setAvgCurrentVal(500);
+    anomalyResultDTOs.get(1).setAvgBaselineVal(1000);
+
+    List<Boolean> results =
+        anomalyResultDTOs.stream().map(anomaly -> filter.isQualified(anomaly)).collect(Collectors.toList());
+    Assert.assertEquals(results, Arrays.asList(false, true));
   }
 }
