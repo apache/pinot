@@ -37,6 +37,8 @@ import java.util.Map;
  * {@link java.lang.String}, {@link java.util.Map}, etc.
  */
 public class CombinedConfigLoader {
+  private static final String PROFILE_SEPARATOR = "___";
+
   static io.vavr.collection.Map<String, ?> loadConfigFromFile(File file, String... profiles) {
     ConfigParseOptions options = ConfigParseOptions.defaults().prependIncluder(new ConfigIncluder() {
       private ConfigIncluder parent = null;
@@ -75,14 +77,14 @@ public class CombinedConfigLoader {
 
     // Get all profile-specific keys
     Set<String> profileKeys = configMap.keySet()
-        .filter(key -> key.contains("_"))
+        .filter(key -> key.contains(PROFILE_SEPARATOR))
         .toSet();
 
     // Keep profile-specific keys for enabled profiles
     Set<String> enabledProfileKeys = profileKeys
         .filter(key -> {
-          int lastUnderscoreIndex = key.lastIndexOf('_');
-          String profile = key.substring(lastUnderscoreIndex + 1, key.length());
+          int lastUnderscoreIndex = key.lastIndexOf(PROFILE_SEPARATOR);
+          String profile = key.substring(lastUnderscoreIndex + PROFILE_SEPARATOR.length(), key.length());
           return enabledProfiles.contains(profile);
         });
 
@@ -90,7 +92,7 @@ public class CombinedConfigLoader {
     io.vavr.collection.Map<String, ConfigValue> overrideConfigMap = HashMap.empty();
 
     for (String enabledProfileKey : enabledProfileKeys) {
-      int lastUnderscoreIndex = enabledProfileKey.lastIndexOf('_');
+      int lastUnderscoreIndex = enabledProfileKey.lastIndexOf(PROFILE_SEPARATOR);
       String destinationKey = enabledProfileKey.substring(0, lastUnderscoreIndex);
 
       if (!overrideConfigMap.containsKey(destinationKey)) {
