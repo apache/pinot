@@ -72,6 +72,7 @@ public class SitewideImpactRuleAnomalyFilterTest {
     SitewideImpactRuleAnomalyFilterSpec spec = new SitewideImpactRuleAnomalyFilterSpec();
     spec.setThreshold(0.5);
     spec.setOffset("median3w");
+    spec.setPattern("down");
     SitewideImpactRuleAnomalyFilter filter = new SitewideImpactRuleAnomalyFilter();
     filter.init(spec, new DefaultInputDataFetcher(this.testDataProvider, 125L));
 

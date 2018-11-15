@@ -1,10 +1,50 @@
 package com.linkedin.thirdeye.detection.spec;
 
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+
 public class SitewideImpactRuleAnomalyFilterSpec extends AbstractSpec {
   private String timezone = "UTC";
-  private String sitewideMetricUrn;
+  private String offset;
   private double threshold = Double.NaN;
-  private String offset = "wo1w";
+  private String pattern;
+  private String sitewideMetricName;
+  private String sitewideCollection;
+  private Map<String, Collection<String>> filters = new HashMap<>();
+
+  public String getSitewideMetricName() {
+    return sitewideMetricName;
+  }
+
+  public void setSitewideMetricName(String sitewideMetricName) {
+    this.sitewideMetricName = sitewideMetricName;
+  }
+
+  public String getSitewideCollection() {
+    return sitewideCollection;
+  }
+
+  public void setSitewideCollection(String sitewideCollection) {
+    this.sitewideCollection = sitewideCollection;
+  }
+
+  public Map<String, Collection<String>> getFilters() {
+    return filters;
+  }
+
+  public void setFilters(Map<String, Collection<String>> filters) {
+    this.filters = filters;
+  }
+
+  public String getPattern() {
+    return pattern;
+  }
+
+  public void setPattern(String pattern) {
+    this.pattern = pattern;
+  }
 
   public String getOffset() {
     return offset;
@@ -20,14 +60,6 @@ public class SitewideImpactRuleAnomalyFilterSpec extends AbstractSpec {
 
   public void setTimezone(String timezone) {
     this.timezone = timezone;
-  }
-
-  public String getSitewideMetricUrn() {
-    return sitewideMetricUrn;
-  }
-
-  public void setSitewideMetricUrn(String sitewideMetricUrn) {
-    this.sitewideMetricUrn = sitewideMetricUrn;
   }
 
   public double getThreshold() {

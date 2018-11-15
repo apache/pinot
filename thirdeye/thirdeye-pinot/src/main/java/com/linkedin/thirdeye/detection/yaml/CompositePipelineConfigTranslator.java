@@ -133,6 +133,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private final Map<String, Object> components = new HashMap<>();
   private MetricConfigDTO metricConfig;
   private DatasetConfigDTO datasetConfig;
+  private String metricUrn;
 
   public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     super(yamlConfig, provider);
@@ -148,7 +149,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         .get(metricConfig.getDataset());
     Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
 
-    String metricUrn = buildMetricUrn(yamlConfig);
+    this.metricUrn = buildMetricUrn(yamlConfig);
     String cron = buildCron();
 
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));

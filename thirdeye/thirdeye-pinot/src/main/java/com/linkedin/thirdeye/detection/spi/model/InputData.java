@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 
@@ -38,7 +39,18 @@ public class InputData {
   final Multimap<EventSlice, EventDTO> events;
   final Map<Long, MetricConfigDTO> metrics;
   final Map<String, DatasetConfigDTO> datasets;
+
+  /**
+   * The data set config dtos for metric ids
+   * @see InputDataSpec#withMetricIdsForDataset(Collection)
+   */
   final Map<Long, DatasetConfigDTO> datasetForMetricId;
+
+  /**
+   * The metric config dtos for metric and data set names
+   * @see InputDataSpec#withMetricNamesAndDatasetNames(Collection)
+   */
+  final Map<InputDataSpec.MetricAndDatasetName, MetricConfigDTO> metricForMetricAndDatasetNames;
 
   public InputData(InputDataSpec spec, Map<MetricSlice, DataFrame> timeseries, Map<MetricSlice, DataFrame> aggregates,
       Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies, Multimap<EventSlice, EventDTO> events) {
@@ -50,11 +62,13 @@ public class InputData {
     this.metrics = Collections.emptyMap();
     this.datasets = Collections.emptyMap();
     this.datasetForMetricId = Collections.emptyMap();
+    this.metricForMetricAndDatasetNames = Collections.emptyMap();
   }
 
   public InputData(InputDataSpec spec, Map<MetricSlice, DataFrame> timeseries, Map<MetricSlice, DataFrame> aggregates,
       Multimap<AnomalySlice, MergedAnomalyResultDTO> anomalies, Multimap<EventSlice, EventDTO> events,
-      Map<Long, MetricConfigDTO> metrics, Map<String, DatasetConfigDTO> datasets, Map<Long, DatasetConfigDTO> datasetForMetricId) {
+      Map<Long, MetricConfigDTO> metrics, Map<String, DatasetConfigDTO> datasets, Map<Long, DatasetConfigDTO> datasetForMetricId,
+      Map<InputDataSpec.MetricAndDatasetName, MetricConfigDTO> metricForMetricAndDatasetNames) {
     this.dataSpec = spec;
     this.timeseries = timeseries;
     this.aggregates = aggregates;
@@ -63,6 +77,7 @@ public class InputData {
     this.metrics = metrics;
     this.datasets = datasets;
     this.datasetForMetricId = datasetForMetricId;
+    this.metricForMetricAndDatasetNames = metricForMetricAndDatasetNames;
   }
 
   public InputDataSpec getDataSpec() {
@@ -95,5 +110,9 @@ public class InputData {
 
   public Map<Long, DatasetConfigDTO> getDatasetForMetricId(){
     return datasetForMetricId;
+  }
+
+  public Map<InputDataSpec.MetricAndDatasetName, MetricConfigDTO> getMetricForMetricAndDatasetNames() {
+    return metricForMetricAndDatasetNames;
   }
 }
