@@ -35,7 +35,8 @@ import {
   get,
   computed,
   getProperties,
-  setProperties
+  setProperties,
+  getWithDefault
 } from '@ember/object';
 import { isPresent } from '@ember/utils';
 import { later } from '@ember/runloop';
@@ -60,6 +61,7 @@ export default Component.extend({
   didReceiveAttrs() {
     this._super(...arguments);
     const filterBlocks = get(this, 'filterBlocks');
+    const filterStateObj = get(this, 'currentFilterState');
     let multiSelectKeys = {}; // new filter object
 
     // Set up filter block object
@@ -68,10 +70,15 @@ export default Component.extend({
       let filterKeys = [];
       let tag = block.name.camelize();
       let matchWidth = block.matchWidth ? block.matchWidth : false;
+
+      // Initially load existing state of selected filters if available
+      if (filterStateObj && filterStateObj[tag] && filterStateObj[tag].length) {
+        block.selected = filterStateObj[tag];
+      }
       // If any pre-selected items, bring them into the new filter object
       multiSelectKeys[tag] = block.selected ? block.selected : null;
       // Dedupe and remove null or empty values
-      filterKeys = Array.from(new Set(block.filterKeys.filter(value => isPresent(value))));
+      filterKeys = Array.from(new Set(block.filterKeys.filter(value => isPresent(value) && value !== 'undefined')));
       // Generate a name and Id for each one based on provided filter keys
       if (block.type !== 'select') {
         filterKeys.forEach((filterName, index) => {
@@ -84,7 +91,13 @@ export default Component.extend({
         });
       }
       // Now add new initialized props to block item
-      setProperties(block, { filtersArray, filterKeys, isHidden: false, tag, matchWidth });
+      setProperties(block, {
+        tag,
+        filterKeys,
+        matchWidth,
+        filtersArray,
+        isHidden: false
+      });
     });
     set(this, 'multiSelectKeys', multiSelectKeys);
   },
@@ -110,23 +123,29 @@ export default Component.extend({
     onFilterSelection(filterObj, selectedItems) {
       const selectKeys = get(this, 'multiSelectKeys');
       let selectedArr = selectedItems;
+
+      // Handle 'status' field toggling rules
       if (filterObj.tag === 'status' && filterObj.selected) {
+        // Toggle selected status
         set(selectedItems, 'isActive', !selectedItems.isActive);
-        if (filterObj.filtersArray.filter(item => item.isActive).length === 0) {
-          const activeItem = filterObj.filtersArray.find(item => item.id === 'active');
-          later(() => {
-            set(activeItem, 'isActive', true);
-          });
-        }
+        // Map selected status to array - will add to filter map
         selectedArr = filterObj.filtersArray.filterBy('isActive').mapBy('name');
+        // Make sure 'Active' is selected by default when both are un-checked
+        if (filterObj.filtersArray.filter(item => item.isActive).length === 0) {
+          selectedArr = ['Active'];
+          const activeItem = filterObj.filtersArray.find(item => item.id === 'active');
+        }
       }
+      // Handle 'global' or 'primary' filter field toggling
       if (filterObj.tag === 'primary') {
         filterObj.filtersArray.forEach(filter => set(filter, 'isActive', false));
         const activeFilter = filterObj.filtersArray.find(filter => filter.name === selectedItems);
         set(activeFilter, 'isActive', true);
       }
+      // Sets the 'alertFilters' object in parent
       set(selectKeys, filterObj.tag, selectedArr);
       set(selectKeys, 'triggerType', filterObj.type);
+      // Send action up to parent controller
       this.get('onSelectFilter')(selectKeys);
     },
 

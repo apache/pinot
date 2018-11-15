@@ -63,9 +63,15 @@ export default Controller.extend({
   /**
    * Filter settings
    */
+  alertFilters: [],
   resetFiltersGlobal: null,
   resetFiltersLocal: null,
   alertFoundByName: null,
+
+  /**
+   * The first and broadest entity search property
+   */
+  topSearchKeyName: 'application',
 
   // Total displayed alerts
   totalFilteredAlerts: 0,
@@ -128,14 +134,21 @@ export default Controller.extend({
     function() {
       const {
         alertFilters,
+        topSearchKeyName,
         filterBlocksLocal,
         alertFoundByName,
         filterToPropertyMap,
         originalAlerts: initialAlerts
-      } = getProperties(this, 'alertFilters', 'filterBlocksLocal', 'alertFoundByName', 'filterToPropertyMap', 'originalAlerts');
+      } = getProperties(this, 'alertFilters', 'topSearchKeyName', 'filterBlocksLocal', 'alertFoundByName', 'filterToPropertyMap', 'originalAlerts');
       const filterBlocksCopy = _.cloneDeep(filterBlocksLocal);
+      const selectFieldKeys = Object.keys(filterToPropertyMap);
+      const fieldsByState = (state) => alertFilters ? selectFieldKeys.filter((key) => {
+        return (state === 'active') ? isPresent(alertFilters[key]) : isBlank(alertFilters[key]);
+      }) : [];
+      const inactiveFields = fieldsByState('inactive');
+      const activeFields = fieldsByState('active');
+      // Recalculate only 'select' filters when we have a change in them
       const canRecalcFilterOptions = alertFilters && alertFilters.triggerType !== 'checkbox';
-      const inactiveFields = alertFilters ? Object.keys(alertFilters).filter(key => isBlank(alertFilters[key])) : [];
       const filtersToRecalculate = filterBlocksCopy.filter(block => block.type === 'select');
       const nonSelectFilters = filterBlocksCopy.filter(block => block.type !== 'select');
       let filteredAlerts = initialAlerts;
@@ -151,19 +164,19 @@ export default Controller.extend({
             Object.assign(blockItem, { selected: alertFilters[blockItem.name] });
             // We are recalculating each field where options have not been selected
             if (inactiveFields.includes(blockItem.name) || !inactiveFields.length) {
-              const alertPropsAsKeys = filteredAlerts.map(alert => alert[filterToPropertyMap[blockItem.name]]);
-              const filterKeys = [ ...new Set(powerSort(alertPropsAsKeys, null)) ];
-              Object.assign(blockItem, { filterKeys });
+              Object.assign(blockItem, { filterKeys: this._recalculateFilterKeys(filteredAlerts, blockItem) });
+            }
+            // For better UX: restore top field options if its the only active field. In our case the top field is 'applications'
+            if (blockItem.name === topSearchKeyName && activeFields.join('') === topSearchKeyName) {
+              Object.assign(blockItem, { filterKeys: this._recalculateFilterKeys(initialAlerts, blockItem) });
             }
           });
-
           // Preserve selected state for filters that initially have a "selected" property
           if (nonSelectFilters.length) {
             nonSelectFilters.forEach((filter) => {
               filter.selected = alertFilters[filter.name] ? alertFilters[filter.name] : filter.selected;
             });
           }
-
           // Be sure to update the filter options object once per pass
           once(() => {
             set(this, 'filterBlocksLocal', filterBlocksCopy);
@@ -257,6 +270,26 @@ export default Controller.extend({
   ),
 
   /**
+   * We are recalculating the options of each selection field. The values come from the aggregated
+   * properties across all filtered alerts. For example, it returns all possible values for 'application'
+   * @method _recalculateFilterKeys
+   * @param {Array} alertsCollection - array of alerts we are extracting values from
+   * @param {Object} blockItem - the current search filter object
+   * @returns {Array} - a deduped array of values to use as select options
+   * @private
+   */
+  _recalculateFilterKeys(alertsCollection, blockItem) {
+    const filterToPropertyMap = get(this, 'filterToPropertyMap');
+    // Aggregate all existing values for our target properties in the current array collection
+    const alertPropsAsKeys = alertsCollection.map(alert => alert[filterToPropertyMap[blockItem.name]]);
+    // Add 'none' select option if allowed
+    const canInsertNullOption = alertPropsAsKeys.includes(undefined) && blockItem.hasNullOption;
+    if (canInsertNullOption) { alertPropsAsKeys.push('none'); }
+    // Return a deduped array containing all of the values for this property in the current set of alerts
+    return [ ...new Set(powerSort(alertPropsAsKeys.filter(val => isPresent(val)), null)) ];
+  },
+
+  /**
    * This is the core filtering method which acts upon a set of initial alerts to return a subset
    * @method _filterAlerts
    * @param {Array} initialAlerts - array of all alerts to start with
@@ -273,12 +306,10 @@ export default Controller.extend({
    */
   _filterAlerts(initialAlerts, filters) {
     const filterToPropertyMap = get(this, 'filterToPropertyMap');
-
     // A click on a primary alert filter will reset 'filteredAlerts'
     if (filters.primary) {
       this._processPrimaryFilters(initialAlerts, filters.primary);
     }
-
     // Pick up cached alert array for the secondary filters
     let filteredAlerts = get(this, 'filteredAlerts');
 
@@ -288,23 +319,23 @@ export default Controller.extend({
       if (filterValueArray && filterValueArray.length) {
         let newAlerts = filteredAlerts.filter(alert => {
           // See 'filterToPropertyMap' in route. For filterKey = 'owner' this would map alerts by alert['createdBy'] = x
-          const targetAlertObject = alert[filterToPropertyMap[filterKey]];
-          return targetAlertObject && filterValueArray.includes(targetAlertObject);
+          const targetAlertPropertyValue = alert[filterToPropertyMap[filterKey]];
+          const alertMeetsCriteria = targetAlertPropertyValue && filterValueArray.includes(targetAlertPropertyValue);
+          const isMatchForNone = !alert.hasOwnProperty(filterToPropertyMap[filterKey]) && filterValueArray.includes('none');
+          return alertMeetsCriteria || isMatchForNone;
         });
         filteredAlerts = newAlerts;
       }
     });
 
+    // If status filter is present, we re-build the results array to contain only active alerts, inactive alerts, or both.
     if (filters.status) {
-      // !filters.status.length forces an 'Active' default if user tries to de-select both
-      // Depending on the desired UX, remove it if you want to allow user to select NO active and NO inactive.
       const concatStatus = filters.status.length ? filters.status.join().toLowerCase() : 'active';
       const requireAll = filters.status.includes('Active') && filters.status.includes('Inactive');
       const alertsByState = {
         active: filteredAlerts.filter(alert => alert.isActive),
         inactive: filteredAlerts.filter(alert => !alert.isActive)
       };
-      // We re-build the alerts array to contain only active alerts, inactive alerts, or both.
       filteredAlerts = requireAll ? [ ...alertsByState.active, ...alertsByState.inactive ] : alertsByState[concatStatus];
     }
 
@@ -347,24 +378,32 @@ export default Controller.extend({
    * @returns {undefined}
    * @private
    */
-  _resetFilters(isSelectDisabled) {
+  _resetLocalFilters(alert) {
+    let alertFilters = {};
+    const filterToPropertyMap = get(this, 'filterToPropertyMap');
+    const newFilterBlocksLocal = _.cloneDeep(get(this, 'initialFiltersLocal'));
+
+    // Set new select field options (filterKeys) to our found alert properties
+    Object.keys(filterToPropertyMap).forEach((filterKey) => {
+      let targetAlertProp = alert[filterToPropertyMap[filterKey]];
+      alertFilters[filterKey] = targetAlertProp ? [ targetAlertProp ] : ['none'];
+      newFilterBlocksLocal.find(filter => filter.name === filterKey).filterKeys = alertFilters[filterKey];
+    });
+
+    // Do not highlight any of the primary filters
+    Object.assign(alertFilters, { primary: 'none' });
+
+    // Set correct status on current alert
+    const alertStatus = alert.isActive ? 'Active' : 'Inactive';
+    newFilterBlocksLocal.find(filter => filter.name === 'status').selected = [ alertStatus ];
+
     // Reset local (secondary) filters, and set select fields to 'disabled'
     setProperties(this, {
-      filterBlocksLocal: _.cloneDeep(get(this, 'initialFiltersLocal')),
+      filterBlocksLocal: newFilterBlocksLocal,
       resetFiltersLocal: moment().valueOf(),
-      isSelectDisabled
+      allowFilterSummary: false,
+      alertFilters
     });
-    // Reset global (primary) filters, and de-activate any selections
-    if (isSelectDisabled) {
-      const origFiltersGlobal = get(this, 'initialFiltersGlobal');
-      origFiltersGlobal.forEach((filter) => {
-        set(filter, 'selected', []);
-      });
-      setProperties(this, {
-        filterBlocksGlobal: origFiltersGlobal,
-        resetFiltersGlobal: moment().valueOf()
-      });
-    }
   },
 
   actions: {
@@ -372,18 +411,22 @@ export default Controller.extend({
     onSelectAlertByName(alert) {
       if (!alert) { return; }
       set(this, 'alertFoundByName', alert);
-      this._resetFilters(true);
+      this._resetLocalFilters(alert);
     },
 
     // Handles filter selections (receives array of filter options)
     userDidSelectFilter(filterArr) {
       setProperties(this, {
         filtersTriggered: true,
+        allowFilterSummary: true,
         alertFilters: filterArr
       });
       // Reset secondary filters component instance if a primary filter was selected
       if (Object.keys(filterArr).includes('primary')) {
-        this._resetFilters(false);
+        setProperties(this, {
+          filterBlocksLocal: _.cloneDeep(get(this, 'initialFiltersLocal')),
+          resetFiltersLocal: moment().valueOf()
+        });
       }
     },
 
