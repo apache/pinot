@@ -93,12 +93,23 @@ public class DetectionMigrationResource {
           ImmutableMap.of("dimensions", Collections.singletonList(anomalyFunctionDTO.getExploreDimensions())));
     }
     // TODO plugin dimension filter
-    yamlConfigs.put("filters", AnomalyDetectionInputContextBuilder.getFiltersForFunction(anomalyFunctionDTO.getFilters()).asMap());
+    yamlConfigs.put("filters",
+        AnomalyDetectionInputContextBuilder.getFiltersForFunction(anomalyFunctionDTO.getFilters()).asMap());
 
     Map<String, Object> ruleYaml = ImmutableMap.of("name", "myRule", "detection", Collections.singletonList(
-        ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO))));
+        ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO))), "filter",
+        Collections.singletonList(ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO))));
     yamlConfigs.put("rules", Collections.singletonList(ruleYaml));
     return this.yaml.dump(yamlConfigs);
+  }
+
+  private Map<String, Object> getAlertFilterParams(AnomalyFunctionDTO functionDTO) {
+    Map<String, Object> filterYaml = new HashMap<>();
+    Map<String, Object> params = new HashMap<>();
+    filterYaml.put("configuration", params);
+    params.putAll(functionDTO.getAlertFilter());
+    // TODO bucket period, timezone
+    return filterYaml;
   }
 
   private Map<String, Object> getAlgorithmDetectorParams(AnomalyFunctionDTO functionDTO) throws Exception {
@@ -109,7 +120,7 @@ public class DetectionMigrationResource {
     for (Map.Entry<Object, Object> property : properties.entrySet()) {
       params.put((String) property.getKey(), property.getValue());
     }
-
+    // TODO bucket period, timezone
     if (functionDTO.getWindowDelay() != 0) {
       detectorYaml.put(PROP_WINDOW_DELAY, functionDTO.getWindowDelay());
       detectorYaml.put(PROP_WINDOW_DELAY_UNIT, functionDTO.getWindowDelayUnit().toString());
