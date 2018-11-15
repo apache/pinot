@@ -69,7 +69,7 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
               statusClassification : [ 'NONE' ],
               score : [ '0.03195732831954956' ],
               functionId : [ '1' ],
-              current : [ '3893.881601969401' ],
+              current : [ '93453.15844726562' ],
               aggregateMultiplier : [ '0.041666666666666664' ],
               metricId : [ '1' ],
               metric : [ 'metric' ],
