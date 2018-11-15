@@ -334,7 +334,6 @@ export default Component.extend({
     const anomalyInfo = get(this, 'anomalyInfo');
     let oldCurrent = parseFloat(get(this, 'current'));
     const newCurrent = this._getAggregate('current');
-
     if (newCurrent && oldCurrent){
       const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
       return (diffCurrent > 0.01);
