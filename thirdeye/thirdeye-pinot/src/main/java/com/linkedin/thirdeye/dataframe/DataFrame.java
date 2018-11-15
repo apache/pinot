@@ -37,6 +37,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -91,11 +92,13 @@ public class DataFrame {
       for(int i=0; i<seriesNames.size(); i++) {
         String rawName = seriesNames.get(i);
 
-        String[] parts = rawName.split(":", 2);
-        if(parts.length == 2) {
+        String[] parts = rawName.split(":");
+        String typeString = parts[parts.length - 1];
+
+        if(parts.length > 1 && getValidTypes().contains(typeString)) {
           // user specified type
-          String name = parts[0];
-          Series.SeriesType type = Series.SeriesType.valueOf(parts[1].toUpperCase());
+          String name = StringUtils.join(Arrays.copyOf(parts, parts.length - 1), ":");
+          Series.SeriesType type = Series.SeriesType.valueOf(typeString);
           Series series = buildSeries(type, i);
           df.addSeries(name, series);
 
@@ -2558,6 +2561,14 @@ public class DataFrame {
     }
 
     return DataFrame.toSeries(values);
+  }
+
+  private static Set<String> getValidTypes() {
+    Set<String> values = new HashSet<>();
+    for (Series.SeriesType type : Series.SeriesType.values()) {
+      values.add(type.name());
+    }
+    return values;
   }
 
   public static class Tuple implements Comparable<Tuple> {
