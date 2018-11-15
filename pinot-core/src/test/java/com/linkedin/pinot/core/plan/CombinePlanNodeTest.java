@@ -36,7 +36,7 @@ public class CombinePlanNodeTest {
   @Test
   public void testParallelExecution() {
     AtomicInteger count = new AtomicInteger(0);
-    int numPlans = 42;
+    int numPlans = 99;
     List<PlanNode> planNodes = new ArrayList<>();
     for (int i = 0; i < numPlans; i++) {
       planNodes.add(new PlanNode() {
