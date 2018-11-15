@@ -137,7 +137,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_FREQUENCY = "frequency";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
-  private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of();
+  private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE");
   private static final Set<String> MOVING_WINDOW_DETECTOR_TYPES = ImmutableSet.of("ALGORITHM");
 
   private final Map<String, Object> components = new HashMap<>();
