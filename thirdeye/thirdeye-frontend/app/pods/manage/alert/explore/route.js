@@ -274,6 +274,8 @@ export default Route.extend({
         const maxTime = isReplayDone && metricId ? await fetch(maxTimeUrl).then(checkStatus) : moment().valueOf();
         Object.assign(model, { metricDataUrl: buildMetricDataUrl({
           maxTime,
+          endStamp: config.endStamp,
+          startStamp: config.startStamp,
           id: metricId,
           filters: config.filters,
           granularity: config.bucketUnit,
