@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.config;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigRenderOptions;
+import com.typesafe.config.ConfigValueFactory;
 import io.vavr.Tuple;
 import io.vavr.collection.HashMap;
 import io.vavr.collection.List;
@@ -50,6 +51,16 @@ public class Serializer {
   public static <T> String serializeToString(T object) {
     Config config = ConfigFactory.parseMap(serialize(object).toJavaMap());
     return config.root().render(ConfigRenderOptions.defaults().setJson(false).setOriginComments(false));
+  }
+
+  public static <T> String serializeToPropertiesString(T object) {
+    ConfigRenderOptions configRenderOptions =
+        ConfigRenderOptions.defaults().setJson(false).setOriginComments(false).setFormatted(false);
+    return serialize(object)
+        .map(keyValueTuple -> keyValueTuple._1 + "=" +
+            ConfigValueFactory.fromAnyRef(keyValueTuple._2).render(configRenderOptions))
+        .sorted()
+        .mkString("\n");
   }
 
   private static <T> Map<String, ?> serialize(T object, Class<? extends T> clazz, String pathContext) throws Exception {
