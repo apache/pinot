@@ -15,6 +15,12 @@
  */
 package com.linkedin.pinot.tools.admin;
 
+import com.linkedin.pinot.tools.admin.command.ApplyTableConfigCommand;
+import com.linkedin.pinot.tools.admin.command.MergeConfigsCommand;
+import com.linkedin.pinot.tools.admin.command.MoveReplicaGroup;
+
+import com.linkedin.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
+import com.linkedin.pinot.tools.segment.converter.SegmentMergeCommand;
 import java.lang.reflect.Field;
 
 import org.kohsuke.args4j.Argument;
@@ -52,11 +58,7 @@ import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
 import com.linkedin.pinot.tools.admin.command.ValidateConfigCommand;
 import com.linkedin.pinot.tools.admin.command.VerifyClusterStateCommand;
 import com.linkedin.pinot.tools.admin.command.VerifySegmentState;
-import com.linkedin.pinot.tools.admin.command.ApplyTableConfigCommand;
-import com.linkedin.pinot.tools.admin.command.MoveReplicaGroup;
-import com.linkedin.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
 import com.linkedin.pinot.tools.segment.converter.PinotSegmentConvertCommand;
-import com.linkedin.pinot.tools.segment.converter.SegmentMergeCommand;
 
 
 /**
@@ -97,7 +99,8 @@ public class PinotAdministrator {
       @SubCommand(name = "VerifyClusterState", impl = VerifyClusterStateCommand.class),
       @SubCommand(name = "ApplyTableConfig", impl = ApplyTableConfigCommand.class),
       @SubCommand(name = "RealtimeProvisioningHelper", impl = RealtimeProvisioningHelperCommand.class),
-      @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class)
+      @SubCommand(name = "MergeSegments", impl = SegmentMergeCommand.class),
+      @SubCommand(name = "MergeConfigs", impl = MergeConfigsCommand.class)
   })
   Command _subCommand;
   // @formatter:on
