@@ -88,11 +88,13 @@ export default Route.extend({
         title: 'Applications',
         type: 'select',
         matchWidth: true,
+        hasNullOption: true, // allow searches for 'none'
         filterKeys: []
       },
       {
         name: 'subscription',
         title: 'Subscription Groups',
+        hasNullOption: true, // allow searches for 'none'
         type: 'select',
         filterKeys: []
       },
@@ -121,6 +123,7 @@ export default Route.extend({
     filterBlocksLocal.filter(block => block.type === 'select').forEach((filter) => {
       const alertPropertyArray = model.alerts.map(alert => alert[filterToPropertyMap[filter.name]]);
       const filterKeys = [ ...new Set(powerSort(alertPropertyArray, null))];
+      // Add filterKeys prop to each facet or filter block
       Object.assign(filter, { filterKeys });
     });
 
