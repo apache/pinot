@@ -83,10 +83,14 @@ public class AbsoluteChangeRuleDetector implements AnomalyDetector<AbsoluteChang
 
     // defaults
     df.addSeries(COL_ANOMALY, BooleanSeries.fillValues(df.size(), false));
-
     // absolute change
     if (!Double.isNaN(this.absoluteChange)) {
-      df.addSeries(COL_PATTERN, this.pattern.equals(Pattern.UP) ? df.getDoubles(COL_DIFF).gt(0) : df.getDoubles(COL_DIFF).lt(0));
+      // consistent with pattern
+      if (pattern.equals(Pattern.UP_OR_DOWN) ) {
+        df.addSeries(COL_PATTERN, BooleanSeries.fillValues(df.size(), true));
+      } else {
+        df.addSeries(COL_PATTERN, this.pattern.equals(Pattern.UP) ? df.getDoubles(COL_DIFF).gt(0) : df.getDoubles(COL_DIFF).lt(0));
+      }
       df.addSeries(COL_DIFF_VIOLATION, df.getDoubles(COL_DIFF).abs().gte(this.absoluteChange));
       df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_DIFF_VIOLATION);
     }

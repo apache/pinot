@@ -75,8 +75,7 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
     double siteWideBaselineValue = getValueFromAggregates(siteWideSlice, aggregates);
 
     // if inconsistent with up/down, filter the anomaly
-    if ((currentValue < baselineValue && pattern.equals(Pattern.UP)) || (currentValue > baselineValue && pattern.equals(
-        Pattern.DOWN))) {
+    if (!pattern.equals(Pattern.UP_OR_DOWN) || (currentValue < baselineValue && pattern.equals(Pattern.UP)) || (currentValue > baselineValue && pattern.equals(Pattern.DOWN))) {
       return false;
     }
     // if doesn't pass the threshold, filter the anomaly

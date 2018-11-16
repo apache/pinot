@@ -16,9 +16,6 @@
 
 package com.linkedin.thirdeye.detection.spec;
 
-import com.linkedin.thirdeye.detection.Pattern;
-
-
 public class AbsoluteChangeRuleDetectorSpec extends AbstractSpec {
   private double absoluteChange = Double.NaN;
   private String offset = "wo1w";

@@ -94,7 +94,12 @@ public class PercentageChangeRuleDetector implements AnomalyDetector<PercentageC
 
     // relative change
     if (!Double.isNaN(this.percentageChange)) {
-      df.addSeries(COL_PATTERN, this.pattern.equals(Pattern.UP) ? df.getDoubles(COL_CHANGE).gt(0) : df.getDoubles(COL_CHANGE).lt(0));
+      // consistent with pattern
+      if (pattern.equals(Pattern.UP_OR_DOWN) ) {
+        df.addSeries(COL_PATTERN, BooleanSeries.fillValues(df.size(), true));
+      } else {
+        df.addSeries(COL_PATTERN, this.pattern.equals(Pattern.UP) ? df.getDoubles(COL_CHANGE).gt(0) : df.getDoubles(COL_CHANGE).lt(0));
+      }
       df.addSeries(COL_CHANGE_VIOLATION, df.getDoubles(COL_CHANGE).abs().gte(this.percentageChange));
       df.mapInPlace(BooleanSeries.ALL_TRUE, COL_ANOMALY, COL_PATTERN, COL_CHANGE_VIOLATION);
     }
