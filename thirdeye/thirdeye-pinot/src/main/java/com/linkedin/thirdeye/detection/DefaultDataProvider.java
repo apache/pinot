@@ -126,45 +126,57 @@ public class DefaultDataProvider implements DataProvider {
     }
   }
 
+  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices,
+      long configId, boolean isLegacy) {
+    String functionIdKey = "detectionConfigId";
+    if (isLegacy) {
+      functionIdKey = "functionId";
+    }
+
+    Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
+    for (AnomalySlice slice : slices) {
+      List<Predicate> predicates = new ArrayList<>();
+      if (slice.getEnd() >= 0) {
+        predicates.add(Predicate.LT("startTime", slice.getEnd()));
+      }
+      if (slice.getStart() >= 0) {
+        predicates.add(Predicate.GT("endTime", slice.getStart()));
+      }
+      if (configId >= 0) {
+        predicates.add(Predicate.EQ(functionIdKey, configId));
+      }
+
+      if (predicates.isEmpty()) throw new IllegalArgumentException("Must provide at least one of start, end, or " + functionIdKey);
+
+      List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
+      anomalies.removeIf(anomaly -> !slice.match(anomaly));
+
+      if (isLegacy) {
+        anomalies.removeIf(anomaly ->
+            (configId >= 0) && (anomaly.getFunctionId() == null || anomaly.getFunctionId() != configId)
+        );
+      } else {
+        anomalies.removeIf(anomaly ->
+            (configId >= 0) && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)
+        );
+      }
+
+      LOG.info("Fetched {} legacy anomalies between (startTime = {}, endTime = {}) with confid Id = {}", anomalies.size(),
+          slice.getStart(), slice.getEnd(), configId);
+      output.putAll(slice, anomalies);
+    }
+
+    return output;
+  }
+
   @Override
   public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchLegacyAnomalies(Collection<AnomalySlice> slices, long configId) {
-    return fetchAnomalies(slices, configId, "functionId");
+    return fetchAnomalies(slices, configId, true);
   }
 
   @Override
   public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
-    return fetchAnomalies(slices, configId, "detectionConfigId");
-  }
-
-  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId,
-      String functionIdKey) {
-    Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
-    for (AnomalySlice slice : slices) {
-      List<Predicate> predicates = new ArrayList<>();
-      if (slice.getEnd() >= 0)
-        predicates.add(Predicate.LT("startTime", slice.getEnd()));
-      if (slice.getStart() >= 0)
-        predicates.add(Predicate.GT("endTime", slice.getStart()));
-      if (configId >= 0)
-        predicates.add(Predicate.EQ(functionIdKey, configId));
-
-      if (predicates.isEmpty())
-        throw new IllegalArgumentException("Must provide at least one of start, end, or " + functionIdKey);
-
-      List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
-      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with confid Id = {} and function id key {}",
-          anomalies.size(), slice.getStart(), slice.getEnd(), configId, functionIdKey);
-      Iterator<MergedAnomalyResultDTO> itAnomaly = anomalies.iterator();
-      while (itAnomaly.hasNext()) {
-        MergedAnomalyResultDTO anomaly = itAnomaly.next();
-        if (!slice.match(anomaly)) {
-          itAnomaly.remove();
-        }
-      }
-
-      output.putAll(slice, anomalies);
-    }
-    return output;
+    return fetchAnomalies(slices, configId, false);
   }
 
   @Override

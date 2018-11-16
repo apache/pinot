@@ -73,8 +73,10 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
     for (Long functionId : this.detectionConfigIds) {
       long startTime = MapUtils.getLong(this.vectorClocks, functionId, 0L);
 
-      AnomalySlice slice =
-          new AnomalySlice().withStart(startTime).withEnd(this.endTime);
+      AnomalySlice slice = new AnomalySlice()
+          .withStart(startTime)
+          .withEnd(this.endTime);
+
       Collection<MergedAnomalyResultDTO> candidates;
       if (this.config.isOnlyFetchLegacyAnomalies()) {
         candidates = this.provider.fetchLegacyAnomalies(Collections.singletonList(slice), functionId).get(slice);
@@ -90,7 +92,11 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
             }
           });
 
-      result.addMapping(this.alertConfig.getReceiverAddresses(), new HashSet<>(anomalies));
+      if (result.getResult().get(this.alertConfig.getReceiverAddresses()) == null) {
+        result.addMapping(this.alertConfig.getReceiverAddresses(), new HashSet<>(anomalies));
+      } else {
+        result.getResult().get(this.alertConfig.getReceiverAddresses()).addAll(anomalies);
+      }
     }
 
     return result;

@@ -123,13 +123,21 @@ public class MockDataProvider implements DataProvider {
     return result;
   }
 
-  @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchLegacyAnomalies(Collection<AnomalySlice> slices,
-      long configId) {
+  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices,
+      long configId, boolean isLegacy) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> result = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       for (MergedAnomalyResultDTO anomaly : this.anomalies) {
         if (slice.match(anomaly)) {
+          if (isLegacy) {
+            if (configId >= 0 && (anomaly.getFunctionId() == null || anomaly.getFunctionId() != configId)) {
+              continue;
+            }
+          } else {
+            if (configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)) {
+              continue;
+            }
+          }
           result.put(slice, anomaly);
         }
       }
@@ -138,19 +146,15 @@ public class MockDataProvider implements DataProvider {
   }
 
   @Override
-  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
-    Multimap<AnomalySlice, MergedAnomalyResultDTO> result = ArrayListMultimap.create();
-    for (AnomalySlice slice : slices) {
-      for (MergedAnomalyResultDTO anomaly : this.anomalies) {
-        if (slice.match(anomaly)) {
-          if (configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)){
-            continue;
-          }
-          result.put(slice, anomaly);
-        }
-      }
-    }
-    return result;
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchLegacyAnomalies(Collection<AnomalySlice> slices,
+      long configId) {
+    return fetchAnomalies(slices, configId, true);
+  }
+
+  @Override
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices,
+      long configId) {
+    return fetchAnomalies(slices, configId, false);
   }
 
   @Override
