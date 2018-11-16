@@ -19,7 +19,8 @@ import {
   computed
 } from '@ember/object';
 import { appendFilters } from 'thirdeye-frontend/utils/rca-utils';
-import { humanizeFloat, checkStatus } from 'thirdeye-frontend/utils/utils';
+import { humanizeFloat, humanizeChange, checkStatus } from 'thirdeye-frontend/utils/utils';
+import floatToPercent from 'thirdeye-frontend/utils/float-to-percent';
 
 const CUSTOMIZE_OPTIONS = [{
   id: 0,
@@ -301,10 +302,21 @@ export default Controller.extend({
           //Get all in the following order - current,wo2w,median4w
           const offsets = await fetch(`/rootcause/metric/aggregate/batch?urn=${metricUrn}&start=${start}&end=${end}&offsets=wo1w,wo2w,median4w&timezone=America/Los_Angeles`).then(checkStatus).then(res => res);
 
+          const current = get(item.anomaly, 'current');
+          const wow = humanizeFloat(offsets[0]);
+          const wo2w = humanizeFloat(offsets[1]);
+          const median4w = humanizeFloat(offsets[2]);
+          const wowChange = floatToPercent(Number((current - offsets[0]) / offsets[0]));
+          const wo2wChange = floatToPercent(Number((current - offsets[1]) / offsets[1]));
+          const median4wChange = floatToPercent(Number((current - offsets[2]) / offsets[2]));
+          const wowHumanizeChange = humanizeChange(Number((current - offsets[0]) / offsets[0]));
+          const wo2wHumanizeChange = humanizeChange(Number((current - offsets[1]) / offsets[1]));
+          const median4wHumanizeChange = humanizeChange(Number((current - offsets[2]) / offsets[2]));
+
           set(item.anomaly, 'offsets',  offsets ? {
-            'wow': humanizeFloat(offsets[0]),
-            'wo2w': humanizeFloat(offsets[1]),
-            'median4w': humanizeFloat(offsets[2])
+            'wow': { value: wow, change: wowChange, humanizedChangeDisplay: wowHumanizeChange },
+            'wo2w': { value: wo2w, change: wo2wChange, humanizedChangeDisplay: wo2wHumanizeChange },
+            'median4w': { value: median4w, change: median4wChange, humanizedChangeDisplay: median4wHumanizeChange },
           } : {
             'wow': '-',
             'wo2w': '-',
@@ -381,9 +393,6 @@ export default Controller.extend({
           'offsetsMap': map
         });
       }
-
-      // //show median4w column
-      // this.toggleProperty('showMedian4w');
   },
 
   _customizeEmailHelper(option, type) {
