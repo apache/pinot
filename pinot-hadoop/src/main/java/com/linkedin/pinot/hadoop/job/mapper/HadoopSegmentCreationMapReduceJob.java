@@ -17,6 +17,7 @@ package com.linkedin.pinot.hadoop.job.mapper;
 
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.utils.DataSize;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
@@ -57,6 +58,7 @@ public class HadoopSegmentCreationMapReduceJob {
     private String _tableName;
     private String _postfix;
     private String _readerConfigFile;
+    private String _starTreeIndexSpecFile;
 
     // Temporary local disk path for current working directory
     private String _currentDiskWorkDir;
@@ -101,6 +103,7 @@ public class HadoopSegmentCreationMapReduceJob {
       _tableName = _properties.get(JobConfigConstants.SEGMENT_TABLE_NAME);
       _postfix = _properties.get(SEGMENT_NAME_POSTFIX, null);
       _readerConfigFile = _properties.get(JobConfigConstants.PATH_TO_READER_CONFIG);
+      _starTreeIndexSpecFile = _properties.get(JobConfigConstants.PATH_TO_STARTREE_INDEX_SPEC);
       if (_outputPath == null || _tableName == null) {
         throw new RuntimeException(
             "Missing configs: " + "\n\toutputPath: " + _properties.get(JobConfigConstants.PATH_TO_OUTPUT)
@@ -233,6 +236,14 @@ public class HadoopSegmentCreationMapReduceJob {
         segmentGeneratorConfig.setSequenceId(seqId);
       }
       segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
+
+      if(_starTreeIndexSpecFile != null){
+        LOGGER.info("StarTreeIndexSpecFile: {}", _starTreeIndexSpecFile);
+        Path starTreeIndexSpecPath = new Path(_starTreeIndexSpecFile);
+        StarTreeIndexSpec starTreeIndexSpec = new ObjectMapper().readValue(_fileSystem.open(starTreeIndexSpecPath), StarTreeIndexSpec.class);
+        LOGGER.info("StarTreeIndexSpec: {}", starTreeIndexSpec.toString());
+        segmentGeneratorConfig.enableStarTreeIndex(starTreeIndexSpec);
+      }
 
       segmentGeneratorConfig.setOutDir(_localDiskOutputSegmentDir);
 
