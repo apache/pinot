@@ -36,7 +36,8 @@ import org.slf4j.LoggerFactory;
 public class CombinePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
 
-  private static final int NUM_PLAN_NODES_THRESHOLD_FOR_PARALLEL_RUN = 10;
+  private static final int MAX_PLAN_THREADS = Math.min(10, (int) (Runtime.getRuntime().availableProcessors() * .5));
+  private static final int MIN_TASKS_PER_THREAD = 10;
   private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 10_000;
 
   private final List<PlanNode> _planNodes;
@@ -67,7 +68,7 @@ public class CombinePlanNode implements PlanNode {
     int numPlanNodes = _planNodes.size();
     List<Operator> operators = new ArrayList<>(numPlanNodes);
 
-    if (numPlanNodes < NUM_PLAN_NODES_THRESHOLD_FOR_PARALLEL_RUN) {
+    if (numPlanNodes <= MIN_TASKS_PER_THREAD) {
       // Small number of plan nodes, run them sequentially
       for (PlanNode planNode : _planNodes) {
         operators.add(planNode.run());
@@ -78,14 +79,24 @@ public class CombinePlanNode implements PlanNode {
       // Calculate the time out timestamp
       long endTime = System.currentTimeMillis() + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
 
+      int threads = Math.min(numPlanNodes/MIN_TASKS_PER_THREAD + ((numPlanNodes % MIN_TASKS_PER_THREAD == 0) ? 0 : 1), // ceil without using double arithmetic
+          MAX_PLAN_THREADS);
+      int opsPerThread = Math.max(numPlanNodes/threads + ((numPlanNodes % threads == 0) ? 0 : 1), // ceil without using double arithmetic
+          MIN_TASKS_PER_THREAD);
       // Submit all jobs
-      Future[] futures = new Future[numPlanNodes];
-      for (int i = 0; i < numPlanNodes; i++) {
+      Future[] futures = new Future[threads];
+      for (int i = 0; i < threads; i++) {
         final int index = i;
-        futures[i] = _executorService.submit(new TraceCallable<Operator>() {
+        futures[i] = _executorService.submit(new TraceCallable<List<Operator>>() {
           @Override
-          public Operator callJob() throws Exception {
-            return _planNodes.get(index).run();
+          public List<Operator> callJob() throws Exception {
+            List<Operator> operators = new ArrayList<>();
+            int start = index * opsPerThread;
+            int limit = Math.min(opsPerThread, numPlanNodes - start);
+            for(int count = start; count < start + limit; count++) {
+              operators.add(_planNodes.get(count).run());
+            }
+            return operators;
           }
         });
       }
@@ -93,7 +104,8 @@ public class CombinePlanNode implements PlanNode {
       // Get all results
       try {
         for (Future future : futures) {
-          operators.add((Operator) future.get(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS));
+          List<Operator> ops = (List<Operator>) future.get(endTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+          operators.addAll(ops);
         }
       } catch (Exception e) {
         // Future object will throw ExecutionException for execution exception, need to check the cause to determine
