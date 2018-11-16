@@ -23,7 +23,8 @@ import java.util.Map;
 import org.joda.time.Interval;
 
 /**
- * The tunable. For tuning specs of each component.
+ * The tunable. For tuning specs of each component. Will be initialize with user's input yaml for this
+ * component.
  */
 public interface Tunable<T extends AbstractSpec> extends BaseComponent<T> {
   /**

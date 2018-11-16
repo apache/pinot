@@ -27,6 +27,7 @@ import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import com.linkedin.thirdeye.detection.spi.model.InputData;
 import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -56,12 +57,21 @@ public class DefaultInputDataFetcher implements InputDataFetcher {
     Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIds());
     Map<String, DatasetConfigDTO> datasets = provider.fetchDatasets(inputDataSpec.getDatasetNames());
 
-    Map<Long, DatasetConfigDTO> datasetForMetricId = fetchDatasetForMetricId(provider, inputDataSpec);
-    return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events, metrics, datasets, datasetForMetricId);
+    Map<Long, DatasetConfigDTO> datasetForMetricId = fetchDatasetForMetricId(inputDataSpec.getMetricIdsForDatasets());
+    Map<InputDataSpec.MetricAndDatasetName, MetricConfigDTO> metricForMetricAndDatasetName = fetchMetricForDatasetAndMetricNames(inputDataSpec.getMetricAndDatasetNames());
+    return new InputData(inputDataSpec, timeseries, aggregates, existingAnomalies, events, metrics, datasets, datasetForMetricId, metricForMetricAndDatasetName);
   }
 
-  private Map<Long, DatasetConfigDTO> fetchDatasetForMetricId(DataProvider provider, InputDataSpec inputDataSpec) {
-    Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(inputDataSpec.getMetricIdsForDatasets());
+  private Map<InputDataSpec.MetricAndDatasetName, MetricConfigDTO> fetchMetricForDatasetAndMetricNames(Collection<InputDataSpec.MetricAndDatasetName> metricNameAndDatasetNames){
+    Map<InputDataSpec.MetricAndDatasetName, MetricConfigDTO> result = new HashMap<>();
+    for (InputDataSpec.MetricAndDatasetName pair : metricNameAndDatasetNames) {
+      result.put(pair, this.provider.fetchMetric(pair.getMetricName(), pair.getDatasetName()));
+    }
+    return result;
+  }
+
+  private Map<Long, DatasetConfigDTO> fetchDatasetForMetricId(Collection<Long> metricIdsForDatasets) {
+    Map<Long, MetricConfigDTO> metrics = provider.fetchMetrics(metricIdsForDatasets);
     Map<Long, String> metricIdToDataSet = new HashMap<>();
     for (Map.Entry<Long, MetricConfigDTO> entry : metrics.entrySet()){
       metricIdToDataSet.put(entry.getKey(), entry.getValue().getDataset());
