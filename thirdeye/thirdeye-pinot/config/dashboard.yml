@@ -19,9 +19,10 @@ rootCause:
 dashboardHost: "http://localhost:1426"
 failureFromAddress: thirdeye@localhost
 failureToAddress: user@localhost
-smtpConfiguration:
-  smtpHost: localhost
-  smtpPort: 25
+alerterConfiguration:
+  smtpConfiguration:
+    smtpHost: localhost
+    smtpPort: 25
 server:
   type: default
   applicationConnectors:

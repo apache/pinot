@@ -25,11 +25,10 @@ detectionPipeline: false
 detectionAlert: false
 dashboardHost: "http://localhost:1426"
 id: 0
-smtpConfiguration:
-  smtpHost: "localhost"
-  smtpPort: 25
-  smtpUser: ""
-  smtpPassword: ""
+alerterConfiguration:
+  smtpConfiguration:
+    smtpHost: "localhost"
+    smtpPort: 25
 failureFromAddress: "thirdeye@localhost"
 failureToAddress: "thirdeye@localhost"
 phantomJsPath: "/usr/local/bin/jstf"
