@@ -96,9 +96,17 @@ public class DetectionMigrationResource {
     yamlConfigs.put("filters",
         AnomalyDetectionInputContextBuilder.getFiltersForFunction(anomalyFunctionDTO.getFilters()).asMap());
 
-    Map<String, Object> ruleYaml = ImmutableMap.of("name", "myRule", "detection", Collections.singletonList(
-        ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO))), "filter",
-        Collections.singletonList(ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO))));
+    Map<String, Object> ruleYaml = new HashMap<>();
+    ruleYaml.put("name", "myRule");
+    ruleYaml.put("detection", Collections.singletonList(
+        ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO))));
+
+    Map<String, String> alertFilter = anomalyFunctionDTO.getAlertFilter();
+    if (alertFilter != null && !alertFilter.isEmpty()){
+      ruleYaml.put("filter", Collections.singletonList(
+          ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO))));
+    }
+
     yamlConfigs.put("rules", Collections.singletonList(ruleYaml));
     return this.yaml.dump(yamlConfigs);
   }
