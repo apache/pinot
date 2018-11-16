@@ -34,8 +34,12 @@ frameworks:
           className: com.linkedin.thirdeye.rootcause.impl.EmptyPipeline
 
     eventHoliday:
-        - outputName: OUTPUT
+        - outputName: METRIC_RELATED
           inputNames: [INPUT]
+          className: com.linkedin.thirdeye.rootcause.impl.MetricAnalysisPipeline
+
+        - outputName: OUTPUT
+          inputNames: [INPUT, METRIC_RELATED]
           className: com.linkedin.thirdeye.rootcause.impl.ThirdEyeEventsPipeline
           properties:
               strategy: COMPOUND
