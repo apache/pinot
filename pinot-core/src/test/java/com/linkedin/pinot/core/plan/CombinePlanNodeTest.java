@@ -20,6 +20,7 @@ import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -35,27 +36,32 @@ public class CombinePlanNodeTest {
    */
   @Test
   public void testParallelExecution() {
-    AtomicInteger count = new AtomicInteger(0);
-    int numPlans = 99;
-    List<PlanNode> planNodes = new ArrayList<>();
-    for (int i = 0; i < numPlans; i++) {
-      planNodes.add(new PlanNode() {
-        @Override
-        public Operator run() {
-          count.incrementAndGet();
-          return null;
-        }
 
-        @Override
-        public void showTree(String prefix) {
-        }
-      });
+    AtomicInteger count = new AtomicInteger(0);
+
+    Random rand = new Random();
+    for (int i = 0; i < 5; ++i) {
+      count.set(0);
+      int numPlans = rand.nextInt(5000);
+      List<PlanNode> planNodes = new ArrayList<>();
+      for (int index = 0; index < numPlans; index++) {
+        planNodes.add(new PlanNode() {
+          @Override
+          public Operator run() {
+            count.incrementAndGet();
+            return null;
+          }
+
+          @Override
+          public void showTree(String prefix) {
+          }
+        });
+      }
+      CombinePlanNode combinePlanNode =
+          new CombinePlanNode(planNodes, new BrokerRequest(), _executorService, 1000, InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
+      combinePlanNode.run();
+      Assert.assertEquals(numPlans, count.get());
     }
-    CombinePlanNode combinePlanNode =
-        new CombinePlanNode(planNodes, new BrokerRequest(), _executorService, 1000,
-            InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT);
-    combinePlanNode.run();
-    Assert.assertEquals(numPlans, count.get());
   }
 
   @Test

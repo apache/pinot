@@ -93,7 +93,7 @@ public class CombinePlanNode implements PlanNode {
             List<Operator> operators = new ArrayList<>();
             int start = index * opsPerThread;
             int limit = Math.min(opsPerThread, numPlanNodes - start);
-            for(int count = index * opsPerThread; count < start + limit; count = count + 1) {
+            for(int count = start; count < start + limit; count++) {
               operators.add(_planNodes.get(count).run());
             }
             return operators;
