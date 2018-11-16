@@ -52,8 +52,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   public PinotTaskManager(@Nonnull PinotHelixTaskResourceManager helixTaskResourceManager,
       @Nonnull PinotHelixResourceManager helixResourceManager, @Nonnull ControllerConf controllerConf,
       @Nonnull ControllerMetrics controllerMetrics) {
-    super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(),
-        Math.min(60, controllerConf.getTaskManagerFrequencyInSeconds()), helixResourceManager);
+    super("PinotTaskManager", controllerConf.getTaskManagerFrequencyInSeconds(), helixResourceManager);
     _helixTaskResourceManager = helixTaskResourceManager;
     _clusterInfoProvider = new ClusterInfoProvider(helixResourceManager, helixTaskResourceManager, controllerConf);
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoProvider);
@@ -82,12 +81,13 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   }
 
   /**
-   * Check the Pinot cluster status and schedule new tasks.
-   * @param allTableNames List of all the table names
+   * Check the Pinot cluster status and schedule new tasks for the given tables.
+   *
+   * @param tables List of table names
    * @return Map from task type to task scheduled
    */
   @Nonnull
-  private Map<String, String> scheduleTasks(List<String> allTableNames) {
+  private Map<String, String> scheduleTasks(List<String> tables) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
@@ -102,7 +102,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
     }
 
     // Scan all table configs to get the tables with tasks enabled
-    for (String tableName : allTableNames) {
+    for (String tableName : tables) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
       if (tableConfig != null) {
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
@@ -155,7 +155,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> allTableNames) {
-    scheduleTasks(allTableNames);
+  public void process(List<String> tables) {
+    scheduleTasks(tables);
   }
 }

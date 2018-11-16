@@ -27,8 +27,6 @@ import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicT
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -69,7 +67,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
     _config = config;
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _metricsRegistry = metricsRegistry;
-    HttpConnectionManager httpConnectionManager = new MultiThreadedHttpConnectionManager();
   }
 
   @Override
@@ -85,15 +82,17 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> allTableNames) {
-    updateSegmentMetrics(allTableNames);
+  public void process(List<String> tables) {
+    updateSegmentMetrics(tables);
   }
 
   /**
-   * Runs a segment status pass over the currently loaded tables.
-   * @param allTableNames List of all the table names
+   * Runs a segment status pass over the given tables.
+   * TODO: revisit the logic and reduce the ZK access
+   *
+   * @param tables List of table names
    */
-  private void updateSegmentMetrics(List<String> allTableNames) {
+  private void updateSegmentMetrics(List<String> tables) {
     // Fetch the list of tables
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
@@ -112,7 +111,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
       logDisabledTables = false;
     }
 
-    for (String tableName : allTableNames) {
+    for (String tableName : tables) {
       try {
         if (TableNameBuilder.getTableTypeFromTableName(tableName) == TableType.OFFLINE) {
           offlineTableCount++;

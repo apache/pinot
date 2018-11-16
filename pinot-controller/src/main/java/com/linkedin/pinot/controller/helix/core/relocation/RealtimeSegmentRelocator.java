@@ -58,18 +58,19 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> allTableNames) {
-    runRelocation(allTableNames);
+  public void process(List<String> tables) {
+    runRelocation(tables);
   }
 
   /**
-   * Check all tables. Perform relocation of segments if table is realtime and relocation is required
+   * Check the given tables. Perform relocation of segments if table is realtime and relocation is required
    * TODO: Model this to implement {@link com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy} interface
    * https://github.com/linkedin/pinot/issues/2609
-   * @param allTableNames List of all the table names
+   *
+   * @param tables List of table names
    */
-  private void runRelocation(List<String> allTableNames) {
-    for (final String tableNameWithType : allTableNames) {
+  private void runRelocation(List<String> tables) {
+    for (String tableNameWithType : tables) {
       // Only consider realtime tables.
       if (!TableNameBuilder.REALTIME.tableHasTypeSuffix(tableNameWithType)) {
         continue;

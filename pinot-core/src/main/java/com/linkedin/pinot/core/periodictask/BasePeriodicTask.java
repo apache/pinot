@@ -19,9 +19,9 @@ package com.linkedin.pinot.core.periodictask;
  * A base class to implement periodic task interface.
  */
 public abstract class BasePeriodicTask implements PeriodicTask {
-  private final String _taskName;
-  private long _intervalInSeconds;
-  private long _initialDelayInSeconds;
+  protected final String _taskName;
+  protected final long _intervalInSeconds;
+  protected final long _initialDelayInSeconds;
 
   public BasePeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds) {
     _taskName = taskName;
@@ -42,5 +42,11 @@ public abstract class BasePeriodicTask implements PeriodicTask {
   @Override
   public String getTaskName() {
     return _taskName;
+  }
+
+  @Override
+  public String toString() {
+    return String.format("Task: %s, Interval: %ds, Initial Delay: %ds", _taskName, _intervalInSeconds,
+        _initialDelayInSeconds);
   }
 }
