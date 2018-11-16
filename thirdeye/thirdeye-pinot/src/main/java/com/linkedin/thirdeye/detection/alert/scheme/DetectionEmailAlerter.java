@@ -176,7 +176,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   public void run() throws Exception {
     Preconditions.checkNotNull(result);
     if (result.getAllAnomalies().size() == 0) {
-      LOG.info("Zero anomalies found, skipping sending iris alert for {}", config.getId());
+      LOG.info("Zero anomalies found, skipping sending email alert for {}", config.getId());
       return;
     }
 

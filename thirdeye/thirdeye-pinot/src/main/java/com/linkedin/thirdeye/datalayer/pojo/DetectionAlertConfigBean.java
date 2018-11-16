@@ -36,6 +36,7 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String from;
   String cronExpression;
   String application;
+  boolean onlyFetchLegacyAnomalies;
 
   Map<String, Map<String, Object>> alertSchemes;
   Map<String, Map<String, Object>> alertSuppressors;
@@ -47,6 +48,14 @@ public class DetectionAlertConfigBean extends AbstractBean {
   Map<String, Object> properties;
 
   Map<String, String> refLinks;
+
+  public boolean isOnlyFetchLegacyAnomalies() {
+    return onlyFetchLegacyAnomalies;
+  }
+
+  public void setOnlyFetchLegacyAnomalies(boolean onlyFetchLegacyAnomalies) {
+    this.onlyFetchLegacyAnomalies = onlyFetchLegacyAnomalies;
+  }
 
   public boolean isActive() {
     return active;

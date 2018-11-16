@@ -33,6 +33,7 @@ import org.apache.commons.collections.MapUtils;
 
 
 public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter {
+
   public StatefulDetectionAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) {
     super(provider, config, endTime);
   }
@@ -47,11 +48,16 @@ public abstract class StatefulDetectionAlertFilter extends DetectionAlertFilter 
   protected final Set<MergedAnomalyResultDTO> filter(Map<Long, Long> vectorClocks, final long minId) {
     // retrieve all candidate anomalies
     Set<MergedAnomalyResultDTO> allAnomalies = new HashSet<>();
-    for (Long detectionConfigId : vectorClocks.keySet()) {
-      long startTime = vectorClocks.get(detectionConfigId);
+    for (Long functionId : vectorClocks.keySet()) {
+      long startTime = vectorClocks.get(functionId);
 
       AnomalySlice slice = new AnomalySlice().withStart(startTime).withEnd(this.endTime);
-      Collection<MergedAnomalyResultDTO> candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), detectionConfigId).get(slice);
+      Collection<MergedAnomalyResultDTO> candidates;
+      if (this.config.isOnlyFetchLegacyAnomalies()) {
+        candidates = this.provider.fetchLegacyAnomalies(Collections.singletonList(slice), functionId).get(slice);
+      } else {
+        candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), functionId).get(slice);
+      }
 
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {

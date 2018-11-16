@@ -32,6 +32,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
 import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
+import com.linkedin.thirdeye.detection.alert.StatefulDetectionAlertFilter;
 import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.spi.model.EventSlice;
 import java.util.ArrayList;
@@ -45,9 +46,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class DefaultDataProvider implements DataProvider {
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultDataProvider.class);
   private static final long TIMEOUT = 60000;
 
   private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -123,7 +127,17 @@ public class DefaultDataProvider implements DataProvider {
   }
 
   @Override
+  public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchLegacyAnomalies(Collection<AnomalySlice> slices, long configId) {
+    return fetchAnomalies(slices, configId, "functionId");
+  }
+
+  @Override
   public Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId) {
+    return fetchAnomalies(slices, configId, "detectionConfigId");
+  }
+
+  private Multimap<AnomalySlice, MergedAnomalyResultDTO> fetchAnomalies(Collection<AnomalySlice> slices, long configId,
+      String functionIdKey) {
     Multimap<AnomalySlice, MergedAnomalyResultDTO> output = ArrayListMultimap.create();
     for (AnomalySlice slice : slices) {
       List<Predicate> predicates = new ArrayList<>();
@@ -132,19 +146,17 @@ public class DefaultDataProvider implements DataProvider {
       if (slice.getStart() >= 0)
         predicates.add(Predicate.GT("endTime", slice.getStart()));
       if (configId >= 0)
-        predicates.add(Predicate.EQ("detectionConfigId", configId));
+        predicates.add(Predicate.EQ(functionIdKey, configId));
 
       if (predicates.isEmpty())
-        throw new IllegalArgumentException("Must provide at least one of start, end, or detectionConfigId");
+        throw new IllegalArgumentException("Must provide at least one of start, end, or " + functionIdKey);
 
       List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(AND(predicates));
+      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with confid Id = {} and function id key {}",
+          anomalies.size(), slice.getStart(), slice.getEnd(), configId, functionIdKey);
       Iterator<MergedAnomalyResultDTO> itAnomaly = anomalies.iterator();
       while (itAnomaly.hasNext()) {
         MergedAnomalyResultDTO anomaly = itAnomaly.next();
-        if (configId >= 0 && (anomaly.getDetectionConfigId() == null || anomaly.getDetectionConfigId() != configId)){
-          itAnomaly.remove();
-        }
-
         if (!slice.match(anomaly)) {
           itAnomaly.remove();
         }
