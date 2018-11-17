@@ -181,7 +181,7 @@ public abstract class SegmentDirectory implements Closeable {
     // NOTE: an interface like readFrom(File f, String column, ColumnIndexType, int sizeBytes) will be safe
     // but it can lead to potential endianness issues. Endianness used to create data may not be
     // same as PinotDataBufferOld
-    public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, int sizeBytes)
+    public abstract PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
         throws IOException;
 
     /**

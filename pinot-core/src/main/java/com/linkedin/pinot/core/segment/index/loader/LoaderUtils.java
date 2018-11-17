@@ -48,7 +48,7 @@ public class LoaderUtils {
    */
   public static void writeIndexToV3Format(SegmentDirectory.Writer segmentWriter, String column, File indexFile,
       ColumnIndexType indexType) throws IOException {
-    int fileLength = (int) indexFile.length();
+    long fileLength = indexFile.length();
     try (PinotDataBuffer buffer = segmentWriter.newIndexFor(column, indexType, fileLength)) {
       buffer.readFrom(0, indexFile, 0, fileLength);
       FileUtils.forceDelete(indexFile);

@@ -356,7 +356,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, int sizeBytes)
+    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
         throws IOException {
       return getNewIndexBuffer(new IndexKey(columnName, indexType), sizeBytes);
     }
