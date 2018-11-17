@@ -101,7 +101,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newDictionaryBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
       throws IOException;
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
@@ -110,7 +110,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
       throws IOException;
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
@@ -119,7 +119,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
       throws IOException;
 
   /**

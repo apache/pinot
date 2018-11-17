@@ -407,12 +407,11 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       ColumnIndexType indexType = key.type;
       switch (indexType) {
         case DICTIONARY:
-          return columnIndexDirectory.newDictionaryBuffer(key.name, (int) sizeBytes);
-
+          return columnIndexDirectory.newDictionaryBuffer(key.name, sizeBytes);
         case FORWARD_INDEX:
-          return columnIndexDirectory.newForwardIndexBuffer(key.name, (int) sizeBytes);
+          return columnIndexDirectory.newForwardIndexBuffer(key.name, sizeBytes);
         case INVERTED_INDEX:
-          return columnIndexDirectory.newInvertedIndexBuffer(key.name, ((int) sizeBytes));
+          return columnIndexDirectory.newInvertedIndexBuffer(key.name, sizeBytes);
         default:
           throw new RuntimeException("Unknown index type: " + indexType.name() +
               " for directory: " + segmentDirectory);
