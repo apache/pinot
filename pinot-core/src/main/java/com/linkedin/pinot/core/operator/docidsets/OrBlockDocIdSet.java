@@ -72,6 +72,15 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
+  public long getNumIndicesLoaded() {
+    long loaded = 0;
+    for (FilterBlockDocIdSet docIdSet : _docIdSets) {
+      loaded += docIdSet.getNumIndicesLoaded();
+    }
+    return loaded;
+  }
+
+  @Override
   public BlockDocIdIterator iterator() {
     boolean useBitmapOr = false;
     for (BlockDocIdSet docIdSet : _docIdSets) {

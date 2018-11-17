@@ -50,6 +50,11 @@ public final class SizeBasedDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
+  public long getNumIndicesLoaded() {
+    return 0L;
+  }
+
+  @Override
   public BlockDocIdIterator iterator() {
     return new SizeBasedDocIdIterator(_maxDocId);
   }

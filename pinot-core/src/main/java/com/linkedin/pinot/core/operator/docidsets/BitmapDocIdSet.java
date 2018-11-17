@@ -23,19 +23,20 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 public class BitmapDocIdSet implements FilterBlockDocIdSet {
   private final ImmutableRoaringBitmap _bitmap;
+  private final long _bitMapCount;
   private int _startDocId;
   // Inclusive
   private int _endDocId;
 
   public BitmapDocIdSet(ImmutableRoaringBitmap[] bitmaps, int startDocId, int endDocId, boolean exclusive) {
-    int numBitmaps = bitmaps.length;
-    if (numBitmaps > 1) {
+    _bitMapCount = bitmaps.length;
+    if (_bitMapCount > 1) {
       MutableRoaringBitmap orBitmap = MutableRoaringBitmap.or(bitmaps);
       if (exclusive) {
         orBitmap.flip(startDocId, endDocId + 1);
       }
       _bitmap = orBitmap;
-    } else if (numBitmaps == 1) {
+    } else if (_bitMapCount == 1) {
       if (exclusive) {
         // NOTE: cannot use ImmutableRoaringBitmap.flip() because the library has a bug in that method
         // TODO: the bug has been fixed in the latest version of ImmutableRoaringBitmap, update the version
@@ -80,6 +81,11 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
+  }
+
+  @Override
+  public long getNumIndicesLoaded() {
+    return _bitMapCount;
   }
 
   @Override

@@ -78,6 +78,11 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
+  public long getNumIndicesLoaded() {
+    return 0L;
+  }
+
+  @Override
   public BlockDocIdIterator iterator() {
     if (pairs == null || pairs.isEmpty()) {
       return EmptyBlockDocIdIterator.getInstance();

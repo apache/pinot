@@ -56,6 +56,11 @@ public final class EmptyFilterBlockDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
+  public long getNumIndicesLoaded() {
+    return 0L;
+  }
+
+  @Override
   public BlockDocIdIterator iterator() {
     return EmptyBlockDocIdIterator.getInstance();
   }

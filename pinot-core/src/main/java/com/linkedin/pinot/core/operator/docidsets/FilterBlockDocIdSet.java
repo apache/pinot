@@ -68,4 +68,9 @@ public interface FilterBlockDocIdSet extends BlockDocIdSet {
    * Returns the number of entries scanned in filtering phase.
    */
   long getNumEntriesScannedInFilter();
+
+  /**
+   * Returns the number of indices loaded in filtering phase.
+   */
+  long getNumIndicesLoaded();
 }

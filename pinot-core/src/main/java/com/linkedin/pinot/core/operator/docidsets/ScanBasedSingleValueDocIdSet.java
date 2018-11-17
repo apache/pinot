@@ -73,6 +73,11 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
+  public long getNumIndicesLoaded() {
+    return 0L;
+  }
+  
+  @Override
   public ScanBasedDocIdIterator iterator() {
     return blockValSetBlockDocIdIterator;
   }

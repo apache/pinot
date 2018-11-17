@@ -70,7 +70,8 @@ public class MetadataBasedAggregationOperator extends BaseOperator<IntermediateR
 
     // Create execution statistics. Set numDocsScanned to totalRawDocs for backward compatibility.
     _executionStatistics =
-        new ExecutionStatistics(totalRawDocs, 0/*numEntriesScannedInFilter*/, 0/*numEntriesScannedPostFilter*/,
+        new ExecutionStatistics(totalRawDocs, 0/*numIndicesLoaded*/,
+            0/*numEntriesScannedInFilter*/, 0/*numEntriesScannedPostFilter*/,
             totalRawDocs);
 
     // Build intermediate result block based on aggregation result from the executor.

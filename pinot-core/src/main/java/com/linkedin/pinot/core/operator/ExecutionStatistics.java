@@ -20,6 +20,7 @@ package com.linkedin.pinot.core.operator;
  */
 public class ExecutionStatistics {
   private long _numDocsScanned;
+  private long _numIndicesLoaded;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
@@ -29,9 +30,10 @@ public class ExecutionStatistics {
   public ExecutionStatistics() {
   }
 
-  public ExecutionStatistics(long numDocsScanned, long numEntriesScannedInFilter, long numEntriesScannedPostFilter,
-      long numTotalRawDocs) {
+  public ExecutionStatistics(long numDocsScanned, long numIndicesLoaded, long numEntriesScannedInFilter,
+      long numEntriesScannedPostFilter, long numTotalRawDocs) {
     _numDocsScanned = numDocsScanned;
+    _numIndicesLoaded = numIndicesLoaded;
     _numEntriesScannedInFilter = numEntriesScannedInFilter;
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
     _numTotalRawDocs = numTotalRawDocs;
@@ -41,6 +43,10 @@ public class ExecutionStatistics {
 
   public long getNumDocsScanned() {
     return _numDocsScanned;
+  }
+
+  public long getNumIndicesLoaded() {
+    return _numIndicesLoaded;
   }
 
   public long getNumEntriesScannedInFilter() {
@@ -70,6 +76,7 @@ public class ExecutionStatistics {
    */
   public void merge(ExecutionStatistics executionStatisticsToMerge) {
     _numDocsScanned += executionStatisticsToMerge._numDocsScanned;
+    _numIndicesLoaded += executionStatisticsToMerge._numIndicesLoaded;
     _numEntriesScannedInFilter += executionStatisticsToMerge._numEntriesScannedInFilter;
     _numEntriesScannedPostFilter += executionStatisticsToMerge._numEntriesScannedPostFilter;
     _numTotalRawDocs += executionStatisticsToMerge._numTotalRawDocs;
@@ -81,6 +88,7 @@ public class ExecutionStatistics {
   public String toString() {
     return "Execution Statistics:"
         + "\n  numDocsScanned: " + _numDocsScanned
+        + "\n  numIndicesLoaded: " + _numIndicesLoaded
         + "\n  numEntriesScannedInFilter: " + _numEntriesScannedInFilter
         + "\n  numEntriesScannedPostFilter: " + _numEntriesScannedPostFilter
         + "\n  numTotalRawDocs: " + _numTotalRawDocs

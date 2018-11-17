@@ -27,6 +27,7 @@ import javax.annotation.Nonnull;
 public interface DataTable {
   String EXCEPTION_METADATA_KEY = "Exception";
   String NUM_DOCS_SCANNED_METADATA_KEY = "numDocsScanned";
+  String NUM_INDICES_LOADED_KEY = "numIndicesLoaded";
   String NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY = "numEntriesScannedInFilter";
   String NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY = "numEntriesScannedPostFilter";
   String NUM_SEGMENTS_QUERIED = "numSegmentsQueried";

@@ -259,4 +259,13 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
     }
     return numEntriesScannedInFilter;
   }
+
+  @Override
+  public long getNumIndicesLoaded() {
+    long loaded = 0;
+    for (FilterBlockDocIdSet docIdSet : blockDocIdSets) {
+      loaded += docIdSet.getNumIndicesLoaded();
+    }
+    return loaded;
+  }
 }

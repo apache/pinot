@@ -88,6 +88,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    return new ExecutionStatistics(0L, _filterBlockDocIdSet.getNumEntriesScannedInFilter(), 0L, 0L);
+    return new ExecutionStatistics(0L, _filterBlockDocIdSet.getNumIndicesLoaded(),
+        _filterBlockDocIdSet.getNumEntriesScannedInFilter(), 0L, 0L);
   }
 }

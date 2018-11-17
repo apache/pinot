@@ -50,6 +50,7 @@ public class IntermediateResultsBlock implements Block {
   private List<Map<String, Object>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
+  private long _numIndicesLoaded;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
@@ -165,6 +166,10 @@ public class IntermediateResultsBlock implements Block {
 
   public void setNumDocsScanned(long numDocsScanned) {
     _numDocsScanned = numDocsScanned;
+  }
+
+  public void setNumIndicesLoaded(long numIndicesLoaded) {
+    _numIndicesLoaded = numIndicesLoaded;
   }
 
   public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
@@ -293,6 +298,7 @@ public class IntermediateResultsBlock implements Block {
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {
     dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
+    dataTable.getMetadata().put(DataTable.NUM_INDICES_LOADED_KEY, String.valueOf(_numIndicesLoaded));
     dataTable.getMetadata()
         .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
     dataTable.getMetadata()
