@@ -111,19 +111,19 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newDictionaryBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
       throws IOException {
     return allocNewBufferInternal(column, ColumnIndexType.DICTIONARY, sizeBytes, "dictionary.create");
   }
 
   @Override
-  public PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
       throws IOException {
     return allocNewBufferInternal(column, ColumnIndexType.FORWARD_INDEX, sizeBytes, "forward_index.create");
   }
 
   @Override
-  public PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
       throws IOException {
     return  allocNewBufferInternal(column, ColumnIndexType.INVERTED_INDEX, sizeBytes, "inverted_index.create");
   }
@@ -139,7 +139,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   // This is using extra resources right now which can be changed.
-  private PinotDataBuffer allocNewBufferInternal(String column, ColumnIndexType indexType, int size,
+  private PinotDataBuffer allocNewBufferInternal(String column, ColumnIndexType indexType, long size,
       String context)
       throws IOException {
 

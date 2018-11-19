@@ -46,7 +46,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newDictionaryBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
       throws IOException {
     IndexKey key = new IndexKey(column, ColumnIndexType.DICTIONARY);
     return getWriteBufferFor(key, sizeBytes);
@@ -60,7 +60,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
       throws IOException {
     IndexKey key = new IndexKey(column, ColumnIndexType.FORWARD_INDEX);
     return getWriteBufferFor(key, sizeBytes);
@@ -74,7 +74,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
-  public PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
       throws IOException {
     IndexKey key = new IndexKey(column, ColumnIndexType.INVERTED_INDEX);
     return getWriteBufferFor(key, sizeBytes);
@@ -116,7 +116,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return buffer;
   }
 
-  private PinotDataBuffer getWriteBufferFor(IndexKey key, int sizeBytes) throws IOException {
+  private PinotDataBuffer getWriteBufferFor(IndexKey key, long sizeBytes) throws IOException {
     if (indexBuffers.containsKey(key)) {
       return indexBuffers.get(key);
     }
@@ -146,7 +146,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
     return new File(segmentDirectory, filename);
   }
 
-  private PinotDataBuffer mapForWrites(File file, int sizeBytes, String context) throws IOException {
+  private PinotDataBuffer mapForWrites(File file, long sizeBytes, String context) throws IOException {
     Preconditions.checkNotNull(file);
     Preconditions.checkArgument(sizeBytes >= 0 && sizeBytes < Integer.MAX_VALUE,
         "File size must be less than 2GB, file: " + file);
