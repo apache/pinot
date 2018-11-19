@@ -256,15 +256,17 @@ public class RootCauseMetricResource {
     offsets = ResourceUtils.parseListParams(offsets);
     List<MetricSlice> slices = new ArrayList<>();
 
-    Map<String, MetricSlice> offsetToBaseSlice = new HashMap<>();
+    Map<Pair<String, String>, MetricSlice> offsetToBaseSlice = new HashMap<>();
     Map<Pair<String, String>, Baseline> tupleToRange = new HashMap<>();
     for (String urn : urns) {
       for (String offset : offsets) {
+        Pair<String, String> key = Pair.of(urn, offset);
+
         MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
-        offsetToBaseSlice.put(offset, baseSlice);
+        offsetToBaseSlice.put(key, baseSlice);
 
         Baseline range = parseOffset(offset, timezone);
-        tupleToRange.put(Pair.of(urn, offset), range);
+        tupleToRange.put(key, range);
 
         List<MetricSlice> currentSlices = range.scatter(baseSlice);
 
@@ -279,7 +281,8 @@ public class RootCauseMetricResource {
     // Pick the results
     for (String urn : urns) {
       for (String offset : offsets) {
-        DataFrame result = tupleToRange.get(Pair.of(urn, offset)).gather(offsetToBaseSlice.get(offset), data);
+        Pair<String, String> key = Pair.of(urn, offset);
+        DataFrame result = tupleToRange.get(key).gather(offsetToBaseSlice.get(key), data);
         if (result.isEmpty()) {
           aggregateValues.put(urn, Double.NaN);
         } else {
