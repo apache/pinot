@@ -48,7 +48,7 @@ public class CompositePipelineConfigTranslatorTest {
 
 
   @Test
-  public void testBuildDetectionPropertiesMultipleRules() throws Exception {
+  public void testBuildDetectionPropertiesFull() throws Exception {
     this.yamlConfig = (Map<String, Object>) this.yaml.load(this.getClass().getResourceAsStream("pipeline-config-1.yaml"));
     CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
     YamlTranslationResult result = translator.translateYaml();

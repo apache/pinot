@@ -21,6 +21,11 @@ rules:
       max: 100
   filter:
   - type: THRESHOLD_RULE_FILTER
+    id: 0
+    params:
+      min: 50
+  - type: THRESHOLD_RULE_FILTER
+    id: 1
     params:
       min: 50
 - name: rule2
@@ -32,3 +37,6 @@ rules:
   - type: THRESHOLD_RULE_FILTER
     params:
       min: 50
+merger:
+  maxGap: 0
+  maxDuration: 100

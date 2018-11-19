@@ -50,6 +50,7 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 import static com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder.*;
+import static com.linkedin.thirdeye.anomaly.merge.AnomalyMergeStrategy.*;
 
 
 /**
@@ -88,6 +89,9 @@ public class DetectionMigrationResource {
   public void getAnomalyFunctionStats() {
     List<AnomalyFunctionDTO> anomalyFunctions = this.anomalyFunctionDAO.findAll();
     long mergeConfigCount = 0;
+    long functionDimensionsMergeStrategyCount = 0;
+    long averageThresholdDataFilterCount = 0;
+
     long datafilterCount = 0;
     long swiFilterCount = 0;
     long twoSideSWICount = 0;
@@ -98,9 +102,18 @@ public class DetectionMigrationResource {
         continue;
       }
       if (anomalyFunctionDTO.getAnomalyMergeConfig() != null ) {
+        if (anomalyFunctionDTO.getAnomalyMergeConfig().getMergeStrategy() == FUNCTION_DIMENSIONS){
+          functionDimensionsMergeStrategyCount++;
+          LOGGER.info(anomalyFunctionDTO.getAnomalyMergeConfig().getMergeablePropertyKeys().toString());
+        }
         mergeConfigCount++;
       }
       if (anomalyFunctionDTO.getDataFilter() != null && !anomalyFunctionDTO.getDataFilter().isEmpty()) {
+        if (anomalyFunctionDTO.getDataFilter().get("type").equals("average_threshold")){
+          averageThresholdDataFilterCount++;
+        } else {
+          LOGGER.info("other data filter {}", anomalyFunctionDTO.getDataFilter().get("type"));
+        }
         datafilterCount++;
       }
       if (anomalyFunctionDTO.getAlertFilter() != null){
@@ -117,7 +130,9 @@ public class DetectionMigrationResource {
     }
     LOGGER.info("anomalyFunctions count", anomalyFunctions.size());
     LOGGER.info("mergeConfigCount {}", mergeConfigCount);
+    LOGGER.info("functionDimensionsMergeStrategyCount {}", functionDimensionsMergeStrategyCount);
     LOGGER.info("datafilterCount {}", datafilterCount);
+    LOGGER.info("averageThresholdDataFilterCount {}", averageThresholdDataFilterCount);
     LOGGER.info("swiFilterCount {}", swiFilterCount);
     LOGGER.info("twoSideSWICount {}", twoSideSWICount);
     LOGGER.info("otherFilter {}", otherFilter);
@@ -166,6 +181,16 @@ public class DetectionMigrationResource {
     }
 
     yamlConfigs.put("rules", Collections.singletonList(ruleYaml));
+
+    // merger configs
+    if (anomalyFunctionDTO.getAnomalyMergeConfig() != null ) {
+      Map<String, Object> mergerYaml = new HashMap<>();
+      if (anomalyFunctionDTO.getAnomalyMergeConfig().getMergeStrategy() == FUNCTION_DIMENSIONS){
+        mergerYaml.put("maxGap", anomalyFunctionDTO.getAnomalyMergeConfig().getSequentialAllowedGap());
+        mergerYaml.put("maxDuration", anomalyFunctionDTO.getAnomalyMergeConfig().getMaxMergeDurationLength());
+      }
+    }
+
     return this.yaml.dump(yamlConfigs);
   }
 

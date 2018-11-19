@@ -135,6 +135,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_WINDOW_SIZE = "windowSize";
   private static final String PROP_WINDOW_UNIT = "windowUnit";
   private static final String PROP_FREQUENCY = "frequency";
+  private static final String PROP_MERGER = "merger";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE");
@@ -144,6 +145,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private MetricConfigDTO metricConfig;
   private DatasetConfigDTO datasetConfig;
   private String metricUrn;
+  private Map<String, Object> mergerProperties = new HashMap<>();
 
   public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     super(yamlConfig, provider);
@@ -158,6 +160,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     this.datasetConfig = this.dataProvider.fetchDatasets(Collections.singletonList(metricConfig.getDataset()))
         .get(metricConfig.getDataset());
     Preconditions.checkNotNull(this.datasetConfig, "dataset not found");
+
+    // if user set merger properties
+    this.mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
 
     this.metricUrn = buildMetricUrn(yamlConfig);
     String cron = buildCron();
@@ -187,7 +192,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     dimensionWrapperProperties.put(PROP_METRIC_URN, metricUrn);
     Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(),
         Collections.singletonList(
-            buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)));
+            buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)), this.mergerProperties);
     return new YamlTranslationResult().withProperties(properties).withComponents(this.components).withCron(cron);
   }
 
@@ -222,7 +227,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     String baselineProviderKey = makeComponentKey(ruleName + "_" + detectorType,  baselineProviderType, id);
     properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
-
+    properties.putAll(this.mergerProperties);
     return properties;
   }
 
