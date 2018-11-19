@@ -16,7 +16,6 @@
 
 package com.linkedin.thirdeye.detection.components;
 
-import com.google.common.base.Strings;
 import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
@@ -33,6 +32,7 @@ import com.linkedin.thirdeye.rootcause.timeseries.Baseline;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang.StringUtils;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -84,7 +84,7 @@ public class AbsoluteChangeRuleAnomalyFilter implements AnomalyFilter<AbsoluteCh
     this.dataFetcher = dataFetcher;
     this.pattern = Pattern.valueOf(spec.getPattern().toUpperCase());
     // customize baseline offset
-    if (!Strings.isNullOrEmpty(spec.getOffset())) {
+    if (StringUtils.isNotBlank(spec.getOffset())) {
       this.baseline = BaselineParsingUtils.parseOffset(spec.getOffset(), spec.getTimezone());
     }
     this.threshold = spec.getThreshold();
