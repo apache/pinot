@@ -38,6 +38,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 /**
  * Percentage change anomaly filter. Check if the anomaly's percentage change compared to baseline is above the threshold.
+ * If not, filters the anomaly.
  */
 @Components(type = "PERCENTAGE_CHANGE_FILTER", tags = {DetectionTag.RULE_FILTER})
 public class PercentageChangeRuleAnomalyFilter implements AnomalyFilter<PercentageChangeRuleAnomalyFilterSpec> {

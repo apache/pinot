@@ -38,6 +38,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
 /**
  * Absolute change anomaly filter. Check if the anomaly's absolute change compared to baseline is above the threshold.
+ * If not, filters the anomaly.
  */
 @Components(type = "ABSOLUTE_CHANGE_FILTER", tags = {DetectionTag.RULE_FILTER})
 public class AbsoluteChangeRuleAnomalyFilter implements AnomalyFilter<AbsoluteChangeRuleAnomalyFilterSpec> {
