@@ -67,7 +67,7 @@ public class AbsoluteChangeRuleAnomalyFilterTest {
   }
 
   @Test
-  public void testPercentageChangeFilter(){
+  public void testAbsoluteChangeFilter(){
     AbsoluteChangeRuleAnomalyFilterSpec spec = new AbsoluteChangeRuleAnomalyFilterSpec();
     spec.setOffset("median1w");
     spec.setThreshold(100);
