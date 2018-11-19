@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang.StringUtils;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -94,7 +95,7 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
     this.pattern = Pattern.valueOf(spec.getPattern().toUpperCase());
 
     // customize baseline offset
-    if (!Strings.isNullOrEmpty(spec.getOffset())){
+    if (StringUtils.isNotBlank(spec.getOffset())){
       this.baseline = BaselineParsingUtils.parseOffset(spec.getOffset(), spec.getTimezone());
     }
 
