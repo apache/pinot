@@ -208,10 +208,6 @@ export default Route.extend({
     const groupsWithAppName = activeGroups.filter(group => isPresent(group.application));
     const groupsWithAlertId = groupsWithAppName.filter(group => group.emailConfig.functionIds.length > 0);
     const filteredGroups = isDemoMode ? groupsWithAlertId.slice(0, 3) : groupsWithAlertId;
-
-    // NOTE: use this in order to find non-existent alert in the event of an error
-    // filteredGroups.filter(group => group.emailConfig.functionIds.includes(45639479)));
-
     const idsByApplication = fillAppBuckets(model.applications, filteredGroups);
     Object.assign(model, { idsByApplication });
   },
@@ -239,16 +235,7 @@ export default Route.extend({
     // Get perf data for each alert and assign it to the model
     fetchAppAnomalies(idsByApplication, startDate, endDate)
       .then((richFunctionObjects) => {
-        // Catch any rejected promises
-        if (isPromiseRejected(richFunctionObjects)) {
-          const badId = richFunctionObjects.filter(obj => obj.state !== 'fulfilled').map((obj) => {
-            return getWithDefault(obj, 'reason.response.url', '').split('?')[0].split('/').pop();
-          });
-          const errMsg = badId.length ? `API error with alert ids ${badId.join(',')}` : 'API error';
-          throw new Error(errMsg);
-        }
-
-        const newFunctionObjects = richFunctionObjects.map(obj => obj.value);
+        const newFunctionObjects = richFunctionObjects.filter(obj => obj.state === 'fulfilled').map(obj => obj.value);
         const availableGroups = Array.from(new Set(newFunctionObjects.map(alertObj => alertObj.name)));
         const roundable = ['totalAlerts', 'totalResponses', 'falseAlarm', 'newTrend', 'trueAnomalies', 'userReportAnomaly'];
         let sortMenuGlyph = {};
