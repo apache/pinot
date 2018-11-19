@@ -10,6 +10,7 @@ import _ from 'lodash';
 
 const ROOTCAUSE_SCORES_ENDPOINT = '/rootcause/query';
 const ROOTCAUSE_SCORES_PRIORITY = 20;
+const ROOTCAUSE_SCORES_CHUNK_SIZE = 10;
 
 export default Service.extend({
   scores: null, // {}
@@ -65,14 +66,15 @@ export default Service.extend({
 
     // metrics
     const fetcher = this.get('fetcher');
+    const chunks = _.chunk([...missing].sort(), ROOTCAUSE_SCORES_CHUNK_SIZE);
 
-    [...missing].sort().forEach((urn, i) => {
-      const url = this._makeUrl('metricAnalysis', requestContext, [urn]);
+    chunks.forEach((urns, i) => {
+      const url = this._makeUrl('metricAnalysis', requestContext, urns);
       fetcher.fetch(url, ROOTCAUSE_SCORES_PRIORITY, i)
         .then(checkStatus)
-        .then(res => this._extractScores(res, [urn]))
+        .then(res => this._extractScores(res, urns))
         .then(res => this._complete(requestContext, res))
-        .catch(error => this._handleError([urn], error));
+        .catch(error => this._handleError(urns, error));
     });
   },
 

@@ -3,6 +3,8 @@ import { get, getProperties, set, setProperties } from '@ember/object';
 import fetch from 'fetch';
 import RSVP from 'rsvp';
 
+// TODO halt loading while not on RCA page
+
 /**
  * Comparator for of MyPromise for priority queue
  */

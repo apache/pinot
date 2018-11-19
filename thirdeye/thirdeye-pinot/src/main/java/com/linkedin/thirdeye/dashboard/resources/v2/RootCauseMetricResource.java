@@ -16,6 +16,8 @@
 
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -33,6 +35,7 @@ import com.wordnik.swagger.annotations.Api;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +54,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -154,7 +158,7 @@ public class RootCauseMetricResource {
   }
 
   /**
-   * Returns a list of aggregate value for the specified metric and time range, and (optionally) a list of offset.
+   * Returns a list of aggregate value for the specified metric and time range, and a list of offset.
    * Aligns time stamps if necessary and returns NaN if no data is available for the given time range.
    *
    * @param urn metric urn
@@ -180,21 +184,16 @@ public class RootCauseMetricResource {
       throws Exception {
     List<Double> aggregateValues = new ArrayList<>();
 
+    if (StringUtils.isBlank(timezone)) {
+      timezone = TIMEZONE_DEFAULT;
+    }
+
     offsets = ResourceUtils.parseListParams(offsets);
     List<MetricSlice> slices = new ArrayList<>();
 
     Map<String, MetricSlice> offsetToBaseSlice = new HashMap<>();
     Map<String, Baseline> offsetToRange = new HashMap<>();
     for (String offset : offsets) {
-      // Put all metric slices together
-      if (StringUtils.isBlank(offset)) {
-        offset = OFFSET_DEFAULT;
-      }
-
-      if (StringUtils.isBlank(timezone)) {
-        timezone = TIMEZONE_DEFAULT;
-      }
-
       MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
       offsetToBaseSlice.put(offset, baseSlice);
 
@@ -220,6 +219,76 @@ public class RootCauseMetricResource {
       }
     }
     return aggregateValues;
+  }
+
+  /**
+   * Returns a map of lists of aggregate values for the specified metrics and time range, and a list of offsets.
+   * Aligns time stamps if necessary and returns NaN if no data is available for the given time range.
+   *
+   * @param urns metric urns
+   * @param start start time (in millis)
+   * @param end end time (in millis)
+   * @param offsets A list of offset identifiers (e.g. "current", "wo2w")
+   * @param timezone timezone identifier (e.g. "America/Los_Angeles")
+   *
+   * @see BaselineParsingUtils#parseOffset(String, String) supported offsets
+   *
+   * @return map of lists (keyed by urn) of aggregate values, or NaN if data not available
+   * @throws Exception on catch-all execution failure
+   */
+  @GET
+  @Path("/aggregate/chunk")
+  @ApiOperation(value = "Returns a map of lists (keyed by urn) of aggregate value for the specified metrics and time range, and offsets.")
+  public Map<String, Collection<Double>> getAggregateChunk(
+      @ApiParam(value = "metric urns", required = true) @QueryParam("urns") @NotNull List<String> urns,
+      @ApiParam(value = "start time (in millis)", required = true) @QueryParam("start") @NotNull long start,
+      @ApiParam(value = "end time (in millis)", required = true) @QueryParam("end") @NotNull long end,
+      @ApiParam(value = "A list of offset identifier separated by comma (e.g. \"current\", \"wo2w\")") @QueryParam("offsets") List<String> offsets,
+      @ApiParam(value = "timezone identifier (e.g. \"America/Los_Angeles\")") @QueryParam("timezone") String timezone)
+      throws Exception {
+    ListMultimap<String, Double> aggregateValues = ArrayListMultimap.create();
+
+    if (StringUtils.isBlank(timezone)) {
+      timezone = TIMEZONE_DEFAULT;
+    }
+
+    urns = ResourceUtils.parseListParams(urns);
+    offsets = ResourceUtils.parseListParams(offsets);
+    List<MetricSlice> slices = new ArrayList<>();
+
+    Map<String, MetricSlice> offsetToBaseSlice = new HashMap<>();
+    Map<Pair<String, String>, Baseline> tupleToRange = new HashMap<>();
+    for (String urn : urns) {
+      for (String offset : offsets) {
+        MetricSlice baseSlice = alignSlice(makeSlice(urn, start, end), timezone);
+        offsetToBaseSlice.put(offset, baseSlice);
+
+        Baseline range = parseOffset(offset, timezone);
+        tupleToRange.put(Pair.of(urn, offset), range);
+
+        List<MetricSlice> currentSlices = range.scatter(baseSlice);
+
+        slices.addAll(currentSlices);
+        logSlices(baseSlice, currentSlices);
+      }
+    }
+
+    // Fetch all aggregates
+    Map<MetricSlice, DataFrame> data = fetchAggregates(slices);
+
+    // Pick the results
+    for (String urn : urns) {
+      for (String offset : offsets) {
+        DataFrame result = tupleToRange.get(Pair.of(urn, offset)).gather(offsetToBaseSlice.get(offset), data);
+        if (result.isEmpty()) {
+          aggregateValues.put(urn, Double.NaN);
+        } else {
+          aggregateValues.put(urn, result.getDouble(COL_VALUE, 0));
+        }
+      }
+    }
+
+    return aggregateValues.asMap();
   }
 
   /**
