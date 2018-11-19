@@ -24,6 +24,8 @@ import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.annotation.Param;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.io.IOException;
@@ -31,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import javax.ws.rs.GET;
@@ -80,6 +83,46 @@ public class DetectionMigrationResource {
     this.yaml = new Yaml(options);
   }
 
+  @Path("/stats")
+  @GET
+  public void getAnomalyFunctionStats() {
+    List<AnomalyFunctionDTO> anomalyFunctions = this.anomalyFunctionDAO.findAll();
+    long mergeConfigCount = 0;
+    long datafilterCount = 0;
+    long swiFilterCount = 0;
+    long twoSideSWICount = 0;
+    long otherFilter = 0;
+
+    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctions) {
+      if (!anomalyFunctionDTO.getIsActive()) {
+        continue;
+      }
+      if (anomalyFunctionDTO.getAnomalyMergeConfig() != null ) {
+        mergeConfigCount++;
+      }
+      if (anomalyFunctionDTO.getDataFilter() != null && !anomalyFunctionDTO.getDataFilter().isEmpty()) {
+        datafilterCount++;
+      }
+      if (anomalyFunctionDTO.getAlertFilter() != null){
+        if(anomalyFunctionDTO.getAlertFilter().get("thresholdField") != null){
+          if (!anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("impactToGlobal")) {
+            otherFilter++;
+          }
+          swiFilterCount++;
+          if (anomalyFunctionDTO.getAlertFilter().get("maxThreshold") != anomalyFunctionDTO.getAlertFilter().get("maxThreshold")){
+            twoSideSWICount++;
+          }
+        }
+      }
+    }
+    LOGGER.info("anomalyFunctions count", anomalyFunctions.size());
+    LOGGER.info("mergeConfigCount {}", mergeConfigCount);
+    LOGGER.info("datafilterCount {}", datafilterCount);
+    LOGGER.info("swiFilterCount {}", swiFilterCount);
+    LOGGER.info("twoSideSWICount {}", twoSideSWICount);
+    LOGGER.info("otherFilter {}", otherFilter);
+  }
+
   @GET
   public String migrateToYaml(@QueryParam("id") long anomalyFunctionId) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionId);
@@ -98,26 +141,50 @@ public class DetectionMigrationResource {
 
     Map<String, Object> ruleYaml = new HashMap<>();
     ruleYaml.put("name", "myRule");
+    // detection
     ruleYaml.put("detection", Collections.singletonList(
         ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO))));
 
+    // filters
     Map<String, String> alertFilter = anomalyFunctionDTO.getAlertFilter();
     if (alertFilter != null && !alertFilter.isEmpty()){
-      ruleYaml.put("filter", Collections.singletonList(
-          ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO))));
+      // threshold filter migrate to rule filters
+      if (!alertFilter.containsKey("thresholdField")) {
+        ruleYaml.put("filter", Collections.singletonList(
+            ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO))));
+      } else {
+        Map<String, Object> thresholdRuleYaml = new HashMap<>();
+        if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("impactToGlobal")){
+          thresholdRuleYaml.put("type", "SITEWIDE_IMPACT_FILTER");
+          thresholdRuleYaml.put("params", getSiteWideImpactFilterParams(anomalyFunctionDTO));
+        }
+        if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("weight")){
+          // TODO
+        }
+      }
     }
 
     yamlConfigs.put("rules", Collections.singletonList(ruleYaml));
     return this.yaml.dump(yamlConfigs);
   }
 
+  private Map<String, Object> getSiteWideImpactFilterParams(AnomalyFunctionDTO functionDTO) {
+    Map<String, Object> filterYamlParams = new HashMap<>();
+    filterYamlParams.put("threshold", Math.abs(Double.valueOf(functionDTO.getAlertFilter().get("maxThreshold"))));
+    filterYamlParams.put("pattern", "up_or_down");
+    filterYamlParams.put("sitewideMetricName", functionDTO.getGlobalMetric());
+    filterYamlParams.put("sitewideCollection", functionDTO.getCollection());
+    filterYamlParams.put("filters", AnomalyDetectionInputContextBuilder.getFiltersForFunction(functionDTO.getGlobalMetricFilters()).asMap());
+    return filterYamlParams;
+  }
+
   private Map<String, Object> getAlertFilterParams(AnomalyFunctionDTO functionDTO) {
-    Map<String, Object> filterYaml = new HashMap<>();
+    Map<String, Object> filterYamlParams = new HashMap<>();
     Map<String, Object> params = new HashMap<>();
-    filterYaml.put("configuration", params);
+    filterYamlParams.put("configuration", params);
     params.putAll(functionDTO.getAlertFilter());
     // TODO bucket period, timezone
-    return filterYaml;
+    return filterYamlParams;
   }
 
   private Map<String, Object> getAlgorithmDetectorParams(AnomalyFunctionDTO functionDTO) throws Exception {

@@ -112,7 +112,7 @@ public class DetectionRegistry {
    */
   public String lookupTunable(String className) {
     Preconditions.checkArgument(TUNE_MAP.containsKey(className), className + " not found in registry");
-    return TUNE_MAP.get(className).tunable();
+    return this.lookup(TUNE_MAP.get(className).tunable());
   }
 
   /**

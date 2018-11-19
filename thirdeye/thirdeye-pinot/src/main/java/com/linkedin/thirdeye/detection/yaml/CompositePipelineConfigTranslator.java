@@ -202,9 +202,10 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
   private Map<String, Object> buildMergeWrapperProperties(String ruleName, Map<String, Object> yamlConfig) {
     String detectorType = MapUtils.getString(yamlConfig, PROP_TYPE);
+    long id = MapUtils.getLong(yamlConfig, "id", 0L);
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectorWrapper.class.getName());
-    String detectorKey = makeComponentKey(ruleName, detectorType);
+    String detectorKey = makeComponentKey(ruleName, detectorType, id);
     nestedProperties.put(PROP_DETECTOR, detectorKey);
 
     fillInWindowSizeAndUnit(nestedProperties, yamlConfig, detectorType);
@@ -218,7 +219,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     if (DETECTOR_TO_BASELINE.containsKey(detectorType)) {
       baselineProviderType = DETECTOR_TO_BASELINE.get(detectorType);
     }
-    String baselineProviderKey = makeComponentKey(ruleName + "_" + detectorType,  baselineProviderType);
+    String baselineProviderKey = makeComponentKey(ruleName + "_" + detectorType,  baselineProviderType, id);
     properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
 
@@ -273,8 +274,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     if (wrapperProperties.isEmpty()) {
       return Collections.emptyList();
     }
+    long id = MapUtils.getLong(yamlConfig, "id", 0L);
     String filterType = MapUtils.getString(yamlConfig, PROP_TYPE);
-    String filterKey = makeComponentKey(ruleName, filterType);
+    String filterKey = makeComponentKey(ruleName, filterType, id);
     wrapperProperties.put(PROP_FILTER, filterKey);
     buildComponentSpec(yamlConfig, filterType, filterKey);
 
@@ -374,8 +376,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     return tunable;
   }
 
-  private String makeComponentKey(String name, String type) {
-    return "$" + name + "_" + type;
+  private String makeComponentKey(String name, String type, long id) {
+    return "$" + name + "_" + type + "_" + id;
   }
 
   @Override

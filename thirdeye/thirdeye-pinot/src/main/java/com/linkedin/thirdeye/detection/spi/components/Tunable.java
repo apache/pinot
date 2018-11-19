@@ -30,7 +30,7 @@ public interface Tunable<T extends AbstractSpec> extends BaseComponent<T> {
   /**
    * Returns the new spec for the component it's tuning
    * @param currentSpec current spec for the component. empty if not exist
-   * @return input data spec
+   * @return the init spec for the component it's tuning
    */
   Map<String, Object> tune(Map<String, Object> currentSpec, Interval trainingWindow);
 }
