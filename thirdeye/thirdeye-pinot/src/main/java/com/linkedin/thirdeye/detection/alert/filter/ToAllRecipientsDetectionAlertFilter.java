@@ -35,6 +35,7 @@ import org.apache.commons.collections.MapUtils;
  * The detection alert filter that sends the anomaly email to all recipients
  */
 public class ToAllRecipientsDetectionAlertFilter extends StatefulDetectionAlertFilter {
+
   private static final String PROP_RECIPIENTS = "recipients";
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";

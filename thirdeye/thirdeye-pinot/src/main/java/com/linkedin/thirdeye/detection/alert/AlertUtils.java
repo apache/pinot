@@ -102,6 +102,11 @@ public class AlertUtils {
       @Nullable
       @Override
       public Long apply(@Nullable MergedAnomalyResultDTO mergedAnomalyResultDTO) {
+        // Return functionId to support alerting of legacy anomalies
+        if (mergedAnomalyResultDTO.getDetectionConfigId() == null) {
+          return mergedAnomalyResultDTO.getFunctionId();
+        }
+
         return mergedAnomalyResultDTO.getDetectionConfigId();
       }
     });

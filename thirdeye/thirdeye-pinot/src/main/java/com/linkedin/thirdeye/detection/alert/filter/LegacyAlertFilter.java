@@ -70,13 +70,19 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
   public DetectionAlertFilterResult run() {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
 
-    for (Long detectionConfigId : this.detectionConfigIds) {
-      long startTime = MapUtils.getLong(this.vectorClocks, detectionConfigId, 0L);
+    for (Long functionId : this.detectionConfigIds) {
+      long startTime = MapUtils.getLong(this.vectorClocks, functionId, 0L);
 
-      AnomalySlice slice =
-          new AnomalySlice().withStart(startTime).withEnd(this.endTime);
-      Collection<MergedAnomalyResultDTO> candidates =
-          this.provider.fetchAnomalies(Collections.singletonList(slice), detectionConfigId).get(slice);
+      AnomalySlice slice = new AnomalySlice()
+          .withStart(startTime)
+          .withEnd(this.endTime);
+
+      Collection<MergedAnomalyResultDTO> candidates;
+      if (this.config.isOnlyFetchLegacyAnomalies()) {
+        candidates = this.provider.fetchLegacyAnomalies(Collections.singletonList(slice), functionId).get(slice);
+      } else {
+        candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), functionId).get(slice);
+      }
 
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
@@ -86,7 +92,11 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
             }
           });
 
-      result.addMapping(this.alertConfig.getReceiverAddresses(), new HashSet<>(anomalies));
+      if (result.getResult().get(this.alertConfig.getReceiverAddresses()) == null) {
+        result.addMapping(this.alertConfig.getReceiverAddresses(), new HashSet<>(anomalies));
+      } else {
+        result.getResult().get(this.alertConfig.getReceiverAddresses()).addAll(anomalies);
+      }
     }
 
     return result;

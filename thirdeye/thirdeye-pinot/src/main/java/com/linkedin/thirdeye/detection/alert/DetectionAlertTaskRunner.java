@@ -85,6 +85,8 @@ public class DetectionAlertTaskRunner implements TaskRunner {
         AlertUtils.mergeVectorClock(alertConfig.getVectorClocks(),
         AlertUtils.makeVectorClock(result.getAllAnomalies()))
     );
+
+    LOG.info("Saving watermarks for alertConfigDAO : {}", alertConfig.toString());
     this.alertConfigDAO.save(alertConfig);
   }
 
