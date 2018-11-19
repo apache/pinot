@@ -159,13 +159,21 @@ public class DetectionMigrationResource {
           thresholdRuleYaml.put("params", getSiteWideImpactFilterParams(anomalyFunctionDTO));
         }
         if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("weight")){
-          // TODO
+          thresholdRuleYaml.put("type", "PERCENTAGE_CHANGE_FILTER");
+          thresholdRuleYaml.put("params", getPercentageChangeFilterParams(anomalyFunctionDTO));
         }
       }
     }
 
     yamlConfigs.put("rules", Collections.singletonList(ruleYaml));
     return this.yaml.dump(yamlConfigs);
+  }
+
+  private Map<String, Object> getPercentageChangeFilterParams(AnomalyFunctionDTO functionDTO) {
+    Map<String, Object> filterYamlParams = new HashMap<>();
+    filterYamlParams.put("threshold", Math.abs(Double.valueOf(functionDTO.getAlertFilter().get("maxThreshold"))));
+    filterYamlParams.put("pattern", "up_or_down");
+    return filterYamlParams;
   }
 
   private Map<String, Object> getSiteWideImpactFilterParams(AnomalyFunctionDTO functionDTO) {
