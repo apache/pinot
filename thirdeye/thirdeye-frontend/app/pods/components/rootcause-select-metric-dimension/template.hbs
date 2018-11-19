@@ -21,17 +21,15 @@
     <div class="{{if showExclusions 'col-xs-3' 'col-xs-6'}}">
       <label class="te-label te-label--small" for="select-filters">
         Filter by
+        {{#unless showExclusions}}
+          <a {{action "showExclusions"}}>Exclude</a>
+        {{/unless}}
         <span>
           <i class="glyphicon glyphicon-question-sign"></i>
           {{#tooltip-on-element class="te-tooltip"}}
             You can add filters to the analyzed metric, for example page views for "countryCode::us" only. The available filters depend on the data set. You can also add filters via left-click in the "Dimensions" tab.
           {{/tooltip-on-element}}
         </span>
-        {{#unless showExclusions}}
-          <span>
-            <a {{action "showExclusions"}}>Exclude</a>
-          </span>
-        {{/unless}}
       </label>
 
       {{filter-select
@@ -50,17 +48,15 @@
             {{partial 'partials/rootcause/exclusion-warning'}}
           {{/if}}
           Exclude
+          {{#unless hasExclusions}}
+            <a {{action "hideExclusions"}}>Hide</a>
+          {{/unless}}
           <span>
             <i class="glyphicon glyphicon-question-sign"></i>
             {{#tooltip-on-element class="te-tooltip"}}
               You can exclude subsets of the analyzed metric, for example all page views without "countryCode::us". The available exclusions depend on the data set. You can also add exclusions via right-click in the "Dimensions" tab.
             {{/tooltip-on-element}}
-           </span>
-          {{#unless hasExclusions}}
-            <span>
-              <a {{action "hideExclusions"}}>Hide</a>
-            </span>
-          {{/unless}}
+          </span>
         </label>
         {{filter-select
           selected=exclusions
