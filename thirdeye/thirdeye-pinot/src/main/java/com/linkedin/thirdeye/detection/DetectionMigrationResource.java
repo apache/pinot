@@ -91,7 +91,6 @@ public class DetectionMigrationResource {
     long mergeConfigCount = 0;
     long functionDimensionsMergeStrategyCount = 0;
     long averageThresholdDataFilterCount = 0;
-
     long datafilterCount = 0;
     long swiFilterCount = 0;
     long twoSideSWICount = 0;
@@ -104,7 +103,6 @@ public class DetectionMigrationResource {
       if (anomalyFunctionDTO.getAnomalyMergeConfig() != null ) {
         if (anomalyFunctionDTO.getAnomalyMergeConfig().getMergeStrategy() == FUNCTION_DIMENSIONS){
           functionDimensionsMergeStrategyCount++;
-          LOGGER.info(anomalyFunctionDTO.getAnomalyMergeConfig().getMergeablePropertyKeys().toString());
         }
         mergeConfigCount++;
       }
@@ -148,7 +146,7 @@ public class DetectionMigrationResource {
     yamlConfigs.put("pipelineType", "Composite");
     if (anomalyFunctionDTO.getExploreDimensions() != null) {
       yamlConfigs.put("dimensionExploration",
-          ImmutableMap.of("dimensions", Collections.singletonList(anomalyFunctionDTO.getExploreDimensions())));
+          getDimensionExplorationParams(anomalyFunctionDTO));
     }
     // TODO plugin dimension filter
     yamlConfigs.put("filters",
@@ -156,6 +154,7 @@ public class DetectionMigrationResource {
 
     Map<String, Object> ruleYaml = new HashMap<>();
     ruleYaml.put("name", "myRule");
+
     // detection
     ruleYaml.put("detection", Collections.singletonList(
         ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO))));
@@ -169,10 +168,12 @@ public class DetectionMigrationResource {
             ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO))));
       } else {
         Map<String, Object> thresholdRuleYaml = new HashMap<>();
+        // site wide impact filter migrate to rule based swi filter
         if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("impactToGlobal")){
           thresholdRuleYaml.put("type", "SITEWIDE_IMPACT_FILTER");
           thresholdRuleYaml.put("params", getSiteWideImpactFilterParams(anomalyFunctionDTO));
         }
+        // weight filter migrate to rule based percentage change filter
         if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("weight")){
           thresholdRuleYaml.put("type", "PERCENTAGE_CHANGE_FILTER");
           thresholdRuleYaml.put("params", getPercentageChangeFilterParams(anomalyFunctionDTO));
@@ -192,6 +193,15 @@ public class DetectionMigrationResource {
     }
 
     return this.yaml.dump(yamlConfigs);
+  }
+
+  private Map<String, Object> getDimensionExplorationParams(AnomalyFunctionDTO functionDTO) {
+    Map<String, Object> dimensionExploreYaml = new HashMap<>();
+    dimensionExploreYaml.put("dimensions", Collections.singletonList(functionDTO.getExploreDimensions()));
+    if (functionDTO.getDataFilter() != null && !functionDTO.getDataFilter().isEmpty() && functionDTO.getDataFilter().get("type").equals("average_threshold")) {
+      dimensionExploreYaml.put("minValue", functionDTO.getDataFilter().get("threshold"));
+    }
+    return ImmutableMap.of();
   }
 
   private Map<String, Object> getPercentageChangeFilterParams(AnomalyFunctionDTO functionDTO) {
