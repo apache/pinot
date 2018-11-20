@@ -38,7 +38,8 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
       onFeedback: () => {},
       aggregates: {
         'frontend:metric:current:1': 93453.15844726562
-      }
+      },
+      anomalyRange: [0, 0]
     });
 
     await render(hbs`
@@ -47,6 +48,7 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
         aggregates=aggregates
         anomalyUrns=anomalyUrns
         onFeedback=(action onFeedback)
+        anomalyRange=anomalyRange
       }}
     `);
 
@@ -85,17 +87,19 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
         onFeedback: () => {},
         aggregates: {
           'frontend:metric:current:1': 93453.15844726562
-        }
+        },
+        anomalyRange: [0, 0]
       });
 
-    await render(hbs`
-      {{rootcause-anomaly
-        entities=entities
-        aggregates=aggregates
-        anomalyUrns=anomalyUrns
-        onFeedback=(action onFeedback)
-      }}
-    `);
+      await render(hbs`
+        {{rootcause-anomaly
+          entities=entities
+          aggregates=aggregates
+          anomalyUrns=anomalyUrns
+          onFeedback=(action onFeedback)
+          anomalyRange=anomalyRange
+        }}
+      `);
 
     assert.notOk(this.$('.diffcurrent-alert').length > 0);
   });

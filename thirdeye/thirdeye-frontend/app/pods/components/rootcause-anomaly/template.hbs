@@ -56,7 +56,7 @@
       {{#if isWarning}}
       <div class="diffcurrent-alert alert alert-warning fade in">
         <h4><i class="glyphicon glyphicon-exclamation-sign"></i> Data has been changed since anomaly detected</h4>
-        At the time when anomaly was detected, the data has changed from <strong>{{humanizedAnomalyCurrent}}</strong> to <strong>{{get anomalyInfo "current.value"}}</strong>.<br>
+        At the time when anomaly was detected, the data has changed from <strong>{{humanizedAnomalyCurrent}}</strong> to <strong>{{warningChangedTo}}</strong>.<br>
         No action is needed.  Anomaly will be labeled as <strong>Inconsistent Data</strong>.
       </div>
       {{/if}}

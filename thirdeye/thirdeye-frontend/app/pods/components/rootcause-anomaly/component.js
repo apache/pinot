@@ -3,7 +3,8 @@ import {
   computed,
   setProperties,
   getProperties,
-  get
+  get,
+  set
 } from '@ember/object';
 import moment from 'moment';
 import {
@@ -67,10 +68,38 @@ export default Component.extend({
   options: Object.keys(ANOMALY_OPTIONS_MAPPING),
 
   /**
+   * Can be set by isWarning if data inconsistent
+   * @type {boolean}
+   */
+  warningValue: false,
+
+  /**
    * A mapping of the status and a more human readable version
    * @type {Object}
    */
   optionsMapping: ANOMALY_OPTIONS_MAPPING,
+
+  /**
+   * Locally cache original time range on init
+   *
+   */
+  init() {
+    this._super(...arguments);
+    set(this, 'anomalyRangeOld', get(this, 'anomalyRange'));
+  },
+
+  /**
+   * Checks if anomalyRange has been changed since init
+   * @type {boolean}
+   */
+  isRangeChanged: computed(
+    'anomalyRange',
+    function () {
+      const anomalyRange = get(this, 'anomalyRange');
+      const anomalyRangeOld = get(this, 'anomalyRangeOld');
+      return (anomalyRange != anomalyRangeOld);
+    }
+  ),
 
   /**
    * Urn of an anomaly
@@ -330,16 +359,27 @@ export default Component.extend({
    * Checks if param values and displayed values differ by 5% or more
    * @type {Boolean}
    */
-  isWarning: computed('anomalyInfo', function () {
-    const anomalyInfo = get(this, 'anomalyInfo');
-    let oldCurrent = parseFloat(get(this, 'current'));
-    const newCurrent = this._getAggregate('current');
-
-    if (newCurrent && oldCurrent){
-      const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
-      return (diffCurrent > 0.01);
+  isWarning: computed('anomalyInfo', 'isRangeChanged', function () {
+    if(!get(this, 'isRangeChanged')) {
+      let oldCurrent = parseFloat(get(this, 'current'));
+      const newCurrent = this._getAggregate('current');
+      if (newCurrent && oldCurrent){
+        const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
+        if (diffCurrent > 0.01) {
+          set(this, 'warningValue', true);
+        }
+      }
     }
-    return false;
+    return get(this, 'warningValue');
+  }),
+
+  /**
+   * grabs value of new current only when warningValue is toggled
+   * @type {string}
+   */
+  warningChangedTo: computed('warningValue', function() {
+    const newCurrent = this._getAggregate('current');
+    return humanizeFloat(newCurrent);
   }),
 
   /**
