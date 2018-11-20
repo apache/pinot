@@ -35,6 +35,8 @@ export default Component.extend({
 
   onSelection: null, // function (updates)
 
+  onPrimaryChange: null, // function (updates)
+
   timeseriesMode: null, // 'absolute', 'relative', 'log', 'split'
 
   classNames: ['rootcause-chart'],
@@ -524,10 +526,16 @@ export default Component.extend({
 
   actions: {
     onSelect(urn) {
-      const { onSelection } = getProperties(this, 'onSelection');
+      const { onPrimaryChange } = getProperties(this, 'onPrimaryChange');
+      if (onPrimaryChange) {
+        onPrimaryChange({ [toMetricUrn(urn)]: true, [toBaselineUrn(urn)]: true, [toCurrentUrn(urn)]: true });
+      }
+    },
 
+    onRemove(urn) {
+      const { onSelection } = getProperties(this, 'onSelection');
       if (onSelection) {
-        onSelection({ [toMetricUrn(urn)]: true, [toBaselineUrn(urn)]: true, [toCurrentUrn(urn)]: true });
+        onSelection({ [toMetricUrn(urn)]: false, [toBaselineUrn(urn)]: false, [toCurrentUrn(urn)]: false });
       }
     }
   }
