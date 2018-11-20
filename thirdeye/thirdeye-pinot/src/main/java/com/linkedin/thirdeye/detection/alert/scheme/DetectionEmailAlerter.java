@@ -146,7 +146,7 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     HtmlEmail email = emailEntity.getContent();
     email.setFrom(this.config.getFrom());
     email.setTo(AlertUtils.toAddress(recipients.getTo()));
-    email.setSubject(email.getSubject());
+    email.setSubject(emailEntity.getSubject());
     if (CollectionUtils.isNotEmpty(recipients.getCc())) {
       email.setCc(AlertUtils.toAddress(recipients.getCc()));
     }
