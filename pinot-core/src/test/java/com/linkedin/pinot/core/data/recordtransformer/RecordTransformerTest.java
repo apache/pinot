@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -41,9 +40,6 @@ public class RecordTransformerTest {
       // For sanitation
       .addSingleValueDimension("svStringWithNullCharacters", FieldSpec.DataType.STRING)
       .addSingleValueDimension("svStringWithLengthLimit", FieldSpec.DataType.STRING)
-      // For time conversion
-      .addTime("incoming", 6, TimeUnit.HOURS, FieldSpec.DataType.INT, "outgoing", 1, TimeUnit.MILLISECONDS,
-          FieldSpec.DataType.LONG)
       .build();
 
   static {
@@ -67,22 +63,8 @@ public class RecordTransformerTest {
     fields.put("mvDouble", new Object[]{123});
     fields.put("svStringWithNullCharacters", "1\0002\0003");
     fields.put("svStringWithLengthLimit", "123");
-    fields.put("incoming", "123");
     record.init(fields);
     return record;
-  }
-
-  @Test
-  public void testTimeTransformer() {
-    RecordTransformer transformer = new TimeTransformer(SCHEMA);
-    GenericRow record = getRecord();
-    for (int i = 0; i < NUM_ROUNDS; i++) {
-      record = transformer.transform(record);
-      assertNotNull(record);
-      // We keep the incoming time field in case other transformers rely on it
-      assertEquals(record.getValue("incoming"), "123");
-      assertEquals(record.getValue("outgoing"), 123 * 6 * 3600 * 1000L);
-    }
   }
 
   @Test
@@ -103,11 +85,6 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
       assertEquals(record.getValue("svStringWithNullCharacters"), "1\0002\0003");
       assertEquals(record.getValue("svStringWithLengthLimit"), "123");
-      // Incoming time field won't be converted (it's ignored in this transformer)
-      assertEquals(record.getValue("incoming"), "123");
-      // Outgoing time field will be converted (without time transformer, this field will be null before transform, and
-      // be filled with default null value after transform)
-      assertEquals(record.getValue("outgoing"), Long.MIN_VALUE);
     }
   }
 
@@ -141,8 +118,6 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("mvDouble"), new Object[]{123d});
       assertEquals(record.getValue("svStringWithNullCharacters"), "1");
       assertEquals(record.getValue("svStringWithLengthLimit"), "12");
-      assertEquals(record.getValue("incoming"), "123");
-      assertEquals(record.getValue("outgoing"), 123 * 6 * 3600 * 1000L);
     }
   }
 

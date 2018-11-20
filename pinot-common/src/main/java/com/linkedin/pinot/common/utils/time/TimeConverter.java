@@ -15,24 +15,50 @@
  */
 package com.linkedin.pinot.common.utils.time;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import java.util.concurrent.TimeUnit;
+
 
 /**
- * TimeConverter to convert inputTimeValue whose spec is defined by incomingGranularitySpec to
- * outgoingGranularitySpec
+ * TimeConverter to convert value to/from milliseconds since epoch based on the given {@link TimeGranularitySpec}.
  */
-public interface TimeConverter {
-  /**
-   * @param incomingGranularitySpec
-   * @param outgoingGranularitySpec
-   */
-  void init(TimeGranularitySpec incomingGranularitySpec,
-      TimeGranularitySpec outgoingGranularitySpec);
+public class TimeConverter {
+  private final TimeGranularitySpec _timeGranularitySpec;
 
-  /**
-   * @param incoming time value based on incoming time spec
-   * @return time value based on outgoing time spec
-   */
-  Object convert(Object inputTimeValue);
+  public TimeConverter(TimeGranularitySpec timeGranularitySpec) {
+    Preconditions.checkArgument(
+        timeGranularitySpec.getTimeFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString()),
+        "Cannot perform time conversion for time format other than EPOCH");
+    _timeGranularitySpec = timeGranularitySpec;
+  }
 
+  public long toMillisSinceEpoch(Object value) {
+    long duration;
+    if (value instanceof Number) {
+      duration = ((Number) value).longValue();
+    } else {
+      duration = Long.parseLong(value.toString());
+    }
+    return _timeGranularitySpec.getTimeType().toMillis(duration * _timeGranularitySpec.getTimeUnitSize());
+  }
+
+  public Object fromMillisSinceEpoch(long value) {
+    long duration = _timeGranularitySpec.getTimeType().convert(value, TimeUnit.MILLISECONDS)
+        / _timeGranularitySpec.getTimeUnitSize();
+    switch (_timeGranularitySpec.getDataType()) {
+      case INT:
+        return (int) duration;
+      case LONG:
+        return duration;
+      case FLOAT:
+        return (float) duration;
+      case DOUBLE:
+        return (double) duration;
+      case STRING:
+        return Long.toString(duration);
+      default:
+        throw new IllegalStateException();
+    }
+  }
 }

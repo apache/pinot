@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.utils.time.TimeConverter;
-import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
+import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
@@ -29,37 +29,64 @@ import com.linkedin.pinot.core.data.GenericRow;
  * column for other record transformers (incoming time column can be ignored).
  */
 public class TimeTransformer implements RecordTransformer {
-  private final String _incomingTimeColumn;
-  private final String _outgoingTimeColumn;
-  private final TimeConverter _timeConverter;
+  private String _incomingTimeColumn;
+  private String _outgoingTimeColumn;
+  private TimeConverter _incomingTimeConverter;
+  private TimeConverter _outgoingTimeConverter;
+  private boolean _isValidated;
 
   public TimeTransformer(Schema schema) {
     TimeFieldSpec timeFieldSpec = schema.getTimeFieldSpec();
     if (timeFieldSpec != null) {
       TimeGranularitySpec incomingGranularitySpec = timeFieldSpec.getIncomingGranularitySpec();
       TimeGranularitySpec outgoingGranularitySpec = timeFieldSpec.getOutgoingGranularitySpec();
+
+      // Perform time conversion only if incoming and outgoing granularity spec are different
       if (!incomingGranularitySpec.equals(outgoingGranularitySpec)) {
         _incomingTimeColumn = incomingGranularitySpec.getName();
         _outgoingTimeColumn = outgoingGranularitySpec.getName();
-        _timeConverter = TimeConverterProvider.getTimeConverter(incomingGranularitySpec, outgoingGranularitySpec);
-        return;
+        _incomingTimeConverter = new TimeConverter(incomingGranularitySpec);
+        _outgoingTimeConverter = new TimeConverter(outgoingGranularitySpec);
       }
     }
-    _incomingTimeColumn = null;
-    _outgoingTimeColumn = null;
-    _timeConverter = null;
   }
 
   @Override
   public GenericRow transform(GenericRow record) {
-    if (_timeConverter == null) {
+    if (_incomingTimeColumn == null) {
       return record;
     }
-    // Skip transformation if outgoing value already exist
-    // NOTE: outgoing value might already exist for OFFLINE data
-    if (record.getValue(_outgoingTimeColumn) == null) {
-      record.putField(_outgoingTimeColumn, _timeConverter.convert(record.getValue(_incomingTimeColumn)));
+
+    Object incomingTimeValue = record.getValue(_incomingTimeColumn);
+    // Validate the time values and determine whether the conversion is needed
+    if (!_isValidated) {
+      // If incoming time value does not exist or the value is invalid after conversion, check the outgoing time value.
+      // If the outgoing time value is valid, skip time conversion, otherwise, throw exception.
+      if (incomingTimeValue == null || !TimeUtils.timeValueInValidRange(
+          _incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue))) {
+        Object outgoingTimeValue = record.getValue(_outgoingTimeColumn);
+        if (outgoingTimeValue == null || !TimeUtils.timeValueInValidRange(
+            _outgoingTimeConverter.toMillisSinceEpoch(outgoingTimeValue))) {
+          throw new IllegalStateException(
+              "No valid time value found in either incoming time column: " + _incomingTimeColumn
+                  + " or outgoing time column: " + _outgoingTimeColumn);
+        } else {
+          disableConversion();
+          return record;
+        }
+      }
+      _isValidated = true;
     }
+
+    record.putField(_outgoingTimeColumn,
+        _outgoingTimeConverter.fromMillisSinceEpoch(_incomingTimeConverter.toMillisSinceEpoch(incomingTimeValue)));
     return record;
+  }
+
+  private void disableConversion() {
+    _incomingTimeColumn = null;
+    _outgoingTimeColumn = null;
+    _incomingTimeConverter = null;
+    _outgoingTimeConverter = null;
   }
 }
