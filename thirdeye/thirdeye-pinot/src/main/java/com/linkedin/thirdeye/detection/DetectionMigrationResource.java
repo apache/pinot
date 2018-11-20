@@ -140,12 +140,14 @@ public class DetectionMigrationResource {
     yamlConfigs.put("dataset", anomalyFunctionDTO.getCollection());
     yamlConfigs.put("pipelineType", "Composite");
     if (anomalyFunctionDTO.getExploreDimensions() != null) {
+      // dimension explore and data filter
       yamlConfigs.put("dimensionExploration",
           getDimensionExplorationParams(anomalyFunctionDTO));
     }
-    // TODO plugin dimension filter
-    yamlConfigs.put("filters",
-        AnomalyDetectionInputContextBuilder.getFiltersForFunction(anomalyFunctionDTO.getFilters()).asMap());
+    if (anomalyFunctionDTO.getFilters() != null){
+      yamlConfigs.put("filters",
+          AnomalyDetectionInputContextBuilder.getFiltersForFunction(anomalyFunctionDTO.getFilters()).asMap());
+    }
 
     Map<String, Object> ruleYaml = new LinkedHashMap<>();
     ruleYaml.put("name", "myRule");
