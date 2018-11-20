@@ -40,7 +40,7 @@ import org.json.JSONObject;
  * Supports serialization via JSON.
  */
 @JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded",
-    "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "totalDocs", "numGroupsLimitReached",
+    "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numSegmentsProcessed", "numSegmentsWithNoMatch", "totalDocs", "numGroupsLimitReached",
     "timeUsedMs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -54,6 +54,9 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numDocsScanned = 0L;
   private long _numEntriesScannedInFilter = 0L;
   private long _numEntriesScannedPostFilter = 0L;
+  private long _numSegmentsProcessed = 0L;
+  private long _numSegmentsWithNoMatch = 0L;
+  
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
@@ -171,6 +174,26 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numEntriesScannedPostFilter")
   public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
+  }
+
+  @JsonProperty("numSegmentsProcessed")
+  public long getNumSegmentsProcessed() {
+    return _numSegmentsProcessed;
+  }
+
+  @JsonProperty("numSegmentsProcessed")
+  public void setNumSegmentsProcessed(long numSegmentsProcessed) {
+    _numSegmentsProcessed = numSegmentsProcessed;
+  }
+
+  @JsonProperty("numSegmentsWithNoMatch")
+  public long getNumSegmentsWithNoMatch() {
+    return _numSegmentsWithNoMatch;
+  }
+  
+  @JsonProperty("numSegmentsWithNoMatch")
+  public void setNumSegmentsWithNoMatch(long numSegmentsWithNoMatch) {
+    _numSegmentsWithNoMatch = numSegmentsWithNoMatch;
   }
 
   @JsonProperty("totalDocs")

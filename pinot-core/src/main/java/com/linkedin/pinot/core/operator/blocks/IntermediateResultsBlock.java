@@ -53,6 +53,8 @@ public class IntermediateResultsBlock implements Block {
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
+  private long _numSegmentsProcessed;
+  private long _numSegmentsWithNoMatch;
   private boolean _numGroupsLimitReached;
 
   /**
@@ -172,6 +174,22 @@ public class IntermediateResultsBlock implements Block {
   public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
+  
+  public long getNumSegmentsProcessed() {
+    return _numSegmentsProcessed;
+  }
+
+  public void setNumSegmentsProcessed(long numSegmentsProcessed) {
+    _numSegmentsProcessed = numSegmentsProcessed;
+  }
+
+  public long getNumSegmentsWithNoMatch() {
+    return _numSegmentsWithNoMatch;
+  }
+
+  public void setNumSegmentsWithNoMatch(long numSegmentsWithNoMatch) {
+    _numSegmentsWithNoMatch = numSegmentsWithNoMatch;
+  }
 
   public void setNumTotalRawDocs(long numTotalRawDocs) {
     _numTotalRawDocs = numTotalRawDocs;
@@ -279,6 +297,9 @@ public class IntermediateResultsBlock implements Block {
         .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
     dataTable.getMetadata()
         .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
+    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_WITH_NO_MATCH, String.valueOf(_numSegmentsWithNoMatch));
+    
     dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalRawDocs));
     if (_numGroupsLimitReached) {
       dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");
