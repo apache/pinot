@@ -348,11 +348,10 @@ public class PqlUtils {
     return AND.join(components);
   }
 
-  private static String convertEpochToAggGranularity(String timeColumnName, TimeSpec timeSpec, TimeGranularity aggregationGranularity) {
+  private static String convertEpochToMinuteAggGranularity(String timeColumnName, TimeSpec timeSpec) {
     String groupByTimeColumnName = String.format("dateTimeConvert(%s,'%d:%s:%s','%d:%s:%s','%d:%s')", timeColumnName,
         timeSpec.getDataGranularity().getSize(), timeSpec.getDataGranularity().getUnit(), timeSpec.getFormat(),
-        timeSpec.getDataGranularity().getSize(), timeSpec.getDataGranularity().getUnit(), timeSpec.getFormat(),
-        aggregationGranularity.getSize(), aggregationGranularity.getUnit());
+        timeSpec.getDataGranularity().getSize(), timeSpec.getDataGranularity().getUnit(), timeSpec.getFormat());
     return groupByTimeColumnName;
   }
 
@@ -365,7 +364,7 @@ public class PqlUtils {
       // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','15:MINUTES')
       if (timeSpec.getFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
           && !timeSpec.getDataGranularity().equals(aggregationGranularity)) {
-        String groupByTimeColumnName = convertEpochToAggGranularity(timeColumnName, timeSpec, aggregationGranularity);
+        String groupByTimeColumnName = convertEpochToMinuteAggGranularity(timeColumnName, timeSpec);
         groups.add(groupByTimeColumnName);
       } else {
         groups.add(timeColumnName);
