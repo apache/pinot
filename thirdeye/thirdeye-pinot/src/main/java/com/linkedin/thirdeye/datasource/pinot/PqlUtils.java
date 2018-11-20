@@ -348,11 +348,10 @@ public class PqlUtils {
     return AND.join(components);
   }
 
-  private static String convertEpochToAggGranularity(String timeColumnName, TimeSpec timeSpec, TimeGranularity aggregationGranularity) {
-    String groupByTimeColumnName = String.format("dateTimeConvert(%s,'%d:%s:%s','%d:%s:%s','%d:%s')", timeColumnName,
+  private static String convertEpochToMinuteAggGranularity(String timeColumnName, TimeSpec timeSpec) {
+    String groupByTimeColumnName = String.format("dateTimeConvert(%s,'%d:%s:%s','%d:%s:%s','1:MINUTES')", timeColumnName,
         timeSpec.getDataGranularity().getSize(), timeSpec.getDataGranularity().getUnit(), timeSpec.getFormat(),
-        timeSpec.getDataGranularity().getSize(), timeSpec.getDataGranularity().getUnit(), timeSpec.getFormat(),
-        aggregationGranularity.getSize(), aggregationGranularity.getUnit());
+        timeSpec.getDataGranularity().getSize(), timeSpec.getDataGranularity().getUnit(), timeSpec.getFormat());
     return groupByTimeColumnName;
   }
 
@@ -361,11 +360,11 @@ public class PqlUtils {
     String timeColumnName = timeSpec.getColumnName();
     List<String> groups = new LinkedList<>();
     if (aggregationGranularity != null && !groups.contains(timeColumnName)) {
-      // Convert the time column to aggregation granularity if it is epoch.
-      // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','15:MINUTES')
+      // Convert the time column to 1 minute granularity if it is epoch.
+      // E.g., dateTimeConvert(timestampInEpoch,'1:MILLISECONDS:EPOCH','1:MILLISECONDS:EPOCH','1:MINUTES')
       if (timeSpec.getFormat().equals(TimeGranularitySpec.TimeFormat.EPOCH.toString())
           && !timeSpec.getDataGranularity().equals(aggregationGranularity)) {
-        String groupByTimeColumnName = convertEpochToAggGranularity(timeColumnName, timeSpec, aggregationGranularity);
+        String groupByTimeColumnName = convertEpochToMinuteAggGranularity(timeColumnName, timeSpec);
         groups.add(groupByTimeColumnName);
       } else {
         groups.add(timeColumnName);
