@@ -138,12 +138,12 @@
                     </td>
 
                     <td style="padding:14px 24px;">
-                      <span style=" white-space:nowrap; font-size: 14px; color:#606060;">(${holiday.startTime?number_to_date})</span>
+                      <span style="white-space:nowrap; font-size: 14px; color:#606060;">(${holiday.startTime?number_to_date})</span>
                     </td>
 
                     <#if holiday.targetDimensionMap["countryCode"]??>
                       <td style="padding:14px 24px;">
-                        <span style="color: rgba(0,0,0,0.6); font-size: 12px;">${holiday.targetDimensionMap["countryCode"]?join(", ")}</span>
+                        <span style="white-space:nowrap; color: rgba(0,0,0,0.6); font-size: 12px;">${holiday.targetDimensionMap["countryCode"]?join(", ")}</span>
                       </td>
                     </#if>
 
