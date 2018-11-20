@@ -1,7 +1,9 @@
 {{#if isSplit}}
   {{#each splitUrns as |urn|}}
     <div>
-      <h4 class="rootcause-chart__title">{{get-safe splitLabels urn}}</h4>
+      <a {{action "onSelect" urn}}>
+        <h4 class="rootcause-chart__title">{{get-safe splitLabels urn}}</h4>
+      </a>
       {{timeseries-chart
         series=(get-safe splitSeries urn)
         tooltip=tooltip
