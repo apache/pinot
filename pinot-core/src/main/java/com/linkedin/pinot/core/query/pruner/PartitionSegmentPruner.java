@@ -22,6 +22,9 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.configuration.Configuration;
@@ -59,7 +62,8 @@ public class PartitionSegmentPruner extends AbstractSegmentPruner {
     Map<String, ColumnMetadata> columnMetadataMap =
         ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataMap();
 
-    return (columnMetadataMap != null) && pruneSegment(filterQueryTree, columnMetadataMap);
+    Map<String, BloomFilterReader> emptyMap = Collections.emptyMap();
+    return (columnMetadataMap != null) && pruneSegment(filterQueryTree, columnMetadataMap, emptyMap);
   }
 
   /**
@@ -74,12 +78,12 @@ public class PartitionSegmentPruner extends AbstractSegmentPruner {
    * @return True if segment can be pruned, false otherwise
    */
   @Override
-  public boolean pruneSegment(FilterQueryTree filterQueryTree, Map<String, ColumnMetadata> columnMetadataMap) {
+  public boolean pruneSegment(FilterQueryTree filterQueryTree, Map<String, ColumnMetadata> columnMetadataMap, Map<String, BloomFilterReader> bloomFilterMap) {
     List<FilterQueryTree> children = filterQueryTree.getChildren();
 
     // Non-leaf node
     if (children != null && !children.isEmpty()) {
-      return pruneNonLeaf(filterQueryTree, columnMetadataMap);
+      return pruneNonLeaf(filterQueryTree, columnMetadataMap, bloomFilterMap);
     }
 
     // TODO: Enhance partition based pruning for RANGE operator.

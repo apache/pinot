@@ -82,6 +82,8 @@ public interface SegmentMetadata {
 
   String getBitmapInvertedIndexFileName(String column);
 
+  String getBloomFilterFileName(String column);
+
   String getCreatorName();
 
   char getPaddingCharacter();
@@ -99,4 +101,5 @@ public interface SegmentMetadata {
   String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType);
 
   boolean close();
+
 }

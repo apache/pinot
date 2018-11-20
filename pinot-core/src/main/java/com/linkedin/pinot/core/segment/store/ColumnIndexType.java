@@ -18,7 +18,8 @@ package com.linkedin.pinot.core.segment.store;
 public enum ColumnIndexType {
   DICTIONARY("dictionary"),
   FORWARD_INDEX("forward_index"),
-  INVERTED_INDEX("inverted_index");
+  INVERTED_INDEX("inverted_index"),
+  BLOOM_FILTER("bloom_filter");
 
   private final String indexName;
   ColumnIndexType(String name) {

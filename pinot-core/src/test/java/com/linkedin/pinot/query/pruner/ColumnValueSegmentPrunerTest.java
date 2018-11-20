@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.query.pruner.ColumnValueSegmentPruner;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.util.HashMap;
 import java.util.Map;
@@ -35,6 +36,7 @@ import org.testng.annotations.Test;
 public class ColumnValueSegmentPrunerTest {
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
   private static final Map<String, ColumnMetadata> COLUMN_METADATA_MAP = new HashMap<>();
+  private static final Map<String, BloomFilterReader> BLOOM_FILTER_MAP = new HashMap<>();
 
   static {
     COLUMN_METADATA_MAP.put("time", new ColumnMetadata.Builder().setColumnName("time")
@@ -95,6 +97,6 @@ public class ColumnValueSegmentPrunerTest {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
     ColumnValueSegmentPruner pruner = new ColumnValueSegmentPruner();
-    return pruner.pruneSegment(filterQueryTree, COLUMN_METADATA_MAP);
+    return pruner.pruneSegment(filterQueryTree, COLUMN_METADATA_MAP, BLOOM_FILTER_MAP);
   }
 }
