@@ -203,13 +203,6 @@ public class SegmentDeletionManager {
    */
   public void removeAgedDeletedSegments(int retentionInDays) {
     if (_dataDir != null) {
-      File deletedDir = new File(_dataDir, DELETED_SEGMENTS);
-      // Check that the directory for deleted segments exists
-      if (!deletedDir.isDirectory()) {
-        LOGGER.warn("Deleted segment directory {} does not exist or it is not directory.", deletedDir.getAbsolutePath());
-        return;
-      }
-
       URI dataDirURI = ControllerConf.getUriFromPath(_dataDir);
       URI deletedDirURI = ControllerConf.getUriFromPath(StringUtil.join(File.separator, _dataDir, DELETED_SEGMENTS));
       PinotFS pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
