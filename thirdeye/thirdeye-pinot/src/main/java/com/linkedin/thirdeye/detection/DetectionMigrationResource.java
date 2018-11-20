@@ -79,58 +79,6 @@ public class DetectionMigrationResource {
     this.yaml = new Yaml(options);
   }
 
-  @Path("/stats")
-  @GET
-  public void getAnomalyFunctionStats() {
-    List<AnomalyFunctionDTO> anomalyFunctions = this.anomalyFunctionDAO.findAll();
-    long mergeConfigCount = 0;
-    long functionDimensionsMergeStrategyCount = 0;
-    long averageThresholdDataFilterCount = 0;
-    long datafilterCount = 0;
-    long swiFilterCount = 0;
-    long twoSideSWICount = 0;
-    long otherFilter = 0;
-
-    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctions) {
-      if (!anomalyFunctionDTO.getIsActive()) {
-        continue;
-      }
-      if (anomalyFunctionDTO.getAnomalyMergeConfig() != null ) {
-        if (anomalyFunctionDTO.getAnomalyMergeConfig().getMergeStrategy() == FUNCTION_DIMENSIONS){
-          functionDimensionsMergeStrategyCount++;
-        }
-        mergeConfigCount++;
-      }
-      if (anomalyFunctionDTO.getDataFilter() != null && !anomalyFunctionDTO.getDataFilter().isEmpty()) {
-        if (anomalyFunctionDTO.getDataFilter().get("type").equals("average_threshold")){
-          averageThresholdDataFilterCount++;
-        } else {
-          LOGGER.info("other data filter {}", anomalyFunctionDTO.getDataFilter().get("type"));
-        }
-        datafilterCount++;
-      }
-      if (anomalyFunctionDTO.getAlertFilter() != null){
-        if(anomalyFunctionDTO.getAlertFilter().get("thresholdField") != null){
-          if (!anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("impactToGlobal")) {
-            otherFilter++;
-          }
-          swiFilterCount++;
-          if (anomalyFunctionDTO.getAlertFilter().get("maxThreshold") != anomalyFunctionDTO.getAlertFilter().get("maxThreshold")){
-            twoSideSWICount++;
-          }
-        }
-      }
-    }
-    LOGGER.info("anomalyFunctions count", anomalyFunctions.size());
-    LOGGER.info("mergeConfigCount {}", mergeConfigCount);
-    LOGGER.info("functionDimensionsMergeStrategyCount {}", functionDimensionsMergeStrategyCount);
-    LOGGER.info("datafilterCount {}", datafilterCount);
-    LOGGER.info("averageThresholdDataFilterCount {}", averageThresholdDataFilterCount);
-    LOGGER.info("swiFilterCount {}", swiFilterCount);
-    LOGGER.info("twoSideSWICount {}", twoSideSWICount);
-    LOGGER.info("otherFilter {}", otherFilter);
-  }
-
   @GET
   public String migrateToYaml(@QueryParam("id") long anomalyFunctionId) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionId);
