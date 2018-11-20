@@ -94,6 +94,8 @@ public class ControllerLeaderLocator {
       int leaderPort = Integer.valueOf(leader.substring(index + 1));
       _controllerLeaderHostPort = new Pair<>(leaderHost, leaderPort);
       _cachedControllerLeaderInvalid = false;
+      LOGGER.info("Setting controller leader to be {}:{} as per znode version {}, mtime {}", leaderHost, leaderPort,
+          stat.getVersion(), stat.getMtime());
       return _controllerLeaderHostPort;
     } catch (Exception e) {
       LOGGER.warn("Could not locate controller leader, exception", e);
