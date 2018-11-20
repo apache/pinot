@@ -79,6 +79,11 @@ public class DetectionMigrationResource {
     this.yaml = new Yaml(options);
   }
 
+  /**
+   * Endpoint to convert a existing anomaly function to a composite pipeline yaml
+   *
+   * @param anomalyFunctionId the anomaly function id
+   */
   @GET
   public String migrateToYaml(@QueryParam("id") long anomalyFunctionId) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionId);
