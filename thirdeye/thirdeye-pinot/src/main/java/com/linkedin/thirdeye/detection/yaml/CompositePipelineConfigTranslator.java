@@ -124,6 +124,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_PARAMS = "params";
   private static final String PROP_METRIC_URN = "metricUrn";
+  private static final String PROP_DIMENSION_FILTER_METRIC = "dimensionFilterMetric";
+  private static final String PROP_NESTED_METRIC_URNS = "nestedMetricUrns";
   private static final String PROP_RULES = "rules";
   private static final String PROP_NESTED = "nested";
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
@@ -146,6 +148,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private DatasetConfigDTO datasetConfig;
   private String metricUrn;
   private Map<String, Object> mergerProperties = new HashMap<>();
+  private Map<String, Collection<String>> filterMaps;
 
   public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     super(yamlConfig, provider);
@@ -164,7 +167,8 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     // if user set merger properties
     this.mergerProperties = MapUtils.getMap(yamlConfig, PROP_MERGER, new HashMap());
 
-    this.metricUrn = buildMetricUrn(yamlConfig);
+    Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
+    this.metricUrn = buildMetricUrn(filterMaps, this.metricConfig.getId());
     String cron = buildCron();
 
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
@@ -187,9 +191,16 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     }
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
     if (yamlConfig.containsKey(PROP_DIMENSION_EXPLORATION)) {
-      dimensionWrapperProperties.putAll(MapUtils.getMap(yamlConfig, PROP_DIMENSION_EXPLORATION));
+      Map<String, Object> dimensionExploreYaml = MapUtils.getMap(yamlConfig, PROP_DIMENSION_EXPLORATION);
+      dimensionWrapperProperties.putAll(dimensionExploreYaml);
+      if (dimensionExploreYaml.containsKey(PROP_DIMENSION_FILTER_METRIC)){
+        MetricConfigDTO dimensionExploreMetric = this.dataProvider.fetchMetric(MapUtils.getString(dimensionExploreYaml, PROP_DIMENSION_FILTER_METRIC), this.datasetConfig.getDataset());
+        dimensionWrapperProperties.put(PROP_METRIC_URN, buildMetricUrn(filterMaps, dimensionExploreMetric.getId()));
+        dimensionWrapperProperties.put(PROP_NESTED_METRIC_URNS, Collections.singletonList(this.metricUrn));
+      } else {
+        dimensionWrapperProperties.put(PROP_METRIC_URN, this.metricUrn);
+      }
     }
-    dimensionWrapperProperties.put(PROP_METRIC_URN, metricUrn);
     Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(),
         Collections.singletonList(
             buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)), this.mergerProperties);
@@ -324,9 +335,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     }
   }
 
-  private String buildMetricUrn(Map<String, Object> yamlConfig) {
-    Map<String, Collection<String>> filterMaps = MapUtils.getMap(yamlConfig, PROP_FILTERS);
-
+  private String buildMetricUrn(Map<String, Collection<String>> filterMaps, long metricId) {
     Multimap<String, String> filters = ArrayListMultimap.create();
     if (filterMaps != null) {
       for (Map.Entry<String, Collection<String>> entry : filterMaps.entrySet()) {
@@ -334,7 +343,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
     }
 
-    MetricEntity me = MetricEntity.fromMetric(1.0, this.metricConfig.getId(), filters);
+    MetricEntity me = MetricEntity.fromMetric(1.0, metricId, filters);
     return me.getUrn();
   }
 

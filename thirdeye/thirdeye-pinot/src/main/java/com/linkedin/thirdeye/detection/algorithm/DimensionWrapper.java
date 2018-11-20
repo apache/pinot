@@ -35,10 +35,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
 
@@ -49,6 +52,7 @@ import static com.linkedin.thirdeye.dataframe.util.DataFrameUtils.*;
  * each filtered time series.
  */
 public class DimensionWrapper extends DetectionPipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(DimensionWrapper.class);
 
   // prototyping
   private static final String PROP_NESTED = "nested";
@@ -66,8 +70,12 @@ public class DimensionWrapper extends DetectionPipeline {
   private final double minValue;
   private final double minValueHourly;
   private final double minValueDaily;
+  private final double minLiveZone;
+  private final double liveBucketPercentageThreshold;
   private final Period lookback;
   private final DateTimeZone timezone;
+  private DateTime start;
+  private DateTime end;
 
   protected final String nestedMetricUrnKey;
   protected final List<String> dimensions;
@@ -88,10 +96,26 @@ public class DimensionWrapper extends DetectionPipeline {
     this.lookback = ConfigUtils.parsePeriod(MapUtils.getString(config.getProperties(), "lookback", "1w"));
     this.timezone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), "timezone", "America/Los_Angeles"));
 
+    /*
+     * A bucket of the time series is taken into consider only if its value is above the minLiveZone. In other words,
+     * if a bucket's value is smaller than minLiveZone, then this bucket is ignored when calculating the average value.
+     * Used for outlier removal. Replace legacy average threshold filter.
+     */
+    this.minLiveZone = MapUtils.getDoubleValue(config.getProperties(), "minLiveZone", Double.NaN);
+    this.liveBucketPercentageThreshold = MapUtils.getDoubleValue(config.getProperties(), "liveBucketPercentageThreshold", 0.5);
+
     // prototyping
     this.nestedMetricUrns = ConfigUtils.getList(config.getProperties().get(PROP_NESTED_METRIC_URNS), Collections.singletonList(this.metricUrn));
     this.nestedMetricUrnKey = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_DEFAULT);
     this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+
+    this.start = new DateTime(this.startTime, this.timezone);
+    this.end = new DateTime(this.endTime, this.timezone);
+
+    DateTime minStart = this.end.minus(this.lookback);
+    if (minStart.isBefore(this.start)) {
+      this.start = minStart;
+    }
   }
 
   @Override
@@ -100,19 +124,10 @@ public class DimensionWrapper extends DetectionPipeline {
 
     if (this.metricUrn != null) {
       // metric and dimension exploration
-
-      DateTime start = new DateTime(this.startTime, this.timezone);
-      DateTime end = new DateTime(this.endTime, this.timezone);
-
-      DateTime minStart = end.minus(this.lookback);
-      if (minStart.isBefore(start)) {
-        start = minStart;
-      }
-
-      Period testPeriod = new Period(start, end);
+      Period testPeriod = new Period(this.start, this.end);
 
       MetricEntity metric = MetricEntity.fromURN(this.metricUrn);
-      MetricSlice slice = MetricSlice.from(metric.getId(), start.getMillis(), end.getMillis(), metric.getFilters());
+      MetricSlice slice = MetricSlice.from(metric.getId(), this.start.getMillis(), this.end.getMillis(), metric.getFilters());
 
       DataFrame aggregates = this.provider.fetchAggregates(Collections.singletonList(slice), this.dimensions).get(slice);
 
@@ -128,7 +143,8 @@ public class DimensionWrapper extends DetectionPipeline {
       }
 
       // min value
-      if (!Double.isNaN(this.minValue)) {
+      // check min value if only min live zone not set, other wise use checkMinLiveZone below
+      if (!Double.isNaN(this.minValue) && Double.isNaN(this.minLiveZone)) {
         aggregates = aggregates.filter(aggregates.getDoubles(COL_VALUE).gte(this.minValue)).dropNull();
       }
 
@@ -168,11 +184,17 @@ public class DimensionWrapper extends DetectionPipeline {
       }
     }
 
+    if (!Double.isNaN(this.minLiveZone) && !Double.isNaN(this.minValue)) {
+      // filters all nested metric that didn't pass live zone check
+      nestedMetrics = nestedMetrics.stream().filter(metricEntity -> checkMinLiveZone(metricEntity)).collect(Collectors.toList());
+    }
+
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
 
     for (MetricEntity metric : nestedMetrics) {
       for (Map<String, Object> properties : this.nestedProperties) {
+        LOG.info("running detection for {}", metric.toString());
         DetectionPipelineResult intermediate = this.runNested(metric, properties);
 
         anomalies.addAll(intermediate.getAnomalies());
@@ -182,6 +204,19 @@ public class DimensionWrapper extends DetectionPipeline {
 
     return new DetectionPipelineResult(anomalies)
         .setDiagnostics(diagnostics);
+  }
+
+  private boolean checkMinLiveZone(MetricEntity me) {
+    MetricSlice slice = MetricSlice.from(me.getId(), this.start.getMillis(), this.end.getMillis(), me.getFilters());
+    DataFrame df = this.provider.fetchTimeseries(Collections.singleton(slice)).get(slice);
+    long totalBuckets = df.size();
+    df = df.filter(df.getDoubles(COL_VALUE).gt(this.minLiveZone)).dropNull();
+    double liveBucketPercentage = (double) df.size() / (double) totalBuckets;
+    if (liveBucketPercentage >= this.liveBucketPercentageThreshold) {
+      double val = df.getDoubles(COL_VALUE).mean().getDouble(0);
+      return val >= this.minValue;
+    }
+    return false;
   }
 
   protected DetectionPipelineResult runNested(MetricEntity metric, Map<String, Object> template) throws Exception {

@@ -152,7 +152,10 @@ public class DetectionMigrationResource {
     Map<String, Object> dimensionExploreYaml = new LinkedHashMap<>();
     dimensionExploreYaml.put("dimensions", Collections.singletonList(functionDTO.getExploreDimensions()));
     if (functionDTO.getDataFilter() != null && !functionDTO.getDataFilter().isEmpty() && functionDTO.getDataFilter().get("type").equals("average_threshold")) {
-      dimensionExploreYaml.put("minValue", functionDTO.getDataFilter().get("threshold"));
+      // migrate average threshold data filter
+      dimensionExploreYaml.put("dimensionFilterMetric", functionDTO.getDataFilter().get("metricName"));
+      dimensionExploreYaml.put("minValue", Double.valueOf(functionDTO.getDataFilter().get("threshold")));
+      dimensionExploreYaml.put("minLiveZone", functionDTO.getDataFilter().get("minLiveZone"));
     }
     return dimensionExploreYaml;
   }
