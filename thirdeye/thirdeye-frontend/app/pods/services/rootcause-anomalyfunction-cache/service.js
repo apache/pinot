@@ -118,7 +118,7 @@ export default Service.extend({
   _toFilterMapCustom(filters) {
     const filterMap = {};
     [...filters].forEach(tup => {
-      const [key, value] = tup;
+      const [key, op, value] = tup;
       filterMap[key] = value;
     });
     return filterMap;
