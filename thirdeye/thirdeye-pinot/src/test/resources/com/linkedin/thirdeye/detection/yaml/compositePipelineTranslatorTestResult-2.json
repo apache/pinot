@@ -5,11 +5,11 @@
       "className" : "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper",
       "metricUrn" : "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3",
       "nested" : [ {
-        "baselineValueProvider" : "$rule1_THRESHOLD_RULE_BASELINE_0",
+        "baselineValueProvider" : "$rule1:RULE_BASELINE:0",
         "className" : "com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
         "nested" : [ {
           "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
-          "detector" : "$rule1_THRESHOLD_0"
+          "detector" : "$rule1:THRESHOLD:0"
         } ]
       } ],
       "minContribution" : 0.05,
@@ -17,11 +17,11 @@
     } ]
   },
   "components" : {
-    "rule1_THRESHOLD_RULE_BASELINE_0" : {
+    "rule1:RULE_BASELINE:0" : {
       "max" : 100,
       "className" : "com.linkedin.thirdeye.detection.components.RuleBaselineProvider"
     },
-    "rule1_THRESHOLD_0" : {
+    "rule1:THRESHOLD:0" : {
       "max" : 100,
       "className" : "com.linkedin.thirdeye.detection.components.ThresholdRuleDetector"
     }
