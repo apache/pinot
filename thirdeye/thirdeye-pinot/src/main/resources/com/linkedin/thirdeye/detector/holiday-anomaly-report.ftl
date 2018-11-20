@@ -118,7 +118,7 @@
           </#list>
 
           <#if referenceLinks?has_content>
-            <@utils.addRow title="Useful Links" align="center">
+            <@utils.addRow title="Useful Links" align="left">
               <#list referenceLinks?keys as referenceLinkKey>
                 <div style="padding-top: 16px;">
                   <a href="${referenceLinks[referenceLinkKey]}" style="text-decoration: none; color:#0073B1; font-size:14px; font-weight:bold; line-height:20px; margin-bottom: 0;">${referenceLinkKey}</a>
@@ -128,18 +128,28 @@
           </#if>
 
           <#if holidays?has_content>
-            <@utils.addRow title="Holidays" align="center">
-              <#list holidays as holiday>
-                  <div style="padding-top: 16px;">
-                    <a href="https://www.google.com/search?q=${holiday.name}" style="text-decoration: none; color:#0073B1; font-size:14px; font-weight:bold; line-height:20px; margin-bottom: 0;">${holiday.name}</a>
-                    <span style="font-size: 14px; color:#606060; line-height:20px;">(${holiday.startTime?number_to_date})</span>
-                  </div>
-                  <#if holiday.targetDimensionMap?has_content>
-                    <#list holiday.targetDimensionMap?keys as dimension>
-                        <span style="color: rgba(0,0,0,0.6); line-height:16px; font-size: 12px;">${holiday.targetDimensionMap[dimension]?join(",")}</span>
-                    </#list>
-                  </#if>
-              </#list>
+            <@utils.addRow title="Holidays" align="left">
+              <table border="0" width="100%" align="center" style="width:100%; padding:0; margin:0; border-collapse: collapse; text-align:left;">
+                <#list holidays as holiday>
+                  <tr style="border-bottom: 1px solid #C7D1D8;">
+
+                    <td style="padding:14px 24px;">
+                      <a href="https://www.google.com/search?q=${holiday.name}" style="text-decoration: none; white-space:nowrap; color:#0073B1; font-size:14px; font-weight:bold;">${holiday.name}</a>
+                    </td>
+
+                    <td style="padding:14px 24px;">
+                      <span style=" white-space:nowrap; font-size: 14px; color:#606060;">(${holiday.startTime?number_to_date})</span>
+                    </td>
+
+                    <#if holiday.targetDimensionMap["countryCode"]??>
+                      <td style="padding:14px 24px;">
+                        <span style="color: rgba(0,0,0,0.6); font-size: 12px;">${holiday.targetDimensionMap["countryCode"]?join(", ")}</span>
+                      </td>
+                    </#if>
+
+                  </tr>
+                </#list>
+              </table>
             </@utils.addRow>
           </#if>
 
