@@ -17,39 +17,34 @@
 package com.linkedin.thirdeye.detection;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.annotation.Param;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections.MultiMap;
 import org.apache.commons.lang3.StringUtils;
+import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
-import static com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder.*;
 import static com.linkedin.thirdeye.anomaly.merge.AnomalyMergeStrategy.*;
 
 
@@ -152,7 +147,7 @@ public class DetectionMigrationResource {
     yamlConfigs.put("filters",
         AnomalyDetectionInputContextBuilder.getFiltersForFunction(anomalyFunctionDTO.getFilters()).asMap());
 
-    Map<String, Object> ruleYaml = new HashMap<>();
+    Map<String, Object> ruleYaml = new LinkedHashMap<>();
     ruleYaml.put("name", "myRule");
 
     // detection
@@ -161,58 +156,61 @@ public class DetectionMigrationResource {
 
     // filters
     Map<String, String> alertFilter = anomalyFunctionDTO.getAlertFilter();
+
     if (alertFilter != null && !alertFilter.isEmpty()){
-      // threshold filter migrate to rule filters
+      Map<String, Object> filterYaml = new LinkedHashMap<>();
       if (!alertFilter.containsKey("thresholdField")) {
-        ruleYaml.put("filter", Collections.singletonList(
-            ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO))));
+        // algorithm alert filter
+        filterYaml = ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO));
       } else {
-        Map<String, Object> thresholdRuleYaml = new HashMap<>();
+        // threshold filter migrate to rule filters
         // site wide impact filter migrate to rule based swi filter
         if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("impactToGlobal")){
-          thresholdRuleYaml.put("type", "SITEWIDE_IMPACT_FILTER");
-          thresholdRuleYaml.put("params", getSiteWideImpactFilterParams(anomalyFunctionDTO));
+          filterYaml.put("type", "SITEWIDE_IMPACT_FILTER");
+          filterYaml.put("params", getSiteWideImpactFilterParams(anomalyFunctionDTO));
         }
         // weight filter migrate to rule based percentage change filter
         if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("weight")){
-          thresholdRuleYaml.put("type", "PERCENTAGE_CHANGE_FILTER");
-          thresholdRuleYaml.put("params", getPercentageChangeFilterParams(anomalyFunctionDTO));
+          filterYaml.put("type", "PERCENTAGE_CHANGE_FILTER");
+          filterYaml.put("params", getPercentageChangeFilterParams(anomalyFunctionDTO));
         }
       }
+      ruleYaml.put("filter", Collections.singletonList(filterYaml));
     }
 
     yamlConfigs.put("rules", Collections.singletonList(ruleYaml));
 
     // merger configs
     if (anomalyFunctionDTO.getAnomalyMergeConfig() != null ) {
-      Map<String, Object> mergerYaml = new HashMap<>();
+      Map<String, Object> mergerYaml = new LinkedHashMap<>();
       if (anomalyFunctionDTO.getAnomalyMergeConfig().getMergeStrategy() == FUNCTION_DIMENSIONS){
         mergerYaml.put("maxGap", anomalyFunctionDTO.getAnomalyMergeConfig().getSequentialAllowedGap());
         mergerYaml.put("maxDuration", anomalyFunctionDTO.getAnomalyMergeConfig().getMaxMergeDurationLength());
       }
+      yamlConfigs.put("merger", mergerYaml);
     }
 
     return this.yaml.dump(yamlConfigs);
   }
 
   private Map<String, Object> getDimensionExplorationParams(AnomalyFunctionDTO functionDTO) {
-    Map<String, Object> dimensionExploreYaml = new HashMap<>();
+    Map<String, Object> dimensionExploreYaml = new LinkedHashMap<>();
     dimensionExploreYaml.put("dimensions", Collections.singletonList(functionDTO.getExploreDimensions()));
     if (functionDTO.getDataFilter() != null && !functionDTO.getDataFilter().isEmpty() && functionDTO.getDataFilter().get("type").equals("average_threshold")) {
       dimensionExploreYaml.put("minValue", functionDTO.getDataFilter().get("threshold"));
     }
-    return ImmutableMap.of();
+    return dimensionExploreYaml;
   }
 
   private Map<String, Object> getPercentageChangeFilterParams(AnomalyFunctionDTO functionDTO) {
-    Map<String, Object> filterYamlParams = new HashMap<>();
+    Map<String, Object> filterYamlParams = new LinkedHashMap<>();
     filterYamlParams.put("threshold", Math.abs(Double.valueOf(functionDTO.getAlertFilter().get("maxThreshold"))));
     filterYamlParams.put("pattern", "up_or_down");
     return filterYamlParams;
   }
 
   private Map<String, Object> getSiteWideImpactFilterParams(AnomalyFunctionDTO functionDTO) {
-    Map<String, Object> filterYamlParams = new HashMap<>();
+    Map<String, Object> filterYamlParams = new LinkedHashMap<>();
     filterYamlParams.put("threshold", Math.abs(Double.valueOf(functionDTO.getAlertFilter().get("maxThreshold"))));
     filterYamlParams.put("pattern", "up_or_down");
     filterYamlParams.put("sitewideMetricName", functionDTO.getGlobalMetric());
@@ -222,22 +220,28 @@ public class DetectionMigrationResource {
   }
 
   private Map<String, Object> getAlertFilterParams(AnomalyFunctionDTO functionDTO) {
-    Map<String, Object> filterYamlParams = new HashMap<>();
+    Map<String, Object> filterYamlParams = new LinkedHashMap<>();
     Map<String, Object> params = new HashMap<>();
     filterYamlParams.put("configuration", params);
     params.putAll(functionDTO.getAlertFilter());
+    params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
     // TODO bucket period, timezone
     return filterYamlParams;
   }
 
+  private String getBucketPeriod(AnomalyFunctionDTO functionDTO) {
+    return new Period(TimeUnit.MILLISECONDS.convert(functionDTO.getBucketSize(), functionDTO.getWindowUnit())).toString();
+  }
+
   private Map<String, Object> getAlgorithmDetectorParams(AnomalyFunctionDTO functionDTO) throws Exception {
-    Map<String, Object> detectorYaml = new HashMap<>();
-    Map<String, Object> params = new HashMap<>();
+    Map<String, Object> detectorYaml = new LinkedHashMap<>();
+    Map<String, Object> params = new LinkedHashMap<>();
     detectorYaml.put("configuration", params);
     Properties properties = AnomalyFunctionDTO.toProperties(functionDTO.getProperties());
     for (Map.Entry<Object, Object> property : properties.entrySet()) {
       params.put((String) property.getKey(), property.getValue());
     }
+    params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
     // TODO bucket period, timezone
     if (functionDTO.getWindowDelay() != 0) {
       detectorYaml.put(PROP_WINDOW_DELAY, functionDTO.getWindowDelay());

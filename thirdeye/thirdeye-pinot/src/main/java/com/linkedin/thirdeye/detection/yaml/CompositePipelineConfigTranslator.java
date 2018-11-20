@@ -224,7 +224,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     if (DETECTOR_TO_BASELINE.containsKey(detectorType)) {
       baselineProviderType = DETECTOR_TO_BASELINE.get(detectorType);
     }
-    String baselineProviderKey = makeComponentKey(ruleName + "_" + detectorType,  baselineProviderType, id);
+    String baselineProviderKey = makeComponentKey(ruleName, baselineProviderType, id);
     properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
     buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
     properties.putAll(this.mergerProperties);
@@ -248,7 +248,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         case DAYS:
           properties.put(PROP_WINDOW_SIZE, 1);
           properties.put(PROP_WINDOW_UNIT, TimeUnit.DAYS);
-          // completeness checker true
+          // TODO completeness checker true
           break;
         default:
           properties.put(PROP_WINDOW_SIZE, 6);
@@ -382,7 +382,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   }
 
   private String makeComponentKey(String name, String type, long id) {
-    return "$" + name + "_" + type + "_" + id;
+    return "$" + name + ":" + type + ":" + id;
   }
 
   @Override
