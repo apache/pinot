@@ -1,4 +1,4 @@
-import { computed } from '@ember/object';
+import { computed, get, getProperties } from '@ember/object';
 import { equal } from '@ember/object/computed';
 import Component from '@ember/component';
 import d3 from 'd3';
@@ -6,6 +6,7 @@ import buildTooltip from 'thirdeye-frontend/utils/build-tooltip';
 import {
   toBaselineUrn,
   toMetricUrn,
+  toCurrentUrn,
   filterPrefix,
   hasPrefix,
   toMetricLabel,
@@ -32,6 +33,8 @@ export default Component.extend({
 
   onHover: null, // function (urns)
 
+  onSelection: null, // function (updates)
+
   timeseriesMode: null, // 'absolute', 'relative', 'log', 'split'
 
   classNames: ['rootcause-chart'],
@@ -47,7 +50,7 @@ export default Component.extend({
    * @returns {Set}
    */
   focusedIds: computed('focusedUrns', function() {
-    return this.get('focusedUrns');
+    return get(this, 'focusedUrns');
   }),
 
   legend: {
@@ -84,7 +87,7 @@ export default Component.extend({
           const {
             entities,
             timeseries
-          } = this.getProperties('entities', 'timeseries');
+          } = getProperties(this, 'entities', 'timeseries');
 
           const tooltip = this.buildTooltip.create();
 
@@ -102,7 +105,7 @@ export default Component.extend({
   axis: computed(
     'context',
     function () {
-      const { context } = this.getProperties('context');
+      const { context } = getProperties(this, 'context');
 
       const { analysisRange } = context;
 
@@ -147,7 +150,7 @@ export default Component.extend({
     'selectedUrns',
     function () {
       const { entities, timeseries, selectedUrns } =
-        this.getProperties('entities', 'timeseries', 'selectedUrns');
+        getProperties(this, 'entities', 'timeseries', 'selectedUrns');
 
       return filterPrefix(selectedUrns, ['thirdeye:event:', 'frontend:metric:'])
         .filter(urn => !hasPrefix(urn, 'thirdeye:event:') || entities[urn])
@@ -166,7 +169,7 @@ export default Component.extend({
     'timeseriesMode',
     function () {
       const { timeseries, timeseriesMode, displayableUrns } =
-        this.getProperties('timeseries', 'timeseriesMode', 'displayableUrns');
+        getProperties(this, 'timeseries', 'timeseriesMode', 'displayableUrns');
 
       if (timeseriesMode === TIMESERIES_MODE_SPLIT) {
         return {};
@@ -195,7 +198,7 @@ export default Component.extend({
     'timeseriesMode',
     function () {
       const { displayableUrns, timeseriesMode } =
-        this.getProperties('displayableUrns', 'timeseriesMode');
+        getProperties(this, 'displayableUrns', 'timeseriesMode');
 
       if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
         return {};
@@ -233,7 +236,7 @@ export default Component.extend({
     'timeseriesMode',
     function () {
       const { entities, displayableUrns, timeseriesMode } =
-        this.getProperties('entities', 'displayableUrns', 'timeseriesMode');
+        getProperties(this, 'entities', 'displayableUrns', 'timeseriesMode');
 
       if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
         return {};
@@ -254,7 +257,7 @@ export default Component.extend({
     'timeseriesMode',
     function () {
       const { entities, displayableUrns, timeseriesMode } =
-        this.getProperties('entities', 'displayableUrns', 'timeseriesMode');
+        getProperties(this, 'entities', 'displayableUrns', 'timeseriesMode');
 
       if (timeseriesMode !== TIMESERIES_MODE_SPLIT) {
         return {};
@@ -284,7 +287,7 @@ export default Component.extend({
    * @param {Array} urns metric ref urns
    */
   _makeChartSeries(urns) {
-    const { context } = this.getProperties('context');
+    const { context } = getProperties(this, 'context');
     const { anomalyRange } = context;
 
     const series = {};
@@ -313,7 +316,7 @@ export default Component.extend({
     'timeseries',
     'displayableUrns',
     function () {
-      const { displayableUrns } = this.getProperties('displayableUrns');
+      const { displayableUrns } = getProperties(this, 'displayableUrns');
 
       const bounds = {};
       [...displayableUrns].forEach(urn => {
@@ -333,7 +336,7 @@ export default Component.extend({
     'displayableUrns',
     function () {
       const { entities, displayableUrns, context } =
-        this.getProperties('entities', 'displayableUrns', 'context');
+        getProperties(this, 'entities', 'displayableUrns', 'context');
 
       const selectedEvents = filterPrefix(displayableUrns, 'thirdeye:event:').map(urn => entities[urn]);
 
@@ -398,7 +401,7 @@ export default Component.extend({
    */
   _makeSeries(urn) {
     const { entities, timeseries, timeseriesMode, _eventValues, context } =
-      this.getProperties('entities', 'timeseries', 'timeseriesMode', '_eventValues', 'context');
+      getProperties(this, 'entities', 'timeseries', 'timeseriesMode', '_eventValues', 'context');
 
     if (hasPrefix(urn, 'frontend:metric:current:')) {
       const metricEntity = entities[toMetricUrn(urn)];
@@ -505,7 +508,7 @@ export default Component.extend({
    */
   _onHover(d) {
     const { _hoverBounds: bounds, displayableUrns, onHover } =
-      this.getProperties('_hoverBounds', 'displayableUrns', 'onHover');
+      getProperties(this, '_hoverBounds', 'displayableUrns', 'onHover');
 
     if (onHover != null) {
       const urns = [...displayableUrns].filter(urn => bounds[urn] && bounds[urn][0] <= d && d <= bounds[urn][1]);
@@ -518,4 +521,14 @@ export default Component.extend({
       return outputUrns;
     }
   },
+
+  actions: {
+    onSelect(urn) {
+      const { onSelection } = getProperties(this, 'onSelection');
+
+      if (onSelection) {
+        onSelection({ [toMetricUrn(urn)]: true, [toBaselineUrn(urn)]: true, [toCurrentUrn(urn)]: true });
+      }
+    }
+  }
 });
