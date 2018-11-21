@@ -83,6 +83,7 @@ public class DetectionMigrationResource {
    * Endpoint to convert a existing anomaly function to a composite pipeline yaml
    *
    * @param anomalyFunctionId the anomaly function id
+   * @return the yaml config as string
    */
   @GET
   public String migrateToYaml(@QueryParam("id") long anomalyFunctionId) throws Exception {
