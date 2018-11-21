@@ -80,24 +80,19 @@ export default Component.extend({
   optionsMapping: ANOMALY_OPTIONS_MAPPING,
 
   /**
-   * Locally cache original time range on init
-   *
-   */
-  init() {
-    this._super(...arguments);
-    set(this, 'anomalyRangeOld', get(this, 'anomalyRange'));
-  },
-
-  /**
-   * Checks if anomalyRange has been changed since init
+   * Checks if anomalyRange from context is different than anomaly start and end
+   * times
    * @type {boolean}
    */
   isRangeChanged: computed(
     'anomalyRange',
+    'anomaly',
     function () {
+      const anomaly = get(this, 'anomaly');
       const anomalyRange = get(this, 'anomalyRange');
-      const anomalyRangeOld = get(this, 'anomalyRangeOld');
-      return (anomalyRange != anomalyRangeOld);
+      const start = get(this, 'anomaly').start;
+      const end = get(this, 'anomaly').end;
+      return !(anomalyRange[0] === start && anomalyRange[1] === end);
     }
   ),
 
@@ -356,7 +351,7 @@ export default Component.extend({
   }),
 
   /**
-   * Checks if param values and displayed values differ by 5% or more
+   * Checks if value at anomaly detection time and present differ by 1% or more
    * @type {Boolean}
    */
   isWarning: computed('anomalyInfo', 'isRangeChanged', function () {

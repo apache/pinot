@@ -31,7 +31,9 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
             metricGranularity : [ '5_MINUTES' ],
             dataset : [ 'my_dataset' ],
             status : [ 'NO_FEEDBACK' ]
-          }
+          },
+          start: 0,
+          end: 0
         }
       },
       anomalyUrns: ['thirdeye:event:anomaly:1', 'thirdeye:metric:1'],
@@ -80,7 +82,9 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
               metricGranularity : [ '5_MINUTES' ],
               dataset : [ 'my_dataset' ],
               status : [ 'NO_FEEDBACK' ]
-            }
+            },
+            start: 0,
+            end: 0
           }
         },
         anomalyUrns: ['thirdeye:event:anomaly:1', 'thirdeye:metric:1'],
