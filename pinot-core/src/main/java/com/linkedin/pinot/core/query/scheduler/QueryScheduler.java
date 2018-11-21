@@ -166,14 +166,17 @@ public abstract class QueryScheduler {
     }
 
     TimerContext timerContext = queryRequest.getTimerContext();
+    int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
     LOGGER.info(
         "Processed requestId={},table={},Segments={}/{}/{},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
-        requestId, tableNameWithType, queryRequest.getSegmentsToQuery().size(), numSegmentsProcessed, numSegmentsMatched,
+        requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
         timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
         numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
     
-    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsProcessed);
+    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
+    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
+    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_MATCHED, numSegmentsMatched);
 
     return responseData;
   }
