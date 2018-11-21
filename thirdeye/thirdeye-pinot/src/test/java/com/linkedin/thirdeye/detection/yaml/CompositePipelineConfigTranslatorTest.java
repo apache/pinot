@@ -71,7 +71,6 @@ public class CompositePipelineConfigTranslatorTest {
     this.yamlConfig.put("rules", Collections.singletonList(
         ImmutableMap.of("name", "rule2","detection", Collections.singletonList(ImmutableMap.of("change", 0.3)))));
     CompositePipelineConfigTranslator translator = new CompositePipelineConfigTranslator(this.yamlConfig, this.provider);
-
     translator.generateDetectionConfig();
   }
 }

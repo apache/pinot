@@ -85,7 +85,7 @@ public class DimensionWrapper extends DetectionPipeline {
   public DimensionWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
 
-    // exploration
+    // the metric used in dimension exploration
     this.metricUrn = MapUtils.getString(config.getProperties(), "metricUrn", null);
     this.minContribution = MapUtils.getDoubleValue(config.getProperties(), "minContribution", Double.NaN);
     this.minValue = MapUtils.getDoubleValue(config.getProperties(), "minValue", Double.NaN);
@@ -104,7 +104,7 @@ public class DimensionWrapper extends DetectionPipeline {
     this.minLiveZone = MapUtils.getDoubleValue(config.getProperties(), "minLiveZone", Double.NaN);
     this.liveBucketPercentageThreshold = MapUtils.getDoubleValue(config.getProperties(), "liveBucketPercentageThreshold", 0.5);
 
-    // prototyping
+    // the metric to run the detection for
     this.nestedMetricUrns = ConfigUtils.getList(config.getProperties().get(PROP_NESTED_METRIC_URNS), Collections.singletonList(this.metricUrn));
     this.nestedMetricUrnKey = MapUtils.getString(config.getProperties(), PROP_NESTED_METRIC_URN_KEY, PROP_NESTED_METRIC_URN_KEY_DEFAULT);
     this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));

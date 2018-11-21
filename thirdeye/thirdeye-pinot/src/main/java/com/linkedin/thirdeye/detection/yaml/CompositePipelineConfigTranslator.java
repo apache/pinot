@@ -198,16 +198,16 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
 
   private Map<String, Object> buildDimensionWrapperProperties(Map<String, Collection<String>> filterMaps) {
     Map<String, Object> dimensionWrapperProperties = new HashMap<>();
+    dimensionWrapperProperties.put(PROP_NESTED_METRIC_URNS, Collections.singletonList(this.metricUrn));
     if (yamlConfig.containsKey(PROP_DIMENSION_EXPLORATION)) {
       Map<String, Object> dimensionExploreYaml = MapUtils.getMap(this.yamlConfig, PROP_DIMENSION_EXPLORATION);
       dimensionWrapperProperties.putAll(dimensionExploreYaml);
       if (dimensionExploreYaml.containsKey(PROP_DIMENSION_FILTER_METRIC)){
         MetricConfigDTO dimensionExploreMetric = this.dataProvider.fetchMetric(MapUtils.getString(dimensionExploreYaml, PROP_DIMENSION_FILTER_METRIC), this.datasetConfig.getDataset());
         dimensionWrapperProperties.put(PROP_METRIC_URN, buildMetricUrn(filterMaps, dimensionExploreMetric.getId()));
-        dimensionWrapperProperties.put(PROP_NESTED_METRIC_URNS, Collections.singletonList(this.metricUrn));
+      } else {
+        dimensionWrapperProperties.put(PROP_METRIC_URN, this.metricUrn);
       }
-    } else {
-      dimensionWrapperProperties.put(PROP_METRIC_URN, this.metricUrn);
     }
     return dimensionWrapperProperties;
   }

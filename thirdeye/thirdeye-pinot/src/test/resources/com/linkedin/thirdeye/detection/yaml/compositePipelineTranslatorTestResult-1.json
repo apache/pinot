@@ -3,6 +3,7 @@
     "className" : "com.linkedin.thirdeye.detection.wrapper.ChildKeepingMergeWrapper",
     "maxGap" : 0,
     "nested" : [ {
+      "nestedMetricUrns" : [ "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3" ],
       "className" : "com.linkedin.thirdeye.detection.algorithm.DimensionWrapper",
       "metricUrn" : "thirdeye:metric:1:D1%3Dv1:D1%3Dv2:D2%3Dv3",
       "nested" : [ {
