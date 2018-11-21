@@ -49,19 +49,21 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   private static final String PROP_CURRENT_PROVIDER = "currentValueProvider";
   private static final String PROP_METRIC_URN = "metricUrn";
+  private static final String PROP_BASELINE_PROVIDER_COMPONENT_KEY = "baselineProviderComponentKey";
 
   private BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
   private BaselineProvider currentValueProvider;
   private Series.DoubleFunction aggregationFunction;
+  private String baselineProviderComponentKey;
 
   public BaselineFillingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
   {
     super(provider, config, startTime, endTime);
 
     if (config.getProperties().containsKey(PROP_BASELINE_PROVIDER)) {
-      String referenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
-      Preconditions.checkArgument(this.config.getComponents().containsKey(referenceKey));
-      this.baselineValueProvider = (BaselineProvider) this.config.getComponents().get(referenceKey);
+      this.baselineProviderComponentKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
+      Preconditions.checkArgument(this.config.getComponents().containsKey(this.baselineProviderComponentKey));
+      this.baselineValueProvider = (BaselineProvider) this.config.getComponents().get(this.baselineProviderComponentKey);
     }
     if (config.getProperties().containsKey(PROP_CURRENT_PROVIDER)) {
       String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), currentValueProvider));
@@ -104,6 +106,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         anomaly.setAvgCurrentVal(this.currentValueProvider.computePredictedAggregates(slice, aggregationFunction));
         if (this.baselineValueProvider != null) {
           anomaly.setAvgBaselineVal(this.baselineValueProvider.computePredictedAggregates(slice, aggregationFunction));
+          anomaly.getProperties().put(PROP_BASELINE_PROVIDER_COMPONENT_KEY, this.baselineProviderComponentKey);
         }
       } catch (Exception e) {
         // ignore

@@ -41,7 +41,7 @@ public abstract class YamlDetectionConfigTranslator {
 
   public YamlDetectionConfigTranslator withExistingDetectionConfig(DetectionConfigDTO existingDTO) {
     this.existingConfig = existingDTO;
-    this.existingComponentSpecs = existingDTO.getComponentSpecs();
+    if(existingDTO != null) this.existingComponentSpecs = existingDTO.getComponentSpecs();
     return this;
   }
 

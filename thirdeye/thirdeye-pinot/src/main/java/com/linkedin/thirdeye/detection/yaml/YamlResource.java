@@ -37,11 +37,15 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.MapUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 
 @Path("/yaml")
 public class YamlResource {
+  protected static final Logger LOG = LoggerFactory.getLogger(YamlResource.class);
+
   private static final String PROP_NAME = "detectionName";
   private static final String PROP_TYPE = "type";
   private static final String PROP_DETECTION_CONFIG_ID = "detectionConfigIds";
@@ -110,6 +114,7 @@ public class YamlResource {
     try{
       detectionConfig = translator.withTrainingWindow(startTime, endTime).withExistingDetectionConfig(existingDetectionConfig).generateDetectionConfig();
     } catch (Exception e) {
+      LOG.error("yaml translation error", e);
       return Response.status(400).entity(ImmutableMap.of("status", "400", "message", e.getMessage())).build();
     }
     detectionConfig.setYaml(payload);
