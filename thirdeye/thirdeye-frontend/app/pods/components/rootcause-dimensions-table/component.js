@@ -3,6 +3,7 @@ import Component from '@ember/component';
 import {
   toCurrentUrn,
   toBaselineUrn,
+  toMetricUrn,
   isInverse,
   toColorDirection,
   makeSortable,
@@ -125,7 +126,7 @@ export default Component.extend({
         Object.keys(current[name]).forEach(value => {
           if (value === ROOTCAUSE_VALUE_OTHER) { return; }
 
-          const urn = appendFilters(metricUrn, [[name, value]]);
+          const urn = appendFilters(metricUrn, [[name, '=', value]]);
           const curr = (current[name] || {})[value] || 0;
           const base = (baseline[name] || {})[value] || 0;
 
@@ -209,11 +210,7 @@ export default Component.extend({
       const urn = e.selectedItems[0].urn;
       const state = !selectedUrns.has(urn);
 
-      const updates = {[urn]: state};
-      if (hasPrefix(urn, 'thirdeye:metric:')) {
-        updates[toCurrentUrn(urn)] = state;
-        updates[toBaselineUrn(urn)] = state;
-      }
+      const updates = { [toMetricUrn(urn)]: state, [toCurrentUrn(urn)]: state, [toBaselineUrn(urn)]: state };
 
       set(this, 'preselectedItems', []);
       onSelection(updates);
