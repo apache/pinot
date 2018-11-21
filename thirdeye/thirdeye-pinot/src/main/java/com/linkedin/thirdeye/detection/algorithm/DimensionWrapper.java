@@ -192,6 +192,7 @@ public class DimensionWrapper extends DetectionPipeline {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     Map<String, Object> diagnostics = new HashMap<>();
 
+    LOG.info("exploring {} metrics", nestedMetrics.size());
     for (MetricEntity metric : nestedMetrics) {
       for (Map<String, Object> properties : this.nestedProperties) {
         LOG.info("running detection for {}", metric.toString());
@@ -213,8 +214,7 @@ public class DimensionWrapper extends DetectionPipeline {
     df = df.filter(df.getDoubles(COL_VALUE).gt(this.minLiveZone)).dropNull();
     double liveBucketPercentage = (double) df.size() / (double) totalBuckets;
     if (liveBucketPercentage >= this.liveBucketPercentageThreshold) {
-      double val = df.getDoubles(COL_VALUE).mean().getDouble(0);
-      return val >= this.minValue;
+      return df.getDoubles(COL_VALUE).mean().getDouble(0)>= this.minValue;
     }
     return false;
   }
