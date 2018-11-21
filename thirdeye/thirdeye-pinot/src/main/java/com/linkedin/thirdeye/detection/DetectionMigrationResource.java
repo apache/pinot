@@ -183,12 +183,12 @@ public class DetectionMigrationResource {
     filterYamlParams.put("configuration", params);
     params.putAll(functionDTO.getAlertFilter());
     params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
-    // TODO bucket period, timezone
+    // TODO  timezone
     return filterYamlParams;
   }
 
   private String getBucketPeriod(AnomalyFunctionDTO functionDTO) {
-    return new Period(TimeUnit.MILLISECONDS.convert(functionDTO.getBucketSize(), functionDTO.getWindowUnit())).toString();
+    return new Period(TimeUnit.MILLISECONDS.convert(functionDTO.getBucketSize(), functionDTO.getBucketUnit())).toString();
   }
 
   private Map<String, Object> getAlgorithmDetectorParams(AnomalyFunctionDTO functionDTO) throws Exception {
@@ -200,7 +200,7 @@ public class DetectionMigrationResource {
       params.put((String) property.getKey(), property.getValue());
     }
     params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
-    // TODO bucket period, timezone
+    // TODO  timezone
     if (functionDTO.getWindowDelay() != 0) {
       detectorYaml.put(PROP_WINDOW_DELAY, functionDTO.getWindowDelay());
       detectorYaml.put(PROP_WINDOW_DELAY_UNIT, functionDTO.getWindowDelayUnit().toString());
