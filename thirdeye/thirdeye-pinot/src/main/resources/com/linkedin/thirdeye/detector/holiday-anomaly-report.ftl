@@ -5,9 +5,9 @@
 </head>
 
 <body style="background-color: #EDF0F3;">
-<table border="0" cellpadding="0" cellspacing="0" colspan="2" style="width:100%; font-family: 'Proxima Nova','Arial','Helvetica Neue',Helvetica,sans-serif; font-size:14px; line-height:normal; margin:0 auto; max-width: 65%; background-color: #F3F6F8;">
+<table border="0" cellpadding="0" cellspacing="0" style="width:100%; font-family: 'Proxima Nova','Arial','Helvetica Neue',Helvetica,sans-serif; font-size:14px; margin:0 auto; max-width: 50%; background-color: #F3F6F8;">
   <tr>
-    <td align="left" style="padding: 12px;">
+    <td align="left" style="padding: 12px 24px;">
       <img width="35" height="35" alt="logo" src="https://static.licdn-ei.com/scds/common/u/images/email/logos/logo_shift_inbug_82x82_v1.png"
            style="vertical-align: middle; display: inline-block; background: white;">
       <span style="color: rgba(0,0,0,0.75);font-size: 18px; font-weight: bold; letter-spacing: 2px; display: inline-block;vertical-align: middle;">THIRDEYE</span>
@@ -21,27 +21,29 @@
           <td style="padding: 12px; background-color: #0073B1; color: #FFF; text-align: center;">
             <h2>ACTION REQUIRED</h2>
             <p>
-                <#if anomalyCount == 1>
-                  <strong>An anomaly</strong> was detected between <strong>${startTime} and ${endTime} (${timeZone})</strong>
-                <#else>
-                  <strong>${anomalyCount} anomalies</strong> were detected between <strong>${startTime} and ${endTime} (${timeZone})</strong>
-                </#if>
-                <#if metricsMap?size == 1>
-                  on metric
-                <#else>
-                  on metrics
-                </#if>
+              <#if anomalyCount == 1>
+                <strong>An anomaly</strong> was detected between <strong>${startTime} and ${endTime} (${timeZone})</strong>
+              <#else>
+                <strong>${anomalyCount} anomalies</strong> were detected between <strong>${startTime} and ${endTime} (${timeZone})</strong>
+              </#if>
+              <#if metricsMap?size == 1>
                 <#list metricsMap?keys as id>
-                  <div style="padding-top: 10px;">
-                    <strong><a style="color: white;" href="${dashboardHost}/app/#/rootcause?metricId=${id}">${metricsMap[id].name}</a></strong>
+                  on metric <div style="padding: 10px;"><strong><a style="color: white;" href="${dashboardHost}/app/#/rootcause?metricId=${id}">${metricsMap[id].name}</a></strong></div>
+                </#list>
+              <#else>
+                on metrics
+                <#list metricsMap?keys as id>
+                  <div style="padding: 10px;">
+                    <strong><a style="padding: 10px; color: white;" href="${dashboardHost}/app/#/rootcause?metricId=${id}">${metricsMap[id].name}</a></strong>
                   </div>
                 </#list>
+              </#if>
             </p>
             <p>
               <#if isGroupedAnomaly>
-                <a style="padding: 4px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=groupId&anomalyGroupIds=${groupId}">Investigate all in ThirdEye</a>
+                <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=groupId&anomalyGroupIds=${groupId}">Investigate all in ThirdEye</a>
               <#else>
-                <a style="padding: 4px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">Investigate all in ThirdEye</a>
+                <a style="padding: 6px 12px; border-radius: 2px; border: 1px solid #FFF; font-size: 16px; font-weight: bold; color: white; text-decoration: none; line-height: 32px;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">Investigate all in ThirdEye</a>
               </#if>
             </p>
           </td>
@@ -58,7 +60,7 @@
           </#if>
 
           <#list metricAnomalyDetails?keys as metric>
-            <@utils.addRow title="" align="left">
+            <@utils.addBlock title="" align="left">
                 <p>
                   <span style="color: #606060; font-size: 20px;">Metric</span>
                   <span style="color: #1D1D1D; font-size: 20px; font-weight: bold;">${metric}</span>
@@ -112,35 +114,35 @@
                     </#list>
                   </table>
                 </#list>
-            </@utils.addRow>
+            </@utils.addBlock>
           </#list>
 
           <#if referenceLinks?has_content>
-            <@utils.addRow title="Useful Links" align="left">
+            <@utils.addBlock title="Useful Links" align="left">
               <#list referenceLinks?keys as referenceLinkKey>
-                <div style="padding-top: 16px;">
-                  <a href="${referenceLinks[referenceLinkKey]}" style="padding-left: 16px; font-weight: bold; text-decoration: none; color:#0073B1;">${referenceLinkKey}</a>
+                <div style="padding: 10px;">
+                  <a href="${referenceLinks[referenceLinkKey]}" style="font-weight: bold; text-decoration: none; color:#0073B1;">${referenceLinkKey}</a>
                 </div>
               </#list>
-            </@utils.addRow>
+            </@utils.addBlock>
           </#if>
 
           <#if holidays?has_content>
-            <@utils.addRow title="Holidays" align="left">
+            <@utils.addBlock title="Holidays" align="left">
               <table border="0" align="center" style="table-layout: fixed; width:100%; padding:0; margin:0; border-collapse: collapse; text-align:left;">
                 <#list holidays as holiday>
-                  <tr style="border-bottom: 1px solid #C7D1D8; padding-top: 16px;">
+                  <tr style="border-bottom: 1px solid #C7D1D8; padding: 16px;">
 
-                    <td>
+                    <td style="padding: 6px 12px;">
                       <a href="https://www.google.com/search?q=${holiday.name}" style="text-decoration: none; color:#0073B1; font-size:12px; font-weight:bold;">${holiday.name}</a>
                     </td>
 
-                    <td>
+                    <td style="padding: 6px 12px;">
                       <span style="font-size: 12px; color:#606060;">(${holiday.startTime?number_to_date})</span>
                     </td>
 
                     <#if holiday.targetDimensionMap["countryCode"]??>
-                      <td>
+                      <td style="padding: 6px 12px;">
                         <span style="color: rgba(0,0,0,0.6); font-size: 12px;">${holiday.targetDimensionMap["countryCode"]?join(", ")}</span>
                       </td>
                     </#if>
@@ -148,7 +150,7 @@
                   </tr>
                 </#list>
               </table>
-            </@utils.addRow>
+            </@utils.addBlock>
           </#if>
 
         <tr>
