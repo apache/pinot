@@ -39,9 +39,9 @@ import org.json.JSONObject;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({ "selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numDocsScanned",
-    "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "totalDocs",
-    "numGroupsLimitReached", "timeUsedMs", "segmentStatistics", "traceInfo" })
+@JsonPropertyOrder({ "selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
+    "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached",
+    "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo" })
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
