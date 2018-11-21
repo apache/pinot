@@ -87,6 +87,21 @@ public interface BrokerResponse {
   long getNumEntriesScannedPostFilter();
 
   /**
+   * Get number of entries scanned post filter phase while processing the query.
+   */
+  long getNumSegmentsQueried();
+
+  /**
+   * Get number of entries scanned post filter phase while processing the query.
+   */
+  long getNumSegmentsProcessed();
+
+  /**
+   * Get number of entries scanned post filter phase while processing the query.
+   */
+  long getNumSegmentsMatched();
+
+  /**
    * Get total number of documents within the table hit.
    */
   long getTotalDocs();

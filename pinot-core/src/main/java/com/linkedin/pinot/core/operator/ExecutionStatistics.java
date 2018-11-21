@@ -24,7 +24,7 @@ public class ExecutionStatistics {
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
   private long _numSegmentsProcessed;
-  private long _numSegmentsWithNoMatch;
+  private long _numSegmentsMatched;
   
   public ExecutionStatistics() {
   }
@@ -36,7 +36,7 @@ public class ExecutionStatistics {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
     _numTotalRawDocs = numTotalRawDocs;
     _numSegmentsProcessed = 1;
-    _numSegmentsWithNoMatch = (numDocsScanned == 0) ? 1 : 0;
+    _numSegmentsMatched = (numDocsScanned == 0) ? 0 : 1;
   }
 
   public long getNumDocsScanned() {
@@ -60,7 +60,7 @@ public class ExecutionStatistics {
   }
 
   public long getNumSegmentsWithNoMatch() {
-    return _numSegmentsWithNoMatch;
+    return _numSegmentsMatched;
   }
 
   /**
@@ -74,7 +74,7 @@ public class ExecutionStatistics {
     _numEntriesScannedPostFilter += executionStatisticsToMerge._numEntriesScannedPostFilter;
     _numTotalRawDocs += executionStatisticsToMerge._numTotalRawDocs;
     _numSegmentsProcessed += executionStatisticsToMerge._numSegmentsProcessed;
-    _numSegmentsWithNoMatch += executionStatisticsToMerge._numSegmentsWithNoMatch;
+    _numSegmentsMatched += executionStatisticsToMerge._numSegmentsMatched;
   }
 
   @Override
@@ -85,6 +85,6 @@ public class ExecutionStatistics {
         + "\n  numEntriesScannedPostFilter: " + _numEntriesScannedPostFilter
         + "\n  numTotalRawDocs: " + _numTotalRawDocs
         + "\n  numSegmentsProcessed: " + _numSegmentsProcessed
-        + "\n  numSegmentsWithNoMatch: " + _numSegmentsWithNoMatch;
+        + "\n  numSegmentsMatched: " + _numSegmentsMatched;
   }
 }

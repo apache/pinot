@@ -51,7 +51,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_DOCS_SCANNED("rows", false),
   NUM_ENTRIES_SCANNED_IN_FILTER("entries", false),
   NUM_ENTRIES_SCANNED_POST_FILTER("entries", false),
-  NUM_SEGMENTS_SEARCHED("numSegmentsSearched", false),
+  NUM_SEGMENTS_QUERIED("numSegmentsQueried", false),
+  NUM_SEGMENTS_PROCESSED("numSegmentsProcessed", false),
+  NUM_SEGMENTS_MATCHED("numSegmentsMatched", false),
   NUM_MISSING_SEGMENTS("segments", false);
 
   private final String meterName;

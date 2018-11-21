@@ -191,12 +191,4 @@ public class ServerQueryRequest {
   public Set<String> getSelectionColumns() {
     return _selectionColumns;
   }
-
-  public int getSegmentCountAfterPruning() {
-    return _segmentCountAfterPruning;
-  }
-
-  public void setSegmentCountAfterPruning(int segmentCountAfterPruning) {
-    _segmentCountAfterPruning = segmentCountAfterPruning;
-  }
 }

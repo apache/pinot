@@ -31,7 +31,7 @@ public interface DataTable {
   String NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY = "numEntriesScannedPostFilter";
   String NUM_SEGMENTS_QUERIED = "numSegmentsQueried";
   String NUM_SEGMENTS_PROCESSED = "numSegmentsProcessed";
-  String NUM_SEGMENTS_WITH_NO_MATCH = "numSegmentsWithNoMatch";
+  String NUM_SEGMENTS_MATCHED = "numSegmentsMatched";
   String TOTAL_DOCS_METADATA_KEY = "totalDocs";
   String NUM_GROUPS_LIMIT_REACHED_KEY = "numGroupsLimitReached";
   String TIME_USED_MS_METADATA_KEY = "timeUsedMs";

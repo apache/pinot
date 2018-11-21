@@ -46,7 +46,8 @@ import org.slf4j.LoggerFactory;
 public abstract class QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryScheduler.class);
   private static final String INVALID_NUM_SCANNED = "-1";
-
+  private static final String INVALID_SEGMENTS_COUNT = "-1";
+  
   protected final ServerMetrics serverMetrics;
   protected final QueryExecutor queryExecutor;
   protected final ResourceManager resourceManager;
@@ -147,6 +148,11 @@ public abstract class QueryScheduler {
         dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
     long numEntriesScannedPostFilter = Long.parseLong(
         dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
+    long numSegmentsProcessed = Long.parseLong(
+        dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, INVALID_SEGMENTS_COUNT));
+    long numSegmentsMatched = Long.parseLong(
+        dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, INVALID_SEGMENTS_COUNT));
+    
     if (numDocsScanned > 0) {
       serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_DOCS_SCANNED, numDocsScanned);
     }
@@ -161,13 +167,13 @@ public abstract class QueryScheduler {
 
     TimerContext timerContext = queryRequest.getTimerContext();
     LOGGER.info(
-        "Processed requestId={},table={},reqSegments={},prunedToSegmentCount={},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
-        requestId, tableNameWithType, queryRequest.getSegmentsToQuery().size(),
-        queryRequest.getSegmentCountAfterPruning(), timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
+        "Processed requestId={},table={},Segments={}/{}/{},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},scanInFilter={},scanPostFilter={},sched={}",
+        requestId, tableNameWithType, queryRequest.getSegmentsToQuery().size(), numSegmentsProcessed, numSegmentsMatched,
+        timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
         numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
-    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_SEARCHED,
-        queryRequest.getSegmentCountAfterPruning());
+    
+    serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsProcessed);
 
     return responseData;
   }
