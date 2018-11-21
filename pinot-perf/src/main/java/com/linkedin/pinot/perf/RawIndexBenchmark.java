@@ -30,10 +30,10 @@ import com.linkedin.pinot.core.operator.ProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
+import com.linkedin.pinot.core.operator.filter.TestFilterOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.operator.filter.FilterOperatorTestUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -73,7 +73,8 @@ public class RawIndexBenchmark {
   @Option(name = "-rawIndexColumn", required = false, usage = "Name of column with raw index (no-dictionary")
   private String _rawIndexColumn = DEFAULT_RAW_INDEX_COLUMN;
 
-  @Option(name = "-dataFile", required = false, forbids = {"-segmentDir"}, usage = "File containing input data (one string per line)")
+  @Option(name = "-dataFile", required = false, forbids = {
+      "-segmentDir"}, usage = "File containing input data (one string per line)")
   private String _dataFile = null;
 
   @Option(name = "-loadMode", required = false, usage = "Load mode for data (mmap|heap")
@@ -209,7 +210,7 @@ public class RawIndexBenchmark {
    * @return Time take in millis for the lookups
    */
   private long profileLookups(IndexSegment segment, String column, int[] docIds) {
-    BaseFilterOperator filterOperator = FilterOperatorTestUtils.makeFilterOperator(docIds);
+    BaseFilterOperator filterOperator = new TestFilterOperator(docIds);
     DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator = new ProjectionOperator(buildDataSourceMap(segment), docIdSetOperator);
 

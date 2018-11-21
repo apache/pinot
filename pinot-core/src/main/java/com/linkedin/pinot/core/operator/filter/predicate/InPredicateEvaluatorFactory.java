@@ -79,6 +79,7 @@ public class InPredicateEvaluatorFactory {
 
   private static final class DictionaryBasedInPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final IntSet _matchingDictIdSet;
+    final int _numMatchingDictIds;
     int[] _matchingDictIds;
 
     DictionaryBasedInPredicateEvaluator(InPredicate inPredicate, Dictionary dictionary) {
@@ -90,16 +91,17 @@ public class InPredicateEvaluatorFactory {
           _matchingDictIdSet.add(dictId);
         }
       }
+      _numMatchingDictIds = _matchingDictIdSet.size();
+      if (_numMatchingDictIds == 0) {
+        _alwaysFalse = true;
+      } else if (dictionary.length() == _numMatchingDictIds) {
+        _alwaysTrue = true;
+      }
     }
 
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.IN;
-    }
-
-    @Override
-    public boolean isAlwaysFalse() {
-      return _matchingDictIdSet.isEmpty();
     }
 
     @Override
@@ -109,7 +111,7 @@ public class InPredicateEvaluatorFactory {
 
     @Override
     public int getNumMatchingDictIds() {
-     return _matchingDictIdSet.size();
+      return _numMatchingDictIds;
     }
 
     @Override

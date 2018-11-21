@@ -75,11 +75,6 @@ public class RegexpLikePredicateEvaluatorFactory {
     }
 
     @Override
-    public boolean isAlwaysFalse() {
-      return false;
-    }
-
-    @Override
     public boolean applySV(int dictId) {
       return _pattern.matcher(_dictionary.getStringValue(dictId)).find();
     }

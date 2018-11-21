@@ -15,14 +15,10 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -50,13 +46,10 @@ import org.testng.annotations.Test;
  *   </li>
  * </ul>
  */
+// TODO: remove this integration test and add unit test for metadata and dictionary based aggregation operator
 public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends BaseClusterIntegrationTest {
-
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
-
-  private final List<ServiceStatus.ServiceStatusCallback> _serviceStatusCallbacks =
-      new ArrayList<>(getNumBrokers() + getNumServers());
 
   protected int getNumBrokers() {
     return NUM_BROKERS;
@@ -97,22 +90,6 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     startBrokers(getNumBrokers());
     startServers(getNumServers());
 
-    // Set up service status callbacks
-    List<String> instances = _helixAdmin.getInstancesInCluster(_clusterName);
-    for (String instance : instances) {
-      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-        _serviceStatusCallbacks.add(
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName, instance,
-                Collections.singletonList(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)));
-      }
-      if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
-        _serviceStatusCallbacks.add(new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
-            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, _clusterName,
-                instance),
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, _clusterName,
-                instance))));
-      }
-    }
     // Create the tables
     addOfflineTable(DEFAULT_TABLE_NAME);
     addOfflineTable(STAR_TREE_TABLE_NAME);
@@ -423,11 +400,10 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
 
     // filter in query: not answered by DictionaryBasedAggregationOperator
-    pqlQuery = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME + " where DaysSinceEpoch > 0";
+    pqlQuery = "SELECT MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME + " where DaysSinceEpoch > 16100";
     response = postQuery(pqlQuery);
     Assert.assertEquals(response.getLong("numEntriesScannedPostFilter") > 0, true);
     Assert.assertEquals(response.getLong("numEntriesScannedInFilter") > 0, true);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
   }
 
 
@@ -476,11 +452,10 @@ public class MetadataAndDictionaryAggregationPlanClusterIntegrationTest extends 
     Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
 
     // filter present in query: not answered by MetadataBasedAggregationOperator
-    pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME + " WHERE DaysSinceEpoch > 0";
+    pqlQuery = "SELECT COUNT(*) FROM " + DEFAULT_TABLE_NAME + " WHERE DaysSinceEpoch > 16100";
     response = postQuery(pqlQuery);
     Assert.assertEquals(response.getLong("numEntriesScannedPostFilter"), 0);
     Assert.assertEquals(response.getLong("numEntriesScannedInFilter") > 0, true);
-    Assert.assertEquals(response.getLong("totalDocs"), response.getLong("numDocsScanned"));
 
     // mixed aggregation functions in query: not answered by MetadataBasedAggregationOperator
     pqlQuery = "SELECT COUNT(*),MAX(ArrTime) FROM " + DEFAULT_TABLE_NAME;

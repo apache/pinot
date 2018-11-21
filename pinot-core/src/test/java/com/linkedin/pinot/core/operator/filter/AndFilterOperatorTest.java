@@ -13,13 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.operator.filter;
+package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.filter.AndFilterOperator;
-import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
-import com.linkedin.pinot.core.operator.filter.OrFilterOperator;
 import java.util.ArrayList;
 import java.util.List;
 import org.testng.Assert;
@@ -34,8 +31,8 @@ public class AndFilterOperatorTest {
     int[] docIds2 = new int[]{3, 6, 8, 20, 28};
 
     List<BaseFilterOperator> operators = new ArrayList<>();
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds1));
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds2));
+    operators.add(new TestFilterOperator(docIds1));
+    operators.add(new TestFilterOperator(docIds2));
     AndFilterOperator andOperator = new AndFilterOperator(operators);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
@@ -51,9 +48,9 @@ public class AndFilterOperatorTest {
     int[] docIds3 = new int[]{1, 2, 3, 6, 30};
 
     List<BaseFilterOperator> operators = new ArrayList<>();
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds1));
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds2));
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds3));
+    operators.add(new TestFilterOperator(docIds1));
+    operators.add(new TestFilterOperator(docIds2));
+    operators.add(new TestFilterOperator(docIds3));
     AndFilterOperator andOperator = new AndFilterOperator(operators);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
@@ -69,13 +66,13 @@ public class AndFilterOperatorTest {
     int[] docIds3 = new int[]{1, 2, 3, 6, 30};
 
     List<BaseFilterOperator> childOperators = new ArrayList<>();
-    childOperators.add(FilterOperatorTestUtils.makeFilterOperator(docIds1));
-    childOperators.add(FilterOperatorTestUtils.makeFilterOperator(docIds2));
+    childOperators.add(new TestFilterOperator(docIds1));
+    childOperators.add(new TestFilterOperator(docIds2));
     AndFilterOperator childAndOperator = new AndFilterOperator(childOperators);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childAndOperator);
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds3));
+    operators.add(new TestFilterOperator(docIds3));
     AndFilterOperator andOperator = new AndFilterOperator(operators);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();
@@ -91,13 +88,13 @@ public class AndFilterOperatorTest {
     int[] docIds3 = new int[]{1, 2, 3, 6, 30};
 
     List<BaseFilterOperator> childOperators = new ArrayList<>();
-    childOperators.add(FilterOperatorTestUtils.makeFilterOperator(docIds3));
-    childOperators.add(FilterOperatorTestUtils.makeFilterOperator(docIds2));
+    childOperators.add(new TestFilterOperator(docIds3));
+    childOperators.add(new TestFilterOperator(docIds2));
     OrFilterOperator childOrOperator = new OrFilterOperator(childOperators);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds1));
+    operators.add(new TestFilterOperator(docIds1));
     AndFilterOperator andOperator = new AndFilterOperator(operators);
 
     BlockDocIdIterator iterator = andOperator.nextBlock().getBlockDocIdSet().iterator();

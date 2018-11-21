@@ -25,7 +25,16 @@ import com.linkedin.pinot.core.operator.blocks.FilterBlock;
 public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
 
   /**
-   * Returns {@code true} if the result is always empty (without calling {@link #nextBlock()}), {@code false} otherwise.
+   * Returns {@code true} if the result is always empty, {@code false} otherwise.
    */
-  public abstract boolean isResultEmpty();
+  public boolean isResultEmpty() {
+    return false;
+  }
+
+  /**
+   * Returns {@code true} if the result matches all the records, {@code false} otherwise.
+   */
+  public boolean isResultMatchingAll() {
+    return false;
+  }
 }

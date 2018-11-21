@@ -34,13 +34,13 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
-    return EmptyFilterBlock.getInstance();
+  public final boolean isResultEmpty() {
+    return true;
   }
 
   @Override
-  public boolean isResultEmpty() {
-    return true;
+  protected FilterBlock getNextBlock() {
+    return EmptyFilterBlock.getInstance();
   }
 
   @Override

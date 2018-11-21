@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.Pairs.IntPair;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.io.reader.impl.v1.SortedIndexReader;
@@ -36,8 +37,15 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   // Inclusive
   private final int _endDocId;
 
-  public SortedInvertedIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
+  SortedInvertedIndexBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
       int startDocId, int endDocId) {
+    // NOTE:
+    // Predicate that is always evaluated as true or false should not be passed into the
+    // SortedInvertedIndexBasedFilterOperator for performance concern.
+    // If predicate is always evaluated as true, use MatchAllFilterOperator; if predicate is always evaluated as false,
+    // use EmptyFilterOperator.
+    Preconditions.checkArgument(!predicateEvaluator.isAlwaysTrue() && !predicateEvaluator.isAlwaysFalse());
+
     _predicateEvaluator = predicateEvaluator;
     _dataSource = dataSource;
     _startDocId = startDocId;
@@ -144,11 +152,6 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
     }
 
     return new FilterBlock(new SortedDocIdSet(_dataSource.getOperatorName(), pairs));
-  }
-
-  @Override
-  public boolean isResultEmpty() {
-    return _predicateEvaluator.isAlwaysFalse();
   }
 
   @Override

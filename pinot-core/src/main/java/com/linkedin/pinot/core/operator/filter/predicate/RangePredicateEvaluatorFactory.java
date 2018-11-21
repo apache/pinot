@@ -115,17 +115,18 @@ public class RangePredicateEvaluatorFactory {
           }
         }
       }
+
       _numMatchingDictIds = _endDictId - _startDictId;
+      if (_numMatchingDictIds <= 0) {
+        _alwaysFalse = true;
+      } else if (dictionary.length() == _numMatchingDictIds) {
+        _alwaysTrue = true;
+      }
     }
 
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.RANGE;
-    }
-
-    @Override
-    public boolean isAlwaysFalse() {
-      return _startDictId >= _endDictId;
     }
 
     @Override
@@ -157,6 +158,7 @@ public class RangePredicateEvaluatorFactory {
   private static final class RealtimeDictionaryBasedRangePredicateEvaluator
       extends BaseDictionaryBasedPredicateEvaluator {
     final IntSet _matchingDictIdSet;
+    final int _numMatchingDictIds;
     int[] _matchingDictIds;
 
     RealtimeDictionaryBasedRangePredicateEvaluator(RangePredicate rangePredicate, MutableDictionary dictionary) {
@@ -164,6 +166,8 @@ public class RangePredicateEvaluatorFactory {
 
       int dictionarySize = dictionary.length();
       if (dictionarySize == 0) {
+        _numMatchingDictIds = 0;
+        _alwaysFalse = true;
         return;
       }
 
@@ -184,6 +188,13 @@ public class RangePredicateEvaluatorFactory {
           _matchingDictIdSet.add(dictId);
         }
       }
+
+      _numMatchingDictIds = _matchingDictIdSet.size();
+      if (_numMatchingDictIds == 0) {
+        _alwaysFalse = true;
+      } else if (dictionarySize == _numMatchingDictIds) {
+        _alwaysTrue = true;
+      }
     }
 
     @Override
@@ -198,7 +209,7 @@ public class RangePredicateEvaluatorFactory {
 
     @Override
     public int getNumMatchingDictIds() {
-      return _matchingDictIdSet.size();
+      return _numMatchingDictIds;
     }
 
     @Override
@@ -207,16 +218,6 @@ public class RangePredicateEvaluatorFactory {
         _matchingDictIds = _matchingDictIdSet.toIntArray();
       }
       return _matchingDictIds;
-    }
-
-    @Override
-    public int[] getNonMatchingDictIds() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean isAlwaysFalse() {
-      return _matchingDictIdSet.isEmpty();
     }
   }
 

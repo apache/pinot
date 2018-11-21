@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.operator.blocks.FilterBlock;
 import com.linkedin.pinot.core.operator.docidsets.AndBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
@@ -27,7 +28,19 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   private final List<BaseFilterOperator> _filterOperators;
 
-  public AndFilterOperator(List<BaseFilterOperator> filterOperators) {
+  AndFilterOperator(List<BaseFilterOperator> filterOperators) {
+    // NOTE:
+    // EmptyFilterOperator and MatchAllFilterOperator should not be passed into the AndFilterOperator for performance
+    // concern.
+    // If there is any EmptyFilterOperator inside AndFilterOperator, the whole AndFilterOperator is equivalent to a
+    // EmptyFilterOperator; MatchAllFilterOperator should be ignored in AndFilterOperator.
+    // After removing the MatchAllFilterOperators, if there is no child filter operator left, use
+    // MatchAllFilterOperator; if there is only one child filter operator left, use the child filter operator directly.
+    // These checks should be performed before constructing the AndFilterOperator.
+    for (BaseFilterOperator filterOperator : filterOperators) {
+      Preconditions.checkArgument(!filterOperator.isResultEmpty() && !filterOperator.isResultMatchingAll());
+    }
+
     _filterOperators = filterOperators;
   }
 
@@ -38,16 +51,6 @@ public class AndFilterOperator extends BaseFilterOperator {
       filterBlockDocIdSets.add(filterOperator.nextBlock().getBlockDocIdSet());
     }
     return new FilterBlock(new AndBlockDocIdSet(filterBlockDocIdSets));
-  }
-
-  @Override
-  public boolean isResultEmpty() {
-    for (BaseFilterOperator filterOperator : _filterOperators) {
-      if (filterOperator.isResultEmpty()) {
-        return true;
-      }
-    }
-    return false;
   }
 
   @Override
