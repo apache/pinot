@@ -123,8 +123,14 @@ public abstract class AnomalyTimeBasedSummarizer {
         mergedAnomalies.add(mergedAnomaly);
       }
     }
-    LOG.info("merging [{}] raw anomalies, latest merged anomaly start =[{}], end = [{}], merged anomalies size [{}]",
-        anomalies.size(), mergedAnomaly.getStartTime(), mergedAnomaly.getEndTime(), mergedAnomalies.size());
+
+    if (mergedAnomaly != null) {
+      LOG.info("merging [{}] raw anomalies, latest merged anomaly start =[{}], end = [{}], merged anomalies size [{}]",
+          anomalies.size(), mergedAnomaly.getStartTime(), mergedAnomaly.getEndTime(), mergedAnomalies.size());
+    } else {
+      LOG.info("merging [{}] raw anomalies", anomalies.size());
+    }
+
     return mergedAnomalies;
   }
 
