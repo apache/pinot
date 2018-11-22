@@ -185,6 +185,8 @@ public class TimeBasedAnomalyMerger {
       MergedAnomalyResultDTO latestOverlappedMergedResult =
           mergedResultDAO.findLatestOverlapByFunctionIdDimensions(function.getId(), dimensionMap.toString(),
               anomalyWindowStart - mergeConfig.getSequentialAllowedGap(), anomalyWindowEnd);
+      LOG.info("Fetched anomaly id [{}] from time window start = [{}], end = [{}]", latestOverlappedMergedResult.getId(),
+          anomalyWindowStart - mergeConfig.getSequentialAllowedGap(), anomalyWindowEnd);
 
       List<MergedAnomalyResultDTO> mergedResults =
           AnomalyTimeBasedSummarizer.mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
