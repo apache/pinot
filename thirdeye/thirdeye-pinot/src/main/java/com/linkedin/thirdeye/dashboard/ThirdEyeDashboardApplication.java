@@ -174,7 +174,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new DetectionMigrationResource(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
-        DAO_REGISTRY.getDetectionConfigManager(), anomalyFunctionFactory, alertFilterFactory));
+        DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDatasetConfigDAO(), anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new OnboardResource(config));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());
