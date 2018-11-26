@@ -105,7 +105,6 @@ public class EventFilter {
 
       // if filter map not empty, filter events
       if (MapUtils.isNotEmpty(eventFilterDimensionMap)) {
-
         // go over each event
         for (EventDTO event : allEvents) {
           boolean eventAdded = false;
@@ -163,8 +162,10 @@ public class EventFilter {
 
   private static List<String> transformDimensionValues(List<String> dimensionValues) {
     List<String> dimensionValuesTransformed = new ArrayList<>();
-    for (String value : dimensionValues) {
-      dimensionValuesTransformed.add(value.toLowerCase());
+    if (dimensionValues != null) {
+      for (String value : dimensionValues) {
+        dimensionValuesTransformed.add(value.toLowerCase());
+      }
     }
     return dimensionValuesTransformed;
   }

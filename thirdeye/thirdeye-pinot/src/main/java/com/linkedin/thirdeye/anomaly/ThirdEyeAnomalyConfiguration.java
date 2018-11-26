@@ -22,6 +22,7 @@ import com.linkedin.thirdeye.auto.onboard.AutoOnboardConfiguration;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 
 
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
@@ -46,6 +47,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
+  private List<String> holidayCountriesWhitelist;
 
   public HolidayEventsLoaderConfiguration getHolidayEventsLoaderConfiguration() {
     return holidayEventsLoaderConfiguration;
@@ -197,5 +199,13 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setFailureToAddress(String failureToAddress) {
     this.failureToAddress = failureToAddress;
+  }
+
+  public List<String> getHolidayCountriesWhitelist() {
+    return holidayCountriesWhitelist;
+  }
+
+  public void setHolidayCountriesWhitelist(List<String> holidayCountriesWhitelist) {
+    this.holidayCountriesWhitelist = holidayCountriesWhitelist;
   }
 }

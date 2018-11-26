@@ -153,9 +153,10 @@ public class HierarchicalAnomaliesEmailContentFormatter extends BaseEmailContent
     if (affectedCountries.size() > 0) { // if the anomaly is on country level
       Map<String, List<String>> targetDimensions = new HashMap<>();
       targetDimensions.put(EVENT_FILTER_COUNTRY, affectedCountries);
-      relatedEvents.addAll(getRelatedEvents(EventType.HOLIDAY,
-          new DateTime(anomaly.getStartTime(), dateTimeZone), new DateTime(anomaly.getEndTime(), dateTimeZone),
-          null, null, targetDimensions));
+      relatedEvents.addAll(getHolidayEvents(
+          new DateTime(anomaly.getStartTime(), dateTimeZone),
+          new DateTime(anomaly.getEndTime(), dateTimeZone),
+          targetDimensions));
     }
 
     return anomalyReport;
