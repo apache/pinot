@@ -21,19 +21,24 @@ import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class HolidayEventProvider implements EventDataProvider<EventDTO> {
+  private static final Logger LOG = LoggerFactory.getLogger(HolidayEventProvider.class);
+
   private EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
 
   @Override
   public List<EventDTO> getEvents(EventFilter eventFilter) {
+    LOG.info("Fetching all {} events between {} and {}", eventFilter.getEventType(), eventFilter.getStartTime(), eventFilter.getEndTime());
+    List<EventDTO> allEventsBetweenTimeRange = eventDAO.findEventsBetweenTimeRange(
+        eventFilter.getEventType(),
+        eventFilter.getStartTime(),
+        eventFilter.getEndTime());
 
-    List<EventDTO> allEventsBetweenTimeRange =
-        eventDAO.findEventsBetweenTimeRange(EventType.HOLIDAY.name(), eventFilter.getStartTime(),
-            eventFilter.getEndTime());
-
-    List<EventDTO> holidayEvents = EventFilter.applyDimensionFilter(allEventsBetweenTimeRange, eventFilter.getTargetDimensionMap());
-    return holidayEvents;
+    return EventFilter.applyDimensionFilter(allEventsBetweenTimeRange, eventFilter.getTargetDimensionMap());
   }
 
   @Override

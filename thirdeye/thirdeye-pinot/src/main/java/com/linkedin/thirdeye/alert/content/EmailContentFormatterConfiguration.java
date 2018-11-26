@@ -18,6 +18,7 @@ package com.linkedin.thirdeye.alert.content;
 
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import java.util.List;
 
 import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
@@ -32,6 +33,7 @@ public class EmailContentFormatterConfiguration{
   private String phantomJsPath = "";
   private String failureFromAddress;
   private String failureToAddress;
+  private List<String> holidayCountriesWhitelist;
 
   public String getFunctionConfigPath() {
     return functionConfigPath;
@@ -97,6 +99,14 @@ public class EmailContentFormatterConfiguration{
     this.failureToAddress = failureToAddress;
   }
 
+  public List<String> getHolidayCountriesWhitelist() {
+    return holidayCountriesWhitelist;
+  }
+
+  public void setHolidayCountriesWhitelist(List<String> holidayCountriesWhitelist) {
+    this.holidayCountriesWhitelist = holidayCountriesWhitelist;
+  }
+
   public static EmailContentFormatterConfiguration fromThirdEyeAnomalyConfiguration(ThirdEyeAnomalyConfiguration thirdeyeConfig) {
     EmailContentFormatterConfiguration emailConfig = new EmailContentFormatterConfiguration();
     emailConfig.setDashboardHost(thirdeyeConfig.getDashboardHost());
@@ -106,6 +116,7 @@ public class EmailContentFormatterConfiguration{
     emailConfig.setFunctionConfigPath(thirdeyeConfig.getFunctionConfigPath());
     emailConfig.setAlertFilterConfigPath(thirdeyeConfig.getAlertFilterConfigPath());
     emailConfig.setPhantomJsPath(thirdeyeConfig.getPhantomJsPath());
+    emailConfig.setHolidayCountriesWhitelist(thirdeyeConfig.getHolidayCountriesWhitelist());
     emailConfig.setSmtpConfiguration(
         SmtpConfiguration.createFromProperties(thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY)));
 

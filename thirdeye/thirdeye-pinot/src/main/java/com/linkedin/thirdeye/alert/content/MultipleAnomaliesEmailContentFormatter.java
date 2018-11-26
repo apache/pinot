@@ -52,12 +52,9 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
   private static final Logger LOG = LoggerFactory.getLogger(MultipleAnomaliesEmailContentFormatter.class);
 
   public static final String EMAIL_TEMPLATE = "emailTemplate";
-  private static final String DATE_PATTERN = "MMM dd, HH:mm";
 
   public static final String DEFAULT_EMAIL_TEMPLATE = "holiday-anomaly-report.ftl";
-  private static final long EVENT_TIME_TOLERANCE = TimeUnit.DAYS.toMillis(2);
 
-  private EventManager eventDAO = null;
   private DetectionConfigManager configDAO = null;
 
   public MultipleAnomaliesEmailContentFormatter(){
@@ -68,7 +65,6 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
   public void init(Properties properties, EmailContentFormatterConfiguration configuration) {
     super.init(properties, configuration);
     this.emailTemplate = properties.getProperty(EMAIL_TEMPLATE, DEFAULT_EMAIL_TEMPLATE);
-    this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
   }
 
@@ -163,8 +159,9 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     // holidays
     final DateTime eventStart = windowStart.minus(preEventCrawlOffset);
     final DateTime eventEnd = windowEnd.plus(postEventCrawlOffset);
-    List<EventDTO> holidays = eventDAO.findEventsBetweenTimeRange(EventType.HOLIDAY.toString(),
-        eventStart.getMillis(), eventEnd.getMillis());
+    Map<String, List<String>> targetDimensions = new HashMap<>();
+    targetDimensions.put(EVENT_FILTER_COUNTRY, emailContentFormatterConfiguration.getHolidayCountriesWhitelist());
+    List<EventDTO> holidays = getHolidayEvents(eventStart, eventEnd, targetDimensions);
     Collections.sort(holidays, new Comparator<EventDTO>() {
       @Override
       public int compare(EventDTO o1, EventDTO o2) {

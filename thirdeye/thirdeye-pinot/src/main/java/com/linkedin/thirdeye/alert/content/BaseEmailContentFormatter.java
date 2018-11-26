@@ -450,7 +450,7 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
       , String metricName, String serviceName, Map<String, List<String>> targetDimensions) {
     List<EventDTO> relatedEvents = new ArrayList<>();
     for (EventType eventType : eventTypes) {
-      relatedEvents.addAll(getRelatedEvents(eventType, start, end, metricName, serviceName, targetDimensions));
+      relatedEvents.addAll(getHolidayEvents(start, end, targetDimensions));
     }
     return relatedEvents;
   }
@@ -509,27 +509,19 @@ public abstract class BaseEmailContentFormatter implements EmailContentFormatter
 
   /**
    * Taking advantage of event data provider, extract the events around the given start and end time
-   * @param eventType a given event type
    * @param start the start time of the event, preEventCrawlOffset is added before the given date time
    * @param end the end time of the event, postEventCrawlOffset is added after the given date time
-   * @param metricName the affected metric name
-   * @param serviceName the affected service name
    * @param targetDimensions the affected dimensions
    * @return a list of related events
    */
-  public List<EventDTO> getRelatedEvents(EventType eventType, DateTime start, DateTime end
-      , String metricName, String serviceName, Map<String, List<String>> targetDimensions) {
-    List<EventDTO> relatedEvents = new ArrayList<>();
-
-    // Set Event Filters
+  public List<EventDTO> getHolidayEvents(DateTime start, DateTime end, Map<String, List<String>> targetDimensions) {
     EventFilter eventFilter = new EventFilter();
+    eventFilter.setEventType(EventType.HOLIDAY.name());
     eventFilter.setStartTime(start.minus(preEventCrawlOffset).getMillis());
     eventFilter.setEndTime(end.plus(postEventCrawlOffset).getMillis());
-    eventFilter.setMetricName(metricName);
-    eventFilter.setServiceName(serviceName);
     eventFilter.setTargetDimensionMap(targetDimensions);
-    eventFilter.setEventType(eventType.toString());
 
+    LOG.info("Fetching holidays with preEventCrawlOffset {} and postEventCrawlOffset {}", preEventCrawlOffset, postEventCrawlOffset);
     return new HolidayEventProvider().getEvents(eventFilter);
   }
 

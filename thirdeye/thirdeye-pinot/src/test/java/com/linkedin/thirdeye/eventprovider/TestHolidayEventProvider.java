@@ -109,6 +109,7 @@ public class TestHolidayEventProvider {
       // check that it gets all HOLIDAY events in time range, and only HOLIDAY events
       eventFilter.setStartTime(hoursAgo5);
       eventFilter.setEndTime(hoursAgo3);
+      eventFilter.setEventType(EventType.HOLIDAY.name());
       events = holidayEventProvider.getEvents(eventFilter);
       Assert.assertEquals(events.size(), 2);
 
