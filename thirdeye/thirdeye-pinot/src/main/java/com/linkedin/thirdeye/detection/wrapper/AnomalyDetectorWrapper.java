@@ -73,6 +73,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private final TimeUnit windowDelayUnit;
   private final int windowSize;
   private final TimeUnit windowUnit;
+  private final MetricConfigDTO metric;
+  private final MetricEntity metricEntity;
   private final boolean isMovingWindowDetection;
   private DatasetConfigDTO dataset;
   private DateTimeZone dateTimeZone;
@@ -84,6 +86,8 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     super(provider, config, startTime, endTime);
 
     this.metricUrn = MapUtils.getString(config.getProperties(), PROP_METRIC_URN);
+    this.metricEntity = MetricEntity.fromURN(this.metricUrn);
+    this.metric = provider.fetchMetrics(Collections.singleton(this.metricEntity.getId())).get(this.metricEntity.getId());
 
     Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_DETECTOR));
     this.detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
@@ -106,18 +110,21 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     List<Interval> monitoringWindows = this.getMonitoringWindows();
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (Interval window : monitoringWindows) {
-      anomalies.addAll(anomalyDetector.runDetection(window, this.metricUrn));
+      List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
+      try {
+        anomaliesForOneWindow = anomalyDetector.runDetection(window, this.metricUrn);
+      } catch (Exception e) {
+        LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
+      }
+      anomalies.addAll(anomaliesForOneWindow);
     }
-
-    MetricEntity me = MetricEntity.fromURN(this.metricUrn);
-    MetricConfigDTO metric = provider.fetchMetrics(Collections.singleton(me.getId())).get(me.getId());
 
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       anomaly.setDetectionConfigId(this.config.getId());
       anomaly.setMetricUrn(this.metricUrn);
-      anomaly.setMetric(metric.getName());
-      anomaly.setCollection(metric.getDataset());
-      anomaly.setDimensions(DetectionUtils.toFilterMap(me.getFilters()));
+      anomaly.setMetric(this.metric.getName());
+      anomaly.setCollection(this.metric.getDataset());
+      anomaly.setDimensions(DetectionUtils.toFilterMap(this.metricEntity.getFilters()));
       anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_KEY, this.detectorReferenceKey);
     }
     return new DetectionPipelineResult(anomalies);

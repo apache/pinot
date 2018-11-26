@@ -19,9 +19,11 @@ package com.linkedin.thirdeye.detection;
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -60,6 +62,7 @@ public class DetectionMigrationResource {
   private final LegacyAnomalyFunctionTranslator translator;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DetectionConfigManager detectionConfigDAO;
+  private final DatasetConfigManager datasetConfigDAO;
   private final Yaml yaml;
 
   /**
@@ -68,10 +71,13 @@ public class DetectionMigrationResource {
    * @param anomalyFunctionFactory the anomaly function factory
    */
   public DetectionMigrationResource(MetricConfigManager metricConfigDAO, AnomalyFunctionManager anomalyFunctionDAO,
-      DetectionConfigManager detectionConfigDAO, AnomalyFunctionFactory anomalyFunctionFactory,
+      DetectionConfigManager detectionConfigDAO,
+      DatasetConfigManager datasetConfigDAO,
+      AnomalyFunctionFactory anomalyFunctionFactory,
       AlertFilterFactory alertFilterFactory) {
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.detectionConfigDAO = detectionConfigDAO;
+    this.datasetConfigDAO = datasetConfigDAO;
     this.translator = new LegacyAnomalyFunctionTranslator(metricConfigDAO, anomalyFunctionFactory, alertFilterFactory);
     DumperOptions options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
@@ -184,8 +190,13 @@ public class DetectionMigrationResource {
     filterYamlParams.put("configuration", params);
     params.putAll(functionDTO.getAlertFilter());
     params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
-    // TODO  timezone
+    params.put("variables.timeZone", getTimezone(functionDTO));
     return filterYamlParams;
+  }
+
+  private String getTimezone(AnomalyFunctionDTO functionDTO) {
+    DatasetConfigDTO datasetConfigDTO = this.datasetConfigDAO.findByDataset(functionDTO.getCollection());
+    return datasetConfigDTO.getTimezone();
   }
 
   private String getBucketPeriod(AnomalyFunctionDTO functionDTO) {
@@ -201,7 +212,7 @@ public class DetectionMigrationResource {
       params.put((String) property.getKey(), property.getValue());
     }
     params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
-    // TODO  timezone
+    params.put("variables.timeZone", getTimezone(functionDTO));
     if (functionDTO.getWindowDelay() != 0) {
       detectorYaml.put(PROP_WINDOW_DELAY, functionDTO.getWindowDelay());
       detectorYaml.put(PROP_WINDOW_DELAY_UNIT, functionDTO.getWindowDelayUnit().toString());
