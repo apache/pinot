@@ -175,10 +175,15 @@ public class YamlResource {
     }
   }
 
+  /**
+   List all yaml configurations enhanced with detection config id, isActive and createBy information.
+   @param id id of a specific detection config yaml to list (optional)
+   @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
+   */
   @GET
   @Path("/list")
   @Produces(MediaType.APPLICATION_JSON)
-  public List<Object> getYamls(@QueryParam("startTime") Long id){
+  public List<Object> listYamls(@QueryParam("id") Long id){
     List<DetectionConfigDTO> detectionConfigDTOs;
     if (id == null) {
       detectionConfigDTOs = this.detectionConfigDAO.findAll();
@@ -189,7 +194,12 @@ public class YamlResource {
     List<Object> yamlObjects = new ArrayList<>();
     for (DetectionConfigDTO detectionConfigDTO : detectionConfigDTOs) {
       if (detectionConfigDTO.getYaml() != null) {
-        yamlObjects.add(YAML.load(detectionConfigDTO.getYaml()));
+        Map<String, Object> yamlObject = new HashMap<>();
+        yamlObject.putAll((Map<? extends String, ?>) this.YAML.load(detectionConfigDTO.getYaml()));
+        yamlObject.put("id", detectionConfigDTO.getId());
+        yamlObject.put("isActive", detectionConfigDTO.isActive());
+        yamlObject.put("createdBy", detectionConfigDTO.getCreatedBy());
+        yamlObjects.add(yamlObject);
       }
     }
     return yamlObjects;
