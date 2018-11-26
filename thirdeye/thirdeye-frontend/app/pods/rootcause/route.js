@@ -39,7 +39,7 @@ const adjustGranularity = (attrGranularity) => {
   const granularity = [parseInt(count, 10), unit];
 
   if (['NANOSECONDS', 'MILLISECONDS', 'SECONDS'].includes(granularity[1])) {
-    granularity[0] = 5;
+    granularity[0] = 15;
     granularity[1] = 'MINUTES';
   }
 
