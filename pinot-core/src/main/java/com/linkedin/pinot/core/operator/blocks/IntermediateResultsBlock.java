@@ -187,8 +187,8 @@ public class IntermediateResultsBlock implements Block {
     return _numSegmentsMatched;
   }
 
-  public void setNumSegmentsMatched(long numSegmentsWithNoMatch) {
-    _numSegmentsMatched = numSegmentsWithNoMatch;
+  public void setNumSegmentsMatched(long numSegmentsMatched) {
+    _numSegmentsMatched = numSegmentsMatched;
   }
 
   public void setNumTotalRawDocs(long numTotalRawDocs) {
