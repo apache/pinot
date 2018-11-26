@@ -594,21 +594,6 @@ export default Controller.extend({
     }
   ),
 
-  /**
-   * Visible entities for tooltip
-   * @type {object}
-   */
-  tooltipEntities: computed(
-    'entities',
-    'invisibleUrns',
-    'hoverUrns',
-    function () {
-      const { entities, invisibleUrns, hoverUrns } = getProperties(this, 'entities', 'invisibleUrns', 'hoverUrns');
-      const visibleUrns = [...hoverUrns].filter(urn => !invisibleUrns.has(urn));
-      return filterObject(entities, (e) => visibleUrns.has(e.urn));
-    }
-  ),
-
   //
   // loading indicators
   //
