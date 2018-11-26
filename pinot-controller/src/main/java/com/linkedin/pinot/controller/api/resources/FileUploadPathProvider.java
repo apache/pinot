@@ -47,6 +47,7 @@ public class FileUploadPathProvider {
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
     String dataDir = controllerConf.getDataDir();
+    dataDir = cleanDataDir(dataDir);
     try {
       // URIs that are allowed to be remote
       _baseDataDirURI = ControllerConf.getUriFromPath(dataDir);
@@ -133,5 +134,19 @@ public class FileUploadPathProvider {
 
   public File getSchemasTmpDir() {
     return new File(_schemasTmpDirURI);
+  }
+
+  /**
+   * Cleans dataDir by getting rid of unnecessary slashes at the end of dataDir. Needed so other URIs are constructed
+   * as expected.
+   * @param dataDir data directory of pinot segments
+   * @return cleaned data directory
+   */
+  private String cleanDataDir(String dataDir) {
+    if (dataDir != null && dataDir.endsWith("/")) {
+      return dataDir.substring(0, dataDir.length() - 1);
+    } else {
+      return dataDir;
+    }
   }
 }
