@@ -131,17 +131,17 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
       long totalRawDocs = pruneSegments(tableDataManager, segmentDataManagers, queryRequest);
       segmentPruneTimer.stopAndRecord();
-
-      int numSegmentsMatched = segmentDataManagers.size();
-      queryRequest.setSegmentCountAfterPruning(numSegmentsMatched);
-      LOGGER.debug("Matched {} segments", numSegmentsMatched);
-      if (numSegmentsMatched == 0) {
+      int numSegmentsMatchedAfterPruning = segmentDataManagers.size();
+      LOGGER.debug("Matched {} segments after pruning", numSegmentsMatchedAfterPruning);
+      if (numSegmentsMatchedAfterPruning == 0) {
         dataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
         Map<String, String> metadata = dataTable.getMetadata();
         metadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
         metadata.put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "0");
         metadata.put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, "0");
         metadata.put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, "0");
+        metadata.put(DataTable.NUM_SEGMENTS_PROCESSED, "0");
+        metadata.put(DataTable.NUM_SEGMENTS_MATCHED, "0");
       } else {
         TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
         Plan globalQueryPlan =
@@ -188,6 +188,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
+    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_QUERIED, Long.toString(segmentDataManagers.size()));
     dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);

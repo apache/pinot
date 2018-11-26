@@ -87,6 +87,21 @@ public interface BrokerResponse {
   long getNumEntriesScannedPostFilter();
 
   /**
+   * Get the number of segments queried by the broker after broker side pruning
+   */
+  long getNumSegmentsQueried();
+
+  /**
+   * Get the number of segments processed by server after server side pruning
+   */
+  long getNumSegmentsProcessed();
+
+  /**
+   * Get number of segments that had at least one matching document
+   */
+  long getNumSegmentsMatched();
+
+  /**
    * Get total number of documents within the table hit.
    */
   long getTotalDocs();

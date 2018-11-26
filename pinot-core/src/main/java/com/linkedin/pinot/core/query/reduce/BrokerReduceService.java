@@ -76,6 +76,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     long numDocsScanned = 0L;
     long numEntriesScannedInFilter = 0L;
     long numEntriesScannedPostFilter = 0L;
+    long numSegmentsQueried = 0L;
+    long numSegmentsProcessed = 0L;
+    long numSegmentsMatched = 0L;
     long numTotalRawDocs = 0L;
     boolean numGroupsLimitReached = false;
 
@@ -116,6 +119,20 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
       if (numEntriesScannedPostFilterString != null) {
         numEntriesScannedPostFilter += Long.parseLong(numEntriesScannedPostFilterString);
       }
+      String numSegmentsQueriedString = metadata.get(DataTable.NUM_SEGMENTS_QUERIED);
+      if (numSegmentsQueriedString != null) {
+        numSegmentsQueried += Long.parseLong(numSegmentsQueriedString);
+      }
+
+      String numSegmentsProcessedString = metadata.get(DataTable.NUM_SEGMENTS_PROCESSED);
+      if (numSegmentsProcessedString != null) {
+        numSegmentsProcessed += Long.parseLong(numSegmentsProcessedString);
+      }
+      String numSegmentsMatchedString = metadata.get(DataTable.NUM_SEGMENTS_MATCHED);
+      if (numSegmentsMatchedString != null) {
+        numSegmentsMatched += Long.parseLong(numSegmentsMatchedString);
+      }
+      
       String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
@@ -143,6 +160,9 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     brokerResponseNative.setNumDocsScanned(numDocsScanned);
     brokerResponseNative.setNumEntriesScannedInFilter(numEntriesScannedInFilter);
     brokerResponseNative.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);
+    brokerResponseNative.setNumSegmentsQueried(numSegmentsQueried);
+    brokerResponseNative.setNumSegmentsProcessed(numSegmentsProcessed);
+    brokerResponseNative.setNumSegmentsMatched(numSegmentsMatched);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
     brokerResponseNative.setNumGroupsLimitReached(numGroupsLimitReached);
 

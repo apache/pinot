@@ -39,9 +39,9 @@ import org.json.JSONObject;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded",
-    "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "totalDocs", "numGroupsLimitReached",
-    "timeUsedMs", "segmentStatistics", "traceInfo"})
+@JsonPropertyOrder({ "selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
+    "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached",
+    "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo" })
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -54,6 +54,10 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numDocsScanned = 0L;
   private long _numEntriesScannedInFilter = 0L;
   private long _numEntriesScannedPostFilter = 0L;
+  private long _numSegmentsQueried = 0L;
+  private long _numSegmentsProcessed = 0L;
+  private long _numSegmentsMatched = 0L;
+  
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
@@ -173,6 +177,36 @@ public class BrokerResponseNative implements BrokerResponse {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
 
+  @JsonProperty("numSegmentsQueried")
+  public long getNumSegmentsQueried() {
+    return _numSegmentsQueried;
+  }
+
+  @JsonProperty("numSegmentsQueried")
+  public void setNumSegmentsQueried(long numSegmentsQueried) {
+    _numSegmentsQueried = numSegmentsQueried;
+  }
+
+  @JsonProperty("numSegmentsProcessed")
+  public long getNumSegmentsProcessed() {
+    return _numSegmentsProcessed;
+  }
+
+  @JsonProperty("numSegmentsProcessed")
+  public void setNumSegmentsProcessed(long numSegmentsProcessed) {
+    _numSegmentsProcessed = numSegmentsProcessed;
+  }
+
+  @JsonProperty("numSegmentsMatched")
+  public long getNumSegmentsMatched() {
+    return _numSegmentsMatched;
+  }
+
+  @JsonProperty("numSegmentsMatched")
+  public void setNumSegmentsMatched(long numSegmentsMatched) {
+    _numSegmentsMatched = numSegmentsMatched;
+  }
+
   @JsonProperty("totalDocs")
   @Override
   public long getTotalDocs() {
@@ -262,4 +296,6 @@ public class BrokerResponseNative implements BrokerResponse {
   public int getExceptionsSize() {
     return _processingExceptions.size();
   }
+
+
 }
