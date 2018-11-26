@@ -274,7 +274,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // Table name might have been changed (with suffix _OFFLINE/_REALTIME appended)
     LOGGER.info(
-        "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, segments:{}/{}/{} servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}",
+        "RequestId:{}, table:{}, timeMs:{}, docs:{}/{}, entries:{}/{}, segments(queried/processed/matched):{}/{}/{} servers:{}/{}, groupLimitReached:{}, exceptions:{}, serverStats:{}, query:{}",
         requestId, brokerRequest.getQuerySource().getTableName(), totalTimeMs, brokerResponse.getNumDocsScanned(),
         brokerResponse.getTotalDocs(), brokerResponse.getNumEntriesScannedInFilter(),
         brokerResponse.getNumSegmentsQueried(), brokerResponse.getNumSegmentsProcessed(), brokerResponse.getNumSegmentsMatched(),

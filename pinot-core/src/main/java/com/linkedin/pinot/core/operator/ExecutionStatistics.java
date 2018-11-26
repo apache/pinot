@@ -59,7 +59,7 @@ public class ExecutionStatistics {
     return _numSegmentsProcessed;
   }
 
-  public long getNumSegmentsWithNoMatch() {
+  public long getNumSegmentsMatched() {
     return _numSegmentsMatched;
   }
 

@@ -39,6 +39,7 @@ import org.apache.helix.model.InstanceConfig;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 /**
@@ -136,7 +137,27 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             + "FlightDate IN ('2014-12-09', '2014-10-05') GROUP BY ActualElapsedTime, OriginStateFips "
             + "HAVING SUM(ArrDelay) <> 6325.973 AND AVG(CAST(CRSDepTime AS DOUBLE)) <= 1569.8755 OR SUM(TaxiIn) = 1003.87274"));
   }
+  /**
+   * Test to ensure that broker response contains expected stats
+   * 
+   * @throws Exception
+   */
+  public void testBrokerResponseMetadata() throws Exception {
+    String[] pqlQueries = new String[] { //
+        "SELECT count(*) FROM mytable", // matching query
+        "SELECT count(*) FROM mytable where non_existing_column='non_existing_value", // query that does not match any row
+        "SELECT count(*) FROM mytable_foo" // query a non existing table
+    };
+    String[] statNames = new String[] { "totalDocs", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed",
+        "numSegmentsMatched", "numDocsScanned", "totalDocs", "timeUsedMs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter" };
 
+    for (String query : pqlQueries) {
+      JSONObject response = postQuery(query);
+      for (String statName : statNames) {
+        Assert.assertTrue(response.has(statName));
+      }
+    }
+  }
   public void testVirtualColumnQueries() {
     // Check that there are no virtual columns in the query results
     ResultSetGroup resultSetGroup = getPinotConnection().execute("select * from mytable");

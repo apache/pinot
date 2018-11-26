@@ -251,6 +251,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   @Test
   @Override
+  public void testBrokerResponseMetadata() throws Exception {
+    super.testBrokerResponseMetadata();
+  }
+
+  @Test
+  @Override
   public void testVirtualColumnQueries() {
     super.testVirtualColumnQueries();
   }

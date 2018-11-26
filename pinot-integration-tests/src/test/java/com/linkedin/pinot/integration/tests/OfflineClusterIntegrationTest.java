@@ -358,6 +358,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
+  @Override
+  public void testBrokerResponseMetadata() throws Exception {
+    super.testBrokerResponseMetadata();
+  }
+  
+  @Test
   public void testUDF() throws Exception {
     String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";
     JSONObject response = postQuery(pqlQuery);
