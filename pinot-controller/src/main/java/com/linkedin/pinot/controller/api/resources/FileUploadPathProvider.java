@@ -23,6 +23,7 @@ import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,7 +48,7 @@ public class FileUploadPathProvider {
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
     String dataDir = controllerConf.getDataDir();
-    dataDir = cleanDataDir(dataDir);
+    StringUtils.stripEnd(dataDir, "/");
     try {
       // URIs that are allowed to be remote
       _baseDataDirURI = ControllerConf.getUriFromPath(dataDir);
@@ -134,19 +135,5 @@ public class FileUploadPathProvider {
 
   public File getSchemasTmpDir() {
     return new File(_schemasTmpDirURI);
-  }
-
-  /**
-   * Cleans dataDir by getting rid of unnecessary slashes at the end of dataDir. Needed so other URIs are constructed
-   * as expected.
-   * @param dataDir data directory of pinot segments
-   * @return cleaned data directory
-   */
-  private String cleanDataDir(String dataDir) {
-    if (dataDir != null && dataDir.endsWith("/")) {
-      return dataDir.substring(0, dataDir.length() - 1);
-    } else {
-      return dataDir;
-    }
   }
 }
