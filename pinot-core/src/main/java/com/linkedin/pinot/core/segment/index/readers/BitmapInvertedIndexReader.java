@@ -94,7 +94,7 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
     ByteBuffer bb = buffer.toDirectByteBuffer(currentOffset, bufferLength);
     ImmutableRoaringBitmap immutableRoaringBitmap = null;
     try {
-      immutableRoaringBitmap = new ImmutableRoaringBitmap(bb);
+      immutableRoaringBitmap = new ImmutableRoaringBitmapWrapper(bb);
     } catch (Exception e) {
       LOGGER.error(
           "Error creating immutableRoaringBitmap for dictionary id:{} currentOffset:{} bufferLength:{} slice position{} limit:{} file:{}",

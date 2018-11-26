@@ -268,4 +268,13 @@ public final class AndBlockDocIdSet implements FilterBlockDocIdSet {
     }
     return loaded;
   }
+
+  @Override
+  public long getTotalBytesRead() {
+    long bytes = 0;
+    for (FilterBlockDocIdSet docIdSet : blockDocIdSets) {
+      bytes += docIdSet.getTotalBytesRead();
+    }
+    return bytes;
+  }
 }

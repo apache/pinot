@@ -32,6 +32,7 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
   private final Map<String, DataSource> _dataSourceMap;
   private final Map<String, Block> _dataBlockMap;
   private final DocIdSetOperator _docIdSetOperator;
+  private final DataFetcher _dataFetcher;
   private final DataBlockCache _dataBlockCache;
 
   public ProjectionOperator(@Nonnull Map<String, DataSource> dataSourceMap,
@@ -42,7 +43,8 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
       _dataBlockMap.put(entry.getKey(), entry.getValue().nextBlock());
     }
     _docIdSetOperator = docIdSetOperator;
-    _dataBlockCache = new DataBlockCache(new DataFetcher(dataSourceMap));
+    _dataFetcher = new DataFetcher(dataSourceMap);
+    _dataBlockCache = new DataBlockCache(_dataFetcher);
   }
 
   /**
@@ -52,6 +54,10 @@ public class ProjectionOperator extends BaseOperator<ProjectionBlock> {
    */
   public int getNumColumnsProjected() {
     return _dataSourceMap.size();
+  }
+
+  public long getNumBytesProjected() {
+    return _dataFetcher.getBytesRead();
   }
 
   /**

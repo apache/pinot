@@ -41,7 +41,7 @@ import org.apache.commons.codec.binary.Hex;
  */
 @SuppressWarnings("unused")
 public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLifecycleAware {
-  private static final int DEFAULT_MAX_LENGTH = 512;
+  public static final int DEFAULT_MAX_LENGTH_BYTES = 512;
 
   // TODO: revisit to see if we allow 0-length byte array
   private static final byte[] NULL_BYTE_ARRAY_VALUE = new byte[0];
@@ -71,7 +71,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
 
   // NOTE: for STRING column, this is the max number of characters; for BYTES column, this is the max number of bytes
   @ConfigKey("maxLength")
-  private int _maxLength = DEFAULT_MAX_LENGTH;
+  private int _maxLength = DEFAULT_MAX_LENGTH_BYTES;
 
   protected Object _defaultNullValue;
 
@@ -89,11 +89,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField) {
-    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, null);
+    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH_BYTES, null);
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, @Nullable Object defaultNullValue) {
-    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, defaultNullValue);
+    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH_BYTES, defaultNullValue);
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
@@ -275,7 +275,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
     if (!_isSingleValueField) {
       jsonObject.addProperty("singleValueField", false);
     }
-    if (_maxLength != DEFAULT_MAX_LENGTH) {
+    if (_maxLength != DEFAULT_MAX_LENGTH_BYTES) {
       jsonObject.addProperty("maxLength", _maxLength);
     }
     appendDefaultNullValue(jsonObject);
@@ -440,6 +440,22 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, ConfigNodeLife
           return MetricFieldSpec.UNDEFINED_METRIC_SIZE;
         default:
           throw new IllegalStateException("Cannot get number of bytes for: " + this);
+      }
+    }
+
+    public int getSizeInBytes() {
+      switch (this) {
+        case INT:
+          return Integer.BYTES;
+        case LONG:
+          return Long.BYTES;
+        case FLOAT:
+          return Float.BYTES;
+        case DOUBLE:
+          return Double.BYTES;
+        default:
+          // TODO: note - this returns a very approximate value! We should be able to
+          return DEFAULT_MAX_LENGTH_BYTES/4;
       }
     }
   }

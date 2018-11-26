@@ -60,6 +60,16 @@ public class TestFilterOperator extends BaseFilterOperator {
       }
 
       @Override
+      public long getNumIndicesLoaded() {
+        return 0;
+      }
+
+      @Override
+      public long getTotalBytesRead() {
+        return 0;
+      }
+
+      @Override
       public BlockDocIdIterator iterator() {
         return new ArrayBasedDocIdIterator(_docIds, _docIds.length);
       }

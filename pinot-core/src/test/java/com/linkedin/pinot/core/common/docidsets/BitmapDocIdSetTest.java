@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.common.docidsets;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
+import com.linkedin.pinot.core.segment.index.readers.ImmutableRoaringBitmapWrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -57,7 +58,7 @@ public class BitmapDocIdSetTest {
       mutableRoaringBitmap.serialize(dos);
       dos.close();
       ByteBuffer bb = ByteBuffer.wrap(bos.toByteArray());
-      ImmutableRoaringBitmap immutableRoaringBitmap = new ImmutableRoaringBitmap(bb);
+      ImmutableRoaringBitmap immutableRoaringBitmap = new ImmutableRoaringBitmapWrapper(bb);
       list.add(immutableRoaringBitmap);
     }
     ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[list.size()];

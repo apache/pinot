@@ -80,11 +80,14 @@ public class AggregationGroupByOperator extends BaseOperator<IntermediateResults
     AggregationGroupByResult groupByResult = groupByExecutor.getResult();
 
     // Gather execution statistics
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    ExecutionStatistics transformStats = _transformOperator.getExecutionStatistics();
+    long numEntriesScannedInFilter = transformStats.getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
+    long numBytesReadPostFilter = _transformOperator.getNumBytesProjected();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned,_transformOperator.getExecutionStatistics().getNumIndicesLoaded(),
-            numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalRawDocs);
+        new ExecutionStatistics(numDocsScanned, transformStats.getNumIndicesLoaded(),
+            transformStats.getNumBytesReadInFilter(), numBytesReadPostFilter, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+            _numTotalRawDocs);
 
     // Build intermediate result block based on aggregation group-by result from the executor
     return new IntermediateResultsBlock(_functionContexts, groupByResult);

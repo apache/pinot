@@ -21,19 +21,23 @@ package com.linkedin.pinot.core.operator;
 public class ExecutionStatistics {
   private long _numDocsScanned;
   private long _numIndicesLoaded;
+  private long _numBytesReadInFilter;
+  private long _numBytesReadPostFilter;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
   private long _numSegmentsProcessed;
   private long _numSegmentsMatched;
-  
+
   public ExecutionStatistics() {
   }
 
-  public ExecutionStatistics(long numDocsScanned, long numIndicesLoaded, long numEntriesScannedInFilter,
-      long numEntriesScannedPostFilter, long numTotalRawDocs) {
+  public ExecutionStatistics(long numDocsScanned, long numIndicesLoaded, long numBytesReadInFilter,
+      long numBytesReadPostFilter, long numEntriesScannedInFilter, long numEntriesScannedPostFilter, long numTotalRawDocs) {
     _numDocsScanned = numDocsScanned;
     _numIndicesLoaded = numIndicesLoaded;
+    _numBytesReadInFilter = numBytesReadInFilter;
+    _numBytesReadPostFilter = numBytesReadPostFilter;
     _numEntriesScannedInFilter = numEntriesScannedInFilter;
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
     _numTotalRawDocs = numTotalRawDocs;
@@ -47,6 +51,14 @@ public class ExecutionStatistics {
 
   public long getNumIndicesLoaded() {
     return _numIndicesLoaded;
+  }
+
+  public long getNumBytesReadInFilter() {
+    return _numBytesReadInFilter;
+  }
+
+  public long getNumBytesReadPostFilter() {
+    return _numBytesReadPostFilter;
   }
 
   public long getNumEntriesScannedInFilter() {
@@ -77,6 +89,8 @@ public class ExecutionStatistics {
   public void merge(ExecutionStatistics executionStatisticsToMerge) {
     _numDocsScanned += executionStatisticsToMerge._numDocsScanned;
     _numIndicesLoaded += executionStatisticsToMerge._numIndicesLoaded;
+    _numBytesReadInFilter += executionStatisticsToMerge._numBytesReadInFilter;
+    _numBytesReadPostFilter += executionStatisticsToMerge._numBytesReadPostFilter;
     _numEntriesScannedInFilter += executionStatisticsToMerge._numEntriesScannedInFilter;
     _numEntriesScannedPostFilter += executionStatisticsToMerge._numEntriesScannedPostFilter;
     _numTotalRawDocs += executionStatisticsToMerge._numTotalRawDocs;
@@ -89,6 +103,8 @@ public class ExecutionStatistics {
     return "Execution Statistics:"
         + "\n  numDocsScanned: " + _numDocsScanned
         + "\n  numIndicesLoaded: " + _numIndicesLoaded
+        + "\n  numBytesReadInFilter: " + _numBytesReadInFilter
+        + "\n  numBytesReadPostFilter: " + _numBytesReadPostFilter
         + "\n  numEntriesScannedInFilter: " + _numEntriesScannedInFilter
         + "\n  numEntriesScannedPostFilter: " + _numEntriesScannedPostFilter
         + "\n  numTotalRawDocs: " + _numTotalRawDocs

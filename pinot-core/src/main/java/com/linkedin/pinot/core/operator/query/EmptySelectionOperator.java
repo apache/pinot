@@ -42,7 +42,7 @@ public class EmptySelectionOperator extends BaseOperator<IntermediateResultsBloc
     List<String> selectionColumns =
         SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
     _dataSchema = SelectionOperatorUtils.extractDataSchema(null, selectionColumns, indexSegment);
-    _executionStatistics = new ExecutionStatistics(0L, 0L, 0L, 0L, indexSegment.getSegmentMetadata().getTotalRawDocs());
+    _executionStatistics = new ExecutionStatistics(0L, 0L, 0L, 0L, 0L, 0L, indexSegment.getSegmentMetadata().getTotalRawDocs());
   }
 
   @Override

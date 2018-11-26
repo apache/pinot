@@ -20,13 +20,11 @@ import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.EmptyBlockDocIdIterator;
 import com.linkedin.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 
 public class SortedDocIdSet implements FilterBlockDocIdSet {
 
   public final List<IntPair> pairs;
-  public final AtomicLong timeMeasure = new AtomicLong(0);
   int startDocId;
   int endDocId;
   private String datasourceName;
@@ -80,6 +78,12 @@ public class SortedDocIdSet implements FilterBlockDocIdSet {
   @Override
   public long getNumIndicesLoaded() {
     return 0L;
+  }
+
+  @Override
+  public long getTotalBytesRead() {
+    // TODO: verify if this is right
+    return pairs.size() * 2 * Integer.BYTES;
   }
 
   @Override

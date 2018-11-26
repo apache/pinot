@@ -26,6 +26,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   private final BlockValSet blockValSet;
   private SVScanDocIdIterator blockValSetBlockDocIdIterator;
   private String datasourceName;
+  private long dataTypeSizeInBytes;
   int startDocId;
   int endDocId;
 
@@ -33,6 +34,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
     this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     blockValSetBlockDocIdIterator = new SVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
+    dataTypeSizeInBytes = blockMetadata.getDataType().getSizeInBytes();
     setStartDocId(blockMetadata.getStartDocId());
     setEndDocId(blockMetadata.getEndDocId());
   }
@@ -76,7 +78,12 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
   public long getNumIndicesLoaded() {
     return 0L;
   }
-  
+
+  @Override
+  public long getTotalBytesRead() {
+    return getNumEntriesScannedInFilter() * dataTypeSizeInBytes;
+  }
+
   @Override
   public ScanBasedDocIdIterator iterator() {
     return blockValSetBlockDocIdIterator;

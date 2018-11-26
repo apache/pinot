@@ -27,12 +27,14 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   private BlockMetadata blockMetadata;
   private MVScanDocIdIterator blockValSetBlockDocIdIterator;
   private String datasourceName;
+  private final int dataTypeSizeInBytes;
 
   public ScanBasedMultiValueDocIdSet(String datasourceName, BlockValSet blockValSet,
       BlockMetadata blockMetadata, PredicateEvaluator evaluator) {
     this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
+    this.dataTypeSizeInBytes = blockMetadata.getDataType().getSizeInBytes();
     blockValSetBlockDocIdIterator =
         new MVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
   }
@@ -74,6 +76,11 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
   @Override
   public long getNumIndicesLoaded() {
     return 0L;
+  }
+
+  @Override
+  public long getTotalBytesRead() {
+    return getNumEntriesScannedInFilter() * dataTypeSizeInBytes;
   }
 
   @Override

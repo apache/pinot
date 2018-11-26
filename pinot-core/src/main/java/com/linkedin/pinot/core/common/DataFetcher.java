@@ -45,6 +45,8 @@ public class DataFetcher {
   private final Map<String, BlockMultiValIterator> _blockMultiValIteratorMap;
   private final int[] _reusableMVDictIds;
 
+  private long _bytesRead;
+
   /**
    * Constructor for DataFetcher.
    *
@@ -72,6 +74,11 @@ public class DataFetcher {
     }
 
     _reusableMVDictIds = new int[maxNumMultiValues];
+    _bytesRead = 0;
+  }
+
+  public long getBytesRead() {
+    return _bytesRead;
   }
 
   /**
@@ -107,6 +114,7 @@ public class DataFetcher {
     } else {
       _singleValueSetMap.get(column).getIntValues(inDocIds, 0, length, outValues, 0);
     }
+    _bytesRead += length * Integer.BYTES;
   }
 
   /**
@@ -126,6 +134,7 @@ public class DataFetcher {
     } else {
       _singleValueSetMap.get(column).getLongValues(inDocIds, 0, length, outValues, 0);
     }
+    _bytesRead += length * Long.BYTES;
   }
 
   /**
@@ -145,6 +154,7 @@ public class DataFetcher {
     } else {
       _singleValueSetMap.get(column).getFloatValues(inDocIds, 0, length, outValues, 0);
     }
+    _bytesRead += length * Float.BYTES;
   }
 
   /**
@@ -164,6 +174,7 @@ public class DataFetcher {
     } else {
       _singleValueSetMap.get(column).getDoubleValues(inDocIds, 0, length, outValues, 0);
     }
+    _bytesRead += length * Double.BYTES;
   }
 
   /**
@@ -183,6 +194,10 @@ public class DataFetcher {
     } else {
       _singleValueSetMap.get(column).getStringValues(inDocIds, 0, length, outValues, 0);
     }
+    // todo: optimize!
+    for( String val : outValues) {
+      _bytesRead += (val != null) ? val.length() : 0;
+    }
   }
 
   /**
@@ -201,6 +216,9 @@ public class DataFetcher {
       dictionary.readBytesValues(dictIds, 0, length, outValues, 0);
     } else {
       _singleValueSetMap.get(column).getBytesValues(inDocIds, 0, length, outValues, 0);
+    }
+    for( byte[] val : outValues) {
+      _bytesRead += (val != null) ? val.length : 0;
     }
   }
 
@@ -240,6 +258,7 @@ public class DataFetcher {
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new int[numMultiValues];
       _dictionaryMap.get(column).readIntValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _bytesRead += numMultiValues * Integer.BYTES;
     }
   }
 
@@ -258,6 +277,7 @@ public class DataFetcher {
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new long[numMultiValues];
       _dictionaryMap.get(column).readLongValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _bytesRead += numMultiValues * Long.BYTES;
     }
   }
 
@@ -276,6 +296,7 @@ public class DataFetcher {
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new float[numMultiValues];
       _dictionaryMap.get(column).readFloatValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _bytesRead += numMultiValues * Float.BYTES;
     }
   }
 
@@ -294,6 +315,7 @@ public class DataFetcher {
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new double[numMultiValues];
       _dictionaryMap.get(column).readDoubleValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      _bytesRead += numMultiValues * Double.BYTES;
     }
   }
 
@@ -312,6 +334,9 @@ public class DataFetcher {
       int numMultiValues = blockMultiValIterator.nextIntVal(_reusableMVDictIds);
       outValues[i] = new String[numMultiValues];
       _dictionaryMap.get(column).readStringValues(_reusableMVDictIds, 0, numMultiValues, outValues[i], 0);
+      for(String val : outValues[i]) {
+        _bytesRead += val.length();
+      }
     }
   }
 

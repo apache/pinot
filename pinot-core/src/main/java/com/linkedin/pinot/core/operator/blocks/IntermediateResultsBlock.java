@@ -51,6 +51,8 @@ public class IntermediateResultsBlock implements Block {
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _numIndicesLoaded;
+  private long _numBytesReadInFilter;
+  private long _numBytesReadPostFilter;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
   private long _numTotalRawDocs;
@@ -172,6 +174,14 @@ public class IntermediateResultsBlock implements Block {
     _numIndicesLoaded = numIndicesLoaded;
   }
 
+  public void setNumBytesReadInFilter(long numBytesReadInFilter) {
+    _numBytesReadInFilter = numBytesReadInFilter;
+  }
+
+  public void setNumBytesReadPostFilter(long numBytesReadPostFilter) {
+    _numBytesReadPostFilter = numBytesReadPostFilter;
+  }
+
   public void setNumEntriesScannedInFilter(long numEntriesScannedInFilter) {
     _numEntriesScannedInFilter = numEntriesScannedInFilter;
   }
@@ -179,7 +189,7 @@ public class IntermediateResultsBlock implements Block {
   public void setNumEntriesScannedPostFilter(long numEntriesScannedPostFilter) {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
-  
+
   public long getNumSegmentsProcessed() {
     return _numSegmentsProcessed;
   }
@@ -299,13 +309,15 @@ public class IntermediateResultsBlock implements Block {
   private DataTable attachMetadataToDataTable(DataTable dataTable) {
     dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
     dataTable.getMetadata().put(DataTable.NUM_INDICES_LOADED_KEY, String.valueOf(_numIndicesLoaded));
+    dataTable.getMetadata().put(DataTable.NUM_BYTES_READ_IN_FILTER_KEY, String.valueOf(_numBytesReadInFilter));
+    dataTable.getMetadata().put(DataTable.NUM_BYTES_READ_POST_FILTER_KEY, String.valueOf(_numBytesReadPostFilter));
     dataTable.getMetadata()
         .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
     dataTable.getMetadata()
         .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_PROCESSED, String.valueOf(_numSegmentsProcessed));
     dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_MATCHED, String.valueOf(_numSegmentsMatched));
-    
+
     dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalRawDocs));
     if (_numGroupsLimitReached) {
       dataTable.getMetadata().put(DataTable.NUM_GROUPS_LIMIT_REACHED_KEY, "true");

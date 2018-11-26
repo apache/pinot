@@ -16,10 +16,10 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import com.linkedin.pinot.common.config.CombinedConfig;
-import com.linkedin.pinot.common.config.Serializer;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
+import com.linkedin.pinot.common.config.CombinedConfig;
+import com.linkedin.pinot.common.config.Serializer;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.util.TestUtils;
@@ -39,7 +39,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.testng.Assert;
-import org.testng.annotations.Test;
 
 
 /**
@@ -139,7 +138,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   }
   /**
    * Test to ensure that broker response contains expected stats
-   * 
+   *
    * @throws Exception
    */
   public void testBrokerResponseMetadata() throws Exception {
@@ -149,12 +148,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         "SELECT count(*) FROM mytable_foo" // query a non existing table
     };
     String[] statNames = new String[] { "totalDocs", "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed",
-        "numSegmentsMatched", "numDocsScanned", "totalDocs", "timeUsedMs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter" };
+        "numSegmentsMatched", "numDocsScanned", "totalDocs", "timeUsedMs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
+        "numBytesReadInFilter", "numBytesReadPostFilter"};
 
     for (String query : pqlQueries) {
       JSONObject response = postQuery(query);
       for (String statName : statNames) {
-        Assert.assertTrue(response.has(statName));
+        Assert.assertTrue(response.has(statName), "Missing stat " + statName);
       }
     }
   }

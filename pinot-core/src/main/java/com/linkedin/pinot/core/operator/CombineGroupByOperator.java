@@ -191,6 +191,8 @@ public class CombineGroupByOperator extends BaseOperator<IntermediateResultsBloc
       }
       mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
       mergedBlock.setNumIndicesLoaded(executionStatistics.getNumIndicesLoaded());
+      mergedBlock.setNumBytesReadInFilter(executionStatistics.getNumBytesReadInFilter());
+      mergedBlock.setNumBytesReadPostFilter(executionStatistics.getNumBytesReadPostFilter());
       mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
       mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
       mergedBlock.setNumSegmentsProcessed(executionStatistics.getNumSegmentsProcessed());

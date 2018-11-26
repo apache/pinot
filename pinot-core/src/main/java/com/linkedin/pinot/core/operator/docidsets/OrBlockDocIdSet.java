@@ -81,6 +81,15 @@ public final class OrBlockDocIdSet implements FilterBlockDocIdSet {
   }
 
   @Override
+  public long getTotalBytesRead() {
+    long bytes = 0;
+    for (FilterBlockDocIdSet docIdSet : _docIdSets) {
+      bytes += docIdSet.getTotalBytesRead();
+    }
+    return bytes;
+  }
+
+  @Override
   public BlockDocIdIterator iterator() {
     boolean useBitmapOr = false;
     for (BlockDocIdSet docIdSet : _docIdSets) {

@@ -84,12 +84,16 @@ public class SelectionOnlyOperator extends BaseOperator<IntermediateResultsBlock
     }
 
     // Create execution statistics.
-    long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    ExecutionStatistics projectionStats = _projectionOperator.getExecutionStatistics();
+    long numEntriesScannedInFilter = projectionStats.getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumColumnsProjected();
+    long numBytesReadPostFilter = _projectionOperator.getNumBytesProjected();
     long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, _projectionOperator.getExecutionStatistics().getNumIndicesLoaded(),
-            numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalRawDocs);
+        new ExecutionStatistics(numDocsScanned, projectionStats.getNumIndicesLoaded(),
+            projectionStats.getNumBytesReadInFilter(), numBytesReadPostFilter,
+            numEntriesScannedInFilter, numEntriesScannedPostFilter,
+            numTotalRawDocs);
 
     return new IntermediateResultsBlock(_dataSchema, _rowEvents);
   }

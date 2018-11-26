@@ -68,10 +68,13 @@ public class AggregationOperator extends BaseOperator<IntermediateResultsBlock> 
     List<Object> aggregationResult = aggregationExecutor.getResult();
 
     // Create execution statistics
-    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    ExecutionStatistics transformStats = _transformOperator.getExecutionStatistics();
+    long numEntriesScannedInFilter = transformStats.getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumColumnsProjected();
+    long numBytesReadPostFilter = _transformOperator.getNumBytesProjected();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, _transformOperator.getExecutionStatistics().getNumIndicesLoaded(),
+        new ExecutionStatistics(numDocsScanned, transformStats.getNumIndicesLoaded(),
+            transformStats.getNumBytesReadInFilter(), numBytesReadPostFilter,
             numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalRawDocs);
 
     // Build intermediate result block based on aggregation result from the executor

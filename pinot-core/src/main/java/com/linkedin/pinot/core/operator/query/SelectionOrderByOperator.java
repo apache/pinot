@@ -90,13 +90,17 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     }
 
     // Create execution statistics.
+    ExecutionStatistics projectionStats = _projectionOperator.getExecutionStatistics();
     numDocsScanned += _selectionOperatorService.getNumDocsScanned();
-    long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedInFilter = projectionStats.getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumColumnsProjected();
+    long numBytesReadPostFilter = _projectionOperator.getNumBytesProjected();
     long numTotalRawDocs = _indexSegment.getSegmentMetadata().getTotalRawDocs();
     _executionStatistics =
-        new ExecutionStatistics(numDocsScanned, _projectionOperator.getExecutionStatistics().getNumIndicesLoaded(),
-            numEntriesScannedInFilter, numEntriesScannedPostFilter, numTotalRawDocs);
+        new ExecutionStatistics(numDocsScanned, projectionStats.getNumIndicesLoaded(),
+            projectionStats.getNumBytesReadInFilter(), numBytesReadPostFilter,
+            numEntriesScannedInFilter, numEntriesScannedPostFilter,
+            numTotalRawDocs);
 
     return new IntermediateResultsBlock(_selectionOperatorService.getDataSchema(), _selectionOperatorService.getRows());
   }

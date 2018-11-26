@@ -24,13 +24,21 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public class BitmapDocIdSet implements FilterBlockDocIdSet {
   private final ImmutableRoaringBitmap _bitmap;
   private final long _bitMapCount;
+  private final long _totalBitMapBytesRead;
   private int _startDocId;
   // Inclusive
   private int _endDocId;
 
   public BitmapDocIdSet(ImmutableRoaringBitmap[] bitmaps, int startDocId, int endDocId, boolean exclusive) {
     _bitMapCount = bitmaps.length;
+
     if (_bitMapCount > 1) {
+      // estimate the number of bytes read
+      long bytesRead = 0;
+      for(ImmutableRoaringBitmap bitMap : bitmaps) {
+        bytesRead+= bitMap.getSizeInBytes();
+      }
+      _totalBitMapBytesRead = bytesRead;
       MutableRoaringBitmap orBitmap = MutableRoaringBitmap.or(bitmaps);
       if (exclusive) {
         orBitmap.flip(startDocId, endDocId + 1);
@@ -46,12 +54,14 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
       } else {
         _bitmap = bitmaps[0];
       }
+      _totalBitMapBytesRead = _bitmap.getSizeInBytes();
     } else {
       MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
       if (exclusive) {
         bitmap.add(startDocId, endDocId + 1);
       }
       _bitmap = bitmap;
+      _totalBitMapBytesRead = _bitmap.getSizeInBytes();
     }
 
     _startDocId = startDocId;
@@ -86,6 +96,11 @@ public class BitmapDocIdSet implements FilterBlockDocIdSet {
   @Override
   public long getNumIndicesLoaded() {
     return _bitMapCount;
+  }
+
+  @Override
+  public long getTotalBytesRead() {
+    return _totalBitMapBytesRead;
   }
 
   @Override

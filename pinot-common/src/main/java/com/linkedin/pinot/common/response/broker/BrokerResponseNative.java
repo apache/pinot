@@ -40,7 +40,8 @@ import org.json.JSONObject;
  * Supports serialization via JSON.
  */
 @JsonPropertyOrder({ "selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached",
+    "numSegmentsProcessed", "numSegmentsMatched", "numDocsScanned", "numBytesReadInFilter", "numBytesReadPostFilter",
+    "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numGroupsLimitReached",
     "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo" })
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -57,7 +58,10 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _numSegmentsQueried = 0L;
   private long _numSegmentsProcessed = 0L;
   private long _numSegmentsMatched = 0L;
-  
+
+  private long _numBytesReadInFilter = 0L;
+  private long _numBytesReadPostFilter = 0L;
+
   private long _totalDocs = 0L;
   private boolean _numGroupsLimitReached = false;
   private long _timeUsedMs = 0L;
@@ -227,6 +231,26 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("numGroupsLimitReached")
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @JsonProperty("numBytesReadInFilter")
+  public long getNumBytesReadInFilter() {
+    return _numBytesReadInFilter;
+  }
+
+  @JsonProperty("numBytesReadInFilter")
+  public void setNumBytesReadInFilter(long numBytesReadInFilter) {
+    _numBytesReadInFilter = numBytesReadInFilter;
+  }
+
+  @JsonProperty("numBytesReadPostFilter")
+  public long getNumBytesReadPostFilter() {
+    return _numBytesReadPostFilter;
+  }
+
+  @JsonProperty("numBytesReadPostFilter")
+  public void setNumBytesReadPostFilter(long numBytesReadPostFilter) {
+    _numBytesReadPostFilter = numBytesReadPostFilter;
   }
 
   @JsonProperty("timeUsedMs")

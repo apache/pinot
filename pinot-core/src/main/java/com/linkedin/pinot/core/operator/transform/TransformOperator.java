@@ -66,6 +66,10 @@ public class TransformOperator extends BaseOperator<TransformBlock> {
     return _dataSourceMap.size();
   }
 
+  public long getNumBytesProjected() {
+    return _projectionOperator.getNumBytesProjected();
+  }
+
   /**
    * Returns the transform result metadata associated with the given expression.
    *

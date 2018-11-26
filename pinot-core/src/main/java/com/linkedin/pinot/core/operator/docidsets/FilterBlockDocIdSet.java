@@ -73,4 +73,9 @@ public interface FilterBlockDocIdSet extends BlockDocIdSet {
    * Returns the number of indices loaded in filtering phase.
    */
   long getNumIndicesLoaded();
+
+  /**
+   * Returns the number of bytes read in the filtering phase.
+   */
+  long getTotalBytesRead();
 }

@@ -146,6 +146,10 @@ public abstract class QueryScheduler {
         Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, INVALID_NUM_SCANNED));
     long numIndicesLoaded =
         Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_INDICES_LOADED_KEY, "0"));
+    long numBytesReadInFilter =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_BYTES_READ_IN_FILTER_KEY, "0"));
+    long numBytesReadPostFilter =
+        Long.parseLong(dataTableMetadata.getOrDefault(DataTable.NUM_BYTES_READ_POST_FILTER_KEY, "0"));
     long numEntriesScannedInFilter = Long.parseLong(
         dataTableMetadata.getOrDefault(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, INVALID_NUM_SCANNED));
     long numEntriesScannedPostFilter = Long.parseLong(
@@ -170,11 +174,12 @@ public abstract class QueryScheduler {
     TimerContext timerContext = queryRequest.getTimerContext();
     int numSegmentsQueried = queryRequest.getSegmentsToQuery().size();
     LOGGER.info(
-        "Processed requestId={},table={},Segments(Queried/processed/matched)={}/{}/{},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},numIndicesLoaded={},scanInFilter={},scanPostFilter={},sched={}",
+        "Processed requestId={},table={},Segments(Queried/processed/matched)={}/{}/{},totalExecMs={},totalTimeMs={},broker={},numDocsScanned={},numIndicesLoaded={},numBytesReadInFilter={},numBytesReadPostFilter={},scanInFilter={},scanPostFilter={},sched={}",
         requestId, tableNameWithType, numSegmentsQueried, numSegmentsProcessed, numSegmentsMatched,
         timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PROCESSING),
         timerContext.getPhaseDurationMs(ServerQueryPhase.TOTAL_QUERY_TIME), queryRequest.getBrokerId(), numDocsScanned,
-        numIndicesLoaded, numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
+        numIndicesLoaded, numBytesReadInFilter, numBytesReadPostFilter,
+        numEntriesScannedInFilter, numEntriesScannedPostFilter, name());
 
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_QUERIED, numSegmentsQueried);
     serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_SEGMENTS_PROCESSED, numSegmentsProcessed);
