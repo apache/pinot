@@ -79,7 +79,7 @@ export default Route.extend({
 
     // concat legacy alerts and yaml alerts
     alerts = alerts.concat(yamlAlerts);
-    debugger;
+
     // Perform initial filters for our 'primary' filter types and add counts
     const user = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
     const myAlertIds = user ? this._findAlertIdsByUserGroup(user, model.subscriberGroups) : [];
