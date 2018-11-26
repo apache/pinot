@@ -177,6 +177,7 @@ public class YamlResource {
 
   @GET
   @Path("/list")
+  @Produces(MediaType.APPLICATION_JSON)
   public List<Object> getYamls(@QueryParam("startTime") Long id){
     List<DetectionConfigDTO> detectionConfigDTOs;
     if (id == null) {
