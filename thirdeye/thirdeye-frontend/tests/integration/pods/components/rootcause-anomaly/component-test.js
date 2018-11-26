@@ -74,7 +74,7 @@ module('Integration | Component | rootcause-anomaly', function(hooks) {
               score : [ '0.03195732831954956' ],
               functionId : [ '1' ],
               current : [ '93453.15844726562' ],
-              aggregateMultiplier : [ '0.041666666666666664' ],
+              aggregateMultiplier : [ '1' ],
               metricId : [ '1' ],
               metric : [ 'metric' ],
               function : [ 'function' ],

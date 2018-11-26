@@ -327,7 +327,6 @@ export default Component.extend({
           };
         }
       });
-
       return anomalyInfo;
     }
   ),
@@ -356,12 +355,16 @@ export default Component.extend({
    */
   isWarning: computed('anomalyInfo', 'isRangeChanged', function () {
     if(!get(this, 'isRangeChanged')) {
-      let oldCurrent = parseFloat(get(this, 'current'));
-      const newCurrent = this._getAggregate('current');
-      if (newCurrent && oldCurrent){
+      const oldCurrent = parseFloat(get(this, 'current'));
+      let newCurrent = this._getAggregate('current');
+      const aggregateMultiplier = parseFloat(get(this, 'aggregateMultiplier'));
+      if (newCurrent && oldCurrent && aggregateMultiplier){
+        newCurrent = newCurrent * aggregateMultiplier;
         const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
         if (diffCurrent > 0.01) {
           set(this, 'warningValue', true);
+        } else {
+          set(this, 'warningValue', false);
         }
       }
     }
@@ -373,7 +376,7 @@ export default Component.extend({
    * @type {string}
    */
   warningChangedTo: computed('warningValue', function() {
-    const newCurrent = this._getAggregate('current');
+    const newCurrent = this._getAggregate('current') * parseFloat(get(this, 'aggregateMultiplier'));
     return humanizeFloat(newCurrent);
   }),
 
@@ -392,7 +395,6 @@ export default Component.extend({
       if (value === 0.0) { return Number.NaN; }
       return value / (aggregateMultiplier || 1.0);
     }
-
     return aggregates[toOffsetUrn(metricUrn, offset)];
   },
 
