@@ -178,7 +178,7 @@ export default Route.extend({
   },
 
   /**
-   * The yaml filters formatter
+   * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
    * For example, filters = {
    *   "country": ["us", "cn"],
    *   "browser": ["chrome"]
