@@ -6,22 +6,41 @@
 Welcome to Pinot's documentation!
 =================================
 
-Contents:
+########
+Contents
+########
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    intro
+   architecture
    trying_pinot
 
-Reference:
+#########
+Reference
+#########
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    in_production
    reference
 
+################
+Design Documents
+################
+
+.. toctree::
+   :maxdepth: 1
+
+   llc
+   partition_aware_routing
+   expressions_udf
+   multitenancy
+   schema_timespec
+
+   
 
 
 Indices and tables

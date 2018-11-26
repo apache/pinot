@@ -24,7 +24,7 @@ Running Pinot by compiling the code
 One can also run the Pinot demonstration by checking out the code on GitHub, compiling it, and running it. Compiling
 Pinot requires JDK 8 or later and Apache Maven 3.
 
-#. Check out the code from GitHub (https://github.com/linkedin/pinot)
+#. Check out the code from GitHub (https://github.com/apache/incubator-pinot)
 #. With Maven installed, run ``mvn install package -DskipTests`` in the directory in which you checked out Pinot.
 #. Make the generated scripts executable ``cd pinot-distribution/target/pinot-0.016-pkg; chmod +x bin/*.sh``
 #. Run Pinot: ``bin/quick-start-offline.sh``
@@ -42,19 +42,19 @@ Pinot uses PQL, a SQL-like query language, to query data. Here are some sample q
 .. code-block:: sql
 
   /*Total number of documents in the table*/
-  select count(*) from baseballStats limit 0
+  SELECT count(*) FROM baseballStats LIMIT 0
 
   /*Top 5 run scorers of all time*/
-  select sum('runs') from baseballStats group by playerName top 5 limit 0
+  SELECT sum('runs') FROM baseballStats GROUP BY playerName TOP 5 LIMIT 0
 
   /*Top 5 run scorers of the year 2000*/
-  select sum('runs') from baseballStats where yearID=2000 group by playerName top 5 limit 0
+  SELECT sum('runs') FROM baseballStats WHERE yearID=2000 GROUP BY playerName TOP 5 LIMIT 0
 
   /*Top 10 run scorers after 2000*/
-  select sum('runs') from baseballStats where yearID>=2000 group by playerName limit 0
+  SELECT sum('runs') FROM baseballStats WHERE yearID>=2000 GROUP BY playerName
 
   /*Select playerName,runs,homeRuns for 10 records from the table and order them by yearID*/
-  select playerName,runs,homeRuns from baseballStats order by yearID limit 10
+  SELECT playerName,runs,homeRuns FROM baseballStats ORDER BY yearID LIMIT 10
 
 The full reference for the PQL query language is present in the :ref:`pql` section of the Pinot documentation.
 
@@ -73,6 +73,6 @@ show up in Pinot.
 .. role:: sql(code)
   :language: sql
 
-To show new events appearing, one can run :sql:`select * from meetupRsvp order by mtime desc limit 50` repeatedly, which shows the
+To show new events appearing, one can run :sql:`SELECT * FROM meetupRsvp ORDER BY mtime DESC LIMIT 50` repeatedly, which shows the
 last events that were ingested by Pinot.
 
