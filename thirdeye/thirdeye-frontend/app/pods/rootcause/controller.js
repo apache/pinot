@@ -57,10 +57,10 @@ export default Controller.extend({
     'contextUrnsInit',
     'selectedUrnsInit',
     'anomalyUrnsInit',
-    'anomalyRange',
-    'analysisRange',
-    'granularity',
-    'compareMode'
+    'anomalyRangeInit',
+    'analysisRangeInit',
+    'granularityInit',
+    'compareModeInit'
   ],
 
   //
