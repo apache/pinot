@@ -23,8 +23,10 @@ import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
@@ -49,10 +51,12 @@ public class DetectionAlertTaskRunner implements TaskRunner {
   private final DetectionAlertTaskFactory detAlertTaskFactory;
   private CurrentAndBaselineLoader currentAndBaselineLoader;
   private DetectionAlertConfigManager alertConfigDAO;
+  private MergedAnomalyResultManager mergedAnomalyDAO;
 
   public DetectionAlertTaskRunner() {
     this.detAlertTaskFactory = new DetectionAlertTaskFactory();
     this.alertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
+    this.mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
 
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -101,6 +105,13 @@ public class DetectionAlertTaskRunner implements TaskRunner {
       // Load all the anomalies along with their recipients
       DetectionAlertFilter alertFilter = detAlertTaskFactory.loadAlertFilter(alertConfig, System.currentTimeMillis());
       DetectionAlertFilterResult result = alertFilter.run();
+
+      // TODO: The old UI relies on notified tag to display the anomalies. After the migration
+      // we need to clean up all references to notified tag.
+      for (MergedAnomalyResultDTO anomaly : result.getAllAnomalies()) {
+        anomaly.setNotified(true);
+        mergedAnomalyDAO.update(anomaly);
+      }
 
       // Suppress alerts if any and get the filtered anomalies to be notified
       Set<DetectionAlertSuppressor> alertSuppressors = detAlertTaskFactory.loadAlertSuppressors(alertConfig);
