@@ -99,8 +99,7 @@ public class AzurePinotFS extends PinotFS {
     if (exists(dstUri) && !overwrite) {
       return false;
     }
-    //rename the file
-    return _adlStoreClient.rename(srcUri.getPath(), dstUri.getPath());
+    return copy(srcUri, dstUri) && delete(srcUri, true);
   }
 
   @Override
