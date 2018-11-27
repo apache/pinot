@@ -304,10 +304,10 @@ public class LLCSegmentCompletionHandlers {
 
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
 
-      String tmpFilePath = StringUtil.join("/", provider.getFileUploadTmpDirURI().toString(), name + "." + UUID.randomUUID().toString());
-      java.net.URI tmpFileURI = ControllerConf.getUriFromPath(tmpFilePath);
+      String remoteTmpFilePath = StringUtil.join("/", provider.getFileUploadTmpDirURI().toString(), name + "." + UUID.randomUUID().toString());
+      java.net.URI remoteTmpFileURI = ControllerConf.getUriFromPath(remoteTmpFilePath);
 
-      PinotFS pinotFS = PinotFSFactory.create(tmpFileURI.getScheme());
+      PinotFS pinotFS = PinotFSFactory.create(remoteTmpFileURI.getScheme());
 
       File localTmpFile = new File(provider.getFileUploadTmpDir(), name + "." + UUID.randomUUID().toString());
       localTmpFile.deleteOnExit();
@@ -321,10 +321,11 @@ public class LLCSegmentCompletionHandlers {
       // If remote, will need to copy tmp file to remote storage
       try {
         if ((!(pinotFS instanceof LocalPinotFS))) {
-          pinotFS.copyFromLocalFile(localTmpFile, tmpFileURI);
+          pinotFS.copyFromLocalFile(localTmpFile, remoteTmpFileURI);
+          pinotFS.delete(localTmpFile.toURI(), true)
         }
       } catch (Exception e) {
-        pinotFS.delete(tmpFileURI, true);
+        pinotFS.delete(remoteTmpFileURI, true);
         LOGGER.error("Could not copy from local to remote storage");
       }
 
