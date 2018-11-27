@@ -1,8 +1,8 @@
 Pluggable Streams
 =================
 
-Prior to commit `ba9f2d <https://github.com/linkedin/pinot/commit/ba9f2ddfc0faa42fadc2cc48df1d77fec6b174fb>`_, Pinot was only able to support reading 
-from `Kafka <https://kafka.apache.org/documentation/>`_ stream. 
+Prior to commit `ba9f2d <https://github.com/linkedin/pinot/commit/ba9f2ddfc0faa42fadc2cc48df1d77fec6b174fb>`_, Pinot was only able to support reading
+from `Kafka <https://kafka.apache.org/documentation/>`_ stream.
 
 Pinot now enables its users to write plug-ins to read from pub-sub streams
 other than Kafka. (Please refer to `Issue #2583 <https://github.com/linkedin/pinot/issues/2583>`_)
@@ -22,7 +22,7 @@ Pinot Stream Consumers
 ----------------------
 Pinot consumes rows from event streams and serves queries on the data consumed. Rows may be consumed either at stream level (also referred to as high level) or at partition level (also referred to as low level).
 
-**TODO**:: Refer to the pictures in the design document
+.. figure:: pluggable_streams.png
 
 .. figure:: High-level-stream.png
 
@@ -71,7 +71,7 @@ In order to add a new type of stream (say,Foo) implement the following classes:
 #. FooMetadataProvider implements `StreamMetadataProvider <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/StreamMetadataProvider.java>`_
 #. FooMessageDecoder implements `StreamMessageDecoder <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/StreamMessageDecoder.java>`_
 
-Depending on stream level or partition level, your implementation needs to include StreamLevelConsumer or PartitionLevelConsumer. 
+Depending on stream level or partition level, your implementation needs to include StreamLevelConsumer or PartitionLevelConsumer.
 
 
 The properties for the stream implementation are to be set in the table configuration, inside `streamConfigs <https://github.com/linkedin/pinot/blob/master/pinot-core/src/main/java/com/linkedin/pinot/core/realtime/stream/StreamConfig.java>`_ section.
@@ -95,7 +95,7 @@ All values should be strings. For example:
 
   "streamType" : "foo",
   "stream.foo.topic.name" : "SomeTopic",
-  "stream.foo.consumer.type": "lowlevel", 
+  "stream.foo.consumer.type": "lowlevel",
   "stream.foo.consumer.factory.class.name": "fully.qualified.pkg.ConsumerFactoryClassName",
   "stream.foo.consumer.prop.auto.offset.reset": "largest",
   "stream.foo.decoder.class.name" : "fully.qualified.pkg.DecoderClassName",

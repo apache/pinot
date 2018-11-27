@@ -80,7 +80,7 @@ Pinot Cluster creation
 
 When the cluster is created the Zookeeper ZNode layout looks as follows.
 
-**TODO**:: Is there a picture here?
+.. figure:: znode_layout.png
 
 Adding Nodes to cluster
 -----------------------
@@ -89,13 +89,13 @@ Adding node to cluster can be done in two ways, manual or automatic. This is con
 
 ::
 
-  {  
-   "id" : "PinotPerfTestCluster",  
-   "simpleFields" : {  
-   "allowParticipantAutoJoin" : "true"  
-   },  
-   "mapFields" : { },  
-   "listFields" : { }  
+  {
+   "id" : "PinotPerfTestCluster",
+   "simpleFields" : {
+   "allowParticipantAutoJoin" : "true"
+   },
+   "mapFields" : { },
+   "listFields" : { }
   }
 
 In Pinot 2.0 we will set AUTO_JOIN to true. This means after the SRE's procure the hardware they can simply deploy the Pinot war and provide the cluster name. When the nodes start up, they join the cluster and registers themselves as server_untagged or broker_untagged. This is what one would see in Helix.
@@ -104,36 +104,36 @@ The znode ``CONFIGS/PARTICIPANT/ServerInstanceName`` looks lik below:
 
 ::
 
-    {  
-     "id":"Server_localhost_8098"  
-     ,"simpleFields":{  
-     "HELIX_ENABLED":"true"  
-     ,"HELIX_HOST":"Server_localhost"  
-     ,"HELIX_PORT":"8098"     
-     }  
-     ,"listFields":{       
-     "TAG_LIST":["server_untagged"]  
-     }                
-     ,"mapFields":{                  
-     }  
+    {
+     "id":"Server_localhost_8098"
+     ,"simpleFields":{
+     "HELIX_ENABLED":"true"
+     ,"HELIX_HOST":"Server_localhost"
+     ,"HELIX_PORT":"8098"
+     }
+     ,"listFields":{
+     "TAG_LIST":["server_untagged"]
+     }
+     ,"mapFields":{
+     }
     }
 
 And the znode ``CONFIGS/PARTICIPANT/BrokerInstanceName`` looks like below:
 
 ::
 
-    {  
-     "id":"Broker_localhost_8099"  
-     ,"simpleFields":{  
-     "HELIX_ENABLED":"true"  
-     ,"HELIX_HOST":"Broker_localhost"  
-     ,"HELIX_PORT":"8099"  
-     }  
-     ,"listFields":{  
-     "TAG_LIST":["broker_untagged"]  
-     }  
-     ,"mapFields":{  
-     }  
+    {
+     "id":"Broker_localhost_8099"
+     ,"simpleFields":{
+     "HELIX_ENABLED":"true"
+     ,"HELIX_HOST":"Broker_localhost"
+     ,"HELIX_PORT":"8099"
+     }
+     ,"listFields":{
+     "TAG_LIST":["broker_untagged"]
+     }
+     ,"mapFields":{
+     }
     }
 
 Adding Resources to Cluster
@@ -145,19 +145,19 @@ There is one resource idealstate created for Broker by default called broker_res
 
 ::
 
-  {  
-   "id" : "brokerResource",  
-   "simpleFields" : {  
-   "IDEAL_STATE_MODE" : "CUSTOMIZED",  
-   "MAX_PARTITIONS_PER_INSTANCE" : "2147483647",  
-   "NUM_PARTITIONS" : "2147483647",  
-   "REBALANCE_MODE" : "CUSTOMIZED",  
-   "REPLICAS" : "2147483647",  
-   "STATE_MODEL_DEF_REF" : "BrokerResourceOnlineOfflineStateModel",  
-   "STATE_MODEL_FACTORY_NAME" : "DEFAULT"  
-   },  
-   "mapFields" : { },  
-   "listFields" : { }  
+  {
+   "id" : "brokerResource",
+   "simpleFields" : {
+   "IDEAL_STATE_MODE" : "CUSTOMIZED",
+   "MAX_PARTITIONS_PER_INSTANCE" : "2147483647",
+   "NUM_PARTITIONS" : "2147483647",
+   "REBALANCE_MODE" : "CUSTOMIZED",
+   "REPLICAS" : "2147483647",
+   "STATE_MODEL_DEF_REF" : "BrokerResourceOnlineOfflineStateModel",
+   "STATE_MODEL_FACTORY_NAME" : "DEFAULT"
+   },
+   "mapFields" : { },
+   "listFields" : { }
   }
 
 
@@ -168,7 +168,7 @@ Sample Curl request
 
 ::
 
-  curl -i -X POST -H 'Content-Type: application/json' -d '{"requestType":"create", "resourceName":"XLNT","tableName":"T1", "timeColumnName":"daysSinceEpoch", "timeType":"daysSinceEpoch","numberOfDataInstances":4,"numberOfCopies":2,"retentionTimeUnit":"DAYS", "retentionTimeValue":"700","pushFrequency":"daily", "brokerTagName":"XLNT", "numberOfBrokerInstances":1, "segmentAssignmentStrategy":"BalanceNumSegmentAssignmentStrategy", "resourceType":"OFFLINE", "metadata":{}}' 
+  curl -i -X POST -H 'Content-Type: application/json' -d '{"requestType":"create", "resourceName":"XLNT","tableName":"T1", "timeColumnName":"daysSinceEpoch", "timeType":"daysSinceEpoch","numberOfDataInstances":4,"numberOfCopies":2,"retentionTimeUnit":"DAYS", "retentionTimeValue":"700","pushFrequency":"daily", "brokerTagName":"XLNT", "numberOfBrokerInstances":1, "segmentAssignmentStrategy":"BalanceNumSegmentAssignmentStrategy", "resourceType":"OFFLINE", "metadata":{}}'
 
 This is how it looks in Helix after running the above command.
 
@@ -177,17 +177,17 @@ The znode ``CONFIGS/PARTICIPANT/Broker_localhost_8099`` looks as follows:
 
 ::
 
-    {  
-     "id":"Broker_localhost_8099"  
-     ,"simpleFields":{  
-     "HELIX_ENABLED":"true"  
-     ,"HELIX_HOST":"Broker_localhost"  
-     ,"HELIX_PORT":"8099"  
+    {
+     "id":"Broker_localhost_8099"
+     ,"simpleFields":{
+     "HELIX_ENABLED":"true"
+     ,"HELIX_HOST":"Broker_localhost"
+     ,"HELIX_PORT":"8099"
      }
-     ,"listFields":{  
-     "TAG_LIST":["broker_mirrorProfileViewOfflineEvents1"]  
+     ,"listFields":{
+     "TAG_LIST":["broker_mirrorProfileViewOfflineEvents1"]
      }
-     ,"mapFields":{  
+     ,"mapFields":{
      }
     }
 
@@ -195,22 +195,22 @@ And the znode ``IDEALSTATES/brokerResource`` looks like below after Data resourc
 
 ::
 
-    {  
-     "id":"brokerResource"  
-     ,"simpleFields":{  
-     "IDEAL_STATE_MODE":"CUSTOMIZED"  
-     ,"MAX_PARTITIONS_PER_INSTANCE":"2147483647"  
-     ,"NUM_PARTITIONS":"2147483647"  
-     ,"REBALANCE_MODE":"CUSTOMIZED"  
-     ,"REPLICAS":"2147483647"  
-     ,"STATE_MODEL_DEF_REF":"BrokerResourceOnlineOfflineStateModel"  
-     ,"STATE_MODEL_FACTORY_NAME":"DEFAULT"  
+    {
+     "id":"brokerResource"
+     ,"simpleFields":{
+     "IDEAL_STATE_MODE":"CUSTOMIZED"
+     ,"MAX_PARTITIONS_PER_INSTANCE":"2147483647"
+     ,"NUM_PARTITIONS":"2147483647"
+     ,"REBALANCE_MODE":"CUSTOMIZED"
+     ,"REPLICAS":"2147483647"
+     ,"STATE_MODEL_DEF_REF":"BrokerResourceOnlineOfflineStateModel"
+     ,"STATE_MODEL_FACTORY_NAME":"DEFAULT"
      }
-     ,"listFields":{  
+     ,"listFields":{
      }
-     ,"mapFields":{  
-     "mirrorProfileViewOfflineEvents1_O":{  
-     "Broker_localhost_8099":"ONLINE"  
+     ,"mapFields":{
+     "mirrorProfileViewOfflineEvents1_O":{
+     "Broker_localhost_8099":"ONLINE"
      }
      }
     }
@@ -222,38 +222,38 @@ The znode ``CONFIGS/PARTICIPANT/Server_localhost_8098`` looks as below
 
 ::
 
-    {  
-     "id":"Server_localhost_8098"  
-     ,"simpleFields":{  
-     "HELIX_ENABLED":"true"  
-     ,"HELIX_HOST":"Server_localhost"  
-     ,"HELIX_PORT":"8098"  
-     }  
-     ,"listFields":{  
-     "TAG_LIST":["XLNT"]  
-     }  
-     ,"mapFields":{  
-     }  
+    {
+     "id":"Server_localhost_8098"
+     ,"simpleFields":{
+     "HELIX_ENABLED":"true"
+     ,"HELIX_HOST":"Server_localhost"
+     ,"HELIX_PORT":"8098"
+     }
+     ,"listFields":{
+     "TAG_LIST":["XLNT"]
+     }
+     ,"mapFields":{
+     }
     }
 
 And the znode ``/IDEALSTATES/XLNT (XLNT Data Resource IdealState)`` looks as below:
 
 ::
 
-    {  
-     "id":"XLNT"  
-     ,"simpleFields":{  
-     "IDEAL_STATE_MODE":"CUSTOMIZED"  
-     ,"INSTANCE_GROUP_TAG":"XLNT"  
-     ,"MAX_PARTITIONS_PER_INSTANCE":"1"  
-     ,"NUM_PARTITIONS":"0"  
-     ,"REBALANCE_MODE":"CUSTOMIZED"  
-     ,"REPLICAS":"1"  
-     ,"STATE_MODEL_DEF_REF":"SegmentOnlineOfflineStateModel"  
-     ,"STATE_MODEL_FACTORY_NAME":"DEFAULT"  
-     }  
-     ,"listFields":{}  
-     ,"mapFields":{ }  
+    {
+     "id":"XLNT"
+     ,"simpleFields":{
+     "IDEAL_STATE_MODE":"CUSTOMIZED"
+     ,"INSTANCE_GROUP_TAG":"XLNT"
+     ,"MAX_PARTITIONS_PER_INSTANCE":"1"
+     ,"NUM_PARTITIONS":"0"
+     ,"REBALANCE_MODE":"CUSTOMIZED"
+     ,"REPLICAS":"1"
+     ,"STATE_MODEL_DEF_REF":"SegmentOnlineOfflineStateModel"
+     ,"STATE_MODEL_FACTORY_NAME":"DEFAULT"
+     }
+     ,"listFields":{}
+     ,"mapFields":{ }
     }
 
 
@@ -277,31 +277,31 @@ The znode ``/PROPERTYSTORE/CONFIGS/RESOURCE/XLNT`` like like:
 
 ::
 
-    {  
-     "id":"mirrorProfileViewOfflineEvents1_O"  
-     ,"simpleFields":{  
-     "brokerTagName":"broker_mirrorProfileViewOfflineEvents1"  
-     ,"numberOfBrokerInstances":"1"  
-     ,"numberOfCopies":"1"  
-     ,"numberOfDataInstances":"1"  
-     ,"pushFrequency":"daily"  
-     ,"resourceName":"mirrorProfileViewOfflineEvents1"  
-     ,"resourceType":"OFFLINE"  
-     ,"retentionTimeUnit":"DAYS"  
-     ,"retentionTimeValue":"300"  
-     ,"segmentAssignmentStrategy":"BalanceNumSegmentAssignmentStrategy"  
-     ,"timeColumnName":"daysSinceEpoch"  
-     ,"timeType":"DAYS"  
-     }  
-     ,"listFields":{  
-     "tableName":["T1"]  
-     }  
-     ,"mapFields":{  
-     "metadata":{  
-     }  
-     }  
-    }  
-    //This will change slightly when retention properties   
+    {
+     "id":"mirrorProfileViewOfflineEvents1_O"
+     ,"simpleFields":{
+     "brokerTagName":"broker_mirrorProfileViewOfflineEvents1"
+     ,"numberOfBrokerInstances":"1"
+     ,"numberOfCopies":"1"
+     ,"numberOfDataInstances":"1"
+     ,"pushFrequency":"daily"
+     ,"resourceName":"mirrorProfileViewOfflineEvents1"
+     ,"resourceType":"OFFLINE"
+     ,"retentionTimeUnit":"DAYS"
+     ,"retentionTimeValue":"300"
+     ,"segmentAssignmentStrategy":"BalanceNumSegmentAssignmentStrategy"
+     ,"timeColumnName":"daysSinceEpoch"
+     ,"timeType":"DAYS"
+     }
+     ,"listFields":{
+     "tableName":["T1"]
+     }
+     ,"mapFields":{
+     "metadata":{
+     }
+     }
+    }
+    //This will change slightly when retention properties
     //are stored at table scope </pre>
 
 
@@ -309,31 +309,31 @@ The znode ``/IDEALSTATES/XLNT (XLNT Data Resource IdealState)``
 
 ::
 
-    {  
-     "id":"XLNT_O"  
-     ,"simpleFields":{  
-     "IDEAL_STATE_MODE":"CUSTOMIZED"  
-     ,"INSTANCE_GROUP_TAG":"XLNT_O"  
-     ,"MAX_PARTITIONS_PER_INSTANCE":"1"  
-     ,"NUM_PARTITIONS":"3"  
-     ,"REBALANCE_MODE":"CUSTOMIZED"  
-     ,"REPLICAS":"1"  
-     ,"STATE_MODEL_DEF_REF":"SegmentOnlineOfflineStateModel"  
-     ,"STATE_MODEL_FACTORY_NAME":"DEFAULT"  
-     }  
-     ,"listFields":{  
-     }  
-     ,"mapFields":{  
-     "XLNT_T1_daily_2014-08-01_2014-08-01_0":{  
-     "Server_localhost_8098":"ONLINE"  
-     }  
-     ,"XLNT_T1_daily_2014-08-01_2014-08-01_1":{  
-     "Server_localhost_8098":"ONLINE"  
-     }  
-     ,"XLNT_T1_daily_2014-08-01_2014-08-01_2":{  
-     "Server_localhost_8098":"ONLINE"  
-     }  
-     }  
+    {
+     "id":"XLNT_O"
+     ,"simpleFields":{
+     "IDEAL_STATE_MODE":"CUSTOMIZED"
+     ,"INSTANCE_GROUP_TAG":"XLNT_O"
+     ,"MAX_PARTITIONS_PER_INSTANCE":"1"
+     ,"NUM_PARTITIONS":"3"
+     ,"REBALANCE_MODE":"CUSTOMIZED"
+     ,"REPLICAS":"1"
+     ,"STATE_MODEL_DEF_REF":"SegmentOnlineOfflineStateModel"
+     ,"STATE_MODEL_FACTORY_NAME":"DEFAULT"
+     }
+     ,"listFields":{
+     }
+     ,"mapFields":{
+     "XLNT_T1_daily_2014-08-01_2014-08-01_0":{
+     "Server_localhost_8098":"ONLINE"
+     }
+     ,"XLNT_T1_daily_2014-08-01_2014-08-01_1":{
+     "Server_localhost_8098":"ONLINE"
+     }
+     ,"XLNT_T1_daily_2014-08-01_2014-08-01_2":{
+     "Server_localhost_8098":"ONLINE"
+     }
+     }
     }
 
 

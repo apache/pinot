@@ -293,6 +293,8 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
+extensions = ['sphinx.ext.intersphinx']
+
 # Documents to append as an appendix to all manuals.
 #texinfo_appendices = []
 
