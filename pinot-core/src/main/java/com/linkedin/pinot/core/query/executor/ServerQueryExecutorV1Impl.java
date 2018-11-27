@@ -121,6 +121,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
     Preconditions.checkState(tableDataManager != null, "Failed to find data manager for table: " + tableNameWithType);
     List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(queryRequest.getSegmentsToQuery());
+    int numSegmentsQueried = segmentDataManagers.size();
     boolean enableTrace = queryRequest.isEnableTrace();
     if (enableTrace) {
       TraceContext.register(requestId);
@@ -188,7 +189,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
-    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_QUERIED, Long.toString(segmentDataManagers.size()));
+    dataTable.getMetadata().put(DataTable.NUM_SEGMENTS_QUERIED, Integer.toString(numSegmentsQueried));
     dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTime));
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     LOGGER.debug("InstanceResponse for request Id - {}: {}", requestId, dataTable);
