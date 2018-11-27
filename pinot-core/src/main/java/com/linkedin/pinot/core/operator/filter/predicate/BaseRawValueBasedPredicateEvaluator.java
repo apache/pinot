@@ -23,6 +23,16 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
   }
 
   @Override
+  public final boolean isAlwaysTrue() {
+    return false;
+  }
+
+  @Override
+  public final boolean isAlwaysFalse() {
+    return false;
+  }
+
+  @Override
   public final int[] getMatchingDictIds() {
     throw new UnsupportedOperationException();
   }
@@ -30,11 +40,6 @@ public abstract class BaseRawValueBasedPredicateEvaluator extends BasePredicateE
   @Override
   public final int[] getNonMatchingDictIds() {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean isAlwaysFalse() {
-    return false;
   }
 
   /**

@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.operator.filter;
+package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
-import com.linkedin.pinot.core.operator.filter.OrFilterOperator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -41,8 +39,8 @@ public class OrFilterOperatorTest {
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> operators = new ArrayList<>();
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds1));
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds2));
+    operators.add(new TestFilterOperator(docIds1));
+    operators.add(new TestFilterOperator(docIds2));
     OrFilterOperator orOperator = new OrFilterOperator(operators);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
@@ -64,9 +62,9 @@ public class OrFilterOperatorTest {
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> operators = new ArrayList<>();
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds1));
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds2));
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds3));
+    operators.add(new TestFilterOperator(docIds1));
+    operators.add(new TestFilterOperator(docIds2));
+    operators.add(new TestFilterOperator(docIds3));
     OrFilterOperator orOperator = new OrFilterOperator(operators);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();
@@ -88,13 +86,13 @@ public class OrFilterOperatorTest {
     Iterator<Integer> expectedIterator = treeSet.iterator();
 
     List<BaseFilterOperator> childOperators = new ArrayList<>();
-    childOperators.add(FilterOperatorTestUtils.makeFilterOperator(docIds1));
-    childOperators.add(FilterOperatorTestUtils.makeFilterOperator(docIds2));
+    childOperators.add(new TestFilterOperator(docIds1));
+    childOperators.add(new TestFilterOperator(docIds2));
     OrFilterOperator childOrOperator = new OrFilterOperator(childOperators);
 
     List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(childOrOperator);
-    operators.add(FilterOperatorTestUtils.makeFilterOperator(docIds3));
+    operators.add(new TestFilterOperator(docIds3));
     OrFilterOperator orOperator = new OrFilterOperator(operators);
 
     BlockDocIdIterator iterator = orOperator.nextBlock().getBlockDocIdSet().iterator();

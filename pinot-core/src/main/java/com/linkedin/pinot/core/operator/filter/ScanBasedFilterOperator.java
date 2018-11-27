@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
@@ -37,8 +38,14 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   // Inclusive
   private final int _endDocId;
 
-  public ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,
-      int endDocId) {
+  ScanBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId, int endDocId) {
+    // NOTE:
+    // Predicate that is always evaluated as true or false should not be passed into the ScanBasedFilterOperator for
+    // performance concern.
+    // If predicate is always evaluated as true, use MatchAllFilterOperator; if predicate is always evaluated as false,
+    // use EmptyFilterOperator.
+    Preconditions.checkArgument(!predicateEvaluator.isAlwaysTrue() && !predicateEvaluator.isAlwaysFalse());
+
     _predicateEvaluator = predicateEvaluator;
     _dataSource = dataSource;
     _startDocId = startDocId;
@@ -65,11 +72,6 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
     filterBlockDocIdSet.setEndDocId(_endDocId);
 
     return new FilterBlock(filterBlockDocIdSet);
-  }
-
-  @Override
-  public boolean isResultEmpty() {
-    return _predicateEvaluator.isAlwaysFalse();
   }
 
   @Override

@@ -32,13 +32,14 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
   public void testRanges() {
     int rangeStart, rangeEnd;
     {
-      // (2,5)
+      // [2, 5]
       rangeStart = 2;
       rangeEnd = 5;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
       Assert.assertTrue(evaluator.applySV(rangeEnd));
       Assert.assertTrue(evaluator.applySV(rangeStart + 1));
@@ -52,13 +53,14 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       verifyDictId(dictIds, rangeStart, rangeEnd);
     }
     {
-      // [2,5)
+      // (2, 5]
       rangeStart = 2;
       rangeEnd = 5;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, true);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertFalse(evaluator.applySV(rangeStart));
       Assert.assertTrue(evaluator.applySV(rangeEnd));
       Assert.assertTrue(evaluator.applySV(rangeStart + 1));
@@ -72,13 +74,14 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       verifyDictId(dictIds, rangeStart + 1, rangeEnd);
     }
     {
-      // (2,5]
+      // [2, 5)
       rangeStart = 2;
       rangeEnd = 5;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, false);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
       Assert.assertFalse(evaluator.applySV(rangeEnd));
       Assert.assertTrue(evaluator.applySV(rangeStart + 1));
@@ -92,13 +95,14 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       verifyDictId(dictIds, rangeStart, rangeEnd - 1);
     }
     {
-      // [2,5]
+      // (2, 5)
       rangeStart = 2;
       rangeEnd = 5;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, false);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertFalse(evaluator.applySV(rangeStart));
       Assert.assertFalse(evaluator.applySV(rangeEnd));
       Assert.assertTrue(evaluator.applySV(rangeStart + 1));
@@ -124,13 +128,14 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
   public void testBoundaries() {
     int rangeStart, rangeEnd;
     {
-      // (0,5]
+      // [0, 5)
       rangeStart = 0;
       rangeEnd = 5;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, false);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
       Assert.assertFalse(evaluator.applySV(rangeEnd));
       Assert.assertTrue(evaluator.applySV(rangeStart + 1));
@@ -143,26 +148,28 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       verifyDictId(dictIds, rangeStart, rangeEnd - 1);
     }
     {
-      // (0,5)
+      // [0, 5]
       rangeStart = 0;
       rangeEnd = 5;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
       Assert.assertTrue(evaluator.applySV(rangeEnd));
       Assert.assertTrue(evaluator.applySV(rangeStart + 1));
       Assert.assertFalse(evaluator.applySV(rangeEnd + 1));
     }
     {
-      // (6, DICT_LEN-1)
+      // [6, DICT_LEN-1]
       rangeStart = 6;
       rangeEnd = DICT_LEN - 1;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertTrue(evaluator.applySV(rangeStart));
       Assert.assertTrue(evaluator.applySV(rangeEnd));
       Assert.assertTrue(evaluator.applySV(rangeStart + 1));
@@ -175,14 +182,29 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
       verifyDictId(dictIds, rangeStart, rangeEnd);
     }
     {
-      // [6, DICT_LEN-1)
+      // (6, DICT_LEN-1]
       rangeStart = 6;
       rangeEnd = DICT_LEN - 1;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, true);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertFalse(evaluator.applySV(rangeStart));
+      Assert.assertTrue(evaluator.applySV(rangeEnd));
+      Assert.assertTrue(evaluator.applySV(rangeStart + 1));
+      Assert.assertFalse(evaluator.applySV(rangeStart - 1));
+    }
+    {
+      // [0, DICT_LEN-1]
+      rangeStart = 0;
+      rangeEnd = DICT_LEN - 1;
+      ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
+      RangePredicate predicate = createPredicate(rangeStart, true, rangeEnd, true);
+      PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
+      Assert.assertFalse(evaluator.isAlwaysFalse());
+      Assert.assertTrue(evaluator.isAlwaysTrue());
+      Assert.assertTrue(evaluator.applySV(rangeStart));
       Assert.assertTrue(evaluator.applySV(rangeEnd));
       Assert.assertTrue(evaluator.applySV(rangeStart + 1));
       Assert.assertFalse(evaluator.applySV(rangeStart - 1));
@@ -193,12 +215,14 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
   public void testZeroRange() {
     int rangeStart, rangeEnd;
     {
+      // (4, 5)
       rangeStart = 4;
       rangeEnd = 5;
       ImmutableDictionaryReader reader = createReader(rangeStart, rangeEnd);
       RangePredicate predicate = createPredicate(rangeStart, false, rangeEnd, false);
       PredicateEvaluator evaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(predicate, reader);
       Assert.assertTrue(evaluator.isAlwaysFalse());
+      Assert.assertFalse(evaluator.isAlwaysTrue());
       Assert.assertFalse(evaluator.applySV(rangeStart));
       Assert.assertFalse(evaluator.applySV(rangeEnd));
       Assert.assertFalse(evaluator.applySV(rangeStart + 1));
@@ -225,11 +249,11 @@ public class RangeOfflineDictionaryPredicateEvaluatorTest {
     when(predicate.includeLowerBoundary()).thenReturn(inclLower);
     when(predicate.includeUpperBoundary()).thenReturn(inclUpper);
     String lowerStr = "lower";
-    if (lower == 0) {
+    if (lower == 0 && inclLower) {
       lowerStr = "*";
     }
     String upperStr = "upper";
-    if (upper == DICT_LEN - 1) {
+    if (upper == DICT_LEN - 1 && inclUpper) {
       upperStr = "*";
     }
     when(predicate.getLowerBoundary()).thenReturn(lowerStr);

@@ -39,6 +39,11 @@ public interface PredicateEvaluator {
   boolean isExclusive();
 
   /**
+   * Return whether the predicate will always be evaluated as true.
+   */
+  boolean isAlwaysTrue();
+
+  /**
    * Return whether the predicate will always be evaluated as false.
    */
   boolean isAlwaysFalse();

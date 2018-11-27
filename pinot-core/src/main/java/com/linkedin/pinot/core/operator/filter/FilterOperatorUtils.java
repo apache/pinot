@@ -19,6 +19,7 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -37,10 +38,17 @@ public class FilterOperatorUtils {
    * Returns the leaf filter operator (i.e. not {@link AndFilterOperator} or {@link OrFilterOperator}).
    */
   public static BaseFilterOperator getLeafFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource,
-      int startDocId, int endDocId) {
+      int numDocs) {
     if (predicateEvaluator.isAlwaysFalse()) {
       return EmptyFilterOperator.getInstance();
+    } else if (predicateEvaluator.isAlwaysTrue()) {
+      return new MatchAllFilterOperator(numDocs);
     }
+
+    int startDocId = 0;
+    // NOTE: end document Id is inclusive
+    // TODO: make it exclusive
+    int endDocId = numDocs - 1;
 
     // Use inverted index if the predicate type is not RANGE or REGEXP_LIKE for efficiency
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
@@ -58,12 +66,65 @@ public class FilterOperatorUtils {
   }
 
   /**
+   * Returns the AND filter operator or equivalent filter operator.
+   */
+  public static BaseFilterOperator getAndFilterOperator(List<BaseFilterOperator> filterOperators, int numDocs,
+      @Nullable Map<String, String> debugOptions) {
+    List<BaseFilterOperator> childFilterOperators = new ArrayList<>(filterOperators.size());
+    for (BaseFilterOperator filterOperator : filterOperators) {
+      if (filterOperator.isResultEmpty()) {
+        return EmptyFilterOperator.getInstance();
+      } else if (!filterOperator.isResultMatchingAll()) {
+        childFilterOperators.add(filterOperator);
+      }
+    }
+    int numChildFilterOperators = childFilterOperators.size();
+    if (numChildFilterOperators == 0) {
+      // Return match all filter operator if all child filter operators match all records
+      return new MatchAllFilterOperator(numDocs);
+    } else if (numChildFilterOperators == 1) {
+      // Return the child filter operator if only one left
+      return childFilterOperators.get(0);
+    } else {
+      // Return the AND filter operator with re-ordered child filter operators
+      FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, debugOptions);
+      return new AndFilterOperator(childFilterOperators);
+    }
+  }
+
+  /**
+   * Returns the OR filter operator or equivalent filter operator.
+   */
+  public static BaseFilterOperator getOrFilterOperator(List<BaseFilterOperator> filterOperators, int numDocs,
+      @Nullable Map<String, String> debugOptions) {
+    List<BaseFilterOperator> childFilterOperators = new ArrayList<>(filterOperators.size());
+    for (BaseFilterOperator filterOperator : filterOperators) {
+      if (filterOperator.isResultMatchingAll()) {
+        return new MatchAllFilterOperator(numDocs);
+      } else if (!filterOperator.isResultEmpty()) {
+        childFilterOperators.add(filterOperator);
+      }
+    }
+    int numChildFilterOperators = childFilterOperators.size();
+    if (numChildFilterOperators == 0) {
+      // Return empty filter operator if all child filter operators's result is empty
+      return EmptyFilterOperator.getInstance();
+    } else if (numChildFilterOperators == 1) {
+      // Return the child filter operator if only one left
+      return childFilterOperators.get(0);
+    } else {
+      // Return the OR filter operator with child filter operators
+      return new OrFilterOperator(childFilterOperators);
+    }
+  }
+
+  /**
    * For AND filter operator, reorders its child filter operators based on the their cost and puts the ones with
    * inverted index first in order to reduce the number of documents to be processed.
    * <p>Special filter operators such as {@link MatchAllFilterOperator} and {@link EmptyFilterOperator} should be
    * removed from the list before calling this method.
    */
-  public static void reorderAndFilterChildOperators(List<BaseFilterOperator> filterOperators,
+  private static void reorderAndFilterChildOperators(List<BaseFilterOperator> filterOperators,
       @Nullable Map<String, String> debugOptions) {
     filterOperators.sort(new Comparator<BaseFilterOperator>() {
       @Override

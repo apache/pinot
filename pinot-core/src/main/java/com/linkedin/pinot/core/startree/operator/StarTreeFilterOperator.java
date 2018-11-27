@@ -20,9 +20,9 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.blocks.EmptyFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.FilterBlock;
-import com.linkedin.pinot.core.operator.filter.AndFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import com.linkedin.pinot.core.operator.filter.EmptyFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
@@ -137,21 +137,17 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     _debugOptions = debugOptions;
 
     if (rootFilterNode != null) {
+      _predicateEvaluatorsMap = new HashMap<>();
+      _matchingDictIdsMap = new HashMap<>();
+
       // Process the filter tree and get a map from column to a list of predicates applied to it
       Map<String, List<Predicate>> predicatesMap = getPredicatesMap(rootFilterNode);
-
-      // Remove columns with predicates from group-by columns because we won't use star node for that column
-      _groupByColumns.removeAll(predicatesMap.keySet());
-
-      int numColumnsInPredicates = predicatesMap.size();
-      _predicateEvaluatorsMap = new HashMap<>(numColumnsInPredicates);
-      _matchingDictIdsMap = new HashMap<>(numColumnsInPredicates);
 
       // Initialize the predicate evaluators map
       for (Map.Entry<String, List<Predicate>> entry : predicatesMap.entrySet()) {
         String columnName = entry.getKey();
         List<Predicate> predicates = entry.getValue();
-        List<PredicateEvaluator> predicateEvaluators = new ArrayList<>(predicates.size());
+        List<PredicateEvaluator> predicateEvaluators = new ArrayList<>();
 
         DataSource dataSource = starTreeV2.getDataSource(columnName);
         for (Predicate predicate : predicates) {
@@ -161,11 +157,17 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
           if (predicateEvaluator.isAlwaysFalse()) {
             _resultEmpty = true;
             return;
+          } else if (!predicateEvaluator.isAlwaysTrue()) {
+            predicateEvaluators.add(predicateEvaluator);
           }
-          predicateEvaluators.add(predicateEvaluator);
         }
-        _predicateEvaluatorsMap.put(columnName, predicateEvaluators);
+        if (!predicateEvaluators.isEmpty()) {
+          _predicateEvaluatorsMap.put(columnName, predicateEvaluators);
+        }
       }
+
+      // Remove columns with predicates from group-by columns because we won't use star node for that column
+      _groupByColumns.removeAll(_predicateEvaluatorsMap.keySet());
     } else {
       _predicateEvaluatorsMap = Collections.emptyMap();
       _matchingDictIdsMap = Collections.emptyMap();
@@ -200,16 +202,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
     if (_resultEmpty) {
       return EmptyFilterBlock.getInstance();
     }
-    List<BaseFilterOperator> childFilterOperators = getChildFilterOperators();
-    int numChildFilterOperators = childFilterOperators.size();
-    if (numChildFilterOperators == 0) {
-      return EmptyFilterBlock.getInstance();
-    } else if (numChildFilterOperators == 1) {
-      return childFilterOperators.get(0).nextBlock();
-    } else {
-      FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, _debugOptions);
-      return new AndFilterOperator(childFilterOperators).nextBlock();
-    }
+    return getFilterOperator().nextBlock();
   }
 
   @Override
@@ -218,35 +211,37 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean isResultMatchingAll() {
+    return false;
+  }
+
+  @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
   }
 
   /**
-   * Helper method to get a list of child filter operators that match the matchingDictIdsMap.
+   * Helper method to get a filter operator that match the matchingDictIdsMap.
    * <ul>
    *   <li>First go over the star tree and try to match as many columns as possible</li>
    *   <li>For the remaining columns, use other indexes to match them</li>
    * </ul>
    */
-  private List<BaseFilterOperator> getChildFilterOperators() {
+  private BaseFilterOperator getFilterOperator() {
     StarTreeResult starTreeResult = traverseStarTree();
 
     // If star tree result is null, the result for the filter operator will be empty, early terminate
     if (starTreeResult == null) {
-      return Collections.emptyList();
+      return EmptyFilterOperator.getInstance();
     }
 
+    int numDocs = _starTreeV2.getMetadata().getNumDocs();
     List<BaseFilterOperator> childFilterOperators =
         new ArrayList<>(1 + starTreeResult._remainingPredicateColumns.size());
 
-    int startDocId = 0;
-    // Inclusive end document id
-    int endDocId = _starTreeV2.getMetadata().getNumDocs() - 1;
-
     // Add the bitmap of matching documents from star tree
     childFilterOperators.add(
-        new BitmapBasedFilterOperator(new ImmutableRoaringBitmap[]{starTreeResult._matchedDocIds}, startDocId, endDocId,
+        new BitmapBasedFilterOperator(new ImmutableRoaringBitmap[]{starTreeResult._matchedDocIds}, 0, numDocs - 1,
             false));
 
     // Add remaining predicates
@@ -254,12 +249,11 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       List<PredicateEvaluator> predicateEvaluators = _predicateEvaluatorsMap.get(remainingPredicateColumn);
       DataSource dataSource = _starTreeV2.getDataSource(remainingPredicateColumn);
       for (PredicateEvaluator predicateEvaluator : predicateEvaluators) {
-        childFilterOperators.add(
-            FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId));
+        childFilterOperators.add(FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs));
       }
     }
 
-    return childFilterOperators;
+    return FilterOperatorUtils.getAndFilterOperator(childFilterOperators, numDocs, _debugOptions);
   }
 
   /**

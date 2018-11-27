@@ -29,13 +29,13 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected FilterBlock getNextBlock() {
-    return new FilterBlock(new SizeBasedDocIdSet(_maxDocId));
+  public final boolean isResultMatchingAll() {
+    return true;
   }
 
   @Override
-  public boolean isResultEmpty() {
-    return false;
+  protected FilterBlock getNextBlock() {
+    return new FilterBlock(new SizeBasedDocIdSet(_maxDocId));
   }
 
   @Override

@@ -73,19 +73,18 @@ public class EqualsPredicateEvaluatorFactory {
       _matchingDictId = dictionary.indexOf(eqPredicate.getEqualsValue());
       if (_matchingDictId >= 0) {
         _matchingDictIds = new int[]{_matchingDictId};
+        if (dictionary.length() == 1) {
+          _alwaysTrue = true;
+        }
       } else {
         _matchingDictIds = new int[0];
+        _alwaysFalse = true;
       }
     }
 
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.EQ;
-    }
-
-    @Override
-    public boolean isAlwaysFalse() {
-      return _matchingDictId < 0;
     }
 
     @Override

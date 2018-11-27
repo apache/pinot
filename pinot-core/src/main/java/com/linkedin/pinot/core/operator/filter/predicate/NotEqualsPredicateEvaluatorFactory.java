@@ -75,8 +75,12 @@ public class NotEqualsPredicateEvaluatorFactory {
       _nonMatchingDictId = dictionary.indexOf(nEqPredicate.getNotEqualsValue());
       if (_nonMatchingDictId >= 0) {
         _nonMatchingDictIds = new int[]{_nonMatchingDictId};
+        if (dictionary.length() == 1) {
+          _alwaysFalse = true;
+        }
       } else {
         _nonMatchingDictIds = new int[0];
+        _alwaysTrue = true;
       }
       _dictionary = dictionary;
     }
@@ -84,11 +88,6 @@ public class NotEqualsPredicateEvaluatorFactory {
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.NEQ;
-    }
-
-    @Override
-    public boolean isAlwaysFalse() {
-      return _nonMatchingDictIds.length == _dictionary.length();
     }
 
     @Override
