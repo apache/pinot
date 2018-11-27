@@ -5,7 +5,7 @@ This document describes steps required for creating Pinot2_0 segments from stand
 
 Compiling the code
 ------------------
-Follow the steps described in `trying_pinot`_ to build pinot. Locate ``pinot-admin.sh`` in ``pinot-tools/trget/pinot-tools=pkg/bin/pinot-admin.sh``.
+Follow the steps described in the section on :doc: `Demonstration <trying_pinot>` to build pinot. Locate ``pinot-admin.sh`` in ``pinot-tools/trget/pinot-tools=pkg/bin/pinot-admin.sh``.
 
 
 Data Preparation
