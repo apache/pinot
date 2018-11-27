@@ -60,7 +60,7 @@ export default Route.extend({
         type: yamlAlert.pipelineType,
         exploreDimensions: yamlAlert.dimensions,
         filters: this._formatYamlFilter(yamlAlert.filters)
-      })
+      });
     }
 
     // Itereate through detection alerter to enhance all yaml alert with extra properties (group name, application)
@@ -72,7 +72,7 @@ export default Route.extend({
           Object.assign(foundAlert, {
             application: detectionAlert.application,
             group: detectionAlert.name
-          })
+          });
         }
       }
     }
