@@ -23,6 +23,7 @@ import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,7 @@ public class FileUploadPathProvider {
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
     String dataDir = controllerConf.getDataDir();
+    StringUtils.stripEnd(dataDir, "/");
     try {
       // URIs that are allowed to be remote
       _baseDataDirURI = ControllerConf.getUriFromPath(dataDir);
