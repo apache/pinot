@@ -242,6 +242,10 @@
       <groupId>io.federecio</groupId>
       <artifactId>dropwizard-swagger</artifactId>
     </dependency>
+    <dependency>
+      <groupId>javassist</groupId>
+      <artifactId>javassist</artifactId>
+    </dependency>
 
     <!-- Holiday loader dependencies -->
     <dependency>
