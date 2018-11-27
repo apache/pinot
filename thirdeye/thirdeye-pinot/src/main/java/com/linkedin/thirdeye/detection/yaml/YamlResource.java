@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultDataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
 import com.wordnik.swagger.annotations.ApiParam;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -30,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -50,7 +52,7 @@ public class YamlResource {
   private static final String PROP_TYPE = "type";
   private static final String PROP_DETECTION_CONFIG_ID = "detectionConfigIds";
 
-  private static final Yaml YAML_READER = new Yaml();
+  private static final Yaml YAML = new Yaml();
 
   private final DetectionConfigManager detectionConfigDAO;
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
@@ -98,7 +100,7 @@ public class YamlResource {
     if (Strings.isNullOrEmpty(payload)) {
       throw new IllegalArgumentException("Empty Payload");
     }
-    Map<String, Object> yamlConfig = (Map<String, Object>) this.YAML_READER.load(payload);
+    Map<String, Object> yamlConfig = (Map<String, Object>) this.YAML.load(payload);
 
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "missing " + PROP_NAME);
     // retrieve id if detection config already exists
@@ -171,5 +173,35 @@ public class YamlResource {
         return existingAlertConfigDTO;
       }
     }
+  }
+
+  /**
+   List all yaml configurations enhanced with detection config id, isActive and createBy information.
+   @param id id of a specific detection config yaml to list (optional)
+   @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
+   */
+  @GET
+  @Path("/list")
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<Object> listYamls(@QueryParam("id") Long id){
+    List<DetectionConfigDTO> detectionConfigDTOs;
+    if (id == null) {
+      detectionConfigDTOs = this.detectionConfigDAO.findAll();
+    } else {
+      detectionConfigDTOs = Collections.singletonList(this.detectionConfigDAO.findById(id));
+    }
+
+    List<Object> yamlObjects = new ArrayList<>();
+    for (DetectionConfigDTO detectionConfigDTO : detectionConfigDTOs) {
+      if (detectionConfigDTO.getYaml() != null) {
+        Map<String, Object> yamlObject = new HashMap<>();
+        yamlObject.putAll((Map<? extends String, ?>) this.YAML.load(detectionConfigDTO.getYaml()));
+        yamlObject.put("id", detectionConfigDTO.getId());
+        yamlObject.put("isActive", detectionConfigDTO.isActive());
+        yamlObject.put("createdBy", detectionConfigDTO.getCreatedBy());
+        yamlObjects.add(yamlObject);
+      }
+    }
+    return yamlObjects;
   }
 }

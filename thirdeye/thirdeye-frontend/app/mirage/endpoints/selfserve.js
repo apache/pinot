@@ -206,4 +206,18 @@ export default function (server) {
     const idArray = request.queryParams.anomalyIds ? request.queryParams.anomalyIds : [ 38456269 ];
     return anomalySet(idArray.split(','));
   });
+
+  /**
+   * get request for all detection alerters
+   */
+  server.get('/thirdeye/entity/DETECTION_ALERT_CONFIG', () => {
+    return [];
+  });
+
+  /**
+   * get request for list yaml configs
+   */
+  server.get('/yaml/list', () => {
+    return [];
+  })
 }
