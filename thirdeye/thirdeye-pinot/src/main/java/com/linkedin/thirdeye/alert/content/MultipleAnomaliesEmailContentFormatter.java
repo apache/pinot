@@ -160,7 +160,9 @@ public class MultipleAnomaliesEmailContentFormatter extends BaseEmailContentForm
     final DateTime eventStart = windowStart.minus(preEventCrawlOffset);
     final DateTime eventEnd = windowEnd.plus(postEventCrawlOffset);
     Map<String, List<String>> targetDimensions = new HashMap<>();
-    targetDimensions.put(EVENT_FILTER_COUNTRY, emailContentFormatterConfiguration.getHolidayCountriesWhitelist());
+    if (emailContentFormatterConfiguration.getHolidayCountriesWhitelist() != null) {
+      targetDimensions.put(EVENT_FILTER_COUNTRY, emailContentFormatterConfiguration.getHolidayCountriesWhitelist());
+    }
     List<EventDTO> holidays = getHolidayEvents(eventStart, eventEnd, targetDimensions);
     Collections.sort(holidays, new Comparator<EventDTO>() {
       @Override

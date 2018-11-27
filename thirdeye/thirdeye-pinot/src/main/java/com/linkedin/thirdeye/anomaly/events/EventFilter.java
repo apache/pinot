@@ -27,8 +27,13 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class EventFilter {
+  private static final Logger LOG = LoggerFactory.getLogger(EventFilter.class);
+
   String eventType;
   String serviceName;
   String metricName;
@@ -152,6 +157,8 @@ public class EventFilter {
         filteredEvents.addAll(allEvents);
       }
     }
+
+    LOG.info("Whitelisting complete. Returning {} fetched events after whitelist", filteredEvents.size());
     return filteredEvents;
   }
 
