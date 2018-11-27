@@ -5,7 +5,7 @@ import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
-import { get, set, computed, getProperties } from '@ember/object';
+import { computed, getProperties } from '@ember/object';
 export default Component.extend({
   classNames: ['rootcause-select-metric-dimension'],
 
@@ -48,12 +48,12 @@ export default Component.extend({
           return agg;
         });
       const relatedMetrics = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-      .filter(urn => urn in entities)
-      .map((urn) => {
-        const entity = entities[urn];
-        const agg = { alias: entity.label, id: entity.urn.split(':')[2] };
-        return agg;
-      });
+        .filter(urn => urn in entities)
+        .map((urn) => {
+          const entity = entities[urn];
+          const agg = { alias: entity.label, id: entity.urn.split(':')[2] };
+          return agg;
+        });
 
       return [
         { groupName: 'Selected Metrics', options: _.sortBy(selectedMetrics, (row) => row.alias) || [] },
@@ -132,6 +132,7 @@ export default Component.extend({
       if (selectionEditable && selectObj.isActive && selectObj.selected) {
         const selectInputEl = document.querySelector(searchInputSelector);
         selectInputEl.value = selectObj.selected.alias;
+        selectInputEl.select();
       }
     },
 
