@@ -236,10 +236,9 @@ The following two queries are both supported in PQL, where the non-aggregation c
     GROUP BY bar, baz
     TOP 50
 
-* Always order by the aggregated value
-  The results will always order by the aggregated value itself.
-* Results equivalent to grouping on each aggregation
-  The results for query:
+* The results will always order by the aggregated value (descending).
+
+The results for query:
 
 .. code-block:: sql
 

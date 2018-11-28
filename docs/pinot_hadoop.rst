@@ -70,9 +70,9 @@ You can then use the SegmentTarPush job to push segments via the controller REST
 Creating Pinot segments outside of Hadoop
 -----------------------------------------
 
-This document describes steps required for creating Pinot segments from standard formats like CSV/JSON.
+Here is how you can create Pinot segments from standard formats like CSV/JSON.
 
-#. Follow the steps described in the section on :doc: `Demonstration <trying_pinot>` to build pinot. Locate ``pinot-admin.sh`` in ``pinot-tools/trget/pinot-tools=pkg/bin/pinot-admin.sh``.
+#. Follow the steps described in the section on :ref:`compiling-code-section` to build pinot. Locate ``pinot-admin.sh`` in ``pinot-tools/target/pinot-tools=pkg/bin/pinot-admin.sh``.
 #.  Create a top level directory containing all the CSV/JSON files that need to be converted into segments.
 #.  The file name extensions are expected to be the same as the format name (*i.e* ``.csv``, or ``.json``), and are case insensitive.
     Note that the converter expects the ``.csv`` extension even if the data is delimited using tabs or spaces instead.
@@ -155,3 +155,23 @@ Sample Schema:
     },
     "schemaName" : "mySchema",
   }
+
+Pushing segments to Pinot
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can use curl to push a segment to pinot:
+
+.. code-block:: none
+
+   curl -X POST -F segment=@<segment-tar-file-path> http://controllerHost:controllerPort/segments
+
+
+Alternatively you can use the pinot-admin.sh utility to upload one or more segments:
+
+.. code-block:: none
+
+  pinot-tools/target/pinot-tools-pkg/bin//pinot-admin.sh UploadSegment -controllerHost <hostname> -controllerPort <port> -segmentDir <segmentDirectoryPath>
+
+The command uploads all the segments found in ``segmentDirectoryPath``. 
+The segments could be either tar-compressed (in which case it is a file under ``segmentDirectoryPath``)
+or uncompressed (in which case it is a directory under ``segmentDirectoryPath``).

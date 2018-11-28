@@ -1,25 +1,24 @@
-Quickstart guide
-================
+Quick Demo
+==========
 
 A quick way to get familiar with Pinot is to run the Pinot examples. The examples can be run either by compiling the
 code or by running the prepackaged Docker images.
-
-Basic Pinot querying
---------------------
 
 To demonstrate Pinot, let's start a simple one node cluster, along with the required Zookeeper. This demo setup also
 creates a table, generates some Pinot segments, then uploads them to the cluster in order to make them queryable.
 
 All of the setup is automated, so the only thing required at the beginning is to start the demonstration cluster.
 
-Running Pinot using Docker
-~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-With Docker installed, the Pinot demonstration can be run using ``docker run -it -p 9000:9000
-linkedin/pinot-quickstart-offline``. This will start a single node Pinot cluster with a preloaded data set.
+.. _compiling-code-section:
 
-Running Pinot by compiling the code
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Compiling the code
+~~~~~~~~~~~~~~~~~~
+
+.. note::
+
+    You can skip this step if you are planning to run the pre-built docker image. Make sure you have Docker installed.
+    Some of the newer query features may not be available in docker as of this writing
 
 One can also run the Pinot demonstration by checking out the code on GitHub, compiling it, and running it. Compiling
 Pinot requires JDK 8 or later and Apache Maven 3.
@@ -27,10 +26,14 @@ Pinot requires JDK 8 or later and Apache Maven 3.
 #. Check out the code from GitHub (https://github.com/apache/incubator-pinot)
 #. With Maven installed, run ``mvn install package -DskipTests`` in the directory in which you checked out Pinot.
 #. Make the generated scripts executable ``cd pinot-distribution/target/pinot-0.016-pkg; chmod +x bin/*.sh``
-#. Run Pinot: ``bin/quick-start-offline.sh``
 
-Trying out the demo
-~~~~~~~~~~~~~~~~~~~
+Trying out Offline quickstart demo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To run the demo with docker
+  ``docker run -it -p 9000:9000 linkedin/pinot-quickstart-offline``
+To run the demo with compiled code:
+  ``bin/quick-start-offline.sh``
 
 Once the Pinot cluster is running, you can query it by going to http://localhost:9000/query/
 
@@ -58,12 +61,15 @@ Pinot uses PQL, a SQL-like query language, to query data. Here are some sample q
 
 The full reference for the PQL query language is present in the :ref:`pql` section of the Pinot documentation.
 
-Realtime data ingestion
------------------------
+Trying out Realtime quickstart demo
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Pinot can also ingest data from streaming sources, such as Kafka streams. To run the realtime data ingestion demo, you
-can run ``docker run -it -p 9000:9000 linkedin/pinot-quickstart-realtime`` using Docker, or
-``bin/quick-start-realtime.sh`` if using the self-compiled version.
+Pinot can ingest data from streaming sources such as Kafka. 
+
+To run the demo with docker
+  ``docker run -it -p 9000:9000 linkedin/pinot-quickstart-realtime``
+To run the demo with compiled code:
+  ``bin/quick-start-realtime.sh``
 
 Once started, the demo will start Kafka, create a Kafka topic, and create a realtime Pinot table. Once created, Pinot
 will start ingesting events from the Kafka topic into the table. The demo also starts a consumer that consumes events
