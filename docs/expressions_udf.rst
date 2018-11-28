@@ -3,7 +3,7 @@ Expressions and UDFs
 
 Requirements
 ~~~~~~~~~~~~
-The query language for Pinot (pql_) currently only supports *selection*, *aggregation* & *group by* operations on columns, and moreover, do not support nested operations. There are a growing number of use-cases of Pinot that require some sort of transformation on the column values, before and/or after performing *selection*, *aggregation* & *group by*. One very common example is when we would want to aggregate *metrics* over different granularity of times, without needing to pre-aggregate records on the individual granularity outside of Pinot. Another example would be when we would want to aggregate on *function* (say difference) of multiple columns.
+The query language for Pinot (:doc:`PQL <reference>`) currently only supports *selection*, *aggregation* & *group by* operations on columns, and moreover, do not support nested operations. There are a growing number of use-cases of Pinot that require some sort of transformation on the column values, before and/or after performing *selection*, *aggregation* & *group by*. One very common example is when we would want to aggregate *metrics* over different granularity of times, without needing to pre-aggregate records on the individual granularity outside of Pinot. Another example would be when we would want to aggregate on *function* (say difference) of multiple columns.
 
 The high level requirement here is to support *expressions* that represent a function on a set of columns in the queries, as opposed to just columns.
 

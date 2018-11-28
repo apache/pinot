@@ -29,25 +29,19 @@ Because of the design choices we made to achieve these goals, there are certain 
 
 Pinot works very well for querying time series data with lots of Dimensions and Metrics. For example:
 
-::
+.. code-block:: sql
 
-    SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable WHERE ((daysSinceEpoch >= 17849 AND daysSinceEpoch <= 17856)) AND accountId IN (123456789) GROUP BY daysSinceEpoch TOP 15000
-    SELECT sum(impressions) FROM AdAnalyticsTable WHERE (daysSinceEpoch >= 17824 and daysSinceEpoch <= 17854) AND adveriserId = '1234356789' GROUP BY daysSinceEpoch,advertiserId TOP 1000
+    SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
+      WHERE ((daysSinceEpoch >= 17849 AND daysSinceEpoch <= 17856)) AND accountId IN (123456789)
+      GROUP BY daysSinceEpoch TOP 100
+
+.. code-block:: sql
+
+    SELECT sum(impressions) FROM AdAnalyticsTable
+      WHERE (daysSinceEpoch >= 17824 and daysSinceEpoch <= 17854) AND adveriserId = '1234356789'
+      GROUP BY daysSinceEpoch,advertiserId TOP 100
+
+.. code-block:: sql
+
     SELECT sum(cost) FROM AdAnalyticsTable GROUP BY advertiserId TOP 50
-
-
-Terminology
-
-* Table: A table is a logical abstraction to refer to a collection of related data. It consists of columns and rows (Document). Table Schema defines column names and their metadata.
-* Segment: Data in table is divided into shards referred to as segments.
-
-Pinot Components
-
-* Pinot Controller: Manages other pinot components (brokers, servers) as well as controls assignment of tables/segments to servers.
-* Pinot Server: Hosts one or more segments and serves queries from those segments
-* Pinot Broker: Accepts queries from clients and routes them to one or more servers, and returns consolidated response to the server.
-
-Pinot leverages [Apache Helix](http://helix.apache.org) for cluster management. 
-
-For more information on Pinot Design and Architecture can be found [here](https://github.com/linkedin/pinot/wiki/Architecture)
 
