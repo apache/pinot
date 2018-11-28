@@ -99,7 +99,7 @@ public class DetectionMigrationResource {
     yamlConfigs.put("metric", anomalyFunctionDTO.getMetric());
     yamlConfigs.put("dataset", anomalyFunctionDTO.getCollection());
     yamlConfigs.put("pipelineType", "Composite");
-    if (anomalyFunctionDTO.getExploreDimensions() != null) {
+    if (StringUtils.isNotBlank(anomalyFunctionDTO.getExploreDimensions())) {
       // dimension explore and data filter
       yamlConfigs.put("dimensionExploration",
           getDimensionExplorationParams(anomalyFunctionDTO));
@@ -180,7 +180,10 @@ public class DetectionMigrationResource {
     filterYamlParams.put("pattern", "up_or_down");
     filterYamlParams.put("sitewideMetricName", functionDTO.getGlobalMetric());
     filterYamlParams.put("sitewideCollection", functionDTO.getCollection());
-    filterYamlParams.put("filters", AnomalyDetectionInputContextBuilder.getFiltersForFunction(functionDTO.getGlobalMetricFilters()).asMap());
+    if (StringUtils.isNotBlank(functionDTO.getGlobalMetricFilters())) {
+      filterYamlParams.put("filters",
+          AnomalyDetectionInputContextBuilder.getFiltersForFunction(functionDTO.getGlobalMetricFilters()).asMap());
+    }
     return filterYamlParams;
   }
 

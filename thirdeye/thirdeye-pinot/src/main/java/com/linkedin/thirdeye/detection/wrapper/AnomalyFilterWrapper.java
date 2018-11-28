@@ -28,6 +28,7 @@ import com.linkedin.thirdeye.detection.DetectionUtils;
 import com.linkedin.thirdeye.detection.spi.components.AnomalyFilter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.MapUtils;
@@ -46,8 +47,7 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
   private final AnomalyFilter anomalyFilter;
   private String metricUrn;
 
-  public AnomalyFilterWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
-      throws Exception {
+  public AnomalyFilterWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
     Map<String, Object> properties = config.getProperties();
     this.nestedProperties = ConfigUtils.getList(properties.get(PROP_NESTED));
@@ -72,13 +72,14 @@ public class AnomalyFilterWrapper extends DetectionPipeline {
       DetectionConfigDTO nestedConfig = new DetectionConfigDTO();
 
       Preconditions.checkArgument(properties.containsKey(PROP_CLASS_NAME), "Nested missing " + PROP_CLASS_NAME);
+      HashMap<String, Object> nestedProp = new HashMap<>(properties);
+      if (this.metricUrn != null){
+        nestedProp.put(PROP_METRIC_URN, this.metricUrn);
+      }
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
-      nestedConfig.setProperties(properties);
+      nestedConfig.setProperties(nestedProp);
       nestedConfig.setComponents(this.config.getComponents());
-      if (this.metricUrn != null){
-        properties.put(PROP_METRIC_URN, this.metricUrn);
-      }
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 
       DetectionPipelineResult intermediate = pipeline.run();
