@@ -6,7 +6,7 @@ Problems with current schema design
 
 The pinot schema timespec looks like this:
 
-::
+.. code-block:: none
 
   {
     "timeFieldSpec":
@@ -29,7 +29,7 @@ Changes
 
 We have added a List<DateTimeFieldSpec> _dateTimeFieldSpecs to the pinot schema
 
-::
+.. code-block:: none
 
   {
     “dateTimeFieldSpec”:
@@ -67,7 +67,7 @@ We have added a List<DateTimeFieldSpec> _dateTimeFieldSpecs to the pinot schema
 
 Examples:
 
-::
+.. code-block:: none
 
   “dateTimeFieldSpec”:
   {

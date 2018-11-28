@@ -1,5 +1,5 @@
-Running the Pinot Demonstration
-===============================
+Quickstart guide
+================
 
 A quick way to get familiar with Pinot is to run the Pinot examples. The examples can be run either by compiling the
 code or by running the prepackaged Docker images.
@@ -35,7 +35,7 @@ Trying out the demo
 Once the Pinot cluster is running, you can query it by going to http://localhost:9000/query/
 
 You can also use the REST API to query Pinot, as well as the Java client. As this is outside of the scope of this
-introduction, the reference documentation to use the Pinot client APIs is in the :ref:`client-api` section.
+introduction, the reference documentation to use the Pinot client APIs is in the :doc:`client_api` section.
 
 Pinot uses PQL, a SQL-like query language, to query data. Here are some sample queries:
 

@@ -48,6 +48,7 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.githubpages',
+    'sphinx.ext.intersphinx',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -293,7 +294,6 @@ texinfo_documents = [
      'Miscellaneous'),
 ]
 
-extensions = ['sphinx.ext.intersphinx']
 
 # Documents to append as an appendix to all manuals.
 #texinfo_appendices = []

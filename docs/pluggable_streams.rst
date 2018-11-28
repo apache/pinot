@@ -16,17 +16,14 @@ Some of the streams for which plug-ins can be added are:
 * `Pulsar <https://pulsar.apache.org/docs/en/client-libraries-java/>`_
 
 
-You may encounter some limitations either in Pinot or in the stream system while developing plug-ins. Please feel free to get in touch with us when you start writing a stream plug-in, and we can help you out. We are open to receiving PRs in order to improve these abstractions if they do not work for a certain stream implementation.
+You may encounter some limitations either in Pinot or in the stream system while developing plug-ins.
+Please feel free to get in touch with us when you start writing a stream plug-in, and we can help you out.
+We are open to receiving PRs in order to improve these abstractions if they do not work for a certain stream implementation.
 
-Pinot Stream Consumers
-----------------------
-Pinot consumes rows from event streams and serves queries on the data consumed. Rows may be consumed either at stream level (also referred to as high level) or at partition level (also referred to as low level).
+Refer to sections :ref:`hlc-section` and :ref:`llc-section` for details on how Pinot consumes streaming data.
 
-.. figure:: pluggable_streams.png
-
-.. figure:: High-level-stream.png
-
-   Stream Level Consumer
+Requirements to support Stream Level (High Level) consumers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The stream should provide the following guarantees:
 
@@ -36,13 +33,12 @@ The stream should provide the following guarantees:
 * The checkpoints should be recorded only when Pinot makes a call to do so.
 * The consumer should be able to start consumption from one of:
 
-  ** latest avaialble data
-  ** earliest available data
-  ** last saved checkpoint
+  * latest avaialble data
+  * earliest available data
+  * last saved checkpoint
 
-.. figure:: Low-level-stream.png
-
-  Partition Level Consumer
+Requirements to support Partition Level (Low Level) consumers
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 While consuming rows at a partition level, the stream should support the following
 properties:
@@ -52,9 +48,10 @@ properties:
 * Refer to a partition as a number not exceeding 32 bits long.
 * Stream should provide the following mechanisms to get an offset for a given partition of the stream:
 
-  ** get the offset of the oldest event available (assuming events are aged out periodically) in the partition.
-  ** get the offset of the most recent event published in the partition
-  ** (optionally) get the offset of an event that was published at a specified time
+  * get the offset of the oldest event available (assuming events are aged out periodically) in the partition.
+  * get the offset of the most recent event published in the partition
+  * (optionally) get the offset of an event that was published at a specified time
+
 * Stream should provide a mechanism to consume a set of events from a partition starting from a specified offset.
 * Events with higher offsets should be more recent (the offsets of events need not be contiguous)
 
@@ -91,24 +88,25 @@ The rest of the configuration properties for your stream should be set with the 
 
 All values should be strings. For example:
 
-.::
 
-  "streamType" : "foo",
-  "stream.foo.topic.name" : "SomeTopic",
-  "stream.foo.consumer.type": "lowlevel",
-  "stream.foo.consumer.factory.class.name": "fully.qualified.pkg.ConsumerFactoryClassName",
-  "stream.foo.consumer.prop.auto.offset.reset": "largest",
-  "stream.foo.decoder.class.name" : "fully.qualified.pkg.DecoderClassName",
-  "stream.foo.decoder.prop.a.decoder.property" : "decoderPropValue",
-  "stream.foo.connection.timeout.millis" : "10000", // default 30_000
-  "stream.foo.fetch.timeout.millis" : "10000" // default 5_000
+.. code-block:: none
+
+    "streamType" : "foo",
+    "stream.foo.topic.name" : "SomeTopic",
+    "stream.foo.consumer.type": "lowlevel",
+    "stream.foo.consumer.factory.class.name": "fully.qualified.pkg.ConsumerFactoryClassName",
+    "stream.foo.consumer.prop.auto.offset.reset": "largest",
+    "stream.foo.decoder.class.name" : "fully.qualified.pkg.DecoderClassName",
+    "stream.foo.decoder.prop.a.decoder.property" : "decoderPropValue",
+    "stream.foo.connection.timeout.millis" : "10000", // default 30_000
+    "stream.foo.fetch.timeout.millis" : "10000" // default 5_000
 
 
 You can have additional properties that are specific to your stream. For example:
 
-.::
+.. code-block:: none
 
-"stream.foo.some.buffer.size" : "24g"
+  "stream.foo.some.buffer.size" : "24g"
 
 In addition to these properties, you can define thresholds for the consuming segments:
 
@@ -117,10 +115,10 @@ In addition to these properties, you can define thresholds for the consuming seg
 
 The properties for the thresholds are as follows:
 
-.::
+.. code-block:: none
 
-"realtime.segment.flush.threshold.size" : "100000"
-"realtime.segment.flush.threshold.time" : "6h"
+  "realtime.segment.flush.threshold.size" : "100000"
+  "realtime.segment.flush.threshold.time" : "6h"
 
 
 An example of this implementation can be found in the `KafkaConsumerFactory <com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory>`_, which is an implementation for the kafka stream.

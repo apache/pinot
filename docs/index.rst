@@ -3,12 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to Pinot's documentation!
-=================================
+############
+Introduction
+############
 
-########
-Contents
-########
 
 .. toctree::
    :maxdepth: 1
@@ -24,8 +22,20 @@ Reference
 .. toctree::
    :maxdepth: 1
 
-   in_production
+
    reference
+   in_production
+
+#################
+Customizing Pinot
+#################
+
+.. toctree::
+   :maxdepth: 1
+
+
+   pluggable_streams
+   segment_fetcher
 
 ################
 Design Documents
@@ -34,19 +44,19 @@ Design Documents
 .. toctree::
    :maxdepth: 1
 
+
    llc
    partition_aware_routing
    expressions_udf
-   multitenancy
    schema_timespec
 
-   
+################
+Design Proposals
+################
+
+.. toctree::
+   :maxdepth: 1
 
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+   multitenancy
 

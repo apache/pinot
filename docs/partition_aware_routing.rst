@@ -48,7 +48,7 @@ Prune function: Name of the class that will be used by the broker to prune a seg
 
 For example, let us consider a case where the data is naturally partitioned on time column ‘daysSinceEpoch’. The segment zk metadata will have information like below:
 
-::
+.. code-block:: none
 
   {
     “partitionColumn”	: “daysSinceEpoch”,
@@ -59,7 +59,7 @@ For example, let us consider a case where the data is naturally partitioned on t
 
 Now consider the following query comes in. 
 
-::
+.. code-block:: none
 
   Select count(*) from myTable where daysSinceEpoch between 17100 and 17110
 
@@ -67,7 +67,7 @@ The broker will recognize the range predicate on the partition column, and call 
 
 Let’s consider another example where the data is partitioned by memberId, where a hash function was applied on the memberId to compute a partition number.
 
-::
+.. code-block:: none
 
   {
     “partitionColumn”	: “memberId”,

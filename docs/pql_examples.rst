@@ -77,66 +77,30 @@ Note: results might not be consistent if column ordered by has same value in mul
     ORDER BY bar DESC
     LIMIT 50, 100
 
-Wild-card match
----------------
+Wild-card match (in WHERE clause only)
+--------------------------------------
+
+To count rows where the column ``airlineName`` starts with ``U``
 
 .. code-block:: sql
 
   SELECT count(*) FROM SomeTable
-    WHERE regexp_like(columnName, '.*regex-here?')
-    GROUP BY someOtherColumn TOP 10
+    WHERE regexp_like(airlineName, '^U.*')
+    GROUP BY airlineName TOP 10
 
-Time-Convert UDF
-----------------
+Examples with UDF
+-----------------
+
+As of now, functions have to be implemented within Pinot. Injecting functions is not allowed yet.
+The examples below demonstrate the use of UDFs
 
 .. code-block:: sql
 
   SELECT count(*) FROM myTable
     GROUP BY timeConvert(timeColumnName, 'SECONDS', 'DAYS')
 
-Differences with SQL
---------------------
-
-* ``JOIN`` is not supported
-* Use ``TOP`` instead of ``LIMIT`` for truncation
-* ``LIMIT n`` has no effect in grouping queries, should use ``TOP n`` instead. If no ``TOP n`` defined, PQL will use ``TOP 10`` as default truncation setting.
-* No need to select the columns to group with.
-
-The following two queries are both supported in PQL, where the non-aggregation columns are ignored.
-
-.. code-block:: sql
-
-  SELECT MIN(foo), MAX(foo), SUM(foo), AVG(foo) FROM mytable
-    GROUP BY bar, baz
-    TOP 50
-
-  SELECT bar, baz, MIN(foo), MAX(foo), SUM(foo), AVG(foo) FROM mytable
-    GROUP BY bar, baz
-    TOP 50
-
-* Always order by the aggregated value
-  The results will always order by the aggregated value itself.
-* Results equivalent to grouping on each aggregation
-  The results for query:
-
-.. code-block:: sql
-
-  SELECT MIN(foo), MAX(foo) FROM myTable
-    GROUP BY bar
-    TOP 50
-
-will be the same as the combining results from the following queries:
-
-.. code-block:: sql
-
-  SELECT MIN(foo) FROM myTable
-    GROUP BY bar
-    TOP 50
-  SELECT MAX(foo) FROM myTable
-    GROUP BY bar
-    TOP 50
-
-where we don't put the results for the same group together.
+  SELECT count(*) FROM myTable
+    GROUP BY div(tim
 
 PQL Specification
 -----------------
@@ -189,10 +153,12 @@ WHERE
 
 Supported predicates are comparisons with a constant using the standard SQL operators (``=``, ``<``, ``<=``, ``>``, ``>=``, ``<>``, '!=') , range comparisons using ``BETWEEN`` (``foo BETWEEN 42 AND 69``), set membership (``foo IN (1, 2, 4, 8)``) and exclusion (``foo NOT IN (1, 2, 4, 8)``). For ``BETWEEN``, the range is inclusive.
 
+Comparison with a regular expression is supported using the regexp_like function, as in ``WHERE regexp_like(columnName, 'regular expression')``
+
 GROUP BY
 ^^^^^^^^
 
-The ``GROUP BY`` clause groups aggregation results by a list of columns.
+The ``GROUP BY`` clause groups aggregation results by a list of columns, or transform functions on columns (see below)
 
 
 ORDER BY
@@ -224,11 +190,72 @@ For example, the following query will calculate the maximum value of column ``fo
 
 Supported transform functions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``ADD``
+   Sum of at least two values
 
-* ``ADD``: sum of at least two values
-* ``SUB``: difference between two values
-* ``MULT``: product of at least two values
-* ``DIV``: quotient of two values
-* ``TIMECONVERT``: takes 3 arguments, converts the value into another time unit. E.g. ``TIMECONVERT(time, 'MILLISECONDS', 'SECONDS')``
-* ``DATETIMECONVERT``: takes 4 arguments, converts the value into another date time format, and buckets time based on the given time granularity. E.g. ``DATETIMECONVERT(date, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES')``
-* ``VALUEIN``: takes at least 2 arguments, where the first argument is a multi-valued column, and the following arguments are constant values. The transform function will filter the value from the multi-valued column with the given constant values. The ``VALUEIN`` transform function is especially useful when the same multi-valued column is both filtering column and grouping column. E.g. ``VALUEIN(mvColumn, 3, 5, 15)``
+``SUB``
+   Difference between two values
+
+``MULT``
+   Product of at least two values
+
+``DIV``
+   Quotient of two values
+
+``TIMECONVERT``
+   Takes 3 arguments, converts the value into another time unit. E.g. ``TIMECONVERT(time, 'MILLISECONDS', 'SECONDS')``
+
+``DATETIMECONVERT``
+   Takes 4 arguments, converts the value into another date time format, and buckets time based on the given time granularity.
+   *e.g.* ``DATETIMECONVERT(date, '1:MILLISECONDS:EPOCH', '1:SECONDS:EPOCH', '15:MINUTES')``
+
+``VALUEIN``
+   Takes at least 2 arguments, where the first argument is a multi-valued column, and the following arguments are constant values.
+   The transform function will filter the value from the multi-valued column with the given constant values.
+   The ``VALUEIN`` transform function is especially useful when the same multi-valued column is both filtering column and grouping column.
+   *e.g.* ``VALUEIN(mvColumn, 3, 5, 15)``
+
+
+Differences with SQL
+--------------------
+
+* ``JOIN`` is not supported
+* Use ``TOP`` instead of ``LIMIT`` for truncation
+* ``LIMIT n`` has no effect in grouping queries, should use ``TOP n`` instead. If no ``TOP n`` defined, PQL will use ``TOP 10`` as default truncation setting.
+* No need to select the columns to group with.
+
+The following two queries are both supported in PQL, where the non-aggregation columns are ignored.
+
+.. code-block:: sql
+
+  SELECT MIN(foo), MAX(foo), SUM(foo), AVG(foo) FROM mytable
+    GROUP BY bar, baz
+    TOP 50
+
+  SELECT bar, baz, MIN(foo), MAX(foo), SUM(foo), AVG(foo) FROM mytable
+    GROUP BY bar, baz
+    TOP 50
+
+* Always order by the aggregated value
+  The results will always order by the aggregated value itself.
+* Results equivalent to grouping on each aggregation
+  The results for query:
+
+.. code-block:: sql
+
+  SELECT MIN(foo), MAX(foo) FROM myTable
+    GROUP BY bar
+    TOP 50
+
+will be the same as the combining results from the following queries:
+
+.. code-block:: sql
+
+  SELECT MIN(foo) FROM myTable
+    GROUP BY bar
+    TOP 50
+  SELECT MAX(foo) FROM myTable
+    GROUP BY bar
+    TOP 50
+
+where we don't put the results for the same group together.

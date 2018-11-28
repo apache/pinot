@@ -1,12 +1,14 @@
-REST API
-========
+Executing queries via REST API on the Broker
+============================================
 
-The Pinot REST API can be accessed by ``POST`` ing a JSON object containing the parameter ``pql`` to the ``/query`` endpoint on a broker. Depending on the type of query, the results can take different shapes. For example, using curl:
+The Pinot REST API can be accessed by invoking ``POST`` operation witha a JSON body containing the parameter ``pql``
+to the ``/query`` URI endpoint on a broker. Depending on the type of query, the results can take different shapes.
+The examples below use curl.
 
 Aggregation
 -----------
 
-::
+.. code-block:: none
 
   curl -X POST -d '{"pql":"select count(*) from flights"}' http://localhost:8099/query
 
@@ -30,7 +32,7 @@ Aggregation
 Aggregation with grouping
 -------------------------
 
-::
+.. code-block:: none
 
   curl -X POST -d '{"pql":"select count(*) from flights group by Carrier"}' http://localhost:8099/query
 
@@ -68,7 +70,7 @@ Aggregation with grouping
 Selection
 ---------
 
-::
+.. code-block:: none
 
   curl -X POST -d '{"pql":"select * from flights limit 3"}' http://localhost:8099/query
 
@@ -145,12 +147,12 @@ Connections to Pinot are created using the ConnectionFactory class' utility meth
 
 .. code-block:: java
 
- Connection connection = ConnectionFactory.fromZookeeper
-     (some-zookeeper-server:2191/zookeeperPath");
+   Connection connection = ConnectionFactory.fromZookeeper
+     ("some-zookeeper-server:2191/zookeeperPath");
 
- Connection connection = ConnectionFactory.fromProperties("demo.properties");
+   Connection connection = ConnectionFactory.fromProperties("demo.properties");
 
- Connection connection = ConnectionFactory.fromHostList
+   Connection connection = ConnectionFactory.fromHostList
      ("some-server:1234", "some-other-server:1234", ...);
 
 
@@ -158,8 +160,8 @@ Queries can be sent directly to the Pinot cluster using the Connection.execute(j
 
 .. code-block:: java
 
- ResultSetGroup resultSetGroup = connection.execute("select * from foo...");
- Future<ResultSetGroup> futureResultSetGroup = connection.executeAsync
+   ResultSetGroup resultSetGroup = connection.execute("select * from foo...");
+   Future<ResultSetGroup> futureResultSetGroup = connection.executeAsync
      ("select * from foo...");
 
 
@@ -167,38 +169,38 @@ Queries can also use a PreparedStatement to escape query parameters:
 
 .. code-block:: java
 
- PreparedStatement statement = connection.prepareStatement
+   PreparedStatement statement = connection.prepareStatement
      ("select * from foo where a = ?");
- statement.setString(1, "bar");
+   statement.setString(1, "bar");
 
- ResultSetGroup resultSetGroup = statement.execute();
- Future<ResultSetGroup> futureResultSetGroup = statement.executeAsync();
+   ResultSetGroup resultSetGroup = statement.execute();
+   Future<ResultSetGroup> futureResultSetGroup = statement.executeAsync();
 
 
 In the case of a selection query, results can be obtained with the various get methods in the first ResultSet, obtained through the getResultSet(int) method:
 
 .. code-block:: java
 
- ResultSet resultSet = connection.execute
+   ResultSet resultSet = connection.execute
      ("select foo, bar from baz where quux = 'quuux'").getResultSet(0);
 
- for(int i = 0; i < resultSet.getRowCount(); ++i) {
-     System.out.println("foo: " + resultSet.getString(i, 0);
-     System.out.println("bar: " + resultSet.getInt(i, 1);
- }
+   for (int i = 0; i < resultSet.getRowCount(); ++i) {
+     System.out.println("foo: " + resultSet.getString(i, 0));
+     System.out.println("bar: " + resultSet.getInt(i, 1));
+   }
 
- resultSet.close();
+   resultSet.close();
 
 
-In the case where there is an aggregation, each aggregation function is within its own ResultSet:
+In the case of aggregation, each aggregation function is within its own ResultSet:
 
 .. code-block:: java
 
- ResultSetGroup resultSetGroup = connection.execute("select count(*) from foo");
+   ResultSetGroup resultSetGroup = connection.execute("select count(*) from foo");
 
- ResultSet resultSet = resultSetGroup.getResultSet(0);
- System.out.println("Number of records: " + resultSet.getInt(0));
- resultSet.close();
+   ResultSet resultSet = resultSetGroup.getResultSet(0);
+   System.out.println("Number of records: " + resultSet.getInt(0));
+   resultSet.close();
 
 
 There can be more than one ResultSet, each of which can contain multiple results grouped by a group key.
