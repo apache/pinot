@@ -22,7 +22,6 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
-import com.linkedin.pinot.filesystem.LocalPinotFS;
 import com.linkedin.pinot.filesystem.PinotFS;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
@@ -43,6 +42,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.httpclient.URI;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -304,11 +304,6 @@ public class LLCSegmentCompletionHandlers {
 
       FileUploadPathProvider provider = new FileUploadPathProvider(_controllerConf);
 
-      String remoteTmpFilePath = StringUtil.join("/", provider.getFileUploadTmpDirURI().toString(), name + "." + UUID.randomUUID().toString());
-      java.net.URI remoteTmpFileURI = ControllerConf.getUriFromPath(remoteTmpFilePath);
-
-      PinotFS pinotFS = PinotFSFactory.create(remoteTmpFileURI.getScheme());
-
       File localTmpFile = new File(provider.getFileUploadTmpDir(), name + "." + UUID.randomUUID().toString());
       localTmpFile.deleteOnExit();
 
@@ -316,17 +311,6 @@ public class LLCSegmentCompletionHandlers {
       try (InputStream inputStream = bodyPart.getValueAs(InputStream.class);
           OutputStream outputStream = new FileOutputStream(localTmpFile)) {
         IOUtils.copyLarge(inputStream, outputStream);
-      }
-
-      // If remote, will need to copy tmp file to remote storage
-      try {
-        if ((!(pinotFS instanceof LocalPinotFS))) {
-          pinotFS.copyFromLocalFile(localTmpFile, remoteTmpFileURI);
-          pinotFS.delete(localTmpFile.toURI(), true)
-        }
-      } catch (Exception e) {
-        pinotFS.delete(remoteTmpFileURI, true);
-        LOGGER.error("Could not copy from local to remote storage");
       }
 
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
@@ -340,40 +324,40 @@ public class LLCSegmentCompletionHandlers {
         segmentFileURI = ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), segmentName));
       }
 
-      if (isSplitCommit) {
-        try {
-          pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
-        } catch (Exception e) {
-          LOGGER.error("Could not copy from {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
-        }
-      } else {
-        // Multiple threads can reach this point at the same time, if the following scenario happens
-        // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
-        // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
-        // the network speeds changed). The second server made it through the FSM and reached this point.
-        // The synchronization below takes care that exactly one file gets moved in place.
-        // There are still corner conditions that are not handled correctly. For example,
-        // 1. What if the offset of the faster server was different?
-        // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
-        //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
-        //    of the slower server.
-        // In order to overcome controller restarts after the segment is renamed, but before it is committed, we DO need to
-        // check for existing segment file and remove it. So, the block cannot be removed altogether.
-        // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
-        // be used.
-        synchronized (SegmentCompletionManager.getInstance()) {
-          if (pinotFS.exists(segmentFileURI)) {
-            LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentFileURI.toString(),
-                instanceId);
-            pinotFS.delete(segmentFileURI, true);
-          }
-          try {
+      PinotFS pinotFS = PinotFSFactory.create(provider.getBaseDataDirURI().getScheme());
+      try {
+        if (isSplitCommit) {
             pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
-          } catch (Exception e) {
-            LOGGER.error("Could not copy from {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
+        } else {
+          // Multiple threads can reach this point at the same time, if the following scenario happens
+          // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
+          // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
+          // the network speeds changed). The second server made it through the FSM and reached this point.
+          // The synchronization below takes care that exactly one file gets moved in place.
+          // There are still corner conditions that are not handled correctly. For example,
+          // 1. What if the offset of the faster server was different?
+          // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
+          //    that the race to this statement is won by the slower server, and so the real segment that is in there is that
+          //    of the slower server.
+          // In order to overcome controller restarts after the segment is renamed, but before it is committed, we DO need to
+          // check for existing segment file and remove it. So, the block cannot be removed altogether.
+          // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no longer
+          // be used.
+          synchronized (SegmentCompletionManager.getInstance()) {
+            if (pinotFS.exists(segmentFileURI)) {
+              LOGGER.warn("Segment file {} exists. Replacing with upload from {}", segmentFileURI.toString(), instanceId);
+              pinotFS.delete(segmentFileURI, true);
+            }
+            pinotFS.copyFromLocalFile(localTmpFile, segmentFileURI);
           }
         }
+      } catch (Exception e) {
+        LOGGER.error("Could not copy from {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
+      } finally {
+        FileUtils.deleteQuietly(localTmpFile);
       }
+
+
       LOGGER.info("Moved file {} to {}", localTmpFile.getAbsolutePath(), segmentFileURI.toString());
       return new URI(SCHEME + segmentFileURI.toString(), /* boolean escaped */ false).toString();
     } catch (InvalidControllerConfigException e) {

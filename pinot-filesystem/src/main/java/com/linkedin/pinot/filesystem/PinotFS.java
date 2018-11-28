@@ -40,7 +40,7 @@ public abstract class PinotFS implements Closeable {
   /**
    * Deletes the file at the location provided. If the segmentUri is a directory, it will delete the entire directory.
    * @param segmentUri URI of the segment
-   * @param forceDelete true if we want the uri and any suburis to always be deleted, true if we want delete to fail
+   * @param forceDelete true if we want the uri and any suburis to always be deleted, false if we want delete to fail
    *                    when we want to delete a directory and that directory is not empty
    * @return true if delete is successful else false
    * @throws IOException IO failure
