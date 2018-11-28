@@ -80,7 +80,11 @@ public class MergeWrapper extends DetectionPipeline {
     this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", 0);
     this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", Long.MAX_VALUE);
     this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime);
-    this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    this.nestedProperties = new ArrayList<>();
+    List<Map<String, Object>> nested = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    for (Map<String, Object> properties : nested) {
+      this.nestedProperties.add(new HashMap<>(properties));
+    }
   }
 
   @Override
