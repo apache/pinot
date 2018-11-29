@@ -15,22 +15,40 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
-import java.io.IOException;
-
-import com.clearspring.analytics.stream.membership.BloomFilter;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.bloom.BloomFilterType;
+import com.linkedin.pinot.core.bloom.BloomFilter;
+import com.linkedin.pinot.core.bloom.SegmentBloomFilterFactory;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
-public class BloomFilterReader {
-  BloomFilter _bloomFilter;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
 
-  public BloomFilterReader(PinotDataBuffer bloomFilterBuffer, DataType dataType) throws IOException {
+
+/**
+ * Bloom filter reader
+ */
+public class BloomFilterReader {
+
+  private BloomFilter _bloomFilter;
+
+  public BloomFilterReader(PinotDataBuffer bloomFilterBuffer) throws IOException {
     byte[] buffer = new byte[(int) bloomFilterBuffer.size()];
     bloomFilterBuffer.copyTo(0, buffer);
-    _bloomFilter = BloomFilter.deserialize(buffer);
+
+    try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(buffer))) {
+      BloomFilterType bloomFilterType = BloomFilterType.valueOf(in.readInt());
+      int version = in.readInt();
+      _bloomFilter = SegmentBloomFilterFactory.createSegmentBloomFilter(bloomFilterType);
+      if (version != _bloomFilter.getVersion()) {
+        throw new IOException(
+            "Unexpected bloom filter version (type: " + bloomFilterType.toString() + ", version: " + version);
+      }
+      _bloomFilter.readFrom(in);
+    }
   }
 
   public boolean mightContain(Object key) {
-    return _bloomFilter.isPresent(key.toString());
+    return _bloomFilter.mightContain(key.toString());
   }
 }

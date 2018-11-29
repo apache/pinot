@@ -55,7 +55,7 @@ public final class ColumnDataSource extends DataSource {
   public ColumnDataSource(ColumnIndexContainer indexContainer, ColumnMetadata metadata) {
     this(metadata.getColumnName(), metadata.getDataType(), metadata.isSingleValue(), metadata.isSorted(),
         metadata.getTotalDocs(), metadata.getMaxNumberOfMultiValues(), indexContainer.getForwardIndex(),
-        indexContainer.getInvertedIndex(), indexContainer.getDictionary(), indexContainer.getBloomFilter(), 
+        indexContainer.getInvertedIndex(), indexContainer.getDictionary(), indexContainer.getBloomFilter(),
         metadata.getCardinality());
   }
 
@@ -69,7 +69,7 @@ public final class ColumnDataSource extends DataSource {
   }
 
   private ColumnDataSource(String columnName, FieldSpec.DataType dataType, boolean isSingleValue, boolean isSorted,
-      int numDocs, int maxNumMultiValues, DataFileReader forwardIndex, InvertedIndexReader invertedIndex, 
+      int numDocs, int maxNumMultiValues, DataFileReader forwardIndex, InvertedIndexReader invertedIndex,
       Dictionary dictionary, BloomFilterReader bloomFilterReader, int cardinality) {
     // Sanity check
     if (isSingleValue) {
@@ -161,7 +161,7 @@ public final class ColumnDataSource extends DataSource {
   public BloomFilterReader getBloomFilter() {
     return _bloomFilter;
   }
-  
+
   @Override
   protected Block getNextBlock() {
     if (_isSingleValue) {

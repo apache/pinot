@@ -114,7 +114,7 @@ public class StarTreeMetricDataSource extends DataSource {
   public BloomFilterReader getBloomFilter() {
     return null;
   }
-  
+
   @Override
   protected Block getNextBlock() {
     return new SingleValueBlock(_forwardIndex, _numDocs, _dataType, null);
@@ -124,6 +124,4 @@ public class StarTreeMetricDataSource extends DataSource {
   public String getOperatorName() {
     return _operatorName;
   }
-
-
 }

@@ -236,7 +236,6 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       case BLOOM_FILTER:
         buffer = columnIndexDirectory.getBloomFilterBufferFor(column);
         break;
-
       default:
         throw new RuntimeException("Unknown index type: " + type.name());
     }

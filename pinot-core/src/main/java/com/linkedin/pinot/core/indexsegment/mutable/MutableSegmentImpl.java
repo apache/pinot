@@ -388,7 +388,8 @@ public class MutableSegmentImpl implements MutableSegment {
   public ColumnDataSource getDataSource(String columnName) {
     if (!_schema.isVirtualColumn(columnName)) {
       return new ColumnDataSource(_schema.getFieldSpecFor(columnName), _numDocsIndexed, _maxNumValuesMap.get(columnName),
-          _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName), _bloomFilterMap.get(columnName));
+          _indexReaderWriterMap.get(columnName), _invertedIndexMap.get(columnName), _dictionaryMap.get(columnName),
+          _bloomFilterMap.get(columnName));
     } else {
       return getVirtualDataSource(columnName);
     }

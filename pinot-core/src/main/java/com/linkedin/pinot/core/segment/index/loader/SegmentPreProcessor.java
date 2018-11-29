@@ -91,10 +91,11 @@ public class SegmentPreProcessor implements AutoCloseable {
           new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
 
-      BloomFilterHandler bloomFilterHandler = 
+      // Create bloom filter if required
+      BloomFilterHandler bloomFilterHandler =
           new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       bloomFilterHandler.createBloomFilters();
-      
+
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
       ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode =

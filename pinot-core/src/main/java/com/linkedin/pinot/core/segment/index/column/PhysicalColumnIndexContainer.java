@@ -56,8 +56,8 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
   private final ImmutableDictionaryReader _dictionary;
-  private final BloomFilterReader _bloomFilterReader; 
-  
+  private final BloomFilterReader _bloomFilterReader;
+
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
       IndexLoadingConfig indexLoadingConfig) throws IOException {
     String columnName = metadata.getColumnName();
@@ -75,7 +75,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       //bloom filter
       if (loadBloomFilter) {
         PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.BLOOM_FILTER);
-        _bloomFilterReader = new BloomFilterReader(bloomFilterBuffer, metadata.getDataType());
+        _bloomFilterReader = new BloomFilterReader(bloomFilterBuffer);
       } else {
         _bloomFilterReader = null;
       }
@@ -131,7 +131,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   public ImmutableDictionaryReader getDictionary() {
     return _dictionary;
   }
-  
+
   @Override
   public BloomFilterReader getBloomFilter() {
     return _bloomFilterReader;

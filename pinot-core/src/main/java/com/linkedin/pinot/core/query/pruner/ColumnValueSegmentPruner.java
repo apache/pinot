@@ -55,10 +55,12 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
         ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataMap();
 
     Map<String, BloomFilterReader> bloomFilterMap = new HashMap<>();
-    for (String column : columnMetadataMap.keySet()) {
-      BloomFilterReader bloomFilterReader = segment.getDataSource(column).getBloomFilter();
-      if (bloomFilterReader != null) {
-        bloomFilterMap.put(column, bloomFilterReader);
+    if (columnMetadataMap != null) {
+      for (String column : columnMetadataMap.keySet()) {
+        BloomFilterReader bloomFilterReader = segment.getDataSource(column).getBloomFilter();
+        if (bloomFilterReader != null) {
+          bloomFilterMap.put(column, bloomFilterReader);
+        }
       }
     }
     return (columnMetadataMap != null) && pruneSegment(filterQueryTree, columnMetadataMap, bloomFilterMap);
@@ -111,22 +113,22 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
 
       if (filterOperator == FilterOperator.EQUALITY) {
         // EQUALITY
-        boolean prune = false;
+        boolean pruneSegment = false;
         FieldSpec.DataType dataType = columnMetadata.getDataType();
         Comparable value = getValue(filterQueryTree.getValue().get(0), dataType);
-        // Doesn't have min/max value set in metadata
+
+        // Check if the value is in the min/max range
         if (minValue != null && maxValue != null) {
-          // Check if the value is in the min/max range
-          prune = (value.compareTo(minValue) < 0) || (value.compareTo(maxValue) > 0);
-        }        
-        //check bloom filter if it exists
-        if( !prune && bloomFilterMap.containsKey(column)) {
-          BloomFilterReader bloomFilterReader = bloomFilterMap.get(column);
-          if(bloomFilterReader != null){
-            prune = !bloomFilterReader.mightContain(value);
-          }
+          pruneSegment = (value.compareTo(minValue) < 0) || (value.compareTo(maxValue) > 0);
         }
-        return prune;
+
+        // If the bloom filter is available for the column, check if the value may exist
+        if (!pruneSegment && bloomFilterMap.containsKey(column)) {
+          BloomFilterReader bloomFilterReader = bloomFilterMap.get(column);
+          pruneSegment = !bloomFilterReader.mightContain(value);
+        }
+
+        return pruneSegment;
       } else {
         // RANGE
 

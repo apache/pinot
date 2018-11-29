@@ -15,37 +15,52 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.bloom;
 
-import java.io.BufferedOutputStream;
+import com.linkedin.pinot.core.bloom.BloomFilterUtil;
+import com.linkedin.pinot.core.bloom.BloomFilter;
+import com.linkedin.pinot.core.bloom.SegmentBloomFilterFactory;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 
-import com.clearspring.analytics.stream.membership.BloomFilter;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
+/**
+ * Bloom filter creator
+ *
+ * Note:
+ * 1. Currently, we limit the filter size to 1MB to avoid the heap overhead. We can remove it once we have the offheap
+ *    implementation of the bloom filter.
+ * 2. When capping the bloom filter to 1MB, max false pos steeply grows from 1 million cardinality. If the column has
+ *    larger than "5 million" cardinality, it is not recommended to use bloom filter since maxFalsePosProb is already
+ *    0.45 when the filter size is 1MB.
+ */
 public class BloomFilterCreator implements AutoCloseable {
+  private static double DEFAULT_MAX_FALSE_POS_PROBABILITY = 0.05;
+  private static int MB_IN_BITS = 8388608;
 
-  BloomFilter _bloomFilter;
-  File _bloomFilterFile;
+  private BloomFilter _bloomFilter;
+  private File _bloomFilterFile;
 
-  public BloomFilterCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs, int totalNumberOfEntries) {
-    String columnName = fieldSpec.getName();
+  public BloomFilterCreator(File indexDir, String columnName, int cardinality) {
     _bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
-    _bloomFilter = new BloomFilter(cardinality, .03);
-
+    double maxFalsePosProbability =
+        BloomFilterUtil.computeMaxFalsePositiveProbabilityForNumBits(cardinality, MB_IN_BITS,
+            DEFAULT_MAX_FALSE_POS_PROBABILITY);
+    _bloomFilter = SegmentBloomFilterFactory.createSegmentBloomFilter(cardinality, maxFalsePosProbability);
   }
 
   @Override
-  public void close() throws Exception {
-    byte[] buffer = BloomFilter.serialize(_bloomFilter);
-    try (DataOutputStream dataOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(_bloomFilterFile)))) {
-      dataOutputStream.write(buffer);
+  public void close() throws IOException {
+    try (DataOutputStream outputStream = new DataOutputStream(new FileOutputStream(_bloomFilterFile))) {
+      outputStream.writeInt(_bloomFilter.getBloomFilterType().getValue());
+      outputStream.writeInt(_bloomFilter.getVersion());
+      _bloomFilter.writeTo(outputStream);
     }
   }
 
   public void add(Object input) {
     _bloomFilter.add(input.toString());
   }
-
 }

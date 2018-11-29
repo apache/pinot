@@ -62,8 +62,7 @@ public class PartitionSegmentPruner extends AbstractSegmentPruner {
     Map<String, ColumnMetadata> columnMetadataMap =
         ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataMap();
 
-    Map<String, BloomFilterReader> emptyMap = Collections.emptyMap();
-    return (columnMetadataMap != null) && pruneSegment(filterQueryTree, columnMetadataMap, emptyMap);
+    return (columnMetadataMap != null) && pruneSegment(filterQueryTree, columnMetadataMap, Collections.emptyMap());
   }
 
   /**
@@ -78,7 +77,8 @@ public class PartitionSegmentPruner extends AbstractSegmentPruner {
    * @return True if segment can be pruned, false otherwise
    */
   @Override
-  public boolean pruneSegment(FilterQueryTree filterQueryTree, Map<String, ColumnMetadata> columnMetadataMap, Map<String, BloomFilterReader> bloomFilterMap) {
+  public boolean pruneSegment(FilterQueryTree filterQueryTree, Map<String, ColumnMetadata> columnMetadataMap,
+      Map<String, BloomFilterReader> bloomFilterMap) {
     List<FilterQueryTree> children = filterQueryTree.getChildren();
 
     // Non-leaf node

@@ -101,5 +101,4 @@ public interface SegmentMetadata {
   String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType);
 
   boolean close();
-
 }
