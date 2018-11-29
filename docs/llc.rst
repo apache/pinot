@@ -1,14 +1,28 @@
-LLC Design
-==========
+Realtime Design
+===============
 
-High Level Consumer
--------------------
+Pinot consumes rows from streaming data (such as Kafka) and serves queries on the data consumed thus far.
+
+Two modes of consumption are supported in Pinot:
+
+.. _hlc-section:
+
+High Level Consumers
+--------------------
+
 .. figure:: High-level-stream.png
 
    High Level Stream Consumer Architecture
 
-Low Level Consumer
-------------------
+
+*TODO*: Add design description of how HLC realtime works
+
+
+.. _llc-section:
+
+Low Level Consumers
+------------------- 
+
 .. figure:: Low-level-stream.png
 
    Low Level Stream Consumer Architecture

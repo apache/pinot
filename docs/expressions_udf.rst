@@ -7,13 +7,13 @@ The query language for Pinot (:doc:`PQL <reference>`) currently only supports *s
 
 The high level requirement here is to support *expressions* that represent a function on a set of columns in the queries, as opposed to just columns.
 
-::
+.. code-block:: none
 
   select <exp1> from myTable where ... [group by <exp2>]
 
 Where exp1 and exp2 can be of the form:
 
-::
+.. code-block:: none
 
   func1(func2(col1, col2...func3(...)...), coln...)...
 
@@ -44,7 +44,8 @@ Parser
 
 The PQL parser is already capable of parsing expressions in the *selection*, *aggregation* and *group by* sections. Following is a sample query containing expression, and its parse tree shown in the image.
 
-::
+.. code-block:: none
+
   select f1(f2(col1, col2), col3) from myTable where (col4 = 'x') group by f3(col5, f4(col6, col7))
 
 
@@ -112,7 +113,7 @@ We see the following limitations in functionality currently:
 
 #. Nesting of *aggregation* functions is not supported in the expression tree. This is because the number of documents after *aggregation* is reduced. In the expression below, *sum* of *col2* would yield one value, whereas *xform1* one *col1* would yield the same number of documents as in the input.
 
-::
+.. code-block:: none
 
    sum(xform1(col1), sum(col2))
 

@@ -87,7 +87,7 @@ Adding Nodes to cluster
 
 Adding node to cluster can be done in two ways, manual or automatic. This is controlled by a property set in cluster config called "allowPariticpantAutoJoin". If this is set to true, participants can join the cluster when they are started. If not, they need to be pre-registered in Helix via `Helix Admin <http://helix.apache.org/0.6.4-docs/tutorial_admin.html>`_ command addInstance.
 
-::
+.. code-block:: none
 
   {
    "id" : "PinotPerfTestCluster",
@@ -102,7 +102,7 @@ In Pinot 2.0 we will set AUTO_JOIN to true. This means after the SRE's procure t
 
 The znode ``CONFIGS/PARTICIPANT/ServerInstanceName`` looks lik below:
 
-::
+.. code-block:: none
 
     {
      "id":"Server_localhost_8098"
@@ -120,7 +120,7 @@ The znode ``CONFIGS/PARTICIPANT/ServerInstanceName`` looks lik below:
 
 And the znode ``CONFIGS/PARTICIPANT/BrokerInstanceName`` looks like below:
 
-::
+.. code-block:: none
 
     {
      "id":"Broker_localhost_8099"
@@ -143,7 +143,7 @@ There is one resource idealstate created for Broker by default called broker_res
 
 *CLUSTERNAME/IDEALSTATES/BrokerResource (Broker IdealState before adding data resource)*
 
-::
+.. code-block:: none
 
   {
    "id" : "brokerResource",
@@ -166,7 +166,7 @@ After adding a resource using the following data resource creation command, a re
 Sample Curl request
 -------------------
 
-::
+.. code-block:: none
 
   curl -i -X POST -H 'Content-Type: application/json' -d '{"requestType":"create", "resourceName":"XLNT","tableName":"T1", "timeColumnName":"daysSinceEpoch", "timeType":"daysSinceEpoch","numberOfDataInstances":4,"numberOfCopies":2,"retentionTimeUnit":"DAYS", "retentionTimeValue":"700","pushFrequency":"daily", "brokerTagName":"XLNT", "numberOfBrokerInstances":1, "segmentAssignmentStrategy":"BalanceNumSegmentAssignmentStrategy", "resourceType":"OFFLINE", "metadata":{}}'
 
@@ -175,7 +175,7 @@ This is how it looks in Helix after running the above command.
 
 The znode ``CONFIGS/PARTICIPANT/Broker_localhost_8099`` looks as follows:
 
-::
+.. code-block:: none
 
     {
      "id":"Broker_localhost_8099"
@@ -193,7 +193,7 @@ The znode ``CONFIGS/PARTICIPANT/Broker_localhost_8099`` looks as follows:
 
 And the znode ``IDEALSTATES/brokerResource`` looks like below after Data resource is created
 
-::
+.. code-block:: none
 
     {
      "id":"brokerResource"
@@ -220,7 +220,7 @@ Server Info in Helix
 
 The znode ``CONFIGS/PARTICIPANT/Server_localhost_8098`` looks as below
 
-::
+.. code-block:: none
 
     {
      "id":"Server_localhost_8098"
@@ -238,7 +238,7 @@ The znode ``CONFIGS/PARTICIPANT/Server_localhost_8098`` looks as below
 
 And the znode ``/IDEALSTATES/XLNT (XLNT Data Resource IdealState)`` looks as below:
 
-::
+.. code-block:: none
 
     {
      "id":"XLNT"
@@ -267,7 +267,7 @@ Add a table to data resource
 
 Sample Curl request
 
-::
+.. code-block:: none
 
     curl -i -X PUT -H 'Content-Type: application/json' -d '{"requestType":"addTableToResource","resourceName":"XLNT","tableName":"T1", "resourceType":"OFFLINE", "metadata":{}}' <span class="nolink">[http://CONTROLLER-HOST:PORT/dataresources](http://CONTROLLER-HOST:PORT/dataresources)
 
@@ -275,7 +275,7 @@ After the table is added, mapping between Resources and Tables are maintained in
 
 The znode ``/PROPERTYSTORE/CONFIGS/RESOURCE/XLNT`` like like:
 
-::
+.. code-block:: none
 
     {
      "id":"mirrorProfileViewOfflineEvents1_O"
@@ -307,7 +307,7 @@ The znode ``/PROPERTYSTORE/CONFIGS/RESOURCE/XLNT`` like like:
 
 The znode ``/IDEALSTATES/XLNT (XLNT Data Resource IdealState)``
 
-::
+.. code-block:: none
 
     {
      "id":"XLNT_O"
