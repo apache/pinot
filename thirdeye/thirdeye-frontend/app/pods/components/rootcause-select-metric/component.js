@@ -1,6 +1,6 @@
 import Component from '@ember/component';
 import fetch from 'fetch';
-import { toBaselineUrn, toCurrentUrn, filterPrefix } from 'thirdeye-frontend/utils/rca-utils';
+import { toBaselineUrn, toCurrentUrn, filterPrefix, toMetricLabel } from 'thirdeye-frontend/utils/rca-utils';
 import { selfServeApiCommon } from 'thirdeye-frontend/utils/api/self-serve';
 import { task, timeout } from 'ember-concurrency';
 import _ from 'lodash';
@@ -40,24 +40,40 @@ export default Component.extend({
     'entities', 'selectedUrns',
     function() {
       const { selectedUrns, entities } = this.getProperties('selectedUrns', 'entities');
+
+      // NOTE: all of this is very hacky as it merges data from two different sources - entities and the autocomplete
+
       const selectedMetrics = filterPrefix(selectedUrns, 'thirdeye:metric:')
         .filter(urn => urn in entities)
         .map((urn) => {
           const entity = entities[urn];
-          const agg = { alias: entity.label, id: entity.urn.split(':')[2] };
-          return agg;
-        });
-      const relatedMetrics = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
-        .filter(urn => urn in entities)
-        .map((urn) => {
-          const entity = entities[urn];
-          const agg = { alias: entity.label, id: entity.urn.split(':')[2] };
-          return agg;
+          const labelParts = entity.label.split('::');
+          return {
+            alias: entity.label,
+            urn: entity.urn,
+            name: toMetricLabel(urn, entities),
+            dataset: labelParts[0],
+            isSelected: true
+          };
         });
 
+      const relatedMetrics = filterPrefix(Object.keys(entities), 'thirdeye:metric:')
+      .filter(urn => urn in entities && !selectedUrns.has(urn))
+      .map((urn) => {
+        const entity = entities[urn];
+        const labelParts = entity.label.split('::');
+        return {
+          alias: entity.label,
+          urn: entity.urn,
+          name: toMetricLabel(urn, entities),
+          dataset: labelParts[0],
+          isSelected: false
+        };
+      });
+
       return [
-        { groupName: 'Selected Metrics', options: _.sortBy(selectedMetrics, (row) => row.alias) || [] },
-        { groupName: 'Related Metrics', options: _.sortBy(relatedMetrics, (row) => row.alias) || [] }
+        { groupName: 'Selected Metrics', options: _.sortBy(selectedMetrics || [], (row) => row.alias) },
+        { groupName: 'Related Metrics', options: _.sortBy(relatedMetrics || [], (row) => row.alias) }
       ];
     }
   ),
@@ -103,6 +119,7 @@ export default Component.extend({
     recommendedMetricsAction(metric) {
       this.send('onChange', metric);
     },
+
     /**
      * Action handler for metric search changes
      * @param {Object} metric
@@ -111,10 +128,11 @@ export default Component.extend({
       const { onSelection } = this.getProperties('onSelection');
       if (!onSelection) { return; }
 
-      const { id } = metric;
-      if (!id) { return; }
+      const { urn, id } = metric;
+      if (!urn && !id) { return; }
 
-      const metricUrn = `thirdeye:metric:${id}`;
+      const metricUrn = urn ? urn : `thirdeye:metric:${id}`;
+
       const updates = { [metricUrn]: true, [toBaselineUrn(metricUrn)]: true, [toCurrentUrn(metricUrn)]: true };
 
       onSelection(updates);
