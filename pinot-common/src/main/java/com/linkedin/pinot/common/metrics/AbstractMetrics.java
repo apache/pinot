@@ -350,7 +350,6 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param value The value to set the gauge to
    */
   public void setValueOfGlobalGauge(final G gauge, final long value) {
-    final String fullGaugeName;
     final String gaugeName = gauge.getGaugeName();
 
     if (!_gaugeValues.containsKey(gaugeName)) {
@@ -369,6 +368,34 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       }
     } else {
       _gaugeValues.get(gaugeName).set(value);
+    }
+  }
+
+  /**
+   * Adds a value to a table gauge.
+   *
+   * @param gauge The gauge to use
+   * @param unitCount The number of units to add to the gauge
+   */
+  public void addValueToGlobalGauge(final G gauge, final long unitCount) {
+    String gaugeName = gauge.getGaugeName();
+
+    if (!_gaugeValues.containsKey(gaugeName)) {
+      synchronized (_gaugeValues) {
+        if(!_gaugeValues.containsKey(gaugeName)) {
+          _gaugeValues.put(gaugeName, new AtomicLong(unitCount));
+          addCallbackGauge(gaugeName, new Callable<Long>() {
+            @Override
+            public Long call() throws Exception {
+              return _gaugeValues.get(gaugeName).get();
+            }
+          });
+        } else {
+          _gaugeValues.get(gaugeName).addAndGet(unitCount);
+        }
+      }
+    } else {
+      _gaugeValues.get(gaugeName).addAndGet(unitCount);
     }
   }
 
