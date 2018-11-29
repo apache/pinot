@@ -64,7 +64,7 @@ export default Controller.extend({
   metricLookupCache: [],
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
   isForm: true,
-  isAlertYamlDisabled: true,
+  disableYamlSave: true,
   yamlAlertProps,
 
   /**
@@ -74,6 +74,7 @@ export default Controller.extend({
   graphConfig: {},
   selectedFilters: JSON.stringify({}),
   selectedWeeklyEffect: true,
+  alertYamlContent: null,
 
   /**
    * Object to cover basic ield 'presence' validation
@@ -401,6 +402,20 @@ export default Controller.extend({
     'isMetricSelected',
     function() {
       return (!this.get('isMetricSelected') || isEmpty(this.get('granularities')));
+    }
+  ),
+
+  /**
+   * sets Yaml value displayed to contents of alertYamlContent or yamlAlertProps
+   * @method currentYamlValues
+   * @return {String}
+   */
+  currentYamlValues: computed(
+    'yamlAlertProps',
+    'alertYamlContent',
+    function() {
+      const inputYaml = this.get('alertYamlContent');
+      return (inputYaml ? inputYaml : this.get('yamlAlertProps'));
     }
   ),
 
@@ -761,19 +776,28 @@ export default Controller.extend({
   actions: {
 
     /**
-     * Navigate to Alert Page
+     * Clears YAML content, disables 'save changes' button, and moves to form
      */
-    onYMLSelector(value) {
-      set(this, 'isAlertYamlDisabled', !this.get('isAlertYamlDisabled'));
-      set(this, 'alertYamlContent', value);
-      //this.transitionToRoute('manage.alert.explore', this.get('id'));
+    cancelAlertYaml() {
+      set(this, 'disableYamlSave', true);
+      set(this, 'alertYamlContent', null);
+      set(this, 'isForm', true);
     },
 
     /**
-     * Navigate to Alert Page
+     * Activates 'save changes' button and stores YAML content in alertYamlContent
+     */
+    onYMLSelector(value) {
+      set(this, 'disableYamlSave', false);
+      set(this, 'alertYamlContent', value);
+    },
+
+    /**
+     * Fired by save button in YAML UI
+     * Grabs YAML content and sends it
      */
     saveAlertYaml() {
-      set(this, 'isAlertYamlDisabled', !this.get('isAlertYamlDisabled'));
+      set(this, 'disableYamlSave', true);
       const content = get(this, 'alertYamlContent');
       const url = '/yaml';
       const postProps = {

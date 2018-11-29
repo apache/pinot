@@ -10,7 +10,7 @@
     onToggle=(action (mut isForm))
     as |toggle|}}
       {{#toggle.label value=isForm}}
-        <span class="te-label te-label--flush">{{if isForm 'Form' 'YAML'}}</span>
+        <span class="te-label te-label--flush">{{if isForm 'YAML' 'Form'}}</span>
       {{/toggle.label}}
       {{toggle.switch theme='ios' onLabel='diff on' offLabel='diff off'}}
   {{/x-toggle}}
@@ -423,7 +423,7 @@
         <legend class="te-form__section-title">Define alert in YAML</legend>
         {{ember-ace
           lines=35
-          value=yamlAlertProps
+          value=currentYamlValues
           update=(action 'onYMLSelector')
           mode="ace/mode/yaml"
         }}
@@ -444,14 +444,14 @@
         defaultText="Cancel"
         type="outline-primary"
         buttonType="cancel"
-        onClick=(action (mut isForm))
+        onClick=(action "cancelAlertYaml")
         class="te-button te-button--cancel"
       }}
       {{bs-button
         defaultText="Save changes"
         type="primary"
         buttonType="submit"
-        disabled=isAlertYamlDisabled
+        disabled=disableYamlSave
         onClick=(action "saveAlertYaml")
         class="te-button te-button--submit"
       }}
