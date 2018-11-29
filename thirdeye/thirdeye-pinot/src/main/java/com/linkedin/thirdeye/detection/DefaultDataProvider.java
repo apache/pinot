@@ -161,7 +161,7 @@ public class DefaultDataProvider implements DataProvider {
         );
       }
 
-      LOG.info("Fetched {} legacy anomalies between (startTime = {}, endTime = {}) with confid Id = {}", anomalies.size(),
+      LOG.info("Fetched {} anomalies between (startTime = {}, endTime = {}) with confid Id = {}", anomalies.size(),
           slice.getStart(), slice.getEnd(), configId);
       output.putAll(slice, anomalies);
     }

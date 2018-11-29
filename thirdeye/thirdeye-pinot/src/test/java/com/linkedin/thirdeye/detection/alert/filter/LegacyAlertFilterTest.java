@@ -20,7 +20,6 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -39,20 +39,16 @@ public class LegacyAlertFilterTest {
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   private static final List<Long> PROP_ID_VALUE = Arrays.asList(1001L, 1002L);
   private static final String PROP_LEGACY_ALERT_FILTER_CONFIG = "legacyAlertFilterConfig";
-  private static final String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
   private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
-  private static final String TO_RECIPIENTS_VALUES = "test@example.com,mytest@example.org";
-  private static final String CC_RECIPIENTS_VALUES = "iamcc@host.domain,iamcc2@host.domain";
-  private static final String BCC_RECIPIENTS_VALUES = "iambcc@host.domain";
-
-  private static final DetectionAlertFilterRecipients RECEIVER_ADDRESSES = new DetectionAlertFilterRecipients(
-      new HashSet<>(Arrays.asList(TO_RECIPIENTS_VALUES)),
-      new HashSet<>(Arrays.asList(CC_RECIPIENTS_VALUES)),
-      new HashSet<>(Arrays.asList(BCC_RECIPIENTS_VALUES)));
+  private static final Set<String> TO_RECIPIENTS_VALUES = new HashSet<>(Arrays.asList("test@example.com", "mytest@example.org"));
+  private static final Set<String> CC_RECIPIENTS_VALUES = new HashSet<>(Arrays.asList("iamcc@host.domain", "iamcc2@host.domain"));
+  private static final Set<String> BCC_RECIPIENTS_VALUES = new HashSet<>(Arrays.asList("iambcc@host.domain"));
+  private static final String PROP_RECIPIENTS = "recipients";
 
   private List<MergedAnomalyResultDTO> detectedAnomalies;
   private LegacyAlertFilter legacyAlertFilter;
   private LegacyAlertFilter legacyAlertFilterOnLegacyAnomalies;
+  private Map<String, Set<String>> recipientsMap;
 
   @BeforeMethod
   public void beforeMethod() throws Exception {
@@ -78,17 +74,20 @@ public class LegacyAlertFilterTest {
     DetectionAlertConfigDTO detectionAlertConfigLegacyAnomalies = createDetectionAlertConfig();
     detectionAlertConfigLegacyAnomalies.setOnlyFetchLegacyAnomalies(true);
     this.legacyAlertFilterOnLegacyAnomalies = new LegacyAlertFilter(mockDataProvider, detectionAlertConfigLegacyAnomalies, 2500L);
+
+    this.recipientsMap = new HashMap<>();
+    recipientsMap.put("to", TO_RECIPIENTS_VALUES);
+    recipientsMap.put("cc", CC_RECIPIENTS_VALUES);
+    recipientsMap.put("bcc", BCC_RECIPIENTS_VALUES);
   }
 
   private DetectionAlertConfigDTO createDetectionAlertConfig() {
     DetectionAlertConfigDTO detectionAlertConfig = new DetectionAlertConfigDTO();
     Map<String, Object> properties = new HashMap<>();
     properties.put(PROP_DETECTION_CONFIG_IDS, PROP_ID_VALUE);
-    Map<String, Object> alertConfig = new HashMap<>();
-    alertConfig.put("receiverAddresses", RECEIVER_ADDRESSES);
-    properties.put(PROP_LEGACY_ALERT_CONFIG, alertConfig);
     properties.put(PROP_LEGACY_ALERT_FILTER_CLASS_NAME, "com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter");
     properties.put(PROP_LEGACY_ALERT_FILTER_CONFIG, "");
+    properties.put(PROP_RECIPIENTS, recipientsMap);
     detectionAlertConfig.setProperties(properties);
     detectionAlertConfig.setVectorClocks(new HashMap<Long, Long>());
 
@@ -98,15 +97,13 @@ public class LegacyAlertFilterTest {
   @Test
   public void testRun() throws Exception {
     DetectionAlertFilterResult result = this.legacyAlertFilter.run();
-    Assert.assertEquals(result.getResult().get(RECEIVER_ADDRESSES),
-        new HashSet<>(this.detectedAnomalies.subList(0, 4)));
+    Assert.assertEquals(result.getAllAnomalies(), new HashSet<>(this.detectedAnomalies.subList(0, 4)));
   }
 
   @Test
   public void testFetchingLegacyAnomalies() throws Exception {
     DetectionAlertFilterResult result = this.legacyAlertFilterOnLegacyAnomalies.run();
     Assert.assertEquals(result.getAllAnomalies().size(), 2);
-    Assert.assertEquals(result.getResult().get(RECEIVER_ADDRESSES),
-        new HashSet<>(this.detectedAnomalies.subList(7, 9)));
+    Assert.assertEquals(result.getAllAnomalies(), new HashSet<>(this.detectedAnomalies.subList(7, 9)));
   }
 }
