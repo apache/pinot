@@ -62,6 +62,7 @@ public class BrokerServerBuilder {
   private final TimeBoundaryService _timeBoundaryService;
   private final LiveInstancesChangeListenerImpl _liveInstanceChangeListener;
   private final TableQueryQuotaManager _tableQueryQuotaManager;
+  private final TableSchemaCache _tableSchemaCache;
   private final AccessControlFactory _accessControlFactory;
   private final MetricsRegistry _metricsRegistry;
   private final BrokerMetrics _brokerMetrics;
@@ -69,7 +70,8 @@ public class BrokerServerBuilder {
   private final BrokerAdminApiApplication _brokerAdminApplication;
 
   public BrokerServerBuilder(Configuration config, RoutingTable routingTable, TimeBoundaryService timeBoundaryService,
-      LiveInstancesChangeListenerImpl liveInstanceChangeListener, TableQueryQuotaManager tableQueryQuotaManager) {
+      LiveInstancesChangeListenerImpl liveInstanceChangeListener, TableQueryQuotaManager tableQueryQuotaManager,
+      TableSchemaCache tableSchemaCache) {
     _state.set(State.INIT);
     _config = config;
     _delayedShutdownTimeMs = config.getLong(DELAY_SHUTDOWN_TIME_MS_CONFIG, DEFAULT_DELAY_SHUTDOWN_TIME_MS);
@@ -77,6 +79,7 @@ public class BrokerServerBuilder {
     _timeBoundaryService = timeBoundaryService;
     _liveInstanceChangeListener = liveInstanceChangeListener;
     _tableQueryQuotaManager = tableQueryQuotaManager;
+    _tableSchemaCache = tableSchemaCache;
     _accessControlFactory = AccessControlFactory.loadFactory(_config.subset(ACCESS_CONTROL_PREFIX));
     _metricsRegistry = new MetricsRegistry();
     MetricsHelper.initializeMetrics(config.subset(METRICS_CONFIG_PREFIX));
@@ -92,11 +95,11 @@ public class BrokerServerBuilder {
     if (requestHandlerType.equalsIgnoreCase(SINGLE_CONNECTION_REQUEST_HANDLER_TYPE)) {
       LOGGER.info("Using SingleConnectionBrokerRequestHandler");
       return new SingleConnectionBrokerRequestHandler(_config, _routingTable, _timeBoundaryService,
-          _accessControlFactory, _tableQueryQuotaManager, _brokerMetrics);
+          _accessControlFactory, _tableQueryQuotaManager, _tableSchemaCache, _brokerMetrics);
     } else {
       LOGGER.info("Using ConnectionPoolBrokerRequestHandler");
       return new ConnectionPoolBrokerRequestHandler(_config, _routingTable, _timeBoundaryService, _accessControlFactory,
-          _tableQueryQuotaManager, _brokerMetrics, _liveInstanceChangeListener, _metricsRegistry);
+          _tableQueryQuotaManager, _tableSchemaCache, _brokerMetrics, _liveInstanceChangeListener, _metricsRegistry);
     }
   }
 

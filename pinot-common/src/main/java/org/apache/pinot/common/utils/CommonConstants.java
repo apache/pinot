@@ -121,11 +121,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL =
         "pinot.broker.refresh.timeBoundaryInfo.sleepInterval";
     public static final long DEFAULT_BROKER_REFRESH_TIMEBOUNDARY_INFO_SLEEP_INTERVAL_MS = 10000L;
+    public static final String CONFIG_OF_TABLE_SCHEMA_CACHE_TIMEOUT_IN_MINUTE = "pinot.broker.table.schema.cache.timeoutInMinutes";
+    public static final int DEFAULT_TABLE_SCHEMA_CACHE_TIMEOUT_IN_MINUTE = 60;
 
     public static class Request {
       public static final String PQL = "pql";
       public static final String TRACE = "trace";
       public static final String DEBUG_OPTIONS = "debugOptions";
+      public static final String VALIDATE_QUERY = "validateQuery";
 
       public static class QueryOptionKey {
         public static final String PRESERVE_TYPE = "preserveType";

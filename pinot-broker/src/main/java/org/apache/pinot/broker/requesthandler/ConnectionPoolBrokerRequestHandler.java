@@ -89,9 +89,11 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
 
   public ConnectionPoolBrokerRequestHandler(Configuration config, RoutingTable routingTable,
       TimeBoundaryService timeBoundaryService, AccessControlFactory accessControlFactory,
-      TableQueryQuotaManager tableQueryQuotaManager, BrokerMetrics brokerMetrics,
-      LiveInstancesChangeListenerImpl liveInstanceChangeListener, MetricsRegistry metricsRegistry) {
-    super(config, routingTable, timeBoundaryService, accessControlFactory, tableQueryQuotaManager, brokerMetrics);
+      TableQueryQuotaManager tableQueryQuotaManager, TableSchemaCache tableSchemaCache,
+      BrokerMetrics brokerMetrics, LiveInstancesChangeListenerImpl liveInstanceChangeListener,
+      MetricsRegistry metricsRegistry) {
+    super(config, routingTable, timeBoundaryService, accessControlFactory, tableQueryQuotaManager, tableSchemaCache,
+        brokerMetrics);
     _liveInstanceChangeListener = liveInstanceChangeListener;
 
     TransportClientConf transportClientConf = new TransportClientConf();

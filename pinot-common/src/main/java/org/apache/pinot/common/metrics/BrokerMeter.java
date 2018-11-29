@@ -97,7 +97,9 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   // Netty connection metrics
   NETTY_CONNECTION_REQUESTS_SENT("nettyConnection", true),
   NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
-  NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true);
+  NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
+
+  QUERY_NON_EXISTENT_COLUMNS("queries", false);
 
   private final String brokerMeterName;
   private final String unit;
