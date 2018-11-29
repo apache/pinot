@@ -626,6 +626,9 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
         segmentLogger.info("Waiting to acquire semaphore for building segment");
         _segBuildSemaphore.acquire();
       }
+      // Increment llc simultaneous segment builds.
+      _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, 1L);
+
       final long lockAquireTimeMillis = now();
       // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
       // TODO Use an auto-closeable object to delete temp resources.
@@ -681,6 +684,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
       if (_segBuildSemaphore != null) {
         _segBuildSemaphore.release();
       }
+      // Decrement llc simultaneous segment builds.
+      _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, -1L);
     }
   }
 
