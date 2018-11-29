@@ -22,6 +22,7 @@ import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
@@ -34,19 +35,20 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
 
 
 public class LegacyAlertFilter extends DetectionAlertFilter {
   private static final String PROP_LEGACY_ALERT_FILTER_CONFIG = "legacyAlertFilterConfig";
-  private static final String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
   private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
+  private static final String PROP_RECIPIENTS = "recipients";
+  private static final String PROP_TO = "to";
+  private static final String PROP_CC = "cc";
+  private static final String PROP_BCC = "bcc";
 
-  private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-  private AlertConfigDTO alertConfig;
   private BaseAlertFilter alertFilter;
   private final List<Long> detectionConfigIds;
   private final Map<Long, Long> vectorClocks;
@@ -54,8 +56,6 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
   public LegacyAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) throws Exception {
     super(provider, config, endTime);
 
-    String alertConfigStr = OBJECT_MAPPER.writeValueAsString(MapUtils.getMap(config.getProperties(), PROP_LEGACY_ALERT_CONFIG));
-    alertConfig = OBJECT_MAPPER.readValue(alertConfigStr, AlertConfigDTO.class);
     alertFilter = new DummyAlertFilter();
     if (config.getProperties().containsKey(PROP_LEGACY_ALERT_FILTER_CLASS_NAME)) {
       String className = MapUtils.getString(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CLASS_NAME);
@@ -69,6 +69,12 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
   @Override
   public DetectionAlertFilterResult run() {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
+
+    Map<String, Set<String>> recipientsMap = ConfigUtils.getMap(this.config.getProperties().get(PROP_RECIPIENTS));
+    Set<String> to = (recipientsMap.get(PROP_TO) == null) ? Collections.emptySet() : new HashSet<>(recipientsMap.get(PROP_TO));
+    Set<String> cc = (recipientsMap.get(PROP_CC) == null) ? Collections.emptySet() : new HashSet<>(recipientsMap.get(PROP_CC));
+    Set<String> bcc = (recipientsMap.get(PROP_BCC) == null) ? Collections.emptySet() : new HashSet<>(recipientsMap.get(PROP_BCC));
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(to, cc, bcc);
 
     for (Long functionId : this.detectionConfigIds) {
       long startTime = MapUtils.getLong(this.vectorClocks, functionId, 0L);
@@ -92,10 +98,10 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
             }
           });
 
-      if (result.getResult().get(this.alertConfig.getReceiverAddresses()) == null) {
-        result.addMapping(this.alertConfig.getReceiverAddresses(), new HashSet<>(anomalies));
+      if (result.getResult().isEmpty()) {
+        result.addMapping(recipients, new HashSet<>(anomalies));
       } else {
-        result.getResult().get(this.alertConfig.getReceiverAddresses()).addAll(anomalies);
+        result.getResult().get(recipients).addAll(anomalies);
       }
     }
 
