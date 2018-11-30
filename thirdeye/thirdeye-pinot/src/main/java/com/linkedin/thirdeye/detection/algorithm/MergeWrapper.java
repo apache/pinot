@@ -30,9 +30,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.collections.MapUtils;
 
 
@@ -44,6 +46,7 @@ public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_MERGE_KEY = "mergeKey";
+  private static final String PROP_DETECTOR_COMPONENT_KEY = "detectorComponentKey";
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -115,22 +118,23 @@ public class MergeWrapper extends DetectionPipeline {
       i++;
     }
 
-    // retrieve anomalies
-    AnomalySlice effectiveSlice = this.slice
-        .withStart(this.getStartTime(generated) - this.maxGap - 1)
-        .withEnd(this.getEndTime(generated) + this.maxGap + 1);
-
-    List<MergedAnomalyResultDTO> retrieved = new ArrayList<>();
-    retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), this.config.getId()).get(effectiveSlice));
-
     // merge
-    List<MergedAnomalyResultDTO> all = new ArrayList<>();
-    all.addAll(retrieved);
+    Set<MergedAnomalyResultDTO> all = new HashSet<>();
+    all.addAll(retrieveAnomaliesFromDatabase(generated));
     all.addAll(generated);
 
     return new DetectionPipelineResult(this.merge(all)).setDiagnostics(diagnostics);
   }
 
+  protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
+    AnomalySlice effectiveSlice = this.slice
+        .withStart(this.getStartTime(generated) - this.maxGap - 1)
+        .withEnd(this.getEndTime(generated) + this.maxGap + 1);
+
+    return new ArrayList<>(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), this.config.getId()).get(effectiveSlice));
+  }
+
+  // logic to do time-based merging.
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> input = new ArrayList<>(anomalies);
     Collections.sort(input, COMPARATOR);
@@ -198,16 +202,19 @@ public class MergeWrapper extends DetectionPipeline {
     final String collection;
     final DimensionMap dimensions;
     final String mergeKey;
+    final String componentKey;
 
-    public AnomalyKey(String metric, String collection, DimensionMap dimensions, String mergeKey) {
+    public AnomalyKey(String metric, String collection, DimensionMap dimensions, String mergeKey, String componentKey) {
       this.metric = metric;
       this.collection = collection;
       this.dimensions = dimensions;
       this.mergeKey = mergeKey;
+      this.componentKey = componentKey;
     }
 
     public static AnomalyKey from(MergedAnomalyResultDTO anomaly) {
-      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY));
+      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY),
+          anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_KEY));
     }
 
     @Override

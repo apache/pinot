@@ -16,6 +16,7 @@
 
 package com.linkedin.thirdeye.detection;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -94,8 +95,9 @@ public class DetectionMigrationResource {
   @GET
   public String migrateToYaml(@QueryParam("id") long anomalyFunctionId) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = this.anomalyFunctionDAO.findById(anomalyFunctionId);
+    Preconditions.checkArgument(anomalyFunctionDTO.getIsActive(), "try to migrate inactive anomaly function");
     Map<String, Object> yamlConfigs = new LinkedHashMap<>();
-    yamlConfigs.put("detectionName", anomalyFunctionDTO.getFunctionName());
+    yamlConfigs.put("detectionName", "new_pipeline_" + anomalyFunctionDTO.getFunctionName());
     yamlConfigs.put("metric", anomalyFunctionDTO.getMetric());
     yamlConfigs.put("dataset", anomalyFunctionDTO.getCollection());
     yamlConfigs.put("pipelineType", "Composite");
@@ -192,8 +194,8 @@ public class DetectionMigrationResource {
     Map<String, Object> params = new HashMap<>();
     filterYamlParams.put("configuration", params);
     params.putAll(functionDTO.getAlertFilter());
-    params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
-    params.put("variables.timeZone", getTimezone(functionDTO));
+    params.put("bucketPeriod", getBucketPeriod(functionDTO));
+    params.put("timeZone", getTimezone(functionDTO));
     return filterYamlParams;
   }
 

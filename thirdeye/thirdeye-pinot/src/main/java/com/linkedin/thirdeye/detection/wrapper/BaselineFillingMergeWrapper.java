@@ -110,7 +110,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         }
       } catch (Exception e) {
         // ignore
-        LOG.warn("cannot get metric slice for anomaly {}", anomaly, e);
+        LOG.warn("cannot get current or baseline value for anomaly {}. ", anomaly, e);
       }
     }
     return mergedAnomalies;
