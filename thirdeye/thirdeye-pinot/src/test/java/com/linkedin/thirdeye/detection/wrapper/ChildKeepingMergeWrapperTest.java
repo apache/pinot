@@ -18,7 +18,6 @@ package com.linkedin.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableSet;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.MockDataProvider;
@@ -85,26 +84,23 @@ public class ChildKeepingMergeWrapperTest {
     this.config.setName(PROP_NAME_VALUE);
     this.config.setProperties(this.properties);
 
-    List<MergedAnomalyResultDTO> existing = new ArrayList<>();
-    existing.add(makeAnomaly(0, 1000));
-    existing.add(makeAnomaly(1500, 2000));
-
     this.outputs = new ArrayList<>();
 
     this.outputs.add(new MockPipelineOutput(Arrays.asList(
         makeAnomaly(1100, 1200),
-        makeAnomaly(2200, 2300)
+        makeAnomaly(2200, 2300),
+        makeAnomaly(0, 1000)
     ), 2900));
 
     this.outputs.add(new MockPipelineOutput(Arrays.asList(
         makeAnomaly(1150, 1250),
-        makeAnomaly(2400, 2800)
+        makeAnomaly(2400, 2800),
+        makeAnomaly(1500, 2000)
     ), 3000));
 
     MockPipelineLoader mockLoader = new MockPipelineLoader(this.runs, this.outputs);
 
     this.provider = new MockDataProvider()
-        .setAnomalies(existing)
         .setLoader(mockLoader);
   }
 
