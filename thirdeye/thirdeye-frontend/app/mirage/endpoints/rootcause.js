@@ -185,7 +185,8 @@ export default function(server) {
   server.get('/rootcause/metric/aggregate', () => {});
   server.get('/rootcause/metric/aggregate/cache', () => {});
   server.get('/rootcause/metric/breakdown', () => {});
-  server.get('rootcause/metric/aggregate/batch', () => {});
+  server.get('/rootcause/metric/aggregate/batch', () => {});
+  server.get('/rootcause/metric/aggregate/chunk', () => {});
   server.get('/rootcause/metric/timeseries', () => {
     return {
       timestamp: [moment().valueOf()],

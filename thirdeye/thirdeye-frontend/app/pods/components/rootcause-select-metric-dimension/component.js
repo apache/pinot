@@ -208,11 +208,14 @@ export default Component.extend({
       const baseUrn = metricUrns[0];
 
       const { selectedUrn, baseUrnCache } = getProperties(this, 'selectedUrn', 'baseUrnCache');
-      const filterMap = toFilterMap(toFilters(selectedUrn));
 
-      if (!_.isEqual(baseUrn, baseUrnCache)) {
+      const previousFilterMap = toFilterMap(toFilters(selectedUrn));
+      const incomingFilterMap = toFilterMap(toFilters(baseUrn));
+      const newFilterMap = _.isEmpty(incomingFilterMap) ? previousFilterMap : incomingFilterMap;
+
+      if (!_.isEqual(baseUrn, baseUrnCache) || !_.isEqual(previousFilterMap, newFilterMap)) {
         setProperties(this, { baseUrn, baseUrnCache: baseUrn });
-        this._fetchFilters(baseUrn, filterMap);
+        this._fetchFilters(baseUrn, newFilterMap);
       }
     },
 

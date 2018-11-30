@@ -152,15 +152,13 @@ export default Component.extend({
   // Selected Filters Serializer
   selectedFilters: computed('selected', {
     get() {
-      const filters = JSON.parse(this.get('selected'));
+      const selected = this.get('selected') || '{}';
+      const filters = JSON.parse(selected);
 
       return convertHashToFilters(filters);
     },
     set(key, value) {
-      const filters = convertFiltersToHash(value);
-      this.set('selected', filters);
-
-      return value;
+      this.set('selected', value);
     }
   }),
 
@@ -201,10 +199,12 @@ export default Component.extend({
     // Action handler for filter Selection/Deselection
     onFilterChange(filters) {
       const onChangeHandler = this.get('onChange');
-      this.set('selectedFilters', filters);
+
+      const newSelected = convertFiltersToHash(filters);
+      this.set('selected', newSelected);
 
       if (onChangeHandler) {
-        onChangeHandler(this.get('selected'));
+        onChangeHandler(newSelected);
       }
     }
   }
