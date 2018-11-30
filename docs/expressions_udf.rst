@@ -34,8 +34,8 @@ The *xform* produces the following output:
 
 * For each document Id in the input, it evaluates the specified expression, and produces one value.
 
-  ** It is Many:1 for columns, i.e. many columns in the input produce one column value in the output.
-  ** It is 1:1 for document Id's, i.e. for each document in the input, it produces one value in the output.
+  * It is Many:1 for columns, i.e. many columns in the input produce one column value in the output.
+  * It is 1:1 for document Id's, i.e. for each document in the input, it produces one value in the output.
 
 The *functions* in the *expression* can be either built-in into Pinot, or can be user-defined. We will discuss the mechanism for hooking up *UDF* and the manageability aspects in later sections.
 
@@ -90,9 +90,9 @@ The functions in *expressions* can either be built-in functions in Pinot, or the
 
 #. Dynamic loading of user-defined functions:
 
-  ** Users can specify jars containing their UDF's in the class path.
-  ** List of UDF's can be specified in server config, and the server can ensure that it can find and load classes for each UDF specified in the config. This allows for a one-time static checking of availability of all specified UDF's.
-  ** Alternatively, the server may do a dynamic check for each query to ensure all UDF's specified in the query are available and can be loaded.
+  * Users can specify jars containing their UDF's in the class path.
+  * List of UDF's can be specified in server config, and the server can ensure that it can find and load classes for each UDF specified in the config. This allows for a one-time static checking of availability of all specified UDF's.
+  * Alternatively, the server may do a dynamic check for each query to ensure all UDF's specified in the query are available and can be loaded.
 
 
 Backward compatibility
@@ -103,8 +103,8 @@ Given that this proposal requires modifying *BrokerRequest*, we are exposed to b
 #. The changes to *BrokerRequest* to include *expressions* instead of *columns* would only take effect if a query containing *expression* is received. For the query just contains *columns* instead of *expressions*, we fall be to existing behavior and send the *columns* as they are being sent in the current design (ie not as a special case of an *expresion*).
 
 #. This will warrant the following sequencing:
-   ** Broker upgraded before server.
-   ** New queries containing *expressions* should be sent only after both broker and server are upgraded.
+   * Broker upgraded before server.
+   * New queries containing *expressions* should be sent only after both broker and server are upgraded.
 
 Limitations
 ~~~~~~~~~~~
