@@ -42,6 +42,7 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
   }
 
   @Override
+  // does not fetch any anomalies from database
   protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
     return Collections.emptyList();
   }
