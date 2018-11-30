@@ -112,10 +112,6 @@ public class AnomalyEventFormatter extends RootCauseEventEntityFormatter {
       AnomalyFunctionDTO function = anomaly.getFunction();
       functionName = function.getFunctionName();
       attributes.put(ATTR_FUNCTION_ID, String.valueOf(function.getId()));
-    }
-
-    if (anomaly.getAvgBaselineVal() != 0.0d) {
-      // NOTE: hack for legacy anomaly function results
       attributes.put(ATTR_AGGREGATE_MULTIPLIER, String.valueOf(getAggregateMultiplier(anomaly, dataset, metric)));
     }
 
