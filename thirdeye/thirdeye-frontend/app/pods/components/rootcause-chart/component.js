@@ -14,6 +14,7 @@ import {
   makeTime
 } from 'thirdeye-frontend/utils/rca-utils';
 import _ from 'lodash';
+import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
 
 const TIMESERIES_MODE_ABSOLUTE = 'absolute';
 const TIMESERIES_MODE_RELATIVE = 'relative';
@@ -115,7 +116,7 @@ export default Component.extend({
         y: {
           show: true,
           tick: {
-            format: d3.format('.2s')
+            format: function(d){return humanizeFloat(d)}
           }
         },
         y2: {
