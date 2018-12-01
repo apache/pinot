@@ -16,6 +16,7 @@
 package com.linkedin.pinot.tools.perf;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -259,10 +260,10 @@ public class PerfBenchmarkDriver {
 
   public void configureTable(String tableName)
       throws Exception {
-    configureTable(tableName, null);
+    configureTable(tableName, null, null);
   }
 
-  public void configureTable(String tableName, List<String> invertedIndexColumns)
+  public void configureTable(String tableName, List<String> invertedIndexColumns, List<String> bloomFilterColumns)
       throws Exception {
     TableConfig tableConfig = new TableConfig.Builder(CommonConstants.Helix.TableType.OFFLINE).setTableName(tableName)
         .setSegmentAssignmentStrategy(_segmentAssignmentStrategy)
@@ -272,6 +273,7 @@ public class PerfBenchmarkDriver {
         .setLoadMode(_loadMode)
         .setSegmentVersion(_segmentFormatVersion)
         .setInvertedIndexColumns(invertedIndexColumns)
+        .setBloomFilterColumns(bloomFilterColumns)
         .build();
     _helixResourceManager.addTable(tableConfig);
   }

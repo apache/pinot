@@ -82,6 +82,8 @@ public interface SegmentMetadata {
 
   String getBitmapInvertedIndexFileName(String column);
 
+  String getBloomFilterFileName(String column);
+
   String getCreatorName();
 
   char getPaddingCharacter();

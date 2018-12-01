@@ -15,13 +15,15 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import java.util.List;
-import java.util.Map;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
+
+import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 
@@ -32,7 +34,8 @@ import javax.annotation.Nonnull;
  */
 public abstract class AbstractSegmentPruner implements SegmentPruner {
 
-  public abstract boolean pruneSegment(FilterQueryTree filterQueryTree, Map<String, ColumnMetadata> columnMetadataMap);
+  public abstract boolean pruneSegment(FilterQueryTree filterQueryTree, Map<String, ColumnMetadata> columnMetadataMap,
+      Map<String, BloomFilterReader> bloomFilterMap);
 
   /**
    * Given a non leaf filter query tree node prunes it as follows:
@@ -46,8 +49,8 @@ public abstract class AbstractSegmentPruner implements SegmentPruner {
    *
    * @return True to prune, false otherwise
    */
-  protected boolean pruneNonLeaf(@Nonnull FilterQueryTree filterQueryTree,
-      @Nonnull Map<String, ColumnMetadata> columnMetadataMap) {
+  protected boolean pruneNonLeaf(@Nonnull FilterQueryTree filterQueryTree, @Nonnull Map<String, ColumnMetadata> columnMetadataMap,
+      Map<String, BloomFilterReader> bloomFilterMap) {
     List<FilterQueryTree> children = filterQueryTree.getChildren();
 
     if (children.isEmpty()) {
@@ -58,7 +61,7 @@ public abstract class AbstractSegmentPruner implements SegmentPruner {
     switch (filterOperator) {
       case AND:
         for (FilterQueryTree child : children) {
-          if (pruneSegment(child, columnMetadataMap)) {
+          if (pruneSegment(child, columnMetadataMap, bloomFilterMap)) {
             return true;
           }
         }
@@ -66,7 +69,7 @@ public abstract class AbstractSegmentPruner implements SegmentPruner {
 
       case OR:
         for (FilterQueryTree child : children) {
-          if (!pruneSegment(child, columnMetadataMap)) {
+          if (!pruneSegment(child, columnMetadataMap, bloomFilterMap)) {
             return false;
           }
         }

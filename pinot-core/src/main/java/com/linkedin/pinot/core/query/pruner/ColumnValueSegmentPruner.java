@@ -23,8 +23,13 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.query.request.ServerQueryRequest;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
+
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
 
@@ -48,7 +53,17 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
     // For realtime segment, this map can be null.
     Map<String, ColumnMetadata> columnMetadataMap =
         ((SegmentMetadataImpl) segment.getSegmentMetadata()).getColumnMetadataMap();
-    return (columnMetadataMap != null) && pruneSegment(filterQueryTree, columnMetadataMap);
+
+    Map<String, BloomFilterReader> bloomFilterMap = new HashMap<>();
+    if (columnMetadataMap != null) {
+      for (String column : columnMetadataMap.keySet()) {
+        BloomFilterReader bloomFilterReader = segment.getDataSource(column).getBloomFilter();
+        if (bloomFilterReader != null) {
+          bloomFilterMap.put(column, bloomFilterReader);
+        }
+      }
+    }
+    return (columnMetadataMap != null) && pruneSegment(filterQueryTree, columnMetadataMap, bloomFilterMap);
   }
 
   @Override
@@ -74,7 +89,7 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
   @SuppressWarnings("unchecked")
   @Override
   public boolean pruneSegment(@Nonnull FilterQueryTree filterQueryTree,
-      @Nonnull Map<String, ColumnMetadata> columnMetadataMap) {
+      @Nonnull Map<String, ColumnMetadata> columnMetadataMap, Map<String, BloomFilterReader> bloomFilterMap) {
     FilterOperator filterOperator = filterQueryTree.getOperator();
     List<FilterQueryTree> children = filterQueryTree.getChildren();
 
@@ -86,7 +101,8 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
         return false;
       }
 
-      ColumnMetadata columnMetadata = columnMetadataMap.get(filterQueryTree.getColumn());
+      String column = filterQueryTree.getColumn();
+      ColumnMetadata columnMetadata = columnMetadataMap.get(column);
       if (columnMetadata == null) {
         // Should not reach here after DataSchemaSegmentPruner
         return true;
@@ -97,16 +113,22 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
 
       if (filterOperator == FilterOperator.EQUALITY) {
         // EQUALITY
-
-        // Doesn't have min/max value set in metadata
-        if ((minValue == null) || (maxValue == null)) {
-          return false;
-        }
-
-        // Check if the value is in the min/max range
+        boolean pruneSegment = false;
         FieldSpec.DataType dataType = columnMetadata.getDataType();
         Comparable value = getValue(filterQueryTree.getValue().get(0), dataType);
-        return (value.compareTo(minValue) < 0) || (value.compareTo(maxValue) > 0);
+
+        // Check if the value is in the min/max range
+        if (minValue != null && maxValue != null) {
+          pruneSegment = (value.compareTo(minValue) < 0) || (value.compareTo(maxValue) > 0);
+        }
+
+        // If the bloom filter is available for the column, check if the value may exist
+        if (!pruneSegment && bloomFilterMap.containsKey(column)) {
+          BloomFilterReader bloomFilterReader = bloomFilterMap.get(column);
+          pruneSegment = !bloomFilterReader.mightContain(value);
+        }
+
+        return pruneSegment;
       } else {
         // RANGE
 
@@ -170,7 +192,7 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
       }
     } else {
       // Parent node
-      return pruneNonLeaf(filterQueryTree, columnMetadataMap);
+      return pruneNonLeaf(filterQueryTree, columnMetadataMap, bloomFilterMap);
     }
   }
 }

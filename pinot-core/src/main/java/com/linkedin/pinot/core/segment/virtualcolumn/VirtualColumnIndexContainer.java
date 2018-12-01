@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.segment.virtualcolumn;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.column.PhysicalColumnIndexContainer;
+import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 
@@ -50,5 +51,10 @@ public class VirtualColumnIndexContainer implements ColumnIndexContainer {
   @Override
   public Dictionary getDictionary() {
     return _dictionary;
+  }
+
+  @Override
+  public BloomFilterReader getBloomFilter() {
+    return null;
   }
 }

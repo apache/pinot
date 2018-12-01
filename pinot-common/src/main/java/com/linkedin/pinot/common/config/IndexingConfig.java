@@ -43,6 +43,9 @@ public class IndexingConfig {
   @ConfigKey("sortedColumn")
   private List<String> _sortedColumn = new ArrayList<>();
 
+  @ConfigKey("bloomFilterColumns")
+  private List<String> _bloomFilterColumns = new ArrayList<>();
+
   @ConfigKey("loadMode")
   private String _loadMode;
 
@@ -111,6 +114,15 @@ public class IndexingConfig {
 
   public void setSortedColumn(List<String> sortedColumn) {
     _sortedColumn = sortedColumn;
+  }
+
+  
+  public List<String> getBloomFilterColumns() {
+    return _bloomFilterColumns;
+  }
+
+  public void setBloomFilterColumns(List<String> _bloomFilterColumns) {
+    this._bloomFilterColumns = _bloomFilterColumns;
   }
 
   public String getLoadMode() {

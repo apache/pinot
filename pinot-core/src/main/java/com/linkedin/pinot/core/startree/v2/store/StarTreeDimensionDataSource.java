@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
+import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -96,6 +97,11 @@ public class StarTreeDimensionDataSource extends DataSource {
 
   @Override
   public InvertedIndexReader getInvertedIndex() {
+    return null;
+  }
+
+  @Override
+  public BloomFilterReader getBloomFilter() {
     return null;
   }
 

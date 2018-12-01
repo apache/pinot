@@ -874,6 +874,7 @@
           <configuration>
             <source>${jdk.version}</source>
             <target>${jdk.version}</target>
+            <compilerVersion>${jdk.version}</compilerVersion>
           </configuration>
         </plugin>
         <plugin>

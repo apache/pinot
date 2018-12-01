@@ -47,12 +47,16 @@ import org.testng.annotations.Test;
 public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final int NUM_BROKERS = 1;
   private static final int NUM_SERVERS = 1;
+  private static final int NUM_SEGMENTS = 12;
 
   // For inverted index triggering test
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
       Arrays.asList("FlightNum", "Origin", "Quarter", "DivActualElapsedTime");
   private static final String TEST_UPDATED_INVERTED_INDEX_QUERY =
       "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
+
+  private static final List<String> UPDATED_BLOOM_FLITER_COLUMNS = Arrays.asList("Carrier");
+  private static final String TEST_UPDATED_BLOOM_FILTER_QUERY = "SELECT COUNT(*) FROM mytable WHERE Carrier = 'CA'";
 
   // For default columns test
   private static final String SCHEMA_WITH_EXTRA_COLUMNS =
@@ -121,7 +125,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Create the table
     addOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1, getInvertedIndexColumns(),
-        getTaskConfig());
+        getBloomFilterIndexColumns(), getTaskConfig());
 
     completeTableConfiguration();
 
@@ -149,7 +153,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Update table config and trigger reload
     updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
-        UPDATED_INVERTED_INDEX_COLUMNS, getTaskConfig());
+        UPDATED_INVERTED_INDEX_COLUMNS, null, getTaskConfig());
 
     updateTableConfiguration();
 
@@ -163,6 +167,35 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
           // Total docs should not change during reload
           Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
           return queryResponse.getLong("numEntriesScannedInFilter") == 0L;
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+    }, 600_000L, "Failed to generate inverted index");
+  }
+
+  @Test
+  public void testBloomFilterTriggering() throws Exception {
+    final long numTotalDocs = getCountStarResult();
+    JSONObject queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
+    Assert.assertEquals(queryResponse.getLong("numSegmentsProcessed"), NUM_SEGMENTS);
+
+    // Update table config and trigger reload
+    updateOfflineTable(getTableName(), null, null, null, null, getLoadMode(), SegmentVersion.v1,
+        null, UPDATED_BLOOM_FLITER_COLUMNS, getTaskConfig());
+
+    updateTableConfiguration();
+
+    sendPostRequest(_controllerBaseApiUrl + "/tables/mytable/segments/reload?type=offline", null);
+
+    TestUtils.waitForCondition(new Function<Void, Boolean>() {
+      @Override
+      public Boolean apply(@Nullable Void aVoid) {
+        try {
+          JSONObject queryResponse = postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY);
+          // Total docs should not change during reload
+          Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
+          return queryResponse.getLong("numSegmentsProcessed") == 0L;
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
@@ -362,7 +395,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testBrokerResponseMetadata() throws Exception {
     super.testBrokerResponseMetadata();
   }
-  
+
   @Test
   public void testUDF() throws Exception {
     String pqlQuery = "SELECT COUNT(*) FROM mytable GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS')";

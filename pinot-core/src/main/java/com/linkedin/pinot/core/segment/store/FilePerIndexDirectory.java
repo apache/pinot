@@ -81,6 +81,20 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
+  public PinotDataBuffer getBloomFilterBufferFor(String column)
+      throws IOException {
+    IndexKey key = new IndexKey(column, ColumnIndexType.BLOOM_FILTER);
+    return getReadBufferFor(key);
+  }
+
+  @Override
+  public PinotDataBuffer newBloomFilterBuffer(String column, long sizeBytes)
+      throws IOException {
+    IndexKey key = new IndexKey(column, ColumnIndexType.BLOOM_FILTER);
+    return getWriteBufferFor(key, sizeBytes);
+  }
+
+  @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
     File indexFile = getFileFor(column, type);
     return indexFile.exists();
@@ -139,6 +153,9 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
         break;
       case INVERTED_INDEX:
         filename = metadata.getBitmapInvertedIndexFileName(column);
+        break;
+      case BLOOM_FILTER:
+        filename = metadata.getBloomFilterFileName(column);
         break;
       default:
         throw new UnsupportedOperationException("Unknown index type: " + indexType.toString());

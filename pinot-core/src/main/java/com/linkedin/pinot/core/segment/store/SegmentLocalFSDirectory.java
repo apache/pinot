@@ -233,6 +233,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       case INVERTED_INDEX:
         buffer = columnIndexDirectory.getInvertedIndexBufferFor(column);
         break;
+      case BLOOM_FILTER:
+        buffer = columnIndexDirectory.getBloomFilterBufferFor(column);
+        break;
       default:
         throw new RuntimeException("Unknown index type: " + type.name());
     }
@@ -412,6 +415,8 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
           return columnIndexDirectory.newForwardIndexBuffer(key.name, sizeBytes);
         case INVERTED_INDEX:
           return columnIndexDirectory.newInvertedIndexBuffer(key.name, sizeBytes);
+        case BLOOM_FILTER:
+          return columnIndexDirectory.newBloomFilterBuffer(key.name, sizeBytes);
         default:
           throw new RuntimeException("Unknown index type: " + indexType.name() +
               " for directory: " + segmentDirectory);

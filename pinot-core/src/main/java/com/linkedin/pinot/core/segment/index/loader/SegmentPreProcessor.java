@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.loader.bloomfilter.BloomFilterHandler;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import com.linkedin.pinot.core.segment.index.loader.defaultcolumn.DefaultColumnHandler;
@@ -63,7 +64,6 @@ public class SegmentPreProcessor implements AutoCloseable {
     if (_segmentMetadata.getTotalDocs() == 0) {
       return;
     }
-
     // Remove all the existing inverted index temp files before loading segments.
     // NOTE: This step fixes the issue of temporary files not getting deleted after creating new inverted indexes.
     // In this, we look for all files in the directory and remove the ones with  '.bitmap.inv.tmp' extension.
@@ -90,6 +90,11 @@ public class SegmentPreProcessor implements AutoCloseable {
       InvertedIndexHandler invertedIndexHandler =
           new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
+
+      // Create bloom filter if required
+      BloomFilterHandler bloomFilterHandler =
+          new BloomFilterHandler(_indexDir, _segmentMetadata, _indexLoadingConfig, segmentWriter);
+      bloomFilterHandler.createBloomFilters();
 
       // Add min/max value to column metadata according to the prune mode.
       // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.

@@ -72,6 +72,10 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       usage = "Comma separated inverted index columns to be created (non-batch load).")
   private String _invertedIndexColumns;
 
+  @Option(name = "-bloomFilterColumns", required = false, metaVar = "<String>",
+      usage = "Comma separated bloom filter columns to be created (non-batch load).")
+  private String _bloomFilterColumns;
+
   @Option(name = "-help", required = false, help = true, aliases = {"-h", "--h", "--help"},
       usage = "Print this message.")
   private boolean _help = false;
@@ -132,7 +136,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
           @Override
           public void run() {
             try {
-              loadTable(driver, _dataDir, tableName, null);
+              loadTable(driver, _dataDir, tableName, null, null);
             } catch (Exception e) {
               LOGGER.error("Caught exception while loading table: {}", tableName, e);
             }
@@ -146,14 +150,18 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       if (_invertedIndexColumns != null) {
         invertedIndexColumns = Arrays.asList(_invertedIndexColumns.split(","));
       }
+      List<String> bloomFilterColumns = null;
+      if (_bloomFilterColumns != null) {
+        bloomFilterColumns = Arrays.asList(_bloomFilterColumns.split(","));
+      }
       for (String tableName : _tableNames.split(",")) {
-        loadTable(driver, _dataDir, tableName, invertedIndexColumns);
+        loadTable(driver, _dataDir, tableName, invertedIndexColumns, bloomFilterColumns);
       }
     }
   }
 
   public static void loadTable(PerfBenchmarkDriver driver, String dataDir, String tableName,
-      List<String> invertedIndexColumns)
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns)
       throws Exception {
     boolean tableConfigured = false;
     File[] segments = new File(dataDir, tableName).listFiles();
@@ -161,7 +169,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
     for (File segment : segments) {
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segment);
       if (!tableConfigured) {
-        driver.configureTable(segmentMetadata.getTableName(), invertedIndexColumns);
+        driver.configureTable(segmentMetadata.getTableName(), invertedIndexColumns, bloomFilterColumns);
         tableConfigured = true;
       }
       driver.addSegment(segmentMetadata);
