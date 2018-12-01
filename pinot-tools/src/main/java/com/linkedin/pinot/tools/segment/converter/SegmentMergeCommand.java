@@ -151,9 +151,27 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       LOGGER.info("Table config: {}", tableConfig);
       LOGGER.info("Schema : {}", schema);
 
+      // Compute mix/max time from segment metadata
+      long minStartTime = Long.MAX_VALUE;
+      long maxEndTime = Long.MIN_VALUE;
+      long totalNumDocsBeforeMerge = 0L;
+      for (File indexDir : inputIndexDirs) {
+        SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
+        long currentStartTime = segmentMetadata.getStartTime();
+        if (currentStartTime < minStartTime) {
+          minStartTime = currentStartTime;
+        }
+
+        long currentEndTime = segmentMetadata.getEndTime();
+        if (currentEndTime > maxEndTime) {
+          maxEndTime = currentEndTime;
+        }
+        totalNumDocsBeforeMerge += segmentMetadata.getTotalDocs();
+      }
+
       // Compute segment name if it is not specified
       if (_outputSegmentName == null) {
-        _outputSegmentName = getDefaultSegmentName(tableConfig, schema, inputIndexDirs);
+        _outputSegmentName = getDefaultSegmentName(tableConfig, schema, inputIndexDirs, minStartTime, maxEndTime);
       }
       LOGGER.info("Output segment name: {}", _outputSegmentName);
 
@@ -195,6 +213,11 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
         FileUtils.moveDirectory(outputSegment, finalOutputPath);
       }
       LOGGER.info("Segment has been merged correctly. Output file is located at {}", finalOutputPath);
+      LOGGER.info("Min start time / max end time for input segments : " + minStartTime + " / " + maxEndTime);
+      LOGGER.info("Min start time / max end time for merged segment: " + outputSegmentMetadata.getStartTime() + " / "
+          + outputSegmentMetadata.getEndTime());
+      LOGGER.info("Total number of documents for input segments: " + totalNumDocsBeforeMerge);
+      LOGGER.info("Total number of documents for merged segment: " + outputSegmentMetadata.getTotalDocs());
     } finally {
       // Clean up working directory
       FileUtils.deleteQuietly(workingDir);
@@ -207,25 +230,9 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
     return "Create the merged segment using concatenation";
   }
 
-  private String getDefaultSegmentName(TableConfig tableConfig, Schema schema, List<File> inputIndexDirs)
-      throws Exception {
-    String tableName = TableNameBuilder.extractRawTableName(tableConfig.getTableName());
-
-    // Compute mix/max time from segment metadata
-    long minStartTime = Long.MAX_VALUE;
-    long maxEndTime = Long.MIN_VALUE;
-    for (File indexDir : inputIndexDirs) {
-      SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
-      long currentStartTime = segmentMetadata.getStartTime();
-      if (currentStartTime < minStartTime) {
-        minStartTime = currentStartTime;
-      }
-
-      long currentEndTime = segmentMetadata.getEndTime();
-      if (currentEndTime > maxEndTime) {
-        maxEndTime = currentEndTime;
-      }
-    }
+  private String getDefaultSegmentName(TableConfig tableConfig, Schema schema, List<File> inputIndexDirs,
+      long minStartTime, long maxEndTime) throws Exception {
+    String tableName = tableConfig.getTableName();
 
     // Fetch time related configurations from schema and table config.
     String pushFrequency = tableConfig.getValidationConfig().getSegmentPushFrequency();
