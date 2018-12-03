@@ -379,7 +379,7 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }
     } catch (Exception e) {
-      LOGGER.warn("Could not delete tmp segment files");
+      LOGGER.warn("Could not delete tmp segment files for {}", tableDirURI, e);
     }
 
     return true;
