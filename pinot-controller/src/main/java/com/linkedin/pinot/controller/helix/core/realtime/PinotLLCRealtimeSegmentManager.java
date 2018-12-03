@@ -59,11 +59,12 @@ import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.filesystem.PinotFS;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -349,11 +350,11 @@ public class PinotLLCRealtimeSegmentManager {
   public boolean commitSegmentFile(String tableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
     String segmentName = committingSegmentDescriptor.getSegmentName();
     String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
-    File segmentFile = convertURIToSegmentLocation(segmentLocation);
-
-    File baseDir = new File(_controllerConf.getDataDir());
-    File tableDir = new File(baseDir, tableName);
-    File fileToMoveTo = new File(tableDir, segmentName);
+    URI segmentFileURI = ControllerConf.getUriFromPath(segmentLocation);
+    URI baseDirURI = ControllerConf.getUriFromPath(_controllerConf.getDataDir());
+    URI tableDirURI = ControllerConf.getUriFromPath(StringUtil.join("/", _controllerConf.getDataDir(), tableName));
+    URI uriToMoveTo = ControllerConf.getUriFromPath(StringUtil.join("/", tableDirURI.toString(), segmentName));
+    PinotFS pinotFS = PinotFSFactory.create(baseDirURI.getScheme());
 
     if (!isConnected() || !isLeader()) {
       // We can potentially log a different value than what we saw ....
@@ -364,27 +365,24 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     try {
-      com.linkedin.pinot.common.utils.FileUtils.moveFileWithOverwrite(segmentFile, fileToMoveTo);
+      pinotFS.move(segmentFileURI, uriToMoveTo, true);
     } catch (Exception e) {
-      LOGGER.error("Could not move {} to {}", segmentFile, segmentName, e);
+      LOGGER.error("Could not move {} to {}", segmentLocation, segmentName, e);
       return false;
     }
-    for (File file : tableDir.listFiles()) {
-      if (file.getName().startsWith(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
-        LOGGER.warn("Deleting " + file);
-        FileUtils.deleteQuietly(file);
-      }
-    }
-    return true;
-  }
 
-  private static File convertURIToSegmentLocation(String segmentLocation) {
     try {
-      URI uri = new URI(segmentLocation);
-      return new File(uri.getPath());
-    } catch (URISyntaxException e) {
-      throw new RuntimeException("Could not convert URI " + segmentLocation + " to segment location", e);
+      for (String uri : pinotFS.listFiles(tableDirURI, true)) {
+        if (uri.contains(SegmentCompletionUtils.getSegmentNamePrefix(segmentName))) {
+          LOGGER.warn("Deleting " + uri);
+          pinotFS.delete(new URI(uri), true);
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Could not delete tmp segment files for {}", tableDirURI, e);
     }
+
+    return true;
   }
 
   /**

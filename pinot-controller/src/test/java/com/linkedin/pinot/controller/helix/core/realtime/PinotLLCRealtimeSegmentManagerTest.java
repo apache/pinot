@@ -45,6 +45,7 @@ import com.linkedin.pinot.core.realtime.stream.OffsetCriteria;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
@@ -59,6 +60,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -1120,6 +1122,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   @Test
   public void testCommitSegmentFile() throws Exception {
+    PinotFSFactory.init(new PropertiesConfiguration());
     PinotLLCRealtimeSegmentManager realtimeSegmentManager =
         new FakePinotLLCRealtimeSegmentManager(Collections.<String>emptyList());
     String tableName = "fakeTable_REALTIME";
@@ -1138,6 +1141,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   @Test
   public void testSegmentAlreadyThereAndExtraneousFilesDeleted() throws Exception {
+    PinotFSFactory.init(new PropertiesConfiguration());
     PinotLLCRealtimeSegmentManager realtimeSegmentManager =
         new FakePinotLLCRealtimeSegmentManager(Collections.<String>emptyList());
     String tableName = "fakeTable_REALTIME";
