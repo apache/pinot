@@ -395,7 +395,22 @@ export function toBaselineRange(range, offset) {
     mean4w: 1, // default. not fully supported by backend yet
     median4w: 1, // default. not fully supported by backend yet
     min4w: 1, // default. not fully supported by backend yet
-    max4w: 1 // default. not fully supported by backend yet
+    max4w: 1, // default. not fully supported by backend yet
+    ho1h: 1,
+    ho2h: 1,
+    ho3h: 1,
+    median4h: 1,
+    mean4h: 1,
+    do1d: 1,
+    do2d: 1,
+    do3d: 1,
+    median4d: 1,
+    mean4d: 1,
+    mo1m: 1,
+    mo2m: 1,
+    mo3m: 1,
+    median4m: 1,
+    mean4m: 1
   }[offset.toLowerCase()];
 
   if (offsetWeeks === 0) {
