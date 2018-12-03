@@ -120,7 +120,7 @@ public class ThirdEyeDashboardApplication
   public void initialize(Bootstrap<ThirdEyeDashboardConfiguration> bootstrap) {
     bootstrap.addBundle(new ViewBundle());
     bootstrap.addBundle(new HelperBundle());
-    bootstrap.addBundle(new RedirectBundle(new PathRedirect("/", "/thirdeye")));
+    bootstrap.addBundle(new RedirectBundle(new PathRedirect("/", "/app/#/home")));
     bootstrap.addBundle(new AssetsBundle("/app/", "/app", "index.html", "app"));
     bootstrap.addBundle(new AssetsBundle("/assets", "/assets", null, "assets"));
     bootstrap.addBundle(new AssetsBundle("/assets/css", "/assets/css", null, "css"));
