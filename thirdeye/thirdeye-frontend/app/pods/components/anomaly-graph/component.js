@@ -4,6 +4,7 @@ import { later } from '@ember/runloop';
 import Component from '@ember/component';
 import moment from 'moment';
 import d3 from 'd3';
+import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
 
 const COLOR_MAPPING = {
   blue: '#33AADA',
@@ -185,7 +186,7 @@ export default Component.extend({
           .attr('y1', 10)
           .attr('x2', 30)
           .attr('y2', 10)
-          .attr('stroke-dasharray', (d) => {
+          .attr('stroke-dasharray', () => {
             const dasharrayNum = 'none';
             return dasharrayNum;
           });
@@ -385,7 +386,6 @@ export default Component.extend({
    * Graph Legend config
    */
   legend: computed('showGraphLegend', function() {
-    const showGraphLegend = this.get('showGraphLegend');
     return {
       position: 'inset',
       show: false
@@ -459,7 +459,7 @@ export default Component.extend({
           show: true,
           // min: 0,
           tick: {
-            format: d3.format('.2s')
+            format: function(d){return humanizeFloat(d);}
           }
         },
         y2: {
@@ -559,7 +559,7 @@ export default Component.extend({
 
       // Return data only when it's selected
       if (primaryMetric.isSelected) {
-        const { baselineValues, currentValues } = primaryMetric.subDimensionContributionMap['All'];
+        const { currentValues } = primaryMetric.subDimensionContributionMap['All'];
         return [
           [`${primaryMetric.metricName}-current`, ...currentValues]
         ];
@@ -583,7 +583,7 @@ export default Component.extend({
       selectedMetrics.forEach((metric)  => {
         if (!metric) { return; }
 
-        const { baselineValues, currentValues } = metric.subDimensionContributionMap['All'];
+        const { currentValues } = metric.subDimensionContributionMap['All'];
         columns.push([`${metric.metricName}-current`, ...currentValues]);
       });
       return columns;
@@ -600,7 +600,7 @@ export default Component.extend({
       const selectedDimensions = this.get('selectedDimensions') || [];
 
       selectedDimensions.forEach((dimension) => {
-        const { baselineValues, currentValues } = dimension;
+        const { currentValues } = dimension;
         columns.push([`${dimension.name}-current`, ...currentValues]);
       });
       return columns;
