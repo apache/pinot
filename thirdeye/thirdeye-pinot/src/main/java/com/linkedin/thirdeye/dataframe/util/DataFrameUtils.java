@@ -443,12 +443,24 @@ public class DataFrameUtils {
       fields.add(DateTimeFieldType.secondOfMinute());
       fields.add(DateTimeFieldType.millisOfSecond());
 
+    } else if (PeriodType.months().equals(type)) {
+      fields.add(DateTimeFieldType.dayOfMonth());
+      fields.add(DateTimeFieldType.hourOfDay());
+      fields.add(DateTimeFieldType.minuteOfHour());
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
+
     } else {
       throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", type));
     }
 
     int[] zeros = new int[fields.size()];
     Arrays.fill(zeros, 0);
+
+    // workaround for dayOfMonth > 0 constraint
+    if (PeriodType.months().equals(type)) {
+      zeros[0] = 1;
+    }
 
     return new Partial(fields.toArray(new DateTimeFieldType[fields.size()]), zeros);
   }

@@ -29,11 +29,36 @@ public class BaselineParsingUtils {
   private static final Pattern PATTERN_NONE = Pattern.compile("none");
   private static final Pattern PATTERN_PREDICTED = Pattern.compile("predicted");
   private static final Pattern PATTERN_CURRENT = Pattern.compile("current");
+  private static final Pattern PATTERN_HOUR_OVER_HOUR = Pattern.compile("ho([1-9][0-9]*)h");
+  private static final Pattern PATTERN_DAY_OVER_DAY = Pattern.compile("do([1-9][0-9]*)d");
   private static final Pattern PATTERN_WEEK_OVER_WEEK = Pattern.compile("wo([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MEAN = Pattern.compile("mean([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MEDIAN = Pattern.compile("median([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MIN = Pattern.compile("min([1-9][0-9]*)w");
-  private static final Pattern PATTERN_MAX = Pattern.compile("max([1-9][0-9]*)w");
+  private static final Pattern PATTERN_MONTH_OVER_MONTH = Pattern.compile("mo([1-9][0-9]*)m");
+  private static final Pattern PATTERN_MEAN = Pattern.compile("mean([1-9][0-9]*)(h|d|w|m)");
+  private static final Pattern PATTERN_MEDIAN = Pattern.compile("median([1-9][0-9]*)(h|d|w|m)");
+  private static final Pattern PATTERN_MIN = Pattern.compile("min([1-9][0-9]*)(h|d|w|m)");
+  private static final Pattern PATTERN_MAX = Pattern.compile("max([1-9][0-9]*)(h|d|w|m)");
+
+  private enum Unit {
+    HOUR("h"),
+    DAY("d"),
+    WEEK("w"),
+    MONTH("m");
+
+    final String unit;
+
+    Unit(String unit) {
+      this.unit = unit;
+    }
+
+    static Unit fromUnit(String unit) {
+      for (Unit u : Unit.values()) {
+        if (u.unit.equals(unit)) {
+          return u;
+        }
+      }
+      throw new IllegalArgumentException(String.format("Unknown unit '%s'", unit));
+    }
+  }
 
   /**
    * Returns a configured instance of Baseline for the given, named offset. The method uses slice and
@@ -43,11 +68,14 @@ public class BaselineParsingUtils {
    * <pre>
    *   current   the time range as specified by start and end)
    *   none      empty time range
+   *   hoXh      hour-over-hour data points with a lag of X hours)
+   *   doXd      day-over-day data points with a lag of X days)
    *   woXw      week-over-week data points with a lag of X weeks)
-   *   meanXw    average of data points from the the past X weeks, with a lag of 1 week)
-   *   medianXw  median of data points from the the past X weeks, with a lag of 1 week)
-   *   minXw     minimum of data points from the the past X weeks, with a lag of 1 week)
-   *   maxXw     maximum of data points from the the past X weeks, with a lag of 1 week)
+   *   moXm      month-over-month data points with a lag of X months)
+   *   meanXU    average of data points from the the past X units (hour, day, month, week), with a lag of 1 unit)
+   *   medianXU  median of data points from the the past X units (hour, day, month, week), with a lag of 1 unit)
+   *   minXU     minimum of data points from the the past X units (hour, day, month, week), with a lag of 1 unit)
+   *   maxXU     maximum of data points from the the past X units (hour, day, month, week), with a lag of 1 unit)
    * </pre>
    *
    * @param offset offset identifier
@@ -74,31 +102,90 @@ public class BaselineParsingUtils {
       return new BaselineNone();
     }
 
+    BaselineAggregateType agg = null;
+    int shift = Integer.MIN_VALUE;
+    int count = Integer.MIN_VALUE;
+    Unit unit = null;
+
+    Matcher mHourOverHour = PATTERN_HOUR_OVER_HOUR.matcher(offset);
+    if (mHourOverHour.find()) {
+      agg = BaselineAggregateType.SUM;
+      shift = Integer.valueOf(mHourOverHour.group(1));
+      count = 1;
+      unit = Unit.HOUR;
+    }
+
+    Matcher mDayOverDay = PATTERN_DAY_OVER_DAY.matcher(offset);
+    if (mDayOverDay.find()) {
+      agg = BaselineAggregateType.SUM;
+      shift = Integer.valueOf(mDayOverDay.group(1));
+      count = 1;
+      unit = Unit.DAY;
+    }
+
     Matcher mWeekOverWeek = PATTERN_WEEK_OVER_WEEK.matcher(offset);
     if (mWeekOverWeek.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.SUM, 1, Integer.valueOf(mWeekOverWeek.group(1)), timeZone);
+      agg = BaselineAggregateType.SUM;
+      shift = Integer.valueOf(mWeekOverWeek.group(1));
+      count = 1;
+      unit = Unit.WEEK;
+    }
+
+    Matcher mMonthOverMonth = PATTERN_MONTH_OVER_MONTH.matcher(offset);
+    if (mMonthOverMonth.find()) {
+      agg = BaselineAggregateType.SUM;
+      shift = Integer.valueOf(mMonthOverMonth.group(1));
+      count = 1;
+      unit = Unit.MONTH;
     }
 
     Matcher mMean = PATTERN_MEAN.matcher(offset);
     if (mMean.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEAN, Integer.valueOf(mMean.group(1)), 1, timeZone);
+      agg = BaselineAggregateType.MEAN;
+      shift = 1;
+      count = Integer.valueOf(mMean.group(1));
+      unit = Unit.fromUnit(mMean.group(2));
     }
 
     Matcher mMedian = PATTERN_MEDIAN.matcher(offset);
     if (mMedian.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MEDIAN, Integer.valueOf(mMedian.group(1)), 1, timeZone);
+      agg = BaselineAggregateType.MEDIAN;
+      shift = 1;
+      count = Integer.valueOf(mMedian.group(1));
+      unit = Unit.fromUnit(mMedian.group(2));
     }
 
     Matcher mMin = PATTERN_MIN.matcher(offset);
     if (mMin.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MIN, Integer.valueOf(mMin.group(1)), 1, timeZone);
+      agg = BaselineAggregateType.MIN;
+      shift = 1;
+      count = Integer.valueOf(mMin.group(1));
+      unit = Unit.fromUnit(mMin.group(2));
     }
 
     Matcher mMax = PATTERN_MAX.matcher(offset);
     if (mMax.find()) {
-      return BaselineAggregate.fromWeekOverWeek(BaselineAggregateType.MAX, Integer.valueOf(mMax.group(1)), 1, timeZone);
+      agg = BaselineAggregateType.MAX;
+      shift = 1;
+      count = Integer.valueOf(mMax.group(1));
+      unit = Unit.fromUnit(mMax.group(2));
     }
 
-    throw new IllegalArgumentException(String.format("Unknown offset '%s'", offset));
+    if (agg == null || unit == null || shift == Integer.MIN_VALUE || count == Integer.MIN_VALUE ) {
+      throw new IllegalArgumentException(String.format("Unsupported offset '%s'", offset));
+    }
+
+    switch (unit) {
+      case HOUR:
+        return BaselineAggregate.fromHourOverHour(agg, count, shift, timeZone);
+      case DAY:
+        return BaselineAggregate.fromDayOverDay(agg, count, shift, timeZone);
+      case WEEK:
+        return BaselineAggregate.fromWeekOverWeek(agg, count, shift, timeZone);
+      case MONTH:
+        return BaselineAggregate.fromMonthOverMonth(agg, count, shift, timeZone);
+      default:
+        throw new IllegalArgumentException(String.format("Unsupported unit '%s'", unit));
+    }
   }
 }
