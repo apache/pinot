@@ -72,8 +72,8 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
     DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(to, cc, bcc);
 
     Map<String, Object> alertFilterConfig = MapUtils.getMap(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CONFIGS);
-    if (alertFilterConfig == null) {
-      LOG.info("alertFilterConfig cannot be found in notification group {}", this.config.getId());
+    if (alertFilterConfig == null || alertFilterConfig.size() == 0) {
+      LOG.warn("alertFilterConfig is null or empty in notification group {}", this.config.getId());
     }
 
     for (Long functionId : this.detectionConfigIds) {
@@ -94,9 +94,9 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
       if (config.getProperties().containsKey(PROP_LEGACY_ALERT_FILTER_CLASS_NAME)) {
         String className = MapUtils.getString(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CLASS_NAME);
         alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
-        Map<String, String> params = MapUtils.getMap(alertFilterConfig, functionId);
+        Map<String, String> params = MapUtils.getMap(alertFilterConfig, functionId.toString());
         if (params == null) {
-          LOG.info("AlertFilter cannot be found for function {} in notification group {}", functionId, this.config.getId());
+          LOG.warn("AlertFilter cannot be found for function {} in notification group {}", functionId, this.config.getId());
         }
 
         alertFilter.setParameters(params);
