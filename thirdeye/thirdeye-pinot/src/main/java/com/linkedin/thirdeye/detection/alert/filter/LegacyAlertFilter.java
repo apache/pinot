@@ -50,15 +50,18 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
   private static final String PROP_TO = "to";
   private static final String PROP_CC = "cc";
   private static final String PROP_BCC = "bcc";
+  private static final String PROP_SEND_ONCE = "sendOnce";
 
   private final List<Long> detectionConfigIds;
   private final Map<Long, Long> vectorClocks;
+  private final boolean sendOnce;
 
   public LegacyAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) throws Exception {
     super(provider, config, endTime);
 
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     this.vectorClocks = this.config.getVectorClocks();
+    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
@@ -103,11 +106,15 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
       }
 
       BaseAlertFilter finalAlertFilter = alertFilter;
+      final long minId = getMinId(this.config.getHighWaterMark());
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
             @Override
             public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomaly) {
-              return mergedAnomaly != null && !mergedAnomaly.isChild() && finalAlertFilter.isQualified(mergedAnomaly);
+              return mergedAnomaly != null
+                      && !mergedAnomaly.isChild()
+                      && finalAlertFilter.isQualified(mergedAnomaly)
+                      && (mergedAnomaly.getId() == null || mergedAnomaly.getId() >= minId);
             }
           });
 
@@ -119,5 +126,13 @@ public class LegacyAlertFilter extends DetectionAlertFilter {
     }
 
     return result;
+  }
+
+  private long getMinId(long highWaterMark) {
+    if (this.sendOnce) {
+      return highWaterMark + 1;
+    } else {
+      return 0;
+    }
   }
 }

@@ -88,6 +88,7 @@ public class LegacyAlertFilterTest {
     properties.put(PROP_LEGACY_ALERT_FILTER_CLASS_NAME, "com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter");
     properties.put(PROP_LEGACY_ALERT_FILTER_CONFIG, "");
     properties.put(PROP_RECIPIENTS, recipientsMap);
+    detectionAlertConfig.setHighWaterMark(0L);
     detectionAlertConfig.setProperties(properties);
     detectionAlertConfig.setVectorClocks(new HashMap<Long, Long>());
 
