@@ -98,13 +98,14 @@ public class TimeSeriesResource {
       DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
       long maxDataTime = datasetMaxDataTimeCache.get(dataset);
 
-      currentEnd = roundEndTimeByGranularity(currentEnd, datasetConfig);
-      baselineEnd = roundEndTimeByGranularity(baselineEnd, datasetConfig);
       if (currentEnd > maxDataTime) {
         long delta = currentEnd - maxDataTime;
         currentEnd = currentEnd - delta;
         baselineEnd = baselineStart + (currentEnd - currentStart);
       }
+
+      currentEnd = roundEndTimeByGranularity(currentEnd, datasetConfig);
+      baselineEnd = roundEndTimeByGranularity(baselineEnd, datasetConfig);
 
       long analysisDuration = currentEnd - currentStart;
       if (baselineEnd - baselineStart != analysisDuration) {
