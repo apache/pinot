@@ -17,9 +17,9 @@
             "className" : "com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
             "maxGap" : 0,
             "nested" : [ {
-              "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
-              "detector" : "$rule1:THRESHOLD:0"
+              "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
             } ],
+            "detector" : "$rule1:THRESHOLD:0",
             "maxDuration" : 100
           } ]
         } ]
@@ -31,9 +31,9 @@
           "className" : "com.linkedin.thirdeye.detection.wrapper.BaselineFillingMergeWrapper",
           "maxGap" : 0,
           "nested" : [ {
-            "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper",
-            "detector" : "$rule2:THRESHOLD:0"
+            "className" : "com.linkedin.thirdeye.detection.wrapper.AnomalyDetectorWrapper"
           } ],
+          "detector" : "$rule2:THRESHOLD:0",
           "maxDuration" : 100
         } ]
       } ],

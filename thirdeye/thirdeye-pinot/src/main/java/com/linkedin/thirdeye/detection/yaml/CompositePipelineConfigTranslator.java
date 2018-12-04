@@ -138,6 +138,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_WINDOW_UNIT = "windowUnit";
   private static final String PROP_FREQUENCY = "frequency";
   private static final String PROP_MERGER = "merger";
+  private static final String PROP_TIMEZONE = "timezone";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE");
@@ -282,6 +283,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
       if (yamlConfig.containsKey(PROP_WINDOW_DELAY_UNIT)) {
         properties.put(PROP_WINDOW_DELAY_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY_UNIT));
+      }
+      if (yamlConfig.containsKey(PROP_TIMEZONE)){
+        properties.put(PROP_TIMEZONE, MapUtils.getString(yamlConfig, PROP_TIMEZONE));
       }
     }
   }
