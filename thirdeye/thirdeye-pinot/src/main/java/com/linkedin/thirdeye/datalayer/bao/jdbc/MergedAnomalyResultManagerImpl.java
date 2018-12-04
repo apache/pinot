@@ -405,6 +405,9 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       for (MergedAnomalyResultDTO child : entity.getChildren()) {
         if (child.getId() == null) {
           // only allow single level to prevent cycles
+          if (child == entity){
+            throw new IllegalArgumentException("Cannot contain itself as child anomaly");
+          }
           if (child.getChildren() != null && !child.getChildren().isEmpty()) {
             throw new IllegalArgumentException("Multi-level anomaly nesting not supported");
           }
