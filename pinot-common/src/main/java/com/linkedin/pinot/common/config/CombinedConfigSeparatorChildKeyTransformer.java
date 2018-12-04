@@ -45,6 +45,14 @@ public class CombinedConfigSeparatorChildKeyTransformer implements ChildKeyTrans
     // Move keys around so that they match with the combined config
     Map<String, Object> remappedConfig = config.flatMap((k, v) -> {
       if(k.startsWith("table.schema.")) {
+        // Remove realtime/offline suffixes
+        if (k.endsWith(".realtime")) {
+          k = k.substring(0, k.length() - ".realtime".length());
+        }
+        if (k.endsWith(".offline")) {
+          k = k.substring(0, k.length() - ".offline".length());
+        }
+
         // table.schema.foo -> schema.foo
         return List.of(Tuple.of(k.replaceFirst("table.schema", "schema"), v));
       } else if (k.endsWith(".realtime") && hasRealtime) {
