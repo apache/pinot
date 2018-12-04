@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -72,6 +73,11 @@ public class KafkaConnectionHandler {
   final Random _random = new Random();
 
   boolean isPartitionProvided;
+
+  @VisibleForTesting
+  public SimpleConsumer getSimpleConsumer() {
+    return _simpleConsumer;
+  }
 
   /**
    * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for

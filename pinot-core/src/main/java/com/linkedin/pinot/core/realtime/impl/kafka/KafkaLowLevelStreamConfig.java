@@ -49,9 +49,9 @@ public class KafkaLowLevelStreamConfig {
     String llcTimeoutKey =
         KafkaStreamConfigProperties.constructStreamProperty(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT);
     _bootstrapHosts = streamConfigMap.get(llcBrokerListKey);
-    _kafkaBufferSize = getConfigWithDefault(streamConfigMap, llcBufferKey,
+    _kafkaBufferSize = getIntConfigWithDefault(streamConfigMap, llcBufferKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT);
-    _kafkaSocketTimeout = getConfigWithDefault(streamConfigMap, llcTimeoutKey,
+    _kafkaSocketTimeout = getIntConfigWithDefault(streamConfigMap, llcTimeoutKey,
         KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT);
     Preconditions.checkNotNull(_bootstrapHosts,
         "Must specify kafka brokers list " + llcBrokerListKey + " in case of low level kafka consumer");
@@ -73,7 +73,7 @@ public class KafkaLowLevelStreamConfig {
     return _kafkaSocketTimeout;
   }
 
-  private int getConfigWithDefault(Map<String, String> configMap, String key, int defaultValue) {
+  private int getIntConfigWithDefault(Map<String, String> configMap, String key, int defaultValue) {
     String stringValue = configMap.get(key);
     try {
       if (StringUtils.isNotEmpty(stringValue)) {
