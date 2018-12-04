@@ -1,7 +1,7 @@
 import d3 from 'd3';
 import { isNone } from '@ember/utils';
 import moment from 'moment';
-import { splitFilterFragment, toFilterMap } from 'thirdeye-frontend/utils/rca-utils';
+import { splitFilterFragment, toFilterMap, makeTime } from 'thirdeye-frontend/utils/rca-utils';
 
 /**
  * The Promise returned from fetch() won't reject on HTTP error status even if the response is an HTTP 404 or 500.
@@ -94,7 +94,10 @@ export function humanizeScore(f) {
  * Helps with shorthand for repetitive date generation
  */
 export function buildDateEod(unit, type) {
-  return moment().subtract(unit, type).endOf('day').utc();
+  if (unit === 1) {
+    return makeTime().startOf('day');
+  }
+  return makeTime().subtract(unit-1, type).startOf('day');
 }
 
 /**
