@@ -23,6 +23,7 @@ import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.io.IOException;
 import kafka.api.FetchRequestBuilder;
 import kafka.javaapi.FetchResponse;
+import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
 import org.slf4j.Logger;
@@ -43,6 +44,11 @@ public class KafkaPartitionLevelConsumer extends KafkaConnectionHandler implemen
   public KafkaPartitionLevelConsumer(String clientId, StreamConfig streamConfig, int partition,
       KafkaSimpleConsumerFactory kafkaSimpleConsumerFactory) {
     super(clientId, streamConfig, partition, kafkaSimpleConsumerFactory);
+  }
+
+  @VisibleForTesting
+  public SimpleConsumer getSimpleConsumer() {
+    return _simpleConsumer;
   }
 
   /**
