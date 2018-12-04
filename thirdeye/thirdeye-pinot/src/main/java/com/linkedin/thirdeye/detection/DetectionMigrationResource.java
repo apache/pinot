@@ -59,6 +59,8 @@ public class DetectionMigrationResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(DetectionMigrationResource.class);
   private static final String PROP_WINDOW_DELAY = "windowDelay";
   private static final String PROP_WINDOW_DELAY_UNIT = "windowDelayUnit";
+  private static final String PROP_WINDOW_SIZE = "windowSize";
+  private static final String PROP_WINDOW_UNIT = "windowUnit";
 
   private final LegacyAnomalyFunctionTranslator translator;
   private final AnomalyFunctionManager anomalyFunctionDAO;
@@ -218,6 +220,8 @@ public class DetectionMigrationResource {
     }
     params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
     params.put("variables.timeZone", getTimezone(functionDTO));
+    detectorYaml.put(PROP_WINDOW_SIZE, functionDTO.getWindowSize());
+    detectorYaml.put(PROP_WINDOW_UNIT, functionDTO.getWindowUnit().toString());
     if (functionDTO.getWindowDelay() != 0) {
       detectorYaml.put(PROP_WINDOW_DELAY, functionDTO.getWindowDelay());
       detectorYaml.put(PROP_WINDOW_DELAY_UNIT, functionDTO.getWindowDelayUnit().toString());
