@@ -227,7 +227,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectorWrapper.class.getName());
     String detectorKey = makeComponentKey(ruleName, detectorType, id);
-    nestedProperties.put(PROP_DETECTOR, detectorKey);
 
     fillInWindowSizeAndUnit(nestedProperties, yamlConfig, detectorType);
 
@@ -242,6 +241,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     }
     String baselineProviderKey = makeComponentKey(ruleName, baselineProviderType, id);
     properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
+    properties.put(PROP_DETECTOR, detectorKey);
     buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
     properties.putAll(this.mergerProperties);
     return properties;

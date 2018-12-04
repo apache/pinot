@@ -61,7 +61,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_WINDOW_UNIT = "windowUnit";
   private static final String PROP_FREQUENCY = "frequency";
   private static final String PROP_DETECTOR = "detector";
-  private static final String PROP_DETECTOR_COMPONENT_KEY = "detectorComponentKey";
+  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
   private static final Logger LOG = LoggerFactory.getLogger(
       AnomalyDetectorWrapper.class);
@@ -80,7 +80,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private DateTimeZone dateTimeZone;
   // need to specify run frequency for minute level detection. Used for moving monitoring window alignment, default to be 15 minutes.
   private final TimeGranularity functionFrequency;
-  private final String detectorReferenceKey;
+  private final String detectorName;
 
   public AnomalyDetectorWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
@@ -90,9 +90,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     this.metric = provider.fetchMetrics(Collections.singleton(this.metricEntity.getId())).get(this.metricEntity.getId());
 
     Preconditions.checkArgument(this.config.getProperties().containsKey(PROP_DETECTOR));
-    this.detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
-    Preconditions.checkArgument(this.config.getComponents().containsKey(this.detectorReferenceKey));
-    this.anomalyDetector = (AnomalyDetector) this.config.getComponents().get(this.detectorReferenceKey);
+    this.detectorName = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_DETECTOR));
+    Preconditions.checkArgument(this.config.getComponents().containsKey(this.detectorName));
+    this.anomalyDetector = (AnomalyDetector) this.config.getComponents().get(this.detectorName);
 
     this.isMovingWindowDetection = MapUtils.getBooleanValue(config.getProperties(), PROP_MOVING_WINDOW_DETECTION, false);
     // delays to wait for data becomes available
@@ -125,7 +125,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
       anomaly.setMetric(this.metric.getName());
       anomaly.setCollection(this.metric.getDataset());
       anomaly.setDimensions(DetectionUtils.toFilterMap(this.metricEntity.getFilters()));
-      anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_KEY, this.detectorReferenceKey);
+      anomaly.getProperties().put(PROP_DETECTOR_COMPONENT_NAME, this.detectorName);
     }
     return new DetectionPipelineResult(anomalies);
   }

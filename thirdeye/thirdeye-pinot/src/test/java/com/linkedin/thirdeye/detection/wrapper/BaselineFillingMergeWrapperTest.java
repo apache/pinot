@@ -17,10 +17,12 @@
 package com.linkedin.thirdeye.detection.wrapper;
 
 import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.util.MetricSlice;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
@@ -95,16 +97,22 @@ public class BaselineFillingMergeWrapperTest {
   @Test
   public void testMergerCurrentAndBaselineLoading() throws Exception {
     MergedAnomalyResultDTO anomaly = makeAnomaly(3000, 3600);
+    anomaly.setProperties(ImmutableMap.of("detectorComponentName", "testDetector"));
     anomaly.setMetricUrn("thirdeye:metric:1");
 
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
     aggregates.put(MetricSlice.from(1, 3000, 3600), DataFrame.builder(COL_TIME + ":LONG", COL_VALUE + ":DOUBLE").append(-1, 100).build());
 
+    MetricConfigDTO metric = new MetricConfigDTO();
+    metric.setId(1L);
+    metric.setDefaultAggFunction(MetricAggFunction.SUM);
     DataProvider
-        provider = new MockDataProvider().setLoader(new MockPipelineLoader(this.runs, Collections.<MockPipelineOutput>emptyList())).setAnomalies(Collections.singletonList(anomaly)).setAggregates(aggregates);
+        provider = new MockDataProvider().setLoader(new MockPipelineLoader(this.runs, Collections.<MockPipelineOutput>emptyList())).setAnomalies(Collections.singletonList(anomaly)).setAggregates(aggregates)
+        .setMetrics(Collections.singletonList(metric));
 
     this.config.getProperties().put(PROP_MAX_GAP, 100);
     this.config.getProperties().put(PROP_BASELINE_PROVIDER, "$baseline");
+    this.config.getProperties().put("detector", "$testDetector");
     BaselineProvider baselineProvider = new MockBaselineProvider();
     MockBaselineProviderSpec spec = new MockBaselineProviderSpec();
     spec.setAggregates(ImmutableMap.of(MetricSlice.from(1, 3000, 3600), 100.0));
