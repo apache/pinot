@@ -65,8 +65,10 @@ public class DetectionUtils {
   }
 
   // get the component name from the reference key
+  // example "$myRule:ALGORITHM:0" -> "myRule:ALGORITHM:0"
   public static String getComponentName(String key) {
-    return key.substring(1);
+    if (isReferenceName(key)) return key.substring(1);
+    else throw new IllegalArgumentException("not a component reference key. should starts with $");
   }
 
   // get the spec class name for a component class
