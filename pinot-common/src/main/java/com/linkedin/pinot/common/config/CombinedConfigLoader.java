@@ -44,7 +44,14 @@ public class CombinedConfigLoader {
       private ConfigIncluder parent = null;
 
       public ConfigObject include(ConfigIncludeContext context, String what) {
-        return ConfigFactory.parseFileAnySyntax(new File(what)).root();
+        File file = new File(what);
+
+        // Attempt to locate the file
+        if (!file.exists()) {
+          file = new File("profiles", what);
+        }
+
+        return ConfigFactory.parseFileAnySyntax(file).root();
       }
 
       public ConfigIncluder withFallback(ConfigIncluder fallback) {
