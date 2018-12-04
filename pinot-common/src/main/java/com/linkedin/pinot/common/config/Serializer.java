@@ -131,7 +131,12 @@ public class Serializer {
         Class<?> dslValueType = dslClass.getMethod("parse", String.class).getReturnType();
         Object dslValueObject = Deserializer.deserialize(dslValueType, dslValueData, "");
         if (dslValueObject != null) {
-          return List.of(Tuple.of(configKey, dslInstance.unparse(dslValueObject)));
+          String unparsedValue = dslInstance.unparse(dslValueObject);
+          if (unparsedValue != null) {
+            return List.of(Tuple.of(configKey, unparsedValue));
+          } else {
+            return List.empty();
+          }
         } else {
           return List.empty();
         }
