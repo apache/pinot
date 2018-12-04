@@ -164,32 +164,6 @@ public class DetectionResource {
     return Response.ok(result).build();
   }
 
-  List<Interval> getReplayMonitoringWindows(DetectionConfigDTO detectionConfigDTO,long start, long end){
-    String cron = detectionConfigDTO.getCron();
-    long windowSize = end - start;
-    if(cron.equals("0 0 14 * * ? *")){
-      // daily
-      windowSize = TimeUnit.DAYS.toMillis(1);
-    } else if (cron.equals("0 0/15 * * * ? *")) {
-      windowSize = TimeUnit.MINUTES.toMillis(15);
-    } else if (cron.equals("0 0 * * * ? *")){
-      windowSize = TimeUnit.HOURS.toMillis(1);
-    }
-    List<Interval> intervals = new ArrayList<>();
-    long currStart = start;
-    long currEnd = currStart + windowSize;
-
-    while(currEnd < end){
-      intervals.add(new Interval(currStart, currEnd));
-      currStart = currEnd;
-      currEnd = currStart + windowSize;
-    }
-
-    if (currEnd >= end) {
-      intervals.add(new Interval(currStart, end));
-    }
-    return intervals;
-  }
 
   @POST
   @Path("/replay/{id}")
@@ -205,9 +179,10 @@ public class DetectionResource {
     }
 
     AnomalySlice slice = new AnomalySlice().withStart(start).withEnd(end);
-    if (deleteExistingAnomaly){
+    if (deleteExistingAnomaly) {
       // clear existing anomalies
-      Collection<MergedAnomalyResultDTO> existing = this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
+      Collection<MergedAnomalyResultDTO> existing =
+          this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
 
       List<Long> existingIds = new ArrayList<>();
       for (MergedAnomalyResultDTO anomaly : existing) {
@@ -217,25 +192,23 @@ public class DetectionResource {
     }
 
     // execute replay
-    List<Interval> intervals = getReplayMonitoringWindows(config, start, end);
-    for (Interval window : intervals){
-      DetectionPipeline pipeline = this.loader.from(this.provider, config, window.getStartMillis(), window.getEndMillis());
-      DetectionPipelineResult result = pipeline.run();
+    DetectionPipeline pipeline = this.loader.from(this.provider, config, start, end);
+    DetectionPipelineResult result = pipeline.run();
 
-      // save state
-      if (result.getLastTimestamp() > 0) {
-        config.setLastTimestamp(result.getLastTimestamp());
-      }
-
-      this.configDAO.update(config);
-
-      for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
-        anomaly.setAnomalyResultSource(AnomalyResultSource.ANOMALY_REPLAY);
-        this.anomalyDAO.save(anomaly);
-      }
+    // save state
+    if (result.getLastTimestamp() > 0) {
+      config.setLastTimestamp(result.getLastTimestamp());
     }
 
-    Collection<MergedAnomalyResultDTO> replayResult = this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
+    this.configDAO.update(config);
+
+    for (MergedAnomalyResultDTO anomaly : result.getAnomalies()) {
+      anomaly.setAnomalyResultSource(AnomalyResultSource.ANOMALY_REPLAY);
+      this.anomalyDAO.save(anomaly);
+    }
+
+    Collection<MergedAnomalyResultDTO> replayResult =
+        this.provider.fetchAnomalies(Collections.singleton(slice), configId).get(slice);
 
     LOG.info("replay detection pipeline {} generated {} anomalies.", config.getId(), replayResult.size());
     return Response.ok(replayResult).build();

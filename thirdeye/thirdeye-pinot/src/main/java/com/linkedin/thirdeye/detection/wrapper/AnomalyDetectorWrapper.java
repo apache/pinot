@@ -18,8 +18,10 @@ package com.linkedin.thirdeye.detection.wrapper;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -62,6 +64,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private static final String PROP_FREQUENCY = "frequency";
   private static final String PROP_DETECTOR = "detector";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  private static final String PROP_TIMEZONE = "timezone";
 
   private static final Logger LOG = LoggerFactory.getLogger(
       AnomalyDetectorWrapper.class);
@@ -76,11 +79,13 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
   private final MetricConfigDTO metric;
   private final MetricEntity metricEntity;
   private final boolean isMovingWindowDetection;
-  private DatasetConfigDTO dataset;
-  private DateTimeZone dateTimeZone;
   // need to specify run frequency for minute level detection. Used for moving monitoring window alignment, default to be 15 minutes.
   private final TimeGranularity functionFrequency;
   private final String detectorName;
+  private final long windowSizeMillis;
+  private final DatasetConfigDTO dataset;
+  private final DateTimeZone dateTimeZone;
+
 
   public AnomalyDetectorWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime) {
     super(provider, config, startTime, endTime);
@@ -94,15 +99,26 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     Preconditions.checkArgument(this.config.getComponents().containsKey(this.detectorName));
     this.anomalyDetector = (AnomalyDetector) this.config.getComponents().get(this.detectorName);
 
+    // emulate moving window or now
     this.isMovingWindowDetection = MapUtils.getBooleanValue(config.getProperties(), PROP_MOVING_WINDOW_DETECTION, false);
     // delays to wait for data becomes available
     this.windowDelay = MapUtils.getIntValue(config.getProperties(), PROP_WINDOW_DELAY, 0);
+    // window delay unit
     this.windowDelayUnit = TimeUnit.valueOf(MapUtils.getString(config.getProperties(), PROP_WINDOW_DELAY_UNIT, "DAYS"));
     // detection window size
     this.windowSize = MapUtils.getIntValue(config.getProperties(), PROP_WINDOW_SIZE, 1);
     this.windowUnit = TimeUnit.valueOf(MapUtils.getString(config.getProperties(), PROP_WINDOW_UNIT, "DAYS"));
+    this.windowSizeMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
+    // run frequency, used to determine moving windows for minute-level detection
     Map<String, Object> frequency = MapUtils.getMap(config.getProperties(), PROP_FREQUENCY, Collections.emptyMap());
     this.functionFrequency = new TimeGranularity(MapUtils.getIntValue(frequency, "size", 15), TimeUnit.valueOf(MapUtils.getString(frequency, "unit", "MINUTES")));
+
+    MetricEntity me = MetricEntity.fromURN(this.metricUrn);
+    MetricConfigDTO metricConfigDTO = this.provider.fetchMetrics(Collections.singletonList(me.getId())).get(me.getId());
+    this.dataset = this.provider.fetchDatasets(Collections.singletonList(metricConfigDTO.getDataset()))
+        .get(metricConfigDTO.getDataset());
+    // date time zone for moving windows. use dataset time zone as default
+    this.dateTimeZone = DateTimeZone.forID(MapUtils.getString(config.getProperties(), PROP_TIMEZONE, "America/Los_Angeles"));
   }
 
   @Override
@@ -112,6 +128,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     for (Interval window : monitoringWindows) {
       List<MergedAnomalyResultDTO> anomaliesForOneWindow = new ArrayList<>();
       try {
+        LOG.info("[New Pipeline] running detection for config {} metricUrn {}. start time {}, end time{}", config.getId(), metricUrn, window.getStart(), window.getEnd());
         anomaliesForOneWindow = anomalyDetector.runDetection(window, this.metricUrn);
       } catch (Exception e) {
         LOG.warn("[DetectionConfigID{}] detecting anomalies for window {} to {} failed.", this.config.getId(), window.getStart(), window.getEnd(), e);
@@ -130,20 +147,15 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     return new DetectionPipelineResult(anomalies);
   }
 
+  // get a list of the monitoring window, if no sliding window used, use start time and end time as window
   List<Interval> getMonitoringWindows() {
     if (this.isMovingWindowDetection) {
       try{
         List<Interval> monitoringWindows = new ArrayList<>();
-        MetricEntity me = MetricEntity.fromURN(this.metricUrn);
-        MetricConfigDTO metricConfigDTO =
-            this.provider.fetchMetrics(Collections.singletonList(me.getId())).get(me.getId());
-        dataset = this.provider.fetchDatasets(Collections.singletonList(metricConfigDTO.getDataset()))
-            .get(metricConfigDTO.getDataset());
-        dateTimeZone = DateTimeZone.forID(dataset.getTimezone());
         List<Long> monitoringWindowEndTimes = getMonitoringWindowEndTimes();
         for (long monitoringEndTime : monitoringWindowEndTimes) {
           long endTime = monitoringEndTime - TimeUnit.MILLISECONDS.convert(windowDelay, windowDelayUnit);
-          long startTime = endTime - TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
+          long startTime = endTime - this.windowSizeMillis;
           monitoringWindows.add(new Interval(startTime, endTime, dateTimeZone));
         }
         return monitoringWindows;
@@ -154,6 +166,7 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     return Collections.singletonList(new Interval(startTime, endTime));
   }
 
+  // get the list of monitoring window end times
   private List<Long> getMonitoringWindowEndTimes() {
     List<Long> endTimes = new ArrayList<>();
 
@@ -161,14 +174,22 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     DateTime currentEndTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(endTime, dateTimeZone)), dateTimeZone);
 
     DateTime lastDateTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(startTime, dateTimeZone)), dateTimeZone);
+    DateTime endTime = lastDateTime.plus(this.windowSizeMillis);
     Period bucketSizePeriod = getBucketSizePeriodForDataset();
-    while (lastDateTime.isBefore(currentEndTime)) {
-      lastDateTime = lastDateTime.plus(bucketSizePeriod);
-      endTimes.add(lastDateTime.getMillis());
+    while (endTime.isBefore(currentEndTime) || endTime.isEqual(currentEndTime)) {
+      endTimes.add(endTime.getMillis());
+      endTime = endTime.plus(bucketSizePeriod);
     }
     return endTimes;
   }
 
+  /**
+   * round this time to earlier boundary, depending on granularity of dataset
+   * e.g. 12:15pm on HOURLY dataset should be treated as 12pm
+   * any dataset with granularity finer than HOUR, will be rounded as per function frequency (assumption is that this is in MINUTES)
+   * so 12.53 on 5 MINUTES dataset, with function frequency 15 MINUTES will be rounded to 12.45
+   * See also {@link DetectionJobSchedulerUtils#getBoundaryAlignedTimeForDataset(DateTime, TimeUnit)}
+   */
   private long getBoundaryAlignedTimeForDataset(DateTime currentTime) {
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(dataset);
     TimeUnit dataUnit = timeSpec.getDataGranularity().getUnit();
@@ -192,6 +213,12 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     return currentTime.getMillis();
   }
 
+  /**
+   * get bucket size in millis, according to data granularity of dataset
+   * Bucket size are 1 HOUR for hourly, 1 DAY for daily
+   * For MINUTE level data, bucket size is calculated based on anomaly function frequency
+   * See also {@link DetectionJobSchedulerUtils#getBucketSizePeriodForDataset(DatasetConfigDTO, AnomalyFunctionDTO)} (DateTime, TimeUnit)}
+   */
   public Period getBucketSizePeriodForDataset() {
     Period bucketSizePeriod = null;
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(dataset);
