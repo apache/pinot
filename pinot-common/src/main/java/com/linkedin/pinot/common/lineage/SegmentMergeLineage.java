@@ -47,6 +47,22 @@ import org.slf4j.LoggerFactory;
  * 4. lineage information
  *    - If a segment group is created by merging multiple children segment groups, we write the lineage information
  *      (e.g. segment group C is merged from segment group A, B)
+ *
+ *
+ * Example)
+ * Let's say that we have 3 segments to begin with (S1, S2, S3). For original segments, we treat them specially by
+ * regarding each segment as a group. So, our lineage info will have the following data.
+ *
+ * _parentGroupToChildrenGroupsMap = empty
+ * _levelToGroupToSegmentsMap = { level_0 -> { G1 -> S1, G2 -> S2, G3 -> S3} }
+ *
+ * Let's say that a merge task merges S1, S2, S3 into S4, S5. Then, we now have a new group G4 (S4,S5). The lineage
+ * now would be the following:
+ *
+ * _parentGroupToChildrenGroupsMap = { G4 -> { G1, G2, G3} }
+ * _levelToGroupToSegmentsMap = { level_0 -> { G1 -> S1, G2 -> S2, G3 -> S3}
+ *                                level_1 -> { G4 -> S4, S5} }
+ *
  */
 public class SegmentMergeLineage {
 
@@ -63,7 +79,6 @@ public class SegmentMergeLineage {
   private Map<String, List<String>> _parentGroupToChildrenGroupsMap;
 
   // Mapping of group level to group id to segments that belong to a group
-  // Segment level represents
   private Map<Integer, Map<String, List<String>>> _levelToGroupToSegmentsMap;
 
   public SegmentMergeLineage(String tableNameWithType) {
@@ -128,33 +143,32 @@ public class SegmentMergeLineage {
    *
    * @param groupId a group id
    * @param currentGroupSegments a list of segments that belongs to the group
-   * @param childrenGroups a list of children groups that the current group covers
+   * @param childrenGroups a list of children groups that the current group covers. All children group ids has to be
+   *                       from the same group level.
    */
   public void addSegmentGroup(String groupId, List<String> currentGroupSegments, List<String> childrenGroups)
       throws InvalidConfigException {
     // Get group level
     Integer groupLevel = getGroupLevel(childrenGroups);
 
-    // Update group to segments map
     Map<String, List<String>> groupToSegmentMap =
         _levelToGroupToSegmentsMap.computeIfAbsent(groupLevel, k -> new HashMap<>());
-    if (groupToSegmentMap.containsKey(groupId)) {
-      throw new InvalidConfigException("Group id : " + groupId + " already exists.");
+    if (groupToSegmentMap.containsKey(groupId) || _parentGroupToChildrenGroupsMap.containsKey(groupId)) {
+      throw new InvalidConfigException("Group id : " + groupId + " already exists for table " + _tableNameWithType);
     }
+
+    // Update group to segments map
     groupToSegmentMap.put(groupId, new ArrayList<>(currentGroupSegments));
     _levelToGroupToSegmentsMap.put(groupLevel, groupToSegmentMap);
 
     // Update segment group lineage map
     if (groupLevel > DEFAULT_GROUP_LEVEL) {
-      if (_parentGroupToChildrenGroupsMap.containsKey(groupId)) {
-        throw new InvalidConfigException("Group id : " + groupId + " already exists.");
-      } else {
-        _parentGroupToChildrenGroupsMap.put(groupId, new ArrayList<>(childrenGroups));
-      }
+      _parentGroupToChildrenGroupsMap.put(groupId, new ArrayList<>(childrenGroups));
     }
 
-    LOGGER.info("New group has been added successfully to the segment lineage. (groupId: {}, currentGroupSegments: {}, "
-        + "childrenGroups: {}", groupId, currentGroupSegments, childrenGroups);
+    LOGGER.info("New group has been added successfully to the segment lineage. (tableName: {}, groupId: {}, "
+            + "currentGroupSegments: {}, childrenGroups: {}", _tableNameWithType, groupId, currentGroupSegments,
+        childrenGroups);
   }
 
   /**
@@ -174,7 +188,7 @@ public class SegmentMergeLineage {
       groupToSegments.remove(groupId);
     }
 
-    LOGGER.info("Group {} has been successfully removed.", groupId);
+    LOGGER.info("Group {} has been successfully removed for table {}.", groupId, _tableNameWithType);
   }
 
   /**
@@ -303,7 +317,8 @@ public class SegmentMergeLineage {
 
     // At this point, not all children groups are covered, cannot add group
     throw new InvalidConfigException("Cannot compute group level because not all children groups exist "
-        + "in the segment merge lineage, children groups: " + childrenGroups);
+        + "in the segment merge lineage, table name: " + _tableNameWithType + ", children groups: " + childrenGroups
+        + "table");
   }
 
   @Override

@@ -39,7 +39,7 @@ public class SegmentMergeLineageAccessHelper {
    *
    * @param propertyStore a property store
    * @param tableNameWithType a table name with type
-   * @return a ZNRecord of segment merge lineage
+   * @return a ZNRecord of segment merge lineage, return null if znode does not exist
    */
   public static ZNRecord getSegmentMergeLineageZNRecord(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
@@ -57,13 +57,16 @@ public class SegmentMergeLineageAccessHelper {
    *
    * @param propertyStore  a property store
    * @param tableNameWithType a table name with type
-   * @return a segment merge lineage
+   * @return a segment merge lineage, return null if znode does not exist
    */
   public static SegmentMergeLineage getSegmentMergeLineage(ZkHelixPropertyStore<ZNRecord> propertyStore,
       String tableNameWithType) {
-    String path = ZKMetadataProvider.constructPropertyStorePathForSegmentMergeLineage(tableNameWithType);
-    ZNRecord segmentMergeLineageZNRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
-    return SegmentMergeLineage.fromZNRecord(segmentMergeLineageZNRecord);
+    ZNRecord znRecord = getSegmentMergeLineageZNRecord(propertyStore, tableNameWithType);
+    SegmentMergeLineage segmentMergeLineage = null;
+    if (znRecord != null) {
+      segmentMergeLineage = SegmentMergeLineage.fromZNRecord(znRecord);
+    }
+    return segmentMergeLineage;
   }
 
   /**
