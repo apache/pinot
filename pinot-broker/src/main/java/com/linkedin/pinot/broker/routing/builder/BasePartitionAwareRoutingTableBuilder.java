@@ -18,6 +18,7 @@ package com.linkedin.pinot.broker.routing.builder;
 import com.linkedin.pinot.broker.pruner.SegmentPrunerContext;
 import com.linkedin.pinot.broker.pruner.SegmentZKMetadataPrunerService;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -82,14 +83,17 @@ public abstract class BasePartitionAwareRoutingTableBuilder implements RoutingTa
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
     // Copy the reference for the current segment to replica to server mapping for snapshot
     Map<String, Map<Integer, String>> segmentToReplicaToServerMap = _segmentToReplicaToServerMap;
 
     // Get all available segments for table
     Set<String> segmentsToQuery = segmentToReplicaToServerMap.keySet();
 
-    // TODO: add the selection logic here
+    // Selecting segments only required for processing a query
+    if (segmentSelector != null) {
+      segmentsToQuery = segmentSelector.selectSegments(request, segmentsToQuery);
+    }
 
     Map<String, List<String>> routingTable = new HashMap<>();
     SegmentPrunerContext prunerContext = new SegmentPrunerContext(request.getBrokerRequest());

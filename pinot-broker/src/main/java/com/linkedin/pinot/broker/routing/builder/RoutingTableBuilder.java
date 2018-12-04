@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import java.util.List;
@@ -45,9 +46,9 @@ public interface RoutingTableBuilder {
   void computeOnExternalViewChange(String tableName, ExternalView externalView, List<InstanceConfig> instanceConfigs);
 
   /**
-   * Get the routing table based on the given lookup request.
+   * Get the routing table based on the given lookup request and segment selector
    */
-  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request);
+  Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector);
 
   /**
    * Get all pre-computed routing tables.

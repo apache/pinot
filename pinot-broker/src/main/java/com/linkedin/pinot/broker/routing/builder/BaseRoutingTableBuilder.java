@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.RoutingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -123,16 +124,16 @@ public abstract class BaseRoutingTableBuilder implements RoutingTableBuilder {
     }
   }
 
-  @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
     if (_enableDynamicComputing) {
       // Copy the pointer for snapshot since the pointer for segment to servers map can change at anytime
       Map<String, List<String>> segmentToServersMap = _segmentToServersMap;
 
-      // Get all existing segments
+      // Selecting segments only required for processing a query
       Set<String> segmentsToQuery = segmentToServersMap.keySet();
-
-      // TODO: add the selection logic here
+      if (segmentSelector != null) {
+        segmentsToQuery = segmentSelector.selectSegments(request, segmentsToQuery);
+      }
 
       // Compute the final routing table
       return computeDynamicRoutingTable(segmentToServersMap, segmentsToQuery);

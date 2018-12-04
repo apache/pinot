@@ -17,6 +17,7 @@ package com.linkedin.pinot.broker.routing;
 
 import com.linkedin.pinot.broker.routing.builder.HighLevelConsumerBasedRoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.broker.util.FakePropertyStore;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableConfig.Builder;
 import com.linkedin.pinot.common.config.TableNameBuilder;
