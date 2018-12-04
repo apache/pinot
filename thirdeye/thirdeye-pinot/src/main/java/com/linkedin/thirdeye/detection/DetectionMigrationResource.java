@@ -118,7 +118,9 @@ public class DetectionMigrationResource {
 
     // detection
     ruleYaml.put("detection", Collections.singletonList(
-        ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO))));
+        ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO),
+            PROP_WINDOW_SIZE, anomalyFunctionDTO.getWindowSize(),
+    PROP_WINDOW_UNIT, anomalyFunctionDTO.getWindowUnit().toString())));
 
     // filters
     Map<String, String> alertFilter = anomalyFunctionDTO.getAlertFilter();
@@ -220,8 +222,6 @@ public class DetectionMigrationResource {
     }
     params.put("variables.bucketPeriod", getBucketPeriod(functionDTO));
     params.put("variables.timeZone", getTimezone(functionDTO));
-    detectorYaml.put(PROP_WINDOW_SIZE, functionDTO.getWindowSize());
-    detectorYaml.put(PROP_WINDOW_UNIT, functionDTO.getWindowUnit().toString());
     if (functionDTO.getWindowDelay() != 0) {
       detectorYaml.put(PROP_WINDOW_DELAY, functionDTO.getWindowDelay());
       detectorYaml.put(PROP_WINDOW_DELAY_UNIT, functionDTO.getWindowDelayUnit().toString());
