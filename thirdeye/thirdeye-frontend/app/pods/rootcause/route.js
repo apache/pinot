@@ -255,7 +255,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         makeTime().startOf('day').add(1, 'day').valueOf()
       ],
       granularity: '1_HOURS',
-      compareMode: 'WoW'
+      compareMode: 'wo1w'
     };
 
     // default params

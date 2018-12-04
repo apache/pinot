@@ -48,19 +48,19 @@ export default Component.extend({
   compareModeOptions: [
     {
       groupName: 'Weekly',
-      options: [ 'Wo1W', 'Wo2W', 'Wo3W', 'Wo4W', 'mean4w', 'median4w', 'min4w', 'max4w' ]
+      options: [ 'wo1w', 'wo2w', 'wo3w', 'wo4w', 'mean4w', 'median4w', 'min4w', 'max4w' ]
     },
     {
       groupName: 'Hourly',
-      options: [ 'Ho1H', 'Ho2H', 'Ho3H', 'Ho6H', 'mean6h', 'median6h', 'min6h', 'max6h' ]
+      options: [ 'ho1h', 'ho2h', 'ho3h', 'ho6h', 'mean6h', 'median6h', 'min6h', 'max6h' ]
     },
     {
       groupName: 'Daily',
-      options: [ 'Do1D', 'Do2D', 'Do3D', 'Do4D', 'mean4d', 'median4d', 'min4d', 'max4d' ]
+      options: [ 'do1d', 'do2d', 'do3d', 'do4d', 'mean4d', 'median4d', 'min4d', 'max4d' ]
     },
     {
       groupName: 'Monthly',
-      options: [ 'Mo1M', 'Mo2M', 'Mo3M', 'Mo6M', 'mean6m', 'median6m', 'min6m', 'max6m' ]
+      options: [ 'mo1m', 'mo2m', 'mo3m', 'mo6m', 'mean6m', 'median6m', 'min6m', 'max6m' ]
     },
     {
       groupName: 'Algorithm',
