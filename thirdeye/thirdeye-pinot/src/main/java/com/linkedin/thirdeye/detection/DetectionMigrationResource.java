@@ -28,6 +28,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -117,10 +118,21 @@ public class DetectionMigrationResource {
     ruleYaml.put("name", "myRule");
 
     // detection
-    ruleYaml.put("detection", Collections.singletonList(
-        ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO),
-            PROP_WINDOW_SIZE, anomalyFunctionDTO.getWindowSize(),
-    PROP_WINDOW_UNIT, anomalyFunctionDTO.getWindowUnit().toString())));
+    if (anomalyFunctionDTO.getType().equals("WEEK_OVER_WEEK_RULE")){
+      // wo1w change detector
+      ruleYaml.put("detection", Collections.singletonList(ImmutableMap.of("type", "PERCENTAGE_RULE",
+          "params", getPercentageChangeRuleDetectorParams(anomalyFunctionDTO))));
+    } else if (anomalyFunctionDTO.getType().equals("MIN_MAX_THRESHOLD")){
+      // threshold detector
+      ruleYaml.put("detection", Collections.singletonList(ImmutableMap.of("type", "THRESHOLD",
+          "params", getMinMaxThresholdRuleDetectorParams(anomalyFunctionDTO))));
+    } else{
+      // algorithm detector
+      ruleYaml.put("detection", Collections.singletonList(
+          ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO),
+              PROP_WINDOW_SIZE, anomalyFunctionDTO.getWindowSize(),
+              PROP_WINDOW_UNIT, anomalyFunctionDTO.getWindowUnit().toString())));
+    }
 
     // filters
     Map<String, String> alertFilter = anomalyFunctionDTO.getAlertFilter();
@@ -161,7 +173,7 @@ public class DetectionMigrationResource {
     return this.yaml.dump(yamlConfigs);
   }
 
-  private Map<String, Object> getDimensionExplorationParams(AnomalyFunctionDTO functionDTO) {
+  private Map<String, Object> getDimensionExplorationParams(AnomalyFunctionDTO functionDTO) throws IOException {
     Map<String, Object> dimensionExploreYaml = new LinkedHashMap<>();
     dimensionExploreYaml.put("dimensions", Collections.singletonList(functionDTO.getExploreDimensions()));
     if (functionDTO.getDataFilter() != null && !functionDTO.getDataFilter().isEmpty() && functionDTO.getDataFilter().get("type").equals("average_threshold")) {
@@ -169,6 +181,13 @@ public class DetectionMigrationResource {
       dimensionExploreYaml.put("dimensionFilterMetric", functionDTO.getDataFilter().get("metricName"));
       dimensionExploreYaml.put("minValue", Double.valueOf(functionDTO.getDataFilter().get("threshold")));
       dimensionExploreYaml.put("minLiveZone", functionDTO.getDataFilter().get("minLiveZone"));
+    }
+    if (functionDTO.getType().equals("MIN_MAX_THRESHOLD")){
+      // migrate volume threshold
+      Properties properties = AnomalyFunctionDTO.toProperties(functionDTO.getProperties());
+      if (properties.containsKey("averageVolumeThreshold")){
+        dimensionExploreYaml.put("minValue", properties.getProperty("averageVolumeThreshold"));
+      }
     }
     return dimensionExploreYaml;
   }
@@ -210,6 +229,33 @@ public class DetectionMigrationResource {
 
   private String getBucketPeriod(AnomalyFunctionDTO functionDTO) {
     return new Period(TimeUnit.MILLISECONDS.convert(functionDTO.getBucketSize(), functionDTO.getBucketUnit())).toString();
+  }
+
+  private Map<String, Object> getPercentageChangeRuleDetectorParams(AnomalyFunctionDTO functionDTO) throws IOException {
+    Map<String, Object> detectorYaml = new LinkedHashMap<>();
+    Properties properties = AnomalyFunctionDTO.toProperties(functionDTO.getProperties());
+    double threshold = Double.valueOf(properties.getProperty("changeThreshold"));
+    if (properties.containsKey("changeThreshold")){
+      detectorYaml.put("percentageChange", Math.abs(threshold));
+      if (threshold > 0){
+        detectorYaml.put("pattern", "UP");
+      } else {
+        detectorYaml.put("pattern", "DOWN");
+      }
+    }
+    return detectorYaml;
+  }
+
+  private Map<String, Object> getMinMaxThresholdRuleDetectorParams(AnomalyFunctionDTO functionDTO) throws IOException {
+    Map<String, Object> detectorYaml = new LinkedHashMap<>();
+    Properties properties = AnomalyFunctionDTO.toProperties(functionDTO.getProperties());
+    if (properties.containsKey("min")){
+      detectorYaml.put("min", properties.getProperty("min"));
+    }
+    if (properties.containsKey("max")){
+      detectorYaml.put("max", properties.getProperty("max"));
+    }
+    return detectorYaml;
   }
 
   private Map<String, Object> getAlgorithmDetectorParams(AnomalyFunctionDTO functionDTO) throws Exception {
