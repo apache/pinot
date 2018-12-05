@@ -158,6 +158,9 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
           long startTime = endTime - this.windowSizeMillis;
           monitoringWindows.add(new Interval(startTime, endTime, dateTimeZone));
         }
+        for (Interval window : monitoringWindows){
+          LOG.info("running detections in windows {}", window);
+        }
         return monitoringWindows;
       } catch (Exception e) {
         LOG.info("can't generate moving monitoring windows, calling with single detection window", e);
@@ -174,11 +177,10 @@ public class AnomalyDetectorWrapper extends DetectionPipeline {
     DateTime currentEndTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(endTime, dateTimeZone)), dateTimeZone);
 
     DateTime lastDateTime = new DateTime(getBoundaryAlignedTimeForDataset(new DateTime(startTime, dateTimeZone)), dateTimeZone);
-    DateTime endTime = lastDateTime.plus(this.windowSizeMillis);
     Period bucketSizePeriod = getBucketSizePeriodForDataset();
-    while (endTime.isBefore(currentEndTime) || endTime.isEqual(currentEndTime)) {
-      endTimes.add(endTime.getMillis());
-      endTime = endTime.plus(bucketSizePeriod);
+    while (lastDateTime.isBefore(currentEndTime)) {
+      lastDateTime = lastDateTime.plus(bucketSizePeriod);
+      endTimes.add(lastDateTime.getMillis());
     }
     return endTimes;
   }

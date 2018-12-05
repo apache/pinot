@@ -45,7 +45,6 @@ public class AnomalyDetectorWrapperTest {
   private MockDataProvider provider;
   private Map<String, Object> properties;
   private DetectionConfigDTO config;
-  private Map<String, Object> stageSpecs;
 
   @BeforeMethod
   public void setUp() {
