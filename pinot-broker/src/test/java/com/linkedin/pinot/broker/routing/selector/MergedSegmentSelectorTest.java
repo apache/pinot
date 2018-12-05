@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.lineage.SegmentMergeLineage;
 import com.linkedin.pinot.common.lineage.SegmentMergeLineageAccessHelper;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -43,13 +42,11 @@ public class MergedSegmentSelectorTest {
     ZkHelixPropertyStore<ZNRecord> fakePropertyStore = new FakePropertyStore();
     segmentSelector.init(tableConfig, fakePropertyStore);
 
-    // Add G0 (segment0), G1 (segment1), G2 (segment2) that represent 3 base segments
+    // Add G0 (segment0), G1 (segment1), G2 (segment2), G3 (segment3) that represent 4 base segments
     SegmentMergeLineage segmentMergeLineage = new SegmentMergeLineage(TEST_TABLE_NAME);
-    List<String> childrenGroups = new ArrayList<>();
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
       String groupId = "G" + i;
       segmentMergeLineage.addSegmentGroup(groupId, Arrays.asList(new String[]{"segment" + i}), null);
-      childrenGroups.add(groupId);
     }
 
     // Update segment merge lineage in the property store and update segment selector
@@ -57,14 +54,13 @@ public class MergedSegmentSelectorTest {
     segmentSelector.computeOnExternalViewChange();
 
     // Test the result of segment selection
-    Set<String> segmentsToQuery = new HashSet<>(Arrays.asList(
-        new String[]{"segment0", "segment1", "segment2", "segment3"}));
-    Set<String> selectedSegments = segmentSelector.selectSegments(null, segmentsToQuery);
-    Assert.assertEquals(selectedSegments,
-        new HashSet<>(Arrays.asList(new String[]{"segment0", "segment1", "segment2", "segment3"})));
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3"},
+        new String[]{"segment0", "segment1", "segment2", "segment3"});
 
-    // Add G3 (merged_0, merged_1) that was merged from G0, G1, G2
-    String mergedGroupId = "G3";
+    // Add G4 (merged_0, merged_1) that was merged from G0, G1, G2
+    String mergedGroupId = "G4";
+    List<String> childrenGroups = Arrays.asList(new String[]{"G0", "G1", "G2"});
     segmentMergeLineage.addSegmentGroup(mergedGroupId,
         Arrays.asList(new String[]{"merged0", "merged1"}), childrenGroups);
 
@@ -73,30 +69,81 @@ public class MergedSegmentSelectorTest {
     segmentSelector.computeOnExternalViewChange();
 
     // Test the result of segment selection
-    segmentsToQuery = new HashSet<>(Arrays.asList(
-        new String[]{"segment0", "segment1", "segment2", "merged0", "merged1"}));
-    selectedSegments = segmentSelector.selectSegments(null, segmentsToQuery);
-    Assert.assertEquals(selectedSegments,
-        new HashSet<>(Arrays.asList(new String[]{"merged0", "merged1"})));
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "merged0", "merged1"},
+        new String[]{"merged0", "merged1", "segment3"});
 
     // Test the result of segment selection when the external view does not have one of merged segments
-    segmentsToQuery = new HashSet<>(Arrays.asList(
-        new String[]{"segment0", "segment1", "segment2", "merged0"}));
-    selectedSegments = segmentSelector.selectSegments(null, segmentsToQuery);
-    Assert.assertEquals(selectedSegments,
-        new HashSet<>(Arrays.asList(new String[]{"segment0", "segment1", "segment2"})));
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "merged0"},
+        new String[]{"segment0", "segment1", "segment2", "segment3"});
 
-    // Add G4 (segment4)
-    segmentMergeLineage.addSegmentGroup("G4", Arrays.asList(new String[]{"segment3"}), null);
+    // Test the result of segment selection when one of the base segment is missing.
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment2", "segment3", "merged0", "merged1"},
+        new String[]{"merged0", "merged1", "segment3"});
+
+
+    // Add G5 (segment4)
+    segmentMergeLineage.addSegmentGroup("G5", Arrays.asList(new String[]{"segment4"}), null);
+
     // Update segment merge lineage in the property store and update segment selector
     SegmentMergeLineageAccessHelper.writeSegmentMergeLineage(fakePropertyStore, segmentMergeLineage, 0);
     segmentSelector.computeOnExternalViewChange();
 
     // Test the result of segment selection
-    segmentsToQuery = new HashSet<>(Arrays.asList(
-        new String[]{"segment0", "segment1", "segment2", "segment3", "merged0", "merged1"}));
-    selectedSegments = segmentSelector.selectSegments(null, segmentsToQuery);
-    Assert.assertEquals(selectedSegments,
-        new HashSet<>(Arrays.asList(new String[]{"merged0", "merged1", "segment3"})));
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4", "merged0", "merged1"},
+        new String[]{"merged0", "merged1", "segment3", "segment4"});
+
+    // Add G6 (merged3) that is merged from G3 (segment3), G5 (segment4)
+    segmentMergeLineage.addSegmentGroup("G6", Arrays.asList(new String[]{"merged2"}),
+        Arrays.asList(new String[]{"G3", "G5"}));
+
+    // Update segment merge lineage in the property store and update segment selector
+    SegmentMergeLineageAccessHelper.writeSegmentMergeLineage(fakePropertyStore, segmentMergeLineage, 0);
+    segmentSelector.computeOnExternalViewChange();
+
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4", "merged0", "merged1", "merged2"},
+        new String[]{"merged0", "merged1", "merged2"});
+
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4", "merged1", "merged2"},
+        new String[]{"segment0", "segment1", "segment2", "merged2"});
+
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4", "merged1"},
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4"});
+
+    // Add G7 (merged4) that is merged from G3, G6
+    segmentMergeLineage.addSegmentGroup("G7", Arrays.asList(new String[]{"merged3"}),
+        Arrays.asList(new String[]{"G4", "G6"}));
+
+    // Update segment merge lineage in the property store and update segment selector
+    SegmentMergeLineageAccessHelper.writeSegmentMergeLineage(fakePropertyStore, segmentMergeLineage, 0);
+    segmentSelector.computeOnExternalViewChange();
+
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4", "merged0", "merged1", "merged2", "merged3"},
+        new String[]{"merged3"});
+
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4", "merged0", "merged2", "merged3"},
+        new String[]{"merged3"});
+
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4", "merged0", "merged1", "merged2"},
+        new String[]{"merged0", "merged1", "merged2"});
+
+    testSegmentSelector(segmentSelector,
+        new String[]{"segment0", "segment1", "segment2", "segment3", "segment4", "merged0", "merged2"},
+        new String[]{"merged2", "segment0", "segment1", "segment2"});
+  }
+
+  private void testSegmentSelector(SegmentSelector segmentSelector, String[] segmentsToQuery, String[] expectedResult) {
+    Set<String> segmentsToQuerySet = new HashSet<>(Arrays.asList(segmentsToQuery));
+    Set<String> selectedSegments = segmentSelector.selectSegments(null, segmentsToQuerySet);
+    Assert.assertEquals(selectedSegments, new HashSet<>(Arrays.asList(expectedResult)));
   }
 }

@@ -23,11 +23,11 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 /**
  * Factory for segment selector
  */
-public class SegmentSelectorFactory {
+public class SegmentSelectorProvider {
 
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  public SegmentSelectorFactory(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public SegmentSelectorProvider(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     _propertyStore = propertyStore;
   }
 

@@ -18,7 +18,7 @@ package com.linkedin.pinot.broker.routing;
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
-import com.linkedin.pinot.broker.routing.selector.SegmentSelectorFactory;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelectorProvider;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -80,7 +80,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private Configuration _configuration;
 
   private RoutingTableBuilderFactory _routingTableBuilderFactory;
-  private SegmentSelectorFactory _segmentSelectorFactory;
+  private SegmentSelectorProvider _segmentSelectorProvider;
 
 
   public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore, HelixManager helixManager,
@@ -90,7 +90,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _routingTableBuilderMap = new HashMap<>();
     _helixManager = helixManager;
     _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore);
-    _segmentSelectorFactory = new SegmentSelectorFactory(propertyStore);
+    _segmentSelectorProvider = new SegmentSelectorProvider(propertyStore);
   }
 
   @Override
@@ -120,7 +120,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _routingTableBuilderMap.put(tableName, routingTableBuilder);
 
     // Initialize segment selector
-    SegmentSelector segmentSelector = _segmentSelectorFactory.getSegmentSelector(tableConfig);
+    SegmentSelector segmentSelector = _segmentSelectorProvider.getSegmentSelector(tableConfig);
     if (segmentSelector != null) {
       LOGGER.info("Initialized segmentSelector: {} for table {}", segmentSelector.getClass().getName(), tableName);
       _segmentSelectorMap.put(tableName, segmentSelector);
