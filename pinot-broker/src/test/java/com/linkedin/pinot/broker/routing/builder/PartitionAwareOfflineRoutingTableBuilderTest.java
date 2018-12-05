@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.broker.routing.builder;
 
-import com.linkedin.pinot.broker.routing.FakePropertyStore;
+import com.linkedin.pinot.broker.util.FakePropertyStore;
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.common.config.ReplicaGroupStrategyConfig;
 import com.linkedin.pinot.common.config.RoutingConfig;
@@ -50,7 +50,6 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
   private static final String PARTITION_COLUMN = "memberId";
 
   private static final Pql2Compiler COMPILER = new Pql2Compiler();
-
   private static final Random RANDOM = new Random();
 
   private int NUM_REPLICA;
@@ -114,7 +113,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       // Check the query that requires to scan all segment.
       String countStarQuery = "select count(*) from myTable";
       Map<String, List<String>> routingTable =
-          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
 
       // Check that the number of servers picked are always equal or less than the number of servers
       // from a single replica group.
@@ -134,7 +133,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
       for (int queryPartition = 0; queryPartition < 100; queryPartition++) {
         String filterQuery = "select count(*) from myTable where " + PARTITION_COLUMN + " = " + queryPartition;
         routingTable =
-            routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery));
+            routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(filterQuery), null);
 
         // Check that the number of servers picked are always equal or less than the number of servers
         // in a single replica group.
@@ -218,7 +217,7 @@ public class PartitionAwareOfflineRoutingTableBuilderTest {
     for (int i = 0; i < 100; i++) {
       String countStarQuery = "select count(*) from " + OFFLINE_TABLE_NAME;
       Map<String, List<String>> routingTable =
-          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery));
+          routingTableBuilder.getRoutingTable(buildRoutingTableLookupRequest(countStarQuery), null);
       Assert.assertEquals(routingTable.keySet().size(), 1);
       servers.add(routingTable.keySet().iterator().next());
     }

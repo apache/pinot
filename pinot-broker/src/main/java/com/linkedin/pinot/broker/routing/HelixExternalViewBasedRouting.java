@@ -17,6 +17,8 @@ package com.linkedin.pinot.broker.routing;
 
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.broker.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelectorProvider;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -67,6 +69,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private final Map<String, Map<String, InstanceConfig>> _lastKnownInstanceConfigsForTable = new ConcurrentHashMap<>();
   private final Map<String, InstanceConfig> _lastKnownInstanceConfigs = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> _tablesForInstance = new ConcurrentHashMap<>();
+  private final Map<String, SegmentSelector> _segmentSelectorMap = new ConcurrentHashMap<>();
 
   private final HelixExternalViewBasedTimeBoundaryService _timeBoundaryService;
   private final HelixManager _helixManager;
@@ -76,25 +79,25 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private Configuration _configuration;
 
-  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
-
   private RoutingTableBuilderFactory _routingTableBuilderFactory;
+  private SegmentSelectorProvider _segmentSelectorProvider;
+
 
   public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore, HelixManager helixManager,
       Configuration configuration) {
-    _propertyStore = propertyStore;
     _configuration = configuration;
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
     _routingTableBuilderMap = new HashMap<>();
     _helixManager = helixManager;
     _routingTableBuilderFactory = new RoutingTableBuilderFactory(_configuration, propertyStore);
+    _segmentSelectorProvider = new SegmentSelectorProvider(propertyStore);
   }
 
   @Override
   public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
     String tableName = request.getTableName();
     RoutingTableBuilder routingTableBuilder = _routingTableBuilderMap.get(tableName);
-    return routingTableBuilder.getRoutingTable(request);
+    return routingTableBuilder.getRoutingTable(request, _segmentSelectorMap.get(tableName));
   }
 
   @Override
@@ -115,6 +118,13 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     LOGGER.info("Initialized routingTableBuilder: {} for table {}", routingTableBuilder.getClass().getName(),
         tableName);
     _routingTableBuilderMap.put(tableName, routingTableBuilder);
+
+    // Initialize segment selector
+    SegmentSelector segmentSelector = _segmentSelectorProvider.getSegmentSelector(tableConfig);
+    if (segmentSelector != null) {
+      LOGGER.info("Initialized segmentSelector: {} for table {}", segmentSelector.getClass().getName(), tableName);
+      _segmentSelectorMap.put(tableName, segmentSelector);
+    }
 
     // Build the routing table
     if (externalView == null) {
@@ -236,7 +246,14 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     try {
       Map<String, InstanceConfig> relevantInstanceConfigs = new HashMap<>();
 
+      // Update routing table builder
       routingTableBuilder.computeOnExternalViewChange(tableNameWithType, externalView, instanceConfigs);
+
+      // Update segment selector
+      SegmentSelector segmentSelector = _segmentSelectorMap.get(tableNameWithType);
+      if (segmentSelector != null) {
+        segmentSelector.computeOnExternalViewChange();
+      }
 
       // Keep track of the instance configs that are used in that routing table
       updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs, externalView);

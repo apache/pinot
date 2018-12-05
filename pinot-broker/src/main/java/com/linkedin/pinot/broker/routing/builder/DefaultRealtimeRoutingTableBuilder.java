@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.SegmentName;
@@ -68,7 +69,7 @@ public class DefaultRealtimeRoutingTableBuilder implements RoutingTableBuilder {
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
     boolean forceLLC = false;
     boolean forceHLC = false;
     for (String routingOption : request.getRoutingOptions()) {
@@ -85,14 +86,14 @@ public class DefaultRealtimeRoutingTableBuilder implements RoutingTableBuilder {
     }
 
     if (forceLLC) {
-      return _realtimeLLCRoutingTableBuilder.getRoutingTable(request);
+      return _realtimeLLCRoutingTableBuilder.getRoutingTable(request, segmentSelector);
     } else if (forceHLC) {
-      return _realtimeHLCRoutingTableBuilder.getRoutingTable(request);
+      return _realtimeHLCRoutingTableBuilder.getRoutingTable(request, segmentSelector);
     } else {
       if (_hasLLC) {
-        return _realtimeLLCRoutingTableBuilder.getRoutingTable(request);
+        return _realtimeLLCRoutingTableBuilder.getRoutingTable(request, segmentSelector);
       } else if (_hasHLC) {
-        return _realtimeHLCRoutingTableBuilder.getRoutingTable(request);
+        return _realtimeHLCRoutingTableBuilder.getRoutingTable(request, segmentSelector);
       } else {
         return Collections.emptyMap();
       }

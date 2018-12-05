@@ -79,7 +79,7 @@ public class BalancedRandomRoutingTableBuilderTest {
     // Build routing table
     routingTableBuilder.computeOnExternalViewChange("dummy", externalView, instanceConfigList);
     RoutingTableLookupRequest request = new RoutingTableLookupRequest(tableNameWithType);
-    Map<String, List<String>> routingTable = routingTableBuilder.getRoutingTable(request);
+    Map<String, List<String>> routingTable = routingTableBuilder.getRoutingTable(request, null);
 
     Set<String> segmentsInRoutingTable = new HashSet<>();
     for (List<String> segments : routingTable.values()) {
