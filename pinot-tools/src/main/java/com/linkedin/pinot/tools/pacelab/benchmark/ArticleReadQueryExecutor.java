@@ -26,14 +26,17 @@ public class ArticleReadQueryExecutor extends QueryExecutor{
     private static String[] getQueries() {
         String[] queries = {
                 "SELECT COUNT(*) FROM ArticleRead" +
-                    " WHERE  ReadStartTime > %d AND ReadStartTime < %d",
+                    "%s",
+
                 "SELECT COUNT(*) FROM ArticleRead" +
-                    " WHERE ReadStartTime > %d AND ReadStartTime < %d AND ArticleID = '%s'",
+                    " WHERE ArticleID = '%s'" + "%s",
+
                 "SELECT ArticleTopic, COUNT(*), AVG(TimeSpent), AVG(ReaderStrength) FROM ArticleRead" +
-                    " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
+                    "%s" +
                     " GROUP BY ArticleTopic TOP %d",
+
                 "SELECT ArticleAuthor, ArticleTitle, ReaderStrength, COUNT(*) FROM ArticleRead" +
-                    " WHERE ReadStartTime > %d AND ReadStartTime < %d" +
+                    "%s" +
                     " GROUP BY ArticleAuthor, ArticleTitle, ReaderStrength TOP %d"
         };
         return queries;
@@ -50,6 +53,6 @@ public class ArticleReadQueryExecutor extends QueryExecutor{
     }
 
     public ArticleReadQueryTask getTask(Properties config) {
-        return new ArticleReadQueryTask(config, QUERIES, _dataDir, _testDuration);
+        return new ArticleReadQueryTask(config, QUERIES, _dataDir, _testDuration, getCriteria(Constant.MAX_READ_START_TIME,Constant.MIN_READ_START_TIME));
     }
 }

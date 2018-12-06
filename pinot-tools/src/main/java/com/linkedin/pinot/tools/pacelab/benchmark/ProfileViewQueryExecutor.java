@@ -28,21 +28,28 @@ public class ProfileViewQueryExecutor extends QueryExecutor{
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d",
                 "SELECT * FROM ProfileView" +
                     " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s' LIMIT %d",*/
-        "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView" +
-        //                " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'",
-      			  " WHERE ViewedProfileId = '%s'",
-	"SELECT ViewerPosition, COUNT(*) FROM ProfileView" +
-                        //" WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'"+
-                        " WHERE ViewedProfileId = '%s'"+
-			" GROUP BY ViewerPosition TOP %d",
-	"SELECT ViewerWorkPlace, COUNT(*) FROM ProfileView" +
-                       // " WHERE ViewStartTime > %d AND ViewStartTime < %d AND ViewedProfileId = '%s'"+
-                        " WHERE ViewedProfileId = '%s'"+
-			" GROUP BY ViewerWorkPlace TOP %d",
-        "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView" +
-                        " WHERE ViewedProfilePosition = '%s'",
-        "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView " +
-                        " WHERE ViewedProfileWorkPlace = '%s'"
+		    "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView" +     
+		    					" WHERE ViewedProfileId = '%s'"+
+		    					"%s",
+		    					
+    					
+			"SELECT ViewerPosition, COUNT(*) FROM ProfileView" +
+							" WHERE ViewedProfileId = '%s'"+
+							"%s"+
+							" GROUP BY ViewerPosition TOP %d",
+					
+			"SELECT ViewerWorkPlace, COUNT(*) FROM ProfileView" +
+							" WHERE ViewedProfileId = '%s'"+
+							"%s"+
+							" GROUP BY ViewerWorkPlace TOP %d",
+							
+			"SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView" +
+                        " WHERE ViewedProfilePosition = '%s'"+
+                        "%s",
+                        
+            "SELECT COUNT(*), AVG(ReviewTime), AVG(ViewerProfileStrength) FROM ProfileView " +
+                        " WHERE ViewedProfileWorkPlace = '%s'"+
+                        "%s"
         /*
 	"SELECT ViewedProfilePosition, COUNT(*), AVG(ReviewTime) FROM ProfileView" +
         //		" WHERE ViewStartTime > %d AND ViewStartTime < %d" +
@@ -87,6 +94,6 @@ public class ProfileViewQueryExecutor extends QueryExecutor{
     }
 
     public ProfileViewQueryTask getTask(Properties config) {
-        return new ProfileViewQueryTask(config, QUERIES, _dataDir, _testDuration);
+        return new ProfileViewQueryTask(config, QUERIES, _dataDir, _testDuration, getCriteria(Constant.MAX_PROFILE_START_TIME,Constant.MIN_PROFILE_START_TIME));
     }
 }

@@ -25,7 +25,7 @@ import java.util.Properties;
 import java.util.Random;
 
 
-public class JobApplyQueryTask extends QueryTask {
+public class JobApplyQueryTask extends QueryTaskDaemon {
     List<GenericRow> _jobTable;
     List<GenericRow> _profileTable;
     ZipfRandom _zipfRandom;
@@ -34,19 +34,13 @@ public class JobApplyQueryTask extends QueryTask {
     Random _jobIndexGenerator;
     Random _profileIndexGenerator;
 
-    public JobApplyQueryTask(Properties config, String[] queries, String dataDir, int testDuration) {
+    public JobApplyQueryTask(Properties config, String[] queries, String dataDir, int testDuration, Criteria pCriteria) {
         setConfig(config);
         setQueries(queries);
         setDataDir(dataDir);
         setTestDuration(testDuration);
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
-
-        long minApplyStartTime= Long.parseLong(config.getProperty("MinApplyStartTime"));
-        long maxApplyStartTime = Long.parseLong(config.getProperty("MaxApplyStartTime"));
-
-        double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
-        int hourCount = (int) Math.ceil((maxApplyStartTime-minApplyStartTime)/(HourSecond));
-        _zipfRandom = new ZipfRandom(zipfS,hourCount);
+        criteria = pCriteria;
 
         _jobIndexGenerator = new Random(System.currentTimeMillis());
         _profileIndexGenerator = new Random(System.currentTimeMillis());
@@ -68,56 +62,57 @@ public class JobApplyQueryTask extends QueryTask {
 
 
     public void generateAndRunQuery(int queryId) throws Exception {
+        generateAndRunQuery(queryId,0);
+    }
+
+    public void generateAndRunQuery(int queryId, int queryType) throws Exception {
         EventTableGenerator eventTableGenerator = new EventTableGenerator(_dataDir);
         Properties config = getConfig();
         String[] queries = getQueries();
 
-        long minApplyStartTime= Long.parseLong(config.getProperty("MinApplyStartTime"));
-        long maxApplyStartTime = Long.parseLong(config.getProperty("MaxApplyStartTime"));
-
-        //double zipfS = Double.parseDouble(config.getProperty("ZipfSParameter"));
-        //LongRange timeRange = CommonTools.getZipfRandomDailyTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
-        //LongRange timeRange = CommonTools.getZipfRandomHourlyTimeRange(minApplyStartTime,maxApplyStartTime,zipfS);
-
-        int firstHour = _zipfRandom.nextInt();
-        //int secondHour = _zipfRandom.nextInt();
-
-        //long queriedEndTime = maxApplyStartTime - firstHour*HourSecond;
-        long queriedEndTime = maxApplyStartTime;
-        long queriedStartTime = Math.max(minApplyStartTime,queriedEndTime - firstHour*HourSecond);
-
-        LongRange timeRange =  new LongRange(queriedStartTime,queriedEndTime);
-
         int selectLimit = CommonTools.getSelectLimt(config);
         int groupByLimit = Integer.parseInt(config.getProperty("GroupByLimit"));
-
-        //List<GenericRow> profileTable = eventTableGenerator.readProfileTable();
-        //GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(profileTable);
 
         GenericRow randomJob = eventTableGenerator.getRandomGenericRow(_jobTable, _jobIndexGenerator);
         GenericRow randomProfile = eventTableGenerator.getRandomGenericRow(_profileTable, _profileIndexGenerator);
 
-        String query = "";
+        String query;
+        String clause = criteria.getClause(Constant.APPLY_START_TIME, queryType);
         switch (queryId) {
             case 0:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong());
+                if(!clause.equals("")){
+                    clause = " WHERE "+clause;
+                }
+                query = String.format(queries[queryId], clause);
                 runQuery(query);
                 break;
             case 1:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomProfile.getValue("ID"), selectLimit);
+                if(!clause.equals("")){
+                    clause = " AND " +clause;
+                }
+                query = String.format(queries[queryId], randomProfile.getValue("ID"), clause, selectLimit);
                 runQuery(query);
                 break;
 
             case 2:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), randomJob.getValue("Company"), groupByLimit);
+                if(!clause.equals("")){
+                    clause = " AND " +clause;
+                }
+                query = String.format(queries[queryId], randomJob.getValue("Company"), clause, groupByLimit);
                 runQuery(query);
                 break;
             case 3:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
+                if(!clause.equals("")){
+                    clause = " WHERE "+clause;
+                }
+                query = String.format(queries[queryId], clause, groupByLimit);
                 runQuery(query);
                 break;
             case 4:
-                query = String.format(queries[queryId], timeRange.getMinimumLong(), timeRange.getMaximumLong(), groupByLimit);
+                if(!clause.equals("")){
+                    clause = " WHERE "+clause;
+                }
+                query = String.format(queries[queryId], clause, groupByLimit);
                 runQuery(query);
                 break;
         }

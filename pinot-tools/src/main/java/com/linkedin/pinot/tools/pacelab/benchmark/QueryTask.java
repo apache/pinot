@@ -29,6 +29,7 @@ public class QueryTask implements Runnable{
     protected String _dataDir;
     protected int _testDuration;
     //static int queryCount=0;
+    protected Criteria criteria;
 
     public enum Color {
         RESET("\u001B[0m"),

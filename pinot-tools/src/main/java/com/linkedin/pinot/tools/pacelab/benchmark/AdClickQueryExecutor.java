@@ -25,14 +25,17 @@ public class AdClickQueryExecutor extends QueryExecutor{
     private static String[] getQueries() {
         String[] queries = {
                 "SELECT COUNT(*) FROM AdClick" +
-                        " WHERE ClickTime > %d AND ClickTime < %d",
+                        "%s",
+
                 "SELECT COUNT(*) FROM AdClick" +
-                        " WHERE ClickTime > %d AND ClickTime < %d AND AdID = '%s'" ,
+                        " WHERE AdID = '%s'" + "%s",
+
                 "SELECT AdCampaign, COUNT(*), AVG(ViewerStrength), MIN(ViewerStrength), MAX(ViewerStrength) FROM AdClick" +
-                        " WHERE ClickTime > %d AND ClickTime < %d" +
+                        "%s" +
                         " GROUP BY AdCampaign TOP %d",
+
                 "SELECT AdCompany, ViewerPosition, ViewerStrength, COUNT(*) FROM AdClick" +
-                        " WHERE ClickTime > %d AND ClickTime < %d" +
+                        "%s" +
                         " GROUP BY AdCompany, ViewerPosition, ViewerStrength TOP %d"
         };
         return queries;
@@ -49,6 +52,6 @@ public class AdClickQueryExecutor extends QueryExecutor{
     }
 
     public AdClickQueryTask getTask(Properties config) {
-        return new AdClickQueryTask(config, QUERIES, _dataDir, _testDuration);
+        return new AdClickQueryTask(config, QUERIES, _dataDir, _testDuration, getCriteria(Constant.MAX_CLICK_TIME,Constant.MIN_CLICK_TIME));
     }
 }

@@ -48,6 +48,9 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
     @Option(name = "-slotDuration", required = false, metaVar = "<int>", usage = "Slot duration.")
     private  int _slotDuration = DEFAULT_TEST_DURATION;
 
+    @Option(name = "-useCPUMap", required = false, metaVar = "<int>", usage = "Test using CPU load mappings")
+    private int _useCPUMap = 0;
+
     public PinotBenchmarkQueryGeneratorCommand setBrokerHost (String brokerHost) {
         _brokerHost = brokerHost;
         return this;
@@ -76,6 +79,7 @@ public class PinotBenchmarkQueryGeneratorCommand extends AbstractBaseAdminComman
             executor.setRecordFile(_recordFile);
             executor.setTestDuration(_testDuration);
             executor.setSlotDuration(_slotDuration);
+            executor.setUseCPUMap(_useCPUMap);
             executor.start();
         }
 
