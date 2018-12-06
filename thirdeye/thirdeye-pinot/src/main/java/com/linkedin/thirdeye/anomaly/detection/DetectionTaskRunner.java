@@ -259,7 +259,7 @@ public class DetectionTaskRunner implements TaskRunner {
       historyMergedAnomalies = Collections.emptyList();
     }
 
-    LOG.info("Analyzing anomaly function with explored dimensions: {}, windowStart: {}, windowEnd: {}",
+    LOG.info("[Old pipeline] Analyzing anomaly function with explored dimensions: {}, windowStart: {}, windowEnd: {}",
         dimensionMap, windowStart, windowEnd);
 
     AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);

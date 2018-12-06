@@ -138,6 +138,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private static final String PROP_WINDOW_UNIT = "windowUnit";
   private static final String PROP_FREQUENCY = "frequency";
   private static final String PROP_MERGER = "merger";
+  private static final String PROP_TIMEZONE = "timezone";
 
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   private static final Map<String, String> DETECTOR_TO_BASELINE = ImmutableMap.of("ALGORITHM", "ALGORITHM_BASELINE");
@@ -227,7 +228,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Map<String, Object> nestedProperties = new HashMap<>();
     nestedProperties.put(PROP_CLASS_NAME, AnomalyDetectorWrapper.class.getName());
     String detectorKey = makeComponentKey(ruleName, detectorType, id);
-    nestedProperties.put(PROP_DETECTOR, detectorKey);
 
     fillInWindowSizeAndUnit(nestedProperties, yamlConfig, detectorType);
 
@@ -242,6 +242,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     }
     String baselineProviderKey = makeComponentKey(ruleName, baselineProviderType, id);
     properties.put(PROP_BASELINE_PROVIDER, baselineProviderKey);
+    properties.put(PROP_DETECTOR, detectorKey);
     buildComponentSpec(yamlConfig, baselineProviderType, baselineProviderKey);
     properties.putAll(this.mergerProperties);
     return properties;
@@ -282,6 +283,9 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
       if (yamlConfig.containsKey(PROP_WINDOW_DELAY_UNIT)) {
         properties.put(PROP_WINDOW_DELAY_UNIT, MapUtils.getString(yamlConfig, PROP_WINDOW_DELAY_UNIT));
+      }
+      if (yamlConfig.containsKey(PROP_TIMEZONE)){
+        properties.put(PROP_TIMEZONE, MapUtils.getString(yamlConfig, PROP_TIMEZONE));
       }
     }
   }

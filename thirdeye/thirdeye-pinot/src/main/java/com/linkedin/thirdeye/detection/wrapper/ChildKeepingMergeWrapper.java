@@ -20,7 +20,6 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.algorithm.MergeWrapper;
-import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -37,7 +36,7 @@ import java.util.Map;
  */
 public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
   public ChildKeepingMergeWrapper(DataProvider provider, DetectionConfigDTO config, long startTime, long endTime)
-      throws Exception {
+  {
     super(provider, config, startTime, endTime);
   }
 
@@ -105,6 +104,7 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
     newAnomaly.setFeedback(anomaly.getFeedback());
     newAnomaly.setAnomalyFeedbackId(anomaly.getAnomalyFeedbackId());
     newAnomaly.setScore(anomaly.getScore());
+    newAnomaly.setWeight(anomaly.getWeight());
     return newAnomaly;
   }
 }

@@ -40,11 +40,11 @@ public class AnomalyDetectorWrapperTest {
   private static final String PROP_METRIC_URN = "metricUrn";
   private static final String PROP_MOVING_WINDOW_DETECTION = "isMovingWindowDetection";
   private static final String PROP_DETECTOR = "detector";
+  private static final String PROP_TIMEZONE = "timezone";
 
   private MockDataProvider provider;
   private Map<String, Object> properties;
   private DetectionConfigDTO config;
-  private Map<String, Object> stageSpecs;
 
   @BeforeMethod
   public void setUp() {
@@ -80,8 +80,22 @@ public class AnomalyDetectorWrapperTest {
   @Test
   public void testMovingMonitoringWindow() {
     this.properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+    this.properties.put(PROP_TIMEZONE, TimeSpec.DEFAULT_TIMEZONE);
     AnomalyDetectorWrapper detectionPipeline =
         new AnomalyDetectorWrapper(this.provider, this.config, 1540147725000L, 1540493325000L);
+    List<Interval> monitoringWindows = detectionPipeline.getMonitoringWindows();
+    DateTimeZone timeZone = DateTimeZone.forID(TimeSpec.DEFAULT_TIMEZONE);
+    Assert.assertEquals(monitoringWindows,
+        Arrays.asList(new Interval(1540080000000L, 1540166400000L, timeZone), new Interval(1540166400000L, 1540252800000L, timeZone),
+            new Interval(1540252800000L, 1540339200000L, timeZone), new Interval(1540339200000L, 1540425600000L, timeZone)));
+  }
+
+  @Test
+  public void testMovingMonitoringWindowBoundary() {
+    this.properties.put(PROP_MOVING_WINDOW_DETECTION, true);
+    this.properties.put(PROP_TIMEZONE, TimeSpec.DEFAULT_TIMEZONE);
+    AnomalyDetectorWrapper detectionPipeline =
+        new AnomalyDetectorWrapper(this.provider, this.config, 1540080000000L, 1540425600000L);
     List<Interval> monitoringWindows = detectionPipeline.getMonitoringWindows();
     DateTimeZone timeZone = DateTimeZone.forID(TimeSpec.DEFAULT_TIMEZONE);
     Assert.assertEquals(monitoringWindows,
