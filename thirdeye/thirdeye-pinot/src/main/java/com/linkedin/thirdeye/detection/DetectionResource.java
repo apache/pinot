@@ -177,7 +177,7 @@ public class DetectionResource {
     switch (config.getCron()) {
       case DAILY_CRON:
         // daily
-        return TimeUnit.DAYS.toMillis(1) + 1;
+        return TimeUnit.DAYS.toMillis(1);
       case MINUTE_CRON:
         // minute level
         return TimeUnit.MINUTES.toMillis(15);
