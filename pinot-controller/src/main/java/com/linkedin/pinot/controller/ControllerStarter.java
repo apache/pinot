@@ -293,6 +293,9 @@ public class ControllerStarter {
       LOGGER.info("Stopping Jersey admin API");
       _adminApp.stop();
 
+      LOGGER.info("Stopping PinotLLCRealtimeSegmentManager");
+      PinotLLCRealtimeSegmentManager.getInstance().stop();
+
       LOGGER.info("Stopping realtime segment manager");
       _realtimeSegmentsManager.stop();
 

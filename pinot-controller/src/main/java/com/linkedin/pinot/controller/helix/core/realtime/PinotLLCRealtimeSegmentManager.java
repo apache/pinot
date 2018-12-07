@@ -111,6 +111,7 @@ public class PinotLLCRealtimeSegmentManager {
    * The segment will be eligible for repairs by the validation manager, if the time  exceeds this value
    */
   private static int MAX_SEGMENT_COMPLETION_TIME_MINS = 10;
+  private static int WAIT_FOR_COMMIT_SEGMENT_METADATA_SECONDS = 30;
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -127,6 +128,8 @@ public class PinotLLCRealtimeSegmentManager {
   private final TableConfigCache _tableConfigCache;
   private final StreamPartitionAssignmentGenerator _streamPartitionAssignmentGenerator;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
+
+  private volatile boolean _stop = false;
 
   public boolean getIsSplitCommitEnabled() {
     return _controllerConf.getAcceptSplitCommit();
@@ -157,6 +160,11 @@ public class PinotLLCRealtimeSegmentManager {
 
   public void start() {
     _helixManager.addControllerListener(changeContext -> onBecomeLeader());
+  }
+
+  public void stop() {
+    _stop = true;
+    Uninterruptibles.sleepUninterruptibly(WAIT_FOR_COMMIT_SEGMENT_METADATA_SECONDS, TimeUnit.SECONDS);
   }
 
   protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
@@ -395,6 +403,11 @@ public class PinotLLCRealtimeSegmentManager {
    * @return boolean
    */
   public boolean commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    // Do not allow segment metadata updates to proceed if controller is stopping
+    if (_stop) {
+      return false;
+    }
+
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TableConfig tableConfig = getRealtimeTableConfig(realtimeTableName);
     if (tableConfig == null) {
