@@ -80,6 +80,9 @@ public class LocalPinotFS extends PinotFS {
         // dst file exists, returning
         return false;
       }
+    } else {
+      // ensure the dst path exists
+      FileUtils.forceMkdir(dstFile.getParentFile());
     }
 
     Files.move(srcFile.toPath(), dstFile.toPath());
