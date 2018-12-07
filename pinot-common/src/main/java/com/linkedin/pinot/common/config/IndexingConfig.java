@@ -116,7 +116,7 @@ public class IndexingConfig {
     _sortedColumn = sortedColumn;
   }
 
-  
+
   public List<String> getBloomFilterColumns() {
     return _bloomFilterColumns;
   }
@@ -275,7 +275,8 @@ public class IndexingConfig {
         .isEqual(_noDictionaryColumns, that._noDictionaryColumns) && EqualityUtils.isEqual(_noDictionaryConfig,
         that._noDictionaryConfig) && EqualityUtils.isEqual(_onHeapDictionaryColumns, that._onHeapDictionaryColumns)
         && EqualityUtils.isEqual(_starTreeIndexSpec, that._starTreeIndexSpec) && EqualityUtils.isEqual(
-        _segmentPartitionConfig, that._segmentPartitionConfig);
+        _segmentPartitionConfig, that._segmentPartitionConfig) && EqualityUtils.isEqual(_bloomFilterColumns,
+        that._bloomFilterColumns);
   }
 
   @Override
@@ -293,6 +294,7 @@ public class IndexingConfig {
     result = EqualityUtils.hashCodeOf(result, _onHeapDictionaryColumns);
     result = EqualityUtils.hashCodeOf(result, _starTreeIndexSpec);
     result = EqualityUtils.hashCodeOf(result, _segmentPartitionConfig);
+    result = EqualityUtils.hashCodeOf(result, _bloomFilterColumns);
     return result;
   }
 }

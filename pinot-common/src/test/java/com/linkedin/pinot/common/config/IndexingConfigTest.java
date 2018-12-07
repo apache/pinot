@@ -43,6 +43,7 @@ public class IndexingConfigTest {
 
     String[] expectedOnHeapDictionaryColumns = new String[] {"x", "y", "z"};
     json.put("onHeapDictionaryColumns", Arrays.asList(expectedOnHeapDictionaryColumns));
+
     json.put("loadMode", "MMAP");
     json.put("keyThatIsUnknown", "randomValue");
     json.put("aggregateMetrics", "true");
@@ -51,6 +52,9 @@ public class IndexingConfigTest {
     noDictConfig.put("a", "SNAPPY");
     noDictConfig.put("b", "PASS_THROUGH");
     json.put("noDictionaryConfig", noDictConfig);
+
+    String[] expectedBloomFilterColumns = new String[] {"a", "b"};
+    json.put("bloomFilterColumns", Arrays.asList(expectedBloomFilterColumns));
 
     ObjectMapper mapper = new ObjectMapper();
     JsonNode jsonNode = mapper.readTree(json.toString());
@@ -82,6 +86,12 @@ public class IndexingConfigTest {
     }
 
     Assert.assertTrue(indexingConfig.getAggregateMetrics());
+
+    List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
+    Assert.assertEquals(bloomFilterColumns.size(), 2);
+    for (int i = 0; i < bloomFilterColumns.size(); i++) {
+      Assert.assertEquals(bloomFilterColumns.get(i), expectedBloomFilterColumns[i]);
+    }
   }
 
   @Test
