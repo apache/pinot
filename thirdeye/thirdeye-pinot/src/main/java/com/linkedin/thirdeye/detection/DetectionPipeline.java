@@ -67,7 +67,8 @@ public abstract class DetectionPipeline {
     try {
       this.initComponents();
     } catch (Exception e) {
-      LOG.error("initialize components failed", e);
+      LOG.error("Initialize components failed", e);
+      throw new IllegalArgumentException("Initialize components failed. Please check rule parameters. " + e.getMessage());
     }
   }
 

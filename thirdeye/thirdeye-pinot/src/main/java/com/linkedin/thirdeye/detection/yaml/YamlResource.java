@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultDataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
 import com.wordnik.swagger.annotations.ApiParam;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -95,43 +96,61 @@ public class YamlResource {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  public Response setUpDetectionPipeline(@ApiParam("payload") String payload,
-      @QueryParam("startTime") long startTime, @QueryParam("endTime") long endTime) throws Exception {
-    if (Strings.isNullOrEmpty(payload)) {
-      throw new IllegalArgumentException("Empty Payload");
-    }
-    Map<String, Object> yamlConfig = (Map<String, Object>) this.YAML.load(payload);
+  public Response setUpDetectionPipeline(@ApiParam("payload") String payload, @QueryParam("startTime") long startTime,
+      @QueryParam("endTime") long endTime) throws Exception {
+    String errorMessage;
+    try {
+      if (Strings.isNullOrEmpty(payload)) {
+        throw new IllegalArgumentException("Empty Payload");
+      }
+      Map<String, Object> yamlConfig = (Map<String, Object>) this.YAML.load(payload);
 
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "missing " + PROP_NAME);
-    // retrieve id if detection config already exists
-    List<DetectionConfigDTO> detectionConfigDTOs =
-        this.detectionConfigDAO.findByPredicate(Predicate.EQ("name", MapUtils.getString(yamlConfig, PROP_NAME)));
-    DetectionConfigDTO existingDetectionConfig = null;
-    if (!detectionConfigDTOs.isEmpty()) {
-      existingDetectionConfig = detectionConfigDTOs.get(0);
-    }
+      // retrieve id if detection config already exists
+      List<DetectionConfigDTO> detectionConfigDTOs =
+          this.detectionConfigDAO.findByPredicate(Predicate.EQ("name", MapUtils.getString(yamlConfig, PROP_NAME)));
+      DetectionConfigDTO existingDetectionConfig = null;
+      if (!detectionConfigDTOs.isEmpty()) {
+        existingDetectionConfig = detectionConfigDTOs.get(0);
+      }
 
-    YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
-    DetectionConfigDTO detectionConfig;
-    try{
-      detectionConfig = translator.withTrainingWindow(startTime, endTime).withExistingDetectionConfig(existingDetectionConfig).generateDetectionConfig();
+      DetectionConfigDTO detectionConfig;
+      YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
+      detectionConfig = translator.withTrainingWindow(startTime, endTime)
+          .withExistingDetectionConfig(existingDetectionConfig)
+          .generateDetectionConfig();
+      detectionConfig.setYaml(payload);
+      validatePipeline(detectionConfig);
+
+      Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
+      Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
+      // optionally set up an alerter for the detection pipeline
+      if (yamlConfig.containsKey("alert")) {
+        Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
+        DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
+        Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfigDTO);
+        Preconditions.checkNotNull(detectionAlertConfigId, "Save detection alerter config failed");
+      }
+
+      return Response.ok(detectionConfig).build();
+    } catch (InvocationTargetException e){
+      // exception thrown in validate pipeline
+      LOG.error("Validate pipeline error", e);
+      errorMessage = e.getCause().getMessage();
     } catch (Exception e) {
       LOG.error("yaml translation error", e);
-      return Response.status(400).entity(ImmutableMap.of("status", "400", "message", e.getMessage())).build();
+      errorMessage = e.getMessage();
     }
-    detectionConfig.setYaml(payload);
-    Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
-    Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
+    return Response.status(400).entity(ImmutableMap.of("status", "400", "message", errorMessage)).build();
+  }
 
-    // optionally set up an alerter for the detection pipeline
-    if (yamlConfig.containsKey("alert")) {
-      Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
-      DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
-      Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfigDTO);
-      Preconditions.checkNotNull(detectionAlertConfigId, "Save detection alerter config failed");
-    }
-
-    return Response.ok(detectionConfig).build();
+  private void validatePipeline(DetectionConfigDTO detectionConfig) throws Exception {
+    Long id = detectionConfig.getId();
+    // swap out id
+    detectionConfig.setId(-1L);
+    // try to load the detection pipeline and init all the components
+    this.loader.from(provider, detectionConfig, 0, 0);
+    // set id back
+    detectionConfig.setId(id);
   }
 
   /**

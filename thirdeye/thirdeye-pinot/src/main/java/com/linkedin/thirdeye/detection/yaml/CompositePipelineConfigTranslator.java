@@ -190,18 +190,10 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       }
     }
     Map<String, Object> dimensionWrapperProperties = buildDimensionWrapperProperties(filterMaps);
-    Map<String, Object> childKeepingMergerProperties = buildChildKeepingMergerProperties();
     Map<String, Object> properties = buildWrapperProperties(ChildKeepingMergeWrapper.class.getName(),
         Collections.singletonList(
-            buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)), childKeepingMergerProperties);
+            buildWrapperProperties(DimensionWrapper.class.getName(), nestedPipelines, dimensionWrapperProperties)), this.mergerProperties);
     return new YamlTranslationResult().withProperties(properties).withComponents(this.components).withCron(cron);
-  }
-
-  private Map<String, Object> buildChildKeepingMergerProperties(){
-    Map<String, Object> childKeepingMergerProperties = new HashMap<>();
-    childKeepingMergerProperties.putAll(this.mergerProperties);
-    childKeepingMergerProperties.put(PROP_BASELINE_PROVIDER, DEFAULT_BASELINE_PROVIDER_YAML_TYPE);
-    return childKeepingMergerProperties;
   }
 
   private Map<String, Object> buildDimensionWrapperProperties(Map<String, Collection<String>> filterMaps) {
@@ -368,7 +360,10 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     String componentClassName = DETECTION_REGISTRY.lookup(type);
     Map<String, Object> componentSpecs = new HashMap<>();
     componentSpecs.put(PROP_CLASS_NAME, componentClassName);
-    Map<String, Object> params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
+    Map<String, Object> params = new HashMap<>();
+    if (yamlConfig.containsKey(PROP_PARAMS)){
+      params = MapUtils.getMap(yamlConfig, PROP_PARAMS);
+    }
 
     if (DETECTION_REGISTRY.isTunable(componentClassName)) {
       try {
@@ -427,20 +422,22 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
       for (Map<String, Object> detectionStageYaml : detectionStageYamls) {
         Preconditions.checkArgument(detectionStageYaml.containsKey(PROP_TYPE),
             "In rule No." + (i + 1) + ", a detection rule type is missing. ");
-        String name = MapUtils.getString(yamlConfig, PROP_NAME);
-        Preconditions.checkNotNull("In rule No." + (i + 1) + ", a detection rule name is missing");
+        String type = MapUtils.getString(detectionStageYaml, PROP_TYPE);
+        String name = MapUtils.getString(detectionStageYaml, PROP_NAME);
+        Preconditions.checkNotNull(name, "In rule No." + (i + 1) + ", a detection rule name for type " +  type + " is missing");
         Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) +
             ", found duplicate rule name, rule name must be unique." );
         Preconditions.checkNotNull(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
       }
       if (ruleYaml.containsKey(PROP_FILTER)) {
-        List<Map<String, Object>> filterStageYamls = ConfigUtils.getList(MapUtils.getMap(ruleYaml, PROP_FILTER));
+        List<Map<String, Object>> filterStageYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
         // check each filter rule
         for (Map<String, Object> filterStageYaml : filterStageYamls) {
           Preconditions.checkArgument(filterStageYaml.containsKey(PROP_TYPE),
               "In rule No." + (i + 1) + ", a filter rule type is missing. ");
-          String name = MapUtils.getString(yamlConfig, PROP_NAME);
-          Preconditions.checkNotNull("In rule No." + (i + 1) + ", a filter rule name is missing");
+          String type = MapUtils.getString(filterStageYaml, PROP_TYPE);
+          String name = MapUtils.getString(filterStageYaml, PROP_NAME);
+          Preconditions.checkNotNull(name, "In rule No." + (i + 1) + ", a filter rule name for type " + type + " is missing");
           Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) +
               ", found duplicate rule name, rule name must be unique." );
           Preconditions.checkNotNull(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
