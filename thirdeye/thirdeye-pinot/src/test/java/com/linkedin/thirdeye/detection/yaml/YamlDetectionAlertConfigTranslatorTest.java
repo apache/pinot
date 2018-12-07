@@ -1,8 +1,7 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.detection.alert.filter.ToAllRecipientsDetectionAlertFilter;
-import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;

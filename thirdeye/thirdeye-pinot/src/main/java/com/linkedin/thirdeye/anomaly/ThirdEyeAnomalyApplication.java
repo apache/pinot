@@ -38,7 +38,8 @@ import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.pinot.resources.PinotDataSourceResource;
 import com.linkedin.thirdeye.detection.DetectionPipelineScheduler;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertScheduler;
-import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.tracking.RequestStatisticsLogger;
@@ -113,8 +114,9 @@ public class ThirdEyeAnomalyApplication
       LOG.error("Exception while loading caches", e);
     }
 
-    // instantiate detection registry
+    // instantiate registry
     DetectionRegistry.init();
+    DetectionAlertRegistry.init();
 
     environment.getObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
     environment.getObjectMapper().registerModule(makeMapperModule());

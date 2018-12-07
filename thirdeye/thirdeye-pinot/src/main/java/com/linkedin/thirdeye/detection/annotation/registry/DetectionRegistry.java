@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.detection.annotation;
+package com.linkedin.thirdeye.detection.annotation.registry;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.detection.annotation.Components;
+import com.linkedin.thirdeye.detection.annotation.Tune;
+import com.linkedin.thirdeye.detection.annotation.Yaml;
 import com.linkedin.thirdeye.detection.spi.components.BaseComponent;
 import com.linkedin.thirdeye.detection.yaml.YamlDetectionConfigTranslator;
 import java.lang.annotation.Annotation;

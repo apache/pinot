@@ -13,7 +13,7 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
 import com.linkedin.thirdeye.detection.InputDataFetcher;
 import com.linkedin.thirdeye.detection.algorithm.DimensionWrapper;
-import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import com.linkedin.thirdeye.detection.annotation.Yaml;
 import com.linkedin.thirdeye.detection.spec.AbstractSpec;
 import com.linkedin.thirdeye.detection.spi.components.Tunable;
