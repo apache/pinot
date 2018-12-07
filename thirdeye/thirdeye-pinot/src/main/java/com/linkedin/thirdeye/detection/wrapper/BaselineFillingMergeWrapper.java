@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * of filling baseline & current values and inject detector, metric urn. Each detector has a separate baseline filling merge wrapper
  */
 public class BaselineFillingMergeWrapper extends MergeWrapper {
-  private static final Logger LOG = LoggerFactory.getLogger(MergeWrapper.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BaselineFillingMergeWrapper.class);
 
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   private static final String PROP_CURRENT_PROVIDER = "currentValueProvider";
@@ -74,7 +74,15 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
       this.baselineProviderComponentKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
       Preconditions.checkArgument(this.config.getComponents().containsKey(this.baselineProviderComponentKey));
       this.baselineValueProvider = (BaselineProvider) this.config.getComponents().get(this.baselineProviderComponentKey);
+    } else {
+      // default baseline provider, use wo1w
+      this.baselineValueProvider = new RuleBaselineProvider();
+      RuleBaselineProviderSpec spec = new RuleBaselineProviderSpec();
+      spec.setOffset("wo1w");
+      InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.provider, this.config.getId());
+      this.baselineValueProvider.init(spec, dataFetcher);
     }
+
     if (config.getProperties().containsKey(PROP_CURRENT_PROVIDER)) {
       String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), currentValueProvider));
       Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
