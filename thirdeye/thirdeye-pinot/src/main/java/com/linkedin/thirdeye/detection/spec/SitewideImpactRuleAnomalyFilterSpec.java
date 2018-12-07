@@ -9,7 +9,7 @@ public class SitewideImpactRuleAnomalyFilterSpec extends AbstractSpec {
   private String timezone = "UTC";
   private double threshold = Double.NaN;
   private String offset;
-  private String pattern;
+  private String pattern = "UP_OR_DOWN";
   private String sitewideMetricName;
   private String sitewideCollection;
   private Map<String, Collection<String>> filters = new HashMap<>();
