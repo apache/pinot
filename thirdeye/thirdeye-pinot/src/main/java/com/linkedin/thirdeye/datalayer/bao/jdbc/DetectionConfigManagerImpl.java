@@ -19,7 +19,10 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DetectionConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
+import java.util.Collections;
 
 
 @Singleton
@@ -28,5 +31,37 @@ public class DetectionConfigManagerImpl extends AbstractManagerImpl<DetectionCon
     super(DetectionConfigDTO.class, DetectionConfigBean.class);
   }
 
+  @Override
+  public int update(DetectionConfigDTO detectionConfigDTO) {
+    if (detectionConfigDTO.getId() == null) {
+      Long id = save(detectionConfigDTO);
+      if (id > 0) {
+        return 1;
+      } else {
+        return 0;
+      }
+    } else {
+      DetectionConfigBean detectionConfigBean = convertDetectionConfigDTO2Bean(detectionConfigDTO);
+      return genericPojoDao.update(detectionConfigBean);
+    }
+  }
 
+  @Override
+  public Long save(DetectionConfigDTO detectionConfigDTO) {
+    if (detectionConfigDTO.getId() != null) {
+      //TODO: throw exception and force the caller to call update instead
+      update(detectionConfigDTO);
+      return detectionConfigDTO.getId();
+    }
+    DetectionConfigBean detectionConfigBean = convertDetectionConfigDTO2Bean(detectionConfigDTO);
+    Long id = genericPojoDao.put(detectionConfigBean);
+    detectionConfigDTO.setId(id);
+    return id;
+  }
+
+  DetectionConfigBean convertDetectionConfigDTO2Bean(DetectionConfigDTO detectionConfigDTO){
+    detectionConfigDTO.setComponents(Collections.emptyMap());
+    DetectionConfigBean bean = convertDTO2Bean(detectionConfigDTO, DetectionConfigBean.class);
+    return bean;
+  }
 }
