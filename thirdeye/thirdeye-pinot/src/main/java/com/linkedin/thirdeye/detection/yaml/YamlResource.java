@@ -69,7 +69,7 @@ public class YamlResource {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
     this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
     this.translatorLoader = new YamlDetectionTranslatorLoader();
-    this.alertConfigTranslator = new YamlDetectionAlertConfigTranslator();
+    this.alertConfigTranslator = YamlDetectionAlertConfigTranslator.getInstance();
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();

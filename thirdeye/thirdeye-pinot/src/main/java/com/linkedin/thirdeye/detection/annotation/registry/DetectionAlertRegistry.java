@@ -17,6 +17,7 @@
 package com.linkedin.thirdeye.detection.annotation.registry;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
 import com.linkedin.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
 import com.linkedin.thirdeye.detection.annotation.AlertScheme;
@@ -41,6 +42,8 @@ public class DetectionAlertRegistry {
 
   // Alert Suppressor type to Alert Suppressor class name
   private static final Map<String, String> ALERT_SUPPRESSOR_MAP = new HashMap<>();
+
+  private static final String KEY_CLASS_NAME = "className";
 
   private static final DetectionAlertRegistry INSTANCE = new DetectionAlertRegistry();
 
@@ -79,6 +82,14 @@ public class DetectionAlertRegistry {
     } catch (Exception e) {
       LOG.warn("initialize detection registry error", e);
     }
+  }
+
+  public void registerAlertScheme(String type, String className) {
+    ALERT_SCHEME_MAP.put(type, className);
+  }
+
+  public void registerAlertSuppressor(String type, String className) {
+    ALERT_SUPPRESSOR_MAP.put(type, className);
   }
 
   /**
