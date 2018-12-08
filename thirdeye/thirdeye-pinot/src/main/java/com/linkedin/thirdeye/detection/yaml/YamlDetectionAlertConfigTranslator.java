@@ -2,7 +2,7 @@ package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
-import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;

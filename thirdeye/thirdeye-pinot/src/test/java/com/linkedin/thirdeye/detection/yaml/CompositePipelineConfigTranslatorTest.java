@@ -6,7 +6,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.MockDataProvider;
-import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import com.linkedin.thirdeye.detection.components.RuleBaselineProvider;
 import com.linkedin.thirdeye.detection.components.ThresholdRuleAnomalyFilter;
 import com.linkedin.thirdeye.detection.components.ThresholdRuleDetector;

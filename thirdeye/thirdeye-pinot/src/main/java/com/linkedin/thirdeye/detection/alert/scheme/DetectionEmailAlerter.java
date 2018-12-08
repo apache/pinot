@@ -32,6 +32,7 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.alert.AlertUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
+import com.linkedin.thirdeye.detection.annotation.AlertScheme;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -50,6 +51,7 @@ import org.slf4j.LoggerFactory;
 import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
+@AlertScheme(type = "EMAIL")
 public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionEmailAlerter.class);
 

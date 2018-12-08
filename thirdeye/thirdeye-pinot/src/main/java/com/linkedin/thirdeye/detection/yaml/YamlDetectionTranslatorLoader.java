@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.annotation.DetectionRegistry;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.lang.reflect.Constructor;
 import java.util.Map;
 

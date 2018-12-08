@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
+import com.linkedin.thirdeye.detection.annotation.AlertSuppressor;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import org.slf4j.LoggerFactory;
  * 2. Suppress alerts in the time window based on some thresholds.
  *    ({@link #EXPECTED_CHANGE_KEY} and {@link #ACCEPTABLE_DEVIATION_KEY})
  */
+@AlertSuppressor(type = "TIME_WINDOW")
 public class DetectionAlertTimeWindowSuppressor extends DetectionAlertSuppressor {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionAlertTimeWindowSuppressor.class);
 
