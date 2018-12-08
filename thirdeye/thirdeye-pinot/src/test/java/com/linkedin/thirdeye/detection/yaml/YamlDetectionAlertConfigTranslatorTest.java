@@ -72,7 +72,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     refLinks.put("Test Link", "test_url");
     alertYamlConfigs.put(PROP_REFERENCE_LINKS, refLinks);
 
-    Set<Long> detectionIds = new HashSet<>(Arrays.asList(1234L, 6789L));
+    Set<Integer> detectionIds = new HashSet<>(Arrays.asList(1234, 6789));
     alertYamlConfigs.put(PROP_DETECTION_CONFIG_IDS, detectionIds);
 
     Map<String, Object> alertSchemes = new HashMap<>();
