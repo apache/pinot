@@ -77,6 +77,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nonnull;
@@ -102,6 +103,10 @@ public class PinotLLCRealtimeSegmentManager {
 
   private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
   private static final String METADATA_EVENT_NOTIFIER_PREFIX = "metadata.event.notifier";
+
+  // Max time to wait for all LLC segments to complete committing their metadata.
+  private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
+
   // TODO: make this configurable with default set to 10
   /**
    * After step 1 of segment completion is done,
@@ -127,6 +132,9 @@ public class PinotLLCRealtimeSegmentManager {
   private final TableConfigCache _tableConfigCache;
   private final StreamPartitionAssignmentGenerator _streamPartitionAssignmentGenerator;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
+
+  private volatile boolean _isStopping = false;
+  private AtomicInteger _numCompletingSegments = new AtomicInteger(0);
 
   public boolean getIsSplitCommitEnabled() {
     return _controllerConf.getAcceptSplitCommit();
@@ -157,6 +165,30 @@ public class PinotLLCRealtimeSegmentManager {
 
   public void start() {
     _helixManager.addControllerListener(changeContext -> onBecomeLeader());
+  }
+
+
+  public void stop() {
+    _isStopping = true;
+    LOGGER.info("Awaiting segment metadata commits: maxWaitTimeMillis = {}", MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS);
+    long millisToWait = MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS;
+
+    // Busy-wait for all segments that are committing metadata to complete their operation.
+    // Waiting
+    while (_numCompletingSegments.get() > 0 && millisToWait > 0) {
+      try {
+        long thisWait = 1000;
+        if (millisToWait < thisWait) {
+          thisWait = millisToWait;
+        }
+        Thread.sleep(thisWait);
+        millisToWait -= thisWait;
+      } catch (InterruptedException e) {
+        LOGGER.info("Interrupted: Remaining wait time {} (out of {})", millisToWait, MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS);
+        return;
+      }
+    }
+    LOGGER.info("Wait completed: Number of completing segments = {}", _numCompletingSegments.get());
   }
 
   protected PinotLLCRealtimeSegmentManager(HelixAdmin helixAdmin, String clusterName, HelixManager helixManager,
@@ -348,6 +380,10 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public boolean commitSegmentFile(String tableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    if (_isStopping) {
+      LOGGER.info("Returning false since the controller is stopping");
+      return false;
+    }
     String segmentName = committingSegmentDescriptor.getSegmentName();
     String segmentLocation = committingSegmentDescriptor.getSegmentLocation();
     URI segmentFileURI = ControllerConf.getUriFromPath(segmentLocation);
@@ -395,6 +431,20 @@ public class PinotLLCRealtimeSegmentManager {
    * @return boolean
    */
   public boolean commitSegmentMetadata(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+    if (_isStopping) {
+      LOGGER.info("Returning false since the controller is stopping");
+      return false;
+    }
+    try {
+      _numCompletingSegments.addAndGet(1);
+      return commitSegmentMetadataInternal(rawTableName, committingSegmentDescriptor);
+    } finally {
+      _numCompletingSegments.addAndGet(-1);
+    }
+  }
+
+  private boolean commitSegmentMetadataInternal(String rawTableName, CommittingSegmentDescriptor committingSegmentDescriptor) {
+
     final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     TableConfig tableConfig = getRealtimeTableConfig(realtimeTableName);
     if (tableConfig == null) {
