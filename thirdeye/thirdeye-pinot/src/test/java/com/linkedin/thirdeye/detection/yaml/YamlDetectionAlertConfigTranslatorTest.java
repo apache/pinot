@@ -12,7 +12,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.map.SingletonMap;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -29,12 +28,12 @@ public class YamlDetectionAlertConfigTranslatorTest {
     List<Long> ids = Collections.singletonList(1234567L);
     DetectionAlertConfigDTO
         alertConfigDTO = this.translator.generateDetectionAlertConfig(this.alertYamlConfigs, ids, null);
-    Assert.assertEquals(alertConfigDTO.getName(), alertYamlConfigs.get("name"));
+    Assert.assertEquals(alertConfigDTO.getName(), alertYamlConfigs.get(PROP_SUBS_GROUP_NAME));
     Assert.assertEquals(alertConfigDTO.getApplication(), alertYamlConfigs.get("application"));
     Assert.assertEquals(alertConfigDTO.getVectorClocks().get(ids.get(0)), new Long(0L));
-    Assert.assertEquals(alertConfigDTO.getCronExpression(), "0 21 * * * ? *");
+    Assert.assertEquals(alertConfigDTO.getCronExpression(), CRON_SCHEDULE_DEFAULT);
     Map<String, Object> properties = alertConfigDTO.getProperties();
-    Assert.assertEquals(properties.get("detectionConfigIds"), ids);
+    Assert.assertEquals(properties.get(PROP_DETECTION_CONFIG_IDS), ids);
     Assert.assertEquals(properties.get("to"), alertYamlConfigs.get("to"));
   }
 
@@ -46,11 +45,11 @@ public class YamlDetectionAlertConfigTranslatorTest {
     vectorClocks.put(7654321L, 1536173395000L);
     DetectionAlertConfigDTO
         alertConfigDTO = this.translator.generateDetectionAlertConfig(this.alertYamlConfigs, ids, vectorClocks);
-    Assert.assertEquals(alertConfigDTO.getName(), alertYamlConfigs.get("name"));
+    Assert.assertEquals(alertConfigDTO.getName(), alertYamlConfigs.get(PROP_SUBS_GROUP_NAME));
     Assert.assertEquals(alertConfigDTO.getApplication(), alertYamlConfigs.get("application"));
     Assert.assertEquals(alertConfigDTO.getVectorClocks().get(ids.get(0)), vectorClocks.get(ids.get(0)));
     Assert.assertEquals(alertConfigDTO.getVectorClocks().get(7654321L), vectorClocks.get(7654321L));
-    Assert.assertEquals(alertConfigDTO.getCronExpression(), "0 21 * * * ? *");
+    Assert.assertEquals(alertConfigDTO.getCronExpression(), CRON_SCHEDULE_DEFAULT);
 
     Map<String, Object> properties = alertConfigDTO.getProperties();
     Assert.assertEquals(properties.get("detectionConfigIds"), ids);
@@ -66,7 +65,7 @@ public class YamlDetectionAlertConfigTranslatorTest {
     alertYamlConfigs.put(PROP_SUBS_GROUP_NAME, "test_group_name");
     alertYamlConfigs.put(PROP_APPLICATION, "test_application");
     alertYamlConfigs.put(PROP_FROM, "thirdeye@thirdeye");
-    alertYamlConfigs.put(PROP_CRON, "0 0/5 * * * ? *");
+    alertYamlConfigs.put(PROP_CRON, CRON_SCHEDULE_DEFAULT);
     alertYamlConfigs.put(PROP_ACTIVE, true);
 
     Map<String, String> refLinks = new HashMap<>();
@@ -92,12 +91,10 @@ public class YamlDetectionAlertConfigTranslatorTest {
     alertSuppressorsHolder.add(alertSuppressors);
     alertYamlConfigs.put(PROP_ALERT_SUPPRESSORS, alertSuppressorsHolder);
 
-    Map<String, Object> recipientHolder = new HashMap<>();
     Map<String, List<String>> recipients = new HashMap<>();
     recipients.put("to", new ArrayList<>(Collections.singleton("userTo@thirdeye.com")));
     recipients.put("cc", new ArrayList<>(Collections.singleton("userCc@thirdeye.com")));
-    recipientHolder.put(PROP_RECIPIENTS, recipients);
-    alertYamlConfigs.put(PROP_RECIPIENTS, recipientHolder);
+    alertYamlConfigs.put(PROP_RECIPIENTS, recipients);
 
     DetectionAlertConfigDTO alertConfig = YamlDetectionAlertConfigTranslator.getInstance().translate(alertYamlConfigs);
 
@@ -126,17 +123,22 @@ public class YamlDetectionAlertConfigTranslatorTest {
     Assert.assertEquals(((Set<Long>) alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS)).size(), 2);
 
     Map<String, Object> recipient = (Map<String, Object>) alertConfig.getProperties().get(PROP_RECIPIENTS);
-    Assert.assertEquals(recipient.size(), 1);
+    Assert.assertEquals(recipient.size(), 2);
     Assert.assertEquals(((List<String>) recipient.get("to")).get(0), "userTo@thirdeye.com");
+    Assert.assertEquals(((List<String>) recipient.get("cc")).get(0), "userCc@thirdeye.com");
+
+    Assert.assertEquals(((Set<Long>) alertConfig.getProperties().get(PROP_DETECTION_CONFIG_IDS)).size(), 2);
   }
 
   @BeforeMethod
   public void setUp() {
     DetectionRegistry.registerComponent("testclassname", "TO_ALL_RECIPIENTS");
     this.alertYamlConfigs = new HashMap<>();
-    alertYamlConfigs.put("name", "test_alert");
+    alertYamlConfigs.put(PROP_SUBS_GROUP_NAME, "test_alert");
     alertYamlConfigs.put("type", "TO_ALL_RECIPIEnts");
-    alertYamlConfigs.put("to", Arrays.asList("test1", "test2"));
+    Map<String, Object> recipients = new HashMap<>();
+    recipients.put("to", Arrays.asList("test1", "test2"));
+    alertYamlConfigs.put("recipients", recipients);
     alertYamlConfigs.put("application", "TestApplication");
     this.translator = new YamlDetectionAlertConfigTranslator();
   }

@@ -10,7 +10,6 @@ import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -43,8 +42,8 @@ public class YamlDetectionAlertConfigTranslator {
   static final String PROP_DIMENSION = "dimension";
   static final String PROP_DIMENSION_RECIPIENTS = "dimensionRecipients";
   static final String PROP_TIME_WINDOWS = "timeWindows";
+  static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *"; // Every 5 min
 
-  private static final String CRON_SCHEDULE_DEFAULT = "0 0/5 * * * ? *"; // Every 5 min
   private static final DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
   private static final DetectionAlertRegistry DETECTION_ALERT_REGISTRY = DetectionAlertRegistry.getInstance();
   private static final Set<String> PROPERTY_KEYS = new HashSet<>(
@@ -99,7 +98,6 @@ public class YamlDetectionAlertConfigTranslator {
         properties.put(PROP_CLASS_NAME, DETECTION_REGISTRY.lookup(MapUtils.getString(alertYamlConfigs, PROP_TYPE)));
       } else {
         if (PROPERTY_KEYS.contains(entry.getKey())) {
-          // TODO value cannot be inserted as object. It needs to be parsed
           properties.put(entry.getKey(), entry.getValue());
         }
       }
