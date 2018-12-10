@@ -414,7 +414,6 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_DATASET), "Property missing " + PROP_DATASET);
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_RULES), "Property missing " + PROP_RULES);
     if (existingConfig != null) {
-      Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_NAME).equals(existingConfig.getName()));
       Map<String, Object> existingYamlConfig = (Map<String, Object>) this.yaml.load(existingConfig.getYaml());
       Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_METRIC).equals(MapUtils.getString(existingYamlConfig, PROP_METRIC)), "metric name cannot be modified");
       Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_DATASET).equals(MapUtils.getString(existingYamlConfig, PROP_DATASET)), "dataset name cannot be modified");

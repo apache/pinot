@@ -140,6 +140,7 @@ public class YamlResource {
   /**
    Edit a detection pipeline using a YAML config
    @param payload YAML config string
+   @param id the detection config id to be edit
    @param startTime tuning window start time for tunable components
    @param endTime tuning window end time for tunable components
    @return a message contains the saved detection config id & detection alert id
@@ -148,7 +149,7 @@ public class YamlResource {
   @Path("/edit")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  public Response editDetectionPipeline(@ApiParam("payload") String payload, @QueryParam("startTime") long startTime,
+  public Response editDetectionPipeline(@ApiParam("payload") String payload, @QueryParam("id") long id, @QueryParam("startTime") long startTime,
       @QueryParam("endTime") long endTime) {
     String errorMessage;
     try {
@@ -157,13 +158,12 @@ public class YamlResource {
       }
       Map<String, Object> yamlConfig = (Map<String, Object>) this.yaml.load(payload);
 
-      List<DetectionConfigDTO> detectionConfigDTOs =
-          this.detectionConfigDAO.findByPredicate(Predicate.EQ("name", MapUtils.getString(yamlConfig, PROP_NAME)));
-      Preconditions.checkArgument(!detectionConfigDTOs.isEmpty(), "Existing detection config not found, please check the detection name");
+      DetectionConfigDTO existingDetectionConfig = this.detectionConfigDAO.findById(id);
+      Preconditions.checkArgument(existingDetectionConfig != null, "Existing detection config not found");
 
       YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
       DetectionConfigDTO detectionConfig = translator.withTrainingWindow(startTime, endTime)
-          .withExistingDetectionConfig(detectionConfigDTOs.get(0))
+          .withExistingDetectionConfig(existingDetectionConfig)
           .generateDetectionConfig();
       detectionConfig.setYaml(payload);
       validatePipeline(detectionConfig);
