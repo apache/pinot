@@ -287,6 +287,10 @@ public class ControllerStarter {
 
   public void stop() {
     try {
+      // Stop PinotLLCSegmentManager before stopping Jersey API. It is possible that stopping Jersey API
+      // may interrupt the handlers waiting on an I/O.
+      PinotLLCRealtimeSegmentManager.getInstance().stop();
+
       LOGGER.info("Closing PinotFS classes");
       PinotFSFactory.shutdown();
 
@@ -296,6 +300,7 @@ public class ControllerStarter {
       LOGGER.info("Stopping realtime segment manager");
       _realtimeSegmentsManager.stop();
 
+
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
 
@@ -303,6 +308,7 @@ public class ControllerStarter {
       _periodicTaskScheduler.stop();
 
       _executorService.shutdownNow();
+
     } catch (final Exception e) {
       LOGGER.error("Caught exception while shutting down", e);
     }
