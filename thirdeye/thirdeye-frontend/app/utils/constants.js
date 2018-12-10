@@ -10,34 +10,66 @@ export default {
 };
 
 
-export const yamlAlertProps = `name: alert_name
+export const yamlAlertProps = `# give a name for this detection
+detectionName: name_of_the_detection 
+# the metric to detect the anomalies
 metric: metric_name
+# the data set name for this metric
 dataset: dataset_name
+# ThirdEye pipeline type. Just fill in Composite
 pipelineType: Composite
+
+# (Optional) Config dimension exploration
 dimensionExploration:
+  # Create an alert for each dimension value in the dimension
   dimensions:
-    - continent
-    - browserName
+    - dimensionName
+    
+  # (Optional) only create alert for the dimension value if the contribution to 
+  # overall metric is above the threshold 
   minContribution: 0.05
+  
+  # (Optional) only create alert for the top k dimension values
+  k: 10
+
+# (Optional) Filter the metric by 
 filters:
-  continent:
-     - Europe
-     - Asia
-  os_name:
-     - android
-  browserName:
-     - chrome
-     - safari
-
-anomalyDetection:
-- detection:
-    - type: BASELINE
-      change: 0.5
+  dimensionName1:
+     - dimensionValue1
+     - dimensionValue2
+  dimensionName2:
+     - dimensionValue3
+     
+# configure rules of anomaly detection
+rules:
+# configure the first rule
+- # configure the detection rule. ThirdEye will detect anomalies based on the 
+  # detection rules.
+  detection:
+      # give a name for the detection rule
+    - name: detection_rule_1
+      # ThirdEye rule type
+      type: PERCENTAGE_RULE
+      # parameters for this rule
+      params: 
+        offset: wo1w
+        change: 0.1
+ 
+  # (Optional) configure the exclusion rule. (Exclude the anomalies you don't 
+  # want to see but detected by the detection rule above)
   filter:
-    - type: BUSINESS_RULE_FILTER
-      siteWideImpactThreshold: 0.2
+    - name: filter_rule_1
+      type: ABSOLUTE_CHANGE_FILTER
+      params:
+        threshold: 10000
 
+# configure more rule if you'd like to
 - detection:
-    - type: THRESHOLD
-  filter:
-    - type: THRESHOLD_RULE_FILTER`;
+    - name: detection_rule_2
+      type: ABSOLUTE_CHANGE_RULE
+      params:
+        offset: wo1w
+        change: 1000000
+        pattern: UP
+
+`;
