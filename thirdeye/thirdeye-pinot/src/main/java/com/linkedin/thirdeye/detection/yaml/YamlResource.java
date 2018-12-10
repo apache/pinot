@@ -100,7 +100,7 @@ public class YamlResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   public Response setUpDetectionPipeline(@ApiParam("payload") String payload, @QueryParam("startTime") long startTime,
-      @QueryParam("endTime") long endTime) throws Exception {
+      @QueryParam("endTime") long endTime) {
     String errorMessage;
     try {
       if (Strings.isNullOrEmpty(payload)) {
@@ -149,7 +149,7 @@ public class YamlResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
   public Response editDetectionPipeline(@ApiParam("payload") String payload, @QueryParam("startTime") long startTime,
-      @QueryParam("endTime") long endTime) throws Exception {
+      @QueryParam("endTime") long endTime) {
     String errorMessage;
     try {
       if (Strings.isNullOrEmpty(payload)) {
