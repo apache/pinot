@@ -150,9 +150,11 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   private DatasetConfigDTO datasetConfig;
   private String metricUrn;
   private Map<String, Object> mergerProperties = new HashMap<>();
+  protected final org.yaml.snakeyaml.Yaml yaml;
 
   public CompositePipelineConfigTranslator(Map<String, Object> yamlConfig, DataProvider provider) {
     super(yamlConfig, provider);
+    this.yaml = new org.yaml.snakeyaml.Yaml();
   }
 
   @Override
@@ -411,6 +413,12 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_METRIC), "Property missing " + PROP_METRIC);
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_DATASET), "Property missing " + PROP_DATASET);
     Preconditions.checkArgument(yamlConfig.containsKey(PROP_RULES), "Property missing " + PROP_RULES);
+    if (existingConfig != null) {
+      Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_NAME).equals(existingConfig.getName()));
+      Map<String, Object> existingYamlConfig = (Map<String, Object>) this.yaml.load(existingConfig.getYaml());
+      Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_METRIC).equals(MapUtils.getString(existingYamlConfig, PROP_METRIC)), "metric name cannot be modified");
+      Preconditions.checkArgument(MapUtils.getString(yamlConfig, PROP_DATASET).equals(MapUtils.getString(existingYamlConfig, PROP_DATASET)), "dataset name cannot be modified");
+    }
     Set<String> names = new HashSet<>();
     List<Map<String, Object>> ruleYamls = getList(yamlConfig.get(PROP_RULES));
     for (int i = 0; i < ruleYamls.size(); i++) {
