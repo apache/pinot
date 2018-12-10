@@ -115,21 +115,20 @@ public class DetectionMigrationResource {
     }
 
     Map<String, Object> ruleYaml = new LinkedHashMap<>();
-    ruleYaml.put("name", "myRule");
 
     // detection
     if (anomalyFunctionDTO.getType().equals("WEEK_OVER_WEEK_RULE")){
       // wo1w change detector
-      ruleYaml.put("detection", Collections.singletonList(ImmutableMap.of("type", "PERCENTAGE_RULE",
+      ruleYaml.put("detection", Collections.singletonList(ImmutableMap.of("name", "detection_rule1", "type", "PERCENTAGE_RULE",
           "params", getPercentageChangeRuleDetectorParams(anomalyFunctionDTO))));
     } else if (anomalyFunctionDTO.getType().equals("MIN_MAX_THRESHOLD")){
       // threshold detector
-      ruleYaml.put("detection", Collections.singletonList(ImmutableMap.of("type", "THRESHOLD",
+      ruleYaml.put("detection", Collections.singletonList(ImmutableMap.of("name", "detection_rule1", "type", "THRESHOLD",
           "params", getMinMaxThresholdRuleDetectorParams(anomalyFunctionDTO))));
     } else{
       // algorithm detector
       ruleYaml.put("detection", Collections.singletonList(
-          ImmutableMap.of("type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO),
+          ImmutableMap.of("name", "detection_rule1", "type", "ALGORITHM", "params", getAlgorithmDetectorParams(anomalyFunctionDTO),
               PROP_WINDOW_SIZE, anomalyFunctionDTO.getWindowSize(),
               PROP_WINDOW_UNIT, anomalyFunctionDTO.getWindowUnit().toString())));
     }
@@ -141,16 +140,18 @@ public class DetectionMigrationResource {
       Map<String, Object> filterYaml = new LinkedHashMap<>();
       if (!alertFilter.containsKey("thresholdField")) {
         // algorithm alert filter
-        filterYaml = ImmutableMap.of("type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO));
+        filterYaml = ImmutableMap.of("name", "filter_rule1", "type", "ALGORITHM_FILTER", "params", getAlertFilterParams(anomalyFunctionDTO));
       } else {
         // threshold filter migrate to rule filters
         // site wide impact filter migrate to rule based swi filter
         if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("impactToGlobal")){
           filterYaml.put("type", "SITEWIDE_IMPACT_FILTER");
+          filterYaml.put("name", "filter_rule1");
           filterYaml.put("params", getSiteWideImpactFilterParams(anomalyFunctionDTO));
         }
         // weight filter migrate to rule based percentage change filter
         if (anomalyFunctionDTO.getAlertFilter().get("thresholdField").equals("weight")){
+          filterYaml.put("name", "filter_rule1");
           filterYaml.put("type", "PERCENTAGE_CHANGE_FILTER");
           filterYaml.put("params", getPercentageChangeFilterParams(anomalyFunctionDTO));
         }

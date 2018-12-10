@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detection.yaml;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import java.lang.reflect.Constructor;
@@ -13,6 +14,7 @@ public class YamlDetectionTranslatorLoader {
   private static DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
 
   public YamlDetectionConfigTranslator from(Map<String, Object> yamlConfig, DataProvider provider) throws Exception {
+    Preconditions.checkArgument(yamlConfig.containsKey(PROP_PIPELINE_TYPE), "Pipeline type is missing.");
     String className = DETECTION_REGISTRY.lookupYamlConverter(yamlConfig.get(PROP_PIPELINE_TYPE).toString().toUpperCase());
     Constructor<?> constructor = Class.forName(className).getConstructor(Map.class, DataProvider.class);
     return (YamlDetectionConfigTranslator) constructor.newInstance(yamlConfig, provider);

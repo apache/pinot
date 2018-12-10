@@ -54,6 +54,7 @@ public class AnomalyDetectorWrapperTest {
     this.config = new DetectionConfigDTO();
     this.config.setComponents(ImmutableMap.of("testDetector", new ThresholdRuleDetector()));
     this.config.setProperties(properties);
+    this.config.setId(-1L);
 
     this.provider = new MockDataProvider();
     MetricConfigDTO metric = new MetricConfigDTO();

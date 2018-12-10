@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detection.components;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
@@ -92,6 +93,8 @@ public class SitewideImpactRuleAnomalyFilter implements AnomalyFilter<SitewideIm
   public void init(SitewideImpactRuleAnomalyFilterSpec spec, InputDataFetcher dataFetcher) {
     this.dataFetcher = dataFetcher;
     this.threshold = spec.getThreshold();
+    Preconditions.checkArgument(Math.abs(this.threshold) <= 1, "Site wide impact threshold should be less or equal than 1");
+
     this.pattern = Pattern.valueOf(spec.getPattern().toUpperCase());
 
     // customize baseline offset

@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -22,7 +22,10 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultDataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,18 +36,22 @@ import java.util.Set;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 
 @Path("/yaml")
+@Api(tags = {Constants.YAML_TAG})
 public class YamlResource {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlResource.class);
 
@@ -52,7 +59,6 @@ public class YamlResource {
   private static final String PROP_TYPE = "type";
   private static final String PROP_DETECTION_CONFIG_ID = "detectionConfigIds";
 
-  private static final Yaml YAML = new Yaml();
 
   private final DetectionConfigManager detectionConfigDAO;
   private final DetectionAlertConfigManager detectionAlertConfigDAO;
@@ -64,6 +70,7 @@ public class YamlResource {
   private final EventManager eventDAO;
   private final MergedAnomalyResultManager anomalyDAO;
   private final DetectionPipelineLoader loader;
+  private final Yaml yaml;
 
   public YamlResource() {
     this.detectionConfigDAO = DAORegistry.getInstance().getDetectionConfigManager();
@@ -74,6 +81,7 @@ public class YamlResource {
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    this.yaml = new Yaml();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
@@ -90,48 +98,111 @@ public class YamlResource {
   /**
    Set up a detection pipeline using a YAML config
    @param payload YAML config string
-   @return a message contains the saved detection config id & detection alert id
+   @param startTime tuning window start time for tunable components
+   @param endTime tuning window end time for tunable components
+   @return a message contains the saved detection config id
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  public Response setUpDetectionPipeline(@ApiParam("payload") String payload,
-      @QueryParam("startTime") long startTime, @QueryParam("endTime") long endTime) throws Exception {
-    if (Strings.isNullOrEmpty(payload)) {
-      throw new IllegalArgumentException("Empty Payload");
-    }
-    Map<String, Object> yamlConfig = (Map<String, Object>) this.YAML.load(payload);
+  @ApiOperation("Set up a detection pipeline using a YAML config")
+  public Response setUpDetectionPipeline(
+      @ApiParam("yaml config") String payload,
+      @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long startTime,
+      @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) {
+    String errorMessage;
+    try {
+      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "Empty payload");
+      Map<String, Object> yamlConfig = (Map<String, Object>) this.yaml.load(payload);
 
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_NAME), "missing " + PROP_NAME);
-    // retrieve id if detection config already exists
-    List<DetectionConfigDTO> detectionConfigDTOs =
-        this.detectionConfigDAO.findByPredicate(Predicate.EQ("name", MapUtils.getString(yamlConfig, PROP_NAME)));
-    DetectionConfigDTO existingDetectionConfig = null;
-    if (!detectionConfigDTOs.isEmpty()) {
-      existingDetectionConfig = detectionConfigDTOs.get(0);
-    }
+      // retrieve id if detection config already exists
+      List<DetectionConfigDTO> detectionConfigDTOs =
+          this.detectionConfigDAO.findByPredicate(Predicate.EQ("name", MapUtils.getString(yamlConfig, PROP_NAME)));
+      DetectionConfigDTO existingDetectionConfig = null;
+      if (!detectionConfigDTOs.isEmpty()) {
+        existingDetectionConfig = detectionConfigDTOs.get(0);
+      }
 
-    YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
-    DetectionConfigDTO detectionConfig;
-    try{
-      detectionConfig = translator.withTrainingWindow(startTime, endTime).withExistingDetectionConfig(existingDetectionConfig).generateDetectionConfig();
+      YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
+      DetectionConfigDTO detectionConfig = translator.withTrainingWindow(startTime, endTime)
+          .withExistingDetectionConfig(existingDetectionConfig)
+          .generateDetectionConfig();
+      detectionConfig.setYaml(payload);
+      validatePipeline(detectionConfig);
+      Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
+      Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
+
+      return Response.ok(detectionConfig).build();
+    } catch (InvocationTargetException e){
+      // exception thrown in validate pipeline via reflection
+      LOG.error("Validate pipeline error", e);
+      errorMessage = e.getCause().getMessage();
     } catch (Exception e) {
       LOG.error("yaml translation error", e);
-      return Response.status(400).entity(ImmutableMap.of("status", "400", "message", e.getMessage())).build();
+      errorMessage = e.getMessage();
     }
-    detectionConfig.setYaml(payload);
-    Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
-    Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
+    return Response.status(400).entity(ImmutableMap.of("status", "400", "message", errorMessage)).build();
+  }
 
-    // optionally set up an alerter for the detection pipeline
-    if (yamlConfig.containsKey("alert")) {
-      Map<String, Object> alertYaml = MapUtils.getMap(yamlConfig, "alert");
-      DetectionAlertConfigDTO alertConfigDTO = getDetectionAlertConfig(alertYaml, detectionConfigId);
-      Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfigDTO);
-      Preconditions.checkNotNull(detectionAlertConfigId, "Save detection alerter config failed");
+  /**
+   Edit a detection pipeline using a YAML config
+   @param payload YAML config string
+   @param id the detection config id to edit
+   @param startTime tuning window start time for tunable components
+   @param endTime tuning window end time for tunable components
+   @return a message contains the saved detection config id
+   */
+  @PUT
+  @Path("/{id}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Consumes(MediaType.TEXT_PLAIN)
+  @ApiOperation("Edit a detection pipeline using a YAML config")
+  public Response editDetectionPipeline(
+      @ApiParam("yaml config") String payload,
+      @ApiParam("the detection config id to edit") @PathParam("id") long id,
+      @ApiParam("tuning window start time for tunable components")  @QueryParam("startTime") long startTime,
+      @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) {
+    String errorMessage;
+    try {
+      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "Empty payload");
+      Map<String, Object> yamlConfig = (Map<String, Object>) this.yaml.load(payload);
+
+      DetectionConfigDTO existingDetectionConfig = this.detectionConfigDAO.findById(id);
+      Preconditions.checkArgument(existingDetectionConfig != null, "Existing detection config " + id + " not found");
+
+      YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
+      DetectionConfigDTO detectionConfig = translator.withTrainingWindow(startTime, endTime)
+          .withExistingDetectionConfig(existingDetectionConfig)
+          .generateDetectionConfig();
+      detectionConfig.setYaml(payload);
+      validatePipeline(detectionConfig);
+      Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
+      Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
+
+      return Response.ok(detectionConfig).build();
+    } catch (InvocationTargetException e){
+      // exception thrown in validate pipeline via reflection
+      LOG.error("Validate pipeline error", e);
+      errorMessage = e.getCause().getMessage();
+    } catch (Exception e) {
+      LOG.error("yaml translation error", e);
+      errorMessage = e.getMessage();
     }
+    return Response.status(400).entity(ImmutableMap.of("status", "400", "message", errorMessage)).build();
+  }
 
-    return Response.ok(detectionConfig).build();
+
+  /*
+   * Init the pipeline to check if detection pipeline property is valid semantically.
+   */
+  private void validatePipeline(DetectionConfigDTO detectionConfig) throws Exception {
+    Long id = detectionConfig.getId();
+    // swap out id
+    detectionConfig.setId(-1L);
+    // try to load the detection pipeline and init all the components
+    this.loader.from(provider, detectionConfig, 0, 0);
+    // set id back
+    detectionConfig.setId(id);
   }
 
   /**
@@ -195,7 +266,7 @@ public class YamlResource {
     for (DetectionConfigDTO detectionConfigDTO : detectionConfigDTOs) {
       if (detectionConfigDTO.getYaml() != null) {
         Map<String, Object> yamlObject = new HashMap<>();
-        yamlObject.putAll((Map<? extends String, ?>) this.YAML.load(detectionConfigDTO.getYaml()));
+        yamlObject.putAll((Map<? extends String, ?>) this.yaml.load(detectionConfigDTO.getYaml()));
         yamlObject.put("id", detectionConfigDTO.getId());
         yamlObject.put("isActive", detectionConfigDTO.isActive());
         yamlObject.put("createdBy", detectionConfigDTO.getCreatedBy());

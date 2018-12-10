@@ -40,7 +40,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +50,7 @@ import org.slf4j.LoggerFactory;
  * of filling baseline & current values and inject detector, metric urn. Each detector has a separate baseline filling merge wrapper
  */
 public class BaselineFillingMergeWrapper extends MergeWrapper {
-  private static final Logger LOG = LoggerFactory.getLogger(MergeWrapper.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BaselineFillingMergeWrapper.class);
 
   private static final String PROP_BASELINE_PROVIDER = "baselineValueProvider";
   private static final String PROP_CURRENT_PROVIDER = "currentValueProvider";
@@ -59,10 +58,11 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
   private static final String PROP_BASELINE_PROVIDER_COMPONENT_NAME = "baselineProviderComponentName";
   private static final String PROP_DETECTOR = "detector";
   private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
+  private static final String DEFAULT_WOW_BASELINE_PROVIDER_NAME = "DEFAULT_WOW";
 
   private BaselineProvider baselineValueProvider; // optionally configure a baseline value loader
   private BaselineProvider currentValueProvider;
-  private String baselineProviderComponentKey;
+  private String baselineProviderComponentName;
   private String detectorComponentName;
   private String metricUrn;
 
@@ -71,10 +71,19 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
     super(provider, config, startTime, endTime);
 
     if (config.getProperties().containsKey(PROP_BASELINE_PROVIDER)) {
-      this.baselineProviderComponentKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
-      Preconditions.checkArgument(this.config.getComponents().containsKey(this.baselineProviderComponentKey));
-      this.baselineValueProvider = (BaselineProvider) this.config.getComponents().get(this.baselineProviderComponentKey);
+      this.baselineProviderComponentName = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), PROP_BASELINE_PROVIDER));
+      Preconditions.checkArgument(this.config.getComponents().containsKey(this.baselineProviderComponentName));
+      this.baselineValueProvider = (BaselineProvider) this.config.getComponents().get(this.baselineProviderComponentName);
+    } else {
+      // default baseline provider, use wo1w
+      this.baselineValueProvider = new RuleBaselineProvider();
+      this.baselineProviderComponentName = DEFAULT_WOW_BASELINE_PROVIDER_NAME;
+      RuleBaselineProviderSpec spec = new RuleBaselineProviderSpec();
+      spec.setOffset("wo1w");
+      InputDataFetcher dataFetcher = new DefaultInputDataFetcher(this.provider, this.config.getId());
+      this.baselineValueProvider.init(spec, dataFetcher);
     }
+
     if (config.getProperties().containsKey(PROP_CURRENT_PROVIDER)) {
       String detectorReferenceKey = DetectionUtils.getComponentName(MapUtils.getString(config.getProperties(), currentValueProvider));
       Preconditions.checkArgument(this.config.getComponents().containsKey(detectorReferenceKey));
@@ -158,7 +167,7 @@ public class BaselineFillingMergeWrapper extends MergeWrapper {
         anomaly.setAvgCurrentVal(this.currentValueProvider.computePredictedAggregates(slice, aggregationFunction));
         if (this.baselineValueProvider != null) {
           anomaly.setAvgBaselineVal(this.baselineValueProvider.computePredictedAggregates(slice, aggregationFunction));
-          anomaly.getProperties().put(PROP_BASELINE_PROVIDER_COMPONENT_NAME, this.baselineProviderComponentKey);
+          anomaly.getProperties().put(PROP_BASELINE_PROVIDER_COMPONENT_NAME, this.baselineProviderComponentName);
           anomaly.setWeight(calculateWeight(anomaly));
         }
       } catch (Exception e) {
