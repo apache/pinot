@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
@@ -21,6 +22,8 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultDataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -33,7 +36,9 @@ import java.util.Set;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -46,6 +51,7 @@ import org.yaml.snakeyaml.Yaml;
 
 
 @Path("/yaml")
+@Api(tags = {Constants.YAML_TAG})
 public class YamlResource {
   protected static final Logger LOG = LoggerFactory.getLogger(YamlResource.class);
 
@@ -94,13 +100,16 @@ public class YamlResource {
    @param payload YAML config string
    @param startTime tuning window start time for tunable components
    @param endTime tuning window end time for tunable components
-   @return a message contains the saved detection config id & detection alert id
+   @return a message contains the saved detection config id
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  public Response setUpDetectionPipeline(@ApiParam("payload") String payload, @QueryParam("startTime") long startTime,
-      @QueryParam("endTime") long endTime) {
+  @ApiOperation("Set up a detection pipeline using a YAML config")
+  public Response setUpDetectionPipeline(
+      @ApiParam("yaml config") String payload,
+      @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long startTime,
+      @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) {
     String errorMessage;
     try {
       Preconditions.checkArgument(StringUtils.isNotBlank(payload), "Empty payload");
@@ -138,17 +147,21 @@ public class YamlResource {
   /**
    Edit a detection pipeline using a YAML config
    @param payload YAML config string
-   @param id the detection config id to be edit
+   @param id the detection config id to edit
    @param startTime tuning window start time for tunable components
    @param endTime tuning window end time for tunable components
-   @return a message contains the saved detection config id & detection alert id
+   @return a message contains the saved detection config id
    */
-  @POST
-  @Path("/edit")
+  @PUT
+  @Path("/{id}")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  public Response editDetectionPipeline(@ApiParam("payload") String payload, @QueryParam("id") long id, @QueryParam("startTime") long startTime,
-      @QueryParam("endTime") long endTime) {
+  @ApiOperation("Edit a detection pipeline using a YAML config")
+  public Response editDetectionPipeline(
+      @ApiParam("yaml config") String payload,
+      @ApiParam("the detection config id to edit") @PathParam("id") long id,
+      @ApiParam("tuning window start time for tunable components")  @QueryParam("startTime") long startTime,
+      @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) {
     String errorMessage;
     try {
       Preconditions.checkArgument(StringUtils.isNotBlank(payload), "Empty payload");
