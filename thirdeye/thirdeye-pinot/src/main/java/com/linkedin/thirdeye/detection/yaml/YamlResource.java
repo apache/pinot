@@ -133,7 +133,7 @@ public class YamlResource {
 
       return Response.ok(detectionConfig).build();
     } catch (InvocationTargetException e){
-      // exception thrown in validate pipeline
+      // exception thrown in validate pipeline via reflection
       LOG.error("Validate pipeline error", e);
       errorMessage = e.getCause().getMessage();
     } catch (Exception e) {
@@ -143,6 +143,9 @@ public class YamlResource {
     return Response.status(400).entity(ImmutableMap.of("status", "400", "message", errorMessage)).build();
   }
 
+  /*
+   * Init the pipeline to check if detection pipeline property is valid semantically.
+   */
   private void validatePipeline(DetectionConfigDTO detectionConfig) throws Exception {
     Long id = detectionConfig.getId();
     // swap out id

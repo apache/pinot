@@ -427,7 +427,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
         Preconditions.checkNotNull(name, "In rule No." + (i + 1) + ", a detection rule name for type " +  type + " is missing");
         Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) +
             ", found duplicate rule name, rule name must be unique." );
-        Preconditions.checkNotNull(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
+        Preconditions.checkArgument(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
       }
       if (ruleYaml.containsKey(PROP_FILTER)) {
         List<Map<String, Object>> filterStageYamls = ConfigUtils.getList(ruleYaml.get(PROP_FILTER));
@@ -440,7 +440,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
           Preconditions.checkNotNull(name, "In rule No." + (i + 1) + ", a filter rule name for type " + type + " is missing");
           Preconditions.checkArgument(!names.contains(name), "In rule No." + (i + 1) +
               ", found duplicate rule name, rule name must be unique." );
-          Preconditions.checkNotNull(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
+          Preconditions.checkArgument(!name.contains(":"), "Sorry, rule name cannot contain \':\'");
         }
       }
     }
