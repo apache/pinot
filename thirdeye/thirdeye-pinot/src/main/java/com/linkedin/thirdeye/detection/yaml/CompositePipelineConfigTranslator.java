@@ -402,7 +402,7 @@ public class CompositePipelineConfigTranslator extends YamlDetectionConfigTransl
   }
 
   private String makeComponentKey(String type, String name) {
-    return "$" + type + ":" + name;
+    return "$" + name + ":" + type;
   }
 
   @Override
