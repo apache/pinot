@@ -79,7 +79,7 @@ public class BaselineRuleDetectionStageTest {
 
     this.config = new DetectionConfigDTO();
     this.config.setProperties(properties);
-
+    this.config.setId(-1L);
     this.provider = new MockDataProvider()
         .setTimeseries(timeseries)
         .setMetrics(Collections.singletonList(metricConfigDTO));

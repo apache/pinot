@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
@@ -40,6 +39,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
@@ -103,9 +103,7 @@ public class YamlResource {
       @QueryParam("endTime") long endTime) {
     String errorMessage;
     try {
-      if (Strings.isNullOrEmpty(payload)) {
-        throw new IllegalArgumentException("Empty Payload");
-      }
+      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "Empty payload");
       Map<String, Object> yamlConfig = (Map<String, Object>) this.yaml.load(payload);
 
       // retrieve id if detection config already exists
@@ -153,13 +151,11 @@ public class YamlResource {
       @QueryParam("endTime") long endTime) {
     String errorMessage;
     try {
-      if (Strings.isNullOrEmpty(payload)) {
-        throw new IllegalArgumentException("Empty Payload");
-      }
+      Preconditions.checkArgument(StringUtils.isNotBlank(payload), "Empty payload");
       Map<String, Object> yamlConfig = (Map<String, Object>) this.yaml.load(payload);
 
       DetectionConfigDTO existingDetectionConfig = this.detectionConfigDAO.findById(id);
-      Preconditions.checkArgument(existingDetectionConfig != null, "Existing detection config not found");
+      Preconditions.checkArgument(existingDetectionConfig != null, "Existing detection config " + id + " not found");
 
       YamlDetectionConfigTranslator translator = this.translatorLoader.from(yamlConfig, this.provider);
       DetectionConfigDTO detectionConfig = translator.withTrainingWindow(startTime, endTime)
