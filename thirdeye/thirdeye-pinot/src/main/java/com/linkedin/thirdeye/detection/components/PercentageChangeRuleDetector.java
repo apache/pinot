@@ -16,7 +16,6 @@
 
 package com.linkedin.thirdeye.detection.components;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.dashboard.resources.v2.BaselineParsingUtils;
 import com.linkedin.thirdeye.dataframe.BooleanSeries;
 import com.linkedin.thirdeye.dataframe.DataFrame;

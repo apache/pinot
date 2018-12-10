@@ -97,7 +97,9 @@ public class BaselineFillingMergeWrapperTest {
   @Test
   public void testMergerCurrentAndBaselineLoading() throws Exception {
     MergedAnomalyResultDTO anomaly = makeAnomaly(3000, 3600);
-    anomaly.setProperties(ImmutableMap.of("detectorComponentName", "testDetector"));
+    Map<String, String> anomalyProperties = new HashMap<>();
+    anomalyProperties.put("detectorComponentName", "testDetector");
+    anomaly.setProperties(anomalyProperties);
     anomaly.setMetricUrn("thirdeye:metric:1");
 
     Map<MetricSlice, DataFrame> aggregates = new HashMap<>();
@@ -127,6 +129,8 @@ public class BaselineFillingMergeWrapperTest {
     Assert.assertTrue(anomalyResults.contains(anomaly));
     Assert.assertEquals(anomalyResults.get(0).getAvgBaselineVal(), 100.0);
     Assert.assertEquals(anomalyResults.get(0).getAvgCurrentVal(), 100.0);
+    Assert.assertEquals(anomalyResults.get(0).getProperties().get("detectorComponentName"), "testDetector");
+    Assert.assertEquals(anomalyResults.get(0).getProperties().get("baselineProviderComponentName"), "baseline");
   }
 
 }
