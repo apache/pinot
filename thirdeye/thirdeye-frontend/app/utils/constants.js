@@ -44,7 +44,7 @@ filters:
 rules:
 # configure the first rule
 - # configure the detection rule. ThirdEye will detect anomalies based on the 
-  # detection rule.
+  # detection rules.
   detection:
       # give a name for the detection rule
     - name: detection_rule_1
@@ -56,14 +56,14 @@ rules:
         change: 0.1
  
   # (Optional) configure the exclusion rule. (Exclude the anomalies you don't 
-  # want to see but detected by the detection rules above)
+  # want to see but detected by the detection rule above)
   filter:
     - name: filter_rule_1
       type: ABSOLUTE_CHANGE_FILTER
       params:
         threshold: 10000
 
-# configure more rule if you want
+# configure more rule if you'd like to
 - detection:
     - name: detection_rule_2
       type: ABSOLUTE_CHANGE_RULE
