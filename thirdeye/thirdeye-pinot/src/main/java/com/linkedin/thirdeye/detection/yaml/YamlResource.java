@@ -195,7 +195,7 @@ public class YamlResource {
   @Path("/notification")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
-  @ApiOperation("Create a detection pipeline using a YAML config")
+  @ApiOperation("Create a notification group using a YAML config")
   @SuppressWarnings("unchecked")
   public Response createDetectionAlertConfig(
       @ApiParam("payload") String yamlAlertConfig) {
