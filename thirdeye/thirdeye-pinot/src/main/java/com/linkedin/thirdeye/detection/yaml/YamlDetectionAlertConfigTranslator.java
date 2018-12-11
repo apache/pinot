@@ -22,6 +22,9 @@ import org.apache.commons.collections.MapUtils;
  * The translator converts the alert yaml config into a detection alert config
  */
 public class YamlDetectionAlertConfigTranslator {
+  public static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
+  public static final String PROP_RECIPIENTS = "recipients";
+
   static final String PROP_SUBS_GROUP_NAME = "subscriptionGroupName";
   static final String PROP_CRON = "cron";
   static final String PROP_ACTIVE = "active";
@@ -29,11 +32,9 @@ public class YamlDetectionAlertConfigTranslator {
   static final String PROP_FROM = "fromAddress";
   static final String PROP_ONLY_FETCH_LEGACY_ANOMALIES = "onlyFetchLegacyAnomalies";
   static final String PROP_EMAIL_SUBJECT_TYPE = "emailSubjectStyle";
-  static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
   static final String PROP_ALERT_SCHEMES = "alertSchemes";
   static final String PROP_ALERT_SUPPRESSORS = "alertSuppressors";
   static final String PROP_REFERENCE_LINKS = "referenceLinks";
-  static final String PROP_RECIPIENTS = "recipients";
 
   static final String PROP_TYPE = "type";
   static final String PROP_CLASS_NAME = "className";
@@ -176,8 +177,13 @@ public class YamlDetectionAlertConfigTranslator {
     alertConfigDTO.setOnlyFetchLegacyAnomalies(MapUtils.getBooleanValue(yamlAlertConfig, PROP_ONLY_FETCH_LEGACY_ANOMALIES, false));
     alertConfigDTO.setSubjectType((AlertConfigBean.SubjectType) MapUtils.getObject(yamlAlertConfig, PROP_EMAIL_SUBJECT_TYPE, AlertConfigBean.SubjectType.METRICS));
 
-    MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS).put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
-    MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS).put("Add Reference Links", "https://go/thirdeyealertreflink");
+    Map<String, String> refLinks = MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS);
+    if (refLinks == null) {
+      refLinks = new HashMap<>();
+      yamlAlertConfig.put(PROP_REFERENCE_LINKS, refLinks);
+    }
+    refLinks.put("ThirdEye User Guide", "https://go/thirdeyeuserguide");
+    refLinks.put("Add Reference Links", "https://go/thirdeyealertreflink");
     alertConfigDTO.setReferenceLinks(MapUtils.getMap(yamlAlertConfig, PROP_REFERENCE_LINKS));
 
     alertConfigDTO.setAlertSchemes(buildAlertSchemes(yamlAlertConfig));
@@ -185,10 +191,10 @@ public class YamlDetectionAlertConfigTranslator {
     alertConfigDTO.setProperties(buildAlerterProperties(yamlAlertConfig));
 
     // NOTE: The below fields will/should be hidden from the YAML/UI. They will only be updated by the backend pipeline.
-    List<Long> detectionConfigIds = ConfigUtils.getList(yamlAlertConfig.get(PROP_DETECTION_CONFIG_IDS));
+    List<Integer> detectionConfigIds = ConfigUtils.getList(yamlAlertConfig.get(PROP_DETECTION_CONFIG_IDS));
     Map<Long, Long> vectorClocks = new HashMap<>();
-    for (long detectionConfigId : detectionConfigIds) {
-      vectorClocks.put(detectionConfigId, 0L);
+    for (int detectionConfigId : detectionConfigIds) {
+      vectorClocks.put((long) detectionConfigId, 0L);
     }
     alertConfigDTO.setHighWaterMark(0L);
     alertConfigDTO.setVectorClocks(vectorClocks);
