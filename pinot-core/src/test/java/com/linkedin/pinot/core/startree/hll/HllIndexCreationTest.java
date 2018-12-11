@@ -119,7 +119,7 @@ public class HllIndexCreationTest {
         docIdSet[i] = i;
       }
       Map<String, DataSource> dataSourceMap = new HashMap<>();
-      for (String column : indexSegment.getColumnNames()) {
+      for (String column : indexSegment.getPhysicalColumnNames()) {
         dataSourceMap.put(column, indexSegment.getDataSource(column));
       }
       DataBlockCache blockCache = new DataBlockCache(new DataFetcher(dataSourceMap));

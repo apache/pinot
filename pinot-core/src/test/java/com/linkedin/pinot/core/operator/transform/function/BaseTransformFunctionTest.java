@@ -128,7 +128,7 @@ public abstract class BaseTransformFunctionTest {
     driver.build();
 
     IndexSegment indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
-    Set<String> columnNames = indexSegment.getColumnNames();
+    Set<String> columnNames = indexSegment.getPhysicalColumnNames();
     _dataSourceMap = new HashMap<>(columnNames.size());
     for (String columnName : columnNames) {
       _dataSourceMap.put(columnName, indexSegment.getDataSource(columnName));
