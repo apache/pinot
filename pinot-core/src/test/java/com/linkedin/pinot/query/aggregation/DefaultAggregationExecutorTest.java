@@ -126,7 +126,7 @@ public class DefaultAggregationExecutorTest {
   void testAggregation() {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     Set<TransformExpressionTree> expressionTrees = new HashSet<>();
-    for (String column : _indexSegment.getColumnNames()) {
+    for (String column : _indexSegment.getPhysicalColumnNames()) {
       dataSourceMap.put(column, _indexSegment.getDataSource(column));
       expressionTrees.add(TransformExpressionTree.compileToExpressionTree(column));
     }

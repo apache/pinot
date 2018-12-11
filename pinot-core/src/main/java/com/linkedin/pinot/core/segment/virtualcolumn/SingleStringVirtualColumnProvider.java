@@ -51,16 +51,15 @@ public abstract class SingleStringVirtualColumnProvider extends BaseVirtualColum
 
   @Override
   public ColumnMetadata buildMetadata(VirtualColumnContext context) {
-    ColumnMetadata.Builder columnMetadataBuilder = new ColumnMetadata.Builder()
-        .setColumnName(context.getColumnName())
-        .setCardinality(1)
+    ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
+
+    columnMetadataBuilder.setCardinality(1)
         .setHasDictionary(true)
         .setHasInvertedIndex(true)
         .setFieldType(FieldSpec.FieldType.DIMENSION)
         .setDataType(FieldSpec.DataType.STRING)
         .setSingleValue(true)
-        .setIsSorted(true)
-        .setTotalDocs(context.getTotalDocCount());
+        .setIsSorted(true);
 
     return columnMetadataBuilder.build();
   }

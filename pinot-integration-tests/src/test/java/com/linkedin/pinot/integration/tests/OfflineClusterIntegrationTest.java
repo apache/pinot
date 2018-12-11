@@ -234,6 +234,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     queryResponse = postQuery(SELECT_STAR_QUERY);
     Assert.assertEquals(queryResponse.getLong("totalDocs"), numTotalDocs);
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 79);
+
+
   }
 
   private void reloadDefaultColumns(final boolean withExtraColumns) throws Exception {

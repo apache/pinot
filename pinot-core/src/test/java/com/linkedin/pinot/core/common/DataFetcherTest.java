@@ -121,7 +121,7 @@ public class DataFetcherTest {
     IndexSegment indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR_PATH, SEGMENT_NAME), ReadMode.heap);
 
     Map<String, DataSource> dataSourceMap = new HashMap<>();
-    for (String column : indexSegment.getColumnNames()) {
+    for (String column : indexSegment.getPhysicalColumnNames()) {
       dataSourceMap.put(column, indexSegment.getDataSource(column));
     }
     // Get a data fetcher for the index segment.

@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.segment.virtualcolumn;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 
 
@@ -22,6 +24,17 @@ import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
  * Shared implementation code between virtual column providers.
  */
 public abstract class BaseVirtualColumnProvider implements VirtualColumnProvider {
+
+  protected ColumnMetadata.Builder getColumnMetadataBuilder(VirtualColumnContext context) {
+
+    ColumnMetadata.Builder builder = new ColumnMetadata.Builder()
+        .setVirtual(true)
+        .setColumnName(context.getColumnName())
+        .setTotalDocs(context.getTotalDocCount());
+
+    return builder;
+  }
+
   @Override
   public ColumnIndexContainer buildColumnIndexContainer(VirtualColumnContext context) {
     return new VirtualColumnIndexContainer(buildReader(context), buildInvertedIndex(context), buildDictionary(context));

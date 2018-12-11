@@ -241,7 +241,7 @@ public class RawIndexBenchmark {
    */
   private Map<String, DataSource> buildDataSourceMap(IndexSegment segment) {
     Map<String, DataSource> dataSourceMap = new HashMap<>();
-    for (String column : segment.getColumnNames()) {
+    for (String column : segment.getPhysicalColumnNames()) {
       dataSourceMap.put(column, segment.getDataSource(column));
     }
     return dataSourceMap;
