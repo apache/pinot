@@ -160,7 +160,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       try {
         if (_segmentName.equals("")) {
           acquireSema("ALL", _logger);
-          // NOTE: the method aborts if any segment reload encounters an unhandled exception - can lead to inconsisten
+          // NOTE: the method aborts if any segment reload encounters an unhandled exception - can lead to inconsistent
           // state across segments
           _instanceDataManager.reloadAllSegments(_tableNameWithType);
         } else {
