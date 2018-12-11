@@ -161,13 +161,15 @@ public class ControllerStarter {
     _helixResourceManager.start();
     final HelixManager helixManager = _helixResourceManager.getHelixZkManager();
 
+    LOGGER.info("Creating ControllerLeadershipManager instance");
+    ControllerLeadershipManager.createInstance(helixManager);
+
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixManager));
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
     PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
-    PinotLLCRealtimeSegmentManager.getInstance().start();
     _realtimeSegmentsManager.start(_controllerMetrics);
 
     // Setting up periodic tasks

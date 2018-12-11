@@ -22,10 +22,9 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
@@ -33,9 +32,12 @@ import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.controller.ControllerChangeSubscriber;
+import com.linkedin.pinot.controller.ControllerLeadershipManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.core.query.utils.Pair;
+import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -47,8 +49,6 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.IZkChildListener;
 import org.I0Itec.zkclient.IZkDataListener;
-import org.apache.helix.ControllerChangeListener;
-import org.apache.helix.NotificationContext;
 import org.apache.helix.PropertyPathConfig;
 import org.apache.helix.PropertyType;
 import org.apache.helix.ZNRecord;
@@ -65,7 +65,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Realtime segment manager, which assigns realtime segments to server instances so that they can consume from the stream.
  */
-public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkChildListener, IZkDataListener {
+public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkChildListener, IZkDataListener, ControllerChangeSubscriber {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentManager.class);
   private static final String TABLE_CONFIG = "/CONFIGS/TABLE";
   private static final String SEGMENTS_PATH = "/SEGMENTS";
@@ -101,12 +101,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
     _zkClient.subscribeDataChanges(_tableConfigPath, this);
 
     // Subscribe to leadership changes
-    _pinotHelixResourceManager.getHelixZkManager().addControllerListener(new ControllerChangeListener() {
-      @Override
-      public void onControllerChange(NotificationContext changeContext) {
-        processPropertyStoreChange(CONTROLLER_LEADER_CHANGE);
-      }
-    });
+    ControllerLeadershipManager.getInstance().subscribe(PinotLLCRealtimeSegmentManager.class.getName(), this);
 
     // Setup change listeners for already existing tables, if any.
     processPropertyStoreChange(_tableConfigPath);
@@ -115,6 +110,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   public void stop() {
     LOGGER.info("Stopping realtime segments manager, stopping property store.");
     _pinotHelixResourceManager.getPropertyStore().stop();
+    ControllerLeadershipManager.getInstance().unsubscribe(PinotRealtimeSegmentManager.class.getName());
   }
 
   private synchronized void assignRealtimeSegmentsToServerInstancesIfNecessary()
@@ -265,7 +261,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   }
 
   private boolean isLeader() {
-    return _pinotHelixResourceManager.isLeader();
+    return ControllerLeadershipManager.getInstance().isLeader();
   }
 
   @Override
@@ -407,5 +403,15 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       throws Exception {
     LOGGER.info("PinotRealtimeSegmentManager.handleDataDeleted: {}", dataPath);
     processPropertyStoreChange(dataPath);
+  }
+
+  @Override
+  public void onBecomingLeader() {
+    processPropertyStoreChange(CONTROLLER_LEADER_CHANGE);
+  }
+
+  @Override
+  public void onBecomingNonLeader() {
+    processPropertyStoreChange(CONTROLLER_LEADER_CHANGE);
   }
 }

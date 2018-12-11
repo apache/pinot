@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.exception.InvalidConfigException;
 import com.linkedin.pinot.common.metrics.ControllerGauge;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.DataSize;
+import com.linkedin.pinot.controller.ControllerLeadershipManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.util.TableSizeReader;
 import java.io.File;
@@ -150,7 +151,7 @@ public class StorageQuotaChecker {
         tableName, tableSubtypeSize.estimatedSizeInBytes, tableSubtypeSize.reportedSizeInBytes);
 
     // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
-    if (_pinotHelixResourceManager.isLeader() && allowedStorageBytes != 0L) {
+    if (isLeader() && allowedStorageBytes != 0L) {
       long existingStorageQuotaUtilization = tableSubtypeSize.estimatedSizeInBytes  * 100 / allowedStorageBytes;
       _controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
           existingStorageQuotaUtilization);
@@ -192,5 +193,9 @@ public class StorageQuotaChecker {
       LOGGER.warn(message);
       return failure(message);
     }
+  }
+
+  protected boolean isLeader() {
+    return ControllerLeadershipManager.getInstance().isLeader();
   }
 }

@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix.core.periodictask;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.linkedin.pinot.controller.ControllerLeadershipManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
 import java.util.List;
@@ -59,7 +61,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
 
   @Override
   public void run() {
-    if (!_pinotHelixResourceManager.isLeader()) {
+    if (!isLeader()) {
       skipLeaderTask();
     } else {
       List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
@@ -109,4 +111,9 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    * @param tables List of table names
    */
   public abstract void process(List<String> tables);
+
+  @VisibleForTesting
+  protected boolean isLeader() {
+    return ControllerLeadershipManager.getInstance().isLeader();
+  }
 }

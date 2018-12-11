@@ -32,8 +32,8 @@ public class ControllerPeriodicTaskTest {
   private final AtomicBoolean _onBecomeNonLeaderCalled = new AtomicBoolean();
   private final AtomicBoolean _processCalled = new AtomicBoolean();
 
-  private final ControllerPeriodicTask _task =
-      new ControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS, _resourceManager) {
+  private final MockControllerPeriodicTask _task =
+      new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS, _resourceManager) {
         @Override
         public void onBecomeLeader() {
           _onBecomeLeaderCalled.set(true);
@@ -48,6 +48,7 @@ public class ControllerPeriodicTaskTest {
         public void process(List<String> tables) {
           _processCalled.set(true);
         }
+
       };
 
   private void resetState() {
@@ -68,6 +69,7 @@ public class ControllerPeriodicTaskTest {
   public void testChangeLeadership() {
     // Initial state
     resetState();
+    _task.setLeader(false);
     _task.init();
     assertFalse(_onBecomeLeaderCalled.get());
     assertFalse(_onBecomeNonLeaderCalled.get());
@@ -82,7 +84,7 @@ public class ControllerPeriodicTaskTest {
 
     // From non-leader to leader
     resetState();
-    when(_resourceManager.isLeader()).thenReturn(true);
+    _task.setLeader(true);
     _task.run();
     assertTrue(_onBecomeLeaderCalled.get());
     assertFalse(_onBecomeNonLeaderCalled.get());
@@ -97,10 +99,33 @@ public class ControllerPeriodicTaskTest {
 
     // From leader to non-leader
     resetState();
-    when(_resourceManager.isLeader()).thenReturn(false);
+    _task.setLeader(false);
     _task.run();
     assertFalse(_onBecomeLeaderCalled.get());
     assertTrue(_onBecomeNonLeaderCalled.get());
     assertFalse(_processCalled.get());
+  }
+
+  private class MockControllerPeriodicTask extends ControllerPeriodicTask {
+
+    private boolean _isLeader = true;
+    public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds,
+        PinotHelixResourceManager pinotHelixResourceManager) {
+      super(taskName, runFrequencyInSeconds, pinotHelixResourceManager);
+    }
+
+    @Override
+    public void process(List<String> tables) {
+
+    }
+
+    @Override
+    protected boolean isLeader() {
+      return _isLeader;
+    }
+
+    void setLeader(boolean isLeader) {
+      _isLeader = isLeader;
+    }
   }
 }
