@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.virtualcolumn;
 
-import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 

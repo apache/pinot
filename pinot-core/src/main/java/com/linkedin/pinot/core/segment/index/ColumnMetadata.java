@@ -82,7 +82,6 @@ public class ColumnMetadata {
   private final String dateTimeFormat;
   private final String dateTimeGranularity;
 
-
   public static ColumnMetadata fromPropertiesConfiguration(String column, PropertiesConfiguration config) {
     Builder builder = new Builder();
 
