@@ -271,7 +271,7 @@ public class YamlResource {
     return alertConfig;
   }
 
-  @POST
+  @PUT
   @Path("/notification/{id}")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.TEXT_PLAIN)
