@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import com.linkedin.pinot.common.metrics.ServerMeter;
@@ -124,6 +125,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         result.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
+        Utils.rethrowException(e);
       } finally {
         releaseSema();
       }
