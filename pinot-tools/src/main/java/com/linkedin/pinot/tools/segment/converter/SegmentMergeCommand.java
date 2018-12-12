@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
@@ -155,18 +156,25 @@ public class SegmentMergeCommand extends AbstractBaseAdminCommand implements Com
       long minStartTime = Long.MAX_VALUE;
       long maxEndTime = Long.MIN_VALUE;
       long totalNumDocsBeforeMerge = 0L;
-      for (File indexDir : inputIndexDirs) {
+      Iterator<File> it = inputIndexDirs.iterator();
+      while (it.hasNext()) {
+        File indexDir = it.next();
         SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
-        long currentStartTime = segmentMetadata.getStartTime();
-        if (currentStartTime < minStartTime) {
-          minStartTime = currentStartTime;
-        }
+        if (segmentMetadata.getTotalDocs() > 0) {
+          long currentStartTime = segmentMetadata.getStartTime();
+          if (currentStartTime < minStartTime) {
+            minStartTime = currentStartTime;
+          }
 
-        long currentEndTime = segmentMetadata.getEndTime();
-        if (currentEndTime > maxEndTime) {
-          maxEndTime = currentEndTime;
+          long currentEndTime = segmentMetadata.getEndTime();
+          if (currentEndTime > maxEndTime) {
+            maxEndTime = currentEndTime;
+          }
+          totalNumDocsBeforeMerge += segmentMetadata.getTotalDocs();
+        } else {
+          LOGGER.info("Discarding segment {} since it has 0 records", segmentMetadata.getName());
+          it.remove();
         }
-        totalNumDocsBeforeMerge += segmentMetadata.getTotalDocs();
       }
 
       // Compute segment name if it is not specified
