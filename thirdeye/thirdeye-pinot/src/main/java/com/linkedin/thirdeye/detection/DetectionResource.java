@@ -109,7 +109,7 @@ public class DetectionResource {
   @Path("/{id}")
   @GET
   @ApiOperation("get a detection config with yaml")
-  public Response getDetectionConfig(@ApiParam("the detection config id to edit") @PathParam("id") long id){
+  public Response getDetectionConfig(@ApiParam("the detection config id") @PathParam("id") long id){
     DetectionConfigDTO config = this.configDAO.findById(id);
     return Response.ok(config).build();
   }
@@ -117,7 +117,7 @@ public class DetectionResource {
   @Path("/notification/{id}")
   @GET
   @ApiOperation("get a detection alert config with yaml")
-  public Response getDetectionAlertConfig(@ApiParam("the detection config id to edit") @PathParam("id") long id){
+  public Response getDetectionAlertConfig(@ApiParam("the detection alert config id") @PathParam("id") long id){
     DetectionAlertConfigDTO config = this.detectionAlertConfigDAO.findById(id);
     return Response.ok(config).build();
   }
