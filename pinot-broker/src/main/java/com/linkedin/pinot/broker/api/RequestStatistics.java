@@ -1,0 +1,171 @@
+/**
+ * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.linkedin.pinot.broker.api;
+
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.QueryType;
+import com.linkedin.pinot.common.response.BrokerResponse;
+
+
+/**
+ * A class to hold the details regarding a request and the statistics.
+ * This object can be used to publish the query processing statistics to a stream for
+ * post-processing at a finer level than metrics.
+ */
+public class RequestStatistics {
+  private int _errorCode = 0;
+  private String _pql;
+  private String _tableName = "NotYetParsed";
+  private long _processingTimeMillis = -1;
+
+  private long _totalDocs;
+  private long _numDocsScanned;
+  private long _numEntriesScannedInFilter;
+  private long _numEntriesScannedPostFilter;
+  private long _numSegmentsQueried;
+  private long _numSegmentsProcessed;
+  private long _numSegmentsMatched;
+  private int _numServersQueried;
+  private int _numServersResponded;
+  private boolean _isNumGroupsLimitReached;
+  private int _numExceptions;
+  private boolean _isGroupBy;
+  private boolean _isAggregation;
+
+  public enum FanoutType {
+    OFFLINE,
+    REALTIME,
+    HYBRID
+  }
+
+  private FanoutType _fanoutType;
+
+  public RequestStatistics() {
+  }
+
+  public void setErrorCode(int errorCode) {
+    _errorCode = errorCode;
+  }
+
+  public void setPql(String pql) {
+    _pql = pql;
+  }
+
+  public void setTableName(String tableName) {
+    _tableName = tableName;
+  }
+
+  public void setQueryProcessingTime(long processingTimeMillis) {
+    _processingTimeMillis = processingTimeMillis;
+  }
+
+  public void setStatistics(BrokerResponse brokerResponse) {
+    _totalDocs = brokerResponse.getTotalDocs();
+    _numDocsScanned = brokerResponse.getNumDocsScanned();
+    _numEntriesScannedInFilter = brokerResponse.getNumEntriesScannedInFilter();
+    _numEntriesScannedPostFilter = brokerResponse.getNumEntriesScannedPostFilter();
+    _numSegmentsQueried = brokerResponse.getNumSegmentsQueried();
+    _numSegmentsProcessed = brokerResponse.getNumSegmentsProcessed();
+    _numSegmentsMatched = brokerResponse.getNumSegmentsMatched();
+    _numServersQueried = brokerResponse.getNumServersQueried();
+    _numSegmentsProcessed = brokerResponse.getNumSegmentsProcessed();
+    _numServersResponded = brokerResponse.getNumServersResponded();
+    _isNumGroupsLimitReached = brokerResponse.isNumGroupsLimitReached();
+    _numExceptions = brokerResponse.getExceptionsSize();
+  }
+
+  public void setStatistics(BrokerRequest brokerRequest) {
+    _isGroupBy = brokerRequest.isSetGroupBy();
+    _isAggregation = brokerRequest.isSetAggregationsInfo();
+  }
+
+  public void setFanoutType(FanoutType fanoutType) {
+    _fanoutType = fanoutType;
+  }
+
+  public FanoutType getFanoutType() {
+    return _fanoutType;
+  }
+
+  public boolean isAggregation() {
+    return _isAggregation;
+  }
+
+  public boolean isGroupBy() {
+    return _isGroupBy;
+  }
+
+  public int getErrorCode() {
+    return _errorCode;
+  }
+
+  public String getPql() {
+    return _pql;
+  }
+
+  public String getTableName() {
+    return _tableName;
+  }
+
+  public long getProcessingTimeMillis() {
+    return _processingTimeMillis;
+  }
+
+  public long getTotalDocs() {
+    return _totalDocs;
+  }
+
+  public long getNumDocsScanned() {
+    return _numDocsScanned;
+  }
+
+  public long getNumEntriesScannedInFilter() {
+    return _numEntriesScannedInFilter;
+  }
+
+  public long getNumEntriesScannedPostFilter() {
+    return _numEntriesScannedPostFilter;
+  }
+
+  public long getNumSegmentsQueried() {
+    return _numSegmentsQueried;
+  }
+
+  public long getNumSegmentsProcessed() {
+    return _numSegmentsProcessed;
+  }
+
+  public long getNumSegmentsMatched() {
+    return _numSegmentsMatched;
+  }
+
+  public int getNumServersQueried() {
+    return _numServersQueried;
+  }
+
+  public int getNumServersResponded() {
+    return _numServersResponded;
+  }
+
+  public boolean isNumGroupsLimitReached() {
+    return _isNumGroupsLimitReached;
+  }
+
+  public int getNumExceptions() {
+    return _numExceptions;
+  }
+}
