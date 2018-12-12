@@ -128,7 +128,7 @@ public class YamlResource {
       return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "detection yaml parsing error, " + e.getMessage())).build();
     }
 
-    // retrieve id if detection config already exists
+    // check if detection config already exists
     String name = MapUtils.getString(detectionYamlConfig, PROP_DETECTION_NAME);
     List<DetectionConfigDTO> detectionConfigDTOs = this.detectionConfigDAO.findByPredicate(
         Predicate.EQ("name", name));
@@ -227,7 +227,7 @@ public class YamlResource {
       return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "detection yaml parsing error, " + e.getMessage())).build();
     }
 
-    // retrieve id if detection config already exists
+    // check if detection config already exists
     String name = MapUtils.getString(yamlConfig, PROP_DETECTION_NAME);
     List<DetectionConfigDTO> detectionConfigDTOs = this.detectionConfigDAO.findByPredicate(
         Predicate.EQ("name", name));
