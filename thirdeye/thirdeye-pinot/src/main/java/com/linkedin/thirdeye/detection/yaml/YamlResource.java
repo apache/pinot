@@ -129,32 +129,37 @@ public class YamlResource {
     }
 
     // retrieve id if detection config already exists
+    String name = MapUtils.getString(detectionYamlConfig, PROP_DETECTION_NAME);
     List<DetectionConfigDTO> detectionConfigDTOs = this.detectionConfigDAO.findByPredicate(
-        Predicate.EQ("name", MapUtils.getString(detectionYamlConfig, PROP_DETECTION_NAME)));
-    DetectionConfigDTO existingDetectionConfig = null;
-    if (!detectionConfigDTOs.isEmpty()) {
-      existingDetectionConfig = detectionConfigDTOs.get(0);
+        Predicate.EQ("name", name));
+    if (!detectionConfigDTOs.isEmpty()){
+      return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "detection name already exist: " + name )).build();
     }
 
     HashMap<String, String> responseMessage = new HashMap<>();
     DetectionConfigDTO detectionConfig =
-        buildDetectionConfigFromYaml(startTime, endTime, detectionYamlConfig, existingDetectionConfig, responseMessage);
+        buildDetectionConfigFromYaml(startTime, endTime, detectionYamlConfig, null, responseMessage);
     if (detectionConfig == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
     detectionConfig.setYaml(detectionYaml);
     Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
-    LOG.info("saved detection config id {}", detectionConfigId);
 
     // notification
     // TODO: Inject detectionConfigId into detection alert config
     DetectionAlertConfigDTO alertConfig = createDetectionAlertConfig(yamls.get("notification"), responseMessage);
     if (alertConfig == null) {
+      // revert
+      this.detectionAlertConfigDAO.deleteById(detectionConfigId);
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
     Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfig);
-    Preconditions.checkNotNull(detectionAlertConfigId, "Save detection alert config failed");
+    if (detectionAlertConfigId == null){
+      // revert
+      this.detectionAlertConfigDAO.deleteById(detectionConfigId);
+      return Response.serverError().entity(ImmutableMap.of("message", "Save detection alert config failed")).build();
+    }
     LOG.info("saved detection alert config id {}", detectionAlertConfigId);
 
     return Response.ok().entity(ImmutableMap.of("detectionConfigId", detectionConfig.getId(), "detectionAlertConfigId", alertConfig.getId())).build();
@@ -223,15 +228,15 @@ public class YamlResource {
     }
 
     // retrieve id if detection config already exists
+    String name = MapUtils.getString(yamlConfig, PROP_DETECTION_NAME);
     List<DetectionConfigDTO> detectionConfigDTOs = this.detectionConfigDAO.findByPredicate(
-        Predicate.EQ("name", MapUtils.getString(yamlConfig, PROP_DETECTION_NAME)));
-    DetectionConfigDTO existingDetectionConfig = null;
-    if (!detectionConfigDTOs.isEmpty()) {
-      existingDetectionConfig = detectionConfigDTOs.get(0);
+        Predicate.EQ("name", name));
+    if (!detectionConfigDTOs.isEmpty()){
+      return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "detection name already exist: " + name )).build();
     }
     Map<String, String> responseMessage = new HashMap<>();
     DetectionConfigDTO detectionConfig =
-        buildDetectionConfigFromYaml(startTime, endTime, yamlConfig, existingDetectionConfig, responseMessage);
+        buildDetectionConfigFromYaml(startTime, endTime, yamlConfig, null, responseMessage);
     if (detectionConfig == null) {
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
@@ -422,7 +427,7 @@ public class YamlResource {
   }
 
   /**
-   List all yaml configurations enhanced with detection config id, isActive and createBy information.
+   List all yaml configurations as JSON. enhanced with detection config id, isActive and createBy information.
    @param id id of a specific detection config yaml to list (optional)
    @return the yaml configuration converted in to JSON, with enhanced information from detection config DTO.
    */
