@@ -98,6 +98,11 @@ public class ControllerStarter {
   public ControllerStarter(ControllerConf conf) {
     _config = conf;
     _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
+    if (_config.getUseSSL()) {
+    	LOGGER.info("Using SSL");
+    	_adminApp.setSSLConfigs(_config.getKeyStoreFile(), _config.getKeyStorePassword(), 
+    			_config.getTrustStoreFile(), _config.getTrustStorePassword());
+    }
     _helixResourceManager = new PinotHelixResourceManager(_config);
     _retentionManager = new RetentionManager(_helixResourceManager, _config);
     _metricsRegistry = new MetricsRegistry();
@@ -250,9 +255,14 @@ public class ControllerStarter {
     _adminApp.start(jerseyPort);
     LOGGER.info("Started Jersey API on port {}", jerseyPort);
     LOGGER.info("Pinot controller ready and listening on port {} for API requests", _config.getControllerPort());
-    LOGGER.info("Controller services available at http://{}:{}/", _config.getControllerHost(),
-        _config.getControllerPort());
-
+    if (_config.getUseSSL() && _config.getQueryConsoleUseHttps()) {
+      LOGGER.info("Controller services available at https://{}:{}/", _config.getControllerHost(),
+    	_config.getControllerPort());
+    }
+    else {
+       LOGGER.info("Controller services available at http://{}:{}/", _config.getControllerHost(),
+         _config.getControllerPort());
+    }
     _controllerMetrics.addCallbackGauge("helix.connected", () -> helixManager.isConnected() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("helix.leader", () -> helixManager.isLeader() ? 1L : 0L);
     _controllerMetrics.addCallbackGauge("dataDir.exists", () -> new File(_config.getDataDir()).exists() ? 1L : 0L);

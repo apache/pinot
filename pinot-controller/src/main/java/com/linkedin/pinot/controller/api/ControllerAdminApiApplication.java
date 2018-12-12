@@ -36,6 +36,8 @@ import io.swagger.jaxrs.config.BeanConfig;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
+import org.glassfish.grizzly.ssl.SSLContextConfigurator;
+import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
 
 
 public class ControllerAdminApiApplication extends ResourceConfig {
@@ -46,7 +48,12 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   private boolean started = false;
   private static final String RESOURCE_PACKAGE = "com.linkedin.pinot.controller.api.resources";
   private static String CONSOLE_WEB_PATH;
-  private final boolean _useHttps;
+  private String _keyStoreFile;
+  private String _keyStorePass;
+  private String _trustStoreFile;
+  private String _trustStorePass;
+  private boolean _useHttps;
+  private boolean _useSSL = false;
 
   public ControllerAdminApiApplication(String consoleWebPath, boolean useHttps) {
     super();
@@ -73,6 +80,14 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     // property("jersey.config.server.tracing.type", "ALL");
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }
+  
+  public void setSSLConfigs(String keyStoreFile, String keyStorePass, String trustStoreFile, String trustStorePass) {
+	  _useSSL = true;
+	  _keyStoreFile = keyStoreFile;
+	  _keyStorePass = keyStorePass;
+	  _trustStoreFile = trustStoreFile;
+	  _trustStorePass = trustStorePass;
+  }
 
   public void registerBinder(AbstractBinder binder) {
     register(binder);
@@ -81,8 +96,19 @@ public class ControllerAdminApiApplication extends ResourceConfig {
   public boolean start(int httpPort) {
     // ideally greater than reserved port but then port 80 is also valid
     Preconditions.checkArgument(httpPort > 0);
-    baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
-    httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, this);
+    if (_useSSL) {
+      baseUri = URI.create("https://0.0.0.0:" + Integer.toString(httpPort) + "/");
+  	  SSLContextConfigurator sslContext = new SSLContextConfigurator();
+  	  sslContext.setKeyStoreFile(_keyStoreFile);
+  	  sslContext.setKeyStorePass(_keyStorePass);
+  	  sslContext.setTrustStoreFile(_trustStoreFile);
+  	  sslContext.setTrustStorePass(_trustStorePass);
+  	  httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, this, true, 
+          new SSLEngineConfigurator(sslContext).setClientMode(false).setNeedClientAuth(false));
+    } else {
+      baseUri = URI.create("http://0.0.0.0:" + Integer.toString(httpPort) + "/");
+      httpServer = GrizzlyHttpServerFactory.createHttpServer(baseUri, this);
+    }
 
     setupSwagger(httpServer);
 

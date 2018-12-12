@@ -44,6 +44,11 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_PROTOCOL = "controller.vip.protocol";
   private static final String CONTROLLER_HOST = "controller.host";
   private static final String CONTROLLER_PORT = "controller.port";
+  private static final String USE_SSL = "controller.ssl.enabled";
+  private static final String KEYSTORE_FILE = "controller.ssl.keystore.file";
+  private static final String KEYSTORE_PASSWORD = "controller.ssl.keystore.pass";
+  private static final String TRUSTSTORE_FILE = "controller.ssl.truststore.file";
+  private static final String TRUSTSTORE_PASSWORD = "controller.ssl.truststore.pass";
   private static final String DATA_DIR = "controller.data.dir";
   // Potentially same as data dir if local
   private static final String LOCAL_TEMP_DIR = "controller.local.temp.dir";
@@ -206,6 +211,46 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public boolean getQueryConsoleUseHttps() {
     return containsKey(CONSOLE_WEBAPP_USE_HTTPS) && getBoolean(CONSOLE_WEBAPP_USE_HTTPS);
+  }
+  
+  public void setUseSSL(boolean useSSL) {
+	setProperty(USE_SSL, useSSL);
+  }
+  
+  public boolean getUseSSL() {
+	return containsKey(USE_SSL) && getBoolean(USE_SSL);
+  }
+  
+  public void setKeyStoreFile(String keyStoreFile) {
+	setProperty(KEYSTORE_FILE, keyStoreFile);
+  }
+  
+  public String getKeyStoreFile() {
+	return getString(KEYSTORE_FILE, null);
+  }
+  
+  public void setKeyStorePassword(String keyStorePassword) {
+	setProperty(KEYSTORE_PASSWORD, keyStorePassword);
+  }
+	  
+  public String getKeyStorePassword() {
+	return getString(KEYSTORE_PASSWORD, null);
+  }
+  
+  public void setTrustStoreFile(String trustStoreFile) {
+    setProperty(TRUSTSTORE_FILE, trustStoreFile);
+  }
+  
+  public String getTrustStoreFile() {
+	return getString(TRUSTSTORE_FILE, null);
+  }
+  
+  public void setTrustStorePassword(String trustStorePassword) {
+	setProperty(TRUSTSTORE_PASSWORD, trustStorePassword);
+  }
+	  
+  public String getTrustStorePassword() {
+	return getString(TRUSTSTORE_PASSWORD, null);
   }
 
   public void setJerseyAdminPrimary(String jerseyAdminPrimary) {
