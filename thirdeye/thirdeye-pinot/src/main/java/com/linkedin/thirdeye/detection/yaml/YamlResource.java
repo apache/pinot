@@ -106,7 +106,7 @@ public class YamlResource {
   public Response createYamlAlert(@ApiParam(value =  "a json contains both notification and detection yaml as string")  String payload,
       @ApiParam("tuning window start time for tunable components") @QueryParam("startTime") long startTime,
       @ApiParam("tuning window end time for tunable components") @QueryParam("endTime") long endTime) throws Exception{
-    Map<String, String> yamls = OBJECT_MAPPER.readValue(payload, HashMap.class);
+    Map<String, String> yamls = OBJECT_MAPPER.readValue(payload, Map.class);
 
     if (StringUtils.isBlank(payload)){
       return Response.status(Response.Status.BAD_REQUEST).entity(ImmutableMap.of("message", "Empty payload")).build();
