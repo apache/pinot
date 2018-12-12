@@ -18,12 +18,15 @@ package com.linkedin.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
+import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -35,6 +38,8 @@ import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detection.finetune.GridSearchTuningAlgorithm;
 import com.linkedin.thirdeye.detection.finetune.TuningAlgorithm;
 import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
+import com.wordnik.swagger.annotations.Api;
+import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -46,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -63,6 +69,7 @@ import org.slf4j.LoggerFactory;
 
 @Path("/detection")
 @Produces(MediaType.APPLICATION_JSON)
+@Api(tags = {Constants.DETECTION_TAG})
 public class DetectionResource {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionResource.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -77,6 +84,7 @@ public class DetectionResource {
   private final DetectionPipelineLoader loader;
   private final DataProvider provider;
   private final DetectionConfigManager configDAO;
+  private final DetectionAlertConfigManager detectionAlertConfigDAO;
 
   public DetectionResource() {
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -84,6 +92,7 @@ public class DetectionResource {
     this.eventDAO = DAORegistry.getInstance().getEventDAO();
     this.anomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     this.configDAO = DAORegistry.getInstance().getDetectionConfigManager();
+    this.detectionAlertConfigDAO = DAORegistry.getInstance().getDetectionAlertConfigManager();
 
     TimeSeriesLoader timeseriesLoader =
         new DefaultTimeSeriesLoader(metricDAO, datasetDAO, ThirdEyeCacheRegistry.getInstance().getQueryCache());
@@ -95,6 +104,22 @@ public class DetectionResource {
     this.loader = new DetectionPipelineLoader();
 
     this.provider = new DefaultDataProvider(metricDAO, datasetDAO, eventDAO, anomalyDAO, timeseriesLoader, aggregationLoader, loader);
+  }
+
+  @Path("/{id}")
+  @GET
+  @ApiOperation("get a detection config with yaml")
+  public Response getDetectionConfig(@ApiParam("the detection config id") @PathParam("id") long id){
+    DetectionConfigDTO config = this.configDAO.findById(id);
+    return Response.ok(config).build();
+  }
+
+  @Path("/notification/{id}")
+  @GET
+  @ApiOperation("get a detection alert config with yaml")
+  public Response getDetectionAlertConfig(@ApiParam("the detection alert config id") @PathParam("id") long id){
+    DetectionAlertConfigDTO config = this.detectionAlertConfigDAO.findById(id);
+    return Response.ok(config).build();
   }
 
   @POST
