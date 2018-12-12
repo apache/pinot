@@ -24,7 +24,7 @@ import com.linkedin.thirdeye.detection.spi.components.AnomalyFilter;
 import java.time.Duration;
 
 /**
- * 
+ * Duration filter. Filter the anomaly based on anomaly duration.
  */
 @Components(type = "DURATION_FILTER")
 public class DurationAnomalyFilter implements AnomalyFilter<DurationAnomalyFilterSpec> {
