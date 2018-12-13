@@ -76,11 +76,11 @@ public class SegmentAssignmentStrategyTest {
     final String instanceId = "localhost_helixController";
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZK_SERVER, HELIX_CLUSTER_NAME, instanceId, null, 10000L, true, /*isUpdateStateModel=*/
-            false);
+            false, true);
     _pinotHelixResourceManager.start();
 
     final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
-    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false);
+    _helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false, true);
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _partitionAssignmentGenerator =
         new ReplicaGroupPartitionAssignmentGenerator(_helixZkManager.getHelixPropertyStore());
