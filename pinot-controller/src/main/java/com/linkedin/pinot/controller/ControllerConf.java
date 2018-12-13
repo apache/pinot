@@ -74,6 +74,7 @@ public class ControllerConf extends PropertiesConfiguration {
   // separate interval
   private static final String SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS =
       "controller.segment.level.validation.intervalInSeconds";
+  private static final String ENABLE_BATCH_MESSAGE_MODE = "controller.enable.batch.message.mode";
 
   // Defines the kind of storage and the underlying PinotFS implementation
   private static final String PINOT_FS_FACTORY_CLASS_PREFIX = "controller.storage.factory.class";
@@ -96,6 +97,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final long DEFAULT_SEGMENT_UPLOAD_TIMEOUT_IN_MILLIS = 600_000L; // 10 minutes
   private static final int DEFAULT_REALTIME_SEGMENT_METADATA_COMMIT_NUMLOCKS = 64;
   private static final boolean DEFAULT_ENABLE_STORAGE_QUOTA_CHECK = true;
+  private static final boolean DEFAULT_ENABLE_BATCH_MESSAGE_MODE = true;
   private static final int DEFAULT_SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS = 24 * 60 * 60;
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
@@ -457,6 +459,10 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public boolean getEnableStorageQuotaCheck() {
     return getBoolean(ENABLE_STORAGE_QUOTA_CHECK, DEFAULT_ENABLE_STORAGE_QUOTA_CHECK);
+  }
+
+  public boolean getEnableBatchMessageMode() {
+    return getBoolean(ENABLE_BATCH_MESSAGE_MODE, DEFAULT_ENABLE_BATCH_MESSAGE_MODE);
   }
 
   public int getSegmentLevelValidationIntervalInSeconds() {
