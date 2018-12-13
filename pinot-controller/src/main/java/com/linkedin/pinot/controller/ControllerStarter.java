@@ -161,8 +161,8 @@ public class ControllerStarter {
     _helixResourceManager.start();
     final HelixManager helixManager = _helixResourceManager.getHelixZkManager();
 
-    LOGGER.info("Creating ControllerLeadershipManager instance");
-    ControllerLeadershipManager.createInstance(helixManager);
+    LOGGER.info("Init controller leadership manager");
+    ControllerLeadershipManager.init(helixManager);
 
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixManager));
@@ -289,6 +289,9 @@ public class ControllerStarter {
 
   public void stop() {
     try {
+      LOGGER.info("Stopping controller leadership manager");
+      ControllerLeadershipManager.getInstance().stop();
+
       LOGGER.info("Closing PinotFS classes");
       PinotFSFactory.shutdown();
 

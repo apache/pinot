@@ -37,7 +37,7 @@ public class ControllerLeadershipManager {
   private HelixManager _helixManager;
   private volatile boolean _amILeader = false;
 
-  private Map<String, ControllerChangeSubscriber> _subscribers = new ConcurrentHashMap<>();
+  private Map<String, LeadershipChangeSubscriber> _subscribers = new ConcurrentHashMap<>();
 
   private ControllerLeadershipManager(HelixManager helixManager) {
     _helixManager = helixManager;
@@ -48,7 +48,7 @@ public class ControllerLeadershipManager {
    * Create an instance of ControllerLeadershipManager
    * @param helixManager
    */
-  public static synchronized void createInstance(HelixManager helixManager) {
+  public static synchronized void init(HelixManager helixManager) {
     if (INSTANCE != null) {
       throw new RuntimeException("Instance of ControllerLeadershipManager already created");
     }
@@ -59,11 +59,20 @@ public class ControllerLeadershipManager {
    * Get the instance of ControllerLeadershipManager
    * @return
    */
-  public static ControllerLeadershipManager getInstance() {
+  public static synchronized ControllerLeadershipManager getInstance() {
     if (INSTANCE == null) {
       throw new RuntimeException("Instance of ControllerLeadershipManager not yet created");
     }
     return INSTANCE;
+  }
+
+  /**
+   * When stopping this service, if the controller is leader, invoke {@link ControllerLeadershipManager#onBecomingNonLeader()}
+   */
+  public void stop() {
+    if (_amILeader) {
+      onBecomingNonLeader();
+    }
   }
 
   /**
@@ -79,9 +88,13 @@ public class ControllerLeadershipManager {
         LOGGER.info("Already leader. Duplicate notification");
       }
     } else {
-      _amILeader = false;
-      LOGGER.info("Lost leadership");
-      onBecomingNonLeader();
+      if (_amILeader) {
+        _amILeader = false;
+        LOGGER.info("Lost leadership");
+        onBecomingNonLeader();
+      } else {
+        LOGGER.info("Already not leader. Duplicate notification");
+      }
     }
   }
 
@@ -99,18 +112,15 @@ public class ControllerLeadershipManager {
 
   /**
    * Subscribe to changes in the controller leadership
+   * If controller is already leader, invoke {@link LeadershipChangeSubscriber#onBecomingLeader()}
    * @param name
    * @param subscriber
    */
-  public void subscribe(String name, ControllerChangeSubscriber subscriber) {
+  public void subscribe(String name, LeadershipChangeSubscriber subscriber) {
+    LOGGER.info("{} subscribing to leadership changes", name);
     _subscribers.put(name, subscriber);
-  }
-
-  /**
-   * Unsubscribe from changes in controller leadership
-   * @param name
-   */
-  public void unsubscribe(String name) {
-    _subscribers.remove(name);
+    if (_amILeader) {
+      subscriber.onBecomingLeader();
+    }
   }
 }

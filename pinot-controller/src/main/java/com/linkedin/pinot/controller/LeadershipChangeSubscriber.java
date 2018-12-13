@@ -18,7 +18,7 @@ package com.linkedin.pinot.controller;
 /**
  * Interface for a subscriber to the {@link ControllerLeadershipManager}
  */
-public interface ControllerChangeSubscriber {
+public interface LeadershipChangeSubscriber {
 
   /**
    * Callback to invoke on becoming leader

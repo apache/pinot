@@ -32,7 +32,7 @@ import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.controller.ControllerChangeSubscriber;
+import com.linkedin.pinot.controller.LeadershipChangeSubscriber;
 import com.linkedin.pinot.controller.ControllerLeadershipManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -65,7 +65,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Realtime segment manager, which assigns realtime segments to server instances so that they can consume from the stream.
  */
-public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkChildListener, IZkDataListener, ControllerChangeSubscriber {
+public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkChildListener, IZkDataListener, LeadershipChangeSubscriber {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeSegmentManager.class);
   private static final String TABLE_CONFIG = "/CONFIGS/TABLE";
   private static final String SEGMENTS_PATH = "/SEGMENTS";
@@ -110,7 +110,6 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
   public void stop() {
     LOGGER.info("Stopping realtime segments manager, stopping property store.");
     _pinotHelixResourceManager.getPropertyStore().stop();
-    ControllerLeadershipManager.getInstance().unsubscribe(PinotRealtimeSegmentManager.class.getName());
   }
 
   private synchronized void assignRealtimeSegmentsToServerInstancesIfNecessary()
