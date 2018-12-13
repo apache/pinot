@@ -26,4 +26,6 @@ public class Constants {
   public static final String RCA_TAG = "Rootcause";
   public static final String DASHBOARD_TAG = "Dashboard";
   public static final String ONBOARD_TAG = "Onboard";
+  public static final String YAML_TAG = "Yaml";
+  public static final String DETECTION_TAG = "detection";
 }

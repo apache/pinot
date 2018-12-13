@@ -65,11 +65,8 @@ public class SelectionOrderByOperator extends BaseOperator<IntermediateResultsBl
     _selectionColumns.addAll(_selection.getSelectionColumns());
     if ((_selectionColumns.size() == 1) && ((_selectionColumns.toArray(new String[0]))[0].equals("*"))) {
       _selectionColumns.clear();
-      for (String columnName : indexSegment.getColumnNames()) {
-        // Filter out columns that start with $ (virtual columns)
-        if (!columnName.startsWith("$")) {
-          _selectionColumns.add(columnName);
-        }
+      for (String columnName : indexSegment.getPhysicalColumnNames()) {
+        _selectionColumns.add(columnName);
       }
     }
     if (_selection.getSelectionSortSequence() != null) {

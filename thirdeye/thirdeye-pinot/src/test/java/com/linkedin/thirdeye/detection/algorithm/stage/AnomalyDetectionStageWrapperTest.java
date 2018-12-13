@@ -49,7 +49,7 @@ public class AnomalyDetectionStageWrapperTest {
     this.properties.put(PROP_METRIC_URN, "thirdeye:metric:1");
     this.properties.put("specs", this.stageSpecs);
     this.config = new DetectionConfigDTO();
-
+    this.config.setId(-1L);
     this.config.setProperties(properties);
 
     this.provider = new MockDataProvider();

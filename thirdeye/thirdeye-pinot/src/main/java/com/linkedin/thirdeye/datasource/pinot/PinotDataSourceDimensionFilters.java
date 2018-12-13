@@ -71,7 +71,7 @@ public class PinotDataSourceDimensionFilters {
       // left blank
     }
 
-    DateTime endDateTime = new DateTime(maxTime);
+    DateTime endDateTime = new DateTime(maxTime).plusMillis(1);
     DateTime startDateTime = endDateTime.minusDays(7);
 
     Map<String, List<String>> filters = null;

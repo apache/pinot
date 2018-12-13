@@ -163,13 +163,13 @@ public class HelixServerStarter {
     _adminApiApplication.start(adminApiPort);
     setAdminApiPort(adminApiPort);
 
+    final ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     // Register message handler factory
     SegmentMessageHandlerFactory messageHandlerFactory =
-        new SegmentMessageHandlerFactory(fetcherAndLoader, _serverInstance.getInstanceDataManager());
+        new SegmentMessageHandlerFactory(fetcherAndLoader, _serverInstance.getInstanceDataManager(), serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
 
-    final ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
     serverMetrics.addCallbackGauge("helix.connected", () -> _helixManager.isConnected() ? 1L : 0L);
     _helixManager.addPreConnectCallback(
         () -> serverMetrics.addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L));

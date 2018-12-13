@@ -14,9 +14,9 @@ dimensionExploration:
   - D2
   minContribution: 0.05
 rules:
-- name: rule1
-  detection:
+- detection:
   - type: THRESHOLD
+    name: rule1
     params:
       max: 100
 

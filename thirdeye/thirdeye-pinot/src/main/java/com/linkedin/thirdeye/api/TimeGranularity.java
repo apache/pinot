@@ -19,6 +19,8 @@ package com.linkedin.thirdeye.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.DurationFieldType;
 import org.joda.time.Period;
 import org.joda.time.PeriodType;
@@ -74,6 +76,29 @@ public class TimeGranularity {
    */
   public long toMillis(long number) {
     return unit.toMillis(number * size);
+  }
+
+  /**
+   * Returns the equivalent milliseconds of the specified number of this time granularity,
+   * given a time zone.
+   *
+   * @param number the specified number of this time granularity.
+   * @param timeZone the time zone to base the timestamp off of
+   * @return the timestamp in millis
+   */
+  public long toMillis(long number, DateTimeZone timeZone) {
+    if (number > Integer.MAX_VALUE) {
+      switch (this.getUnit()) {
+        case MILLISECONDS:
+          return number;
+        case SECONDS:
+          return number * 1000;
+        default:
+          throw new IllegalArgumentException("epoch offset too large");
+      }
+    }
+
+    return new DateTime(0, timeZone).plus(this.toPeriod((int) number)).getMillis();
   }
 
   /**

@@ -16,6 +16,7 @@
 
 package com.linkedin.thirdeye.detection.wrapper;
 
+import com.google.common.collect.Collections2;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
@@ -87,7 +88,11 @@ public class ChildKeepingMergeWrapper extends BaselineFillingMergeWrapper {
       }
     }
 
-    return super.fillCurrentAndBaselineValue(output);
+    // refill current and baseline values for parent anomalies
+    Collection<MergedAnomalyResultDTO> parentAnomalies =
+        Collections2.filter(output, mergedAnomaly -> mergedAnomaly != null && !mergedAnomaly.getChildren().isEmpty());
+    super.fillCurrentAndBaselineValue(new ArrayList<>(parentAnomalies));
+    return output;
   }
 
   private MergedAnomalyResultDTO copyAnomalyInfo(MergedAnomalyResultDTO anomaly, MergedAnomalyResultDTO newAnomaly) {

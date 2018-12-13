@@ -20,7 +20,7 @@ public class AbsoluteChangeRuleDetectorSpec extends AbstractSpec {
   private double absoluteChange = Double.NaN;
   private String offset = "wo1w";
   private String timezone = "UTC";
-  private String pattern;
+  private String pattern = "UP_OR_DOWN";
 
   public double getAbsoluteChange() {
     return absoluteChange;

@@ -81,6 +81,14 @@ public class DetectionAlertRegistry {
     }
   }
 
+  public void registerAlertScheme(String type, String className) {
+    ALERT_SCHEME_MAP.put(type, className);
+  }
+
+  public void registerAlertSuppressor(String type, String className) {
+    ALERT_SUPPRESSOR_MAP.put(type, className);
+  }
+
   /**
    * Look up the {@link #ALERT_SCHEME_MAP} for the Alert scheme class name from the type
    */

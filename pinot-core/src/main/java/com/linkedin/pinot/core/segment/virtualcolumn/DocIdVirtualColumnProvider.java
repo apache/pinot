@@ -51,16 +51,14 @@ public class DocIdVirtualColumnProvider extends BaseVirtualColumnProvider {
 
   @Override
   public ColumnMetadata buildMetadata(VirtualColumnContext context) {
-    ColumnMetadata.Builder columnMetadataBuilder = new ColumnMetadata.Builder()
-        .setColumnName(context.getColumnName())
-        .setCardinality(context.getTotalDocCount())
+    ColumnMetadata.Builder columnMetadataBuilder = super.getColumnMetadataBuilder(context);
+    columnMetadataBuilder.setCardinality(context.getTotalDocCount())
         .setHasDictionary(true)
         .setHasInvertedIndex(true)
         .setFieldType(FieldSpec.FieldType.DIMENSION)
         .setDataType(FieldSpec.DataType.INT)
         .setSingleValue(true)
-        .setIsSorted(true)
-        .setTotalDocs(context.getTotalDocCount());
+        .setIsSorted(true);
 
     return columnMetadataBuilder.build();
   }

@@ -20,7 +20,7 @@ public class AbsoluteChangeRuleAnomalyFilterSpec extends AbstractSpec {
   private String timezone = "UTC";
   private double threshold = Double.NaN;
   private String offset;
-  private String pattern;
+  private String pattern = "UP_OR_DOWN";
 
   public String getTimezone() {
     return timezone;

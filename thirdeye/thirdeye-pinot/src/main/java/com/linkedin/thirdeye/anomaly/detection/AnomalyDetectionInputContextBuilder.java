@@ -58,6 +58,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -656,14 +657,17 @@ public class AnomalyDetectionInputContextBuilder {
 
     LOG.info("Found [{}] time ranges to fetch data for metric(s): {}, with filter: {}", startEndTimeRanges.size(), metricsToRetrieve, filters);
 
+    // NOTE: another ThirdEye-esque hack. This code is to be deprecated, so no value in refactoring it.
+    DateTimeZone timeZone = Utils.getDataTimeZone(anomalyFunctionSpec.getCollection());
+
     // MultiQuery request
     List<Future<TimeSeriesResponse>> futureResponses = new ArrayList<>();
     List<TimeSeriesRequest> requests = new ArrayList<>();
     Set<TimeSeriesRow> timeSeriesRowSet = new HashSet<>();
     for (Pair<Long, Long> startEndInterval : startEndTimeRanges) {
       TimeSeriesRequest request = new TimeSeriesRequest(seedRequest);
-      DateTime startTime = new DateTime(startEndInterval.getFirst());
-      DateTime endTime = new DateTime(startEndInterval.getSecond());
+      DateTime startTime = new DateTime(startEndInterval.getFirst(), timeZone);
+      DateTime endTime = new DateTime(startEndInterval.getSecond(), timeZone);
       request.setStart(startTime);
       request.setEnd(endTime);
 

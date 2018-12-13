@@ -76,7 +76,7 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L,
             true, /*isUpdateStateModel=*/
-            false);
+            false, true);
     _pinotHelixResourceManager.start();
 
     ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
@@ -87,7 +87,7 @@ public class ValidationManagerTest {
         .build();
 
     final String instanceId = "localhost_helixController";
-    _helixManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, ZK_STR, instanceId, /*isUpdateStateModel=*/false);
+    _helixManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, ZK_STR, instanceId, /*isUpdateStateModel=*/false, true);
     _pinotHelixResourceManager.addTable(_offlineTableConfig);
   }
 
