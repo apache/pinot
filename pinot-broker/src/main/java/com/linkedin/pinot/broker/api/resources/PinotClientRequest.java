@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.api.resources;
 
+import com.linkedin.pinot.broker.api.RequestStatistics;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
@@ -74,7 +75,7 @@ public class PinotClientRequest {
       if (debugOptions != null) {
         requestJson.put(DEBUG_OPTIONS, debugOptions);
       }
-      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null);
+      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
       return brokerResponse.toJsonString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -94,7 +95,7 @@ public class PinotClientRequest {
   public String processQueryPost(String query) {
     try {
       JSONObject requestJson = new JSONObject(query);
-      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null);
+      BrokerResponse brokerResponse = requestHandler.handleRequest(requestJson, null, new RequestStatistics());
       return brokerResponse.toJsonString();
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.requesthandler;
 
 import com.google.common.base.Splitter;
+import com.linkedin.pinot.broker.api.RequestStatistics;
 import com.linkedin.pinot.broker.api.RequesterIdentity;
 import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
@@ -103,13 +104,25 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return "";
     }
   }
-
+  
   @Override
   public BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity)
       throws Exception {
+    return handleRequest(request, requesterIdentity, new RequestStatistics());
+  }
+
+  @Override
+  public BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity,
+      RequestStatistics requestStatistics)
+      throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
+    requestStatistics.setBrokerId(_brokerId);
+    requestStatistics.setRequestId(requestId);
+    requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
+
     String query = request.getString(PQL);
     LOGGER.debug("Query string for request {}: {}", requestId, query);
+    requestStatistics.setPql(query);
 
     // Compile the request
     long compilationStartTimeNs = System.nanoTime();
@@ -119,10 +132,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling request {}: {}, {}", requestId, query, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
+      requestStatistics.setErrorCode(QueryException.PQL_PARSING_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
     }
     String tableName = brokerRequest.getQuerySource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    requestStatistics.setTableName(rawTableName);
     long compilationEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         compilationEndTimeNs - compilationStartTimeNs);
@@ -133,6 +148,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if (!hasAccess) {
       _brokerMetrics.addMeteredTableValue(brokerRequest.getQuerySource().getTableName(),
           BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+      requestStatistics.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
       return new BrokerResponseNative(QueryException.ACCESS_DENIED_ERROR);
     }
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
@@ -166,6 +182,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the request
       LOGGER.info("No table matches for request {}: {}", requestId, query);
+      requestStatistics.setErrorCode(QueryException.BROKER_RESOURCE_MISSING_ERROR_CODE);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
       return BrokerResponseNative.NO_TABLE_RESULT;
     }
@@ -175,6 +192,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String errorMessage =
           String.format("Request %d exceeds query quota for table:%s, query:%s", requestId, tableName, query);
       LOGGER.info(errorMessage);
+      requestStatistics.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_QUOTA_EXCEEDED, 1);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
@@ -184,6 +202,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       validateRequest(brokerRequest);
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
+      requestStatistics.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
     }
@@ -213,14 +232,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Hybrid
       offlineBrokerRequest = _brokerRequestOptimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumn);
       realtimeBrokerRequest = _brokerRequestOptimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumn);
+      requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
     } else if (offlineTableName != null) {
       // OFFLINE only
       brokerRequest.getQuerySource().setTableName(offlineTableName);
       offlineBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn);
+      requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
     } else {
       // REALTIME only
       brokerRequest.getQuerySource().setTableName(realtimeTableName);
       realtimeBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn);
+      requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
     }
 
     // Calculate routing table for the query
@@ -256,7 +278,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     ServerStats serverStats = new ServerStats();
     BrokerResponse brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs, serverStats);
+            realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
@@ -269,6 +291,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     // Set total query processing time
     long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(executionEndTimeNs - compilationStartTimeNs);
     brokerResponse.setTimeUsedMs(totalTimeMs);
+    requestStatistics.setQueryProcessingTime(totalTimeMs);
+    requestStatistics.setStatistics(brokerResponse);
 
     LOGGER.debug("Broker Response: {}", brokerResponse);
 
@@ -404,7 +428,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected abstract BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats) throws Exception;
+      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics) throws Exception;
 
   /**
    * Helper class to pass the per server statistics.
