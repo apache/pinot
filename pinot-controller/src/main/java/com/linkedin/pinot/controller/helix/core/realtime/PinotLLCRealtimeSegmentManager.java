@@ -42,6 +42,7 @@ import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.ControllerLeadershipManager;
 import com.linkedin.pinot.controller.api.events.MetadataEventNotifierFactory;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -124,7 +125,6 @@ public class PinotLLCRealtimeSegmentManager {
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final PinotHelixResourceManager _helixResourceManager;
   private final String _clusterName;
-  private boolean _amILeader = false;
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
   private final int _numIdealStateUpdateLocks;
@@ -162,11 +162,6 @@ public class PinotLLCRealtimeSegmentManager {
             controllerConf, controllerMetrics);
     SegmentCompletionManager.create(helixManager, INSTANCE, controllerConf, controllerMetrics);
   }
-
-  public void start() {
-    _helixManager.addControllerListener(changeContext -> onBecomeLeader());
-  }
-
 
   public void stop() {
     _isStopping = true;
@@ -218,24 +213,9 @@ public class PinotLLCRealtimeSegmentManager {
     return INSTANCE;
   }
 
-  private void onBecomeLeader() {
-    if (isLeader()) {
-      if (!_amILeader) {
-        // We were not leader before, now we are.
-        _amILeader = true;
-        LOGGER.info("Became leader");
-      } else {
-        // We already had leadership, nothing to do.
-        LOGGER.info("Already leader. Duplicate notification");
-      }
-    } else {
-      _amILeader = false;
-      LOGGER.info("Lost leadership");
-    }
-  }
 
   protected boolean isLeader() {
-    return _helixManager.isLeader();
+    return ControllerLeadershipManager.getInstance().isLeader();
   }
 
   protected boolean isConnected() {

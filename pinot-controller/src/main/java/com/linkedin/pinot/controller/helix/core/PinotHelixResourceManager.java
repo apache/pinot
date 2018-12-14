@@ -221,15 +221,6 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Check whether the Helix manager is the leader.
-   *
-   * @return Whether the Helix manager is the leader
-   */
-  public boolean isLeader() {
-    return _helixZkManager.isLeader();
-  }
-
-  /**
    * Get the Helix admin.
    *
    * @return Helix admin

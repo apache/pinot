@@ -161,13 +161,15 @@ public class ControllerStarter {
     _helixResourceManager.start();
     final HelixManager helixManager = _helixResourceManager.getHelixZkManager();
 
+    LOGGER.info("Init controller leadership manager");
+    ControllerLeadershipManager.init(helixManager);
+
     LOGGER.info("Starting task resource manager");
     _helixTaskResourceManager = new PinotHelixTaskResourceManager(new TaskDriver(helixManager));
 
     // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
     LOGGER.info("Starting realtime segment manager");
     PinotLLCRealtimeSegmentManager.create(_helixResourceManager, _config, _controllerMetrics);
-    PinotLLCRealtimeSegmentManager.getInstance().start();
     _realtimeSegmentsManager.start(_controllerMetrics);
 
     // Setting up periodic tasks
@@ -287,6 +289,9 @@ public class ControllerStarter {
 
   public void stop() {
     try {
+      LOGGER.info("Stopping controller leadership manager");
+      ControllerLeadershipManager.getInstance().stop();
+
       // Stop PinotLLCSegmentManager before stopping Jersey API. It is possible that stopping Jersey API
       // may interrupt the handlers waiting on an I/O.
       PinotLLCRealtimeSegmentManager.getInstance().stop();
