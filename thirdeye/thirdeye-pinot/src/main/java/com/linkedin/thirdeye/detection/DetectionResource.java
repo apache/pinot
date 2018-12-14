@@ -46,9 +46,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
@@ -120,6 +122,20 @@ public class DetectionResource {
   public Response getDetectionAlertConfig(@ApiParam("the detection alert config id") @PathParam("id") long id){
     DetectionAlertConfigDTO config = this.detectionAlertConfigDAO.findById(id);
     return Response.ok(config).build();
+  }
+
+  @Path("/subscription-groups/{id}")
+  @GET
+  @ApiOperation("get a list of detection alert configs for a given detection config id")
+  public Response getSubscriptionGroups(@ApiParam("the detection config id") @PathParam("id") long id){
+    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigDAO.findAll();
+    Set<DetectionAlertConfigDTO> subscriptionGroupAlertDTOs = new HashSet<>();
+    for (DetectionAlertConfigDTO alertConfigDTO : detectionAlertConfigDTOs){
+      if (alertConfigDTO.getVectorClocks().containsKey(id)){
+        subscriptionGroupAlertDTOs.add(alertConfigDTO);
+      }
+    }
+    return Response.ok(new ArrayList<>(subscriptionGroupAlertDTOs)).build();
   }
 
   @POST
