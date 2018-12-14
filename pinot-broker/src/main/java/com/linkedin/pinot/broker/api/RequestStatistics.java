@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2018 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.broker.api;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.QueryType;
 import com.linkedin.pinot.common.response.BrokerResponse;
 
 
@@ -43,8 +41,10 @@ public class RequestStatistics {
   private int _numServersResponded;
   private boolean _isNumGroupsLimitReached;
   private int _numExceptions;
-  private boolean _isGroupBy;
-  private boolean _isAggregation;
+  private String _brokerId;
+  private long _requestId;
+  private long _requestArrivalTimeMillis;
+  private long _reduceTimeNanos;
 
   public enum FanoutType {
     OFFLINE,
@@ -88,9 +88,20 @@ public class RequestStatistics {
     _numExceptions = brokerResponse.getExceptionsSize();
   }
 
-  public void setStatistics(BrokerRequest brokerRequest) {
-    _isGroupBy = brokerRequest.isSetGroupBy();
-    _isAggregation = brokerRequest.isSetAggregationsInfo();
+  public void setBrokerId(String brokerId) {
+    _brokerId = brokerId;
+  }
+
+  public void setRequestId(long requestId) {
+    _requestId = requestId;
+  }
+
+  public void setRequestArrivalTimeMillis(long requestArrivalTimeMillis) {
+    _requestArrivalTimeMillis = requestArrivalTimeMillis;
+  }
+
+  public void setReduceTimeNanos(long reduceTimeNanos) {
+    _reduceTimeNanos = reduceTimeNanos;
   }
 
   public void setFanoutType(FanoutType fanoutType) {
@@ -99,14 +110,6 @@ public class RequestStatistics {
 
   public FanoutType getFanoutType() {
     return _fanoutType;
-  }
-
-  public boolean isAggregation() {
-    return _isAggregation;
-  }
-
-  public boolean isGroupBy() {
-    return _isGroupBy;
   }
 
   public int getErrorCode() {

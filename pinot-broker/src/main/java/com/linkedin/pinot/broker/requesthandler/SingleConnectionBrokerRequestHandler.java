@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.requesthandler;
 
+import com.linkedin.pinot.broker.api.RequestStatistics;
 import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
 import com.linkedin.pinot.broker.routing.RoutingTable;
@@ -69,7 +70,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
   protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats) throws Exception {
+      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics) throws Exception {
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
 
     String rawTableName = TableNameBuilder.extractRawTableName(originalBrokerRequest.getQuerySource().getTableName());
@@ -80,6 +81,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     Map<Server, ServerResponse> response = asyncQueryResponse.getResponse();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);
+    // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getStats());
 
     // TODO: do not convert Server to ServerInstance
@@ -104,7 +106,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseBrokerRequestHandl
     long reduceStartTimeNs = System.nanoTime();
     BrokerResponseNative brokerResponse =
         _brokerReduceService.reduceOnDataTable(originalBrokerRequest, dataTableMap, _brokerMetrics);
-    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, System.nanoTime() - reduceStartTimeNs);
+    final long reduceTimeNanos = System.nanoTime() - reduceStartTimeNs;
+    requestStatistics.setReduceTimeNanos(reduceTimeNanos);
+    _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REDUCE, reduceTimeNanos);
 
     brokerResponse.setNumServersQueried(numServersQueried);
     brokerResponse.setNumServersResponded(numServersResponded);

@@ -110,6 +110,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       RequestStatistics requestStatistics)
       throws Exception {
     long requestId = _requestIdGenerator.incrementAndGet();
+    requestStatistics.setBrokerId(_brokerId);
+    requestStatistics.setRequestId(requestId);
+    requestStatistics.setRequestArrivalTimeMillis(System.currentTimeMillis());
+
     String query = request.getString(PQL);
     LOGGER.debug("Query string for request {}: {}", requestId, query);
     requestStatistics.setPql(query);
@@ -128,7 +132,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     String tableName = brokerRequest.getQuerySource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
     requestStatistics.setTableName(rawTableName);
-    requestStatistics.setStatistics(brokerRequest);
     long compilationEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         compilationEndTimeNs - compilationStartTimeNs);
@@ -223,14 +226,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       // Hybrid
       offlineBrokerRequest = _brokerRequestOptimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumn);
       realtimeBrokerRequest = _brokerRequestOptimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumn);
+      requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
     } else if (offlineTableName != null) {
       // OFFLINE only
       brokerRequest.getQuerySource().setTableName(offlineTableName);
       offlineBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn);
+      requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
     } else {
       // REALTIME only
       brokerRequest.getQuerySource().setTableName(realtimeTableName);
       realtimeBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn);
+      requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
     }
 
     // Calculate routing table for the query
@@ -238,9 +244,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Map<String, List<String>> offlineRoutingTable = null;
     Map<String, List<String>> realtimeRoutingTable = null;
     if (offlineBrokerRequest != null) {
-      if (realtimeBrokerRequest == null) {
-        requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
-      }
       offlineRoutingTable = _routingTable.getRoutingTable(new RoutingTableLookupRequest(offlineBrokerRequest));
       if (offlineRoutingTable.isEmpty()) {
         LOGGER.debug("No OFFLINE server found for request {}: {}", requestId, query);
@@ -249,18 +252,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
     }
     if (realtimeBrokerRequest != null) {
-      if (offlineBrokerRequest == null) {
-        requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
-      }
       realtimeRoutingTable = _routingTable.getRoutingTable(new RoutingTableLookupRequest(realtimeBrokerRequest));
       if (realtimeRoutingTable.isEmpty()) {
         LOGGER.debug("No REALTIME server found for request {}: {}", requestId, query);
         realtimeBrokerRequest = null;
         realtimeRoutingTable = null;
       }
-    }
-    if (offlineBrokerRequest != null && realtimeBrokerRequest != null) {
-      requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
     }
     if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
       LOGGER.info("No server found for request {}: {}", requestId, query);
@@ -275,7 +272,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     ServerStats serverStats = new ServerStats();
     BrokerResponse brokerResponse =
         processBrokerRequest(requestId, brokerRequest, offlineBrokerRequest, offlineRoutingTable, realtimeBrokerRequest,
-            realtimeRoutingTable, remainingTimeMs, serverStats);
+            realtimeRoutingTable, remainingTimeMs, serverStats, requestStatistics);
     long executionEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_EXECUTION,
         executionEndTimeNs - routingEndTimeNs);
@@ -425,7 +422,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected abstract BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats) throws Exception;
+      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics) throws Exception;
 
   /**
    * Helper class to pass the per server statistics.
