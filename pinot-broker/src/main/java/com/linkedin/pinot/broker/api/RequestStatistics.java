@@ -17,6 +17,7 @@
 package com.linkedin.pinot.broker.api;
 
 import com.linkedin.pinot.common.response.BrokerResponse;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -44,7 +45,7 @@ public class RequestStatistics {
   private String _brokerId;
   private long _requestId;
   private long _requestArrivalTimeMillis;
-  private long _reduceTimeNanos;
+  private long _reduceTimeMillis;
 
   public enum FanoutType {
     OFFLINE,
@@ -101,7 +102,7 @@ public class RequestStatistics {
   }
 
   public void setReduceTimeNanos(long reduceTimeNanos) {
-    _reduceTimeNanos = reduceTimeNanos;
+    _reduceTimeMillis = TimeUnit.MILLISECONDS.convert(reduceTimeNanos, TimeUnit.NANOSECONDS);
   }
 
   public void setFanoutType(FanoutType fanoutType) {

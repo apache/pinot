@@ -104,6 +104,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       return "";
     }
   }
+  
+  @Override
+  public BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity)
+      throws Exception {
+    return handleRequest(request, requesterIdentity, new RequestStatistics());
+  }
 
   @Override
   public BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity,

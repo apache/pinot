@@ -30,6 +30,10 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
+  @Deprecated
+  BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity)
+      throws Exception;
+
   BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity,
       RequestStatistics requestStatistics) throws Exception;
 }
