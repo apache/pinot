@@ -18,6 +18,7 @@ package com.linkedin.pinot.integration.tests;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
@@ -424,11 +425,21 @@ public abstract class ClusterTest extends ControllerTest {
         .setTaskConfig(taskConfig)
         .build();
 
+    // save the realtime table config
+    _realtimeTableConfig = tableConfig;
+
     if (!isUsingNewConfigFormat()) {
       sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
-    } else {
-      _realtimeTableConfig = tableConfig;
     }
+  }
+
+  protected void updateRealtimeTableConfig(String tablename, List<String> invertedIndexCols, List<String> bloomFilterCols) throws Exception {
+
+    IndexingConfig config  = _realtimeTableConfig.getIndexingConfig();
+    config.setInvertedIndexColumns(invertedIndexCols);
+    config.setBloomFilterColumns(bloomFilterCols);
+
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename), _realtimeTableConfig.toJSONConfigString());
   }
 
   protected void dropRealtimeTable(String tableName) throws Exception {
