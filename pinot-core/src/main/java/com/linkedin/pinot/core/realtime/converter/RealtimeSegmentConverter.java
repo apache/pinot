@@ -153,8 +153,10 @@ public class RealtimeSegmentConverter {
     Schema newSchema = new Schema();
     newSchema.addField(newTimeSpec);
 
-    for (String col: original.getPhysicalColumnNames()) {
-      newSchema.addField(original.getFieldSpecFor(col));
+    for (String col : original.getPhysicalColumnNames()) {
+      if (!col.equals(tfs.getName())) {
+        newSchema.addField(original.getFieldSpecFor(col));
+      }
     }
     return newSchema;
   }
