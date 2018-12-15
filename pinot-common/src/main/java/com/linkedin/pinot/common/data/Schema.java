@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -264,6 +265,20 @@ public final class Schema {
   @Nonnull
   public Set<String> getColumnNames() {
     return _fieldSpecMap.keySet();
+  }
+
+  @JsonIgnore
+  @Nonnull
+  public Set<String> getPhysicalColumnNames() {
+    Set<String> cols = new HashSet<>();
+    cols.addAll(_fieldSpecMap.keySet());
+    for (String col : _fieldSpecMap.keySet()) {
+      // exclude virtual columns
+      if(isVirtualColumn(col)) {
+        cols.remove(col);
+      }
+    }
+    return cols;
   }
 
   @JsonIgnore
