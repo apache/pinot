@@ -33,6 +33,8 @@ import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.grizzly.ssl.SSLContextConfigurator;
+import org.glassfish.grizzly.ssl.SSLEngineConfigurator;
 
 
 public class BrokerAdminApiApplication extends ResourceConfig {
@@ -40,6 +42,12 @@ public class BrokerAdminApiApplication extends ResourceConfig {
 
   private URI _baseUri;
   private HttpServer _httpServer;
+  
+  private String _keyStoreFile; // contains server keypair
+  private String _keyStorePass;
+  private String _trustStoreFile; // contains client certificate
+  private String _trustStorePass;
+  private boolean _useHTTPS = false;
 
   public BrokerAdminApiApplication(BrokerServerBuilder brokerServerBuilder) {
     packages(RESOURCE_PACKAGE);
@@ -57,10 +65,30 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     registerClasses(io.swagger.jaxrs.listing.SwaggerSerializers.class);
   }
 
+  public void setSSLConfigs(String keyStoreFile, String keyStorePass, String trustStoreFile, String trustStorePass) {
+	  _useHTTPS = true;
+      _keyStoreFile = keyStoreFile;
+	  _keyStorePass = keyStorePass;
+	  _trustStoreFile = trustStoreFile;
+	  _trustStorePass = trustStorePass;
+  }
+
   public void start(int httpPort) {
     Preconditions.checkArgument(httpPort > 0);
-    _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
-    _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
+
+    if (_useHTTPS) {
+      _baseUri = URI.create("https://0.0.0.0:" + httpPort + "/");
+      SSLContextConfigurator sslContext = new SSLContextConfigurator();
+	  sslContext.setKeyStoreFile(_keyStoreFile);
+	  sslContext.setKeyStorePass(_keyStorePass);
+	  sslContext.setTrustStoreFile(_trustStoreFile);
+	  sslContext.setTrustStorePass(_trustStorePass);
+	  _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this, true, 
+        new SSLEngineConfigurator(sslContext).setClientMode(false).setNeedClientAuth(false));
+    } else {
+      _baseUri = URI.create("http://0.0.0.0:" + httpPort + "/");
+      _httpServer = GrizzlyHttpServerFactory.createHttpServer(_baseUri, this);
+    }
     setupSwagger();
   }
 
@@ -70,7 +98,12 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     beanConfig.setDescription("APIs for accessing Pinot broker information");
     beanConfig.setContact("https://github.com/linkedin/pinot");
     beanConfig.setVersion("1.0");
-    beanConfig.setSchemes(new String[]{"http"});
+    if (_useHTTPS) {
+      beanConfig.setSchemes(new String[]{"https"});
+    }
+    else {
+      beanConfig.setSchemes(new String[]{"http"});
+    }
     beanConfig.setBasePath(_baseUri.getPath());
     beanConfig.setResourcePackage(RESOURCE_PACKAGE);
     beanConfig.setScan(true);

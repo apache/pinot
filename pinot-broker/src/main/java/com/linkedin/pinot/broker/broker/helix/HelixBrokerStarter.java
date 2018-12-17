@@ -31,6 +31,8 @@ import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.yammer.metrics.core.MetricsRegistry;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -196,7 +198,7 @@ public class HelixBrokerStarter {
     }
   }
 
-  private BrokerServerBuilder startBroker(Configuration config) {
+  private BrokerServerBuilder startBroker(Configuration config) throws IOException {
     if (config == null) {
       config = DefaultHelixBrokerConfig.getDefaultBrokerConf();
     }
