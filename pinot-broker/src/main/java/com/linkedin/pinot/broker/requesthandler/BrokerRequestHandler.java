@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.requesthandler;
 
+import com.linkedin.pinot.broker.api.RequestStatistics;
 import com.linkedin.pinot.broker.api.RequesterIdentity;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import javax.annotation.Nullable;
@@ -29,5 +30,10 @@ public interface BrokerRequestHandler {
 
   void shutDown();
 
-  BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity) throws Exception;
+  @Deprecated
+  BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity)
+      throws Exception;
+
+  BrokerResponse handleRequest(JSONObject request, @Nullable RequesterIdentity requesterIdentity,
+      RequestStatistics requestStatistics) throws Exception;
 }

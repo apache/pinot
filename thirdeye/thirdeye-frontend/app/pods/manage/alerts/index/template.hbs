@@ -3,6 +3,7 @@
     {{entity-filter
       title="Quick Filters"
       maxStrLen=25
+      currentFilterState=alertFilters
       resetFilters=resetFiltersGlobal
       filterBlocks=filterBlocksGlobal
       onSelectFilter=(action "userDidSelectFilter")
@@ -10,7 +11,7 @@
     {{entity-filter
       title="Filters"
       maxStrLen=25
-      selectDisabled=isSelectDisabled
+      currentFilterState=alertFilters
       resetFilters=resetFiltersLocal
       filterBlocks=filterBlocksLocal
       onSelectFilter=(action "userDidSelectFilter")
@@ -53,24 +54,25 @@
   </div>
 
   <div class="manage-alert-results">
-    {{#if paginatedSelectedAlerts}}
-      <section class="te-search-header">
-        <span class="te-search-title">Alerts ({{totalFilteredAlerts}})</span>
-        {{#if allowFilterSummary}}
-          <span class="te-search-filters">{{activeFiltersString}}</span>
-          {{#if (gt activeFiltersString.length maxFilterStrngLength)}}
-            <span class="te-search-header__icon">
-              <i class="glyphicon glyphicon-resize-full"></i>
-              {{#popover-on-element side="left" class="te-search-header__tooltip te-tooltip"}}{{activeFiltersString}}{{/popover-on-element}}
-            </span>
-          {{/if}}
+    <section class="te-search-header">
+      <span class="te-search-title">Alerts ({{totalFilteredAlerts}})</span>
+      {{#if allowFilterSummary}}
+        <span class="te-search-filters">{{activeFiltersString}}</span>
+        {{#if (gt activeFiltersString.length maxFilterStrngLength)}}
+          <span class="te-search-header__icon">
+            <i class="glyphicon glyphicon-resize-full"></i>
+            {{#popover-on-element side="left" class="te-search-header__tooltip te-tooltip"}}{{activeFiltersString}}{{/popover-on-element}}
+          </span>
         {{/if}}
+      {{/if}}
+      {{#if paginatedSelectedAlerts}}
         <span class="te-search-header__displaynum pull-right">
           Showing {{paginatedSelectedAlerts.length}} of
           {{totalFilteredAlerts}} {{if (gt totalFilteredAlerts 1) 'alerts' 'alert'}}
         </span>
-      </section>
-    {{/if}}
+      {{/if}}
+    </section>
+
     {{#if isLoading}}
       <div class="spinner-wrapper-self-serve spinner-wrapper-self-serve--fixed">{{ember-spinner}}</div>
     {{/if}}

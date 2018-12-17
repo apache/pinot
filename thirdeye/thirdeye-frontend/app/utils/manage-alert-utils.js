@@ -210,23 +210,21 @@ export function evalObj() {
  * @returns {String} metric data call params/url
  */
 export function buildMetricDataUrl(graphConfig) {
-  const { id, maxTime, filters, dimension, granularity } = graphConfig;
+  const { id, maxTime, startStamp, endStamp, filters, dimension, granularity } = graphConfig;
   // Chosen dimension
   const selectedDimension = dimension || 'All';
   // Do not send a filters param if value not present
   const filterQs = filters ? `&filters=${encodeURIComponent(filters)}` : '';
-  // Load only a week of data if granularity is high
+  // Load only a week of data in default if granularity is high
   const startTimeBucket = granularity && granularity.toLowerCase().includes('minute') ? 'week' : 'months';
-  // For end date, choose either maxTime or end of yesterday
-  const currentEnd = moment(maxTime).isValid() ? moment(maxTime).valueOf() : buildDateEod(1, 'day').valueOf();
-  // For graph start date, take either 1 week or 1 month, depending on granularity
-  const currentStart = moment(currentEnd).subtract(1, startTimeBucket).valueOf();
-  // Baseline starts 1 week before our start date
-  const baselineStart = moment(currentStart).subtract(1, 'week').valueOf();
-  // Baseline ends 1 week before our end date
-  const baselineEnd = moment(currentEnd).subtract(1, 'week');
-  // Now build the metric data url
-  return `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${baselineStart}/${baselineEnd}?dimension=` +
+  // set maxData as maxTime or default
+  const maxData = maxTime && moment(maxTime).isValid() ? moment(maxTime).valueOf() : buildDateEod(1, 'day').valueOf();
+  // For end date, use end stamp if defined and valid, otherwise use maxData
+  const currentEnd = endStamp && moment(endStamp).isValid() ? moment(endStamp).valueOf() : moment(maxData).valueOf();
+  // For graph start date, use start stamp if defined and valid, otherwise pick it usimng startTimeBucket depending on granularity
+  const currentStart = startStamp && moment(startStamp).isValid() ? moment(startStamp).valueOf() : moment(currentEnd).subtract(1, startTimeBucket).valueOf();
+  // Now build the metric data url -> currentEnd and currentStart reused in the call since baseline no longer displayed on graph
+  return `/timeseries/compare/${id}/${currentStart}/${currentEnd}/${currentStart}/${currentEnd}?dimension=` +
          `${selectedDimension}&granularity=${granularity}${filterQs}`;
 }
 

@@ -1,11 +1,11 @@
 import Service from '@ember/service';
 import {
   toFilters,
+  makeTime
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import fetch from 'fetch';
 import _ from 'lodash';
-import moment from 'moment';
 
 export default Service.extend({
   timeseries: null, // {}
@@ -91,8 +91,8 @@ export default Service.extend({
 
   _fetchSlice(urn, context) {
     const functionId = urn.split(':')[2];
-    const startDateTime = moment(context.analysisRange[0]).utc().format();
-    const endDateTime = moment(context.analysisRange[1]).utc().format();
+    const startDateTime = makeTime(context.analysisRange[0]).utc().format();
+    const endDateTime = makeTime(context.analysisRange[1]).utc().format();
     const dimensionJsonString = encodeURIComponent(JSON.stringify(this._toFilterMapCustom(toFilters(urn))));
 
     const url = `/dashboard/anomaly-function/${functionId}/baseline?start=${startDateTime}&end=${endDateTime}&dimension=${dimensionJsonString}&mode=offline`;
@@ -118,7 +118,7 @@ export default Service.extend({
   _toFilterMapCustom(filters) {
     const filterMap = {};
     [...filters].forEach(tup => {
-      const [key, value] = tup;
+      const [key, op, value] = tup;
       filterMap[key] = value;
     });
     return filterMap;

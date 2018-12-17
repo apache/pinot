@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.realtime.kafka;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaPartitionLevelConsumer;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactory;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamMetadataProvider;
 import com.linkedin.pinot.core.realtime.stream.OffsetCriteria;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
@@ -206,6 +207,55 @@ public class KafkaPartitionLevelConsumerTest {
 
       throw new RuntimeException("No such host/port");
     }
+  }
+
+  @Test
+  public void testBuildConsumer() throws Exception {
+     String streamType = "kafka";
+    String streamKafkaTopicName = "theTopic";
+    String streamKafkaBrokerList = "abcd:1234,bcde:2345";
+    String streamKafkaConsumerType = "simple";
+    String clientId = "clientId";
+
+    MockKafkaSimpleConsumerFactory mockKafkaSimpleConsumerFactory = new MockKafkaSimpleConsumerFactory(
+        new String[] { "abcd", "bcde" },
+        new int[] { 1234, 2345 },
+        new long[] { 12345L, 23456L },
+        new long[] { 23456L, 34567L },
+        new int[] { 0, 1 },
+        streamKafkaTopicName
+    );
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", streamType);
+    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
+    streamConfigMap.put("stream.kafka.consumer.type", streamKafkaConsumerType);
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", mockKafkaSimpleConsumerFactory.getClass().getName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+
+    KafkaStreamMetadataProvider streamMetadataProvider =
+        new KafkaStreamMetadataProvider(clientId, streamConfig, mockKafkaSimpleConsumerFactory);
+
+    // test default value
+    KafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
+        new KafkaPartitionLevelConsumer(clientId, streamConfig, 0, mockKafkaSimpleConsumerFactory);
+    kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
+    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_BUFFER_SIZE_DEFAULT,
+        kafkaSimpleStreamConsumer.getSimpleConsumer().bufferSize());
+    Assert.assertEquals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_SOCKET_TIMEOUT_DEFAULT,
+        kafkaSimpleStreamConsumer.getSimpleConsumer().soTimeout());
+
+    // test user defined values
+    streamConfigMap.put("stream.kafka.buffer.size", "100");
+    streamConfigMap.put("stream.kafka.socket.timeout", "1000");
+    streamConfig = new StreamConfig(streamConfigMap);
+    kafkaSimpleStreamConsumer =
+        new KafkaPartitionLevelConsumer(clientId, streamConfig, 0, mockKafkaSimpleConsumerFactory);
+    kafkaSimpleStreamConsumer.fetchMessages(12345L, 23456L, 10000);
+    Assert.assertEquals(100, kafkaSimpleStreamConsumer.getSimpleConsumer().bufferSize());
+    Assert.assertEquals(1000, kafkaSimpleStreamConsumer.getSimpleConsumer().soTimeout());
   }
 
   @Test

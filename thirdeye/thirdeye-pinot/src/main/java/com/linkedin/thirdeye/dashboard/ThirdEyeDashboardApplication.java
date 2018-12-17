@@ -69,6 +69,8 @@ import com.linkedin.thirdeye.datasource.loader.TimeSeriesLoader;
 import com.linkedin.thirdeye.detection.DetectionMigrationResource;
 import com.linkedin.thirdeye.detection.DetectionResource;
 import com.linkedin.thirdeye.detection.annotation.DetectionConfigurationResource;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionAlertRegistry;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
 import com.linkedin.thirdeye.detection.yaml.YamlResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -119,7 +121,7 @@ public class ThirdEyeDashboardApplication
   public void initialize(Bootstrap<ThirdEyeDashboardConfiguration> bootstrap) {
     bootstrap.addBundle(new ViewBundle());
     bootstrap.addBundle(new HelperBundle());
-    bootstrap.addBundle(new RedirectBundle(new PathRedirect("/", "/thirdeye")));
+    bootstrap.addBundle(new RedirectBundle(new PathRedirect("/", "/app/#/home")));
     bootstrap.addBundle(new AssetsBundle("/app/", "/app", "index.html", "app"));
     bootstrap.addBundle(new AssetsBundle("/assets", "/assets", null, "assets"));
     bootstrap.addBundle(new AssetsBundle("/assets/css", "/assets/css", null, "css"));
@@ -150,6 +152,10 @@ public class ThirdEyeDashboardApplication
       LOG.error("Exception while loading caches", e);
     }
 
+    // instantiate registry
+    DetectionRegistry.init();
+    DetectionAlertRegistry.init();
+
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
     AlertFilterAutotuneFactory alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
@@ -170,7 +176,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new DetectionMigrationResource(
         DAO_REGISTRY.getMetricConfigDAO(), DAO_REGISTRY.getAnomalyFunctionDAO(),
-        DAO_REGISTRY.getDetectionConfigManager(), anomalyFunctionFactory, alertFilterFactory));
+        DAO_REGISTRY.getDetectionConfigManager(), DAO_REGISTRY.getDatasetConfigDAO(), anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new OnboardResource(config));
     env.jersey().register(new EntityMappingResource());
     env.jersey().register(new OnboardDatasetMetricResource());

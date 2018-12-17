@@ -198,7 +198,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
   private void readCopyBuffers(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
       ColumnIndexType indexType) throws IOException {
     PinotDataBuffer oldBuffer = reader.getIndexFor(column, indexType);
-    PinotDataBuffer newDictBuffer = writer.newIndexFor(column, indexType, (int) oldBuffer.size());
+    PinotDataBuffer newDictBuffer = writer.newIndexFor(column, indexType, oldBuffer.size());
     oldBuffer.copyTo(0, newDictBuffer, 0, oldBuffer.size());
   }
 

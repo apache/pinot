@@ -46,7 +46,7 @@ public abstract class BaseAlertFilter implements AlertFilter {
       Double value = null;
       String fieldVal = null;
       // Get user's value for the specified field
-      if (parameterSetting.containsKey(fieldName)) {
+      if (parameterSetting != null && parameterSetting.containsKey(fieldName)) {
         fieldVal = parameterSetting.get(fieldName);
         if (NumberUtils.isNumber(fieldVal)) {
           value = Double.parseDouble(parameterSetting.get(fieldName));

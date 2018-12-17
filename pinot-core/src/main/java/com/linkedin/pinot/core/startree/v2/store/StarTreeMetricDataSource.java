@@ -24,6 +24,7 @@ import com.linkedin.pinot.core.io.reader.impl.v1.BaseChunkSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import com.linkedin.pinot.core.operator.blocks.SingleValueBlock;
+import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
@@ -106,6 +107,11 @@ public class StarTreeMetricDataSource extends DataSource {
 
   @Override
   public Dictionary getDictionary() {
+    return null;
+  }
+
+  @Override
+  public BloomFilterReader getBloomFilter() {
     return null;
   }
 

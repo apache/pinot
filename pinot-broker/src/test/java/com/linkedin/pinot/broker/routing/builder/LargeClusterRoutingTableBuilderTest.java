@@ -110,7 +110,7 @@ public class LargeClusterRoutingTableBuilderTest {
     ExternalView externalView = createExternalView(tableName, segmentCount, replicationFactor, instanceCount);
     List<InstanceConfig> instanceConfigs = createInstanceConfigs(instanceCount);
 
-    _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+    _largeClusterRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
 
     List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
@@ -142,7 +142,7 @@ public class LargeClusterRoutingTableBuilderTest {
       ExternalView externalView = createExternalView(tableName, segmentCount, replicationFactor, instanceCount);
       List<InstanceConfig> instanceConfigs = createInstanceConfigs(instanceCount);
 
-      _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      _largeClusterRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
 
       List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
@@ -242,7 +242,7 @@ public class LargeClusterRoutingTableBuilderTest {
   private void validateAssertionForOneRoutingTable(RoutingTableValidator routingTableValidator, String message,
       ExternalView externalView, List<InstanceConfig> instanceConfigs, String tableName) {
 
-    _largeClusterRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+    _largeClusterRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
     List<Map<String, List<String>>> routingTables = _largeClusterRoutingTableBuilder.getRoutingTables();
 
     for (Map<String, List<String>> routingTable : routingTables) {

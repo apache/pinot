@@ -16,6 +16,7 @@
 package com.linkedin.pinot.broker.routing.builder;
 
 import com.linkedin.pinot.broker.routing.RoutingTableLookupRequest;
+import com.linkedin.pinot.broker.routing.selector.SegmentSelector;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.utils.SegmentName;
@@ -33,7 +34,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 /**
  * Create a given number of routing tables based on random selections from ExternalView.
  */
-public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder {
+public class DefaultRealtimeRoutingTableBuilder implements RoutingTableBuilder {
   private RoutingTableBuilder _realtimeHLCRoutingTableBuilder;
   private RoutingTableBuilder _realtimeLLCRoutingTableBuilder;
   private boolean _hasHLC;
@@ -48,7 +49,7 @@ public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder 
   }
 
   @Override
-  public void computeRoutingTableFromExternalView(String tableName, ExternalView externalView,
+  public void computeOnExternalViewChange(String tableName, ExternalView externalView,
       List<InstanceConfig> instanceConfigs) {
     Set<String> segmentSet = externalView.getPartitionSet();
     for (String segmentName : segmentSet) {
@@ -60,15 +61,15 @@ public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder 
       }
     }
     if (_hasHLC) {
-      _realtimeHLCRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      _realtimeHLCRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
     }
     if (_hasLLC) {
-      _realtimeLLCRoutingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
+      _realtimeLLCRoutingTableBuilder.computeOnExternalViewChange(tableName, externalView, instanceConfigs);
     }
   }
 
   @Override
-  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request) {
+  public Map<String, List<String>> getRoutingTable(RoutingTableLookupRequest request, SegmentSelector segmentSelector) {
     boolean forceLLC = false;
     boolean forceHLC = false;
     for (String routingOption : request.getRoutingOptions()) {
@@ -85,14 +86,14 @@ public class DefaultRealtimeRoutingTableBuilder extends BaseRoutingTableBuilder 
     }
 
     if (forceLLC) {
-      return _realtimeLLCRoutingTableBuilder.getRoutingTable(request);
+      return _realtimeLLCRoutingTableBuilder.getRoutingTable(request, segmentSelector);
     } else if (forceHLC) {
-      return _realtimeHLCRoutingTableBuilder.getRoutingTable(request);
+      return _realtimeHLCRoutingTableBuilder.getRoutingTable(request, segmentSelector);
     } else {
       if (_hasLLC) {
-        return _realtimeLLCRoutingTableBuilder.getRoutingTable(request);
+        return _realtimeLLCRoutingTableBuilder.getRoutingTable(request, segmentSelector);
       } else if (_hasHLC) {
-        return _realtimeHLCRoutingTableBuilder.getRoutingTable(request);
+        return _realtimeHLCRoutingTableBuilder.getRoutingTable(request, segmentSelector);
       } else {
         return Collections.emptyMap();
       }

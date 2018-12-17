@@ -84,6 +84,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 11);
+    Assert.assertEquals(getVirtualColumns(selectionDataSchema), 0);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(1), "column11");
     Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
@@ -105,6 +106,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 11);
+    Assert.assertEquals(getVirtualColumns(selectionDataSchema), 0);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(1), "column11");
     Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
@@ -209,5 +211,64 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     Assert.assertEquals(lastRow.length, 4);
     Assert.assertEquals(((Integer) lastRow[0]).intValue(), 6043515);
     Assert.assertEquals(((Integer) lastRow[1]).intValue(), 462769197);
+  }
+
+  @Test
+  public void testSelectStarOrderBy() {
+    String query = "SELECT * " + " FROM testTable" + ORDER_BY;
+
+    // Test query without filter
+    SelectionOrderByOperator selectionOrderByOperator = getOperatorForQuery(query);
+    IntermediateResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
+    ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 330000L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
+    Assert.assertEquals(getVirtualColumns(selectionDataSchema), 0);
+    Assert.assertEquals(selectionDataSchema.size(), 11);
+    Assert.assertEquals(selectionDataSchema.getColumnName(0), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnName(1), "column1");
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(1), DataSchema.ColumnDataType.INT);
+    Queue<Serializable[]> selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
+    Assert.assertEquals(selectionResult.size(), 10);
+    Serializable[] lastRow = selectionResult.peek();
+    Assert.assertEquals(lastRow.length, 11);
+    Assert.assertEquals(((Integer) lastRow[0]).intValue(), 6043515);
+    Assert.assertEquals(((Integer) lastRow[1]).intValue(), 10542595);
+
+    // Test query with filter
+    selectionOrderByOperator = getOperatorForQueryWithFilter(query);
+    resultsBlock = selectionOrderByOperator.nextBlock();
+    executionStatistics = selectionOrderByOperator.getExecutionStatistics();
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 84134L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 67419);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
+    selectionDataSchema = resultsBlock.getSelectionDataSchema();
+    Assert.assertEquals(getVirtualColumns(selectionDataSchema), 0);
+    Assert.assertEquals(selectionDataSchema.size(), 11);
+    Assert.assertEquals(selectionDataSchema.getColumnName(0), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnName(1), "column1");
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnDataType(1), DataSchema.ColumnDataType.INT);
+    selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
+    Assert.assertEquals(selectionResult.size(), 10);
+    lastRow = selectionResult.peek();
+    Assert.assertEquals(lastRow.length, 11);
+    Assert.assertEquals(((Integer) lastRow[0]).intValue(), 6043515);
+    Assert.assertEquals(((Integer) lastRow[1]).intValue(), 462769197);
+  }
+
+  private int getVirtualColumns(DataSchema selectionDataSchema) {
+    int virtualCols = 0;
+    for (int i = 0; i < selectionDataSchema.size(); ++i) {
+      if (selectionDataSchema.getColumnName(i).startsWith("$")) {
+        virtualCols++;
+      }
+    }
+    return virtualCols;
   }
 }

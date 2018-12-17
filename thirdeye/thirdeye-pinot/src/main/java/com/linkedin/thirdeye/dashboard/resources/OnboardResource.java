@@ -23,41 +23,47 @@ import com.linkedin.thirdeye.anomaly.onboard.tasks.DefaultDetectionOnboardJob;
 import com.linkedin.thirdeye.auto.onboard.AutoOnboardUtility;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.wordnik.swagger.annotations.ApiOperation;
 import com.wordnik.swagger.annotations.ApiParam;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import javax.validation.constraints.NotNull;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.joda.time.format.ISODateTimeFormat;
 import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datasource.DAORegistry;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import javax.ws.rs.*;
-import javax.ws.rs.core.MediaType;
-import javax.validation.constraints.NotNull;
 
 import static com.linkedin.thirdeye.anomaly.onboard.tasks.FunctionCreationOnboardingTask.*;
 import static com.linkedin.thirdeye.dashboard.resources.EntityManagerResource.*;
@@ -105,6 +111,7 @@ public class OnboardResource {
    * recipients and send out email alerts.
    *
    * @param tag the tag belonging to the metrics which you would like to onboard
+   * @param dataset the dataset belonging to the metrics which you would like to onboard
    * @param functionPrefix (optional, DEFAULT_FUNCTION_PREFIX) a custom anomaly function prefix
    * @param forceSyncAlertGroup (optional, true) force create alert groups based on dataset owners
    * @param alertGroupName (optional) subscribe to a custom subscription alert group
@@ -115,14 +122,21 @@ public class OnboardResource {
   @Path("/bulk-onboard")
   @ApiOperation("Endpoint used for bulk on-boarding alerts leveraging the create-job endpoint.")
   public Response bulkOnboardAlert(
-      @NotNull @QueryParam("tag") String tag,
+      @QueryParam("tag") String tag,
+      @QueryParam("dataset") String dataset,
       @DefaultValue(DEFAULT_FUNCTION_PREFIX) @QueryParam("functionPrefix") String functionPrefix,
       @DefaultValue("true") @QueryParam("forceSyncAlertGroup") boolean forceSyncAlertGroup,
       @QueryParam("alertGroupName") String alertGroupName, @QueryParam("alertGroupCron") String alertGroupCron,
-      @QueryParam("application") String application)
+      @QueryParam("application") String application,
+      @QueryParam("sleep") Long sleep)
       throws Exception {
     Map<String, String> responseMessage = new HashMap<>();
     Counter counter = new Counter();
+
+    if (StringUtils.isBlank(tag) && StringUtils.isBlank(dataset)) {
+      responseMessage.put("message", "Must provide either tag or dataset");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
 
     AlertConfigDTO alertConfigDTO = null;
     if (StringUtils.isNotEmpty(alertGroupName)) {
@@ -133,8 +147,19 @@ public class OnboardResource {
       }
     }
 
-    List<MetricConfigDTO> metrics = fetchMetrics(tag);
-    LOG.info("Number of metrics with tag {} fetched is {}.", tag, metrics.size());
+    List<MetricConfigDTO> metrics = new ArrayList<>();
+
+    if (StringUtils.isNotBlank(tag)) {
+      List<MetricConfigDTO> tagMetrics = fetchMetricsByTag(tag);
+      LOG.info("Number of metrics with tag {} fetched is {}.", tag, tagMetrics.size());
+      metrics.addAll(tagMetrics);
+    }
+
+    if (StringUtils.isNotBlank(dataset)) {
+      List<MetricConfigDTO> datasetMetrics = fetchMetricsByDataset(dataset);
+      LOG.info("Number of metrics with dataset {} fetched is {}.", dataset, datasetMetrics.size());
+      metrics.addAll(datasetMetrics);
+    }
 
     // For each metric create a new anomaly function & replay it
     List<Long> ids = new ArrayList<>();
@@ -142,6 +167,8 @@ public class OnboardResource {
       String functionName = functionPrefix
           + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getName()) + "_"
           + CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, metric.getDataset());
+
+      LOG.info("[bulk-onboard] Onboarding anomaly function {}.", functionName);
 
       if (alertConfigDTO == null) {
         alertConfigDTO = getAlertConfigGroupForMetric(metric, forceSyncAlertGroup, application, alertGroupCron);
@@ -174,6 +201,15 @@ public class OnboardResource {
         responseMessage.put("metric " + metric.getName(), "success! onboarded and added function id " + functionId
             + " to subscription alertGroup = " + alertConfigDTO.getName());
         counter.inc();
+
+        if (sleep != null) {
+          Thread.sleep(sleep);
+        }
+
+      } catch (InterruptedException e) {
+        responseMessage.put("message", "Operation interrupted");
+        return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+
       } catch (Exception e) {
         LOG.error("[bulk-onboard] There was an exception onboarding metric {} function {}.", metric, functionName, e);
         responseMessage.put("skipped " + metric.getName(), "Exception onboarding metric : " + e);
@@ -274,7 +310,7 @@ public class OnboardResource {
     return this.emailConfigurationDAO.save(alertConfigDTO);
   }
 
-  private List<MetricConfigDTO> fetchMetrics(String tag) {
+  private List<MetricConfigDTO> fetchMetricsByTag(String tag) {
     List<MetricConfigDTO> results = new ArrayList<>();
     for (MetricConfigDTO metricConfigDTO : this.metricConfigDAO.findAll()) {
       if (metricConfigDTO.getTags() != null) {
@@ -284,6 +320,10 @@ public class OnboardResource {
       }
     }
     return results;
+  }
+
+  private List<MetricConfigDTO> fetchMetricsByDataset(String dataset) {
+    return this.metricConfigDAO.findByDataset(dataset);
   }
 
   // endpoint clone function Ids to append a name defined in nameTags

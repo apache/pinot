@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -42,8 +43,6 @@ import org.slf4j.LoggerFactory;
  */
 public class KafkaConnectionHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConnectionHandler.class);
-  private static final int SOCKET_TIMEOUT_MILLIS = 10000;
-  private static final int SOCKET_BUFFER_SIZE = 512000;
 
   enum ConsumerState {
     CONNECTING_TO_BOOTSTRAP_NODE,
@@ -65,6 +64,8 @@ public class KafkaConnectionHandler {
   KafkaBrokerWrapper _leader;
   String _currentHost;
   int _currentPort;
+  int _bufferSize;
+  int _socketTimeout;
 
   final KafkaSimpleConsumerFactory _simpleConsumerFactory;
   SimpleConsumer _simpleConsumer;
@@ -72,6 +73,11 @@ public class KafkaConnectionHandler {
   final Random _random = new Random();
 
   boolean isPartitionProvided;
+
+  @VisibleForTesting
+  public SimpleConsumer getSimpleConsumer() {
+    return _simpleConsumer;
+  }
 
   /**
    * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
@@ -110,6 +116,8 @@ public class KafkaConnectionHandler {
     isPartitionProvided = false;
     _partition = Integer.MIN_VALUE;
 
+    _bufferSize = kafkaLowLevelStreamConfig.getKafkaBufferSize();
+    _socketTimeout = kafkaLowLevelStreamConfig.getKafkaSocketTimeout();
     initializeBootstrapNodeList(kafkaLowLevelStreamConfig.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
@@ -133,6 +141,8 @@ public class KafkaConnectionHandler {
     isPartitionProvided = true;
     _partition = partition;
 
+    _bufferSize = kafkaLowLevelStreamConfig.getKafkaBufferSize();
+    _socketTimeout = kafkaLowLevelStreamConfig.getKafkaSocketTimeout();
     initializeBootstrapNodeList(kafkaLowLevelStreamConfig.getBootstrapHosts());
     setCurrentState(new ConnectingToBootstrapNode());
   }
@@ -216,8 +226,8 @@ public class KafkaConnectionHandler {
 
       try {
         LOGGER.info("Connecting to bootstrap host {}:{} for topic {}", _currentHost, _currentPort, _topic);
-        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, SOCKET_TIMEOUT_MILLIS,
-            SOCKET_BUFFER_SIZE, _clientId);
+        _simpleConsumer = _simpleConsumerFactory.buildSimpleConsumer(_currentHost, _currentPort, _socketTimeout,
+            _bufferSize, _clientId);
         setCurrentState(new ConnectedToBootstrapNode());
       } catch (Exception e) {
         handleConsumerException(e);
@@ -326,8 +336,8 @@ public class KafkaConnectionHandler {
       // Connect to the partition leader
       try {
         _simpleConsumer =
-            _simpleConsumerFactory.buildSimpleConsumer(_leader.host(), _leader.port(), SOCKET_TIMEOUT_MILLIS,
-                SOCKET_BUFFER_SIZE, _clientId);
+            _simpleConsumerFactory.buildSimpleConsumer(_leader.host(), _leader.port(), _socketTimeout,
+                _bufferSize, _clientId);
 
         setCurrentState(new ConnectedToPartitionLeader());
       } catch (Exception e) {

@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.io.readerwriter.RealtimeIndexOffHeapMemoryManager;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.yammer.metrics.core.MetricsRegistry;
-import java.nio.ByteOrder;
 
 
 // Allocates memory using direct allocation
@@ -44,7 +43,7 @@ public class DirectMemoryManager extends RealtimeIndexOffHeapMemoryManager {
    * @param allocationContext String describing context of allocation (typically segment:column name).
    * @return PinotDataBuffer via direct allocation
    *
-   * @see {@link RealtimeIndexOffHeapMemoryManager#allocate(long, String)}
+   * @see RealtimeIndexOffHeapMemoryManager#allocate(long, String)
    */
   @Override
   protected PinotDataBuffer allocateInternal(long size, String allocationContext) {

@@ -27,8 +27,13 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class EventFilter {
+  private static final Logger LOG = LoggerFactory.getLogger(EventFilter.class);
+
   String eventType;
   String serviceName;
   String metricName;
@@ -105,7 +110,6 @@ public class EventFilter {
 
       // if filter map not empty, filter events
       if (MapUtils.isNotEmpty(eventFilterDimensionMap)) {
-
         // go over each event
         for (EventDTO event : allEvents) {
           boolean eventAdded = false;
@@ -153,6 +157,8 @@ public class EventFilter {
         filteredEvents.addAll(allEvents);
       }
     }
+
+    LOG.info("Whitelisting complete. Returning {} fetched events after whitelist", filteredEvents.size());
     return filteredEvents;
   }
 
@@ -163,8 +169,10 @@ public class EventFilter {
 
   private static List<String> transformDimensionValues(List<String> dimensionValues) {
     List<String> dimensionValuesTransformed = new ArrayList<>();
-    for (String value : dimensionValues) {
-      dimensionValuesTransformed.add(value.toLowerCase());
+    if (dimensionValues != null) {
+      for (String value : dimensionValues) {
+        dimensionValuesTransformed.add(value.toLowerCase());
+      }
     }
     return dimensionValuesTransformed;
   }

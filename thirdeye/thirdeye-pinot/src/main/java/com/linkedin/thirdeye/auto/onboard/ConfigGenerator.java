@@ -39,6 +39,17 @@ public class ConfigGenerator {
   private static final String PDT_TIMEZONE = "US/Pacific";
   private static final String BYTES_STRING = "BYTES";
 
+  public static void setTimeSpecs(DatasetConfigDTO datasetConfigDTO, TimeGranularitySpec timeSpec) {
+    datasetConfigDTO.setTimeColumn(timeSpec.getName());
+    datasetConfigDTO.setTimeDuration(timeSpec.getTimeUnitSize());
+    datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
+    datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
+    datasetConfigDTO.setExpectedDelay(getExpectedDelayFromTimeunit(timeSpec.getTimeType()));
+    if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
+      datasetConfigDTO.setTimezone(PDT_TIMEZONE);
+    }
+  }
+
   public static DatasetConfigDTO generateDatasetConfig(String dataset, Schema schema,
       Map<String, String> customConfigs) {
     List<String> dimensions = schema.getDimensionNames();
@@ -48,14 +59,7 @@ public class ConfigGenerator {
     DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
     datasetConfigDTO.setDataset(dataset);
     datasetConfigDTO.setDimensions(dimensions);
-    datasetConfigDTO.setTimeColumn(timeSpec.getName());
-    datasetConfigDTO.setTimeDuration(timeSpec.getTimeUnitSize());
-    datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
-    datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
-    datasetConfigDTO.setExpectedDelay(getExpectedDelayFromTimeunit(timeSpec.getTimeType()));
-    if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
-      datasetConfigDTO.setTimezone(PDT_TIMEZONE);
-    }
+    setTimeSpecs(datasetConfigDTO, timeSpec);
     datasetConfigDTO.setDataSource(PinotThirdEyeDataSource.DATA_SOURCE_NAME);
     datasetConfigDTO.setProperties(customConfigs);
     return datasetConfigDTO;

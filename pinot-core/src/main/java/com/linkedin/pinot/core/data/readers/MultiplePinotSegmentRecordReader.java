@@ -147,15 +147,14 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
       return reuse;
     } else {
       // If there is no sorted column specified, simply concatenate the segments
-      PinotSegmentRecordReader currentReader = _pinotSegmentRecordReaders.get(_currentReaderId);
-      if (!currentReader.hasNext()) {
-        _currentReaderId++;
-        if (_currentReaderId >= _pinotSegmentRecordReaders.size()) {
-          throw new RuntimeException("next is called after reading all data");
+      for (int i = 0; i < _pinotSegmentRecordReaders.size();
+          i++, _currentReaderId = (_currentReaderId + 1) % _pinotSegmentRecordReaders.size()) {
+        PinotSegmentRecordReader currentReader = _pinotSegmentRecordReaders.get(_currentReaderId);
+        if (currentReader.hasNext()) {
+          return currentReader.next(reuse);
         }
-        currentReader = _pinotSegmentRecordReaders.get(_currentReaderId);
       }
-      return currentReader.next(reuse);
+      throw new RuntimeException("next is called after reading all data");
     }
   }
 

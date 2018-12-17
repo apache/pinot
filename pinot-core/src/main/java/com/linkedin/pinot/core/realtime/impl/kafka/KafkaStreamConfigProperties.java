@@ -39,6 +39,10 @@ public class KafkaStreamConfigProperties {
 
   public static class LowLevelConsumer {
     public static final String KAFKA_BROKER_LIST = "kafka.broker.list";
+    public static final String KAFKA_BUFFER_SIZE = "kafka.buffer.size";
+    public static final int KAFKA_BUFFER_SIZE_DEFAULT = 512000;
+    public static final String KAFKA_SOCKET_TIMEOUT = "kafka.socket.timeout";
+    public static final int KAFKA_SOCKET_TIMEOUT_DEFAULT = 10000;
   }
 
   public static final String KAFKA_CONSUMER_PROP_PREFIX = "kafka.consumer.prop";

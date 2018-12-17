@@ -23,7 +23,7 @@ import com.linkedin.pinot.filesystem.PinotFSFactory;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,9 +48,10 @@ public class FileUploadPathProvider {
 
   public FileUploadPathProvider(ControllerConf controllerConf) throws InvalidControllerConfigException {
     String dataDir = controllerConf.getDataDir();
+    StringUtils.stripEnd(dataDir, "/");
     try {
       // URIs that are allowed to be remote
-      _baseDataDirURI = getUriFromPath(dataDir);
+      _baseDataDirURI = ControllerConf.getUriFromPath(dataDir);
       LOGGER.info("Data directory: {}", _baseDataDirURI);
       _schemasTmpDirURI = new URI(_baseDataDirURI + SCHEMAS_TEMP);
       LOGGER.info("Schema temporary directory: {}", _schemasTmpDirURI);
@@ -65,7 +66,7 @@ public class FileUploadPathProvider {
         LOGGER.info("Local temporary directory is not configured, use data directory as the local temporary directory");
         _localTempDirURI = _baseDataDirURI;
       } else {
-        _localTempDirURI = getUriFromPath(localTempDir);
+        _localTempDirURI = ControllerConf.getUriFromPath(localTempDir);
       }
       LOGGER.info("Local temporary directory: {}", _localTempDirURI);
       if (!_localTempDirURI.getScheme().equalsIgnoreCase(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME)) {
@@ -83,18 +84,6 @@ public class FileUploadPathProvider {
       _vip = controllerConf.generateVipUrl();
     } catch (Exception e) {
       throw new InvalidControllerConfigException("Caught exception while initializing file upload path provider", e);
-    }
-  }
-
-  /**
-   * Returns the URI for the given path, appends the local (file) scheme to the URI if no scheme exists.
-   */
-  private static URI getUriFromPath(String path) throws URISyntaxException {
-    URI uri = new URI(path);
-    if (uri.getScheme() != null) {
-      return uri;
-    } else {
-      return new URI(CommonConstants.Segment.LOCAL_SEGMENT_SCHEME, path, null);
     }
   }
 

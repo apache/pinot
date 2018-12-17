@@ -2,9 +2,7 @@ package com.linkedin.thirdeye.detection.alert;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.DetectionAlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -19,11 +17,11 @@ import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DefaultDataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipelineLoader;
 import com.linkedin.thirdeye.detection.alert.scheme.DetectionAlertScheme;
+import com.linkedin.thirdeye.detection.alert.suppress.DetectionAlertSuppressor;
 import java.lang.reflect.Constructor;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -85,5 +83,25 @@ public class DetectionAlertTaskFactory {
           thirdeyeConfig, result));
     }
     return detectionAlertSchemeSet;
+  }
+
+  public Set<DetectionAlertSuppressor> loadAlertSuppressors(DetectionAlertConfigDTO alertConfig) throws Exception {
+    Preconditions.checkNotNull(alertConfig);
+    Set<DetectionAlertSuppressor> detectionAlertSuppressors = new HashSet<>();
+    Map<String, Map<String, Object>> alertSuppressors = alertConfig.getAlertSuppressors();
+    if (alertSuppressors == null || alertSuppressors.isEmpty()) {
+      return detectionAlertSuppressors;
+    }
+
+    for (String alertSuppressor : alertSuppressors.keySet()) {
+      LOG.debug("Loading Alert Suppressor : {}", alertSuppressor);
+      Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor));
+      Preconditions.checkNotNull(alertSuppressors.get(alertSuppressor).get("className"));
+      Constructor<?> constructor = Class.forName(alertSuppressors.get(alertSuppressor).get("className").toString().trim())
+          .getConstructor(DetectionAlertConfigDTO.class);
+      detectionAlertSuppressors.add((DetectionAlertSuppressor) constructor.newInstance(alertConfig));
+    }
+
+    return detectionAlertSuppressors;
   }
 }

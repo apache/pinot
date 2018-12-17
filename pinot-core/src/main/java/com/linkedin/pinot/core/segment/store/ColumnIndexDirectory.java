@@ -93,15 +93,13 @@ abstract class ColumnIndexDirectory implements Closeable {
    */
   public abstract PinotDataBuffer getInvertedIndexBufferFor(String column)
       throws IOException;
-
   /**
-   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
+   * Get inverted bloom filter buffer for a column
    * @param column column name
-   * @param sizeBytes sizeBytes for the buffer allocation
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newDictionaryBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer getBloomFilterBufferFor(String column)
       throws IOException;
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
@@ -110,7 +108,7 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
       throws IOException;
   /**
    * Allocate a new data buffer of specified sizeBytes in the columnar index directory
@@ -119,7 +117,25 @@ abstract class ColumnIndexDirectory implements Closeable {
    * @return in-memory ByteBuffer like buffer for data
    * @throws IOException
    */
-  public abstract PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
+  public abstract PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
+      throws IOException;
+  /**
+   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
+   * @param column column name
+   * @param sizeBytes sizeBytes for the buffer allocation
+   * @return in-memory ByteBuffer like buffer for data
+   * @throws IOException
+   */
+  public abstract PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
+      throws IOException;
+  /**
+   * Allocate a new data buffer of specified sizeBytes in the columnar index directory
+   * @param column column name
+   * @param sizeBytes sizeBytes for the buffer allocation
+   * @return in-memory ByteBuffer like buffer for data
+   * @throws IOException
+   */
+  public abstract PinotDataBuffer newBloomFilterBuffer(String column, long sizeBytes)
       throws IOException;
 
   /**

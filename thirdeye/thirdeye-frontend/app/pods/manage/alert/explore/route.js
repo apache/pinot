@@ -216,7 +216,6 @@ export default Route.extend({
       bucketSize,
       bucketUnit
     } = alertData;
-
     // Derive start/end time ranges based on querystring input with fallback on default '1 month'
     const {
       startStamp,
@@ -274,9 +273,11 @@ export default Route.extend({
         const maxTime = isReplayDone && metricId ? await fetch(maxTimeUrl).then(checkStatus) : moment().valueOf();
         Object.assign(model, { metricDataUrl: buildMetricDataUrl({
           maxTime,
+          endStamp: config.endStamp,
+          startStamp: config.startStamp,
           id: metricId,
           filters: config.filters,
-          granularity: config.bucketUnit,
+          granularity: `${config.bucketSize}_${config.bucketUnit}`,
           dimension: 'All' // NOTE: avoid dimension explosion - config.exploreDimensions ? config.exploreDimensions.split(',')[0] : 'All'
         })});
       })

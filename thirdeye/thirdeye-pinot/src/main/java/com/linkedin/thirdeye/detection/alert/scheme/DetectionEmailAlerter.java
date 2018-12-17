@@ -16,6 +16,7 @@
 
 package com.linkedin.thirdeye.detection.alert.scheme;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.alert.commons.EmailContentFormatterFactory;
 import com.linkedin.thirdeye.alert.commons.EmailEntity;
 import com.linkedin.thirdeye.alert.content.EmailContentFormatter;
@@ -31,7 +32,9 @@ import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.alert.AlertUtils;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
+import com.linkedin.thirdeye.detection.annotation.AlertScheme;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -39,7 +42,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
 import org.apache.commons.mail.DefaultAuthenticator;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -49,6 +51,7 @@ import org.slf4j.LoggerFactory;
 import static com.linkedin.thirdeye.anomaly.SmtpConfiguration.SMTP_CONFIG_KEY;
 
 
+@AlertScheme(type = "EMAIL")
 public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final Logger LOG = LoggerFactory.getLogger(DetectionEmailAlerter.class);
 
@@ -57,19 +60,49 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
   private static final String DEFAULT_EMAIL_FORMATTER_TYPE = "MultipleAnomaliesEmailContentFormatter";
   private static final String EMAIL_WHITELIST_KEY = "emailWhitelist";
 
-  private ThirdEyeAnomalyConfiguration thirdeyeConfig;
+  private ThirdEyeAnomalyConfiguration teConfig;
 
   public DetectionEmailAlerter(DetectionAlertConfigDTO config, ThirdEyeAnomalyConfiguration thirdeyeConfig,
       DetectionAlertFilterResult result) throws Exception {
     super(config, result);
 
-    this.thirdeyeConfig = thirdeyeConfig;
+    this.teConfig = thirdeyeConfig;
+  }
+
+  private Set<String> retainWhitelisted(Set<String> recipients, Collection<String> emailWhitelist) {
+    if (recipients != null) {
+      recipients.retainAll(emailWhitelist);
+    }
+    return recipients;
+  }
+
+  private void whitelistRecipients(DetectionAlertFilterRecipients recipients) {
+    if (recipients != null) {
+      List<String> emailWhitelist = ConfigUtils.getList(
+          this.teConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY).get(EMAIL_WHITELIST_KEY));
+      if (!emailWhitelist.isEmpty()) {
+        recipients.setTo(retainWhitelisted(recipients.getTo(), emailWhitelist));
+        recipients.setCc(retainWhitelisted(recipients.getCc(), emailWhitelist));
+        recipients.setBcc(retainWhitelisted(recipients.getBcc(), emailWhitelist));
+      }
+    }
+  }
+
+  private void validateAlert(DetectionAlertFilterRecipients recipients, Set<MergedAnomalyResultDTO> anomalies) {
+    Preconditions.checkNotNull(recipients);
+    Preconditions.checkNotNull(anomalies);
+    if (recipients.getTo() == null || recipients.getTo().isEmpty()) {
+      throw new IllegalArgumentException("Email doesn't have any valid (whitelisted) recipients.");
+    }
+    if (anomalies.size() == 0) {
+      throw new IllegalArgumentException("Zero anomalies found");
+    }
   }
 
   /** Sends email according to the provided config. */
   private void sendEmail(EmailEntity entity) throws EmailException {
     HtmlEmail email = entity.getContent();
-    SmtpConfiguration config = SmtpConfiguration.createFromProperties(this.thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY));
+    SmtpConfiguration config = SmtpConfiguration.createFromProperties(this.teConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY));
 
     if (config == null) {
       LOG.error("No email configuration available. Skipping.");
@@ -85,66 +118,71 @@ public class DetectionEmailAlerter extends DetectionAlertScheme {
     email.send();
 
     int recipientCount = email.getToAddresses().size() + email.getCcAddresses().size() + email.getBccAddresses().size();
-    LOG.info("Sent email sent with subject '{}' to {} recipients", email.getSubject(), recipientCount);
+    LOG.info("Email sent with subject '{}' to {} recipients", email.getSubject(), recipientCount);
   }
 
-  private void sendEmail(DetectionAlertFilterResult detectionResult) throws Exception {
+  private void sendEmail(DetectionAlertFilterRecipients recipients, Set<MergedAnomalyResultDTO> anomalies) throws Exception {
+    whitelistRecipients(recipients);
+    validateAlert(recipients, anomalies);
+
+    EmailContentFormatter emailContentFormatter =
+        EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
+
+    emailContentFormatter.init(new Properties(),
+        EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.teConfig));
+
+    List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
+    anomalyResultListOfGroup.addAll(anomalies);
+    Collections.sort(anomalyResultListOfGroup, COMPARATOR_DESC);
+
+    AlertConfigDTO alertConfig = new AlertConfigDTO();
+    alertConfig.setName(this.config.getName());
+    alertConfig.setFromAddress(this.config.getFrom());
+    alertConfig.setSubjectType(this.config.getSubjectType());
+    alertConfig.setReferenceLinks(this.config.getReferenceLinks());
+
+    EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
+        "Thirdeye Alert : " + this.config.getName(), null, null, anomalyResultListOfGroup,
+        new EmailContentFormatterContext());
+
+    HtmlEmail email = emailEntity.getContent();
+    email.setFrom(this.config.getFrom());
+    email.setTo(AlertUtils.toAddress(recipients.getTo()));
+    email.setSubject(emailEntity.getSubject());
+    if (CollectionUtils.isNotEmpty(recipients.getCc())) {
+      email.setCc(AlertUtils.toAddress(recipients.getCc()));
+    }
+    if (CollectionUtils.isNotEmpty(recipients.getBcc())) {
+      email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
+    }
+
+    sendEmail(emailEntity);
+  }
+
+  private void generateAndSendEmails(DetectionAlertFilterResult detectionResult) throws Exception {
+    LOG.info("Sending Email alert for {}", config.getId());
+    Preconditions.checkNotNull(detectionResult.getResult());
     for (Map.Entry<DetectionAlertFilterRecipients, Set<MergedAnomalyResultDTO>> entry : detectionResult.getResult().entrySet()) {
       DetectionAlertFilterRecipients recipients = entry.getKey();
       Set<MergedAnomalyResultDTO> anomalies = entry.getValue();
 
-      List<String> emailWhitelist = ConfigUtils.getList(
-          this.thirdeyeConfig.getAlerterConfiguration().get(SMTP_CONFIG_KEY).get(EMAIL_WHITELIST_KEY));
-      if (!emailWhitelist.isEmpty()) {
-        recipients.getTo().retainAll(emailWhitelist);
-        recipients.getCc().retainAll(emailWhitelist);
-        recipients.getBcc().retainAll(emailWhitelist);
+      try {
+        sendEmail(recipients, anomalies);
+      } catch (IllegalArgumentException e) {
+        LOG.warn("Skipping! Found illegal arguments while sending {} anomalies to recipient {} for alert {}."
+            + " Exception message: ", anomalies.size(), recipients, config.getId(), e);
       }
-
-      if (recipients.getTo().isEmpty()) {
-        LOG.warn("Email doesn't have any valid (whitelisted) recipients. Skipping.");
-        continue;
-      }
-
-      EmailContentFormatter emailContentFormatter =
-          EmailContentFormatterFactory.fromClassName(DEFAULT_EMAIL_FORMATTER_TYPE);
-
-      emailContentFormatter.init(new Properties(),
-          EmailContentFormatterConfiguration.fromThirdEyeAnomalyConfiguration(this.thirdeyeConfig));
-
-      List<AnomalyResult> anomalyResultListOfGroup = new ArrayList<>();
-      anomalyResultListOfGroup.addAll(anomalies);
-      Collections.sort(anomalyResultListOfGroup, COMPARATOR_DESC);
-
-      AlertConfigDTO alertConfig = new AlertConfigDTO();
-      alertConfig.setName(this.config.getName());
-      alertConfig.setFromAddress(this.config.getFrom());
-      alertConfig.setSubjectType(this.config.getSubjectType());
-
-      EmailEntity emailEntity = emailContentFormatter.getEmailEntity(alertConfig, null,
-          "Thirdeye Alert : " + this.config.getName(), null, null, anomalyResultListOfGroup,
-          new EmailContentFormatterContext());
-
-      HtmlEmail email = emailEntity.getContent();
-      email.setFrom(this.config.getFrom());
-      email.setTo(AlertUtils.toAddress(recipients.getTo()));
-      if (CollectionUtils.isNotEmpty(recipients.getCc())) {
-        email.setCc(AlertUtils.toAddress(recipients.getCc()));
-      }
-      if (CollectionUtils.isNotEmpty(recipients.getBcc())) {
-        email.setBcc(AlertUtils.toAddress(recipients.getBcc()));
-      }
-
-      sendEmail(emailEntity);
     }
   }
 
   @Override
   public void run() throws Exception {
-    if (result.getResult().isEmpty()) {
-      LOG.info("Zero anomalies found, skipping sending email");
-    } else {
-      sendEmail(result);
+    Preconditions.checkNotNull(result);
+    if (result.getAllAnomalies().size() == 0) {
+      LOG.info("Zero anomalies found, skipping sending email alert for {}", config.getId());
+      return;
     }
+
+    generateAndSendEmails(result);
   }
 }

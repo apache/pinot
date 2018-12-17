@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.converter;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -24,6 +25,7 @@ import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.mutable.MutableSegmentImpl;
@@ -51,33 +53,19 @@ public class RealtimeSegmentConverter {
   private StarTreeIndexSpec starTreeIndexSpec;
 
   public RealtimeSegmentConverter(MutableSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String timeColumnName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
-      List<String> noDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
+      String tableName, String timeColumnName, String segmentName, String sortedColumn,
+      List<String> invertedIndexColumns, List<String> noDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
     }
-    TimeFieldSpec original = schema.getTimeFieldSpec();
-    // Use outgoing granularity for creating segment
-    TimeGranularitySpec outgoing = original.getOutgoingGranularitySpec();
 
-    TimeFieldSpec newTimeSpec = new TimeFieldSpec(outgoing);
-
-    Schema newSchema = new Schema();
-    for (String dimension : schema.getDimensionNames()) {
-      newSchema.addField(schema.getFieldSpecFor(dimension));
-    }
-    for (String metric : schema.getMetricNames()) {
-      newSchema.addField(schema.getFieldSpecFor(metric));
-    }
-
-    newSchema.addField(newTimeSpec);
     this.realtimeSegmentImpl = realtimeSegment;
     this.outputPath = outputPath;
     this.invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
     if (sortedColumn != null && this.invertedIndexColumns.contains(sortedColumn)) {
       this.invertedIndexColumns.remove(sortedColumn);
     }
-    this.dataSchema = newSchema;
+    this.dataSchema = getUpdatedSchema(schema);
     this.sortedColumn = sortedColumn;
     this.tableName = tableName;
     this.segmentName = segmentName;
@@ -137,15 +125,39 @@ public class RealtimeSegmentConverter {
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     RealtimeSegmentSegmentCreationDataSource dataSource =
         new RealtimeSegmentSegmentCreationDataSource(realtimeSegmentImpl, reader, dataSchema);
-    driver.init(genConfig, dataSource);
+    driver.init(genConfig, dataSource, CompoundTransformer.getPassThroughTransformer());
     driver.build();
 
     if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap() != null) {
       Map<String, ColumnPartitionConfig> columnPartitionMap = segmentPartitionConfig.getColumnPartitionMap();
       for (String columnName : columnPartitionMap.keySet()) {
         int partitionRangeWidth = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitionRangeWidth();
-        serverMetrics.addValueToTableGauge(tableName, ServerGauge.REALTIME_SEGMENT_PARTITION_WIDTH, partitionRangeWidth);
+        serverMetrics.addValueToTableGauge(tableName, ServerGauge.REALTIME_SEGMENT_PARTITION_WIDTH,
+            partitionRangeWidth);
       }
     }
+  }
+
+  /**
+   * Returns a new schema based on the original one. The new schema removes columns as needed (for ex, virtual cols)
+   * and adds the new timespec to the schema.
+   */
+  @VisibleForTesting
+  public
+  Schema getUpdatedSchema(Schema original) {
+
+    TimeFieldSpec tfs = original.getTimeFieldSpec();
+    // Use outgoing granularity for creating segment
+    TimeGranularitySpec outgoing = tfs.getOutgoingGranularitySpec();
+    TimeFieldSpec newTimeSpec = new TimeFieldSpec(outgoing);
+    Schema newSchema = new Schema();
+    newSchema.addField(newTimeSpec);
+
+    for (String col : original.getPhysicalColumnNames()) {
+      if (!col.equals(tfs.getName())) {
+        newSchema.addField(original.getFieldSpecFor(col));
+      }
+    }
+    return newSchema;
   }
 }

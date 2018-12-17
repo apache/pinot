@@ -18,6 +18,7 @@ package com.linkedin.pinot.core.io.writer.impl.v1;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -59,10 +60,10 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
    * @param totalDocs Total number of docs to write.
    * @param numDocsPerChunk Number of documents per chunk.
    * @param lengthOfLongestEntry Length of longest entry (in bytes).
-   * @throws IOException
+   * @throws FileNotFoundException Throws {@link FileNotFoundException} if the specified file is not found.
    */
   public VarByteChunkSingleValueWriter(File file, ChunkCompressorFactory.CompressionType compressionType, int totalDocs,
-      int numDocsPerChunk, int lengthOfLongestEntry) throws IOException {
+      int numDocsPerChunk, int lengthOfLongestEntry) throws FileNotFoundException {
 
     super(file, compressionType, totalDocs, numDocsPerChunk,
         ((numDocsPerChunk * Integer.BYTES) + (lengthOfLongestEntry * numDocsPerChunk)), // chunkSize

@@ -16,81 +16,123 @@
 
 package com.linkedin.thirdeye.detection.alert.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilter;
-import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterRecipients;
 import com.linkedin.thirdeye.detection.alert.DetectionAlertFilterResult;
 import com.linkedin.thirdeye.detector.email.filter.BaseAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections.MapUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class LegacyAlertFilter extends DetectionAlertFilter {
-  private static final String PROP_LEGACY_ALERT_FILTER_CONFIG = "legacyAlertFilterConfig";
-  private static final String PROP_LEGACY_ALERT_CONFIG = "legacyAlertConfig";
+  private final static Logger LOG = LoggerFactory.getLogger(LegacyAlertFilter.class);
+
+  private static final String PROP_LEGACY_ALERT_FILTER_CONFIGS = "legacyAlertFilterConfigs";
   private static final String PROP_LEGACY_ALERT_FILTER_CLASS_NAME = "legacyAlertFilterClassName";
   private static final String PROP_DETECTION_CONFIG_IDS = "detectionConfigIds";
+  private static final String PROP_RECIPIENTS = "recipients";
+  private static final String PROP_TO = "to";
+  private static final String PROP_CC = "cc";
+  private static final String PROP_BCC = "bcc";
+  private static final String PROP_SEND_ONCE = "sendOnce";
 
-  private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-  private AlertConfigDTO alertConfig;
-  private BaseAlertFilter alertFilter;
   private final List<Long> detectionConfigIds;
   private final Map<Long, Long> vectorClocks;
+  private final boolean sendOnce;
 
   public LegacyAlertFilter(DataProvider provider, DetectionAlertConfigDTO config, long endTime) throws Exception {
     super(provider, config, endTime);
 
-    String alertConfigStr = OBJECT_MAPPER.writeValueAsString(MapUtils.getMap(config.getProperties(), PROP_LEGACY_ALERT_CONFIG));
-    alertConfig = OBJECT_MAPPER.readValue(alertConfigStr, AlertConfigDTO.class);
-    alertFilter = new DummyAlertFilter();
-    if (config.getProperties().containsKey(PROP_LEGACY_ALERT_FILTER_CLASS_NAME)) {
-      String className = MapUtils.getString(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CLASS_NAME);
-      alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
-      alertFilter.setParameters(MapUtils.getMap(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CONFIG));
-    }
     this.detectionConfigIds = ConfigUtils.getLongs(this.config.getProperties().get(PROP_DETECTION_CONFIG_IDS));
     this.vectorClocks = this.config.getVectorClocks();
+    this.sendOnce = MapUtils.getBoolean(this.config.getProperties(), PROP_SEND_ONCE, true);
   }
 
   @Override
-  public DetectionAlertFilterResult run() {
+  public DetectionAlertFilterResult run() throws Exception {
     DetectionAlertFilterResult result = new DetectionAlertFilterResult();
 
-    for (Long detectionConfigId : this.detectionConfigIds) {
-      long startTime = MapUtils.getLong(this.vectorClocks, detectionConfigId, 0L);
+    Map<String, Set<String>> recipientsMap = ConfigUtils.getMap(this.config.getProperties().get(PROP_RECIPIENTS));
+    Set<String> to = (recipientsMap.get(PROP_TO) == null) ? Collections.emptySet() : new HashSet<>(recipientsMap.get(PROP_TO));
+    Set<String> cc = (recipientsMap.get(PROP_CC) == null) ? Collections.emptySet() : new HashSet<>(recipientsMap.get(PROP_CC));
+    Set<String> bcc = (recipientsMap.get(PROP_BCC) == null) ? Collections.emptySet() : new HashSet<>(recipientsMap.get(PROP_BCC));
+    DetectionAlertFilterRecipients recipients = new DetectionAlertFilterRecipients(to, cc, bcc);
 
-      AnomalySlice slice =
-          new AnomalySlice().withConfigId(detectionConfigId).withStart(startTime).withEnd(this.endTime);
-      Collection<MergedAnomalyResultDTO> candidates =
-          this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
+    Map<String, Object> alertFilterConfig = MapUtils.getMap(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CONFIGS);
+    if (alertFilterConfig == null || alertFilterConfig.size() == 0) {
+      LOG.warn("alertFilterConfig is null or empty in notification group {}", this.config.getId());
+    }
 
+    for (Long functionId : this.detectionConfigIds) {
+      long startTime = MapUtils.getLong(this.vectorClocks, functionId, 0L);
+
+      AnomalySlice slice = new AnomalySlice()
+          .withStart(startTime)
+          .withEnd(this.endTime);
+
+      Collection<MergedAnomalyResultDTO> candidates;
+      if (this.config.isOnlyFetchLegacyAnomalies()) {
+        candidates = this.provider.fetchLegacyAnomalies(Collections.singletonList(slice), functionId).get(slice);
+      } else {
+        candidates = this.provider.fetchAnomalies(Collections.singletonList(slice), functionId).get(slice);
+      }
+
+      BaseAlertFilter alertFilter = new DummyAlertFilter();
+      if (config.getProperties().containsKey(PROP_LEGACY_ALERT_FILTER_CLASS_NAME)) {
+        String className = MapUtils.getString(config.getProperties(), PROP_LEGACY_ALERT_FILTER_CLASS_NAME);
+        alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
+        Map<String, String> params = MapUtils.getMap(alertFilterConfig, functionId.toString());
+        if (params == null) {
+          LOG.warn("AlertFilter cannot be found for function {} in notification group {}", functionId, this.config.getId());
+        }
+
+        alertFilter.setParameters(params);
+      }
+
+      BaseAlertFilter finalAlertFilter = alertFilter;
+      final long minId = getMinId(this.config.getHighWaterMark());
       Collection<MergedAnomalyResultDTO> anomalies =
           Collections2.filter(candidates, new Predicate<MergedAnomalyResultDTO>() {
             @Override
             public boolean apply(@Nullable MergedAnomalyResultDTO mergedAnomaly) {
-              return mergedAnomaly != null && !mergedAnomaly.isChild() && alertFilter.isQualified(mergedAnomaly);
+              return mergedAnomaly != null
+                      && !mergedAnomaly.isChild()
+                      && finalAlertFilter.isQualified(mergedAnomaly)
+                      && (mergedAnomaly.getId() == null || mergedAnomaly.getId() >= minId);
             }
           });
 
-      result.addMapping(this.alertConfig.getReceiverAddresses(), new HashSet<>(anomalies));
+      if (result.getResult().isEmpty()) {
+        result.addMapping(recipients, new HashSet<>(anomalies));
+      } else {
+        result.getResult().get(recipients).addAll(anomalies);
+      }
     }
 
     return result;
+  }
+
+  private long getMinId(long highWaterMark) {
+    if (this.sendOnce) {
+      return highWaterMark + 1;
+    } else {
+      return 0;
+    }
   }
 }

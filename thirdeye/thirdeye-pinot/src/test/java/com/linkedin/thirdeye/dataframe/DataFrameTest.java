@@ -347,6 +347,20 @@ public class DataFrameTest {
     assertEquals(df.getObjects("object"), 1, 2, 3, 4);
   }
 
+  @Test
+  public void testDataFrameBuilderStaticTypingMultiple() {
+    DataFrame df = DataFrame.builder("double:string:LONG").append(2.5d).build();
+    Assert.assertTrue(df.contains("double:string"));
+    Assert.assertEquals(df.get("double:string").type(), Series.SeriesType.LONG);
+  }
+
+  @Test
+  public void testDataFrameBuilderStaticTypingUnknown() {
+    DataFrame df = DataFrame.builder("double:1:2:string").append(1.1d).build();
+    Assert.assertTrue(df.contains("double:1:2:string"));
+    Assert.assertEquals(df.get("double:1:2:string").type(), Series.SeriesType.DOUBLE);
+  }
+
   @Test(expectedExceptions = NumberFormatException.class)
   public void testDataFrameBuilderStaticTypingFailDouble() {
     DataFrame.builder("double:DOUBLE").append("true").build();

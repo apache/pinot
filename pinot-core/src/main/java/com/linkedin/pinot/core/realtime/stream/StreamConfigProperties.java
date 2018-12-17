@@ -18,6 +18,9 @@ package com.linkedin.pinot.core.realtime.stream;
 import com.google.common.base.Joiner;
 
 
+/**
+ * Defines the keys for the stream config properties map
+ */
 public class StreamConfigProperties {
   public static final String DOT_SEPARATOR = ".";
   public static final String STREAM_PREFIX = "stream";

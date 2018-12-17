@@ -555,6 +555,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
   }
 
+  @Override
+  public String getBloomFilterFileName(String column) {
+    return column + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION;
+  }
+
   @Nullable
   @Override
   public String getCreatorName() {

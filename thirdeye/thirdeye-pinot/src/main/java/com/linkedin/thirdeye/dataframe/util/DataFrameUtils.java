@@ -16,8 +16,6 @@
 
 package com.linkedin.thirdeye.dataframe.util;
 
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
@@ -43,10 +41,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeFieldType;
@@ -447,12 +443,24 @@ public class DataFrameUtils {
       fields.add(DateTimeFieldType.secondOfMinute());
       fields.add(DateTimeFieldType.millisOfSecond());
 
+    } else if (PeriodType.months().equals(type)) {
+      fields.add(DateTimeFieldType.dayOfMonth());
+      fields.add(DateTimeFieldType.hourOfDay());
+      fields.add(DateTimeFieldType.minuteOfHour());
+      fields.add(DateTimeFieldType.secondOfMinute());
+      fields.add(DateTimeFieldType.millisOfSecond());
+
     } else {
       throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", type));
     }
 
     int[] zeros = new int[fields.size()];
     Arrays.fill(zeros, 0);
+
+    // workaround for dayOfMonth > 0 constraint
+    if (PeriodType.months().equals(type)) {
+      zeros[0] = 1;
+    }
 
     return new Partial(fields.toArray(new DateTimeFieldType[fields.size()]), zeros);
   }

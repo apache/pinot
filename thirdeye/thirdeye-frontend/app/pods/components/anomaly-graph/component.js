@@ -4,6 +4,7 @@ import { later } from '@ember/runloop';
 import Component from '@ember/component';
 import moment from 'moment';
 import d3 from 'd3';
+import { humanizeFloat } from 'thirdeye-frontend/utils/utils';
 
 const COLOR_MAPPING = {
   blue: '#33AADA',
@@ -159,12 +160,11 @@ export default Component.extend({
     const legendText = this.get('legendText');
 
     const {
-      dotted = { text: 'expected', color: 'blue'},
       solid = { text: 'current', color: 'blue' }
     }  = legendText;
 
     chart.insert('div', '.chart').attr('class', 'anomaly-graph__legend').selectAll('span')
-      .data([dotted, solid])
+      .data([solid])
       .enter().append('svg')
       .attr('class', 'anomaly-graph__legend-item')
       .attr('width', 80)
@@ -186,8 +186,8 @@ export default Component.extend({
           .attr('y1', 10)
           .attr('x2', 30)
           .attr('y2', 10)
-          .attr('stroke-dasharray', (d) => {
-            const dasharrayNum = (d === dotted) ? '10%' : 'none';
+          .attr('stroke-dasharray', () => {
+            const dasharrayNum = 'none';
             return dasharrayNum;
           });
       });
@@ -254,7 +254,8 @@ export default Component.extend({
       primaryMetric,
       ...relatedMetric,
       ...selectedMetrics,
-      ...selectedDimensions];
+      ...selectedDimensions
+    ];
 
     data.forEach((datum) => {
       const name = datum.metricName || datum.name;
@@ -279,7 +280,7 @@ export default Component.extend({
   dimensions: [],
   selectedDimensions: [],
 
-  showGraphLegend: true,
+  showGraphLegend: false,
   colors: {},
   showSubChart: false,
   subchartStart: null,
@@ -385,10 +386,9 @@ export default Component.extend({
    * Graph Legend config
    */
   legend: computed('showGraphLegend', function() {
-    const showGraphLegend = this.get('showGraphLegend');
     return {
       position: 'inset',
-      show: showGraphLegend
+      show: false
     };
   }),
 
@@ -459,7 +459,7 @@ export default Component.extend({
           show: true,
           // min: 0,
           tick: {
-            format: d3.format('.2s')
+            format: function(d){return humanizeFloat(d);}
           }
         },
         y2: {
@@ -541,8 +541,7 @@ export default Component.extend({
     'showLegend',
     'height',
     function() {
-      const height = this.get('height')
-        || this.get('showLegend') ? 400 : 200;
+      const height = this.get('height') || 400;
       return {
         height
       };
@@ -560,15 +559,13 @@ export default Component.extend({
 
       // Return data only when it's selected
       if (primaryMetric.isSelected) {
-        const { baselineValues, currentValues } = primaryMetric.subDimensionContributionMap['All'];
+        const { currentValues } = primaryMetric.subDimensionContributionMap['All'];
         return [
-          [`${primaryMetric.metricName}-current`, ...currentValues],
-          [`${primaryMetric.metricName}-expected`, ...baselineValues]
+          [`${primaryMetric.metricName}-current`, ...currentValues]
         ];
       }
       return [
-        [`${primaryMetric.metricName}-current`],
-        [`${primaryMetric.metricName}-expected`]
+        [`${primaryMetric.metricName}-current`]
       ];
     }
   ),
@@ -586,9 +583,8 @@ export default Component.extend({
       selectedMetrics.forEach((metric)  => {
         if (!metric) { return; }
 
-        const { baselineValues, currentValues } = metric.subDimensionContributionMap['All'];
+        const { currentValues } = metric.subDimensionContributionMap['All'];
         columns.push([`${metric.metricName}-current`, ...currentValues]);
-        columns.push([`${metric.metricName}-expected`, ...baselineValues]);
       });
       return columns;
     }
@@ -604,9 +600,8 @@ export default Component.extend({
       const selectedDimensions = this.get('selectedDimensions') || [];
 
       selectedDimensions.forEach((dimension) => {
-        const { baselineValues, currentValues } = dimension;
+        const { currentValues } = dimension;
         columns.push([`${dimension.name}-current`, ...currentValues]);
-        columns.push([`${dimension.name}-expected`, ...baselineValues]);
       });
       return columns;
     }

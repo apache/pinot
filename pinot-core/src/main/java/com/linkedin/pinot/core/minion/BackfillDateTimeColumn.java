@@ -27,6 +27,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReader;
+import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.RecordReaderSegmentCreationDataSource;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -95,7 +96,8 @@ public class BackfillDateTimeColumn {
 
     LOGGER.info("Creating segment for {} with config {}", segmentName, config.toString());
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config, new RecordReaderSegmentCreationDataSource(wrapperReader));
+    driver.init(config, new RecordReaderSegmentCreationDataSource(wrapperReader),
+        CompoundTransformer.getPassThroughTransformer());
     driver.build();
 
     return true;

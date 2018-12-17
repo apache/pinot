@@ -15,8 +15,9 @@
  */
 package com.linkedin.pinot.common.utils;
 
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.*;
 
 
 /**
@@ -25,18 +26,14 @@ import org.testng.annotations.Test;
 public class StringUtilTest {
 
   @Test
-  public void testContainsNullCharacter() {
-    Assert.assertFalse(StringUtil.containsNullCharacter(""));
-    Assert.assertFalse(StringUtil.containsNullCharacter("potato"));
-    Assert.assertTrue(StringUtil.containsNullCharacter("\0"));
-    Assert.assertTrue(StringUtil.containsNullCharacter("pot\0ato"));
-  }
+  public void testSanitizeStringValue() {
+    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 3), "pot");
+    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 6), "pot");
+    assertEquals(StringUtil.sanitizeStringValue("potato", 2), "po");
+    assertEquals(StringUtil.sanitizeStringValue("pot\0ato", 2), "po");
 
-  @Test
-  public void testRemoveNullCharacters() {
-    Assert.assertEquals(StringUtil.removeNullCharacters(""), "");
-    Assert.assertEquals(StringUtil.removeNullCharacters("potato"), "potato");
-    Assert.assertEquals(StringUtil.removeNullCharacters("\0"), "");
-    Assert.assertEquals(StringUtil.removeNullCharacters("pot\0ato"), "potato");
+    String value = "potato";
+    assertSame(StringUtil.sanitizeStringValue(value, 6), value);
+    assertSame(StringUtil.sanitizeStringValue(value, 7), value);
   }
 }

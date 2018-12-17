@@ -43,7 +43,9 @@ public class AdjustTableNameChildKeyTransformer implements ChildKeyTransformer {
         .getOrElse(List.empty())
         .map(Object::toString);
 
-    String tableName = childKeys.get("table.name").map(Object::toString).getOrNull();
+    String tableName = childKeys.get("table.name").map(Object::toString).getOrElse(
+            () -> childKeys.get("table.name.realtime").map(Object::toString).getOrElse(
+                () -> childKeys.get("table.name.offline").map(Object::toString).getOrNull()));
 
     Map<String, Object> remappedConfig = (Map<String, Object>) childKeys;
 

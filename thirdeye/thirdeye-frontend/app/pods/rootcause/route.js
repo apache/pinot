@@ -39,7 +39,7 @@ const adjustGranularity = (attrGranularity) => {
   const granularity = [parseInt(count, 10), unit];
 
   if (['NANOSECONDS', 'MILLISECONDS', 'SECONDS'].includes(granularity[1])) {
-    granularity[0] = 5;
+    granularity[0] = 15;
     granularity[1] = 'MINUTES';
   }
 
@@ -110,6 +110,16 @@ const augmentFrontendMetrics = (urns) => {
 };
 
 /**
+ * A variation of Object.assign() that returns the original and overrides undefined values only
+ */
+const assignDefaults = (base, defaults) => {
+  Object.keys(base)
+    .filter(key => typeof(base[key]) === 'undefined')
+    .forEach(key => base[key] = defaults[key]);
+  return base;
+};
+
+/**
  * Returns the array for start/end dates of the analysis range
  */
 const toAnalysisRangeArray = (anomalyStart, anomalyEnd, metricGranularity) => {
@@ -153,8 +163,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
   },
 
   model(params) {
-    const { metricId, sessionId, anomalyId, anomalyRange, analysisRange, granularity, compareMode } = params;
-    let { contextUrnsInit, selectedUrnsInit, anomalyUrnsInit } = params;
+    const { metricId, sessionId, anomalyId } = params;
+    let { contextUrnsInit, selectedUrnsInit, anomalyUrnsInit, anomalyRangeInit, analysisRangeInit, compareModeInit, granularityInit } = params;
     const isDevEnv = config.environment === 'development';
 
     let metricUrn, metricEntity, session, anomalyUrn, anomalyEntity, anomalySessions;
@@ -174,14 +184,14 @@ export default Route.extend(AuthenticatedRouteMixin, {
       session = fetch(`/session/${sessionId}`).then(checkStatus).catch(() => {});
     }
 
-    let anomalyRangeStart, anomalyRangeEnd;
-    if (anomalyRange) {
-      [anomalyRangeStart, anomalyRangeEnd] = anomalyRange.split(',').map(r => parseInt(r, 10));
+    let anomalyRange;
+    if (anomalyRangeInit) {
+      anomalyRange = anomalyRangeInit.split(',').map(r => parseInt(r, 10));
     }
 
-    let analysisRangeStart, analysisRangeEnd;
-    if (analysisRange) {
-      [analysisRangeStart, analysisRangeEnd] = analysisRange.split(',').map(r => parseInt(r, 10));
+    let analysisRange;
+    if (analysisRangeInit) {
+      analysisRange = analysisRangeInit.split(',').map(r => parseInt(r, 10));
     }
 
     let contextUrnsPredefined;
@@ -213,12 +223,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
       contextUrnsPredefined,
       selectedUrnsPredefined,
       anomalyUrnsPredefined,
-      anomalyRangeStart,
-      anomalyRangeEnd,
-      analysisRangeStart,
-      analysisRangeEnd,
-      granularity,
-      compareMode
+      anomalyRange,
+      analysisRange,
+      granularity: granularityInit,
+      compareMode: compareModeInit
     });
   },
 
@@ -238,46 +246,45 @@ export default Route.extend(AuthenticatedRouteMixin, {
 
   afterModel(model, transition) {
     const defaultParams = {
-      anomalyRangeStart: makeTime().startOf('hour').subtract(3, 'hour').valueOf(),
-      anomalyRangeEnd: makeTime().startOf('hour').valueOf(),
-      analysisRangeStart: makeTime().startOf('day').subtract(6, 'day').valueOf(),
-      analysisRangeEnd: makeTime().startOf('day').add(1, 'day').valueOf(),
+      anomalyRange: [
+        makeTime().startOf('hour').subtract(3, 'hour').valueOf(),
+        makeTime().startOf('hour').valueOf()
+      ],
+      analysisRange: [
+        makeTime().startOf('day').subtract(6, 'day').valueOf(),
+        makeTime().startOf('day').add(1, 'day').valueOf()
+      ],
       granularity: '1_HOURS',
-      compareMode: 'WoW'
+      compareMode: 'wo1w'
     };
 
     // default params
-    const { queryParams } = transition;
-    const newModel = Object.assign(model, { ...defaultParams, ...queryParams });
+    assignDefaults(model, defaultParams);
 
     // load latest saved session for anomaly
     const { anomalySessions } = model;
     if (!_.isEmpty(anomalySessions)) {
       const mostRecent = _.last(_.sortBy(anomalySessions, 'updated'));
 
-      Object.assign(newModel, {
-        anomalyId: null,
-        anomalyUrn: null,
-        anomalyContext: null,
-        sessionId: mostRecent.id,
-        session: mostRecent
-      });
+      model.anomalyId = null;
+      model.anomalyUrn = null;
+      model.anomalyContext = null;
+      model.sessionId = mostRecent.id;
+      model.session = mostRecent;
 
       // NOTE: apparently this does not abort the ongoing transition
       this.transitionTo({ queryParams: { sessionId: mostRecent.id, anomalyId: null } });
     }
 
-    return newModel;
+    return model;
   },
 
   setupController(controller, model) {
     this._super(...arguments);
 
     const {
-      analysisRangeStart,
-      analysisRangeEnd,
-      anomalyRangeStart,
-      anomalyRangeEnd,
+      analysisRange,
+      anomalyRange,
       granularity,
       compareMode,
       metricId,
@@ -292,9 +299,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
       selectedUrnsPredefined,
       anomalyUrnsPredefined
     } = model;
-
-    const anomalyRange = [anomalyRangeStart, anomalyRangeEnd];
-    const analysisRange = [analysisRangeStart, analysisRangeEnd];
 
     // default blank context
     let context = {
@@ -461,10 +465,10 @@ export default Route.extend(AuthenticatedRouteMixin, {
       contextUrnsInit: undefined,
       selectedUrnsInit: undefined,
       anomalyUrnsInit: undefined,
-      anomalyRange: undefined,
-      analysisRange: undefined,
-      granularity: undefined,
-      compareMode: undefined
+      anomalyRangeInit: undefined,
+      analysisRangeInit: undefined,
+      granularityInit: undefined,
+      compareModeInit: undefined
     });
   },
 

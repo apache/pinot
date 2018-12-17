@@ -17,11 +17,11 @@
 package com.linkedin.thirdeye.auto.onboard;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.CaseFormat;
 import com.google.common.collect.Collections2;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -211,6 +211,7 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
       DatasetConfigDTO datasetConfig) throws Exception {
     checkDimensionChanges(dataset, datasetConfig, schema);
     checkMetricChanges(dataset, datasetConfig, schema);
+    checkTimeFieldChanges(datasetConfig, schema);
     appendNewCustomConfigs(datasetConfig, customConfigs);
   }
 
@@ -328,6 +329,19 @@ public class AutoOnboardPinotMetadataSource extends AutoOnboard {
     // 4) remove any anomaly functions associated with the metric
     // 5) remove any alerts associated with these anomaly functions
 
+  }
+
+  private void checkTimeFieldChanges(DatasetConfigDTO datasetConfig, Schema schema) {
+    TimeGranularitySpec timeSpec = schema.getTimeFieldSpec().getOutgoingGranularitySpec();
+    if (!datasetConfig.getTimeColumn().equals(timeSpec.getName())
+        || !datasetConfig.getTimeFormat().equals(timeSpec.getTimeFormat())
+        || datasetConfig.bucketTimeGranularity().getUnit() != timeSpec.getTimeType()
+        || datasetConfig.bucketTimeGranularity().getSize() != timeSpec.getTimeUnitSize()) {
+      ConfigGenerator.setTimeSpecs(datasetConfig, timeSpec);
+      DAO_REGISTRY.getDatasetConfigDAO().update(datasetConfig);
+      LOG.info("Refreshed time field. name = {}, format = {}, type = {}, unit size = {}.",
+          timeSpec.getName(), timeSpec.getTimeType(), timeSpec.getTimeType(), timeSpec.getTimeUnitSize());
+    }
   }
 
   /**

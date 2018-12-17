@@ -16,7 +16,6 @@
 package com.linkedin.pinot.common.utils;
 
 import java.io.UnsupportedEncodingException;
-import javax.annotation.Nonnull;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -32,29 +31,30 @@ public class StringUtil {
   }
 
   /**
-   * Returns whether the string contains null character.
+   * Sanitizes a string value.
+   * <ul>
+   *   <li>Truncate characters after the first {@code null} character as it is reserved as the padding character</li>
+   *   <li>Limit the length of the string</li>
+   * </ul>
+   *
+   * @param value String value to sanitize
+   * @param maxLength Max number of characters allowed
+   * @return Modified value, or value itself if not modified
    */
-  public static boolean containsNullCharacter(@Nonnull String input) {
-    return input.indexOf(NULL_CHARACTER) >= 0;
-  }
-
-  /**
-   * Removes the null characters from a string.
-   */
-  public static String removeNullCharacters(@Nonnull String input) {
-    if (!containsNullCharacter(input)) {
-      return input;
-    }
-
-    char[] chars = input.toCharArray();
+  public static String sanitizeStringValue(String value, int maxLength) {
+    char[] chars = value.toCharArray();
     int length = chars.length;
-    int index = 0;
-    for (int i = 0; i < length; i++) {
-      if (chars[i] != NULL_CHARACTER) {
-        chars[index++] = chars[i];
+    int limit = Math.min(length, maxLength);
+    for (int i = 0; i < limit; i++) {
+      if (chars[i] == NULL_CHARACTER) {
+        return new String(chars, 0, i);
       }
     }
-    return new String(chars, 0, index);
+    if (limit < length) {
+      return new String(chars, 0, limit);
+    } else {
+      return value;
+    }
   }
 
   public static byte[] encodeUtf8(String s) {

@@ -21,10 +21,10 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
-import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
+import com.linkedin.pinot.core.data.recordtransformer.CompoundTransformer;
+import com.linkedin.pinot.core.data.recordtransformer.RecordTransformer;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
@@ -80,7 +80,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private SegmentCreator indexCreator;
   private SegmentIndexCreationInfo segmentIndexCreationInfo;
   private Schema dataSchema;
-  private PlainFieldExtractor extractor;
+  private RecordTransformer _recordTransformer;
   private int totalDocs = 0;
   private int totalRawDocs = 0;
   private int totalAggDocs = 0;
@@ -99,10 +99,19 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   @Override
   public void init(SegmentGeneratorConfig config) throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(RecordReaderFactory.getRecordReader(config)));
+    init(config, RecordReaderFactory.getRecordReader(config));
   }
 
-  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) throws Exception {
+  public void init(SegmentGeneratorConfig config, RecordReader recordReader) {
+    init(config, new RecordReaderSegmentCreationDataSource(recordReader));
+  }
+
+  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource) {
+    init(config, dataSource, CompoundTransformer.getDefaultTransformer(dataSource.getRecordReader().getSchema()));
+  }
+
+  public void init(SegmentGeneratorConfig config, SegmentCreationDataSource dataSource,
+      RecordTransformer recordTransformer) {
     this.config = config;
     this.createStarTree = config.isEnableStarTreeIndex();
     recordReader = dataSource.getRecordReader();
@@ -125,7 +134,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     addDerivedFieldsInSchema();
 
-    extractor = FieldExtractorFactory.getPlainFieldExtractor(dataSchema);
+    _recordTransformer = recordTransformer;
 
     // Initialize stats collection
     if (!createStarTree) { // For star tree, the stats are gathered in buildStarTree()
@@ -153,10 +162,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     starTreeTempDir = new File(indexDir, com.linkedin.pinot.common.utils.FileUtils.getRandomFileName());
     LOGGER.debug("tempIndexDir:{}", tempIndexDir);
     LOGGER.debug("starTreeTempDir:{}", starTreeTempDir);
-  }
-
-  public void init(SegmentGeneratorConfig config, RecordReader reader) throws Exception {
-    init(config, new RecordReaderSegmentCreationDataSource(reader));
   }
 
   private void addDerivedFieldsInSchema() {
@@ -237,17 +242,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       recordReader.rewind();
       LOGGER.info("Start append raw data to star tree builder!");
       totalDocs = 0;
-      GenericRow readRow = new GenericRow();
-      GenericRow transformedRow = new GenericRow();
+      GenericRow readRow = null;
       while (recordReader.hasNext()) {
-        //PlainFieldExtractor conducts necessary type conversions
-        transformedRow = readNextRowSanitized(readRow, transformedRow);
-        //must be called after previous step since type conversion for derived values is unnecessary
-        populateDefaultDerivedColumnValues(transformedRow);
-        starTreeBuilder.append(transformedRow);
-        statsCollector.collectRow(transformedRow);
-        totalRawDocs++;
-        totalDocs++;
+        readRow = GenericRow.createOrReuseRow(readRow);
+        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(readRow));
+        if (transformedRow != null) {
+          //must be called after previous step since type conversion for derived values is unnecessary
+          populateDefaultDerivedColumnValues(transformedRow);
+          starTreeBuilder.append(transformedRow);
+          statsCollector.collectRow(transformedRow);
+          totalRawDocs++;
+          totalDocs++;
+        }
       }
       recordReader.close();
       LOGGER.info("Start building star tree!");
@@ -318,16 +324,18 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       // Build the index
       recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
-      GenericRow readRow = new GenericRow();
-      GenericRow transformedRow = new GenericRow();
+      GenericRow readRow = null;
       while (recordReader.hasNext()) {
         long start = System.currentTimeMillis();
-        transformedRow = readNextRowSanitized(readRow, transformedRow);
+        readRow = GenericRow.createOrReuseRow(readRow);
+        GenericRow transformedRow = _recordTransformer.transform(recordReader.next(readRow));
         long stop = System.currentTimeMillis();
-        indexCreator.indexRow(transformedRow);
-        long stop1 = System.currentTimeMillis();
         totalRecordReadTime += (stop - start);
-        totalIndexTime += (stop1 - stop);
+        if (transformedRow != null) {
+          indexCreator.indexRow(transformedRow);
+          long stop1 = System.currentTimeMillis();
+          totalIndexTime += (stop1 - stop);
+        }
       }
     } catch (Exception e) {
       indexCreator.close();
@@ -336,26 +344,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       recordReader.close();
     }
     LOGGER.info("Finished records indexing in IndexCreator!");
-    int numErrors, numConversions, numNulls, numNullCols;
-    if ((numErrors = extractor.getTotalErrors()) > 0) {
-      LOGGER.warn("Index creator for schema {} had {} rows with errors", dataSchema.getSchemaName(), numErrors);
-    }
-    Map<String, Integer> errorCount = extractor.getErrorCount();
-    for (String column : errorCount.keySet()) {
-      if ((numErrors = errorCount.get(column)) > 0) {
-        LOGGER.info("Column {} had {} rows with errors", column, numErrors);
-      }
-    }
-    if ((numConversions = extractor.getTotalConversions()) > 0) {
-      LOGGER.info("Index creator for schema {} had {} rows with type conversions", dataSchema.getSchemaName(),
-          numConversions);
-    }
-    if ((numNulls = extractor.getTotalNulls()) > 0) {
-      LOGGER.info("Index creator for schema {} had {} rows with null columns", dataSchema.getSchemaName(), numNulls);
-    }
-    if ((numNullCols = extractor.getTotalNullCols()) > 0) {
-      LOGGER.info("Index creator for schema {} had {}  null columns", dataSchema.getSchemaName(), numNullCols);
-    }
 
     handlePostCreation();
   }
@@ -483,10 +471,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     segmentIndexCreationInfo.setTotalRawDocs(totalRawDocs);
     segmentIndexCreationInfo.setTotalAggDocs(totalAggDocs);
     segmentIndexCreationInfo.setStarTreeEnabled(createStarTree);
-    segmentIndexCreationInfo.setTotalConversions(extractor.getTotalConversions());
-    segmentIndexCreationInfo.setTotalErrors(extractor.getTotalErrors());
-    segmentIndexCreationInfo.setTotalNullCols(extractor.getTotalNullCols());
-    segmentIndexCreationInfo.setTotalNulls(extractor.getTotalNulls());
   }
 
   /**
@@ -503,10 +487,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public File getOutputDirectory() {
     return new File(new File(config.getOutDir()), segmentName);
-  }
-
-  private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow) throws IOException {
-    return extractor.transform(recordReader.next(readRow), transformedRow);
   }
 
   public SegmentPreIndexStatsContainer getSegmentStats() {

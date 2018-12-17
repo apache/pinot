@@ -57,10 +57,10 @@ export default Controller.extend({
     'contextUrnsInit',
     'selectedUrnsInit',
     'anomalyUrnsInit',
-    'anomalyRange',
-    'analysisRange',
-    'granularity',
-    'compareMode'
+    'anomalyRangeInit',
+    'analysisRangeInit',
+    'granularityInit',
+    'compareModeInit'
   ],
 
   //
@@ -591,21 +591,6 @@ export default Controller.extend({
     function () {
       const { entities } = getProperties(this, 'entities');
       return filterObject(entities, (e) => e.type == 'event');
-    }
-  ),
-
-  /**
-   * Visible entities for tooltip
-   * @type {object}
-   */
-  tooltipEntities: computed(
-    'entities',
-    'invisibleUrns',
-    'hoverUrns',
-    function () {
-      const { entities, invisibleUrns, hoverUrns } = getProperties(this, 'entities', 'invisibleUrns', 'hoverUrns');
-      const visibleUrns = [...hoverUrns].filter(urn => !invisibleUrns.has(urn));
-      return filterObject(entities, (e) => visibleUrns.has(e.urn));
     }
   ),
 

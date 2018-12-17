@@ -26,13 +26,14 @@ import java.util.Set;
 public class DetectionTestUtils {
   private static final Long PROP_ID_VALUE = 1000L;
 
-  public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end, String metric, String dataset, Map<String, String> dimensions) {
+  public static MergedAnomalyResultDTO makeAnomaly(Long configId, Long legacyFunctionId, long start, long end, String metric, String dataset, Map<String, String> dimensions) {
     MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
     anomaly.setDetectionConfigId(configId);
     anomaly.setStartTime(start);
     anomaly.setEndTime(end);
     anomaly.setMetric(metric);
     anomaly.setCollection(dataset);
+    anomaly.setFunctionId(legacyFunctionId);
 
     DimensionMap dimMap = new DimensionMap();
     dimMap.putAll(dimensions);
@@ -41,8 +42,16 @@ public class DetectionTestUtils {
     return anomaly;
   }
 
+  public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end, String metric, String dataset, Map<String, String> dimensions) {
+    return DetectionTestUtils.makeAnomaly(configId, null, start, end, metric, dataset, dimensions);
+  }
+
   public static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
     return DetectionTestUtils.makeAnomaly(PROP_ID_VALUE, start, end, null, null, Collections.<String, String>emptyMap());
+  }
+
+  public static MergedAnomalyResultDTO makeAnomaly(Long configId, Long legacyFuncId, long start, long end) {
+    return DetectionTestUtils.makeAnomaly(configId, legacyFuncId, start, end, null, null, Collections.<String, String>emptyMap());
   }
 
   public static MergedAnomalyResultDTO makeAnomaly(Long configId, long start, long end) {

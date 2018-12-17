@@ -159,6 +159,11 @@ public class Deserializer {
       return list;
     });
 
+    typeConverters.put(Tuple.of(ArrayList.class, Set.class), items -> {
+      ArrayList list = (ArrayList) items;
+      return new HashSet(list);
+    });
+
     // Mark all types that have a converter as simple types
     simpleTypes = new HashSet<>();
     typeConverters
@@ -232,7 +237,10 @@ public class Deserializer {
 
               LOGGER.debug("Extracting value from field {} of {}, values are {}", dslInfo.value(), dslValue, dslValues);
 
-              valueInjected |= coerceValueIntoField(rootObject, declaredField, dslValues.getOrElse(dslInfo.value(), null));
+              if (dslValues != null) {
+                valueInjected |=
+                    coerceValueIntoField(rootObject, declaredField, dslValues.getOrElse(dslInfo.value(), null));
+              }
             }
           } else if (useChildKeyHandler != null) {
             // Use a child key handler to handle this value

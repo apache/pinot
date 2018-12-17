@@ -50,6 +50,9 @@ public class ColumnIndexDirectoryTestHelper {
       case INVERTED_INDEX:
         buf = columnDirectory.newInvertedIndexBuffer(columnName, size);
         break;
+      case BLOOM_FILTER:
+        buf = columnDirectory.newBloomFilterBuffer(columnName, size);
+        break;
     }
     return buf;
   }
@@ -70,6 +73,10 @@ public class ColumnIndexDirectoryTestHelper {
       case INVERTED_INDEX:
         buf = columnDirectory.getInvertedIndexBufferFor(columnName);
         break;
+      case BLOOM_FILTER:
+        buf = columnDirectory.getBloomFilterBufferFor(columnName);
+        break;
+        
     }
     return buf;
   }
@@ -130,6 +137,14 @@ public class ColumnIndexDirectoryTestHelper {
             return invocationOnMock.getArguments()[0] + ".ii";
           }
         });
+    when(meta.getBloomFilterFileName(anyString()))
+    .thenAnswer(new Answer<String>() {
+      @Override
+      public String answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        return invocationOnMock.getArguments()[0] + ".bloom";
+      }
+    });
     return meta;
   }
 }

@@ -10,9 +10,5 @@
   matchTriggerWidth=false
 as |metric|
 }}
-{{#if (eq selectedMetric.alias metric.alias)}}
-  <span class="bluelink">{{metric.alias}}</span>
-{{else}}
-  {{metric.alias}}
-{{/if}}
+  {{partial 'partials/rootcause/select-metric-label'}}
 {{/power-select}}

@@ -1,14 +1,17 @@
 import Service from '@ember/service';
 import { inject as service } from '@ember/service';
 import {
+  toOffsetUrn,
+  toMetricUrn,
   toAbsoluteUrn,
-  toMetricUrn
+  makeIterable
 } from 'thirdeye-frontend/utils/rca-utils';
 import { checkStatus } from 'thirdeye-frontend/utils/utils';
 import _ from 'lodash';
 
-const ROOTCAUSE_AGGREGATES_ENDPOINT = '/rootcause/metric/aggregate/batch';
+const ROOTCAUSE_AGGREGATES_ENDPOINT = '/rootcause/metric/aggregate/chunk';
 const ROOTCAUSE_AGGREGATES_PRIORITY = 20;
+const ROOTCAUSE_AGGREGATES_CHUNK_SIZE = 10;
 
 export default Service.extend({
   aggregates: null, // {}
@@ -61,43 +64,64 @@ export default Service.extend({
       return;
     }
 
-    const metricUrnToOffestAndUrn = {};
-    missing.forEach(urn => {
-      const metricUrn = toMetricUrn(urn);
-      const offsetsAndUrns = metricUrnToOffestAndUrn[metricUrn] || [];
-      offsetsAndUrns.push([toAbsoluteUrn(urn, requestContext.compareMode).split(':')[2].toLowerCase(), urn]);
-      metricUrnToOffestAndUrn[metricUrn] = offsetsAndUrns;
-    });
+    // group by metrics and offsets
+    const groupedByUrn = [...missing]
+      .map(urn => toAbsoluteUrn(urn, requestContext.compareMode))
+      .map(urn => { return { urn, base: toMetricUrn(urn), offset: urn.split(':')[2] }; })
+      .reduce((agg, obj) => {
+        agg[obj.base] = (agg[obj.base] || new Set());
+        agg[obj.base].add(obj.offset);
+        return agg;
+      }, {});
 
-    [...Object.keys(metricUrnToOffestAndUrn)].sort().forEach((metricUrn, i) => {
-      this._fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn, i);
-    });
+    // workaround for JS conversion of key values to strings
+    const setsOfOffsets = Object.keys(groupedByUrn)
+      .reduce((agg, urn) => {
+        const offsets = [...groupedByUrn[urn]].sort();
+        const key = offsets.join('_');
+        agg[key] = new Set(offsets);
+        return agg;
+      }, {});
+
+    // hack baseline translation
+    const baselineOffset = requestContext.compareMode === 'WoW' ? 'wo1w' : requestContext.compareMode.toLowerCase();
+
+    Object.values(setsOfOffsets)
+      .forEach(offsets => {
+        const urns = Object.keys(groupedByUrn).filter(urn => _.isEqual(groupedByUrn[urn], offsets));
+        const chunks = _.chunk(urns.sort(), ROOTCAUSE_AGGREGATES_CHUNK_SIZE);
+        chunks.forEach((urns, i) => {
+          this._fetchChunk(urns, [...offsets].sort(), baselineOffset, requestContext, i);
+        });
+      });
   },
 
   /**
    * Fetch the metric data for a row of the metric table
    *
-   * @param {String} metricUrn Metric urn
-   * @param {Object} context Context
-   * @param {Object} metricUrnToOffestAndUrn Hash map from metric urn to offset and urn
+   * @param {Array} metricUrns Metric urns
+   * @param {Array} offsets time offsets
+   * @param {string} baselineOffset offset for baseline translation
+   * @param {Object} requestContext Context
    * @returns {undefined}
    */
-  async _fetchRowSlice(metricUrn, requestContext, metricUrnToOffestAndUrn, index) {
+  async _fetchChunk(metricUrns, offsets, baselineOffset, requestContext, index) {
     const fetcher = this.get('fetcher');
 
     const [ start, end ] = requestContext.anomalyRange;
-    const offsets = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[0]);
-    const urns = metricUrnToOffestAndUrn[metricUrn].map(tuple => tuple[1]);
     const timezone = 'America/Los_Angeles';
 
-    const url = `${ROOTCAUSE_AGGREGATES_ENDPOINT}?urn=${metricUrn}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
+    const url = `${ROOTCAUSE_AGGREGATES_ENDPOINT}?urns=${encodeURIComponent(metricUrns)}&start=${start}&end=${end}&offsets=${offsets}&timezone=${timezone}`;
     try {
       const payload = await fetcher.fetch(url, ROOTCAUSE_AGGREGATES_PRIORITY, index);
       const json = await checkStatus(payload);
-      const aggregates = this._extractAggregatesBatch(json, urns);
+      const aggregates = this._extractAggregatesChunk(json, metricUrns, offsets, baselineOffset);
       this._complete(requestContext, aggregates);
 
     } catch (error) {
+      const urns = metricUrns.reduce((agg, metricUrn) => {
+        return agg.concat([...offsets, 'baseline'].map(offset => toOffsetUrn(metricUrn, offset)));
+      }, []);
       this._handleErrorBatch(urns, error);
     }
   },
@@ -106,11 +130,20 @@ export default Service.extend({
     urns.forEach(urn => this._handleError(urn, error));
   },
 
-  _extractAggregatesBatch(incoming, urns) {
+  _extractAggregatesChunk(incoming, metricUrns, offsets, baselineOffset) {
     const aggregates = {};
-    for (var i = 0; i < urns.length; i++) {
-      aggregates[urns[i]] = incoming[i];
-    }
+    metricUrns.forEach(metricUrn => {
+      offsets.forEach((offset, i) => {
+        const urn = toOffsetUrn(metricUrn, offset);
+        aggregates[urn] = incoming[metricUrn][i];
+
+        // duplicate absolute offset as baseline value
+        if (offset === baselineOffset) {
+          const baselineUrn = toOffsetUrn(metricUrn, 'baseline');
+          aggregates[baselineUrn] = aggregates[urn];
+        }
+      });
+    });
 
     return aggregates;
   },

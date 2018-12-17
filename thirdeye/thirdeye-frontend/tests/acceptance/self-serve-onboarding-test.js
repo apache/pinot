@@ -61,7 +61,7 @@ module('Acceptance | create alert', function(hooks) {
     );
     assert.equal(
       $graphContainer.find('svg').length,
-      3,
+      2,
       'Graph and legend svg elements are rendered.'
     );
     assert.notOk(

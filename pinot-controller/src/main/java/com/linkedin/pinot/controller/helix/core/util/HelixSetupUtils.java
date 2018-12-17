@@ -61,10 +61,10 @@ public class HelixSetupUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixSetupUtils.class);
 
   public static synchronized HelixManager setup(String helixClusterName, String zkPath, String pinotControllerInstanceId,
-      boolean isUpdateStateModel) {
+      boolean isUpdateStateModel, boolean enableBatchMessageMode) {
 
     try {
-      createHelixClusterIfNeeded(helixClusterName, zkPath, isUpdateStateModel);
+      createHelixClusterIfNeeded(helixClusterName, zkPath, isUpdateStateModel, enableBatchMessageMode);
     } catch (final Exception e) {
       LOGGER.error("Caught exception", e);
       return null;
@@ -82,7 +82,8 @@ public class HelixSetupUtils {
     createHelixClusterIfNeeded(helixClusterName, zkPath);
   }
 
-  public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath, boolean isUpdateStateModel) {
+  public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath, boolean isUpdateStateModel,
+      boolean enableBatchMessageMode) {
     final HelixAdmin admin = new ZKHelixAdmin(zkPath);
     final String segmentStateModelName = PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL;
 
@@ -146,8 +147,8 @@ public class HelixSetupUtils {
     LOGGER.info("Adding empty ideal state for Broker!");
     HelixHelper.updateResourceConfigsFor(new HashMap<String, String>(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE,
         helixClusterName, admin);
-    IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyIdealStateForBrokerResource(admin, helixClusterName,
+        enableBatchMessageMode);
     admin.setResourceIdealState(helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
     initPropertyStorePath(helixClusterName, zkPath);
     LOGGER.info("New Cluster setup completed... ********************************************** ");

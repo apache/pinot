@@ -233,6 +233,9 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       case INVERTED_INDEX:
         buffer = columnIndexDirectory.getInvertedIndexBufferFor(column);
         break;
+      case BLOOM_FILTER:
+        buffer = columnIndexDirectory.getBloomFilterBufferFor(column);
+        break;
       default:
         throw new RuntimeException("Unknown index type: " + type.name());
     }
@@ -356,7 +359,7 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     }
 
     @Override
-    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, int sizeBytes)
+    public PinotDataBuffer newIndexFor(String columnName, ColumnIndexType indexType, long sizeBytes)
         throws IOException {
       return getNewIndexBuffer(new IndexKey(columnName, indexType), sizeBytes);
     }
@@ -407,12 +410,13 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       ColumnIndexType indexType = key.type;
       switch (indexType) {
         case DICTIONARY:
-          return columnIndexDirectory.newDictionaryBuffer(key.name, (int) sizeBytes);
-
+          return columnIndexDirectory.newDictionaryBuffer(key.name, sizeBytes);
         case FORWARD_INDEX:
-          return columnIndexDirectory.newForwardIndexBuffer(key.name, (int) sizeBytes);
+          return columnIndexDirectory.newForwardIndexBuffer(key.name, sizeBytes);
         case INVERTED_INDEX:
-          return columnIndexDirectory.newInvertedIndexBuffer(key.name, ((int) sizeBytes));
+          return columnIndexDirectory.newInvertedIndexBuffer(key.name, sizeBytes);
+        case BLOOM_FILTER:
+          return columnIndexDirectory.newBloomFilterBuffer(key.name, sizeBytes);
         default:
           throw new RuntimeException("Unknown index type: " + indexType.name() +
               " for directory: " + segmentDirectory);

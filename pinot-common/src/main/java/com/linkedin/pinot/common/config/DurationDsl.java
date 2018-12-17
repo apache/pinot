@@ -16,26 +16,39 @@
 package com.linkedin.pinot.common.config;
 
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * DSL for durations, which turns "5 days" into a duration.
  */
 public class DurationDsl implements SingleKeyDsl<Duration> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DurationDsl.class);
+
   @Override
   public Duration parse(String text) {
     if (text == null || text.isEmpty()) {
       return null;
     }
 
-    String[] parts = text.split(" ");
-    final String unit = parts[1].toUpperCase();
-    final String unitCount = parts[0];
-    return new Duration(TimeUnit.valueOf(unit), Integer.parseInt(unitCount));
+    try {
+      String[] parts = text.split(" ");
+      final String unit = parts[1].toUpperCase();
+      final String unitCount = parts[0];
+      return new Duration(TimeUnit.valueOf(unit), Integer.parseInt(unitCount));
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while parsing duration {}, discarding the invalid duration.", e, text);
+      return null;
+    }
   }
 
   @Override
   public String unparse(Duration value) {
-    return value.getUnitCount() + " " + value.getUnit();
+    if (value != null) {
+      return value.getUnitCount() + " " + value.getUnit();
+    } else {
+      return null;
+    }
   }
 }

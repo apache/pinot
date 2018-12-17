@@ -33,13 +33,9 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.testng.Assert;
-import org.testng.annotations.AfterSuite;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 public class SegmentStatusCheckerTest {
@@ -48,18 +44,6 @@ public class SegmentStatusCheckerTest {
   private MetricsRegistry metricsRegistry;
   private ControllerMetrics controllerMetrics;
   private ControllerConf config;
-
-  @BeforeSuite
-  public void setUp() throws Exception {
-  }
-
-  @AfterSuite
-  public void tearDown() {
-  }
-
-  @BeforeMethod
-  public void beforeMethod() {
-  }
 
   @Test
   public void offlineBasicTest() throws Exception {
@@ -91,7 +75,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -103,8 +86,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    Assert.assertEquals(segmentStatusChecker.getAmILeader(), false);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
@@ -115,7 +97,6 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.PERCENT_OF_REPLICAS), 33);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
-    Assert.assertEquals(segmentStatusChecker.getAmILeader(), true);
   }
 
   @Test
@@ -159,7 +140,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -171,8 +151,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    Assert.assertEquals(segmentStatusChecker.getAmILeader(), false);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
@@ -183,53 +162,6 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.PERCENT_OF_REPLICAS), 100);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
-    Assert.assertEquals(segmentStatusChecker.getAmILeader(), true);
-  }
-
-  @Test
-  public void nonLeaderTest() throws Exception {
-    final String tableName = "myTable_REALTIME";
-    List<String> allTableNames = new ArrayList<String>();
-    allTableNames.add(tableName);
-
-    HelixAdmin helixAdmin;
-    {
-      helixAdmin = mock(HelixAdmin.class);
-    }
-    {
-      helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(false);
-      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
-      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
-      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
-    }
-    {
-      config = mock(ControllerConf.class);
-      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
-      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
-    }
-    metricsRegistry = new MetricsRegistry();
-    controllerMetrics = new ControllerMetrics(metricsRegistry);
-
-    // From non-leader to non-leader.
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
-    segmentStatusChecker.init();
-    segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE),
-        Long.MIN_VALUE);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS),
-        Long.MIN_VALUE);
-    Assert.assertEquals(segmentStatusChecker.getAmILeader(), false);
-
-    // Leadership transition from leader to non-leader.
-    controllerMetrics.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0L);
-    segmentStatusChecker.setAmILeader(true);
-    segmentStatusChecker.run();
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE),
-        Long.MIN_VALUE);
-    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS),
-        Long.MIN_VALUE);
-    Assert.assertEquals(segmentStatusChecker.getAmILeader(), false);
   }
 
   @Test
@@ -284,7 +216,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -297,7 +228,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
@@ -332,7 +263,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -344,7 +274,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -367,7 +297,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -379,7 +308,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -435,7 +364,6 @@ public class SegmentStatusCheckerTest {
 
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -448,7 +376,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
@@ -481,7 +409,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -493,7 +420,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -520,7 +447,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -532,7 +458,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -567,7 +493,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -579,7 +504,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     // verify state before test
     Assert.assertEquals(controllerMetrics.getValueOfGlobalGauge(
         ControllerGauge.DISABLED_TABLE_COUNT), 0);
@@ -619,7 +544,6 @@ public class SegmentStatusCheckerTest {
     }
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
-      when(helixResourceManager.isLeader()).thenReturn(true);
       when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
@@ -631,7 +555,7 @@ public class SegmentStatusCheckerTest {
     }
     metricsRegistry = new MetricsRegistry();
     controllerMetrics = new ControllerMetrics(metricsRegistry);
-    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config, controllerMetrics);
+    segmentStatusChecker = new MockSegmentStatusChecker(helixResourceManager, config, controllerMetrics);
     segmentStatusChecker.init();
     segmentStatusChecker.run();
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
@@ -642,5 +566,18 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.PERCENT_OF_REPLICAS), 100);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.PERCENT_SEGMENTS_AVAILABLE), 100);
+  }
+
+  private class MockSegmentStatusChecker extends SegmentStatusChecker {
+
+    public MockSegmentStatusChecker(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config,
+        ControllerMetrics metricsRegistry) {
+      super(pinotHelixResourceManager, config, metricsRegistry);
+    }
+
+    @Override
+    protected boolean isLeader() {
+      return true;
+    }
   }
 }

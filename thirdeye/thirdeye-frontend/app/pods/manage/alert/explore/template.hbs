@@ -252,12 +252,13 @@
                   </ul>
                  </td>
                  <td class="te-anomaly-table__cell">
-                    {{#if anomaly.showResponseSaved}}
-                      <i class="te-anomaly-table__icon--status glyphicon glyphicon-ok-circle"></i>
-                    {{/if}}
-
-                    {{#if anomaly.showResponseFailed}}
-                      <i class="te-anomaly-table__icon--status glyphicon glyphicon-remove-circle"></i>
+                    {{#if renderStatusIcon}}
+                      {{#if anomaly.showResponseSaved}}
+                        <i class="te-anomaly-table__icon--status glyphicon glyphicon-ok-circle"></i>
+                      {{/if}}
+                      {{#if anomaly.showResponseFailed}}
+                        <i class="te-anomaly-table__icon--status te-anomaly-table__icon--error glyphicon glyphicon-remove-circle"></i>
+                      {{/if}}
                     {{/if}}
 
                     {{#if anomaly.isUserReported}}

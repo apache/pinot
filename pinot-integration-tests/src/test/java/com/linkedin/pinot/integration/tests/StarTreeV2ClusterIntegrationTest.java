@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -37,7 +38,7 @@ import org.testng.annotations.Test;
 /**
  * Extends the integration test for star-tree V1 with the following changes:
  * <ul>
- *   <li>Only pick a subset of dimensions and metrics to generate star-tree</li>
+ *   <li>Only pick a subset of dimensions and metrics, and generate 2 different star-trees</li>
  *   <li>Test against more aggregation function types (COUNT, MIN, MAX, SUM, AVG, MIN_MAX_RANGE)</li>
  *   <li>
  *     DISTINCT_COUNT_HLL, PERCENTILE_EST, PERCENTILE_TDIGEST are not included because the results are estimated values
@@ -45,29 +46,35 @@ import org.testng.annotations.Test;
  * </ul>
  */
 public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegrationTest {
-  private static final int NUM_STAR_TREE_DIMENSIONS = 10;
+  private static final Random RANDOM = new Random();
+
+  private static final int NUM_STAR_TREE_DIMENSIONS = 5;
   private static final int NUM_STAR_TREE_METRICS = 5;
   private static final List<AggregationFunctionType> AGGREGATION_FUNCTION_TYPES =
       Arrays.asList(AggregationFunctionType.COUNT, AggregationFunctionType.MIN, AggregationFunctionType.MAX,
           AggregationFunctionType.SUM, AggregationFunctionType.AVG, AggregationFunctionType.MINMAXRANGE);
 
-  private List<String> _starTreeDimensions;
-  private List<String> _starTreeMetrics;
+  private List<String> _starTree1Dimensions = new ArrayList<>(NUM_STAR_TREE_DIMENSIONS);
+  private List<String> _starTree2Dimensions = new ArrayList<>(NUM_STAR_TREE_DIMENSIONS);
+  private List<String> _starTree1Metrics = new ArrayList<>(NUM_STAR_TREE_METRICS);
+  private List<String> _starTree2Metrics = new ArrayList<>(NUM_STAR_TREE_METRICS);
+  private StarTreeQueryGenerator _starTree1QueryGenerator;
+  private StarTreeQueryGenerator _starTree2QueryGenerator;
 
   @Override
   protected void setUpSegmentsAndQueryGenerator() throws Exception {
     // Randomly pick some dimensions and metrics for star-tree V2
     List<String> allDimensions = new ArrayList<>(_schema.getDimensionNames());
     Collections.shuffle(allDimensions);
-    _starTreeDimensions = new ArrayList<>(NUM_STAR_TREE_DIMENSIONS);
     for (int i = 0; i < NUM_STAR_TREE_DIMENSIONS; i++) {
-      _starTreeDimensions.add(allDimensions.get(i));
+      _starTree1Dimensions.add(allDimensions.get(2 * i));
+      _starTree2Dimensions.add(allDimensions.get(2 * i + 1));
     }
     List<String> allMetrics = new ArrayList<>(_schema.getMetricNames());
     Collections.shuffle(allMetrics);
-    _starTreeMetrics = new ArrayList<>(NUM_STAR_TREE_METRICS);
     for (int i = 0; i < NUM_STAR_TREE_METRICS; i++) {
-      _starTreeMetrics.add(allMetrics.get(i));
+      _starTree1Metrics.add(allMetrics.get(2 * i));
+      _starTree2Metrics.add(allMetrics.get(2 * i + 1));
     }
 
     // Unpack the Avro files
@@ -82,7 +89,9 @@ public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegration
     for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
       aggregationFunctions.add(functionType.getName());
     }
-    _queryGenerator = new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, _starTreeDimensions, _starTreeMetrics,
+    _starTree1QueryGenerator = new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, _starTree1Dimensions, _starTree1Metrics,
+        segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions);
+    _starTree2QueryGenerator = new StarTreeQueryGenerator(STAR_TREE_TABLE_NAME, _starTree2Dimensions, _starTree2Metrics,
         segmentInfoProvider.getSingleValueDimensionValuesMap(), aggregationFunctions);
 
     // Create and upload segments with star tree indexes from Avro data
@@ -95,17 +104,8 @@ public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegration
 
     List<StarTreeV2BuilderConfig> starTreeV2BuilderConfigs = null;
     if (createStarTreeIndex) {
-      Set<AggregationFunctionColumnPair> functionColumnPairs = new HashSet<>();
-      for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
-        for (String metric : _starTreeMetrics) {
-          functionColumnPairs.add(new AggregationFunctionColumnPair(functionType, metric));
-        }
-      }
-      StarTreeV2BuilderConfig starTreeV2BuilderConfig =
-          new StarTreeV2BuilderConfig.Builder().setDimensionsSplitOrder(_starTreeDimensions)
-              .setFunctionColumnPairs(functionColumnPairs)
-              .build();
-      starTreeV2BuilderConfigs = Collections.singletonList(starTreeV2BuilderConfig);
+      starTreeV2BuilderConfigs = Arrays.asList(getBuilderConfig(_starTree1Dimensions, _starTree1Metrics),
+          getBuilderConfig(_starTree2Dimensions, _starTree2Metrics));
     }
 
     ExecutorService executor = Executors.newCachedThreadPool();
@@ -115,6 +115,28 @@ public class StarTreeV2ClusterIntegrationTest extends StarTreeClusterIntegration
     executor.awaitTermination(10, TimeUnit.MINUTES);
 
     uploadSegments(_tarDir);
+  }
+
+  private static StarTreeV2BuilderConfig getBuilderConfig(List<String> dimensions, List<String> metrics) {
+    Set<AggregationFunctionColumnPair> functionColumnPairs = new HashSet<>();
+    for (AggregationFunctionType functionType : AGGREGATION_FUNCTION_TYPES) {
+      for (String metric : metrics) {
+        functionColumnPairs.add(new AggregationFunctionColumnPair(functionType, metric));
+      }
+    }
+    return new StarTreeV2BuilderConfig.Builder().setDimensionsSplitOrder(dimensions)
+        .setFunctionColumnPairs(functionColumnPairs)
+        .setMaxLeafRecords(10)
+        .build();
+  }
+
+  @Override
+  protected String generateQuery() {
+    if (RANDOM.nextBoolean()) {
+      return _starTree1QueryGenerator.nextQuery();
+    } else {
+      return _starTree2QueryGenerator.nextQuery();
+    }
   }
 
   @Test(enabled = false)

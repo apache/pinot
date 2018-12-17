@@ -74,16 +74,13 @@ public class StarTreeIndexCombiner implements Closeable {
     try (FileChannel src = new RandomAccessFile(srcFile, "r").getChannel()) {
       long offset = _fileChannel.position();
       long size = src.size();
-      long numBytesTransferred = src.transferTo(0, size, _fileChannel);
-      Preconditions.checkState(numBytesTransferred == size,
-          "Error writing file: " + srcFile + ", transfer size mis-match");
+      com.linkedin.pinot.common.utils.FileUtils.transferBytes(src, 0, size, _fileChannel);
       return new IndexValue(offset, size);
     }
   }
 
   @Override
   public void close() throws IOException {
-    _fileChannel.force(false);
     _fileChannel.close();
   }
 }

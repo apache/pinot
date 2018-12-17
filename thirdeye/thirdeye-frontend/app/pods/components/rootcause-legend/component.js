@@ -3,13 +3,13 @@ import Component from '@ember/component';
 import {
   toCurrentUrn,
   toBaselineUrn,
+  toMetricUrn,
   filterPrefix,
   hasPrefix,
   toMetricLabel,
   toEventLabel,
   isExclusionWarning
 } from 'thirdeye-frontend/utils/rca-utils';
-import _ from 'lodash';
 
 export default Component.extend({
   entities: null, // {}
@@ -18,9 +18,11 @@ export default Component.extend({
 
   invisibleUrns: null, // Set
 
-  onVisibility: null, // function (Set, bool)
+  onVisibility: null, // function (updates)
 
-  onSelection: null, // function (Set, bool)
+  onSelection: null, // function (updates)
+
+  onPrimaryChange: null, // function (updates)
 
   classNames: ['rootcause-legend'],
 
@@ -154,35 +156,11 @@ export default Component.extend({
       }
     },
 
-    visibleMetrics() {
-      const { selectedUrns } = getProperties(this, 'selectedUrns');
-      const visible = new Set(filterPrefix(selectedUrns, ['thirdeye:metric:', 'frontend:metric:', 'frontend:anomalyfunction:']));
-      const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
-      this._bulkVisibility(visible, other);
-    },
-
-    visibleEvents() {
-      const { selectedUrns } = getProperties(this, 'selectedUrns');
-      const visible = new Set(filterPrefix(selectedUrns, 'thirdeye:event:'));
-      const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
-      this._bulkVisibility(visible, other);
-    },
-
-    visibleAll() {
-      const { selectedUrns } = getProperties(this, 'selectedUrns');
-      this._bulkVisibility(selectedUrns, new Set());
-    },
-
-    visibleNone() {
-      const { selectedUrns } = getProperties(this, 'selectedUrns');
-      this._bulkVisibility(new Set(), selectedUrns);
-    },
-
-    visibleInvert() {
-      const { selectedUrns, invisibleUrns } = getProperties(this, 'selectedUrns', 'invisibleUrns');
-      const visible = new Set(invisibleUrns);
-      const other = new Set([...selectedUrns].filter(urn => !visible.has(urn)));
-      this._bulkVisibility(visible, other);
+    onSelect(urn) {
+      const { onPrimaryChange } = getProperties(this, 'onPrimaryChange');
+      if (onPrimaryChange) {
+        onPrimaryChange({ [toMetricUrn(urn)]: true, [toBaselineUrn(urn)]: true, [toCurrentUrn(urn)]: true });
+      }
     }
   }
 });

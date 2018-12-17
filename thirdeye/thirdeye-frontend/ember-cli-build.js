@@ -36,6 +36,13 @@ module.exports = function(defaults) {
       'bootstrapVersion': 3,
       'importBootstrapFont': true,
       'importBootstrapCSS': false
+    },
+
+    //for ember EDITOR
+    ace: {
+      themes: ['ambiance', 'chaos'],
+      modes: ['yaml'],
+      exts: ['language_tools']
     }
   });
 

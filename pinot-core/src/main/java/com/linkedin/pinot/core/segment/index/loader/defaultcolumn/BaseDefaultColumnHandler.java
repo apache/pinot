@@ -150,7 +150,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     Map<String, DefaultColumnAction> defaultColumnActionMap = new HashMap<>();
 
     // Compute ADD and UPDATE actions.
-    Collection<String> columnsInSchema = _schema.getColumnNames();
+    Collection<String> columnsInSchema = _schema.getPhysicalColumnNames();
     for (String column : columnsInSchema) {
       FieldSpec fieldSpecInSchema = _schema.getFieldSpecFor(column);
       Preconditions.checkNotNull(fieldSpecInSchema);

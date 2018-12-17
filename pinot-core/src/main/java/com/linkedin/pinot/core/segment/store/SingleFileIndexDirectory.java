@@ -105,27 +105,39 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @Override
+  public PinotDataBuffer getBloomFilterBufferFor(String column)
+      throws IOException {
+    return checkAndGetIndexBuffer(column, ColumnIndexType.BLOOM_FILTER);
+  }
+
+  @Override
   public boolean hasIndexFor(String column, ColumnIndexType type) {
     IndexKey key = new IndexKey(column, type);
     return columnEntries.containsKey(key);
   }
 
   @Override
-  public PinotDataBuffer newDictionaryBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newDictionaryBuffer(String column, long sizeBytes)
       throws IOException {
     return allocNewBufferInternal(column, ColumnIndexType.DICTIONARY, sizeBytes, "dictionary.create");
   }
 
   @Override
-  public PinotDataBuffer newForwardIndexBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newForwardIndexBuffer(String column, long sizeBytes)
       throws IOException {
     return allocNewBufferInternal(column, ColumnIndexType.FORWARD_INDEX, sizeBytes, "forward_index.create");
   }
 
   @Override
-  public PinotDataBuffer newInvertedIndexBuffer(String column, int sizeBytes)
+  public PinotDataBuffer newInvertedIndexBuffer(String column, long sizeBytes)
       throws IOException {
     return  allocNewBufferInternal(column, ColumnIndexType.INVERTED_INDEX, sizeBytes, "inverted_index.create");
+  }
+
+  @Override
+  public PinotDataBuffer newBloomFilterBuffer(String column, long sizeBytes)
+      throws IOException {
+    return  allocNewBufferInternal(column, ColumnIndexType.BLOOM_FILTER, sizeBytes, "bloom_filter.create");
   }
 
   private PinotDataBuffer checkAndGetIndexBuffer(String column, ColumnIndexType type) {
@@ -139,7 +151,7 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   // This is using extra resources right now which can be changed.
-  private PinotDataBuffer allocNewBufferInternal(String column, ColumnIndexType indexType, int size,
+  private PinotDataBuffer allocNewBufferInternal(String column, ColumnIndexType indexType, long size,
       String context)
       throws IOException {
 

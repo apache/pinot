@@ -52,7 +52,7 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     // Test query with filter.
     aggregationOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 15620L, 282430L,
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 15620L, 263414L,
         62480L, 100000L);
     QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 15620L, 17287754700747L,
         999943053, 1182655, 11017594448983L, 15620L);
@@ -73,7 +73,7 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     // Test query with filter.
     aggregationOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 15620L, 282430L,
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 15620L, 263414L,
         31240L, 100000L);
     QueriesTestUtils.testInnerSegmentAggregationResult(resultsBlock.getAggregationResult(), 15620L, 28567975886777L,
         2147483647, 203, 28663153397978L, 15620L);
@@ -95,7 +95,7 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = aggregationGroupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 15620L,
-        282430L, 78100L, 100000L);
+        263414L, 78100L, 100000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(), "203", 1L,
         185436225L, 987549258, 674022574, 674022574L, 1L);
   }
@@ -116,7 +116,7 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = aggregationGroupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 15620L,
-        282430L, 109340L, 100000L);
+        263414L, 109340L, 100000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "L\t306633\t2147483647", 1L, 131154783L, 952002176, 674022574, 674022574L, 1L);
   }
@@ -137,7 +137,7 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = aggregationGroupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 15620L,
-        282430L, 109340L, 100000L);
+        263414L, 109340L, 100000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "903461357\tL\t2147483647\t388", 2L, 1806922714L, 652024397, 674022574, 870535054L, 2L);
   }
@@ -159,7 +159,7 @@ public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValue
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = aggregationGroupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationGroupByOperator.getExecutionStatistics(), 15620L,
-        282430L, 109340L, 100000L);
+        263414L, 109340L, 100000L);
     QueriesTestUtils.testInnerSegmentAggregationGroupByResult(resultsBlock.getAggregationGroupByResult(),
         "949960647\t238753654\t2147483647\t2147483647\t674022574\t674022574\t674022574", 2L, 1899921294L, 238753654,
         674022574, 1348045148L, 2L);

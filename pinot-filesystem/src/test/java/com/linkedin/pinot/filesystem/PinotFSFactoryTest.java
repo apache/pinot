@@ -75,7 +75,7 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public boolean delete(URI segmentUri) throws IOException {
+    public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
       return true;
     }
 
@@ -100,7 +100,7 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public String[] listFiles(URI fileUri) throws IOException {
+    public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
       return null;
     }
 
@@ -113,8 +113,13 @@ public class PinotFSFactoryTest {
     }
 
     @Override
-    public boolean isDirectory(URI uri) throws IOException {
+    public boolean isDirectory(URI uri) {
       return false;
+    }
+
+    @Override
+    public long lastModified(URI uri) {
+      return 0L;
     }
   }
 }

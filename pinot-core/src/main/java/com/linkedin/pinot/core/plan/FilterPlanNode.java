@@ -22,12 +22,10 @@ import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.filter.AndFilterOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.EmptyFilterOperator;
 import com.linkedin.pinot.core.operator.filter.FilterOperatorUtils;
 import com.linkedin.pinot.core.operator.filter.MatchAllFilterOperator;
-import com.linkedin.pinot.core.operator.filter.OrFilterOperator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import java.util.ArrayList;
@@ -59,49 +57,50 @@ public class FilterPlanNode implements PlanNode {
    */
   private static BaseFilterOperator constructPhysicalOperator(FilterQueryTree filterQueryTree, IndexSegment segment,
       @Nullable Map<String, String> debugOptions) {
+    int numDocs = segment.getSegmentMetadata().getTotalRawDocs();
     if (filterQueryTree == null) {
-      return new MatchAllFilterOperator(segment.getSegmentMetadata().getTotalRawDocs());
+      return new MatchAllFilterOperator(numDocs);
     }
 
     // For non-leaf node, recursively create the child filter operators
     FilterOperator filterType = filterQueryTree.getOperator();
     if (filterType == FilterOperator.AND || filterType == FilterOperator.OR) {
+      // Non-leaf filter operator
       List<FilterQueryTree> childFilters = filterQueryTree.getChildren();
       List<BaseFilterOperator> childFilterOperators = new ArrayList<>(childFilters.size());
       if (filterType == FilterOperator.AND) {
+        // AND operator
         for (FilterQueryTree childFilter : childFilters) {
           BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment, debugOptions);
           if (childFilterOperator.isResultEmpty()) {
+            // Return empty filter operator if any of the child filter operator's result is empty
             return EmptyFilterOperator.getInstance();
-          }
-          childFilterOperators.add(childFilterOperator);
-        }
-        FilterOperatorUtils.reorderAndFilterChildOperators(childFilterOperators, debugOptions);
-        return new AndFilterOperator(childFilterOperators);
-      } else {
-        for (FilterQueryTree childFilter : childFilters) {
-          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment, debugOptions);
-          if (!childFilterOperator.isResultEmpty()) {
+          } else if (!childFilterOperator.isResultMatchingAll()) {
+            // Remove child filter operators that match all records
             childFilterOperators.add(childFilterOperator);
           }
         }
-        if (childFilterOperators.isEmpty()) {
-          return EmptyFilterOperator.getInstance();
-        } else if (childFilterOperators.size() == 1) {
-          return childFilterOperators.get(0);
-        } else {
-          return new OrFilterOperator(childFilterOperators);
+        return FilterOperatorUtils.getAndFilterOperator(childFilterOperators, numDocs, debugOptions);
+      } else {
+        // OR operator
+        for (FilterQueryTree childFilter : childFilters) {
+          BaseFilterOperator childFilterOperator = constructPhysicalOperator(childFilter, segment, debugOptions);
+          if (childFilterOperator.isResultMatchingAll()) {
+            // Return match all filter operator if any of the child filter operator matches all records
+            return new MatchAllFilterOperator(numDocs);
+          } else if (!childFilterOperator.isResultEmpty()) {
+            // Remove child filter operators whose result is empty
+            childFilterOperators.add(childFilterOperator);
+          }
         }
+        return FilterOperatorUtils.getOrFilterOperator(childFilterOperators, numDocs, debugOptions);
       }
     } else {
+      // Leaf filter operator
       Predicate predicate = Predicate.newPredicate(filterQueryTree);
       DataSource dataSource = segment.getDataSource(filterQueryTree.getColumn());
       PredicateEvaluator predicateEvaluator = PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource);
-      int startDocId = 0;
-      // TODO: make it exclusive
-      // NOTE: end is inclusive
-      int endDocId = segment.getSegmentMetadata().getTotalRawDocs() - 1;
-      return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, startDocId, endDocId);
+      return FilterOperatorUtils.getLeafFilterOperator(predicateEvaluator, dataSource, numDocs);
     }
   }
 

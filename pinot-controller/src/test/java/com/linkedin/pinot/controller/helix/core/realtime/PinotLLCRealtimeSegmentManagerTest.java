@@ -39,12 +39,13 @@ import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegme
 import com.linkedin.pinot.controller.util.SegmentCompletionUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaStreamConfigProperties;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.OffsetCriteria;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.filesystem.PinotFSFactory;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
 import java.io.IOException;
@@ -59,6 +60,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nonnull;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -855,7 +857,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     TableConfig tableConfig = makeTableConfig(rtTableName, 3, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     segmentManager.addTableToStore(rtTableName, tableConfig, 8);
-    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, 10);
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, 10, true);
     try {
       segmentManager.setupNewTable(tableConfig, idealState);
       Assert.fail("Did not get expected exception when setting up new table with existing segments in ");
@@ -882,7 +884,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager.addTableToStore(tableName, tableConfig, nPartitions);
 
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(tableName, nReplicas);
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(tableName, nReplicas, true);
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
     segmentManager.setupNewTable(tableConfig, idealState);
     // Now commit the first segment of partition 6.
@@ -1111,7 +1113,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     TableConfig tableConfig =
         makeTableConfig(rtTableName, nReplicas, DUMMY_HOST, DEFAULT_SERVER_TENANT);
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, nReplicas);
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(rtTableName, nReplicas, true);
 
     segmentManager.addTableToStore(rtTableName, tableConfig, nPartitions);
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
@@ -1120,6 +1122,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   @Test
   public void testCommitSegmentFile() throws Exception {
+    PinotFSFactory.init(new PropertiesConfiguration());
     PinotLLCRealtimeSegmentManager realtimeSegmentManager =
         new FakePinotLLCRealtimeSegmentManager(Collections.<String>emptyList());
     String tableName = "fakeTable_REALTIME";
@@ -1138,6 +1141,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
   @Test
   public void testSegmentAlreadyThereAndExtraneousFilesDeleted() throws Exception {
+    PinotFSFactory.init(new PropertiesConfiguration());
     PinotLLCRealtimeSegmentManager realtimeSegmentManager =
         new FakePinotLLCRealtimeSegmentManager(Collections.<String>emptyList());
     String tableName = "fakeTable_REALTIME";
@@ -1177,7 +1181,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String streamType = "kafka";
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
     String topic = "aTopic";
-    String consumerFactoryClass = SimpleConsumerFactory.class.getName();
+    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
     streamConfigMap.put(
         StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_TOPIC_NAME), topic);

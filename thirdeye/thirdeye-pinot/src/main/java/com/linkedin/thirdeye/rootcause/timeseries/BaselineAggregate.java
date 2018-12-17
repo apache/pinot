@@ -232,6 +232,27 @@ public class BaselineAggregate implements Baseline {
   }
 
   /**
+   * Returns an instance of BaselineAggregate for the specified type and {@code numMonths} offsets
+   * computed on a consecutive month-over-month basis starting with a lag of {@code offsetMonths}.
+   * <br/><b>NOTE:</b> this will apply DST correction
+   *
+   * @see BaselineAggregateType
+   *
+   * @param type aggregation type
+   * @param numMonths number of consecutive months
+   * @param offsetMonths lag for starting consecutive months
+   * @param timeZone time zone
+   * @return BaselineAggregate with given type and monthly offsets
+   */
+  public static BaselineAggregate fromMonthOverMonth(BaselineAggregateType type, int numMonths, int offsetMonths, DateTimeZone timeZone) {
+    List<Period> offsets = new ArrayList<>();
+    for (int i = 0; i < numMonths; i++) {
+      offsets.add(new Period(0, -1 * (i + offsetMonths), 0, 0, 0, 0, 0, 0, PeriodType.months()));
+    }
+    return new BaselineAggregate(type, offsets, timeZone, PeriodType.months());
+  }
+
+  /**
    * Returns an instance of BaselineAggregate for the specified type and {@code numWeeks} offsets
    * computed on a consecutive week-over-week basis starting with a lag of {@code offsetWeeks}.
    * <br/><b>NOTE:</b> this will apply DST correction (modeled as 7 days)
@@ -384,6 +405,25 @@ public class BaselineAggregate implements Baseline {
         }
       };
 
+    } else if (PeriodType.months().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          DateTime dateTime = new DateTime(values[0], BaselineAggregate.this.timeZone);
+          long months = new Period(origin, dateTime, BaselineAggregate.this.periodType).getMonths();
+          long days = dateTime.getDayOfMonth() - 1; // workaround for dayOfMonth > 0 constraint
+          if (days == dateTime.dayOfMonth().getMaximumValue() - 1) {
+            days = 99;
+          }
+
+          long hours = dateTime.getHourOfDay();
+          long minutes = dateTime.getMinuteOfHour();
+          long seconds = dateTime.getSecondOfMinute();
+          long millis = dateTime.getMillisOfSecond();
+          return months * 100000000000L + days * 1000000000L + hours * 10000000L + minutes * 100000L + seconds * 1000L + millis;
+        }
+      };
+
     } else {
       throw new IllegalArgumentException(String.format("Unsupported PeriodType '%s'", this.periodType));
     }
@@ -466,6 +506,40 @@ public class BaselineAggregate implements Baseline {
               .plusSeconds(seconds)
               .plusMillis(millis)
               .getMillis();
+        }
+      };
+
+    } else if (PeriodType.months().equals(this.periodType)) {
+      return new Series.LongFunction() {
+        @Override
+        public long apply(long... values) {
+          int months = (int) (values[0] / 100000000000L);
+          int days = (int) ((values[0] / 1000000000L) % 100L);
+          int hours = (int) ((values[0] / 10000000L) % 100L);
+          int minutes = (int) ((values[0] / 100000L) % 100L);
+          int seconds = (int) ((values[0] / 1000L) % 100L);
+          int millis = (int) (values[0] % 1000L);
+
+          DateTime originPlusMonth = origin.plusMonths(months);
+
+          // last day of source month
+          if (days >= 99) {
+            days = originPlusMonth.dayOfMonth().getMaximumValue() - 1;
+          }
+
+          // unsupported destination day (e.g. 31st of Feb)
+          if (originPlusMonth.dayOfMonth().getMaximumValue() < originPlusMonth.getDayOfMonth() + days) {
+            return LongSeries.NULL;
+          }
+
+          DateTime target = originPlusMonth
+              .plusDays(days)
+              .plusHours(hours)
+              .plusMinutes(minutes)
+              .plusSeconds(seconds)
+              .plusMillis(millis);
+
+          return target.getMillis();
         }
       };
 

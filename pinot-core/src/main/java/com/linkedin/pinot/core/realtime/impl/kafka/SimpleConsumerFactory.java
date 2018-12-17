@@ -15,66 +15,12 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.realtime.stream.PartitionLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamConsumerFactory;
-import com.linkedin.pinot.core.realtime.stream.StreamLevelConsumer;
-import com.linkedin.pinot.core.realtime.stream.StreamMetadataProvider;
-
-
 /**
- * A {@link StreamConsumerFactory} implementation for consuming a kafka stream using Kafka's Simple Consumer
+ * This class is deprecated, and is kept for backward compatibility. Use {@link KafkaConsumerFactory} instead
+ * Usages of com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory in the table configs,
+ * should be changed to com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory, as SimpleConsumerFactory will be deleted eventually
  */
-// TODO: this should ideally be called KafkaConsumerFactory. It is not a factory for simple consumer.
-// We cannot change this because open source usages of this factory will need to change the class name defined in their stream configs inside table configs
-public class SimpleConsumerFactory extends StreamConsumerFactory {
+@Deprecated
+public class SimpleConsumerFactory extends KafkaConsumerFactory {
 
-  /**
-   * Creates a partition level consumer for fetching from a partition of a kafka stream
-   * @param clientId
-   * @param partition
-   * @return
-   */
-  @Override
-  public PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition) {
-    return new KafkaPartitionLevelConsumer(clientId, _streamConfig, partition);
-  }
-
-  /**
-   * Creates a stream level consumer for a kafka stream
-   * @param clientId
-   * @param tableName
-   * @param schema
-   * @param instanceZKMetadata
-   * @param serverMetrics
-   * @return
-   */
-  @Override
-  public StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
-      InstanceZKMetadata instanceZKMetadata, ServerMetrics serverMetrics) {
-    return new KafkaStreamLevelConsumer(clientId, tableName, _streamConfig, schema, instanceZKMetadata, serverMetrics);
-  }
-
-  /**
-   * Creates a partition metadata provider for a kafka stream
-   * @param clientId
-   * @param partition
-   * @return
-   */
-  @Override
-  public StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition) {
-    return new KafkaStreamMetadataProvider(clientId, _streamConfig, partition);
-  }
-
-  /**
-   * Creates a stream metadata provider for a kafka stream
-   * @param clientId
-   * @return
-   */
-  @Override
-  public StreamMetadataProvider createStreamMetadataProvider(String clientId) {
-    return new KafkaStreamMetadataProvider(clientId, _streamConfig);
-  }
 }

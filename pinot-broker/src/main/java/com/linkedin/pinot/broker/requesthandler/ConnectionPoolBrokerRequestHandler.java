@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.requesthandler;
 
+import com.linkedin.pinot.broker.api.RequestStatistics;
 import com.linkedin.pinot.broker.broker.AccessControlFactory;
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
 import com.linkedin.pinot.broker.queryquota.TableQueryQuotaManager;
@@ -131,7 +132,7 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
   protected BrokerResponse processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
       @Nullable BrokerRequest offlineBrokerRequest, @Nullable Map<String, List<String>> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest, @Nullable Map<String, List<String>> realtimeRoutingTable,
-      long timeoutMs, ServerStats serverStats) throws Exception {
+      long timeoutMs, ServerStats serverStats, RequestStatistics requestStatistics) throws Exception {
     ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
     PhaseTimes phaseTimes = new PhaseTimes();
 
@@ -179,6 +180,7 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
     }
     long gatherEndTimeNs = System.nanoTime();
     phaseTimes.addToGatherTime(gatherEndTimeNs - gatherStartTimeNs);
+    // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(scatterGatherStats.toString());
 
     //Step 3: deserialize the server responses
@@ -204,7 +206,9 @@ public class ConnectionPoolBrokerRequestHandler extends BaseBrokerRequestHandler
     // Step 4: reduce (merge) the server responses and create a broker response to be returned
     BrokerResponse brokerResponse =
         _brokerReduceService.reduceOnDataTable(originalBrokerRequest, dataTableMap, _brokerMetrics);
-    phaseTimes.addToReduceTime(System.nanoTime() - deserializationEndTimeNs);
+    final long reduceTimeNanos = System.nanoTime() - deserializationEndTimeNs;
+    phaseTimes.addToReduceTime(reduceTimeNanos);
+    requestStatistics.setReduceTimeNanos(reduceTimeNanos);
 
     // Set processing exceptions and number of servers queried/responded
     brokerResponse.setExceptions(processingExceptions);

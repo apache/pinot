@@ -84,7 +84,13 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean delete(URI segmentUri) throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
+    // Returns false if directory we want to delete is not empty
+    if (isDirectory(segmentUri)
+        && listFiles(segmentUri, false).length > 0
+        && !forceDelete) {
+      return false;
+    }
     return _adlStoreClient.deleteRecursive(segmentUri.getPath());
   }
 
@@ -100,7 +106,7 @@ public class AzurePinotFS extends PinotFS {
   @Override
   public boolean copy(URI srcUri, URI dstUri) throws IOException {
     if (exists(dstUri)) {
-      delete(dstUri);
+      delete(dstUri, true);
     }
 
     _adlStoreClient.createEmptyFile(dstUri.getPath());
@@ -135,14 +141,23 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public String[] listFiles(URI fileUri) throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     DirectoryEntry rootDir = _adlStoreClient.getDirectoryEntry(fileUri.getPath());
     if (rootDir == null) {
       return EMPTY_ARR;
     }
-    List<DirectoryEntry> directoryEntries = listFiles(rootDir);
 
-    List<String> fullFilePaths = new ArrayList<>();
+    if (!recursive) {
+      List<DirectoryEntry> shallowDirectoryEntries = _adlStoreClient.enumerateDirectory(rootDir.fullName);
+      List<String> shallowDirPaths = new ArrayList<>(shallowDirectoryEntries.size());
+      for (DirectoryEntry directoryEntry : shallowDirectoryEntries) {
+        shallowDirPaths.add(directoryEntry.fullName);
+      }
+      return shallowDirPaths.toArray(new String[shallowDirPaths.size()]);
+    }
+
+    List<DirectoryEntry> directoryEntries = listFiles(rootDir);
+    List<String> fullFilePaths = new ArrayList<>(directoryEntries.size());
     for (DirectoryEntry directoryEntry : directoryEntries) {
       fullFilePaths.add(directoryEntry.fullName);
     }
@@ -152,7 +167,6 @@ public class AzurePinotFS extends PinotFS {
   private List<DirectoryEntry> listFiles(DirectoryEntry origDirEntry) throws IOException {
     List<DirectoryEntry> fileList = new ArrayList<>();
     if (origDirEntry.type.equals(DirectoryEntryType.DIRECTORY)) {
-      fileList.add(origDirEntry);
       for (DirectoryEntry directoryEntry : _adlStoreClient.enumerateDirectory(origDirEntry.fullName)) {
         fileList.add(directoryEntry);
         fileList.addAll(listFiles(directoryEntry));
@@ -196,9 +210,25 @@ public class AzurePinotFS extends PinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri) throws IOException {
-    DirectoryEntry dirEntry = _adlStoreClient.getDirectoryEntry(uri.getPath());
+  public boolean isDirectory(URI uri) {
+    DirectoryEntry dirEntry;
+    try {
+      dirEntry = _adlStoreClient.getDirectoryEntry(uri.getPath());
+    } catch (IOException e) {
+      LOGGER.error("Could not get directory entry for {}", uri);
+      throw new RuntimeException(e);
+    }
 
     return dirEntry.type.equals(DirectoryEntryType.DIRECTORY);
+  }
+
+  @Override
+  public long lastModified(URI uri) {
+    try {
+      return _adlStoreClient.getDirectoryEntry(uri.getPath()).lastModifiedTime.getTime();
+    } catch (IOException e) {
+      LOGGER.error("Could not get directory entry for {}", uri);
+      throw new RuntimeException(e);
+    }
   }
 }

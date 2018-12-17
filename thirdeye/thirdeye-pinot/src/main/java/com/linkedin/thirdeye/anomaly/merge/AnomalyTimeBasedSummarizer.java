@@ -86,6 +86,7 @@ public abstract class AnomalyTimeBasedSummarizer {
 
     for (int i = 0; i < anomalies.size(); i++) {
       AnomalyResult currentResult = anomalies.get(i);
+      LOG.info("Current anomaly start =[{}], end = [{}].", currentResult.getStartTime(), currentResult.getEndTime());
       if (mergedAnomaly == null || currentResult.getEndTime() < mergedAnomaly.getStartTime()) {
         mergedAnomaly = new MergedAnomalyResultDTO(currentResult);
       } else {
@@ -122,7 +123,14 @@ public abstract class AnomalyTimeBasedSummarizer {
         mergedAnomalies.add(mergedAnomaly);
       }
     }
-    LOG.info("merging [{}] raw anomalies", anomalies.size());
+
+    if (mergedAnomaly != null) {
+      LOG.info("merging [{}] raw anomalies, latest merged anomaly start =[{}], end = [{}], merged anomalies size [{}]",
+          anomalies.size(), mergedAnomaly.getStartTime(), mergedAnomaly.getEndTime(), mergedAnomalies.size());
+    } else {
+      LOG.info("merging [{}] raw anomalies", anomalies.size());
+    }
+
     return mergedAnomalies;
   }
 

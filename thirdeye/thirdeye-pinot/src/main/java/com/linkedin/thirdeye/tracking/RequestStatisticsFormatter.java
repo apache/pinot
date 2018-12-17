@@ -26,7 +26,7 @@ import java.util.Objects;
 
 
 public class RequestStatisticsFormatter {
-  private static final int TOP_K = 10;
+  private static final int TOP_K = 20;
 
   private static final Comparator<Map.Entry<String, Long>> COMP_LONG = new Comparator<Map.Entry<String, Long>>() {
     @Override
@@ -42,10 +42,10 @@ public class RequestStatisticsFormatter {
     }
   };
 
-  private static final int MAX_KEY_LEN = 50;
-  private static final String FORMAT_LONG = "  %-50s %10d\n";
-  private static final String FORMAT_DURATION = "  %-50s %10.0f\n";
-  private static final String FORMAT_RATE = "  %-50s %10.3f\n";
+  private static final int MAX_KEY_LEN = 80;
+  private static final String FORMAT_LONG = "  %-80s %10d\n";
+  private static final String FORMAT_DURATION = "  %-80s %10.0f\n";
+  private static final String FORMAT_RATE = "  %-80s %10.3f\n";
 
   public String format(RequestStatistics stats) {
     StringBuilder builder = new StringBuilder();

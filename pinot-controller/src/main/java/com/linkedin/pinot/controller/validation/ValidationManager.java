@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.validation;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -35,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.joda.time.Duration;
@@ -50,15 +52,17 @@ import org.slf4j.LoggerFactory;
 public class ValidationManager extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(ValidationManager.class);
 
-  private final boolean _enableSegmentLevelValidation;
+  private final int _segmentLevelValidationIntervalInSeconds;
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
 
+  private long _lastSegmentLevelValidationTimeMs = 0L;
+
   public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
-    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(),
-        config.getValidationControllerFrequencyInSeconds() / 2, pinotHelixResourceManager);
-    _enableSegmentLevelValidation = config.getEnableSegmentLevelValidation();
+    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(), pinotHelixResourceManager);
+    _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
+    Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
   }
@@ -70,19 +74,30 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> allTableNames) {
-    runValidation(allTableNames);
+  public void process(List<String> tables) {
+    runValidation(tables);
   }
 
   /**
-   * Runs a validation pass over the currently loaded tables.
-   * @param allTableNames List of all the table names
+   * Runs a validation pass over the given tables.
+   *
+   * @param tables List of table names
    */
-  private void runValidation(List<String> allTableNames) {
+  private void runValidation(List<String> tables) {
+    // Run segment level validation using a separate interval
+    boolean runSegmentLevelValidation = false;
+    long currentTimeMs = System.currentTimeMillis();
+    if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationTimeMs)
+        >= _segmentLevelValidationIntervalInSeconds) {
+      LOGGER.info("Run segment-level validation");
+      runSegmentLevelValidation = true;
+      _lastSegmentLevelValidationTimeMs = currentTimeMs;
+    }
+
     // Cache instance configs to reduce ZK access
     List<InstanceConfig> instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
 
-    for (String tableNameWithType : allTableNames) {
+    for (String tableNameWithType : tables) {
       try {
         TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
         if (tableConfig == null) {
@@ -98,14 +113,14 @@ public class ValidationManager extends ControllerPeriodicTask {
         // Perform validation based on the table type
         TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
         if (tableType == TableType.OFFLINE) {
-          if (_enableSegmentLevelValidation) {
+          if (runSegmentLevelValidation) {
             validateOfflineSegmentPush(tableConfig);
           }
         } else {
-          if (_enableSegmentLevelValidation) {
+          if (runSegmentLevelValidation) {
             updateRealtimeDocumentCount(tableConfig);
           }
-          Map<String, String> streamConfigMap =  tableConfig.getIndexingConfig().getStreamConfigs();
+          Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
           StreamConfig streamConfig = new StreamConfig(streamConfigMap);
           if (streamConfig.hasLowLevelConsumerType()) {
             _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);

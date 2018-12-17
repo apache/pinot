@@ -27,8 +27,8 @@ import javax.annotation.Nonnull;
  * OffHeap mutable dictionary for Bytes data type.
  */
 public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary {
-
   private final MutableOffHeapByteArrayStore _byteStore;
+
   private ByteArray _min = null;
   private ByteArray _max = null;
 
@@ -48,8 +48,24 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
-  public void doClose()
-      throws IOException {
+  public int indexOf(Object rawValue) {
+    assert rawValue instanceof byte[];
+    byte[] bytes = (byte[]) rawValue;
+    return getDictId(new ByteArray(bytes), bytes);
+  }
+
+  @Override
+  public byte[] get(int dictId) {
+    return _byteStore.get(dictId);
+  }
+
+  @Override
+  public byte[] getBytesValue(int dictId) {
+    return get(dictId);
+  }
+
+  @Override
+  public void doClose() throws IOException {
     _byteStore.close();
   }
 
@@ -59,49 +75,18 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
   }
 
   @Override
-  public Object get(int dictionaryId) {
-    return _byteStore.get(dictionaryId);
-  }
-
-  @Override
   public void index(@Nonnull Object rawValue) {
-    if (rawValue instanceof ByteArray) {
-      // Single value
-      ByteArray bytes = (ByteArray) rawValue;
-      indexValue(rawValue, bytes.getBytes());
-      updateMinMax(bytes);
-    } else if (rawValue instanceof Object[]) {
-      // Multi value
-      Object[] values = (Object[]) rawValue;
-      for (Object value : values) {
-        ByteArray bytesValue = ((ByteArray) value);
-        indexValue(value, bytesValue.getBytes());
-        updateMinMax(bytesValue);
-      }
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal argument type for BytesOffHeapMutableDictionary: " + rawValue.getClass().getName());
-    }
+    assert rawValue instanceof byte[];
+    byte[] bytes = (byte[]) rawValue;
+    ByteArray byteArray = new ByteArray(bytes);
+    indexValue(byteArray, bytes);
+    updateMinMax(byteArray);
   }
 
   @Override
   public boolean inRange(@Nonnull String lower, @Nonnull String upper, int dictIdToCompare, boolean includeLower,
       boolean includeUpper) {
     throw new UnsupportedOperationException("In-range not supported for Bytes data type.");
-  }
-
-  @Override
-  public int indexOf(Object rawValue) {
-    byte[] value;
-    if (rawValue instanceof ByteArray) {
-      value = ((ByteArray) rawValue).getBytes();
-    } else if (rawValue instanceof byte[]) {
-      value = (byte[]) rawValue;
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal data type for BytesOffHeapMutableDictionary: " + rawValue.getClass().getSimpleName());
-    }
-    return getDictId(rawValue, value);
   }
 
   @Nonnull
@@ -145,8 +130,7 @@ public class BytesOffHeapMutableDictionary extends BaseOffHeapMutableDictionary 
     } else {
       if (value.compareTo(_min) < 0) {
         _min = value;
-      }
-      if (value.compareTo(_max) > 0) {
+      } else if (value.compareTo(_max) > 0) {
         _max = value;
       }
     }

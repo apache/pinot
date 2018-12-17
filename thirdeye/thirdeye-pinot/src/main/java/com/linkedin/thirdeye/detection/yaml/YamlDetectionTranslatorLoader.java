@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.detection.yaml;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
+import com.linkedin.thirdeye.detection.DataProvider;
+import com.linkedin.thirdeye.detection.annotation.registry.DetectionRegistry;
+import java.lang.reflect.Constructor;
 import java.util.Map;
 
 /**
@@ -9,15 +11,13 @@ import java.util.Map;
  */
 public class YamlDetectionTranslatorLoader {
   private static final String PROP_PIPELINE_TYPE= "pipelineType";
+  private static DetectionRegistry DETECTION_REGISTRY = DetectionRegistry.getInstance();
 
-  private static final Map<String, String> PIPELINE_TYPE_REGISTRY = ImmutableMap.<String, String>builder()
-      .put("COMPOSITE", CompositePipelineConfigTranslator.class.getName())
-      .build();
-
-  public YamlDetectionConfigTranslator from(Map<String, Object> yamlConfig) throws Exception {
-    Preconditions.checkArgument(yamlConfig.containsKey(PROP_PIPELINE_TYPE), "pipeline type not found, abort.");
-    String className = this.PIPELINE_TYPE_REGISTRY.get(yamlConfig.get(PROP_PIPELINE_TYPE).toString().toUpperCase());
-    return (YamlDetectionConfigTranslator) Class.forName(className).newInstance();
+  public YamlDetectionConfigTranslator from(Map<String, Object> yamlConfig, DataProvider provider) throws Exception {
+    Preconditions.checkArgument(yamlConfig.containsKey(PROP_PIPELINE_TYPE), "Pipeline type is missing.");
+    String className = DETECTION_REGISTRY.lookupYamlConverter(yamlConfig.get(PROP_PIPELINE_TYPE).toString().toUpperCase());
+    Constructor<?> constructor = Class.forName(className).getConstructor(Map.class, DataProvider.class);
+    return (YamlDetectionConfigTranslator) constructor.newInstance(yamlConfig, provider);
   }
 
 }

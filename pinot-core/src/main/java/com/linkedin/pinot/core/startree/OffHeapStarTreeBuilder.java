@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -603,10 +602,7 @@ public class OffHeapStarTreeBuilder implements StarTreeBuilder {
       File tempFile = new File(_tempDir, startDocId + "_" + endDocId + ".unique.tmp");
       try (FileChannel src = new RandomAccessFile(_dataFile, "r").getChannel();
           FileChannel dest = new RandomAccessFile(tempFile, "rw").getChannel()) {
-        long numBytesTransferred = src.transferTo(startDocId * _docSizeLong, tempBufferSize, dest);
-        Preconditions.checkState(numBytesTransferred == tempBufferSize,
-            "Error transferring data from data file to temp file, transfer size mis-match");
-        dest.force(false);
+        com.linkedin.pinot.common.utils.FileUtils.transferBytes(src, startDocId * _docSizeLong, tempBufferSize, dest);
       }
       tempBuffer = PinotDataBuffer.mapFile(tempFile, false, 0, tempBufferSize, PinotDataBuffer.NATIVE_ORDER,
           "OffHeapStarTreeBuilder#getUniqueCombinations: temp buffer");

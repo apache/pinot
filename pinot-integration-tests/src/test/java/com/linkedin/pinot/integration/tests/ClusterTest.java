@@ -18,6 +18,7 @@ package com.linkedin.pinot.integration.tests;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TableTaskConfig;
@@ -279,15 +280,15 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void addOfflineTable(String tableName, SegmentVersion segmentVersion) throws Exception {
-    addOfflineTable(tableName, null, null, null, null, null, segmentVersion, null, null);
+    addOfflineTable(tableName, null, null, null, null, null, segmentVersion, null, null, null);
   }
 
   protected void addOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      TableTaskConfig taskConfig) throws Exception {
+      List<String> bloomFilterColumns, TableTaskConfig taskConfig) throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, taskConfig);
+            invertedIndexColumns, bloomFilterColumns, taskConfig);
 
     if (!isUsingNewConfigFormat()) {
       sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
@@ -298,10 +299,10 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void updateOfflineTable(String tableName, String timeColumnName, String timeType, String brokerTenant,
       String serverTenant, String loadMode, SegmentVersion segmentVersion, List<String> invertedIndexColumns,
-      TableTaskConfig taskConfig) throws Exception {
+      List<String> bloomFilterColumns, TableTaskConfig taskConfig) throws Exception {
     TableConfig tableConfig =
         getOfflineTableConfig(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, segmentVersion,
-            invertedIndexColumns, taskConfig);
+            invertedIndexColumns, bloomFilterColumns, taskConfig);
 
     if (!isUsingNewConfigFormat()) {
       sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tableName), tableConfig.toJSONConfigString());
@@ -312,7 +313,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   private static TableConfig getOfflineTableConfig(String tableName, String timeColumnName, String timeType,
       String brokerTenant, String serverTenant, String loadMode, SegmentVersion segmentVersion,
-      List<String> invertedIndexColumns, TableTaskConfig taskConfig) throws Exception {
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, TableTaskConfig taskConfig) throws Exception {
     return new TableConfig.Builder(Helix.TableType.OFFLINE).setTableName(tableName)
         .setTimeColumnName(timeColumnName)
         .setTimeType(timeType)
@@ -322,6 +323,7 @@ public abstract class ClusterTest extends ControllerTest {
         .setLoadMode(loadMode)
         .setSegmentVersion(segmentVersion.toString())
         .setInvertedIndexColumns(invertedIndexColumns)
+        .setBloomFilterColumns(bloomFilterColumns)
         .setTaskConfig(taskConfig)
         .build();
   }
@@ -374,8 +376,8 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addRealtimeTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
       String kafkaTopic, int realtimeSegmentFlushRows, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig,
-      String streamConsumerFactoryName) throws Exception {
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
+      TableTaskConfig taskConfig, String streamConsumerFactoryName) throws Exception {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
@@ -417,16 +419,27 @@ public abstract class ClusterTest extends ControllerTest {
         .setLoadMode(loadMode)
         .setSortedColumn(sortedColumn)
         .setInvertedIndexColumns(invertedIndexColumns)
+        .setBloomFilterColumns(bloomFilterColumns)
         .setNoDictionaryColumns(noDictionaryColumns)
         .setStreamConfigs(streamConfigs)
         .setTaskConfig(taskConfig)
         .build();
 
+    // save the realtime table config
+    _realtimeTableConfig = tableConfig;
+
     if (!isUsingNewConfigFormat()) {
       sendPostRequest(_controllerRequestURLBuilder.forTableCreate(), tableConfig.toJSONConfigString());
-    } else {
-      _realtimeTableConfig = tableConfig;
     }
+  }
+
+  protected void updateRealtimeTableConfig(String tablename, List<String> invertedIndexCols, List<String> bloomFilterCols) throws Exception {
+
+    IndexingConfig config  = _realtimeTableConfig.getIndexingConfig();
+    config.setInvertedIndexColumns(invertedIndexCols);
+    config.setBloomFilterColumns(bloomFilterCols);
+
+    sendPutRequest(_controllerRequestURLBuilder.forUpdateTableConfig(tablename), _realtimeTableConfig.toJSONConfigString());
   }
 
   protected void dropRealtimeTable(String tableName) throws Exception {
@@ -437,13 +450,13 @@ public abstract class ClusterTest extends ControllerTest {
   protected void addHybridTable(String tableName, boolean useLlc, String kafkaBrokerList, String kafkaZkUrl,
       String kafkaTopic, int realtimeSegmentFlushSize, File avroFile, String timeColumnName, String timeType,
       String schemaName, String brokerTenant, String serverTenant, String loadMode, String sortedColumn,
-      List<String> invertedIndexColumns, List<String> noDictionaryColumns, TableTaskConfig taskConfig,
-      String streamConsumerFactoryName) throws Exception {
+      List<String> invertedIndexColumns, List<String> bloomFilterColumns, List<String> noDictionaryColumns,
+      TableTaskConfig taskConfig, String streamConsumerFactoryName) throws Exception {
     addOfflineTable(tableName, timeColumnName, timeType, brokerTenant, serverTenant, loadMode, SegmentVersion.v1,
-        invertedIndexColumns, taskConfig);
+        invertedIndexColumns, bloomFilterColumns, taskConfig);
     addRealtimeTable(tableName, useLlc, kafkaBrokerList, kafkaZkUrl, kafkaTopic, realtimeSegmentFlushSize, avroFile,
         timeColumnName, timeType, schemaName, brokerTenant, serverTenant, loadMode, sortedColumn, invertedIndexColumns,
-        noDictionaryColumns, taskConfig, streamConsumerFactoryName);
+        bloomFilterColumns, noDictionaryColumns, taskConfig, streamConsumerFactoryName);
   }
 
   protected void createBrokerTenant(String tenantName, int brokerCount) throws Exception {

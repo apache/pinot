@@ -103,6 +103,7 @@ public class MovingWindowAlgorithmTest {
 
     this.config = new DetectionConfigDTO();
     this.config.setProperties(properties);
+    this.config.setId(-1L);
 
     this.anomalies = new ArrayList<>();
 
@@ -390,7 +391,7 @@ public class MovingWindowAlgorithmTest {
   //
 
   private static MergedAnomalyResultDTO makeAnomaly(long start, long end) {
-    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(null, start, end, METRIC_NAME, DATASET_NAME, Collections.<String, String>emptyMap());
+    MergedAnomalyResultDTO anomaly = DetectionTestUtils.makeAnomaly(-1L, start, end, METRIC_NAME, DATASET_NAME, Collections.<String, String>emptyMap());
     anomaly.setMetricUrn("thirdeye:metric:1");
     return anomaly;
   }

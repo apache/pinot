@@ -3,8 +3,30 @@
 }
 
 .ember-power-select-option {
-  .bluelink {
-    font-weight: bold;
-    color: $te-blue;
+
+}
+
+#select-metric .ember-power-select-selected-item {
+  margin-left: 0;
+}
+
+.rootcause-select-metric {
+  &__value {
+    margin: 0;
+    padding: 0;
+    height: 21px;
+
+    &--small {
+      margin: 0;
+      padding: 0;
+      height: 18px;
+      font-size: 10px;
+      color: app-shade(black, 0.60);
+    }
+
+    &--bluelink {
+      font-weight: bold;
+      color: $te-blue;
+    }
   }
 }

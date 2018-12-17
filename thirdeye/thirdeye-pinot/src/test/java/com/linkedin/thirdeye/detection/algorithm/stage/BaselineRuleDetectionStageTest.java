@@ -26,7 +26,6 @@ import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
 import com.linkedin.thirdeye.detection.MockDataProvider;
 import com.linkedin.thirdeye.detection.algorithm.AlgorithmUtils;
-import com.linkedin.thirdeye.rootcause.timeseries.BaselineAggregateType;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.Collections;
@@ -80,7 +79,7 @@ public class BaselineRuleDetectionStageTest {
 
     this.config = new DetectionConfigDTO();
     this.config.setProperties(properties);
-
+    this.config.setId(-1L);
     this.provider = new MockDataProvider()
         .setTimeseries(timeseries)
         .setMetrics(Collections.singletonList(metricConfigDTO));

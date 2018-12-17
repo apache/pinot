@@ -28,7 +28,7 @@ public abstract class StreamConsumerFactory {
 
   /**
    * Initializes the stream consumer factory with the stream metadata for the table
-   * @param streamConfig
+   * @param streamConfig the stream config object from the table config
    */
   void init(StreamConfig streamConfig) {
     _streamConfig = streamConfig;
@@ -36,15 +36,19 @@ public abstract class StreamConsumerFactory {
 
   /**
    * Creates a partition level consumer which can fetch messages from a partitioned stream
-   * @param clientId
-   * @param partition
+   * @param clientId a client id to identify the creator of this consumer
+   * @param partition the partition id of the partition for which this consumer is being created
    * @return
    */
   public abstract PartitionLevelConsumer createPartitionLevelConsumer(String clientId, int partition);
 
   /**
    * Creates a stream level consumer (high level) which can fetch messages from the stream
-   * @param clientId
+   * @param clientId a client id to identify the creator of this consumer
+   * @param tableName the table name for the topic of this consumer
+   * @param schema the pinot schema of the event being consumed
+   * @param instanceZKMetadata the instance metadata
+   * @param serverMetrics metrics object to emit consumption related metrics
    * @return
    */
   public abstract StreamLevelConsumer createStreamLevelConsumer(String clientId, String tableName, Schema schema,
@@ -52,13 +56,15 @@ public abstract class StreamConsumerFactory {
 
   /**
    * Creates a metadata provider which provides partition specific metadata
-   * @param partition
+   * @param clientId a client id to identify the creator of this consumer
+   * @param partition the partition id of the partition for which this metadata provider is being created
    * @return
    */
   public abstract StreamMetadataProvider createPartitionMetadataProvider(String clientId, int partition);
 
   /**
    * Creates a metadata provider which provides stream specific metadata
+   * @param clientId a client id to identify the creator of this consumer
    * @return
    */
   public abstract StreamMetadataProvider createStreamMetadataProvider(String clientId);

@@ -27,6 +27,7 @@ import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
+import com.linkedin.pinot.core.segment.index.readers.BloomFilterReader;
 import com.linkedin.pinot.core.segment.index.readers.BytesDictionary;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
@@ -44,6 +45,7 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.IOException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,18 +56,29 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   private final DataFileReader _forwardIndex;
   private final InvertedIndexReader _invertedIndex;
   private final ImmutableDictionaryReader _dictionary;
+  private final BloomFilterReader _bloomFilterReader;
 
   public PhysicalColumnIndexContainer(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
       IndexLoadingConfig indexLoadingConfig) throws IOException {
     String columnName = metadata.getColumnName();
     boolean loadInvertedIndex = false;
     boolean loadOnHeapDictionary = false;
+    boolean loadBloomFilter = false;
     if (indexLoadingConfig != null) {
       loadInvertedIndex = indexLoadingConfig.getInvertedIndexColumns().contains(columnName);
       loadOnHeapDictionary = indexLoadingConfig.getOnHeapDictionaryColumns().contains(columnName);
+      loadBloomFilter = indexLoadingConfig.getBloomFilterColumns().contains(columnName);
     }
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.FORWARD_INDEX);
+
     if (metadata.hasDictionary()) {
+      //bloom filter
+      if (loadBloomFilter) {
+        PinotDataBuffer bloomFilterBuffer = segmentReader.getIndexFor(columnName, ColumnIndexType.BLOOM_FILTER);
+        _bloomFilterReader = new BloomFilterReader(bloomFilterBuffer);
+      } else {
+        _bloomFilterReader = null;
+      }
       // Dictionary-based index
       _dictionary = loadDictionary(segmentReader.getIndexFor(columnName, ColumnIndexType.DICTIONARY), metadata,
           loadOnHeapDictionary);
@@ -100,6 +113,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       _forwardIndex = loadRawForwardIndex(fwdIndexBuffer, metadata.getDataType());
       _invertedIndex = null;
       _dictionary = null;
+      _bloomFilterReader = null;
     }
   }
 
@@ -118,8 +132,14 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     return _dictionary;
   }
 
+  @Override
+  public BloomFilterReader getBloomFilter() {
+    return _bloomFilterReader;
+  }
+
+
   private static ImmutableDictionaryReader loadDictionary(PinotDataBuffer dictionaryBuffer, ColumnMetadata metadata,
-      boolean loadOnHeap) throws IOException {
+      boolean loadOnHeap) {
     FieldSpec.DataType dataType = metadata.getDataType();
     if (loadOnHeap) {
       String columnName = metadata.getColumnName();
@@ -152,8 +172,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
 
       case BYTES:
         numBytesPerValue = metadata.getColumnMaxLength();
-        paddingByte = (byte) metadata.getPaddingCharacter();
-        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue, paddingByte);
+        return new BytesDictionary(dictionaryBuffer, length, numBytesPerValue);
 
       default:
         throw new IllegalStateException("Illegal data type for dictionary: " + dataType);
@@ -161,7 +180,7 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
   }
 
   private static SingleColumnSingleValueReader loadRawForwardIndex(PinotDataBuffer forwardIndexBuffer,
-      FieldSpec.DataType dataType) throws IOException {
+      FieldSpec.DataType dataType) {
 
     switch (dataType) {
       case INT:
@@ -176,4 +195,5 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         throw new IllegalStateException("Illegal data type for raw forward index: " + dataType);
     }
   }
+
 }

@@ -2,8 +2,7 @@ import { computed } from '@ember/object';
 import Component from '@ember/component';
 import $ from 'jquery';
 import {
-  makeTime,
-  dateFormatFull
+  makeTime
 } from 'thirdeye-frontend/utils/rca-utils';
 
 // TODO consolidate rootcause-select-comparison-range2, rootcause-slider
@@ -31,7 +30,7 @@ const namedToEpocMapping = {
 
 
 export default Component.extend({
-  timeFormat: "MMM D, hh:mm a z",//slider
+  timeFormat: "MMM D, hh:mm a z", //slider
   range: null, // [0, 0]
   compareMode: null, // ""
   onChange: null, // func (start, end, compareMode)
@@ -47,16 +46,26 @@ export default Component.extend({
   },
 
   compareModeOptions: [
-    'WoW',
-    'Wo2W',
-    'Wo3W',
-    'Wo4W',
-    'mean4w',
-    'median4w',
-    'min4w',
-    'max4w',
-    'predicted',
-    'none'
+    {
+      groupName: 'Weekly',
+      options: [ 'wo1w', 'wo2w', 'wo3w', 'wo4w', 'mean4w', 'median4w', 'min4w', 'max4w' ]
+    },
+    {
+      groupName: 'Hourly',
+      options: [ 'ho1h', 'ho2h', 'ho3h', 'ho6h', 'mean6h', 'median6h', 'min6h', 'max6h' ]
+    },
+    {
+      groupName: 'Daily',
+      options: [ 'do1d', 'do2d', 'do3d', 'do4d', 'mean4d', 'median4d', 'min4d', 'max4d' ]
+    },
+    {
+      groupName: 'Monthly',
+      options: [ 'mo1m', 'mo2m', 'mo3m', 'mo6m', 'mean6m', 'median6m', 'min6m', 'max6m' ]
+    },
+    {
+      groupName: 'Algorithm',
+      options: [ 'predicted', 'none' ]
+    }
   ],
 
   minDisplayWindow: computed('displayRange.[]', function() {//display window start - slider
@@ -135,7 +144,7 @@ export default Component.extend({
     this.setProperties({
       startFormattedOneWay: this.get('startFormatted'),
       endFormattedOneWay: this.get('endFormatted'),
-      maxDateFormattedOneWay: this.get('maxDateFormatted'),
+      maxDateFormattedOneWay: this.get('maxDateFormatted')
       // granularityOneWay: this.get('granularity')
     });
 
@@ -166,7 +175,7 @@ export default Component.extend({
         to: this.get('maxInvestigatePeriod').format('x')
       });
 
-      // Update the display window's investiation period on the chart
+      // Update the display window's investigation period on the chart
       onChange(makeTime(start).valueOf(), makeTime(end).valueOf(), compareMode);
     },
 

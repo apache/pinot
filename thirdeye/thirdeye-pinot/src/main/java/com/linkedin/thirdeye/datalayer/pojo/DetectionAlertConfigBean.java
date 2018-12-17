@@ -36,14 +36,27 @@ public class DetectionAlertConfigBean extends AbstractBean {
   String from;
   String cronExpression;
   String application;
+  String yaml;
+  boolean onlyFetchLegacyAnomalies;
 
   Map<String, Map<String, Object>> alertSchemes;
+  Map<String, Map<String, Object>> alertSuppressors;
   AlertConfigBean.SubjectType subjectType = AlertConfigBean.SubjectType.ALERT;
 
   Map<Long, Long> vectorClocks;
   Long highWaterMark;
 
   Map<String, Object> properties;
+
+  Map<String, String> refLinks;
+
+  public boolean isOnlyFetchLegacyAnomalies() {
+    return onlyFetchLegacyAnomalies;
+  }
+
+  public void setOnlyFetchLegacyAnomalies(boolean onlyFetchLegacyAnomalies) {
+    this.onlyFetchLegacyAnomalies = onlyFetchLegacyAnomalies;
+  }
 
   public boolean isActive() {
     return active;
@@ -125,6 +138,30 @@ public class DetectionAlertConfigBean extends AbstractBean {
     this.alertSchemes = alertSchemes;
   }
 
+  public Map<String, Map<String, Object>> getAlertSuppressors() {
+    return alertSuppressors;
+  }
+
+  public void setAlertSuppressors(Map<String, Map<String, Object>> alertSuppressors) {
+    this.alertSuppressors = alertSuppressors;
+  }
+
+  public Map<String, String> getReferenceLinks() {
+    return refLinks;
+  }
+
+  public void setReferenceLinks(Map<String, String> refLinks) {
+    this.refLinks = refLinks;
+  }
+
+  public String getYaml() {
+    return yaml;
+  }
+
+  public void setYaml(String yaml) {
+    this.yaml = yaml;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -137,12 +174,15 @@ public class DetectionAlertConfigBean extends AbstractBean {
     return active == that.active && Objects.equals(name, that.name) && Objects.equals(from, that.from)
         && Objects.equals(cronExpression, that.cronExpression) && Objects.equals(application, that.application)
         && subjectType == that.subjectType && Objects.equals(vectorClocks, that.vectorClocks) && Objects.equals(
-        highWaterMark, that.highWaterMark) && Objects.equals(properties, that.properties);
+        highWaterMark, that.highWaterMark) && Objects.equals(properties, that.properties)
+        && Objects.equals(alertSchemes, that.alertSchemes) && Objects.equals(alertSuppressors, that.alertSuppressors)
+        && Objects.equals(refLinks, that.refLinks) && onlyFetchLegacyAnomalies == that.onlyFetchLegacyAnomalies
+        && Objects.equals(yaml, that.yaml);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(active, name, from, cronExpression, application, subjectType, vectorClocks,
-        highWaterMark, properties);
+        highWaterMark, properties, alertSchemes, alertSuppressors, refLinks, onlyFetchLegacyAnomalies, yaml);
   }
 }

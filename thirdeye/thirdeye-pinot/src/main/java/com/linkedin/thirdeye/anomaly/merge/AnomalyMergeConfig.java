@@ -39,7 +39,10 @@ import java.util.List;
 public class AnomalyMergeConfig {
   private AnomalyMergeStrategy mergeStrategy = AnomalyMergeStrategy.FUNCTION;
   private long sequentialAllowedGap = 30_000; // 30 seconds
-  private long maxMergeDurationLength = 12 * 60 * 60 * 1000; // 12 hours
+
+  // Look back for 2 days to accommodate merging of anomalies in daily metrics
+  private long maxMergeDurationLength = 48 * 60 * 60 * 1000; // 48 hours
+
   private List<String> mergeablePropertyKeys = new ArrayList<>();
 
   public AnomalyMergeConfig() {

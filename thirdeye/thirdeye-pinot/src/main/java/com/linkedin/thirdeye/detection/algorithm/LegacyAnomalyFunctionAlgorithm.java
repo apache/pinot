@@ -36,7 +36,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
 import com.linkedin.thirdeye.detection.DetectionPipelineResult;
@@ -110,8 +110,8 @@ public class LegacyAnomalyFunctionAlgorithm extends DetectionPipeline {
     try {
       Collection<MergedAnomalyResultDTO> historyMergedAnomalies;
       if (this.anomalyFunction.useHistoryAnomaly() && config.getId() != null) {
-        AnomalySlice slice = new AnomalySlice().withConfigId(config.getId()).withStart(this.startTime).withEnd(this.endTime);
-        historyMergedAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice)).get(slice);
+        AnomalySlice slice = new AnomalySlice().withStart(this.startTime).withEnd(this.endTime);
+        historyMergedAnomalies = this.provider.fetchAnomalies(Collections.singletonList(slice), config.getId()).get(slice);
       } else {
         historyMergedAnomalies = Collections.emptyList();
       }

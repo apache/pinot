@@ -24,7 +24,6 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.InputStream;
-import java.util.List;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -80,7 +79,7 @@ public class ApplyTableConfigCommand extends AbstractBaseAdminCommand implements
       throw new RuntimeException("Table config does not contain a valid offline or realtime table definition.");
     }
 
-    String computedConfig = Serializer.serializeToString(combinedConfig);
+    String computedConfig = Serializer.serializeToPropertiesString(combinedConfig);
 
     if (_showComputedConfig) {
       System.out.println(computedConfig);

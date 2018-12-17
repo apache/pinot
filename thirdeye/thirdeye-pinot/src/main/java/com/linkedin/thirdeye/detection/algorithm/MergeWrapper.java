@@ -20,7 +20,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.detection.AnomalySlice;
+import com.linkedin.thirdeye.detection.spi.model.AnomalySlice;
 import com.linkedin.thirdeye.detection.ConfigUtils;
 import com.linkedin.thirdeye.detection.DataProvider;
 import com.linkedin.thirdeye.detection.DetectionPipeline;
@@ -30,9 +30,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.collections.MapUtils;
 
 
@@ -44,6 +46,7 @@ public class MergeWrapper extends DetectionPipeline {
   private static final String PROP_NESTED = "nested";
   private static final String PROP_CLASS_NAME = "className";
   private static final String PROP_MERGE_KEY = "mergeKey";
+  private static final String PROP_DETECTOR_COMPONENT_NAME = "detectorComponentName";
 
   protected static final Comparator<MergedAnomalyResultDTO> COMPARATOR = new Comparator<MergedAnomalyResultDTO>() {
     @Override
@@ -64,7 +67,7 @@ public class MergeWrapper extends DetectionPipeline {
   protected final List<Map<String, Object>> nestedProperties;
   protected final long maxGap; // max time gap for merge
   protected final long maxDuration; // max overall duration of merged anomaly
-  private final AnomalySlice slice;
+  protected final AnomalySlice slice;
 
   /**
    * Instantiates a new merge wrapper.
@@ -79,8 +82,12 @@ public class MergeWrapper extends DetectionPipeline {
 
     this.maxGap = MapUtils.getLongValue(config.getProperties(), "maxGap", 0);
     this.maxDuration = MapUtils.getLongValue(config.getProperties(), "maxDuration", Long.MAX_VALUE);
-    this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime).withConfigId(config.getId());
-    this.nestedProperties = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    this.slice = new AnomalySlice().withStart(startTime).withEnd(endTime);
+    this.nestedProperties = new ArrayList<>();
+    List<Map<String, Object>> nested = ConfigUtils.getList(config.getProperties().get(PROP_NESTED));
+    for (Map<String, Object> properties : nested) {
+      this.nestedProperties.add(new HashMap<>(properties));
+    }
   }
 
   @Override
@@ -99,6 +106,7 @@ public class MergeWrapper extends DetectionPipeline {
       nestedConfig.setId(this.config.getId());
       nestedConfig.setName(this.config.getName());
       nestedConfig.setProperties(properties);
+      nestedConfig.setComponents(this.config.getComponents());
 
       DetectionPipeline pipeline = this.provider.loadPipeline(nestedConfig, this.startTime, this.endTime);
 
@@ -110,22 +118,23 @@ public class MergeWrapper extends DetectionPipeline {
       i++;
     }
 
-    // retrieve anomalies
-    AnomalySlice effectiveSlice = this.slice
-        .withStart(this.getStartTime(generated) - this.maxGap - 1)
-        .withEnd(this.getEndTime(generated) + this.maxGap + 1);
-
-    List<MergedAnomalyResultDTO> retrieved = new ArrayList<>();
-    retrieved.addAll(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice)).get(effectiveSlice));
-
     // merge
-    List<MergedAnomalyResultDTO> all = new ArrayList<>();
-    all.addAll(retrieved);
+    Set<MergedAnomalyResultDTO> all = new HashSet<>();
+    all.addAll(retrieveAnomaliesFromDatabase(generated));
     all.addAll(generated);
 
     return new DetectionPipelineResult(this.merge(all)).setDiagnostics(diagnostics);
   }
 
+  protected List<MergedAnomalyResultDTO> retrieveAnomaliesFromDatabase(List<MergedAnomalyResultDTO> generated) {
+    AnomalySlice effectiveSlice = this.slice
+        .withStart(this.getStartTime(generated) - this.maxGap - 1)
+        .withEnd(this.getEndTime(generated) + this.maxGap + 1);
+
+    return new ArrayList<>(this.provider.fetchAnomalies(Collections.singleton(effectiveSlice), this.config.getId()).get(effectiveSlice));
+  }
+
+  // logic to do time-based merging.
   protected List<MergedAnomalyResultDTO> merge(Collection<MergedAnomalyResultDTO> anomalies) {
     List<MergedAnomalyResultDTO> input = new ArrayList<>(anomalies);
     Collections.sort(input, COMPARATOR);
@@ -172,7 +181,7 @@ public class MergeWrapper extends DetectionPipeline {
     return output;
   }
 
-  private long getStartTime(Iterable<MergedAnomalyResultDTO> anomalies) {
+  protected long getStartTime(Iterable<MergedAnomalyResultDTO> anomalies) {
     long time = this.startTime;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       time = Math.min(anomaly.getStartTime(), time);
@@ -180,7 +189,7 @@ public class MergeWrapper extends DetectionPipeline {
     return time;
   }
 
-  private long getEndTime(Iterable<MergedAnomalyResultDTO> anomalies) {
+  protected long getEndTime(Iterable<MergedAnomalyResultDTO> anomalies) {
     long time = this.endTime;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       time = Math.max(anomaly.getEndTime(), time);
@@ -193,16 +202,19 @@ public class MergeWrapper extends DetectionPipeline {
     final String collection;
     final DimensionMap dimensions;
     final String mergeKey;
+    final String componentKey;
 
-    public AnomalyKey(String metric, String collection, DimensionMap dimensions, String mergeKey) {
+    public AnomalyKey(String metric, String collection, DimensionMap dimensions, String mergeKey, String componentKey) {
       this.metric = metric;
       this.collection = collection;
       this.dimensions = dimensions;
       this.mergeKey = mergeKey;
+      this.componentKey = componentKey;
     }
 
     public static AnomalyKey from(MergedAnomalyResultDTO anomaly) {
-      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY));
+      return new AnomalyKey(anomaly.getMetric(), anomaly.getCollection(), anomaly.getDimensions(), anomaly.getProperties().get(PROP_MERGE_KEY),
+          anomaly.getProperties().get(PROP_DETECTOR_COMPONENT_NAME));
     }
 
     @Override
@@ -215,12 +227,13 @@ public class MergeWrapper extends DetectionPipeline {
       }
       AnomalyKey that = (AnomalyKey) o;
       return Objects.equals(metric, that.metric) && Objects.equals(collection, that.collection) && Objects.equals(
-          dimensions, that.dimensions) && Objects.equals(mergeKey, that.mergeKey);
+          dimensions, that.dimensions) && Objects.equals(mergeKey, that.mergeKey) && Objects.equals(componentKey,
+          that.componentKey);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(metric, collection, dimensions, mergeKey);
+      return Objects.hash(metric, collection, dimensions, mergeKey, componentKey);
     }
   }
 }

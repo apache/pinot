@@ -16,6 +16,18 @@
 package com.linkedin.pinot.core.operator.filter.predicate;
 
 public abstract class BaseDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
+  protected boolean _alwaysTrue;
+  protected boolean _alwaysFalse;
+
+  @Override
+  public boolean isAlwaysTrue() {
+    return _alwaysTrue;
+  }
+
+  @Override
+  public boolean isAlwaysFalse() {
+    return _alwaysFalse;
+  }
 
   @Override
   public final boolean isDictionaryBased() {

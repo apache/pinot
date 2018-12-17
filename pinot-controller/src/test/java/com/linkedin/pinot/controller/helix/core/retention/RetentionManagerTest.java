@@ -84,7 +84,7 @@ public class RetentionManagerTest {
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME)).thenReturn(metadataList);
 
-    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 0, 0);
+    RetentionManager retentionManager = new MockRetentionManager(pinotHelixResourceManager, 0, 0);
     retentionManager.init();
     retentionManager.run();
 
@@ -156,7 +156,6 @@ public class RetentionManagerTest {
   private void setupPinotHelixResourceManager(TableConfig tableConfig, final List<String> removedSegments,
       PinotHelixResourceManager resourceManager) {
     final String tableNameWithType = tableConfig.getTableName();
-    when(resourceManager.isLeader()).thenReturn(true);
     when(resourceManager.getAllTables()).thenReturn(Collections.singletonList(tableNameWithType));
 
     SegmentDeletionManager deletionManager = mock(SegmentDeletionManager.class);
@@ -202,7 +201,7 @@ public class RetentionManagerTest {
         setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
 
-    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 0, 0);
+    RetentionManager retentionManager = new MockRetentionManager(pinotHelixResourceManager, 0, 0);
     retentionManager.init();
     retentionManager.run();
 
@@ -222,7 +221,7 @@ public class RetentionManagerTest {
     List<RealtimeSegmentZKMetadata> allSegments = new ArrayList<>();
 
     IdealState idealState =
-        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(REALTIME_TABLE_NAME, replicaCount);
+        PinotTableIdealStateBuilder.buildEmptyRealtimeIdealStateFor(REALTIME_TABLE_NAME, replicaCount, true);
 
     final int kafkaPartition = 5;
     final long millisInDays = TimeUnit.DAYS.toMillis(1);
@@ -305,5 +304,18 @@ public class RetentionManagerTest {
         new Interval(timeUnit.toMillis(startTime), timeUnit.toMillis(endTime)));
     when(segmentMetadata.getTimeGranularity()).thenReturn(new Duration(timeUnit.toMillis(1)));
     return segmentMetadata;
+  }
+
+  private class MockRetentionManager extends RetentionManager {
+
+    public MockRetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
+        int deletedSegmentsRetentionInDays) {
+      super(pinotHelixResourceManager, runFrequencyInSeconds, deletedSegmentsRetentionInDays);
+    }
+
+    @Override
+    protected boolean isLeader() {
+      return true;
+    }
   }
 }

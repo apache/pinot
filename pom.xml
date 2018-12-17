@@ -885,6 +885,7 @@
           <configuration>
             <source>${jdk.version}</source>
             <target>${jdk.version}</target>
+            <compilerVersion>${jdk.version}</compilerVersion>
           </configuration>
         </plugin>
         <plugin>
@@ -1140,6 +1141,8 @@
             <exclude>**/NamedThreadFactory.java</exclude>
             <exclude>**/FileUploadUtils.java</exclude>
             <exclude>**/TarGzCompressionUtils.java</exclude>
+            <!-- Documentation files -->
+            <exclude>**/docs/_build/**</exclude>
           </excludes>
           <mapping>
             <thrift>JAVADOC_STYLE</thrift>

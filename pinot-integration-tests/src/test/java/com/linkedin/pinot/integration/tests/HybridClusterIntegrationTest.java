@@ -134,8 +134,8 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
     addHybridTable(getTableName(), useLlc(), KafkaStarterUtils.DEFAULT_KAFKA_BROKER, KafkaStarterUtils.DEFAULT_ZK_STR,
         getKafkaTopic(), getRealtimeSegmentFlushSize(), avroFile, timeColumnName, timeType, schemaName, TENANT_NAME,
-        TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getRawIndexColumns(),
-        getTaskConfig(), getStreamConsumerFactoryClassName());
+        TENANT_NAME, getLoadMode(), getSortedColumn(), getInvertedIndexColumns(), getBloomFilterIndexColumns(),
+        getRawIndexColumns(), getTaskConfig(), getStreamConsumerFactoryClassName());
 
     completeTableConfiguration();
   }
@@ -247,6 +247,12 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
   @Override
   public void testInstanceShutdown() throws Exception {
     super.testInstanceShutdown();
+  }
+
+  @Test
+  @Override
+  public void testBrokerResponseMetadata() throws Exception {
+    super.testBrokerResponseMetadata();
   }
 
   @Test

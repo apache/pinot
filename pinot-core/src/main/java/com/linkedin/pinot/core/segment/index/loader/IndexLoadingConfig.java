@@ -44,6 +44,8 @@ public class IndexLoadingConfig {
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private Map<String, String> _noDictionaryConfig = new HashMap<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
+  private Set<String> _bloomFilterColumns = new HashSet<>();
+
   private SegmentVersion _segmentVersion;
   // This value will remain true only when the empty constructor is invoked.
   private boolean _enableDefaultColumns = true;
@@ -74,6 +76,11 @@ public class IndexLoadingConfig {
     List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
     if (invertedIndexColumns != null) {
       _invertedIndexColumns.addAll(invertedIndexColumns);
+    }
+
+    List<String> bloomFilterColumns = indexingConfig.getBloomFilterColumns();
+    if (bloomFilterColumns != null) {
+      _bloomFilterColumns.addAll(bloomFilterColumns);
     }
 
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
@@ -164,6 +171,12 @@ public class IndexLoadingConfig {
   }
 
   @VisibleForTesting
+  public void setBloomFilterColumns(@Nonnull Set<String> bloomFilterColumns) {
+    _bloomFilterColumns = bloomFilterColumns;
+  }
+
+
+  @VisibleForTesting
   public void setOnHeapDictionaryColumns(@Nonnull Set<String> onHeapDictionaryColumns) {
     _onHeapDictionaryColumns = onHeapDictionaryColumns;
   }
@@ -181,6 +194,10 @@ public class IndexLoadingConfig {
   @Nonnull
   public Set<String> getOnHeapDictionaryColumns() {
     return _onHeapDictionaryColumns;
+  }
+
+  public Set<String> getBloomFilterColumns() {
+    return _bloomFilterColumns;
   }
 
   @Nullable

@@ -51,8 +51,7 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
       int deletedSegmentsRetentionInDays) {
-    super("RetentionManager", runFrequencyInSeconds, Math.min(60, runFrequencyInSeconds),
-        pinotHelixResourceManager);
+    super("RetentionManager", runFrequencyInSeconds, pinotHelixResourceManager);
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
   }
 
@@ -63,17 +62,18 @@ public class RetentionManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> allTableNames) {
-    execute(allTableNames);
+  public void process(List<String> tables) {
+    execute(tables);
   }
 
   /**
-   * Manages retention for all tables.
-   * @param allTableNames List of all the table names
+   * Manages retention for the given tables.
+   *
+   * @param tables List of table names
    */
-  private void execute(List<String> allTableNames) {
+  private void execute(List<String> tables) {
     try {
-      for (String tableNameWithType : allTableNames) {
+      for (String tableNameWithType : tables) {
         LOGGER.info("Start managing retention for table: {}", tableNameWithType);
         manageRetentionForTable(tableNameWithType);
       }

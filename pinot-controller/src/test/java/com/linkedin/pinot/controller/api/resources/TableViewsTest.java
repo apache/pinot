@@ -24,7 +24,7 @@ import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.utils.SegmentMetadataMockUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaAvroMessageDecoder;
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerFactory;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerFactory;
 import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import com.linkedin.pinot.core.realtime.stream.StreamConfigProperties;
 import java.net.HttpURLConnection;
@@ -76,7 +76,7 @@ public class TableViewsTest extends ControllerTest {
     Map<String, String> streamConfigs = new HashMap<>();
     String streamType = "kafka";
     String topic = "aTopic";
-    String consumerFactoryClass = SimpleConsumerFactory.class.getName();
+    String consumerFactoryClass = KafkaConsumerFactory.class.getName();
     String decoderClass = KafkaAvroMessageDecoder.class.getName();
     streamConfigs.put(StreamConfigProperties.STREAM_TYPE, streamType);
     streamConfigs.put(

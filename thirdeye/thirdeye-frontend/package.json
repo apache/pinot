@@ -24,6 +24,7 @@
     "babel-plugin-transform-object-rest-spread": "^6.26.0",
     "bootstrap-sass": "^3.3.7",
     "broccoli-asset-rev": "^2.4.5",
+    "ember-ace": "^2.0.1",
     "ember-ajax": "^3.0.0",
     "ember-bootstrap": "^1.0.0-beta.1",
     "ember-c3": "^0.3.1",

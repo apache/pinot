@@ -17,7 +17,7 @@ module('Acceptance | rootcause', async function(hooks) {
 
   test(`visiting /rootcause on anomalyId shows correct header title`, async assert => {
     await visit('/rootcause?anomalyId=1');
-    
+
     assert.ok(
       $('.rootcause-header__major').get(0).value.includes('Investigation on pageViews'),
       'title is correct');
@@ -52,11 +52,6 @@ module('Acceptance | rootcause', async function(hooks) {
         $(rcEl.LABEL).get(0).innerText.trim(),
         'pageViews',
         'metric label is correct'
-      );
-      assert.equal(
-        $(rcEl.SELECTED_METRIC).get(0).innerText.trim(),
-        'pageViews',
-        'selected metric is correct'
       );
     });
 

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -23,6 +24,7 @@ import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.ControllerLeadershipManager;
 import com.linkedin.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -153,7 +155,7 @@ public class SegmentCompletionManager {
    * that it currently has (i.e. next offset that it will consume, if it continues to consume).
    */
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
-    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+    if (!isLeader() || !_helixManager.isConnected()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -190,7 +192,7 @@ public class SegmentCompletionManager {
    * incoming segment).
    */
   public SegmentCompletionProtocol.Response segmentCommitStart(final SegmentCompletionProtocol.Request.Params reqParams) {
-    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+    if (!isLeader() || !_helixManager.isConnected()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -214,7 +216,7 @@ public class SegmentCompletionManager {
   }
 
   public SegmentCompletionProtocol.Response extendBuildTime(final SegmentCompletionProtocol.Request.Params reqParams) {
-    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+    if (!isLeader() || !_helixManager.isConnected()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -245,7 +247,7 @@ public class SegmentCompletionManager {
    * @return
    */
   public SegmentCompletionProtocol.Response segmentStoppedConsuming(SegmentCompletionProtocol.Request.Params reqParams) {
-    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+    if (!isLeader() || !_helixManager.isConnected()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -280,7 +282,7 @@ public class SegmentCompletionManager {
    * @return
    */
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success, boolean isSplitCommit) {
-    if (!_helixManager.isLeader() || !_helixManager.isConnected()) {
+    if (!isLeader() || !_helixManager.isConnected()) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_NOT_LEADER, 1L);
       return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
@@ -1090,5 +1092,10 @@ public class SegmentCompletionManager {
       }
       return false;
     }
+  }
+
+  @VisibleForTesting
+  protected boolean isLeader() {
+    return ControllerLeadershipManager.getInstance().isLeader();
   }
 }

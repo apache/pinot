@@ -113,15 +113,12 @@ public class ImmutableSegmentLoader {
           new PhysicalColumnIndexContainer(segmentReader, entry.getValue(), indexLoadingConfig));
     }
 
-    // Synthesize schema if necessary, adding virtual columns
-    if (schema != null) {
-      VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
-    } else {
+    if (schema == null) {
       schema = segmentMetadata.getSchema();
     }
 
-    // Ensure that the schema in the segment metadata also has the virtual columns added
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(segmentMetadata.getSchema());
+    // Ensure that the schema has the virtual columns added
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSchema(schema);
 
     // Instantiate virtual columns
     for (String columnName : schema.getColumnNames()) {

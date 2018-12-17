@@ -18,16 +18,24 @@ package com.linkedin.thirdeye.detection.algorithm.stage;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detection.DataProvider;
-import com.linkedin.thirdeye.detection.InputData;
-import com.linkedin.thirdeye.detection.InputDataSpec;
-
-import static com.linkedin.thirdeye.detection.algorithm.stage.StageUtils.*;
+import com.linkedin.thirdeye.detection.DefaultInputDataFetcher;
+import com.linkedin.thirdeye.detection.InputDataFetcher;
+import com.linkedin.thirdeye.detection.spi.model.InputData;
+import com.linkedin.thirdeye.detection.spi.model.InputDataSpec;
+import java.util.Map;
 
 
 /**
  * Static anomaly filter stage. High level interface for anomaly filter.
  */
 public abstract class StaticAnomalyFilterStage implements AnomalyFilterStage {
+  private long configId;
+
+  @Override
+  public void init(Map<String, Object> specs, Long configId, long startTime, long endTime) {
+    this.configId = configId;
+  }
+
   /**
    * Returns a data spec describing all required data(time series, aggregates, existing anomalies) to perform a stage.
    * Data is retrieved in one pass and cached between executions if possible.
@@ -45,6 +53,7 @@ public abstract class StaticAnomalyFilterStage implements AnomalyFilterStage {
 
   @Override
   public final boolean isQualified(MergedAnomalyResultDTO anomaly, DataProvider provider) {
-    return isQualified(anomaly, getDataForSpec(provider, this.getInputDataSpec()));
+    InputDataFetcher dataFetcher = new DefaultInputDataFetcher(provider, -1);
+    return isQualified(anomaly, dataFetcher.fetchData(this.getInputDataSpec()));
   }
 }

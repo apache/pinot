@@ -16,75 +16,116 @@
 package com.linkedin.pinot.controller.helix.core.periodictask;
 
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.core.periodictask.PeriodicTask;
-import com.linkedin.pinot.core.periodictask.PeriodicTaskScheduler;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import junit.framework.Assert;
-import org.testng.annotations.BeforeTest;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 
 public class ControllerPeriodicTaskTest {
-  private PinotHelixResourceManager helixResourceManager;
-  private AtomicInteger numOfProcessingMessages;
+  private static final long RUN_FREQUENCY_IN_SECONDS = 30;
 
-  @BeforeTest
-  public void setUp() {
-    numOfProcessingMessages = new AtomicInteger(0);
-    helixResourceManager = mock(PinotHelixResourceManager.class);
-    List<String> allTableNames = new ArrayList<>();
-    allTableNames.add("testTable_REALTIME");
-    allTableNames.add("testTable_OFFLINE");
-    when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
+  private final PinotHelixResourceManager _resourceManager = mock(PinotHelixResourceManager.class);
+  private final AtomicBoolean _onBecomeLeaderCalled = new AtomicBoolean();
+  private final AtomicBoolean _onBecomeNonLeaderCalled = new AtomicBoolean();
+  private final AtomicBoolean _processCalled = new AtomicBoolean();
+
+  private final MockControllerPeriodicTask _task =
+      new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS, _resourceManager) {
+        @Override
+        public void onBecomeLeader() {
+          _onBecomeLeaderCalled.set(true);
+        }
+
+        @Override
+        public void onBecomeNotLeader() {
+          _onBecomeNonLeaderCalled.set(true);
+        }
+
+        @Override
+        public void process(List<String> tables) {
+          _processCalled.set(true);
+        }
+
+      };
+
+  private void resetState() {
+    _onBecomeLeaderCalled.set(false);
+    _onBecomeNonLeaderCalled.set(false);
+    _processCalled.set(false);
   }
 
   @Test
-  public void testWhenControllerIsLeader() throws InterruptedException {
-    long totalRunTimeInMilliseconds = 3_500L;
-    long runFrequencyInSeconds = 1L;
-    long initialDelayInSeconds = 1L;
-    when(helixResourceManager.isLeader()).thenReturn(true);
+  public void testRandomInitialDelay() {
+    assertTrue(_task.getInitialDelayInSeconds() >= ControllerPeriodicTask.MIN_INITIAL_DELAY_IN_SECONDS);
+    assertTrue(_task.getInitialDelayInSeconds() < ControllerPeriodicTask.MAX_INITIAL_DELAY_IN_SECONDS);
 
-    PeriodicTask periodicTask = createMockPeriodicTask(runFrequencyInSeconds, initialDelayInSeconds);
-
-    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler();
-    periodicTaskScheduler.start(Collections.singletonList(periodicTask));
-    Thread.sleep(totalRunTimeInMilliseconds);
-    periodicTaskScheduler.stop();
-    Assert.assertEquals(totalRunTimeInMilliseconds / 1000L, numOfProcessingMessages.get());
+    assertEquals(_task.getIntervalInSeconds(), RUN_FREQUENCY_IN_SECONDS);
   }
 
   @Test
-  public void testWhenControllerIsNotLeader() throws InterruptedException {
-    long totalRunTimeInMilliseconds = 3_500L;
-    long runFrequencyInSeconds = 1L;
-    long initialDelayInSeconds = 1L;
+  public void testChangeLeadership() {
+    // Initial state
+    resetState();
+    _task.setLeader(false);
+    _task.init();
+    assertFalse(_onBecomeLeaderCalled.get());
+    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertFalse(_processCalled.get());
 
-    when(helixResourceManager.isLeader()).thenReturn(false);
-    PeriodicTask periodicTask = createMockPeriodicTask(runFrequencyInSeconds, initialDelayInSeconds);
+    // From non-leader to non-leader
+    resetState();
+    _task.run();
+    assertFalse(_onBecomeLeaderCalled.get());
+    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertFalse(_processCalled.get());
 
-    PeriodicTaskScheduler periodicTaskScheduler = new PeriodicTaskScheduler();
-    periodicTaskScheduler.start(Collections.singletonList(periodicTask));
-    Thread.sleep(totalRunTimeInMilliseconds);
-    periodicTaskScheduler.stop();
-    Assert.assertEquals(0, numOfProcessingMessages.get());
+    // From non-leader to leader
+    resetState();
+    _task.setLeader(true);
+    _task.run();
+    assertTrue(_onBecomeLeaderCalled.get());
+    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertTrue(_processCalled.get());
+
+    // From leader to leader
+    resetState();
+    _task.run();
+    assertFalse(_onBecomeLeaderCalled.get());
+    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertTrue(_processCalled.get());
+
+    // From leader to non-leader
+    resetState();
+    _task.setLeader(false);
+    _task.run();
+    assertFalse(_onBecomeLeaderCalled.get());
+    assertTrue(_onBecomeNonLeaderCalled.get());
+    assertFalse(_processCalled.get());
   }
 
-  private PeriodicTask createMockPeriodicTask(long runFrequencyInSeconds, long initialDelayInSeconds) {
-    return new ControllerPeriodicTask("Task", runFrequencyInSeconds, initialDelayInSeconds, helixResourceManager) {
-      public void init() {
-        numOfProcessingMessages.set(0);
-      }
+  private class MockControllerPeriodicTask extends ControllerPeriodicTask {
 
-      @Override
-      public void process(List<String> allTableNames) {
-        numOfProcessingMessages.incrementAndGet();
-      }
-    };
+    private boolean _isLeader = true;
+    public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds,
+        PinotHelixResourceManager pinotHelixResourceManager) {
+      super(taskName, runFrequencyInSeconds, pinotHelixResourceManager);
+    }
+
+    @Override
+    public void process(List<String> tables) {
+
+    }
+
+    @Override
+    protected boolean isLeader() {
+      return _isLeader;
+    }
+
+    void setLeader(boolean isLeader) {
+      _isLeader = isLeader;
+    }
   }
 }

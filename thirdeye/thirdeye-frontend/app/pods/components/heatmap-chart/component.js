@@ -145,6 +145,7 @@ export default Component.extend({
       if (d && d.role !== 'value') {
         return;
       }
+
       const tooltipWidth = 200;
       const xPosition = d3.event.pageX - (tooltipWidth + 20);
       const yPosition = d3.event.pageY + 5;
@@ -159,6 +160,8 @@ export default Component.extend({
 
       d3.select(`${tooltipId}`).classed('hidden', false);
     }).on('mouseout', function () {
+      d3.select(`${tooltipId}`).classed('hidden', true);
+    }).on('mousedown', function () {
       d3.select(`${tooltipId}`).classed('hidden', true);
     });
 

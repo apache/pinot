@@ -61,11 +61,6 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public void setOffset(long offset) {
-      _streamLevelConsumer.setOffset(offset);
-    }
-
-    @Override
     public GenericRow next(GenericRow destination) {
       // Return a null row every ~1/1000 rows and an exception every ~1/1000 rows
       int randomValue = _random.nextInt(1000);
@@ -80,16 +75,6 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public GenericRow next(long offset) {
-      return _streamLevelConsumer.next(offset);
-    }
-
-    @Override
-    public long currentOffset() {
-      return _streamLevelConsumer.currentOffset();
-    }
-
-    @Override
     public void commit() {
       // Fail to commit 50% of the time
       boolean failToCommit = _random.nextBoolean();
@@ -99,11 +84,6 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
       } else {
         _streamLevelConsumer.commit();
       }
-    }
-
-    @Override
-    public void commit(long offset) {
-      _streamLevelConsumer.commit(offset);
     }
 
     @Override

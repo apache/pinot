@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.operator.blocks.FilterBlock;
 import com.linkedin.pinot.core.operator.docidsets.BitmapDocIdSet;
@@ -40,8 +41,15 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private final int _endDocId;
   private final boolean _exclusive;
 
-  public BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,
+  BitmapBasedFilterOperator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int startDocId,
       int endDocId) {
+    // NOTE:
+    // Predicate that is always evaluated as true or false should not be passed into the BitmapBasedFilterOperator for
+    // performance concern.
+    // If predicate is always evaluated as true, use MatchAllFilterOperator; if predicate is always evaluated as false,
+    // use EmptyFilterOperator.
+    Preconditions.checkArgument(!predicateEvaluator.isAlwaysTrue() && !predicateEvaluator.isAlwaysFalse());
+
     _predicateEvaluator = predicateEvaluator;
     _dataSource = dataSource;
     _bitmaps = null;
@@ -88,11 +96,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     return new FilterBlock(
         new BitmapDocIdSet(bitmaps.toArray(new ImmutableRoaringBitmap[numBitmaps]), _startDocId, _endDocId,
             _exclusive));
-  }
-
-  @Override
-  public boolean isResultEmpty() {
-    return _predicateEvaluator != null && _predicateEvaluator.isAlwaysFalse();
   }
 
   @Override

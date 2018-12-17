@@ -172,7 +172,9 @@ public class UserDashboardResource {
     if (StringUtils.isNotBlank(application)) {
       List<AnomalyFunctionDTO> functions = this.functionDAO.findAllByApplication(application);
       for (AnomalyFunctionDTO function : functions) {
-        applicationFunctionIds.add(function.getId());
+        if (function.getIsActive()) {
+          applicationFunctionIds.add(function.getId());
+        }
       }
     }
 

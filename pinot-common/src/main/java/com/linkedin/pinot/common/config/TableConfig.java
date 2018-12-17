@@ -394,6 +394,7 @@ public class TableConfig {
     private List<String> _invertedIndexColumns;
     private List<String> _noDictionaryColumns;
     private List<String> _onHeapDictionaryColumns;
+    private List<String> _bloomFilterColumns;
     private Map<String, String> _streamConfigs;
     private String _streamPartitionAssignmentStrategy = DEFAULT_STREAM_PARTITION_ASSIGNMENT_STRATEGY;
 
@@ -508,6 +509,11 @@ public class TableConfig {
       return this;
     }
 
+    public Builder setBloomFilterColumns(List<String> bloomFilterColumns) {
+      _bloomFilterColumns = bloomFilterColumns;
+      return this;
+    }
+
     public Builder setNoDictionaryColumns(List<String> noDictionaryColumns) {
       _noDictionaryColumns = noDictionaryColumns;
       return this;
@@ -583,6 +589,7 @@ public class TableConfig {
       indexingConfig.setNoDictionaryColumns(_noDictionaryColumns);
       indexingConfig.setOnHeapDictionaryColumns(_onHeapDictionaryColumns);
       indexingConfig.setStreamConfigs(_streamConfigs);
+      indexingConfig.setBloomFilterColumns(_bloomFilterColumns);
       StreamConsumptionConfig streamConsumptionConfig = new StreamConsumptionConfig();
       streamConsumptionConfig.setStreamPartitionAssignmentStrategy(_streamPartitionAssignmentStrategy);
       indexingConfig.setStreamConsumptionConfig(streamConsumptionConfig);

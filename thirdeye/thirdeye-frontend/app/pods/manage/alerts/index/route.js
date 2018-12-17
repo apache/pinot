@@ -26,14 +26,16 @@ export default Route.extend({
     return hash({
       rawAlerts: fetch('/thirdeye/entity/ANOMALY_FUNCTION').then(checkStatus),
       subscriberGroups: fetch('/thirdeye/entity/ALERT_CONFIG').then(checkStatus),
-      applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus)
+      applications: fetch('/thirdeye/entity/APPLICATION').then(checkStatus),
+      detectionAlertConfig: fetch('/thirdeye/entity/DETECTION_ALERT_CONFIG').then(checkStatus),
+      detectionYaml: fetch('/yaml/list').then(checkStatus)
     });
   },
 
   afterModel(model) {
     this._super(model);
     // Work only with valid alerts - with metric association
-    const alerts = model.rawAlerts.filter(alert => isPresent(alert.metric));
+    let alerts = model.rawAlerts.filter(alert => isPresent(alert.metric));
 
     // Itereate through config groups to enhance all alerts with extra properties (group name, application)
     for (let config of model.subscriberGroups) {
@@ -48,6 +50,35 @@ export default Route.extend({
         }
       }
     }
+
+    // format Yaml configs
+    const yamlAlerts = model.detectionYaml;
+    for (let yamlAlert of yamlAlerts) {
+      Object.assign(yamlAlert, {
+        functionName: yamlAlert.detectionName,
+        collection: yamlAlert.dataset,
+        type: yamlAlert.pipelineType,
+        exploreDimensions: yamlAlert.dimensions,
+        filters: this._formatYamlFilter(yamlAlert.filters)
+      });
+    }
+
+    // Itereate through detection alerter to enhance all yaml alert with extra properties (group name, application)
+    for (let detectionAlert of model.detectionAlertConfig){
+      const detectionConfigIds = Object.keys(detectionAlert.vectorClocks);
+      for (let id of detectionConfigIds) {
+        let foundAlert = yamlAlerts.find(yamlAlert => yamlAlert.id.toString() === id);
+        if (foundAlert) {
+          Object.assign(foundAlert, {
+            application: detectionAlert.application,
+            group: detectionAlert.name
+          });
+        }
+      }
+    }
+
+    // concat legacy alerts and yaml alerts
+    alerts = alerts.concat(yamlAlerts);
 
     // Perform initial filters for our 'primary' filter types and add counts
     const user = getWithDefault(get(this, 'session'), 'data.authenticated.name', null);
@@ -88,11 +119,13 @@ export default Route.extend({
         title: 'Applications',
         type: 'select',
         matchWidth: true,
+        hasNullOption: true, // allow searches for 'none'
         filterKeys: []
       },
       {
         name: 'subscription',
         title: 'Subscription Groups',
+        hasNullOption: true, // allow searches for 'none'
         type: 'select',
         filterKeys: []
       },
@@ -121,6 +154,7 @@ export default Route.extend({
     filterBlocksLocal.filter(block => block.type === 'select').forEach((filter) => {
       const alertPropertyArray = model.alerts.map(alert => alert[filterToPropertyMap[filter.name]]);
       const filterKeys = [ ...new Set(powerSort(alertPropertyArray, null))];
+      // Add filterKeys prop to each facet or filter block
       Object.assign(filter, { filterKeys });
     });
 
@@ -144,6 +178,35 @@ export default Route.extend({
   },
 
   /**
+   * The yaml filters formatter. Convert filters in the yaml file in to a legacy filters string
+   * For example, filters = {
+   *   "country": ["us", "cn"],
+   *   "browser": ["chrome"]
+   * }
+   * will be convert into "country=us;country=cn;browser=chrome"
+   *
+   * @method _formatYamlFilter
+   * @param {Map} filters multimap of filters
+   * @return {String} - formatted filters string
+   */
+  _formatYamlFilter(filters) {
+    if (filters){
+      const filterStrings = [];
+      Object.keys(filters).forEach(
+        function(filterKey) {
+          filters[filterKey].forEach(
+            function (filterValue) {
+              filterStrings.push(filterKey + "=" + filterValue);
+            }
+          );
+        }
+      );
+      return filterStrings.join(";");
+    }
+    return "";
+  },
+
+  /**
    * A local helper to find "Alerts I subscribe to"
    * @method _findAlertIdsByUserGroup
    * @param {String} user - current logged in user's email alias
@@ -161,7 +224,7 @@ export default Route.extend({
     // Extract alert ids from these groups
     const myAlertIds = [ ...new Set(myGroups
       .map(group => getWithDefault(group, 'emailConfig.functionIds', []))
-      .reduce((a, b) => [...a, ...b])
+      .reduce((a, b) => [...a, ...b], [])
     )];
     return myAlertIds;
   },

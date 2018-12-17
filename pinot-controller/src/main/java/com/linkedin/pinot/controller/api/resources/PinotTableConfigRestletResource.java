@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import io.swagger.annotations.ApiOperation;
 import java.io.IOException;
+import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -31,8 +32,11 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Request;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Variant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,16 +44,19 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotTableConfigRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableConfigRestletResource.class);
+  public static final MediaType APPLICATION_HOCON = new MediaType("application", "hocon");
+  public static final MediaType TEXT_JAVA_PROPERTIES = new MediaType("text", "x-java-properties");
 
   @Inject
   private PinotHelixResourceManager _resourceManager;
 
   @GET
-  @Produces("application/hocon")
+  @Produces({"application/hocon", "text/x-java-properties", "text/plain"})
   @Path("/v2/tables/{tableName}")
   @ApiOperation("Displays the configuration of a table")
   public Response readTableConfiguration(
-      @PathParam("tableName") String tableName
+      @PathParam("tableName") String tableName,
+      @Context Request request
   ) {
     TableConfig offlineTableConfig =
         _resourceManager.getTableConfig(tableName, CommonConstants.Helix.TableType.OFFLINE);
@@ -64,10 +71,27 @@ public class PinotTableConfigRestletResource {
     }
 
     CombinedConfig combinedConfig = new CombinedConfig(offlineTableConfig, realtimeTableConfig, tableSchema);
-    String serializedConfig = Serializer.serializeToString(combinedConfig);
+    String serializedConfig;
+
+    List<Variant> variants = Variant
+        .mediaTypes(APPLICATION_HOCON, TEXT_JAVA_PROPERTIES, MediaType.TEXT_PLAIN_TYPE)
+        .build();
+
+    Variant variant = request.selectVariant(variants);
+
+    if (variant == null) {
+      return Response.notAcceptable(variants).build();
+    } else if (APPLICATION_HOCON.equals(variant.getMediaType()) ||
+        MediaType.TEXT_PLAIN_TYPE.equals(variant.getMediaType())) {
+      serializedConfig = Serializer.serializeToString(combinedConfig);
+    } else if (TEXT_JAVA_PROPERTIES.equals(variant.getMediaType())) {
+      serializedConfig = Serializer.serializeToPropertiesString(combinedConfig);
+    } else {
+      return Response.notAcceptable(variants).build();
+    }
 
     return Response
-        .ok(serializedConfig)
+        .ok(serializedConfig, variant)
         .header("Content-Disposition", "inline")
         .build();
   }

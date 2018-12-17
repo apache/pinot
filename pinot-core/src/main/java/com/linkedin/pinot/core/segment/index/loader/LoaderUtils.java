@@ -48,7 +48,7 @@ public class LoaderUtils {
    */
   public static void writeIndexToV3Format(SegmentDirectory.Writer segmentWriter, String column, File indexFile,
       ColumnIndexType indexType) throws IOException {
-    int fileLength = (int) indexFile.length();
+    long fileLength = indexFile.length();
     try (PinotDataBuffer buffer = segmentWriter.newIndexFor(column, indexType, fileLength)) {
       buffer.readFrom(0, indexFile, 0, fileLength);
       FileUtils.forceDelete(indexFile);
@@ -82,7 +82,7 @@ public class LoaderUtils {
    * Try to recover a segment from reload failures (reloadSegment() method in HelixInstanceDataManager). This has no
    * effect for normal segments.
    * <p>Reload failures include normal failures like Java exceptions (called in reloadSegment() finally block) and hard
-   * failures such as server restart during reload and JVM crush (called before trying to load segment from the index
+   * failures such as server restart during reload and JVM crash (called before trying to load segment from the index
    * directory).
    * <p>The following failure scenarios could happen (use atomic renaming operation to classify scenarios):
    * <ul>

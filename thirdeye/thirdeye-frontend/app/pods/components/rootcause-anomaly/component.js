@@ -3,7 +3,8 @@ import {
   computed,
   setProperties,
   getProperties,
-  get
+  get,
+  set
 } from '@ember/object';
 import moment from 'moment';
 import {
@@ -67,10 +68,33 @@ export default Component.extend({
   options: Object.keys(ANOMALY_OPTIONS_MAPPING),
 
   /**
+   * Can be set by isWarning if data inconsistent
+   * @type {boolean}
+   */
+  warningValue: false,
+
+  /**
    * A mapping of the status and a more human readable version
    * @type {Object}
    */
   optionsMapping: ANOMALY_OPTIONS_MAPPING,
+
+  /**
+   * Checks if anomalyRange from context is different than anomaly start and end
+   * times
+   * @type {boolean}
+   */
+  isRangeChanged: computed(
+    'anomalyRange',
+    'anomaly',
+    function () {
+      const anomaly = get(this, 'anomaly');
+      const anomalyRange = get(this, 'anomalyRange');
+      const start = get(this, 'anomaly').start;
+      const end = get(this, 'anomaly').end;
+      return !(anomalyRange[0] === start && anomalyRange[1] === end);
+    }
+  ),
 
   /**
    * Urn of an anomaly
@@ -150,6 +174,12 @@ export default Component.extend({
    * @type {float}
    */
   predicted: reads('anomaly.attributes.baseline.firstObject'),
+
+  /**
+   * Anomaly current as computed by anomaly function
+   * @type {float}
+   */
+  current: reads('anomaly.attributes.current.firstObject'),
 
   /**
    * Anomaly aggregate multiplier
@@ -297,7 +327,6 @@ export default Component.extend({
           };
         }
       });
-
       return anomalyInfo;
     }
   ),
@@ -312,6 +341,46 @@ export default Component.extend({
   }),
 
   /**
+   * Returns humanized version of current value
+   * @type {String}
+   */
+  humanizedAnomalyCurrent: computed('current', function () {
+    const oldCurrent = get(this, 'current');
+    return humanizeFloat(parseFloat(oldCurrent));
+  }),
+
+  /**
+   * Checks if value at anomaly detection time and present differ by 1% or more
+   * @type {Boolean}
+   */
+  isWarning: computed('anomalyInfo', 'isRangeChanged', function () {
+    if(!get(this, 'isRangeChanged')) {
+      const oldCurrent = parseFloat(get(this, 'current'));
+      let newCurrent = this._getAggregate('current');
+      const aggregateMultiplier = parseFloat(get(this, 'aggregateMultiplier'));
+      if (newCurrent && oldCurrent && aggregateMultiplier){
+        newCurrent = newCurrent * aggregateMultiplier;
+        const diffCurrent = Math.abs((newCurrent-oldCurrent)/newCurrent);
+        if (diffCurrent > 0.01) {
+          set(this, 'warningValue', true);
+        } else {
+          set(this, 'warningValue', false);
+        }
+      }
+    }
+    return get(this, 'warningValue');
+  }),
+
+  /**
+   * grabs value of new current only when warningValue is toggled
+   * @type {string}
+   */
+  warningChangedTo: computed('warningValue', function() {
+    const newCurrent = this._getAggregate('current') * parseFloat(get(this, 'aggregateMultiplier'));
+    return humanizeFloat(newCurrent);
+  }),
+
+  /**
    * Returns the aggregate value for a given offset. Handles computed baseline special case.
    *
    * @param {string} offset metric offset
@@ -321,14 +390,12 @@ export default Component.extend({
   _getAggregate(offset) {
     const { metricUrn, aggregates, predicted, aggregateMultiplier } =
       getProperties(this, 'metricUrn', 'aggregates', 'predicted', 'aggregateMultiplier');
-
     if (offset === 'predicted') {
       const value = parseFloat(predicted);
       if (value === 0.0) { return Number.NaN; }
-      return value;
+      return value / (aggregateMultiplier || 1.0);
     }
-
-    return aggregates[toOffsetUrn(metricUrn, offset)] * (aggregateMultiplier || 1.0);
+    return aggregates[toOffsetUrn(metricUrn, offset)];
   },
 
   actions: {

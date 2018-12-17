@@ -6,6 +6,7 @@ import moment from 'moment';
 import _ from 'lodash';
 import { setUpTimeRangeOptions } from 'thirdeye-frontend/utils/manage-alert-utils';
 import * as anomalyUtil from 'thirdeye-frontend/utils/anomaly';
+import { inject as service } from '@ember/service';
 
 const TIME_PICKER_INCREMENT = 5; // tells date picker hours field how granularly to display time
 const DEFAULT_ACTIVE_DURATION = '1d'; // setting this date range selection as default (Last 24 Hours)
@@ -16,6 +17,7 @@ const TIME_RANGE_OPTIONS = ['today', '1d', '2d', '1w'];
 export default Controller.extend({
   toggleCollapsed: false, /* hide/show accordians */
   isReportAnomalyEnabled: false,
+  store: service('store'),
 
   /**
    * Overrides ember-models-table's css classes
@@ -38,6 +40,17 @@ export default Controller.extend({
       anomalyResponseNames: anomalyResponseFilterTypes.mapBy('name')
     });
   },
+
+  sortedApplications: computed(
+    'model.applications',
+    function() {
+      let model = get(this, 'model');
+
+      // Iterate through each anomaly
+      let applications =  this.get('store').peekAll('application').sortBy('application');
+      return applications;
+    }
+  ),
 
   filteredAnomalyMapping: computed(
     'model.{anomalyMapping,feedbackType}',

@@ -79,6 +79,7 @@ public class NotInPredicateEvaluatorFactory {
 
   public static final class DictionaryBasedNotInPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final IntSet _nonMatchingDictIdSet;
+    final int _numNonMatchingDictIds;
     final Dictionary _dictionary;
     int[] _matchingDictIds;
     int[] _nonMatchingDictIds;
@@ -92,17 +93,18 @@ public class NotInPredicateEvaluatorFactory {
           _nonMatchingDictIdSet.add(dictId);
         }
       }
+      _numNonMatchingDictIds = _nonMatchingDictIdSet.size();
+      if (_numNonMatchingDictIds == 0) {
+        _alwaysTrue = true;
+      } else if (dictionary.length() == _numNonMatchingDictIds) {
+        _alwaysFalse = true;
+      }
       _dictionary = dictionary;
     }
 
     @Override
     public Predicate.Type getPredicateType() {
       return Predicate.Type.NOT_IN;
-    }
-
-    @Override
-    public boolean isAlwaysFalse() {
-      return _nonMatchingDictIdSet.size() == _dictionary.length();
     }
 
     @Override
@@ -114,7 +116,7 @@ public class NotInPredicateEvaluatorFactory {
     public int[] getMatchingDictIds() {
       if (_matchingDictIds == null) {
         int dictionarySize = _dictionary.length();
-        _matchingDictIds = new int[dictionarySize - _nonMatchingDictIdSet.size()];
+        _matchingDictIds = new int[dictionarySize - _numNonMatchingDictIds];
         int index = 0;
         for (int dictId = 0; dictId < dictionarySize; dictId++) {
           if (!_nonMatchingDictIdSet.contains(dictId)) {
@@ -127,7 +129,7 @@ public class NotInPredicateEvaluatorFactory {
 
     @Override
     public int getNumNonMatchingDictIds() {
-      return _nonMatchingDictIdSet.size();
+      return _numNonMatchingDictIds;
     }
 
     @Override

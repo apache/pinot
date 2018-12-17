@@ -4,13 +4,12 @@
  * @exports create
  */
 import { reads } from '@ember/object/computed';
-
+import { inject as service } from '@ember/service';
 import RSVP from "rsvp";
-import _ from 'lodash';
 import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
-import { computed, set, getWithDefault } from '@ember/object';
+import { computed, set, get, getWithDefault } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import {
   isPresent,
@@ -30,6 +29,7 @@ import {
   getTopDimensions
 } from 'thirdeye-frontend/utils/manage-alert-utils';
 import config from 'thirdeye-frontend/config/environment';
+import { yamlAlertProps } from 'thirdeye-frontend/utils/constants';
 
 export default Controller.extend({
 
@@ -63,6 +63,9 @@ export default Controller.extend({
   availableDimensions: 0,
   metricLookupCache: [],
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
+  isForm: true,
+  disableYamlSave: true,
+  yamlAlertProps,
 
   /**
    * Component property initial settings
@@ -71,6 +74,7 @@ export default Controller.extend({
   graphConfig: {},
   selectedFilters: JSON.stringify({}),
   selectedWeeklyEffect: true,
+  alertYamlContent: null,
 
   /**
    * Object to cover basic ield 'presence' validation
@@ -106,6 +110,8 @@ export default Controller.extend({
       'Absolute Value of Change': 'deviation'
     }
   },
+
+  notifications: service('toast'),
 
   /**
    * Severity display options (power-select) and values
@@ -396,6 +402,20 @@ export default Controller.extend({
     'isMetricSelected',
     function() {
       return (!this.get('isMetricSelected') || isEmpty(this.get('granularities')));
+    }
+  ),
+
+  /**
+   * sets Yaml value displayed to contents of alertYamlContent or yamlAlertProps
+   * @method currentYamlValues
+   * @return {String}
+   */
+  currentYamlValues: computed(
+    'yamlAlertProps',
+    'alertYamlContent',
+    function() {
+      const inputYaml = this.get('alertYamlContent');
+      return (inputYaml ? inputYaml : this.get('yamlAlertProps'));
     }
   ),
 
@@ -754,6 +774,47 @@ export default Controller.extend({
    * Actions for create alert form view
    */
   actions: {
+
+    /**
+     * Clears YAML content, disables 'save changes' button, and moves to form
+     */
+    cancelAlertYaml() {
+      set(this, 'disableYamlSave', true);
+      set(this, 'alertYamlContent', null);
+      set(this, 'isForm', true);
+    },
+
+    /**
+     * Activates 'save changes' button and stores YAML content in alertYamlContent
+     */
+    onYMLSelector(value) {
+      set(this, 'disableYamlSave', false);
+      set(this, 'alertYamlContent', value);
+    },
+
+    /**
+     * Fired by save button in YAML UI
+     * Grabs YAML content and sends it
+     */
+    saveAlertYaml() {
+      set(this, 'disableYamlSave', true);
+      const content = get(this, 'alertYamlContent');
+      const url = '/yaml';
+      const postProps = {
+        method: 'post',
+        body: content,
+        headers: { 'content-type': 'text/plain' }
+      };
+      const notifications = this.get('notifications');
+
+      fetch(url, postProps).then(checkStatus).then((res) => {
+        if (res && res.active) {
+          notifications.success('Save alert yaml successfully.', 'Saved');
+        }
+      }).catch(() => {
+        notifications.error('Save alert yaml file failed.', 'Error');
+      });
+    },
 
     /**
      * When a metric is selected, fetch its props, and send them to the graph builder
