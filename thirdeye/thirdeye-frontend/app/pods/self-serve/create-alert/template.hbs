@@ -444,6 +444,12 @@
         }}
       </div> --}}
     </fieldset>
+    {{#unless isYamlParseable}}
+      <div class="yaml alert alert-warning fade in">
+        Could not parse YAML.  If you want autocomplete for filter name,
+        please insert a colon and type before the colon
+      </div>
+    {{/unless}}
     <fieldset class="te-form__section-submit">
       {{bs-button
         defaultText="Cancel"

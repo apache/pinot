@@ -75,6 +75,7 @@ export default Controller.extend({
   disableYamlSave: true,
   yamlAlertProps,
   currentMetric: null,
+  isYamlParseable: true,
 
   /**
    * Component property initial settings
@@ -890,9 +891,10 @@ export default Controller.extend({
       let yamlAsObject = {}
       try {
         yamlAsObject = yamljs.parse(alertYamlContent);
+        set(this, 'isYamlParseable', true);
       }
       catch(err){
-        console.log(`Could not parse YAML.  If you want autocomplete for filter name, please insert a colon and type before the colon`);
+        set(this, 'isYamlParseable', false);
         return noResultsArray;
       }
       // if editor.metricId field contains a value, metric was just chosen.  Populate caches for filters and dimensions
