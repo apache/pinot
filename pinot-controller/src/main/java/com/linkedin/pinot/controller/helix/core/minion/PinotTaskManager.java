@@ -49,6 +49,11 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
   private final ControllerMetrics _controllerMetrics;
 
+  private Map<String, List<TableConfig>> _enabledTableConfigMap;
+  private Set<String> _taskTypes;
+  private int _numTaskTypes;
+  private Map<String, String> _tasksScheduled;
+
   public PinotTaskManager(@Nonnull PinotHelixTaskResourceManager helixTaskResourceManager,
       @Nonnull PinotHelixResourceManager helixResourceManager, @Nonnull ControllerConf controllerConf,
       @Nonnull ControllerMetrics controllerMetrics) {
@@ -81,65 +86,11 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   }
 
   /**
-   * Check the Pinot cluster status and schedule new tasks for the given tables.
-   *
-   * @param tables List of table names
-   * @return Map from task type to task scheduled
-   */
-  @Nonnull
-  private Map<String, String> scheduleTasks(List<String> tables) {
-    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
-
-    Set<String> taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
-    int numTaskTypes = taskTypes.size();
-    Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>(numTaskTypes);
-
-    for (String taskType : taskTypes) {
-      enabledTableConfigMap.put(taskType, new ArrayList<>());
-
-      // Ensure all task queues exist
-      _helixTaskResourceManager.ensureTaskQueueExists(taskType);
-    }
-
-    // Scan all table configs to get the tables with tasks enabled
-    for (String tableName : tables) {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
-      if (tableConfig != null) {
-        TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-        if (taskConfig != null) {
-          for (String taskType : taskTypes) {
-            if (taskConfig.isTaskTypeEnabled(taskType)) {
-              enabledTableConfigMap.get(taskType).add(tableConfig);
-            }
-          }
-        }
-      }
-    }
-
-    // Generate each type of tasks
-    Map<String, String> tasksScheduled = new HashMap<>(numTaskTypes);
-    for (String taskType : taskTypes) {
-      LOGGER.info("Generating tasks for task type: {}", taskType);
-      PinotTaskGenerator pinotTaskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
-      List<PinotTaskConfig> pinotTaskConfigs = pinotTaskGenerator.generateTasks(enabledTableConfigMap.get(taskType));
-      int numTasks = pinotTaskConfigs.size();
-      if (numTasks > 0) {
-        LOGGER.info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType,
-            pinotTaskConfigs);
-        tasksScheduled.put(taskType, _helixTaskResourceManager.submitTask(pinotTaskConfigs,
-            pinotTaskGenerator.getNumConcurrentTasksPerInstance()));
-        _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
-      }
-    }
-
-    return tasksScheduled;
-  }
-
-  /**
    * Public API to schedule tasks. It doesn't matter whether current pinot controller is leader.
    */
   public Map<String, String> scheduleTasks() {
-    return scheduleTasks(_pinotHelixResourceManager.getAllTables());
+    process(_pinotHelixResourceManager.getAllTables());
+    return getTasksScheduled();
   }
 
   /**
@@ -154,8 +105,62 @@ public class PinotTaskManager extends ControllerPeriodicTask {
     }
   }
 
+
   @Override
-  public void process(List<String> tables) {
-    scheduleTasks(tables);
+  protected void preprocess() {
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
+
+    _taskTypes = _taskGeneratorRegistry.getAllTaskTypes();
+    _numTaskTypes = _taskTypes.size();
+    _enabledTableConfigMap = new HashMap<>(_numTaskTypes);
+
+    for (String taskType : _taskTypes) {
+      _enabledTableConfigMap.put(taskType, new ArrayList<>());
+
+      // Ensure all task queues exist
+      _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+    }
+  }
+
+  @Override
+  protected void process(String tableNameWithType) {
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    if (tableConfig != null) {
+      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+      if (taskConfig != null) {
+        for (String taskType : _taskTypes) {
+          if (taskConfig.isTaskTypeEnabled(taskType)) {
+            _enabledTableConfigMap.get(taskType).add(tableConfig);
+          }
+        }
+      }
+    }
+  }
+
+  @Override
+  protected void postprocess() {
+    // Generate each type of tasks
+    _tasksScheduled = new HashMap<>(_numTaskTypes);
+    for (String taskType : _taskTypes) {
+      LOGGER.info("Generating tasks for task type: {}", taskType);
+      PinotTaskGenerator pinotTaskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
+      List<PinotTaskConfig> pinotTaskConfigs = pinotTaskGenerator.generateTasks(_enabledTableConfigMap.get(taskType));
+      int numTasks = pinotTaskConfigs.size();
+      if (numTasks > 0) {
+        LOGGER.info("Submitting {} tasks for task type: {} with task configs: {}", numTasks, taskType,
+            pinotTaskConfigs);
+        _tasksScheduled.put(taskType, _helixTaskResourceManager.submitTask(pinotTaskConfigs,
+            pinotTaskGenerator.getNumConcurrentTasksPerInstance()));
+        _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);
+      }
+    }
+  }
+
+  /**
+   * Returns the tasks that have been scheduled as part of the postprocess
+   * @return
+   */
+  public Map<String, String> getTasksScheduled() {
+    return _tasksScheduled;
   }
 }
