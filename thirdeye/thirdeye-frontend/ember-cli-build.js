@@ -68,6 +68,13 @@ module.exports = function(defaults) {
   // jspdf and html2canvas assets for PDF
   app.import('node_modules/jspdf/dist/jspdf.min.js');
 
+  // imports yamljs node module as commonjs
+  app.import('node_modules/yamljs/index.js', {
+    using: [
+      { transformation: 'cjs', as: 'yamljs'}
+    ]
+  });
+
   // Use `app.import` to add additional libraries to the generated
   // output files.
 
