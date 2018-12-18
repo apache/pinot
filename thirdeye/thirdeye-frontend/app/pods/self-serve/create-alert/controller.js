@@ -6,10 +6,11 @@
 import { reads } from '@ember/object/computed';
 import { inject as service } from '@ember/service';
 import RSVP from "rsvp";
+import yamljs from 'yamljs';
 import fetch from 'fetch';
 import moment from 'moment';
 import Controller from '@ember/controller';
-import { computed, set, get, getWithDefault } from '@ember/object';
+import { computed, set, get, getWithDefault, getProperties } from '@ember/object';
 import { task, timeout } from 'ember-concurrency';
 import {
   isPresent,
@@ -29,7 +30,7 @@ import {
   getTopDimensions
 } from 'thirdeye-frontend/utils/manage-alert-utils';
 import config from 'thirdeye-frontend/config/environment';
-import { yamlAlertProps } from 'thirdeye-frontend/utils/constants';
+import { yamlAlertProps, yamIt } from 'thirdeye-frontend/utils/constants';
 
 export default Controller.extend({
 
@@ -62,10 +63,19 @@ export default Controller.extend({
   dimensionCount: 7,
   availableDimensions: 0,
   metricLookupCache: [],
+  filtersCache: {},
+  dimensionsCache: [],
+  noResultsArray: [{
+    value: 'abcdefghijklmnopqrstuvwxyz0123456789',
+    caption: 'No Results',
+    snippet: ''
+  }],
   metricHelpMailto: `mailto:${config.email}?subject=Metric Onboarding Request (non-additive UMP or derived)`,
   isForm: true,
   disableYamlSave: true,
   yamlAlertProps,
+  currentMetric: null,
+  isYamlParseable: true,
 
   /**
    * Component property initial settings
@@ -731,6 +741,102 @@ export default Controller.extend({
   ),
 
   /**
+   * Calls api's for specific metric's autocomplete
+   * @method _loadAutocompleteById
+   * @return Promise
+   */
+   _loadAutocompleteById(metricId) {
+     const promiseHash = {
+       filters: fetch(selfServeApiGraph.metricFilters(metricId)).then(res => checkStatus(res, 'get', true)),
+       dimensions: fetch(selfServeApiGraph.metricDimensions(metricId)).then(res => checkStatus(res, 'get', true))
+     };
+     return RSVP.hash(promiseHash);
+   },
+
+  /**
+   * Get autocomplete suggestions from relevant api
+   * @method _buildYamlSuggestions
+   * @return Promise
+   */
+   _buildYamlSuggestions(currentMetric, yamlAsObject, prefix, noResultsArray, filtersCache, dimensionsCache) {
+    // holds default result to return if all checks fail
+    let defaultReturn = Promise.resolve(noResultsArray);
+    // when metric is being autocompleted, entire text field will be replaced and metricId stored in editor
+    if (yamlAsObject.metric === prefix) {
+      return fetch(selfServeApiCommon.metricAutoComplete(prefix))
+        .then(checkStatus)
+        .then(metrics => {
+          if (metrics && metrics.length > 0) {
+            return metrics.map(metric => {
+              const [dataset, metricname] = metric.alias.split('::');
+              return {
+                value: metricname,
+                caption: metric.alias,
+                metricname,
+                dataset,
+                id: metric.id,
+                completer:{
+                insertMatch: (editor, data) => {
+                  editor.setValue(yamIt(data.metricname, data.dataset));
+                  editor.metricId = data.id;
+                  //editor.completer.insertMatch({value: data.value});
+                  // editor.insert('abc');
+                }
+              }}
+            })
+          }
+          return noResultsArray
+        })
+        .catch(() => {
+          return noResultsArray;
+        });
+    }
+    // if a currentMetric has been stored, we can check autocomplete filters and dimensions
+    if (currentMetric) {
+      const dimensionValues = yamlAsObject.dimensionExploration.dimensions;
+      const filterTypes = typeof yamlAsObject.filters === "object" ? Object.keys(yamlAsObject.filters) : [];
+      if (Array.isArray(dimensionValues) && dimensionValues.includes(prefix)) {
+        if (dimensionsCache.length > 0) {
+          // wraps result in Promise.resolve because return of Promise is expected by yamlSuggestions
+          return Promise.resolve(dimensionsCache.map(dimension => {
+            return {
+              value: dimension,
+            };
+          }));
+        }
+      }
+      let filterKey = '';
+      let i = 0;
+      while (i < filterTypes.length) {
+        if (filterTypes[i] === prefix){
+          i = filterTypes.length;
+          // wraps result in Promise.resolve because return of Promise is expected by yamlSuggestions
+          return Promise.resolve(Object.keys(filtersCache).map(filterType => {
+            return {
+              value: `${filterType}:`,
+              caption: `${filterType}:`,
+              snippet: filterType
+            };
+          }));
+        }
+        if (Array.isArray(yamlAsObject.filters[filterTypes[i]]) && yamlAsObject.filters[filterTypes[i]].includes(prefix)) {
+          filterKey = filterTypes[i];
+        }
+        i++;
+      }
+      if (filterKey) {
+        // wraps result in Promise.resolve because return of Promise is expected by yamlSuggestions
+        return Promise.resolve(filtersCache[filterKey].map(filterParam => {
+          return {
+            value: filterParam
+          }
+        }));
+      }
+    }
+    return defaultReturn;
+  },
+
+  /**
    * Reset the form... clear all important fields
    * @method clearAll
    * @return {undefined}
@@ -774,6 +880,46 @@ export default Controller.extend({
    * Actions for create alert form view
    */
   actions: {
+    /**
+     * returns array of suggestions for Yaml editor autocompletion
+     */
+    yamlSuggestions(editor, session, position, prefix) {
+      const {
+        alertYamlContent,
+        noResultsArray
+      } = getProperties(this, 'alertYamlContent', 'noResultsArray');
+      let yamlAsObject = {}
+      try {
+        yamlAsObject = yamljs.parse(alertYamlContent);
+        set(this, 'isYamlParseable', true);
+      }
+      catch(err){
+        set(this, 'isYamlParseable', false);
+        return noResultsArray;
+      }
+      // if editor.metricId field contains a value, metric was just chosen.  Populate caches for filters and dimensions
+      if(editor.metricId){
+        const currentMetric = set(this, 'currentMetric', editor.metricId);
+        editor.metricId = '';
+        return get(this, '_loadAutocompleteById')(currentMetric)
+          .then(resultObj => {
+            const { filters, dimensions } = resultObj;
+            this.setProperties({
+              dimensionsCache: dimensions,
+              filtersCache: filters
+            });
+          })
+          .then(() => {
+            return get(this, '_buildYamlSuggestions')(currentMetric, yamlAsObject, prefix, noResultsArray, get(this, 'filtersCache'), get(this, 'dimensionsCache'))
+              .then(results => results);
+          })
+      }
+      const currentMetric = get(this, 'currentMetric');
+      // deals with no metricId, which could be autocomplete for metric or for filters and dimensions already cached
+      return get(this, '_buildYamlSuggestions')(currentMetric, yamlAsObject, prefix, noResultsArray, get(this, 'filtersCache'), get(this, 'dimensionsCache'))
+        .then(results => results);
+
+    },
 
     /**
      * Clears YAML content, disables 'save changes' button, and moves to form
@@ -782,6 +928,7 @@ export default Controller.extend({
       set(this, 'disableYamlSave', true);
       set(this, 'alertYamlContent', null);
       set(this, 'isForm', true);
+      set(this, 'currentMetric', null);
     },
 
     /**
