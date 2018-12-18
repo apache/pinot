@@ -20,7 +20,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.linkedin.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>0.1.095</version>
+  <version>0.1.096-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>pinot</name>
   <modules>
@@ -93,7 +93,7 @@
   </developers>
   <scm>
     <developerConnection>scm:git:gitolite@code.uber.internal:data/pinot</developerConnection>
-    <tag>0.1.095</tag>
+    <tag>pinot-0.1.076-SNAPSHOT</tag>
   </scm>
   <distributionManagement>
     <repository>
