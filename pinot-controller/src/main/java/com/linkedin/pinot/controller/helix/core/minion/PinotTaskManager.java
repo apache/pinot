@@ -123,7 +123,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void process(String tableNameWithType) {
+  protected void processTable(String tableNameWithType) {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig != null) {
       TableTaskConfig taskConfig = tableConfig.getTaskConfig();

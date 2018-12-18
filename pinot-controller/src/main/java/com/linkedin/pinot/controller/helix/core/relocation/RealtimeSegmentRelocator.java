@@ -63,7 +63,7 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void process(String tableNameWithType) {
+  protected void processTable(String tableNameWithType) {
     runRelocation(tableNameWithType);
   }
 

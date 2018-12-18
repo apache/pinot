@@ -113,7 +113,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   protected void process(List<String> tables) {
     preprocess();
     for (String table : tables) {
-      process(table);
+      processTable(table);
     }
     postprocess();
   }
@@ -127,7 +127,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    * Execute the controller periodic task for the given table
    * @param tableNameWithType
    */
-  protected abstract void process(String tableNameWithType);
+  protected abstract void processTable(String tableNameWithType);
 
   /**
    * This method runs after processing all tables

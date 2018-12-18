@@ -92,7 +92,7 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void process(String tableNameWithType) {
+  protected void processTable(String tableNameWithType) {
     runValidation(tableNameWithType);
   }
 

@@ -106,7 +106,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void process(String tableNameWithType) {
+  protected void processTable(String tableNameWithType) {
     updateSegmentMetrics(tableNameWithType);
   }
 

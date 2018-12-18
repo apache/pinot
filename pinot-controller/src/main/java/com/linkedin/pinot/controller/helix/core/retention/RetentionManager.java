@@ -67,7 +67,7 @@ public class RetentionManager extends ControllerPeriodicTask {
   }
 
   @Override
-  protected void process(String tableNameWithType) {
+  protected void processTable(String tableNameWithType) {
     try {
       LOGGER.info("Start managing retention for table: {}", tableNameWithType);
       manageRetentionForTable(tableNameWithType);

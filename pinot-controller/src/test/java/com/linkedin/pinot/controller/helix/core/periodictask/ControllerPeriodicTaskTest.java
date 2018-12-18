@@ -125,7 +125,7 @@ public class ControllerPeriodicTaskTest {
     }
 
     @Override
-    protected void process(String tableNameWithType) {
+    protected void processTable(String tableNameWithType) {
 
     }
 
