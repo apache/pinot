@@ -79,7 +79,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     if (_useHTTPS) {
       _baseUri = URI.create("https://0.0.0.0:" + httpPort + "/");
       SSLContextConfigurator sslContext = new SSLContextConfigurator();
-	  sslContext.setKeyStoreFile(_keyStoreFile);
+          sslContext.setKeyStoreFile(_keyStoreFile);
 	  sslContext.setKeyStorePass(_keyStorePass);
 	  sslContext.setTrustStoreFile(_trustStoreFile);
 	  sslContext.setTrustStorePass(_trustStorePass);
