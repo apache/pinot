@@ -76,7 +76,7 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void preprocess() {
+  protected void preprocess() {
     // Run segment level validation using a separate interval
     _runSegmentLevelValidation = false;
     long currentTimeMs = System.currentTimeMillis();
@@ -92,12 +92,12 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(String tableNameWithType) {
+  protected void process(String tableNameWithType) {
     runValidation(tableNameWithType);
   }
 
   @Override
-  public void postprocess() {
+  protected void postprocess() {
 
   }
 

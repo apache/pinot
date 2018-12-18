@@ -124,7 +124,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   protected abstract void preprocess();
 
   /**
-   * Process the controller periodic task for the given table
+   * Execute the controller periodic task for the given table
    * @param tableNameWithType
    */
   protected abstract void process(String tableNameWithType);

@@ -160,7 +160,7 @@ public class PinotTaskManager extends ControllerPeriodicTask {
    * Returns the tasks that have been scheduled as part of the postprocess
    * @return
    */
-  public Map<String, String> getTasksScheduled() {
+  private Map<String, String> getTasksScheduled() {
     return _tasksScheduled;
   }
 }
