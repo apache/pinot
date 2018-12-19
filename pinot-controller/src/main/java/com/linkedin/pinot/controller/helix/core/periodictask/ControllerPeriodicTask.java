@@ -110,7 +110,29 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    *
    * @param tables List of table names
    */
-  public abstract void process(List<String> tables);
+  protected void process(List<String> tables) {
+    preprocess();
+    for (String table : tables) {
+      processTable(table);
+    }
+    postprocess();
+  }
+
+  /**
+   * This method runs before processing all tables
+   */
+  protected abstract void preprocess();
+
+  /**
+   * Execute the controller periodic task for the given table
+   * @param tableNameWithType
+   */
+  protected abstract void processTable(String tableNameWithType);
+
+  /**
+   * This method runs after processing all tables
+   */
+  protected abstract void postprocess();
 
   @VisibleForTesting
   protected boolean isLeader() {

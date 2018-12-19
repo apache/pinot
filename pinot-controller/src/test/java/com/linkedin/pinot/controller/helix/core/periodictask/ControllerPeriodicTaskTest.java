@@ -115,7 +115,22 @@ public class ControllerPeriodicTaskTest {
     }
 
     @Override
-    public void process(List<String> tables) {
+    protected void process(List<String> tables) {
+
+    }
+
+    @Override
+    protected void preprocess() {
+
+    }
+
+    @Override
+    protected void processTable(String tableNameWithType) {
+
+    }
+
+    @Override
+    public void postprocess() {
 
     }
 

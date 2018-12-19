@@ -58,51 +58,59 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> tables) {
-    runRelocation(tables);
+  protected void preprocess() {
+
+  }
+
+  @Override
+  protected void processTable(String tableNameWithType) {
+    runRelocation(tableNameWithType);
+  }
+
+  @Override
+  protected void postprocess() {
+
   }
 
   /**
-   * Check the given tables. Perform relocation of segments if table is realtime and relocation is required
+   * Check the given table. Perform relocation of segments if table is realtime and relocation is required
    * TODO: Model this to implement {@link com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategy} interface
    * https://github.com/linkedin/pinot/issues/2609
    *
-   * @param tables List of table names
+   * @param tableNameWithType
    */
-  private void runRelocation(List<String> tables) {
-    for (String tableNameWithType : tables) {
-      // Only consider realtime tables.
-      if (!TableNameBuilder.REALTIME.tableHasTypeSuffix(tableNameWithType)) {
-        continue;
+  private void runRelocation(String tableNameWithType) {
+    // Only consider realtime tables.
+    if (!TableNameBuilder.REALTIME.tableHasTypeSuffix(tableNameWithType)) {
+      return;
+    }
+    try {
+      LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
+
+      TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
+      final RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
+      if (!realtimeTagConfig.isRelocateCompletedSegments()) {
+        LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
+        return;
       }
-      try {
-        LOGGER.info("Starting relocation of segments for table: {}", tableNameWithType);
 
-        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableNameWithType);
-        final RealtimeTagConfig realtimeTagConfig = new RealtimeTagConfig(tableConfig);
-        if (!realtimeTagConfig.isRelocateCompletedSegments()) {
-          LOGGER.info("Skipping relocation of segments for {}", tableNameWithType);
-          continue;
-        }
-
-        Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
-          @Nullable
-          @Override
-          public IdealState apply(@Nullable IdealState idealState) {
-            if (!idealState.isEnabled()) {
-              LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
-              return null;
-            }
-            relocateSegments(realtimeTagConfig, idealState);
-            return idealState;
+      Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
+        @Nullable
+        @Override
+        public IdealState apply(@Nullable IdealState idealState) {
+          if (!idealState.isEnabled()) {
+            LOGGER.info("Skipping relocation of segments for {} since ideal state is disabled", tableNameWithType);
+            return null;
           }
-        };
+          relocateSegments(realtimeTagConfig, idealState);
+          return idealState;
+        }
+      };
 
-        HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType, updater,
-            RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
-      } catch (Exception e) {
-        LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
-      }
+      HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType, updater,
+          RetryPolicies.exponentialBackoffRetryPolicy(5, 1000, 2.0f));
+    } catch (Exception e) {
+      LOGGER.error("Exception in relocating realtime segments of table {}", tableNameWithType, e);
     }
   }
 

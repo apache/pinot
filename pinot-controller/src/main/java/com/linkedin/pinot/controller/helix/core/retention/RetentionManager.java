@@ -62,27 +62,24 @@ public class RetentionManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> tables) {
-    execute(tables);
+  protected void preprocess() {
+
   }
 
-  /**
-   * Manages retention for the given tables.
-   *
-   * @param tables List of table names
-   */
-  private void execute(List<String> tables) {
+  @Override
+  protected void processTable(String tableNameWithType) {
     try {
-      for (String tableNameWithType : tables) {
-        LOGGER.info("Start managing retention for table: {}", tableNameWithType);
-        manageRetentionForTable(tableNameWithType);
-      }
-
-      LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
-      _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
+      LOGGER.info("Start managing retention for table: {}", tableNameWithType);
+      manageRetentionForTable(tableNameWithType);
     } catch (Exception e) {
       LOGGER.error("Caught exception while managing retention for all tables", e);
     }
+  }
+
+  @Override
+  protected void postprocess() {
+    LOGGER.info("Removing aged (more than {} days) deleted segments for all tables", _deletedSegmentsRetentionInDays);
+    _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
   }
 
   private void manageRetentionForTable(String tableNameWithType) {

@@ -23,7 +23,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
@@ -57,6 +57,8 @@ public class ValidationManager extends ControllerPeriodicTask {
   private final ValidationMetrics _validationMetrics;
 
   private long _lastSegmentLevelValidationTimeMs = 0L;
+  private boolean _runSegmentLevelValidation;
+  private List<InstanceConfig> _instanceConfigs;
 
   public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
@@ -74,61 +76,62 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void process(List<String> tables) {
-    runValidation(tables);
-  }
-
-  /**
-   * Runs a validation pass over the given tables.
-   *
-   * @param tables List of table names
-   */
-  private void runValidation(List<String> tables) {
+  protected void preprocess() {
     // Run segment level validation using a separate interval
-    boolean runSegmentLevelValidation = false;
+    _runSegmentLevelValidation = false;
     long currentTimeMs = System.currentTimeMillis();
     if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationTimeMs)
         >= _segmentLevelValidationIntervalInSeconds) {
       LOGGER.info("Run segment-level validation");
-      runSegmentLevelValidation = true;
+      _runSegmentLevelValidation = true;
       _lastSegmentLevelValidationTimeMs = currentTimeMs;
     }
 
     // Cache instance configs to reduce ZK access
-    List<InstanceConfig> instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
+    _instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
+  }
 
-    for (String tableNameWithType : tables) {
-      try {
-        TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-        if (tableConfig == null) {
-          LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
-          continue;
-        }
+  @Override
+  protected void processTable(String tableNameWithType) {
+    runValidation(tableNameWithType);
+  }
 
-        // Rebuild broker resource
-        Set<String> brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(instanceConfigs,
-            tableConfig.getTenantConfig().getBroker());
-        _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
+  @Override
+  protected void postprocess() {
 
-        // Perform validation based on the table type
-        TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
-        if (tableType == TableType.OFFLINE) {
-          if (runSegmentLevelValidation) {
-            validateOfflineSegmentPush(tableConfig);
-          }
-        } else {
-          if (runSegmentLevelValidation) {
-            updateRealtimeDocumentCount(tableConfig);
-          }
-          Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
-          StreamConfig streamConfig = new StreamConfig(streamConfigMap);
-          if (streamConfig.hasLowLevelConsumerType()) {
-            _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
-          }
-        }
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while validating table: {}", tableNameWithType, e);
+  }
+
+  private void runValidation(String tableNameWithType) {
+    try {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      if (tableConfig == null) {
+        LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
+        return;
       }
+
+      // Rebuild broker resource
+      Set<String> brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(_instanceConfigs,
+          tableConfig.getTenantConfig().getBroker());
+      _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
+
+      // Perform validation based on the table type
+      CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+        if (_runSegmentLevelValidation) {
+          validateOfflineSegmentPush(tableConfig);
+        }
+      } else {
+        if (_runSegmentLevelValidation) {
+          updateRealtimeDocumentCount(tableConfig);
+        }
+        Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
+        StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+        if (streamConfig.hasLowLevelConsumerType()) {
+          _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while validating table: {}", tableNameWithType, e);
     }
   }
 
