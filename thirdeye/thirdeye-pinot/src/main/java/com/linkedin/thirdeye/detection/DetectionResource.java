@@ -17,7 +17,6 @@
 package com.linkedin.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.detection.DetectionJobSchedulerUtils;
 import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -137,6 +136,16 @@ public class DetectionResource {
     }
     return Response.ok(new ArrayList<>(subscriptionGroupAlertDTOs)).build();
   }
+
+
+  @Path("/subscription-groups")
+  @GET
+  @ApiOperation("get all detection alert configs")
+  public Response getAllSubscriptionGroups(){
+    List<DetectionAlertConfigDTO> detectionAlertConfigDTOs = this.detectionAlertConfigDAO.findAll();
+    return Response.ok(detectionAlertConfigDTOs).build();
+  }
+
 
   @POST
   @Path("/preview")
