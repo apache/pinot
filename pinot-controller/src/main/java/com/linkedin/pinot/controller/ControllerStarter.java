@@ -80,7 +80,7 @@ public class ControllerStarter {
   private final PinotRealtimeSegmentManager _realtimeSegmentsManager;
   private final SegmentStatusChecker _segmentStatusChecker;
   private final ExecutorService _executorService;
-  private final ControllerPeriodicTaskScheduler _periodicTaskScheduler;
+  private final ControllerPeriodicTaskScheduler _controllerPeriodicTaskScheduler;
 
   // Can only be constructed after resource manager getting started
   private ValidationManager _validationManager;
@@ -101,7 +101,7 @@ public class ControllerStarter {
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("restapi-multiget-thread-%d").build());
     _segmentStatusChecker = new SegmentStatusChecker(_helixResourceManager, _config, _controllerMetrics);
     _realtimeSegmentRelocator = new RealtimeSegmentRelocator(_helixResourceManager, _config);
-    _periodicTaskScheduler = new ControllerPeriodicTaskScheduler();
+    _controllerPeriodicTaskScheduler = new ControllerPeriodicTaskScheduler();
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -183,7 +183,7 @@ public class ControllerStarter {
     periodicTasks.add(_validationManager);
     periodicTasks.add(_segmentStatusChecker);
     periodicTasks.add(_realtimeSegmentRelocator);
-    _periodicTaskScheduler.init(periodicTasks);
+    _controllerPeriodicTaskScheduler.init(periodicTasks);
 
 
     LOGGER.info("Creating rebalance segments factory");

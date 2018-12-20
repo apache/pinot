@@ -59,17 +59,17 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
 
   /**
    * Reset flags, and call initTask which initializes each individual task
-   * Synchronizing init() and stop() to handle the scenario where the controller loses leadership, and gains it back before the stop method can finish
    */
   @Override
-  public final synchronized void init() {
+  public final void init() {
     _stopPeriodicTask = false;
     _periodicTaskInProgress = false;
     initTask();
   }
 
   /**
-   * Execute the ControllerPeriodicTask. The _periodicTaskInProgress is enabled at the beginning and disabled before exiting,
+   * Execute the ControllerPeriodicTask.
+   * The _periodicTaskInProgress is enabled at the beginning and disabled before exiting,
    * to ensure that we can wait for a task in progress to finish when stop has been invoked
    */
   @Override
@@ -94,7 +94,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    * Finally, it invokes the stopTask for any specific cleanup at the individual task level
    */
   @Override
-  public final synchronized void stop() {
+  public final void stop() {
     _stopPeriodicTask = true;
 
     LOGGER.info("Waiting for periodic task {} to finish, maxWaitTimeMillis = {}", _taskName,

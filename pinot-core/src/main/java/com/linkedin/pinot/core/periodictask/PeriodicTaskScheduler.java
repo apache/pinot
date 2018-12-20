@@ -52,7 +52,7 @@ public class PeriodicTaskScheduler {
   /**
    * Start scheduling periodic tasks.
    */
-  public void start() {
+  public synchronized void start() {
     if (_executorService != null) {
       LOGGER.warn("Periodic task scheduler already started");
     }
@@ -82,7 +82,7 @@ public class PeriodicTaskScheduler {
   /**
    * Shutdown executor service and stop the periodic tasks
    */
-  public void stop() {
+  public synchronized void stop() {
     if (_executorService != null) {
       LOGGER.info("Stopping periodic task scheduler");
       _executorService.shutdown();
