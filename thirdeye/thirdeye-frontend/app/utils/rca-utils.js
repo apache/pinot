@@ -309,7 +309,7 @@ export function toEventLabel(urn, entities) {
 
   if (urn.includes('anomaly')) {
     const [, id] = urn.split(':anomaly:');
-    label = `#${id} ${label}`;
+    label = `Anomaly #${id} ${label}`;
   }
 
   return label;
