@@ -310,9 +310,6 @@ public class ControllerStarter {
       LOGGER.info("Stopping resource manager");
       _helixResourceManager.stop();
 
-      LOGGER.info("Stopping periodic task scheduler");
-      _periodicTaskScheduler.stop();
-
       _executorService.shutdownNow();
 
     } catch (final Exception e) {
