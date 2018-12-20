@@ -308,7 +308,12 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void cleanup() {
+  protected void initTask() {
+
+  }
+
+  @Override
+  public void stopTask() {
     LOGGER.info("Unregister all the validation metrics.");
     _validationMetrics.unregisterAllMetrics();
   }

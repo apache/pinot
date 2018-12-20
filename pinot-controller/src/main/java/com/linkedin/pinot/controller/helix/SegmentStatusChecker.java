@@ -78,7 +78,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   }
 
   @Override
-  public void init() {
+  public void initTask() {
     LOGGER.info("Initializing table metrics for all the tables.");
     setStatusToDefault();
   }
@@ -263,7 +263,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   }
 
   @Override
-  public void cleanup() {
+  public void stopTask() {
     LOGGER.info("Resetting table metrics for all the tables.");
     setStatusToDefault();
   }

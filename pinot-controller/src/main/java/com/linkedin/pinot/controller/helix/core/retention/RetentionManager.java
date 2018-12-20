@@ -59,6 +59,11 @@ public class RetentionManager extends ControllerPeriodicTask {
   }
 
   @Override
+  protected void initTask() {
+
+  }
+
+  @Override
   protected void preprocess() {
 
   }
@@ -185,7 +190,7 @@ public class RetentionManager extends ControllerPeriodicTask {
 
 
   @Override
-  public void cleanup() {
+  public void stopTask() {
 
   }
 }

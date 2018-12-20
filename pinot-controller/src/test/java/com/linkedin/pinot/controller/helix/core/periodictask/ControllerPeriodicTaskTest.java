@@ -36,7 +36,11 @@ public class ControllerPeriodicTaskTest {
       new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS, _resourceManager) {
 
         @Override
-        public void cleanup() {
+        protected void initTask() {
+        }
+
+        @Override
+        public void stopTask() {
           _cleanupCalled.set(true);
         }
 
@@ -106,6 +110,11 @@ public class ControllerPeriodicTaskTest {
     }
 
     @Override
+    protected void initTask() {
+
+    }
+
+    @Override
     protected void process(List<String> tableNamesWithType) {
 
     }
@@ -126,7 +135,7 @@ public class ControllerPeriodicTaskTest {
     }
 
     @Override
-    protected boolean isStopPeriodicTask() {
+    protected boolean shouldStopPeriodicTask() {
       return _isStopPeriodicTask;
     }
 
@@ -135,7 +144,7 @@ public class ControllerPeriodicTaskTest {
     }
 
     @Override
-    public void cleanup() {
+    public void stopTask() {
 
     }
   }

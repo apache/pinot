@@ -34,13 +34,10 @@ public class PeriodicTaskScheduler {
   private List<PeriodicTask> _tasksWithValidInterval;
 
   /**
-   * Start scheduling periodic tasks.
+   * Initialize the PeriodicTaskScheduler with list of PeriodicTasks
+   * @param periodicTasks
    */
-  public void start(List<PeriodicTask> periodicTasks) {
-    if (_executorService != null) {
-      LOGGER.warn("Periodic task scheduler already started");
-    }
-
+  public void init(List<PeriodicTask> periodicTasks) {
     _tasksWithValidInterval = new ArrayList<>();
     for (PeriodicTask periodicTask : periodicTasks) {
       if (periodicTask.getIntervalInSeconds() > 0) {
@@ -49,6 +46,15 @@ public class PeriodicTaskScheduler {
       } else {
         LOGGER.info("Skipping periodic task: {}", periodicTask);
       }
+    }
+  }
+
+  /**
+   * Start scheduling periodic tasks.
+   */
+  public void start() {
+    if (_executorService != null) {
+      LOGGER.warn("Periodic task scheduler already started");
     }
 
     if (_tasksWithValidInterval.isEmpty()) {

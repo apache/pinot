@@ -29,20 +29,18 @@ import java.util.List;
  */
 public class ControllerPeriodicTaskScheduler extends PeriodicTaskScheduler implements LeadershipChangeSubscriber {
 
-  private List<PeriodicTask> _controllerPeriodicTasks;
-
   /**
-   * Initialize the {@link ControllerPeriodicTaskScheduler} with the {@link ControllerPeriodicTask} created at startup
+   * Initialize the {@link ControllerPeriodicTaskScheduler} with the list of {@link ControllerPeriodicTask} created at startup
    * @param controllerPeriodicTasks
    */
   public void init(List<PeriodicTask> controllerPeriodicTasks) {
-    _controllerPeriodicTasks = controllerPeriodicTasks;
+    super.init(controllerPeriodicTasks);
     ControllerLeadershipManager.getInstance().subscribe(ControllerPeriodicTaskScheduler.class.getName(), this);
   }
 
   @Override
   public void onBecomingLeader() {
-    start(_controllerPeriodicTasks);
+    start();
   }
 
   @Override

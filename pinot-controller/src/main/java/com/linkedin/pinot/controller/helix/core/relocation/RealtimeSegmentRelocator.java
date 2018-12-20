@@ -58,6 +58,11 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
+  protected void initTask() {
+
+  }
+
+  @Override
   protected void preprocess() {
 
   }
@@ -271,7 +276,7 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
-  public void cleanup() {
+  public void stopTask() {
 
   }
 }

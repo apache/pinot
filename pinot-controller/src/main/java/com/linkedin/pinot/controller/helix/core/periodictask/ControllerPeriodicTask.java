@@ -39,8 +39,8 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
 
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
 
-  private volatile boolean _stopPeriodicTask = false;
-  private volatile boolean _periodicTaskInProgress = false;
+  private volatile boolean _stopPeriodicTask;
+  private volatile boolean _periodicTaskInProgress;
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
       PinotHelixResourceManager pinotHelixResourceManager) {
@@ -57,26 +57,44 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
     return MIN_INITIAL_DELAY_IN_SECONDS + RANDOM.nextInt(MAX_INITIAL_DELAY_IN_SECONDS - MIN_INITIAL_DELAY_IN_SECONDS);
   }
 
+  /**
+   * Reset flags, and call initTask which initializes each individual task
+   * Synchronizing init() and stop() to handle the scenario where the controller loses leadership, and gains it back before the stop method can finish
+   */
   @Override
-  public void init() {
+  public final synchronized void init() {
+    _stopPeriodicTask = false;
+    _periodicTaskInProgress = false;
+    initTask();
   }
 
+  /**
+   * Execute the ControllerPeriodicTask. The _periodicTaskInProgress is enabled at the beginning and disabled before exiting,
+   * to ensure that we can wait for a task in progress to finish when stop has been invoked
+   */
   @Override
-  public void run() {
+  public final void run() {
     _periodicTaskInProgress = true;
+
     List<String> tableNamesWithType = _pinotHelixResourceManager.getAllTables();
     long startTime = System.currentTimeMillis();
     int numTables = tableNamesWithType.size();
+
     LOGGER.info("Start processing {} tables in periodic task: {}", numTables, _taskName);
     process(tableNamesWithType);
     LOGGER.info("Finish processing {} tables in periodic task: {} in {}ms", numTables, _taskName,
         (System.currentTimeMillis() - startTime));
+
     _periodicTaskInProgress = false;
   }
 
-
+  /**
+   * Stops the ControllerPeriodicTask by enabling the _stopPeriodicTask flag. The flag ensures that processing of no new table begins.
+   * This method waits for the in progress ControllerPeriodicTask to finish the table being processed, until MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS
+   * Finally, it invokes the stopTask for any specific cleanup at the individual task level
+   */
   @Override
-  public void stop() {
+  public final synchronized void stop() {
     _stopPeriodicTask = true;
 
     LOGGER.info("Waiting for periodic task {} to finish, maxWaitTimeMillis = {}", _taskName,
@@ -98,7 +116,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
     }
     LOGGER.info("Wait completed. _periodicTaskInProgress = {}", _periodicTaskInProgress);
 
-    cleanup();
+    stopTask();
   }
 
 
@@ -108,10 +126,10 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    * @param tableNamesWithType List of table names
    */
   protected void process(List<String> tableNamesWithType) {
-    if (!isStopPeriodicTask()) {
+    if (!shouldStopPeriodicTask()) {
       preprocess();
       for (String table : tableNamesWithType) {
-        if (isStopPeriodicTask()) {
+        if (shouldStopPeriodicTask()) {
           break;
         }
         processTable(table);
@@ -137,9 +155,17 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   protected abstract void postprocess();
 
   @VisibleForTesting
-  protected boolean isStopPeriodicTask() {
+  protected boolean shouldStopPeriodicTask() {
     return _stopPeriodicTask;
   }
 
-  protected abstract void cleanup();
+  /**
+   * Initialize the ControllerPeriodicTask, to be defined by each individual task
+   */
+  protected abstract void initTask();
+
+  /**
+   * Perform cleanup for the ControllerPeriodicTask, to be defined by each individual task
+   */
+  protected abstract void stopTask();
 }

@@ -51,7 +51,8 @@ public class PeriodicTaskSchedulerTest {
     });
 
     PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
-    taskScheduler.start(periodicTasks);
+    taskScheduler.init(periodicTasks);
+    taskScheduler.start();
     Thread.sleep(100L);
     taskScheduler.stop();
 
@@ -88,7 +89,8 @@ public class PeriodicTaskSchedulerTest {
     }
 
     PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
-    taskScheduler.start(periodicTasks);
+    taskScheduler.init(periodicTasks);
+    taskScheduler.start();
     Thread.sleep(1100L);
     taskScheduler.stop();
 
