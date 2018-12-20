@@ -24,8 +24,8 @@ import java.util.List;
 
 
 /**
- * A {@link PeriodicTaskScheduler} for scheduling {@link ControllerPeriodicTask} which are created on controller startup
- * and started/stopped on controller leadership changes
+ * A {@link PeriodicTaskScheduler} for scheduling {@link ControllerPeriodicTask} according to controller leadership changes.
+ * Any controllerPeriodicTasks provided during initialization, will run only on leadership, and stop when leadership lost
  */
 public class ControllerPeriodicTaskScheduler extends PeriodicTaskScheduler implements LeadershipChangeSubscriber {
 
