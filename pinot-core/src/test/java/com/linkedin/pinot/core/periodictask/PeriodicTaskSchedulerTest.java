@@ -31,11 +31,17 @@ public class PeriodicTaskSchedulerTest {
   public void testTaskWithInvalidInterval() throws Exception {
     AtomicBoolean initCalled = new AtomicBoolean();
     AtomicBoolean runCalled = new AtomicBoolean();
+    AtomicBoolean stopCalled = new AtomicBoolean();
 
     List<PeriodicTask> periodicTasks = Collections.singletonList(new BasePeriodicTask("TestTask", 0L/*Invalid*/, 0L) {
       @Override
       public void init() {
         initCalled.set(true);
+      }
+
+      @Override
+      public void stop() {
+        stopCalled.set(true);
       }
 
       @Override
@@ -51,6 +57,7 @@ public class PeriodicTaskSchedulerTest {
 
     assertFalse(initCalled.get());
     assertFalse(runCalled.get());
+    assertFalse(stopCalled.get());
   }
 
   @Test
@@ -58,6 +65,7 @@ public class PeriodicTaskSchedulerTest {
     int numTasks = 3;
     AtomicInteger numTimesInitCalled = new AtomicInteger();
     AtomicInteger numTimesRunCalled = new AtomicInteger();
+    AtomicInteger numTimesStopCalled = new AtomicInteger();
 
     List<PeriodicTask> periodicTasks = new ArrayList<>(numTasks);
     for (int i = 0; i < numTasks; i++) {
@@ -65,6 +73,11 @@ public class PeriodicTaskSchedulerTest {
         @Override
         public void init() {
           numTimesInitCalled.getAndIncrement();
+        }
+
+        @Override
+        public void stop() {
+          numTimesStopCalled.getAndIncrement();
         }
 
         @Override
@@ -81,5 +94,6 @@ public class PeriodicTaskSchedulerTest {
 
     assertEquals(numTimesInitCalled.get(), numTasks);
     assertEquals(numTimesRunCalled.get(), numTasks * 2);
+    assertEquals(numTimesStopCalled.get(), numTasks);
   }
 }

@@ -269,4 +269,9 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
     }
     return seconds;
   }
+
+  @Override
+  public void cleanup() {
+
+  }
 }

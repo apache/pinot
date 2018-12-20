@@ -31,6 +31,7 @@ public class PeriodicTaskScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(PeriodicTaskScheduler.class);
 
   private ScheduledExecutorService _executorService;
+  private List<PeriodicTask> _tasksWithValidInterval;
 
   /**
    * Start scheduling periodic tasks.
@@ -40,25 +41,27 @@ public class PeriodicTaskScheduler {
       LOGGER.warn("Periodic task scheduler already started");
     }
 
-    List<PeriodicTask> tasksWithValidInterval = new ArrayList<>();
+    _tasksWithValidInterval = new ArrayList<>();
     for (PeriodicTask periodicTask : periodicTasks) {
       if (periodicTask.getIntervalInSeconds() > 0) {
         LOGGER.info("Adding periodic task: {}", periodicTask);
-        tasksWithValidInterval.add(periodicTask);
+        _tasksWithValidInterval.add(periodicTask);
       } else {
         LOGGER.info("Skipping periodic task: {}", periodicTask);
       }
     }
 
-    if (tasksWithValidInterval.isEmpty()) {
+    if (_tasksWithValidInterval.isEmpty()) {
       LOGGER.warn("No periodic task scheduled");
     } else {
-      LOGGER.info("Starting periodic task scheduler with tasks: {}", tasksWithValidInterval);
-      _executorService = Executors.newScheduledThreadPool(tasksWithValidInterval.size());
-      for (PeriodicTask periodicTask : tasksWithValidInterval) {
+      LOGGER.info("Starting periodic task scheduler with tasks: {}", _tasksWithValidInterval);
+      _executorService = Executors.newScheduledThreadPool(_tasksWithValidInterval.size());
+      for (PeriodicTask periodicTask : _tasksWithValidInterval) {
         periodicTask.init();
         _executorService.scheduleWithFixedDelay(() -> {
           try {
+            LOGGER.info("Starting {} with running frequency of {} seconds.", periodicTask.getTaskName(),
+                periodicTask.getIntervalInSeconds());
             periodicTask.run();
           } catch (Throwable e) {
             // catch all errors to prevent subsequent executions from being silently suppressed
@@ -70,11 +73,19 @@ public class PeriodicTaskScheduler {
     }
   }
 
+  /**
+   * Shutdown executor service and stop the periodic tasks
+   */
   public void stop() {
     if (_executorService != null) {
       LOGGER.info("Stopping periodic task scheduler");
       _executorService.shutdown();
       _executorService = null;
+    }
+
+    if (_tasksWithValidInterval != null) {
+      LOGGER.info("Stopping all periodic tasks: {}", _tasksWithValidInterval);
+      _tasksWithValidInterval.parallelStream().forEach(PeriodicTask::stop);
     }
   }
 }

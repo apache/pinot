@@ -28,33 +28,32 @@ public class ControllerPeriodicTaskTest {
   private static final long RUN_FREQUENCY_IN_SECONDS = 30;
 
   private final PinotHelixResourceManager _resourceManager = mock(PinotHelixResourceManager.class);
-  private final AtomicBoolean _onBecomeLeaderCalled = new AtomicBoolean();
-  private final AtomicBoolean _onBecomeNonLeaderCalled = new AtomicBoolean();
+  private final AtomicBoolean _cleanupCalled = new AtomicBoolean();
   private final AtomicBoolean _processCalled = new AtomicBoolean();
+  private final AtomicBoolean _processTableCalled = new AtomicBoolean();
 
   private final MockControllerPeriodicTask _task =
       new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS, _resourceManager) {
+
         @Override
-        public void onBecomeLeader() {
-          _onBecomeLeaderCalled.set(true);
+        public void cleanup() {
+          _cleanupCalled.set(true);
         }
 
         @Override
-        public void onBecomeNotLeader() {
-          _onBecomeNonLeaderCalled.set(true);
-        }
-
-        @Override
-        public void process(List<String> tables) {
+        public void process(List<String> tableNamesWithType) {
           _processCalled.set(true);
         }
+
+        @Override
+        public void processTable(String tableNameWithType) { _processTableCalled.set(true);}
 
       };
 
   private void resetState() {
-    _onBecomeLeaderCalled.set(false);
-    _onBecomeNonLeaderCalled.set(false);
+    _cleanupCalled.set(false);
     _processCalled.set(false);
+    _processTableCalled.set(false);
   }
 
   @Test
@@ -66,56 +65,48 @@ public class ControllerPeriodicTaskTest {
   }
 
   @Test
-  public void testChangeLeadership() {
+  public void testControllerPeriodicTaskCalls() {
     // Initial state
     resetState();
-    _task.setLeader(false);
     _task.init();
-    assertFalse(_onBecomeLeaderCalled.get());
-    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertFalse(_cleanupCalled.get());
     assertFalse(_processCalled.get());
+    assertFalse(_processTableCalled.get());
 
-    // From non-leader to non-leader
+    // run task
     resetState();
     _task.run();
-    assertFalse(_onBecomeLeaderCalled.get());
-    assertFalse(_onBecomeNonLeaderCalled.get());
-    assertFalse(_processCalled.get());
-
-    // From non-leader to leader
-    resetState();
-    _task.setLeader(true);
-    _task.run();
-    assertTrue(_onBecomeLeaderCalled.get());
-    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertFalse(_cleanupCalled.get());
     assertTrue(_processCalled.get());
+    assertFalse(_processTableCalled.get());
 
-    // From leader to leader
+    // stop periodic task flag set, task will not run
     resetState();
+    _task.setStopPeriodicTask(true);
     _task.run();
-    assertFalse(_onBecomeLeaderCalled.get());
-    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertFalse(_cleanupCalled.get());
     assertTrue(_processCalled.get());
+    assertFalse(_processTableCalled.get());
 
-    // From leader to non-leader
+    // stop periodic task
     resetState();
-    _task.setLeader(false);
-    _task.run();
-    assertFalse(_onBecomeLeaderCalled.get());
-    assertTrue(_onBecomeNonLeaderCalled.get());
+    _task.stop();
+    assertTrue(_cleanupCalled.get());
     assertFalse(_processCalled.get());
+    assertFalse(_processTableCalled.get());
+
   }
 
   private class MockControllerPeriodicTask extends ControllerPeriodicTask {
 
-    private boolean _isLeader = true;
+    private boolean _isStopPeriodicTask = false;
     public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds,
         PinotHelixResourceManager pinotHelixResourceManager) {
       super(taskName, runFrequencyInSeconds, pinotHelixResourceManager);
     }
 
     @Override
-    protected void process(List<String> tables) {
+    protected void process(List<String> tableNamesWithType) {
 
     }
 
@@ -135,12 +126,17 @@ public class ControllerPeriodicTaskTest {
     }
 
     @Override
-    protected boolean isLeader() {
-      return _isLeader;
+    protected boolean isStopPeriodicTask() {
+      return _isStopPeriodicTask;
     }
 
-    void setLeader(boolean isLeader) {
-      _isLeader = isLeader;
+    void setStopPeriodicTask(boolean isStopPeriodicTask) {
+      _isStopPeriodicTask = isStopPeriodicTask;
+    }
+
+    @Override
+    public void cleanup() {
+
     }
   }
 }
