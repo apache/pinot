@@ -34,7 +34,7 @@ public class ScanBasedSingleValueDocIdSet implements FilterBlockDocIdSet {
     this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     blockValSetBlockDocIdIterator = new SVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
-    dataTypeSizeInBytes = blockMetadata.getDataType().getSizeInBytes();
+    dataTypeSizeInBytes = evaluator.isDictionaryBased() ? Integer.BYTES : blockMetadata.getDataType().getSizeInBytes();
     setStartDocId(blockMetadata.getStartDocId());
     setEndDocId(blockMetadata.getEndDocId());
   }

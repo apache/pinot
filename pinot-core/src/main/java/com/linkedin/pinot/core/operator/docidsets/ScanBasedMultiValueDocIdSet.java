@@ -34,7 +34,7 @@ public class ScanBasedMultiValueDocIdSet implements FilterBlockDocIdSet {
     this.datasourceName = datasourceName;
     this.blockValSet = blockValSet;
     this.blockMetadata = blockMetadata;
-    this.dataTypeSizeInBytes = blockMetadata.getDataType().getSizeInBytes();
+    dataTypeSizeInBytes = evaluator.isDictionaryBased() ? Integer.BYTES : blockMetadata.getDataType().getSizeInBytes();
     blockValSetBlockDocIdIterator =
         new MVScanDocIdIterator(datasourceName, blockValSet, blockMetadata, evaluator);
   }
