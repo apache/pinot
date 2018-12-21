@@ -15,9 +15,11 @@
  */
 package com.linkedin.pinot.controller.helix.core.periodictask;
 
+import com.google.common.collect.Lists;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
@@ -28,7 +30,8 @@ public class ControllerPeriodicTaskTest {
   private static final long RUN_FREQUENCY_IN_SECONDS = 30;
 
   private final PinotHelixResourceManager _resourceManager = mock(PinotHelixResourceManager.class);
-  private final AtomicBoolean _cleanupCalled = new AtomicBoolean();
+  private final AtomicBoolean _stopTaskCalled = new AtomicBoolean();
+  private final AtomicBoolean _initTaskCalled = new AtomicBoolean();
   private final AtomicBoolean _processCalled = new AtomicBoolean();
   private final AtomicBoolean _processTableCalled = new AtomicBoolean();
 
@@ -37,25 +40,35 @@ public class ControllerPeriodicTaskTest {
 
         @Override
         protected void initTask() {
+          _initTaskCalled.set(true);
         }
 
         @Override
         public void stopTask() {
-          _cleanupCalled.set(true);
+          _stopTaskCalled.set(true);
         }
 
         @Override
         public void process(List<String> tableNamesWithType) {
           _processCalled.set(true);
+          super.process(tableNamesWithType);
         }
 
         @Override
-        public void processTable(String tableNameWithType) { _processTableCalled.set(true);}
+        public void processTable(String tableNameWithType) {
+          _processTableCalled.set(true);
+        }
 
       };
 
+  @BeforeTest
+  public void beforeTest() {
+    when(_resourceManager.getAllTables()).thenReturn(Lists.newArrayList("table1_OFFLINE", "table2_REALTIME"));
+  }
+
   private void resetState() {
-    _cleanupCalled.set(false);
+    _initTaskCalled.set(false);
+    _stopTaskCalled.set(false);
     _processCalled.set(false);
     _processTableCalled.set(false);
   }
@@ -73,37 +86,53 @@ public class ControllerPeriodicTaskTest {
     // Initial state
     resetState();
     _task.init();
-    assertFalse(_cleanupCalled.get());
+    assertTrue(_initTaskCalled.get());
     assertFalse(_processCalled.get());
     assertFalse(_processTableCalled.get());
+    assertFalse(_stopTaskCalled.get());
+    assertFalse(_task.shouldStopPeriodicTask());
 
-    // run task
+    // run task after init
     resetState();
     _task.run();
-    assertFalse(_cleanupCalled.get());
+    assertFalse(_initTaskCalled.get());
     assertTrue(_processCalled.get());
-    assertFalse(_processTableCalled.get());
-
-    // stop periodic task flag set, task will not run
-    resetState();
-    _task.setStopPeriodicTask(true);
-    _task.run();
-    assertFalse(_cleanupCalled.get());
-    assertTrue(_processCalled.get());
-    assertFalse(_processTableCalled.get());
+    assertTrue(_processTableCalled.get());
+    assertFalse(_stopTaskCalled.get());
+    assertFalse(_task.shouldStopPeriodicTask());
 
     // stop periodic task
     resetState();
     _task.stop();
-    assertTrue(_cleanupCalled.get());
+    assertFalse(_initTaskCalled.get());
     assertFalse(_processCalled.get());
     assertFalse(_processTableCalled.get());
+    assertTrue(_stopTaskCalled.get());
+    assertTrue(_task.shouldStopPeriodicTask());
+
+    // call to run after periodic task stop invoked, table not processed
+    resetState();
+    _task.run();
+    assertFalse(_initTaskCalled.get());
+    assertTrue(_processCalled.get());
+    assertFalse(_processTableCalled.get());
+    assertFalse(_stopTaskCalled.get());
+    assertTrue(_task.shouldStopPeriodicTask());
+
+    // init then run
+    resetState();
+    _task.init();
+    assertFalse(_task.shouldStopPeriodicTask());
+    _task.run();
+    assertTrue(_initTaskCalled.get());
+    assertTrue(_processCalled.get());
+    assertTrue(_processTableCalled.get());
+    assertFalse(_stopTaskCalled.get());
 
   }
 
   private class MockControllerPeriodicTask extends ControllerPeriodicTask {
 
-    private boolean _isStopPeriodicTask = false;
     public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds,
         PinotHelixResourceManager pinotHelixResourceManager) {
       super(taskName, runFrequencyInSeconds, pinotHelixResourceManager);
@@ -111,11 +140,6 @@ public class ControllerPeriodicTaskTest {
 
     @Override
     protected void initTask() {
-
-    }
-
-    @Override
-    protected void process(List<String> tableNamesWithType) {
 
     }
 
@@ -134,14 +158,6 @@ public class ControllerPeriodicTaskTest {
 
     }
 
-    @Override
-    protected boolean shouldStopPeriodicTask() {
-      return _isStopPeriodicTask;
-    }
-
-    void setStopPeriodicTask(boolean isStopPeriodicTask) {
-      _isStopPeriodicTask = isStopPeriodicTask;
-    }
 
     @Override
     public void stopTask() {
