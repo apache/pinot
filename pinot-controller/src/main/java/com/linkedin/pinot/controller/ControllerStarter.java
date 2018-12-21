@@ -173,6 +173,7 @@ public class ControllerStarter {
     _realtimeSegmentsManager.start(_controllerMetrics);
 
     // Setting up periodic tasks
+    LOGGER.info("Setting up periodic tasks");
     List<PeriodicTask> periodicTasks = new ArrayList<>();
     _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_taskManager);
@@ -183,6 +184,8 @@ public class ControllerStarter {
     periodicTasks.add(_validationManager);
     periodicTasks.add(_segmentStatusChecker);
     periodicTasks.add(_realtimeSegmentRelocator);
+
+    LOGGER.info("Init controller periodic tasks scheduler");
     _controllerPeriodicTaskScheduler.init(periodicTasks);
 
 

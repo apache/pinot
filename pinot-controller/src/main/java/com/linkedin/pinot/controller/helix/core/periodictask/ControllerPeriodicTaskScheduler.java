@@ -21,6 +21,8 @@ import com.linkedin.pinot.controller.LeadershipChangeSubscriber;
 import com.linkedin.pinot.core.periodictask.PeriodicTask;
 import com.linkedin.pinot.core.periodictask.PeriodicTaskScheduler;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -28,6 +30,8 @@ import java.util.List;
  * Any controllerPeriodicTasks provided during initialization, will run only on leadership, and stop when leadership lost
  */
 public class ControllerPeriodicTaskScheduler extends PeriodicTaskScheduler implements LeadershipChangeSubscriber {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(ControllerPeriodicTaskScheduler.class);
 
   /**
    * Initialize the {@link ControllerPeriodicTaskScheduler} with the list of {@link ControllerPeriodicTask} created at startup
@@ -41,11 +45,13 @@ public class ControllerPeriodicTaskScheduler extends PeriodicTaskScheduler imple
 
   @Override
   public void onBecomingLeader() {
+    LOGGER.info("Received callback for controller leadership gain. Starting PeriodicTaskScheduler.");
     start();
   }
 
   @Override
   public void onBecomingNonLeader() {
+    LOGGER.info("Received callback for controller leadership loss. Stopping PeriodicTaskScheduler.");
     stop();
   }
 }
