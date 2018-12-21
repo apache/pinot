@@ -58,6 +58,11 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
   }
 
   @Override
+  protected void initTask() {
+
+  }
+
+  @Override
   protected void preprocess() {
 
   }
@@ -268,5 +273,10 @@ public class RealtimeSegmentRelocator extends ControllerPeriodicTask {
       throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m', '30m')", e);
     }
     return seconds;
+  }
+
+  @Override
+  public void stopTask() {
+
   }
 }

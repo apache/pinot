@@ -53,12 +53,14 @@ public class RetentionManager extends ControllerPeriodicTask {
       int deletedSegmentsRetentionInDays) {
     super("RetentionManager", runFrequencyInSeconds, pinotHelixResourceManager);
     _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
+
+    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
+        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
   }
 
   @Override
-  public void onBecomeLeader() {
-    LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
-        getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
+  protected void initTask() {
+
   }
 
   @Override
@@ -184,5 +186,11 @@ public class RetentionManager extends ControllerPeriodicTask {
       return states.size() == 1 && states.contains(
           CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
     }
+  }
+
+
+  @Override
+  public void stopTask() {
+
   }
 }

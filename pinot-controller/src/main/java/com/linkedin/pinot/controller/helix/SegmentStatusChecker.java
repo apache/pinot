@@ -78,14 +78,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
   }
 
   @Override
-  public void init() {
+  public void initTask() {
     LOGGER.info("Initializing table metrics for all the tables.");
-    setStatusToDefault();
-  }
-
-  @Override
-  public void onBecomeNotLeader() {
-    LOGGER.info("Resetting table metrics for all the tables.");
     setStatusToDefault();
   }
 
@@ -266,5 +260,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask {
     _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, Long.MIN_VALUE);
     _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, Long.MIN_VALUE);
     _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, Long.MIN_VALUE);
+  }
+
+  @Override
+  public void stopTask() {
+    LOGGER.info("Resetting table metrics for all the tables.");
+    setStatusToDefault();
   }
 }

@@ -70,12 +70,6 @@ public class ValidationManager extends ControllerPeriodicTask {
   }
 
   @Override
-  public void onBecomeNotLeader() {
-    LOGGER.info("Unregister all the validation metrics.");
-    _validationMetrics.unregisterAllMetrics();
-  }
-
-  @Override
   protected void preprocess() {
     // Run segment level validation using a separate interval
     _runSegmentLevelValidation = false;
@@ -311,5 +305,16 @@ public class ValidationManager extends ControllerPeriodicTask {
     }
 
     return numTotalDocs;
+  }
+
+  @Override
+  protected void initTask() {
+
+  }
+
+  @Override
+  public void stopTask() {
+    LOGGER.info("Unregister all the validation metrics.");
+    _validationMetrics.unregisterAllMetrics();
   }
 }

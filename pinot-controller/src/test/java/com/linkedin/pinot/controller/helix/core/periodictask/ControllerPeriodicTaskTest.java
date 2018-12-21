@@ -16,8 +16,12 @@
 package com.linkedin.pinot.controller.helix.core.periodictask;
 
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.*;
@@ -28,33 +32,50 @@ public class ControllerPeriodicTaskTest {
   private static final long RUN_FREQUENCY_IN_SECONDS = 30;
 
   private final PinotHelixResourceManager _resourceManager = mock(PinotHelixResourceManager.class);
-  private final AtomicBoolean _onBecomeLeaderCalled = new AtomicBoolean();
-  private final AtomicBoolean _onBecomeNonLeaderCalled = new AtomicBoolean();
+  private final AtomicBoolean _stopTaskCalled = new AtomicBoolean();
+  private final AtomicBoolean _initTaskCalled = new AtomicBoolean();
   private final AtomicBoolean _processCalled = new AtomicBoolean();
+  private final AtomicInteger _numTablesProcessed = new AtomicInteger();
+  private final int _numTables = 3;
 
   private final MockControllerPeriodicTask _task =
       new MockControllerPeriodicTask("TestTask", RUN_FREQUENCY_IN_SECONDS, _resourceManager) {
+
         @Override
-        public void onBecomeLeader() {
-          _onBecomeLeaderCalled.set(true);
+        protected void initTask() {
+          _initTaskCalled.set(true);
         }
 
         @Override
-        public void onBecomeNotLeader() {
-          _onBecomeNonLeaderCalled.set(true);
+        public void stopTask() {
+          _stopTaskCalled.set(true);
         }
 
         @Override
-        public void process(List<String> tables) {
+        public void process(List<String> tableNamesWithType) {
           _processCalled.set(true);
+          super.process(tableNamesWithType);
+        }
+
+        @Override
+        public void processTable(String tableNameWithType) {
+          _numTablesProcessed.getAndIncrement();
         }
 
       };
 
+  @BeforeTest
+  public void beforeTest() {
+    List<String> tables = new ArrayList<>(_numTables);
+    IntStream.range(0, _numTables).forEach(i -> tables.add("table_" + i + " _OFFLINE"));
+    when(_resourceManager.getAllTables()).thenReturn(tables);
+  }
+
   private void resetState() {
-    _onBecomeLeaderCalled.set(false);
-    _onBecomeNonLeaderCalled.set(false);
+    _initTaskCalled.set(false);
+    _stopTaskCalled.set(false);
     _processCalled.set(false);
+    _numTablesProcessed.set(0);
   }
 
   @Test
@@ -66,56 +87,54 @@ public class ControllerPeriodicTaskTest {
   }
 
   @Test
-  public void testChangeLeadership() {
+  public void testControllerPeriodicTaskCalls() {
     // Initial state
     resetState();
-    _task.setLeader(false);
     _task.init();
-    assertFalse(_onBecomeLeaderCalled.get());
-    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertTrue(_initTaskCalled.get());
     assertFalse(_processCalled.get());
+    assertEquals(_numTablesProcessed.get(), 0);
+    assertFalse(_stopTaskCalled.get());
+    assertFalse(_task.shouldStopPeriodicTask());
 
-    // From non-leader to non-leader
+    // run task - leadership gained
     resetState();
     _task.run();
-    assertFalse(_onBecomeLeaderCalled.get());
-    assertFalse(_onBecomeNonLeaderCalled.get());
-    assertFalse(_processCalled.get());
-
-    // From non-leader to leader
-    resetState();
-    _task.setLeader(true);
-    _task.run();
-    assertTrue(_onBecomeLeaderCalled.get());
-    assertFalse(_onBecomeNonLeaderCalled.get());
+    assertFalse(_initTaskCalled.get());
     assertTrue(_processCalled.get());
+    assertEquals(_numTablesProcessed.get(), _numTables);
+    assertFalse(_stopTaskCalled.get());
+    assertFalse(_task.shouldStopPeriodicTask());
 
-    // From leader to leader
+    // stop periodic task - leadership lost
     resetState();
-    _task.run();
-    assertFalse(_onBecomeLeaderCalled.get());
-    assertFalse(_onBecomeNonLeaderCalled.get());
-    assertTrue(_processCalled.get());
-
-    // From leader to non-leader
-    resetState();
-    _task.setLeader(false);
-    _task.run();
-    assertFalse(_onBecomeLeaderCalled.get());
-    assertTrue(_onBecomeNonLeaderCalled.get());
+    _task.stop();
+    assertFalse(_initTaskCalled.get());
     assertFalse(_processCalled.get());
+    assertEquals(_numTablesProcessed.get(), 0);
+    assertTrue(_stopTaskCalled.get());
+    assertTrue(_task.shouldStopPeriodicTask());
+
+    // call to run after periodic task stop invoked - leadership gained back on same controller
+    resetState();
+    _task.run();
+    assertFalse(_task.shouldStopPeriodicTask());
+    assertFalse(_initTaskCalled.get());
+    assertTrue(_processCalled.get());
+    assertEquals(_numTablesProcessed.get(), _numTables);
+    assertFalse(_stopTaskCalled.get());
+
   }
 
   private class MockControllerPeriodicTask extends ControllerPeriodicTask {
 
-    private boolean _isLeader = true;
     public MockControllerPeriodicTask(String taskName, long runFrequencyInSeconds,
         PinotHelixResourceManager pinotHelixResourceManager) {
       super(taskName, runFrequencyInSeconds, pinotHelixResourceManager);
     }
 
     @Override
-    protected void process(List<String> tables) {
+    protected void initTask() {
 
     }
 
@@ -134,13 +153,10 @@ public class ControllerPeriodicTaskTest {
 
     }
 
-    @Override
-    protected boolean isLeader() {
-      return _isLeader;
-    }
 
-    void setLeader(boolean isLeader) {
-      _isLeader = isLeader;
+    @Override
+    public void stopTask() {
+
     }
   }
 }

@@ -64,6 +64,11 @@ public class PinotTaskManager extends ControllerPeriodicTask {
     _controllerMetrics = controllerMetrics;
   }
 
+  @Override
+  protected void initTask() {
+
+  }
+
   /**
    * Get the cluster info provider.
    * <p>Cluster info provider might be needed to initialize task generators.
@@ -92,19 +97,6 @@ public class PinotTaskManager extends ControllerPeriodicTask {
     process(_pinotHelixResourceManager.getAllTables());
     return getTasksScheduled();
   }
-
-  /**
-   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
-   */
-  @Override
-  public void onBecomeNotLeader() {
-    LOGGER.info("Perform task cleanups.");
-    // Performs necessary cleanups for each task type.
-    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
-      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
-    }
-  }
-
 
   @Override
   protected void preprocess() {
@@ -162,5 +154,17 @@ public class PinotTaskManager extends ControllerPeriodicTask {
    */
   private Map<String, String> getTasksScheduled() {
     return _tasksScheduled;
+  }
+
+  /**
+   * Performs necessary cleanups (e.g. remove metrics) when the controller leadership changes.
+   */
+  @Override
+  public void stopTask() {
+    LOGGER.info("Perform task cleanups.");
+    // Performs necessary cleanups for each task type.
+    for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
+      _taskGeneratorRegistry.getTaskGenerator(taskType).nonLeaderCleanUp();
+    }
   }
 }

@@ -16,7 +16,6 @@
 package com.linkedin.pinot.controller.helix.core.periodictask;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.linkedin.pinot.controller.ControllerLeadershipManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.core.periodictask.BasePeriodicTask;
 import java.util.List;
@@ -36,9 +35,12 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
   public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
 
+  private static final long MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS = 30_000L;
+
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
 
-  private boolean _isLeader = false;
+  private volatile boolean _stopPeriodicTask;
+  private volatile boolean _periodicTaskInProgress;
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
       PinotHelixResourceManager pinotHelixResourceManager) {
@@ -55,67 +57,90 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
     return MIN_INITIAL_DELAY_IN_SECONDS + RANDOM.nextInt(MAX_INITIAL_DELAY_IN_SECONDS - MIN_INITIAL_DELAY_IN_SECONDS);
   }
 
+  /**
+   * Reset flags, and call initTask which initializes each individual task
+   */
   @Override
-  public void init() {
+  public final void init() {
+    _stopPeriodicTask = false;
+    _periodicTaskInProgress = false;
+    initTask();
   }
 
+  /**
+   * Execute the ControllerPeriodicTask.
+   * The _periodicTaskInProgress is enabled at the beginning and disabled before exiting,
+   * to ensure that we can wait for a task in progress to finish when stop has been invoked
+   */
   @Override
-  public void run() {
-    if (!isLeader()) {
-      skipLeaderTask();
-    } else {
-      List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
-      processLeaderTask(allTableNames);
-    }
-  }
+  public final void run() {
+    _stopPeriodicTask = false;
+    _periodicTaskInProgress = true;
 
-  private void skipLeaderTask() {
-    if (_isLeader) {
-      LOGGER.info("Current pinot controller lost leadership.");
-      _isLeader = false;
-      onBecomeNotLeader();
-    }
-    LOGGER.info("Skip running periodic task: {} on non-leader controller", _taskName);
-  }
-
-  private void processLeaderTask(List<String> tables) {
-    if (!_isLeader) {
-      LOGGER.info("Current pinot controller became leader. Starting {} with running frequency of {} seconds.",
-          _taskName, _intervalInSeconds);
-      _isLeader = true;
-      onBecomeLeader();
-    }
+    List<String> tableNamesWithType = _pinotHelixResourceManager.getAllTables();
     long startTime = System.currentTimeMillis();
-    int numTables = tables.size();
-    LOGGER.info("Start processing {} tables in periodic task: {}", numTables, _taskName);
-    process(tables);
-    LOGGER.info("Finish processing {} tables in periodic task: {} in {}ms", numTables, _taskName,
+    int numTables = tableNamesWithType.size();
+
+    LOGGER.info("Start processing {} tables in periodic task: {}", numTables, getTaskName());
+    process(tableNamesWithType);
+    LOGGER.info("Finish processing {} tables in periodic task: {} in {}ms", numTables, getTaskName(),
         (System.currentTimeMillis() - startTime));
+
+    _periodicTaskInProgress = false;
   }
 
   /**
-   * Does the following logic when losing the leadership. This should be done only once during leadership transition.
+   * Stops the ControllerPeriodicTask by enabling the _stopPeriodicTask flag. The flag ensures that processing of no new table begins.
+   * This method waits for the in progress ControllerPeriodicTask to finish the table being processed, until MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS
+   * Finally, it invokes the stopTask for any specific cleanup at the individual task level
    */
-  public void onBecomeNotLeader() {
-  }
+  @Override
+  public final void stop() {
+    _stopPeriodicTask = true;
 
-  /**
-   * Does the following logic when becoming lead controller. This should be done only once during leadership transition.
-   */
-  public void onBecomeLeader() {
+    LOGGER.info("Waiting for periodic task {} to finish, maxWaitTimeMillis = {}", getTaskName(),
+        MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS);
+    long millisToWait = MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS;
+    while (_periodicTaskInProgress && millisToWait > 0) {
+      try {
+        long thisWait = 1000;
+        if (millisToWait < thisWait) {
+          thisWait = millisToWait;
+        }
+        Thread.sleep(thisWait);
+        millisToWait -= thisWait;
+      } catch (InterruptedException e) {
+        LOGGER.info("Interrupted: Remaining wait time {} (out of {}) for task {}", millisToWait,
+            MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS, getTaskName());
+        break;
+      }
+    }
+    LOGGER.info("Wait completed for task {}. Waited for {} ms. _periodicTaskInProgress = {}", getTaskName(),
+        MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS - millisToWait, _periodicTaskInProgress);
+
+    stopTask();
   }
 
   /**
    * Processes the task on the given tables.
    *
-   * @param tables List of table names
+   * @param tableNamesWithType List of table names
    */
-  protected void process(List<String> tables) {
-    preprocess();
-    for (String table : tables) {
-      processTable(table);
+  protected void process(List<String> tableNamesWithType) {
+    if (!shouldStopPeriodicTask()) {
+      preprocess();
+      for (String tableNameWithType : tableNamesWithType) {
+        if (shouldStopPeriodicTask()) {
+          LOGGER.info("Skip processing table {} and all the remaining tables for task {}.", tableNameWithType,
+              getTaskName());
+          break;
+        }
+        processTable(tableNameWithType);
+      }
+      postprocess();
+    } else {
+      LOGGER.info("Skip processing all tables for task {}", getTaskName());
     }
-    postprocess();
   }
 
   /**
@@ -135,7 +160,17 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   protected abstract void postprocess();
 
   @VisibleForTesting
-  protected boolean isLeader() {
-    return ControllerLeadershipManager.getInstance().isLeader();
+  protected boolean shouldStopPeriodicTask() {
+    return _stopPeriodicTask;
   }
+
+  /**
+   * Initialize the ControllerPeriodicTask, to be defined by each individual task
+   */
+  protected abstract void initTask();
+
+  /**
+   * Perform cleanup for the ControllerPeriodicTask, to be defined by each individual task
+   */
+  protected abstract void stopTask();
 }

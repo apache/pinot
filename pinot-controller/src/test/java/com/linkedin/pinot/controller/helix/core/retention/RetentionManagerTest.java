@@ -84,7 +84,7 @@ public class RetentionManagerTest {
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getOfflineSegmentMetadata(OFFLINE_TABLE_NAME)).thenReturn(metadataList);
 
-    RetentionManager retentionManager = new MockRetentionManager(pinotHelixResourceManager, 0, 0);
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 0, 0);
     retentionManager.init();
     retentionManager.run();
 
@@ -201,7 +201,7 @@ public class RetentionManagerTest {
         setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager);
 
-    RetentionManager retentionManager = new MockRetentionManager(pinotHelixResourceManager, 0, 0);
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, 0, 0);
     retentionManager.init();
     retentionManager.run();
 
@@ -306,16 +306,4 @@ public class RetentionManagerTest {
     return segmentMetadata;
   }
 
-  private class MockRetentionManager extends RetentionManager {
-
-    public MockRetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
-        int deletedSegmentsRetentionInDays) {
-      super(pinotHelixResourceManager, runFrequencyInSeconds, deletedSegmentsRetentionInDays);
-    }
-
-    @Override
-    protected boolean isLeader() {
-      return true;
-    }
-  }
 }

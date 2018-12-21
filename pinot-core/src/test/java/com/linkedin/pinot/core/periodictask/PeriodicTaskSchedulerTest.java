@@ -31,11 +31,17 @@ public class PeriodicTaskSchedulerTest {
   public void testTaskWithInvalidInterval() throws Exception {
     AtomicBoolean initCalled = new AtomicBoolean();
     AtomicBoolean runCalled = new AtomicBoolean();
+    AtomicBoolean stopCalled = new AtomicBoolean();
 
     List<PeriodicTask> periodicTasks = Collections.singletonList(new BasePeriodicTask("TestTask", 0L/*Invalid*/, 0L) {
       @Override
       public void init() {
         initCalled.set(true);
+      }
+
+      @Override
+      public void stop() {
+        stopCalled.set(true);
       }
 
       @Override
@@ -45,12 +51,14 @@ public class PeriodicTaskSchedulerTest {
     });
 
     PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
-    taskScheduler.start(periodicTasks);
+    taskScheduler.init(periodicTasks);
+    taskScheduler.start();
     Thread.sleep(100L);
     taskScheduler.stop();
 
     assertFalse(initCalled.get());
     assertFalse(runCalled.get());
+    assertFalse(stopCalled.get());
   }
 
   @Test
@@ -58,6 +66,7 @@ public class PeriodicTaskSchedulerTest {
     int numTasks = 3;
     AtomicInteger numTimesInitCalled = new AtomicInteger();
     AtomicInteger numTimesRunCalled = new AtomicInteger();
+    AtomicInteger numTimesStopCalled = new AtomicInteger();
 
     List<PeriodicTask> periodicTasks = new ArrayList<>(numTasks);
     for (int i = 0; i < numTasks; i++) {
@@ -68,6 +77,11 @@ public class PeriodicTaskSchedulerTest {
         }
 
         @Override
+        public void stop() {
+          numTimesStopCalled.getAndIncrement();
+        }
+
+        @Override
         public void run() {
           numTimesRunCalled.getAndIncrement();
         }
@@ -75,11 +89,13 @@ public class PeriodicTaskSchedulerTest {
     }
 
     PeriodicTaskScheduler taskScheduler = new PeriodicTaskScheduler();
-    taskScheduler.start(periodicTasks);
+    taskScheduler.init(periodicTasks);
+    taskScheduler.start();
     Thread.sleep(1100L);
     taskScheduler.stop();
 
     assertEquals(numTimesInitCalled.get(), numTasks);
     assertEquals(numTimesRunCalled.get(), numTasks * 2);
+    assertEquals(numTimesStopCalled.get(), numTasks);
   }
 }

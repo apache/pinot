@@ -43,4 +43,9 @@ public interface PeriodicTask extends Runnable {
    * @return task name.
    */
   String getTaskName();
+
+  /**
+   * Stop the periodic task
+   */
+  void stop();
 }
