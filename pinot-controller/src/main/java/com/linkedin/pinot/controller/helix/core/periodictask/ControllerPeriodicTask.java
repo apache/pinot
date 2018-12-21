@@ -74,15 +74,16 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
    */
   @Override
   public final void run() {
+    _stopPeriodicTask = false;
     _periodicTaskInProgress = true;
 
     List<String> tableNamesWithType = _pinotHelixResourceManager.getAllTables();
     long startTime = System.currentTimeMillis();
     int numTables = tableNamesWithType.size();
 
-    LOGGER.info("Start processing {} tables in periodic task: {}", numTables, _taskName);
+    LOGGER.info("Start processing {} tables in periodic task: {}", numTables, getTaskName());
     process(tableNamesWithType);
-    LOGGER.info("Finish processing {} tables in periodic task: {} in {}ms", numTables, _taskName,
+    LOGGER.info("Finish processing {} tables in periodic task: {} in {}ms", numTables, getTaskName(),
         (System.currentTimeMillis() - startTime));
 
     _periodicTaskInProgress = false;
@@ -97,7 +98,7 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
   public final void stop() {
     _stopPeriodicTask = true;
 
-    LOGGER.info("Waiting for periodic task {} to finish, maxWaitTimeMillis = {}", _taskName,
+    LOGGER.info("Waiting for periodic task {} to finish, maxWaitTimeMillis = {}", getTaskName(),
         MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS);
     long millisToWait = MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS;
     while (_periodicTaskInProgress && millisToWait > 0) {
@@ -110,11 +111,11 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
         millisToWait -= thisWait;
       } catch (InterruptedException e) {
         LOGGER.info("Interrupted: Remaining wait time {} (out of {}) for task {}", millisToWait,
-            MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS, _taskName);
+            MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS, getTaskName());
         break;
       }
     }
-    LOGGER.info("Wait completed for task {}. Waited for {} ms. _periodicTaskInProgress = {}", _taskName,
+    LOGGER.info("Wait completed for task {}. Waited for {} ms. _periodicTaskInProgress = {}", getTaskName(),
         MAX_CONTROLLER_PERIODIC_TASK_STOP_TIME_MILLIS - millisToWait, _periodicTaskInProgress);
 
     stopTask();
@@ -131,15 +132,15 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
       preprocess();
       for (String tableNameWithType : tableNamesWithType) {
         if (shouldStopPeriodicTask()) {
-          LOGGER.info("_stopPeriodicTask={}. Skip processing table {} and all the remaining tables for task {}.",
-              shouldStopPeriodicTask(), tableNameWithType, _taskName);
+          LOGGER.info("Skip processing table {} and all the remaining tables for task {}.",
+              shouldStopPeriodicTask(), tableNameWithType, getTaskName());
           break;
         }
         processTable(tableNameWithType);
       }
       postprocess();
     } else {
-      LOGGER.info("_stopPeriodicTask={}. Skip processing all tables for task {}", shouldStopPeriodicTask(), _taskName);
+      LOGGER.info("Skip processing all tables for task {}", shouldStopPeriodicTask(), getTaskName());
     }
   }
 

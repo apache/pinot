@@ -31,6 +31,7 @@ public class ControllerPeriodicTaskScheduler extends PeriodicTaskScheduler imple
 
   /**
    * Initialize the {@link ControllerPeriodicTaskScheduler} with the list of {@link ControllerPeriodicTask} created at startup
+   * This is called only once during controller startup
    * @param controllerPeriodicTasks
    */
   public void init(List<PeriodicTask> controllerPeriodicTasks) {

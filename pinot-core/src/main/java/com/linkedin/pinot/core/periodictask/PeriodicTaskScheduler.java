@@ -43,6 +43,7 @@ public class PeriodicTaskScheduler {
       if (periodicTask.getIntervalInSeconds() > 0) {
         LOGGER.info("Adding periodic task: {}", periodicTask);
         _tasksWithValidInterval.add(periodicTask);
+        periodicTask.init();
       } else {
         LOGGER.info("Skipping periodic task: {}", periodicTask);
       }
@@ -63,7 +64,6 @@ public class PeriodicTaskScheduler {
       LOGGER.info("Starting periodic task scheduler with tasks: {}", _tasksWithValidInterval);
       _executorService = Executors.newScheduledThreadPool(_tasksWithValidInterval.size());
       for (PeriodicTask periodicTask : _tasksWithValidInterval) {
-        periodicTask.init();
         _executorService.scheduleWithFixedDelay(() -> {
           try {
             LOGGER.info("Starting {} with running frequency of {} seconds.", periodicTask.getTaskName(),
