@@ -121,7 +121,6 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
     stopTask();
   }
 
-
   /**
    * Processes the task on the given tables.
    *
@@ -132,15 +131,15 @@ public abstract class ControllerPeriodicTask extends BasePeriodicTask {
       preprocess();
       for (String tableNameWithType : tableNamesWithType) {
         if (shouldStopPeriodicTask()) {
-          LOGGER.info("Skip processing table {} and all the remaining tables for task {}.",
-              shouldStopPeriodicTask(), tableNameWithType, getTaskName());
+          LOGGER.info("Skip processing table {} and all the remaining tables for task {}.", tableNameWithType,
+              getTaskName());
           break;
         }
         processTable(tableNameWithType);
       }
       postprocess();
     } else {
-      LOGGER.info("Skip processing all tables for task {}", shouldStopPeriodicTask(), getTaskName());
+      LOGGER.info("Skip processing all tables for task {}", getTaskName());
     }
   }
 
