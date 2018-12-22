@@ -35,6 +35,7 @@ public interface BlockValSet {
    * @param inDocIdsSize Number of input doc ids
    * @param outDictionaryIds Output array
    * @param outStartPos Start position in outDictionaryIds
+   * @return total number of bytes read
    */
   void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
 
@@ -45,6 +46,7 @@ public interface BlockValSet {
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
+   * @return total number of bytes read
    */
   long getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos);
 
@@ -55,6 +57,7 @@ public interface BlockValSet {
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
+   * @return total number of bytes read
    */
   long getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos);
 
@@ -65,6 +68,7 @@ public interface BlockValSet {
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
+   * @return total number of bytes read
    */
   long getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos);
 
@@ -74,6 +78,7 @@ public interface BlockValSet {
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
+   * @return total number of bytes read
    */
   long getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos);
 
@@ -84,6 +89,7 @@ public interface BlockValSet {
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
+   * @return total number of bytes read
    */
   long getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos);
 
@@ -94,6 +100,7 @@ public interface BlockValSet {
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
+   * @return total number of bytes read
    */
   long getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos);
 
