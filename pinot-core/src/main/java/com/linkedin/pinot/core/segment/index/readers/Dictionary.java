@@ -50,16 +50,16 @@ public interface Dictionary extends Closeable {
 
   // Batch read APIs
 
-  void readIntValues(int[] dictIds, int inStartPos, int length, int[] outValues, int outStartPos);
+  long readIntValues(int[] dictIds, int inStartPos, int length, int[] outValues, int outStartPos);
 
-  void readLongValues(int[] dictIds, int inStartPos, int length, long[] outValues, int outStartPos);
+  long readLongValues(int[] dictIds, int inStartPos, int length, long[] outValues, int outStartPos);
 
-  void readFloatValues(int[] dictIds, int inStartPos, int length, float[] outValues, int outStartPos);
+  long readFloatValues(int[] dictIds, int inStartPos, int length, float[] outValues, int outStartPos);
 
-  void readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos);
+  long readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos);
 
-  void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos);
+  long readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos);
 
-  void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos);
+  long readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos);
 
 }

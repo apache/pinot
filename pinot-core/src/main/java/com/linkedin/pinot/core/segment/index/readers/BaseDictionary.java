@@ -54,50 +54,62 @@ public abstract class BaseDictionary implements Dictionary {
   }
 
   @Override
-  public void readIntValues(int[] dictIds, int inStartPos, int length, int[] outValues, int outStartPos) {
+  public long readIntValues(int[] dictIds, int inStartPos, int length, int[] outValues, int outStartPos) {
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
       outValues[outStartPos++] = getIntValue(dictIds[i]);
     }
+    return length * Integer.BYTES;
   }
 
   @Override
-  public void readLongValues(int[] dictIds, int inStartPos, int length, long[] outValues, int outStartPos) {
+  public long readLongValues(int[] dictIds, int inStartPos, int length, long[] outValues, int outStartPos) {
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
       outValues[outStartPos++] = getLongValue(dictIds[i]);
     }
+    return length * Long.BYTES;
   }
 
   @Override
-  public void readFloatValues(int[] dictIds, int inStartPos, int length, float[] outValues, int outStartPos) {
+  public long readFloatValues(int[] dictIds, int inStartPos, int length, float[] outValues, int outStartPos) {
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
       outValues[outStartPos++] = getFloatValue(dictIds[i]);
     }
+    return length * Float.BYTES;
   }
 
   @Override
-  public void readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos) {
+  public long readDoubleValues(int[] dictIds, int inStartPos, int length, double[] outValues, int outStartPos) {
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
       outValues[outStartPos++] = getDoubleValue(dictIds[i]);
     }
+    return length * Double.BYTES;
   }
 
   @Override
-  public void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
+  public long readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
+    long bytesRead = 0;
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getStringValue(dictIds[i]);
+      String str = getStringValue(dictIds[i]);
+      outValues[outStartPos++] = str;
+      bytesRead += str.length();
     }
+    return bytesRead;
   }
 
   @Override
-  public void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos) {
+  public long readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos) {
+    long bytesRead = 0;
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getBytesValue(dictIds[i]);
+      byte[] val = getBytesValue(dictIds[i]);
+      outValues[outStartPos++] = val;
+      bytesRead += val.length;
     }
+    return bytesRead;
   }
 }

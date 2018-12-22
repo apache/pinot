@@ -30,7 +30,6 @@ public interface BlockValSet {
 
   /**
    * Get dictionary Ids for the given docIds.
-   *
    * @param inDocIds Input docIds
    * @param inStartPos Start index in inDocIds
    * @param inDocIdsSize Number of input doc ids
@@ -41,68 +40,62 @@ public interface BlockValSet {
 
   /**
    * Get Integer values for the given docIds.
-   *
    * @param inDocIds Input docIds
    * @param inStartPos Start index in inDocIds
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
    */
-  void getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos);
+  long getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos);
 
   /**
    * Get long values for the given docIds.
-   *
    * @param inDocIds Input docIds
    * @param inStartPos Start index in inDocIds
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
    */
-  void getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos);
+  long getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos);
 
   /**
    * Get float values for the given docIds.
-   *
    * @param inDocIds Input docIds
    * @param inStartPos Start index in inDocIds
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
    */
-  void getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos);
+  long getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos);
 
   /**
-   *
    * @param inDocIds Input docIds
    * @param inStartPos Start index in inDocIds
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
    */
-  void getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos);
+  long getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos);
 
   /**
    * Get string values for the given docIds.
-   *
    * @param inDocIds Input docIds
    * @param inStartPos Start index in inDocIds
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
    */
-  void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos);
+  long getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos);
 
   /**
    * Get byte[] values for the given docIds.
-   *
    * @param inDocIds Input docIds
    * @param inStartPos Start index in inDocIds
    * @param inDocIdsSize Number of input doc ids
    * @param outValues Output array
    * @param outStartPos Start position in outValues
    */
-  void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos);
+  long getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos);
 
   /**
    * SINGLE-VALUED COLUMN APIs

@@ -51,11 +51,15 @@ public class StringDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
-  public void readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
+  public long readStringValues(int[] dictIds, int inStartPos, int length, String[] outValues, int outStartPos) {
+    long bytesRead = 0;
     byte[] buffer = getBuffer();
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getUnpaddedString(dictIds[i], buffer);
+      String val = getUnpaddedString(dictIds[i], buffer);
+      outValues[outStartPos++] = val;
+      bytesRead += val.length();
     }
+    return bytesRead;
   }
 }

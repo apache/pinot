@@ -46,7 +46,7 @@ public final class SingleValueSet extends BaseBlockValSet {
   }
 
   @Override
-  public void getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos) {
+  public long getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos) {
     int inEndPos = inStartPos + inDocIdsSize;
     ReaderContext context = _reader.createContext();
     if (_dataType == DataType.INT) {
@@ -56,10 +56,11 @@ public final class SingleValueSet extends BaseBlockValSet {
     } else {
       throw new UnsupportedOperationException();
     }
+    return inDocIdsSize * Integer.BYTES;
   }
 
   @Override
-  public void getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos) {
+  public long getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos) {
     int inEndPos = inStartPos + inDocIdsSize;
     ReaderContext context = _reader.createContext();
     switch (_dataType) {
@@ -67,19 +68,19 @@ public final class SingleValueSet extends BaseBlockValSet {
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getInt(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Integer.BYTES;
       case LONG:
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getLong(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Long.BYTES;
       default:
         throw new UnsupportedOperationException();
     }
   }
 
   @Override
-  public void getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos) {
+  public long getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos) {
     int inEndPos = inStartPos + inDocIdsSize;
     ReaderContext context = _reader.createContext();
     switch (_dataType) {
@@ -87,24 +88,24 @@ public final class SingleValueSet extends BaseBlockValSet {
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getInt(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Integer.BYTES;
       case LONG:
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getLong(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Long.BYTES;
       case FLOAT:
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getFloat(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Float.BYTES;
       default:
         throw new UnsupportedOperationException();
     }
   }
 
   @Override
-  public void getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos) {
+  public long getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos) {
     int inEndPos = inStartPos + inDocIdsSize;
     ReaderContext context = _reader.createContext();
     switch (_dataType) {
@@ -112,48 +113,57 @@ public final class SingleValueSet extends BaseBlockValSet {
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getInt(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Integer.BYTES;
       case LONG:
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getLong(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Long.BYTES;
       case FLOAT:
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getFloat(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Float.BYTES;
       case DOUBLE:
         for (int i = inStartPos; i < inEndPos; i++) {
           outValues[outStartPos++] = _reader.getDouble(inDocIds[i], context);
         }
-        break;
+        return inDocIdsSize * Double.BYTES;
       default:
         throw new UnsupportedOperationException();
     }
   }
 
   @Override
-  public void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos) {
+  public long getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos) {
+
+    long bytesRead = 0;
     int inEndPos = inStartPos + inDocIdsSize;
     ReaderContext context = _reader.createContext();
     if (_dataType == DataType.STRING) {
       for (int i = inStartPos; i < inEndPos; i++) {
-        outValues[outStartPos++] = _reader.getString(inDocIds[i], context);
+        String val =  _reader.getString(inDocIds[i], context);
+        outValues[outStartPos++] = val;
+        bytesRead += val.length();
       }
+      return bytesRead;
     } else {
       throw new UnsupportedOperationException();
     }
   }
 
   @Override
-  public void getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos) {
+  public long getBytesValues(int[] inDocIds, int inStartPos, int inDocIdsSize, byte[][] outValues, int outStartPos) {
     int inEndPos = inStartPos + inDocIdsSize;
+    long bytesRead = 0;
     ReaderContext context = _reader.createContext();
     if (_dataType.equals(DataType.BYTES)) {
       for (int i = inStartPos; i < inEndPos; i++) {
-        outValues[outStartPos++] = _reader.getBytes(inDocIds[i], context);
+        byte[] val = _reader.getBytes(inDocIds[i], context);
+        outValues[outStartPos++] = val;
+        bytesRead += val.length;
       }
+      return bytesRead;
     } else {
       throw new UnsupportedOperationException();
     }

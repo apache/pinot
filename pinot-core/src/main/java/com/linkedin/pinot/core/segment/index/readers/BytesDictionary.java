@@ -49,10 +49,14 @@ public class BytesDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
-  public void readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos) {
+  public long readBytesValues(int[] dictIds, int inStartPos, int length, byte[][] outValues, int outStartPos) {
+    long bytesRead = 0;
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
-      outValues[outStartPos++] = getBytes(dictIds[i], getBuffer());
+      byte[] val = getBytes(dictIds[i], getBuffer());
+      outValues[outStartPos++] = val;
+      bytesRead += val.length;
     }
+    return bytesRead;
   }
 }
