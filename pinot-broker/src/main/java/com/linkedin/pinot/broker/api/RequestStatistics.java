@@ -44,6 +44,23 @@ public class RequestStatistics {
   private int _numExceptions;
   private String _brokerId;
   private long _requestId;
+
+  public String getBrokerId() {
+    return _brokerId;
+  }
+
+  public long getRequestId() {
+    return _requestId;
+  }
+
+  public long getRequestArrivalTimeMillis() {
+    return _requestArrivalTimeMillis;
+  }
+
+  public long getReduceTimeMillis() {
+    return _reduceTimeMillis;
+  }
+
   private long _requestArrivalTimeMillis;
   private long _reduceTimeMillis;
 
