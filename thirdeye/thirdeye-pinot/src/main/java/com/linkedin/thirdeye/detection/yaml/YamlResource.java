@@ -143,17 +143,17 @@ public class YamlResource {
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
     detectionConfig.setYaml(detectionYaml);
-
-    DetectionAlertConfigDTO alertConfig = createDetectionAlertConfig(yamls.get("notification"), responseMessage);
-    if (alertConfig == null) {
-      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
-    }
-
-    // notification
-    // TODO: Inject detectionConfigId into detection alert config
     Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
 
+    // notification
+    // TODO: Inject detectionConfigId into detection alert config
+    DetectionAlertConfigDTO alertConfig = createDetectionAlertConfig(yamls.get("notification"), responseMessage);
+    if (alertConfig == null) {
+      // revert
+      this.detectionAlertConfigDAO.deleteById(detectionConfigId);
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
+    }
     Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfig);
     if (detectionAlertConfigId == null){
       // revert
