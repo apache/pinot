@@ -30,6 +30,7 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
+import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -104,7 +106,7 @@ public class DetectionJobScheduler implements Runnable {
     for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
 
       try {
-        LOG.info("Function: {}", anomalyFunction);
+        LOG.info("Function: {}", anomalyFunction.getFunctionName());
         long functionId = anomalyFunction.getId();
         String dataset = anomalyFunction.getCollection();
         DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
@@ -136,7 +138,7 @@ public class DetectionJobScheduler implements Runnable {
             findAllInTimeRangeForFunctionAndDetectionRun(currentDateTime.minusDays(3).getMillis(),
                 currentDateTime.getMillis(), functionId, false);
         Collections.sort(entriesInLast3Days);
-        LOG.info("Function: {} Dataset: {} Entries in last 3 days {}", functionId, dataset, entriesInLast3Days);
+        LOG.info("Function: {} Dataset: {} Entry count in last 3 days {}", functionId, dataset, entriesInLast3Days.size());
 
         // for each entry, collect startTime and endTime
         List<Long> startTimes = new ArrayList<>();
@@ -265,13 +267,15 @@ public class DetectionJobScheduler implements Runnable {
 
       List<DataCompletenessConfigDTO> incompleteTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
           findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, false);
-      LOG.info("Function: {} Dataset: {} Incomplete periods {}", anomalyFunction.getId(), dataset, incompleteTimePeriods);
+      LOG.info("Function: {} Dataset: {} Incomplete periods {}", anomalyFunction.getId(), dataset,
+          String.join(",", incompleteTimePeriods.stream().map(DataCompletenessConfigBean::getDateToCheckInSDF).collect(Collectors.toList())));
 
       if (incompleteTimePeriods.size() == 0) { // nothing incomplete
         // find complete buckets
         List<DataCompletenessConfigDTO> completeTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
             findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, true);
-        LOG.info("Function: {} Dataset: {} Complete periods {}", anomalyFunction.getId(), dataset, completeTimePeriods);
+        LOG.info("Function: {} Dataset: {} Complete periods {}", anomalyFunction.getId(), dataset,
+            String.join(",", completeTimePeriods.stream().map(DataCompletenessConfigBean::getDateToCheckInSDF).collect(Collectors.toList())));
         long expectedCompleteBuckets = DetectionJobSchedulerUtils.getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
         LOG.info("Function: {} Dataset: {} Num complete periods: {} Expected num buckets:{}",
             anomalyFunction.getId(), dataset, completeTimePeriods.size(), expectedCompleteBuckets);
