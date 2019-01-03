@@ -1,0 +1,82 @@
+<fieldset class="te-form__section te-form__section--first row">
+  <div class="col-xs-12">
+    <legend class="te-form__section-title">{{alertTitle}}</legend>
+    {{ember-ace
+      lines=35
+      value=currentYamlValues
+      suggestCompletions=(action 'yamlSuggestions')
+      enableLiveAutocompletion=true
+      update=(action "onYMLSelectorAction")
+      mode="ace/mode/yaml"
+    }}
+  </div>
+
+  <div class="col-xs-12">
+    <hr/>
+  </div>
+  {{!-- TOD: save for Alert settings --}}
+  {{#if showSettings}}
+    <div class="col-xs-12">
+      <legend class="te-form__section-title">{{alertSettingsTitle}}</legend>
+    </div>
+    <div class="col-xs-4">
+      <label class="te-label te-label--small">Add this alert to a subscription group</label>
+      {{!--  subscription group --}}
+      {{#power-select
+        options=subscriptionGroupNames
+        selected=groupName
+        searchField="name"
+        onchange=(action 'onYAMLGroupSelectionAction')
+        as |groupName|
+      }}
+        {{groupName.name}} ({{groupName.id}})
+      {{/power-select}}
+    </div>
+    <div class="col-xs-12">
+      {{!-- notification settings editor --}}
+      {{ember-ace
+        lines=20
+        value=currentYamlSettings
+        update=(action "onYMLSettingsSelectorAction")
+        mode="ace/mode/yaml"
+      }}
+    </div>
+  {{/if}}
+  <div class="col-xs-12">
+    {{#if isErrorMsg}}
+      <div class="yaml-editor-msg">
+        <p class="yaml-editor-msg__icon"><i class="yaml-editor-msg__icon--error glyphicon glyphicon-remove-circle"></i>Error in the yaml file</p>
+        <p>Message: {{errorMsg}}</p>
+      </div>
+    {{/if}}
+  </div>
+</fieldset>
+
+<fieldset class="te-form__section-submit">
+  {{#if isEditMode}}
+    {{bs-button
+      defaultText="Cancel"
+      type="outline-primary"
+      buttonType="cancel"
+      onClick=(action "cancelAlertYamlAction")
+      class="te-button te-button--cancel"
+    }}
+    {{bs-button
+      defaultText="Save changes"
+      type="primary"
+      buttonType="submit"
+      disabled=disableYamlSave
+      onClick=(action "saveAlertYamlAction")
+      class="te-button te-button--submit"
+    }}
+  {{else}}
+    {{bs-button
+      defaultText="Create alert"
+      type="primary"
+      buttonType="submit"
+      disabled=disableYamlSave
+      onClick=(action "saveAlertYamlAction")
+      class="te-button te-button--submit"
+    }}
+  {{/if}}
+</fieldset>

@@ -27,6 +27,7 @@ Router.map(function() {
     this.route('alerts', function() {
       this.route('performance');
     });
+    this.route('yaml', { path: 'yaml/:alert_id' });
   });
 
   this.route('self-serve', function() {

@@ -2,7 +2,7 @@
   <div class="te-search-results__title-group">
     <div class="te-search-results__title">
       {{#if (eq displayMode "single")}}
-        <span title={{alertData.functionName}}>{{alertData.functionName}}</span>
+        <span title={{alertData.functionName}}>new {{alertData.functionName}}</span>
       {{/if}}
       <div class="te-search-results__tag {{if (eq displayMode "list") "te-search-results__tag--list"}} {{if alertData.isActive "te-search-results__tag--active"}}">
         {{#if isLoadError}}
@@ -12,16 +12,9 @@
         {{/if}}
       </div>
       {{#if (eq displayMode "list")}}
-      {{alertData.isNewPipeline}}
-        {{#if alertData.isNewPipeline}}
-          {{#link-to "manage.yaml" alertData.id}}
-            <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
-          {{/link-to}}
-        {{else}}
-          {{#link-to "manage.alert" alertData.id}}
-            <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
-          {{/link-to}}
-        {{/if}}
+        {{#link-to "manage.yaml" alertData.id}}
+          <div class="te-search-results__title-name" title={{alertData.functionName}}>{{alertData.functionName}}</div>
+        {{/link-to}}
       {{/if}}
     </div>
   </div>

@@ -59,7 +59,8 @@ export default Route.extend({
         collection: yamlAlert.dataset,
         type: yamlAlert.pipelineType,
         exploreDimensions: yamlAlert.dimensions,
-        filters: this._formatYamlFilter(yamlAlert.filters)
+        filters: this._formatYamlFilter(yamlAlert.filters),
+        isNewPipeline: true
       });
     }
 
