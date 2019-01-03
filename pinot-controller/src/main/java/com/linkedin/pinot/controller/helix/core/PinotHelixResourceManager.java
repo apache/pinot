@@ -84,6 +84,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
+import org.apache.helix.BaseDataAccessor;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
@@ -93,7 +94,10 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZkBaseDataAccessor;
+import org.apache.helix.manager.zk.ZkCacheBaseDataAccessor;
 import org.apache.helix.model.CurrentState;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
@@ -128,6 +132,7 @@ public class PinotHelixResourceManager {
   private HelixAdmin _helixAdmin;
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private HelixDataAccessor _helixDataAccessor;
+  private ZkCacheBaseDataAccessor<ZNRecord> _cacheInstanceConfigsDataAccessor;
   private Builder _keyBuilder;
   private SegmentDeletionManager _segmentDeletionManager;
   private TableRebalancer _tableRebalancer;
@@ -168,6 +173,13 @@ public class PinotHelixResourceManager {
     _helixAdmin = _helixZkManager.getClusterManagmentTool();
     _propertyStore = _helixZkManager.getHelixPropertyStore();
     _helixDataAccessor = _helixZkManager.getHelixDataAccessor();
+    // Cache instance zk paths.
+    BaseDataAccessor<ZNRecord> baseDataAccessor = _helixDataAccessor.getBaseDataAccessor();
+
+    String instanceConfigs = PropertyPathBuilder.instanceConfig(_helixClusterName);
+    _cacheInstanceConfigsDataAccessor =
+        new ZkCacheBaseDataAccessor<>((ZkBaseDataAccessor<ZNRecord>) baseDataAccessor, instanceConfigs,
+            null, Collections.singletonList(instanceConfigs));
     _keyBuilder = _helixDataAccessor.keyBuilder();
     _segmentDeletionManager = new SegmentDeletionManager(_dataDir, _helixAdmin, _helixClusterName, _propertyStore);
     ZKMetadataProvider.setClusterTenantIsolationEnabled(_propertyStore, _isSingleTenantCluster);
@@ -249,23 +261,17 @@ public class PinotHelixResourceManager {
    */
   @Nonnull
   public List<String> getAllInstances() {
-    return _helixAdmin.getInstancesInCluster(_helixClusterName);
-  }
-
-  /**
-   * Get key builder
-   * @return
-   */
-  @Nonnull
-  public Builder getKeyBuilder() {
-    return _keyBuilder;
+    return _cacheInstanceConfigsDataAccessor.getChildNames("/", AccessOption.PERSISTENT);
   }
 
   /**
    * Returns the config for all the Helix instances in the cluster.
    */
   public List<InstanceConfig> getAllHelixInstanceConfigs() {
-    return HelixHelper.getInstanceConfigs(_helixZkManager);
+    List<ZNRecord> znRecords = _cacheInstanceConfigsDataAccessor.getChildren("/", null, AccessOption.PERSISTENT);
+    List<InstanceConfig> instanceConfigs = new ArrayList<>(znRecords.size());
+    znRecords.forEach(znRecord -> instanceConfigs.add(new InstanceConfig(znRecord)));
+    return instanceConfigs;
   }
 
   /**
@@ -276,7 +282,8 @@ public class PinotHelixResourceManager {
    */
   @Nonnull
   public InstanceConfig getHelixInstanceConfig(@Nonnull String instanceId) {
-    return _helixAdmin.getInstanceConfig(_helixClusterName, instanceId);
+    ZNRecord znRecord = _cacheInstanceConfigsDataAccessor.get("/" + instanceId, null, AccessOption.PERSISTENT);
+    return new InstanceConfig(znRecord);
   }
 
   /**
@@ -1519,7 +1526,7 @@ public class PinotHelixResourceManager {
 
     ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
     LOGGER.info("Sending timeboundary refresh message for segment {} of table {}:{} to recipients {}", segmentName,
-            rawTableName, refreshMessage, recipientCriteria);
+        rawTableName, refreshMessage, recipientCriteria);
     // Helix sets the timeoutMs argument specified in 'send' call as the processing timeout of the message.
     int nMsgsSent = messagingService.send(recipientCriteria, refreshMessage, null, timeoutMs);
     if (nMsgsSent > 0) {
@@ -1529,7 +1536,7 @@ public class PinotHelixResourceManager {
       // May be the case when none of the brokers are up yet. That is OK, because when they come up they will get
       // the latest time boundary info.
       LOGGER.warn("Unable to send timeboundary refresh message for {} of table {}, nMsgs={}", segmentName,
-              offlineTableName, nMsgsSent);
+          offlineTableName, nMsgsSent);
     }
   }
 
