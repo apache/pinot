@@ -38,10 +38,10 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements TaskManager {
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC =
-      " WHERE status = :status order by startTime asc limit 5";
+      " WHERE status = :status order by startTime asc limit 10";
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC =
-      " WHERE status = :status order by startTime desc limit 5";
+      " WHERE status = :status order by startTime desc limit 10";
 
   public TaskManagerImpl() {
     super(TaskDTO.class, TaskBean.class);

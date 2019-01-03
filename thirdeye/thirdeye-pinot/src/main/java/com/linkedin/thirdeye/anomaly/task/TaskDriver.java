@@ -21,6 +21,7 @@ import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -134,6 +135,7 @@ public class TaskDriver {
       List<TaskDTO> anomalyTasks = new ArrayList<>();
       boolean hasFetchError = false;
       try {
+        // randomize fetching head and tail to reduce synchronized patterns across threads (and hosts)
         boolean orderAscending = System.currentTimeMillis() % 2 == 0;
         anomalyTasks = taskDAO
             .findByStatusOrderByCreateTime(TaskStatus.WAITING, driverConfiguration.getTaskFetchSizeCap(),
@@ -146,6 +148,9 @@ public class TaskDriver {
 
       if (CollectionUtils.isNotEmpty(anomalyTasks)) {
         LOG.info("Thread {} : Found {} tasks in waiting state", Thread.currentThread().getId(), anomalyTasks.size());
+
+        // shuffle candidate tasks to avoid synchronized patterns across threads (and hosts)
+        Collections.shuffle(anomalyTasks);
 
         for (int i = 0; i < anomalyTasks.size() && !shutdown; i++) {
           TaskDTO anomalyTaskSpec = anomalyTasks.get(i);
