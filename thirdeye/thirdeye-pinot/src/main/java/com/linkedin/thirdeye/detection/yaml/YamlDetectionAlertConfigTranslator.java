@@ -96,7 +96,7 @@ public class YamlDetectionAlertConfigTranslator {
     Map<String, Object> properties = new HashMap<>();
     for (Map.Entry<String, Object> entry : alertYamlConfigs.entrySet()) {
       if (entry.getKey().equals(PROP_TYPE)) {
-        properties.put(PROP_CLASS_NAME, DETECTION_REGISTRY.lookup(MapUtils.getString(alertYamlConfigs, PROP_TYPE)));
+        properties.put(PROP_CLASS_NAME, DETECTION_ALERT_REGISTRY.lookupAlertSchemes(MapUtils.getString(alertYamlConfigs, PROP_TYPE)));
       } else {
         if (PROPERTY_KEYS.contains(entry.getKey())) {
           properties.put(entry.getKey(), entry.getValue());
