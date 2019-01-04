@@ -16,29 +16,20 @@
 package com.linkedin.pinot.controller.validation;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.HLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import com.linkedin.pinot.core.realtime.stream.StreamConfig;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.helix.model.InstanceConfig;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
@@ -49,53 +40,26 @@ import org.slf4j.LoggerFactory;
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
  */
-public class ValidationManager extends ControllerPeriodicTask {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ValidationManager.class);
+public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalChecker.class);
 
-  private final int _segmentLevelValidationIntervalInSeconds;
-  private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
-  private final ValidationMetrics _validationMetrics;
+  protected final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
+  protected final ValidationMetrics _validationMetrics;
 
-  private long _lastSegmentLevelValidationTimeMs = 0L;
-  private boolean _runSegmentLevelValidation;
-  private List<InstanceConfig> _instanceConfigs;
-
-  public ValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
+  public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
-    super("ValidationManager", config.getValidationControllerFrequencyInSeconds(), pinotHelixResourceManager);
-    _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
-    Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
+    super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
+        pinotHelixResourceManager);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
   }
 
   @Override
   protected void preprocess() {
-    // Run segment level validation using a separate interval
-    _runSegmentLevelValidation = false;
-    long currentTimeMs = System.currentTimeMillis();
-    if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationTimeMs)
-        >= _segmentLevelValidationIntervalInSeconds) {
-      LOGGER.info("Run segment-level validation");
-      _runSegmentLevelValidation = true;
-      _lastSegmentLevelValidationTimeMs = currentTimeMs;
-    }
-
-    // Cache instance configs to reduce ZK access
-    _instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
   }
 
   @Override
   protected void processTable(String tableNameWithType) {
-    runValidation(tableNameWithType);
-  }
-
-  @Override
-  protected void postprocess() {
-
-  }
-
-  private void runValidation(String tableNameWithType) {
     try {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig == null) {
@@ -103,29 +67,12 @@ public class ValidationManager extends ControllerPeriodicTask {
         return;
       }
 
-      // Rebuild broker resource
-      Set<String> brokerInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(_instanceConfigs,
-          tableConfig.getTenantConfig().getBroker());
-      _pinotHelixResourceManager.rebuildBrokerResource(tableNameWithType, brokerInstances);
-
-      // Perform validation based on the table type
       CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-        if (_runSegmentLevelValidation) {
-          validateOfflineSegmentPush(tableConfig);
-        }
-      } else {
-        if (_runSegmentLevelValidation) {
-          updateRealtimeDocumentCount(tableConfig);
-        }
-        Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
-        StreamConfig streamConfig = new StreamConfig(streamConfigMap);
-        if (streamConfig.hasLowLevelConsumerType()) {
-          _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
-        }
+        validateOfflineSegmentPush(tableConfig);
       }
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while validating table: {}", tableNameWithType, e);
+      LOGGER.warn("Caught exception while checking offline segment intervals for table: {}", tableNameWithType, e);
     }
   }
 
@@ -261,50 +208,9 @@ public class ValidationManager extends ControllerPeriodicTask {
     return numTotalDocs;
   }
 
-  private void updateRealtimeDocumentCount(TableConfig tableConfig) {
-    String realtimeTableName = tableConfig.getTableName();
-    List<RealtimeSegmentZKMetadata> metadataList =
-        _pinotHelixResourceManager.getRealtimeSegmentMetadata(realtimeTableName);
-    boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
-    StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
-    if (streamConfig.hasLowLevelConsumerType() && !streamConfig.hasHighLevelConsumerType()) {
-      countHLCSegments = false;
-    }
-    // Update the gauge to contain the total document count in the segments
-    _validationMetrics.updateTotalDocumentCountGauge(tableConfig.getTableName(),
-        computeRealtimeTotalDocumentInSegments(metadataList, countHLCSegments));
-  }
+  @Override
+  protected void postprocess() {
 
-  @VisibleForTesting
-  static long computeRealtimeTotalDocumentInSegments(List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadataList,
-      boolean countHLCSegments) {
-    long numTotalDocs = 0;
-
-    String groupId = "";
-    for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadataList) {
-      String segmentName = realtimeSegmentZKMetadata.getSegmentName();
-      if (SegmentName.isHighLevelConsumerSegmentName(segmentName)) {
-        if (countHLCSegments) {
-          HLCSegmentName hlcSegmentName = new HLCSegmentName(segmentName);
-          String segmentGroupIdName = hlcSegmentName.getGroupId();
-
-          if (groupId.isEmpty()) {
-            groupId = segmentGroupIdName;
-          }
-          // Discard all segments with different groupids as they are replicas
-          if (groupId.equals(segmentGroupIdName) && realtimeSegmentZKMetadata.getTotalRawDocs() >= 0) {
-            numTotalDocs += realtimeSegmentZKMetadata.getTotalRawDocs();
-          }
-        }
-      } else {
-        // Low level segments
-        if (!countHLCSegments) {
-          numTotalDocs += realtimeSegmentZKMetadata.getTotalRawDocs();
-        }
-      }
-    }
-
-    return numTotalDocs;
   }
 
   @Override
