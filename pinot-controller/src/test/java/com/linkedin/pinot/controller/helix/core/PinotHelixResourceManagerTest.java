@@ -28,7 +28,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import java.util.HashSet;
@@ -36,11 +35,9 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.I0Itec.zkclient.ZkClient;
-import org.apache.helix.AccessOption;
 import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
-import org.apache.helix.manager.zk.ZkCacheBaseDataAccessor;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
@@ -57,6 +54,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+  private static final int CONNECTION_TIMEOUT_IN_MILLISECOND = 10_000;
+  private static final int MAX_TIMEOUT_IN_MILLISECOND = 5_000;
 
   private final String _helixClusterName = getHelixClusterName();
 
@@ -97,7 +96,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       Assert.assertEquals(cachedInstanceConfig, realInstanceConfig);
     }
 
-    ZkClient zkClient = new ZkClient(_helixResourceManager.getHelixZkURL(), 10_000, 10_000, new ZNRecordSerializer());
+    ZkClient zkClient = new ZkClient(_helixResourceManager.getHelixZkURL(), CONNECTION_TIMEOUT_IN_MILLISECOND,
+        CONNECTION_TIMEOUT_IN_MILLISECOND, new ZNRecordSerializer());
 
     modifyExistingInstanceConfig(zkClient);
     addAndRemoveNewInstanceConfig(zkClient);
@@ -121,17 +121,15 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     znRecord.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_PORT.toString(), newPort);
     zkClient.writeData(instanceConfigPath, znRecord);
 
-    long start = System.currentTimeMillis();
-    int retry = 0;
-    InstanceConfig latestCachedInstanceConfig =_helixResourceManager.getHelixInstanceConfig(instanceName);
+    long maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
+    InstanceConfig latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
     String latestPort = latestCachedInstanceConfig.getPort();
-    while (!newPort.equals(latestPort) && retry < 10) {
-      Thread.sleep(500L);
-      retry++;
-      latestCachedInstanceConfig =_helixResourceManager.getHelixInstanceConfig(instanceName);
+    while (!newPort.equals(latestPort) && System.currentTimeMillis() < maxTime) {
+      Thread.sleep(100L);
+      latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
       latestPort = latestCachedInstanceConfig.getPort();
     }
-    System.out.println("It took " + (System.currentTimeMillis() - start) + "ms to update the cached value.");
+    Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for adding instance config");
 
     // Set original port back to this instance config.
     znRecord.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_PORT.toString(), originalPort);
@@ -150,30 +148,24 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     ZNRecord znRecord = new ZNRecord(instanceName);
     zkClient.createPersistent(instanceConfigPath, znRecord);
 
-    long start = System.currentTimeMillis();
     List<String> latestAllInstances = _helixResourceManager.getAllInstances();
-    int retry = 0;
-    while (!latestAllInstances.contains(instanceName) && retry < 10) {
-      Thread.sleep(500L);
-      retry++;
+    long maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
+    while (!latestAllInstances.contains(instanceName) && System.currentTimeMillis() < maxTime) {
+      Thread.sleep(100L);
       latestAllInstances = _helixResourceManager.getAllInstances();
     }
-    Assert.assertTrue(retry < 10, "Retry more than 10 times");
-    System.out.println("It took " + (System.currentTimeMillis() - start) + "ms to update the cached value.");
+    Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for adding instance config");
 
     // Remove new ZNode.
     zkClient.delete(instanceConfigPath);
 
-    start = System.currentTimeMillis();
     latestAllInstances = _helixResourceManager.getAllInstances();
-    retry = 0;
-    while (latestAllInstances.contains(instanceName) && retry < 10) {
-      Thread.sleep(500L);
-      retry++;
+    maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
+    while (latestAllInstances.contains(instanceName) && System.currentTimeMillis() < maxTime) {
+      Thread.sleep(100L);
       latestAllInstances = _helixResourceManager.getAllInstances();
     }
-    Assert.assertTrue(retry < 10, "Retry more than 10 times");
-    System.out.println("It took " + (System.currentTimeMillis() - start) + "ms to update the cached value.");
+    Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for removing instance config");
   }
 
   @Test
