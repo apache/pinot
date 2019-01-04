@@ -150,7 +150,9 @@ public class StartControllerCommand extends AbstractBaseAdminCommand implements 
         conf.setTenantIsolationEnabled(_tenantIsolation);
 
         conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
-        conf.setValidationControllerFrequencyInSeconds(3600);
+        conf.setOfflineSegmentIntervalCheckerFrequencyInSeconds(3600);
+        conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);
+        conf.setBrokerResourceValidationFrequencyInSeconds(3600);
       }
 
       LOGGER.info("Executing command: " + toString());
