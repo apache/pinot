@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
@@ -52,10 +53,9 @@ public class RetentionManager extends ControllerPeriodicTask {
 
   private final int _deletedSegmentsRetentionInDays;
 
-  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
-      int deletedSegmentsRetentionInDays) {
-    super("RetentionManager", runFrequencyInSeconds, pinotHelixResourceManager);
-    _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
+  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
+    super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(), pinotHelixResourceManager);
+    _deletedSegmentsRetentionInDays = config.getDeletedSegmentsRetentionInDays();
 
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}, deletedSegmentsRetentionInDays: {}",
         getIntervalInSeconds(), _deletedSegmentsRetentionInDays);
@@ -148,7 +148,7 @@ public class RetentionManager extends ControllerPeriodicTask {
         // In progress segment, only check LLC segment
         if (SegmentName.isLowLevelConsumerSegmentName(segmentName)) {
           // Delete old LLC segment that hangs around. Do not delete segment that are current since there may be a race
-          // with ValidationManager trying to auto-create the LLC segment
+          // with RealtimeSegmentValidationManager trying to auto-create the LLC segment
           if (shouldDeleteInProgressLLCSegment(segmentName, idealState, realtimeSegmentZKMetadata)) {
             segmentsToDelete.add(segmentName);
           }
@@ -172,7 +172,7 @@ public class RetentionManager extends ControllerPeriodicTask {
       return false;
     }
     // delete a segment only if it is old enough (5 days) or else,
-    // 1. latest segment could get deleted in the middle of repair by ValidationManager
+    // 1. latest segment could get deleted in the middle of repair by RealtimeSegmentValidationManager
     // 2. for a brand new segment, if this code kicks in after new metadata is created but ideal state entry is not yet created (between step 2 and 3),
     // the latest segment metadata could get marked for deletion
     if (System.currentTimeMillis() - realtimeSegmentZKMetadata.getCreationTime()
