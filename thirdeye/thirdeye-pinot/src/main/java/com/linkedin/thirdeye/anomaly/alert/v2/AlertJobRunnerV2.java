@@ -140,7 +140,6 @@ public class AlertJobRunnerV2 implements Job {
         taskSpec.setTaskType(TaskConstants.TaskType.ALERT2);
         taskSpec.setJobName(alertJobContext.getJobName());
         taskSpec.setStatus(TaskConstants.TaskStatus.WAITING);
-        taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
         taskSpec.setJobId(alertJobContext.getJobExecutionId());
         long taskId = taskDAO.save(taskSpec);

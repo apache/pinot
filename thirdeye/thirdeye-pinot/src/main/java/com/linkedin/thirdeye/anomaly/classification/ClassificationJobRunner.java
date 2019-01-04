@@ -90,7 +90,6 @@ public class ClassificationJobRunner implements JobRunner {
         taskSpec.setTaskType(TaskConstants.TaskType.CLASSIFICATION);
         taskSpec.setJobName(classificationJobContext.getJobName());
         taskSpec.setStatus(TaskConstants.TaskStatus.WAITING);
-        taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
         taskSpec.setJobId(classificationJobContext.getJobExecutionId());
         long taskId = DAO_REGISTRY.getTaskDAO().save(taskSpec);

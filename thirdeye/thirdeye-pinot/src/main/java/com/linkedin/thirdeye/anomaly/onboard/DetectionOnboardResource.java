@@ -111,7 +111,6 @@ public class DetectionOnboardResource {
       task.setTaskType(TaskConstants.TaskType.REPLAY);
       task.setJobName(jobName);
       task.setStatus(TaskConstants.TaskStatus.WAITING);
-      task.setStartTime(System.currentTimeMillis());
       task.setTaskInfo(taskInfoJson);
       task.setJobId(anomalyFunctionId);
       this.taskDAO.save(task);

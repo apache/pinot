@@ -161,7 +161,6 @@ public class DetectionJobRunner {
         taskSpec.setTaskType(TaskType.ANOMALY_DETECTION);
         taskSpec.setJobName(detectionJobContext.getJobName());
         taskSpec.setStatus(TaskStatus.WAITING);
-        taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
         taskSpec.setJobId(detectionJobContext.getJobExecutionId());
         long taskId = DAO_REGISTRY.getTaskDAO().save(taskSpec);

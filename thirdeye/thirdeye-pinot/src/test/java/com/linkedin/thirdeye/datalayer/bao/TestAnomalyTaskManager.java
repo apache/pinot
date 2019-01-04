@@ -121,6 +121,14 @@ public class TestAnomalyTaskManager {
     Assert.assertEquals(anomalyTaskSpecs.size(), 1);
   }
 
+  @Test(dependsOnMethods = {"testCreate"})
+  public void testUpdateTaskStartTime() {
+    long taskStartTime = System.currentTimeMillis();
+    taskDAO.updateTaskStartTime(anomalyTaskId1, taskStartTime);
+    TaskDTO anomalyTask = taskDAO.findById(anomalyTaskId1);
+    Assert.assertEquals(anomalyTask.getStartTime(), taskStartTime);
+  }
+
   @Test(dependsOnMethods = {"testFindByJobIdStatusNotIn"})
   public void testDeleteRecordOlderThanDaysWithStatus() {
     TaskStatus status = TaskStatus.COMPLETED;
