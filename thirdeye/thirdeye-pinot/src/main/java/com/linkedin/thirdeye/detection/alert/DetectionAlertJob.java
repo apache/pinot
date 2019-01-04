@@ -69,7 +69,6 @@ public class DetectionAlertJob implements Job {
     taskDTO.setTaskType(TaskConstants.TaskType.DETECTION_ALERT);
     taskDTO.setJobName(String.format("%s_%d", TaskConstants.TaskType.DETECTION_ALERT, detectionAlertConfigId));
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
-    taskDTO.setStartTime(System.currentTimeMillis());
     taskDTO.setTaskInfo(taskInfoJson);
 
     long taskId = taskDAO.save(taskDTO);

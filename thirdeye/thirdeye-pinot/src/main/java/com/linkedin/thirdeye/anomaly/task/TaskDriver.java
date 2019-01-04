@@ -94,6 +94,8 @@ public class TaskDriver {
                 TaskType taskType = anomalyTaskSpec.getTaskType();
                 TaskRunner taskRunner = TaskRunnerFactory.getTaskRunnerFromTaskType(taskType);
                 TaskInfo taskInfo = TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
+
+                updateTaskStartTime(anomalyTaskSpec.getId());
                 LOG.info("Thread {} : Task Info {}", Thread.currentThread().getId(), taskInfo);
                 List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
                 LOG.info("Thread {} : DONE Executing task: {}", Thread.currentThread().getId(), anomalyTaskSpec.getId());
@@ -194,6 +196,17 @@ public class TaskDriver {
       }
     }
     return null;
+  }
+
+  private void updateTaskStartTime(long taskId) {
+    LOG.info("Thread {} : Starting updateTaskStartTime for task id {}", Thread.currentThread().getId(), taskId);
+    try {
+      long startTime = System.currentTimeMillis();
+      taskDAO.updateTaskStartTime(taskId, startTime);
+      LOG.info("Thread {} : Updated task start time {}", Thread.currentThread().getId(), startTime);
+    } catch (Exception e) {
+      LOG.error("Exception in updating task start time", e);
+    }
   }
 
   private void updateStatusAndTaskEndTime(long taskId, TaskStatus oldStatus, TaskStatus newStatus, String message) {

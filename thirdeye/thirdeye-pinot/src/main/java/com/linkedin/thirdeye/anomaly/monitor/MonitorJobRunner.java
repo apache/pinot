@@ -108,7 +108,6 @@ public class MonitorJobRunner implements JobRunner {
         taskSpec.setTaskType(TaskType.MONITOR);
         taskSpec.setJobName(monitorJobContext.getJobName());
         taskSpec.setStatus(TaskStatus.WAITING);
-        taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
         taskSpec.setJobId(monitorJobContext.getJobExecutionId());
         long taskId = taskDAO.save(taskSpec);

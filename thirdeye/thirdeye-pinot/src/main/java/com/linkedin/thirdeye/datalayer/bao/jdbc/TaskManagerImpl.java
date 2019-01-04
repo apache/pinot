@@ -114,6 +114,13 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   }
 
   @Override
+  public void updateTaskStartTime(Long id, Long taskStartTime) {
+    TaskDTO task = findById(id);
+    task.setStartTime(taskStartTime);
+    save(task);
+  }
+
+  @Override
   @Transactional
   public int deleteRecordsOlderThanDaysWithStatus(int days, TaskStatus status) {
     DateTime expireDate = new DateTime().minusDays(days);

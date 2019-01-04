@@ -40,6 +40,8 @@ public interface TaskManager extends AbstractManager<TaskDTO>{
   void updateStatusAndTaskEndTime(Long id, TaskStatus oldStatus, TaskStatus newStatus,
       Long taskEndTime, String message);
 
+  void updateTaskStartTime(Long id, Long taskStartTime);
+
   int deleteRecordsOlderThanDaysWithStatus(int days, TaskStatus status);
 
 }

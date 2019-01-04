@@ -56,7 +56,6 @@ public class DetectionPipelineJob implements Job {
     taskDTO.setTaskType(TaskConstants.TaskType.DETECTION);
     taskDTO.setJobName(String.format("%s_%d", TaskConstants.TaskType.DETECTION, id));
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
-    taskDTO.setStartTime(System.currentTimeMillis());
     taskDTO.setTaskInfo(taskInfoJson);
 
     long taskId = taskDAO.save(taskDTO);
