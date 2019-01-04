@@ -302,7 +302,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       appendToStarTree(recordIterator.next());
     }
     int numStarTreeRecords = _numDocs;
-    LOGGER.info("Generated {} star-tree records from {} segment records", numSegmentRecords, numStarTreeRecords);
+    LOGGER.info("Generated {} star-tree records from {} segment records", numStarTreeRecords, numSegmentRecords);
 
     int numRecordsUnderStarNode = _numDocs - numStarTreeRecords;
     constructStarTree(_rootNode, 0, _numDocs);
