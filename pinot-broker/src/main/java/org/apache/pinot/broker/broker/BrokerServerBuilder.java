@@ -27,6 +27,7 @@ import org.apache.pinot.broker.queryquota.TableQueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.ConnectionPoolBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.TableSchemaCache;
 import org.apache.pinot.broker.routing.RoutingTable;
 import org.apache.pinot.broker.routing.TimeBoundaryService;
 import org.apache.pinot.common.Utils;

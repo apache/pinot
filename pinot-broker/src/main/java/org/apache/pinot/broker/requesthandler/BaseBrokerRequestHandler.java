@@ -208,8 +208,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Validate the request
+    FilterQueryTree[] filterQueryTree = new FilterQueryTree[1];
     try {
-      validateRequest(brokerRequest, requestParams);
+      validateRequest(brokerRequest, requestParams, filterQueryTree);
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating request {}: {}, {}", requestId, query, e.getMessage());
       requestStatistics.setErrorCode(QueryException.QUERY_VALIDATION_ERROR_CODE);
@@ -239,18 +240,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     BrokerRequest realtimeBrokerRequest = null;
     if ((offlineTableName != null) && (realtimeTableName != null)) {
       // Hybrid
-      offlineBrokerRequest = _brokerRequestOptimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumn);
-      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumn);
+      offlineBrokerRequest = _brokerRequestOptimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumn, filterQueryTree[0]);
+      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumn, filterQueryTree[0]);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.HYBRID);
     } else if (offlineTableName != null) {
       // OFFLINE only
       brokerRequest.getQuerySource().setTableName(offlineTableName);
-      offlineBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn);
+      offlineBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn, filterQueryTree[0]);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.OFFLINE);
     } else {
       // REALTIME only
       brokerRequest.getQuerySource().setTableName(realtimeTableName);
-      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn);
+      realtimeBrokerRequest = _brokerRequestOptimizer.optimize(brokerRequest, timeColumn, filterQueryTree[0]);
       requestStatistics.setFanoutType(RequestStatistics.FanoutType.REALTIME);
     }
 
@@ -329,7 +330,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    *   <li>Value for 'LIMIT' for selection query <= configured value</li>
    * </ul>
    */
-  private void validateRequest(BrokerRequest brokerRequest, RequestParams requestParams) {
+  private void validateRequest(BrokerRequest brokerRequest, RequestParams requestParams, FilterQueryTree[] filterQueryTree) {
     if (brokerRequest.isSetAggregationsInfo()) {
       if (brokerRequest.isSetGroupBy()) {
         long topN = brokerRequest.getGroupBy().getTopN();
@@ -352,7 +353,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       String tableName = brokerRequest.getQuerySource().getTableName();
       Schema schema = _tableSchemaCache.getIfTableSchemaPresent(tableName);
       if (schema != null) {
-        Set<String> columnsFromBrokerRequest = getAllColumnsFromBrokerRequest(brokerRequest);
+        Set<String> columnsFromBrokerRequest = getAllColumnsFromBrokerRequest(brokerRequest, filterQueryTree);
         // Filters out virtual columns in the query.
         columnsFromBrokerRequest.removeIf(column -> column.startsWith("$"));
         columnsFromBrokerRequest.removeAll(schema.getColumnNames());
@@ -372,12 +373,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * Helper to get all the columns from broker request.
    * Returns the set of all the columns.
    */
-  private Set<String> getAllColumnsFromBrokerRequest(BrokerRequest brokerRequest) {
+  private Set<String> getAllColumnsFromBrokerRequest(BrokerRequest brokerRequest, FilterQueryTree[] filterQueryTree) {
     Set<String> allColumns = new HashSet<>();
     // Filter
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    if (filterQueryTree != null) {
-      allColumns.addAll(RequestUtils.extractFilterColumns(filterQueryTree));
+    filterQueryTree[0] = RequestUtils.generateFilterQueryTree(brokerRequest);
+    if (filterQueryTree[0] != null) {
+      allColumns.addAll(RequestUtils.extractFilterColumns(filterQueryTree[0]));
     }
 
     // Aggregation
