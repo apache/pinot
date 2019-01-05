@@ -18,10 +18,8 @@ package com.linkedin.thirdeye.anomaly.task;
 
 import com.linkedin.thirdeye.anomaly.classification.classifier.AnomalyClassifierFactory;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -88,9 +86,6 @@ public class TaskDriver {
             TaskDTO anomalyTaskSpec = TaskDriver.this.acquireTask();
 
             if (anomalyTaskSpec != null) { // a task has acquired and we must finish executing it before termination
-              long tStart = System.nanoTime();
-              ThirdeyeMetricsUtil.taskCounter.inc();
-
               try {
                 LOG.info("Thread {} : Executing task: {} {}", Thread.currentThread().getId(), anomalyTaskSpec.getId(),
                     anomalyTaskSpec.getTaskInfo());
@@ -106,12 +101,8 @@ public class TaskDriver {
                 LOG.info("Thread {} : DONE Executing task: {}", Thread.currentThread().getId(), anomalyTaskSpec.getId());
                 // update status to COMPLETED
                 updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED, "");
-                ThirdeyeMetricsUtil.taskSuccessCounter.inc();
-
               } catch (Exception e) {
-                ThirdeyeMetricsUtil.taskExceptionCounter.inc();
                 LOG.error("Exception in electing and executing task", e);
-
                 try {
                   // update task status failed
                   updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.FAILED,
@@ -119,9 +110,6 @@ public class TaskDriver {
                 } catch (Exception e1) {
                   LOG.error("Error in updating failed status", e1);
                 }
-
-              } finally {
-                ThirdeyeMetricsUtil.taskDurationCounter.inc(System.nanoTime() - tStart);
               }
             }
           }
