@@ -42,8 +42,8 @@ import org.slf4j.LoggerFactory;
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
 
-  protected final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
-  protected final ValidationMetrics _validationMetrics;
+  private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
+  private final ValidationMetrics _validationMetrics;
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastUpdateRealtimeDocumentCountTimeMs = 0L;

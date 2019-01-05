@@ -43,8 +43,8 @@ import org.slf4j.LoggerFactory;
 public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalChecker.class);
 
-  protected final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
-  protected final ValidationMetrics _validationMetrics;
+  private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
+  private final ValidationMetrics _validationMetrics;
 
   public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, ValidationMetrics validationMetrics) {
