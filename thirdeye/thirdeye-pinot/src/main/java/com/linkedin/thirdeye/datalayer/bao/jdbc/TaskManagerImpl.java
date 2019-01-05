@@ -18,10 +18,6 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import com.google.inject.Singleton;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,22 +33,15 @@ import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 @Singleton
 public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements TaskManager {
+
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC =
       " WHERE status = :status order by startTime asc limit 10";
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_DESC =
       " WHERE status = :status order by startTime desc limit 10";
-
-  private static final String COUNT_WAITING_TASKS =
-      "SELECT COUNT(*) FROM task_index WHERE status = 'WAITING'";
-
-  private static final Logger LOG = LoggerFactory.getLogger(TaskManagerImpl.class);
 
   public TaskManagerImpl() {
     super(TaskDTO.class, TaskBean.class);
@@ -168,19 +157,5 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     Predicate daysTimestampPredicate = Predicate.GE("createTime", activeTimestamp);
     Predicate timeoutTimestampPredicate = Predicate.LT("updateTime", timeoutTimestamp);
     return findByPredicate(Predicate.AND(statusPredicate, daysTimestampPredicate, timeoutTimestampPredicate));
-  }
-
-  @Override
-  public int countWaiting() {
-    try {
-      // NOTE: this aggregation should be supported by genericPojoDAO directly
-      Connection connection = this.genericPojoDao.getConnection();
-      PreparedStatement statement = connection.prepareStatement(COUNT_WAITING_TASKS);
-      return statement.executeQuery().getInt(0);
-
-    } catch (Exception e) {
-      LOG.warn("Could not retrieve task backlog size. Defaulting to -1.", e);
-      return -1;
-    }
   }
 }
