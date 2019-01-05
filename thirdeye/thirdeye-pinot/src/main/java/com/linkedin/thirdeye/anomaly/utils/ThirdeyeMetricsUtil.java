@@ -16,8 +16,10 @@
 
 package com.linkedin.thirdeye.anomaly.utils;
 
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.tracking.RequestLog;
 import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.Gauge;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
 
@@ -33,6 +35,26 @@ public class ThirdeyeMetricsUtil {
 
   private ThirdeyeMetricsUtil() {
   }
+
+  public static final Counter taskCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "taskCounter");
+
+  public static final Counter taskSuccessCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "taskSuccessCounter");
+
+  public static final Counter taskExceptionCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "taskExceptionCounter");
+
+  public static final Counter taskDurationCounter =
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "taskDurationCounter");
+
+  public static final Gauge<Integer> taskBacklogGauge =
+      metricsRegistry.newGauge(ThirdeyeMetricsUtil.class, "taskBacklogGauge", new Gauge<Integer>() {
+        @Override
+        public Integer value() {
+          return DAORegistry.getInstance().getTaskDAO().countWaiting();
+        }
+      });
 
   public static final Counter detectionTaskCounter =
       metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionTaskCounter");
