@@ -173,6 +173,7 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   @Override
   public int countWaiting() {
     // NOTE: this aggregation should be supported by genericPojoDAO directly
+    // ensure each resource is closed at the end of the statement
     try (Connection connection = this.genericPojoDao.getConnection();
         PreparedStatement statement = connection.prepareStatement(COUNT_WAITING_TASKS);
         ResultSet rs = statement.executeQuery()){
