@@ -78,10 +78,6 @@ public class HelixSetupUtils {
     }
   }
 
-  public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath) {
-    createHelixClusterIfNeeded(helixClusterName, zkPath);
-  }
-
   public static void createHelixClusterIfNeeded(String helixClusterName, String zkPath, boolean isUpdateStateModel,
       boolean enableBatchMessageMode) {
     final HelixAdmin admin = new ZKHelixAdmin(zkPath);
