@@ -44,4 +44,5 @@ public interface TaskManager extends AbstractManager<TaskDTO>{
 
   int deleteRecordsOlderThanDaysWithStatus(int days, TaskStatus status);
 
+  int countWaiting();
 }
