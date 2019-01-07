@@ -23,7 +23,11 @@ import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -37,6 +41,7 @@ public class DetectionPipelineJob implements Job {
   private TaskManager taskDAO = DAORegistry.getInstance().getTaskDAO();
   private DetectionConfigManager detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final long DETECTION_TASK_TIMEOUT = TimeUnit.DAYS.toMillis(1);
 
   @Override
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
@@ -44,6 +49,25 @@ public class DetectionPipelineJob implements Job {
     Long id = getIdFromJobKey(jobKey.getName());
     DetectionConfigDTO configDTO = detectionDAO.findById(id);
     DetectionPipelineTaskInfo taskInfo = new DetectionPipelineTaskInfo(configDTO.getId(), configDTO.getLastTimestamp(), System.currentTimeMillis());
+
+    // check if a task for this detection pipeline is already scheduled
+    String jobName = String.format("%s_%d", TaskConstants.TaskType.DETECTION, id);
+    List<TaskDTO> scheduledTasks = taskDAO.findByPredicate(Predicate.AND(
+        Predicate.EQ("name", jobName),
+        Predicate.EQ("startTime", taskInfo.getStart()),
+        Predicate.OR(
+            Predicate.EQ("status", TaskConstants.TaskStatus.RUNNING.toString()),
+            Predicate.EQ("status", TaskConstants.TaskStatus.WAITING.toString())
+        )
+      )
+    );
+
+    Optional<TaskDTO> latestScheduledTask = scheduledTasks.stream().reduce((task1, task2) -> task1.getEndTime() > task2.getEndTime() ? task1 : task2);
+    if (latestScheduledTask.isPresent() && taskInfo.getEnd() - latestScheduledTask.get().getEndTime() < DETECTION_TASK_TIMEOUT){
+      // if a task is pending and not time out yet, don't schedule more
+      LOG.info("Skip scheduling detection task for {} with start time {}. Task is already in the queue.", jobName, taskInfo.getStart());
+      return;
+    }
 
     String taskInfoJson = null;
     try {
@@ -54,7 +78,7 @@ public class DetectionPipelineJob implements Job {
 
     TaskDTO taskDTO = new TaskDTO();
     taskDTO.setTaskType(TaskConstants.TaskType.DETECTION);
-    taskDTO.setJobName(String.format("%s_%d", TaskConstants.TaskType.DETECTION, id));
+    taskDTO.setJobName(jobName);
     taskDTO.setStatus(TaskConstants.TaskStatus.WAITING);
     taskDTO.setTaskInfo(taskInfoJson);
 
