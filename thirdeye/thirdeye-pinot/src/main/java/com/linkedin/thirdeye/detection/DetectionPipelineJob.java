@@ -26,6 +26,8 @@ import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -39,6 +41,7 @@ public class DetectionPipelineJob implements Job {
   private TaskManager taskDAO = DAORegistry.getInstance().getTaskDAO();
   private DetectionConfigManager detectionDAO = DAORegistry.getInstance().getDetectionConfigManager();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final long DETECTION_TASK_TIMEOUT = TimeUnit.DAYS.toMillis(1);
 
   @Override
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
@@ -58,8 +61,10 @@ public class DetectionPipelineJob implements Job {
         )
       )
     );
-    if (!scheduledTasks.isEmpty()){
-      // if a task is pending, don't schedule more
+
+    Optional<TaskDTO> latestScheduledTask = scheduledTasks.stream().reduce((task1, task2) -> task1.getEndTime() > task2.getEndTime() ? task1 : task2);
+    if (latestScheduledTask.isPresent() && taskInfo.getEnd() - latestScheduledTask.get().getEndTime() < DETECTION_TASK_TIMEOUT){
+      // if a task is pending and not time out yet, don't schedule more
       LOG.info("Skip scheduling detection task for {} with start time {}. Task is already in the queue.", jobName, taskInfo.getStart());
       return;
     }
