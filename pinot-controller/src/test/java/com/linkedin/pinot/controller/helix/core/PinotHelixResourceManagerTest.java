@@ -30,9 +30,16 @@ import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.ControllerTest;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
+import org.I0Itec.zkclient.ZkClient;
+import org.apache.helix.PropertyPathBuilder;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -47,6 +54,8 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
   private static final String TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME);
+  private static final int CONNECTION_TIMEOUT_IN_MILLISECOND = 10_000;
+  private static final int MAX_TIMEOUT_IN_MILLISECOND = 5_000;
 
   private final String _helixClusterName = getHelixClusterName();
 
@@ -76,6 +85,87 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
     for (int i = 0; i < NUM_INSTANCES; i++) {
       Assert.assertTrue(endpoints.inverse().containsKey("localhost:" + String.valueOf(BASE_SERVER_ADMIN_PORT + i)));
     }
+  }
+
+  @Test
+  public void testGetInstanceConfigs() throws Exception {
+    Set<String> servers = _helixResourceManager.getAllInstancesForServerTenant(SERVER_TENANT_NAME);
+    for (String server : servers) {
+      InstanceConfig cachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(server);
+      InstanceConfig realInstanceConfig = _helixAdmin.getInstanceConfig(_helixClusterName, server);
+      Assert.assertEquals(cachedInstanceConfig, realInstanceConfig);
+    }
+
+    ZkClient zkClient = new ZkClient(_helixResourceManager.getHelixZkURL(), CONNECTION_TIMEOUT_IN_MILLISECOND,
+        CONNECTION_TIMEOUT_IN_MILLISECOND, new ZNRecordSerializer());
+
+    modifyExistingInstanceConfig(zkClient);
+    addAndRemoveNewInstanceConfig(zkClient);
+
+    zkClient.close();
+  }
+
+  private void modifyExistingInstanceConfig(ZkClient zkClient) throws InterruptedException {
+    String instanceName = "Server_localhost_" + new Random().nextInt(NUM_INSTANCES);
+    String instanceConfigPath = PropertyPathBuilder.instanceConfig(_helixClusterName, instanceName);
+    Assert.assertTrue(zkClient.exists(instanceConfigPath));
+    ZNRecord znRecord = zkClient.readData(instanceConfigPath, null);
+
+    InstanceConfig cachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
+    String originalPort = cachedInstanceConfig.getPort();
+    Assert.assertNotNull(originalPort);
+    String newPort = Long.toString(System.currentTimeMillis());
+    Assert.assertTrue(!newPort.equals(originalPort));
+
+    // Set new port to this instance config.
+    znRecord.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_PORT.toString(), newPort);
+    zkClient.writeData(instanceConfigPath, znRecord);
+
+    long maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
+    InstanceConfig latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
+    String latestPort = latestCachedInstanceConfig.getPort();
+    while (!newPort.equals(latestPort) && System.currentTimeMillis() < maxTime) {
+      Thread.sleep(100L);
+      latestCachedInstanceConfig = _helixResourceManager.getHelixInstanceConfig(instanceName);
+      latestPort = latestCachedInstanceConfig.getPort();
+    }
+    Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for adding instance config");
+
+    // Set original port back to this instance config.
+    znRecord.setSimpleField(InstanceConfig.InstanceConfigProperty.HELIX_PORT.toString(), originalPort);
+    zkClient.writeData(instanceConfigPath, znRecord);
+  }
+
+  private void addAndRemoveNewInstanceConfig(ZkClient zkClient) throws Exception {
+    int biggerRandomNumber = NUM_INSTANCES + new Random().nextInt(NUM_INSTANCES);
+    String instanceName = "Server_localhost_" + String.valueOf(biggerRandomNumber);
+    String instanceConfigPath = PropertyPathBuilder.instanceConfig(_helixClusterName, instanceName);
+    Assert.assertFalse(zkClient.exists(instanceConfigPath));
+    List<String> instances = _helixResourceManager.getAllInstances();
+    Assert.assertFalse(instances.contains(instanceName));
+
+    // Add new ZNode.
+    ZNRecord znRecord = new ZNRecord(instanceName);
+    zkClient.createPersistent(instanceConfigPath, znRecord);
+
+    List<String> latestAllInstances = _helixResourceManager.getAllInstances();
+    long maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
+    while (!latestAllInstances.contains(instanceName) && System.currentTimeMillis() < maxTime) {
+      Thread.sleep(100L);
+      latestAllInstances = _helixResourceManager.getAllInstances();
+    }
+    Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for adding instance config");
+
+    // Remove new ZNode.
+    zkClient.delete(instanceConfigPath);
+
+    latestAllInstances = _helixResourceManager.getAllInstances();
+    maxTime = System.currentTimeMillis() + MAX_TIMEOUT_IN_MILLISECOND;
+    while (latestAllInstances.contains(instanceName) && System.currentTimeMillis() < maxTime) {
+      Thread.sleep(100L);
+      latestAllInstances = _helixResourceManager.getAllInstances();
+    }
+    Assert.assertTrue(System.currentTimeMillis() < maxTime, "Timeout when waiting for removing instance config");
   }
 
   @Test
@@ -163,6 +253,12 @@ public class PinotHelixResourceManagerTest extends ControllerTest {
       Assert.assertEquals(retrievedMetadata.getSegmentName(), segmentName);
       Assert.assertEquals(realtimeMetadata.getStatus(), CommonConstants.Segment.Realtime.Status.DONE);
     }
+  }
+
+  @Test
+  public void testGetDataInstanceAdminEndpoints() {
+    Set<String> fakeInstances = new HashSet<>();
+    new Random().nextInt(NUM_INSTANCES);
   }
 
 
