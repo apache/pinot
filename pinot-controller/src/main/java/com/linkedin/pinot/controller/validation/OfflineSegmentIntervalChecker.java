@@ -61,14 +61,16 @@ public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask {
   @Override
   protected void processTable(String tableNameWithType) {
     try {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      if (tableConfig == null) {
-        LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
-        return;
-      }
 
       CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+
+        TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+        if (tableConfig == null) {
+          LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
+          return;
+        }
+
         validateOfflineSegmentPush(tableConfig);
       }
     } catch (Exception e) {
