@@ -41,7 +41,6 @@ public class BrokerResourceValidationManager extends ControllerPeriodicTask {
 
   @Override
   protected void preprocess() {
-    // Cache instance configs to reduce ZK access
     _instanceConfigs = _pinotHelixResourceManager.getAllHelixInstanceConfigs();
   }
 
