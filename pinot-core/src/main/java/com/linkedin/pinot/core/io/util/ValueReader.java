@@ -32,6 +32,8 @@ public interface ValueReader {
 
   String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer);
 
+  int getUnpaddedStringBytes(int index, int numBytesPerValue, byte paddingByte, byte[] buffer);
+
   String getPaddedString(int index, int numBytesPerValue, byte[] buffer);
 
   byte[] getBytes(int index, int numBytesPerValue, byte[] buffer);

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.readers;
 
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.io.util.ValueReader;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
@@ -56,9 +57,9 @@ public class StringDictionary extends ImmutableDictionaryReader {
     byte[] buffer = getBuffer();
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++) {
-      String val = getUnpaddedString(dictIds[i], buffer);
-      outValues[outStartPos++] = val;
-      bytesRead += val.length();
+      int len = getUnpaddedStringBytes(dictIds[i], buffer);
+      outValues[outStartPos++] = StringUtil.decodeUtf8(buffer, 0, len);
+      bytesRead += buffer.length;
     }
     return bytesRead;
   }

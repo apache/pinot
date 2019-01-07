@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.operator.docvalsets;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
@@ -142,9 +143,11 @@ public final class SingleValueSet extends BaseBlockValSet {
     ReaderContext context = _reader.createContext();
     if (_dataType == DataType.STRING) {
       for (int i = inStartPos; i < inEndPos; i++) {
-        String val =  _reader.getString(inDocIds[i], context);
+        // read as bytes and then decode to string - allows correct estimation of bytes-read
+        byte[] bytes = _reader.getBytes(inDocIds[i], context);
+        String val = StringUtil.decodeUtf8(bytes, 0, bytes.length);
         outValues[outStartPos++] = val;
-        bytesRead += val.length();
+        bytesRead += bytes.length;
       }
       return bytesRead;
     } else {

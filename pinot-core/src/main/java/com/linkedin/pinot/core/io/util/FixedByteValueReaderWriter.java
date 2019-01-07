@@ -51,17 +51,31 @@ public final class FixedByteValueReaderWriter implements Closeable, ValueReader 
 
   @Override
   public String getUnpaddedString(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
+    int len = getUnpaddedStringBytes(index, numBytesPerValue, paddingByte, buffer);
+    return StringUtil.decodeUtf8(buffer, 0, len);
+  }
+
+  /**
+   * Read the bytes of a string and return the number of bytes in the buffer that represent the unpadded string.
+   * @param index the index of the string value being read
+   * @param numBytesPerValue number of bytes used to store each string
+   * @param paddingByte the value of the padding byte
+   * @param buffer the buffer used to read the value (in and out param)
+   * @return the number of bytes in the buffer representing the string
+   */
+  @Override
+  public int getUnpaddedStringBytes(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
     assert buffer.length >= numBytesPerValue;
 
     long startOffset = (long) index * numBytesPerValue;
     for (int i = 0; i < numBytesPerValue; i++) {
       byte currentByte = _dataBuffer.getByte(startOffset + i);
       if (currentByte == paddingByte) {
-        return StringUtil.decodeUtf8(buffer, 0, i);
+        return i;
       }
       buffer[i] = currentByte;
     }
-    return StringUtil.decodeUtf8(buffer, 0, numBytesPerValue);
+    return numBytesPerValue;
   }
 
   @Override

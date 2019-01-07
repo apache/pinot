@@ -60,6 +60,11 @@ public class DictionaryDelegatingValueReader implements ValueReader {
   }
 
   @Override
+  public int getUnpaddedStringBytes(int index, int numBytesPerValue, byte paddingByte, byte[] buffer) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public String getPaddedString(int index, int numBytesPerValue, byte[] buffer) {
     throw new UnsupportedOperationException();
   }

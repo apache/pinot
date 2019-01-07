@@ -227,6 +227,10 @@ public abstract class ImmutableDictionaryReader extends BaseDictionary {
     return _valueReader.getDouble(dictId);
   }
 
+  protected int getUnpaddedStringBytes(int dictId, byte[] buffer) {
+    return _valueReader.getUnpaddedStringBytes(dictId, _numBytesPerValue, _paddingByte, buffer);
+  }
+
   protected String getUnpaddedString(int dictId, byte[] buffer) {
     return _valueReader.getUnpaddedString(dictId, _numBytesPerValue, _paddingByte, buffer);
   }
