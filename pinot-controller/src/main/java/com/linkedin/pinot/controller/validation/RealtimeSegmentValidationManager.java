@@ -76,22 +76,24 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
   @Override
   protected void processTable(String tableNameWithType) {
     try {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      if (tableConfig == null) {
-        LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
-        return;
-      }
-
       CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       if (tableType == CommonConstants.Helix.TableType.REALTIME) {
+
+        TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+        if (tableConfig == null) {
+          LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
+          return;
+        }
+
         if (_updateRealtimeDocumentCount) {
           updateRealtimeDocumentCount(tableConfig);
         }
-      }
-      Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
-      StreamConfig streamConfig = new StreamConfig(streamConfigMap);
-      if (streamConfig.hasLowLevelConsumerType()) {
-        _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
+
+        Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
+        StreamConfig streamConfig = new StreamConfig(streamConfigMap);
+        if (streamConfig.hasLowLevelConsumerType()) {
+          _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
+        }
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while validating realtime table: {}", tableNameWithType, e);
