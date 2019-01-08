@@ -95,6 +95,12 @@ public abstract class BaseDictionary implements Dictionary {
     for (int i = inStartPos; i < inEndPos; i++) {
       String str = getStringValue(dictIds[i]);
       outValues[outStartPos++] = str;
+      // NOTE: we use string length as an approximation for bytes-read here
+      // In some cases (OnHeap dictionary for example), the strings are not
+      // stored as corresponding bytes - hence we rely on an approximation
+      // based on string length instead of paying a decode penalty to get
+      // actual bytes read Where applicable, derived-classes can override
+      // and return the right values.
       bytesRead += str.length();
     }
     return bytesRead;

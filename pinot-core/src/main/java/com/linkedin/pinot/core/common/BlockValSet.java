@@ -35,7 +35,6 @@ public interface BlockValSet {
    * @param inDocIdsSize Number of input doc ids
    * @param outDictionaryIds Output array
    * @param outStartPos Start position in outDictionaryIds
-   * @return total number of bytes read
    */
   void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
 
