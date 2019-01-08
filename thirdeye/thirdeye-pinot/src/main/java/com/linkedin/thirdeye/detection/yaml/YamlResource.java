@@ -144,20 +144,23 @@ public class YamlResource {
     }
     detectionConfig.setYaml(detectionYaml);
     Long detectionConfigId = this.detectionConfigDAO.save(detectionConfig);
+    if (detectionConfigId == null){
+      return Response.serverError().entity(ImmutableMap.of("message", "Save detection config failed")).build();
+    }
     Preconditions.checkNotNull(detectionConfigId, "Save detection config failed");
 
     // notification
     // TODO: Inject detectionConfigId into detection alert config
     DetectionAlertConfigDTO alertConfig = createDetectionAlertConfig(yamls.get("notification"), responseMessage);
     if (alertConfig == null) {
-      // revert
-      this.detectionAlertConfigDAO.deleteById(detectionConfigId);
+      // revert detection DTO
+      this.detectionConfigDAO.deleteById(detectionConfigId);
       return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
     Long detectionAlertConfigId = this.detectionAlertConfigDAO.save(alertConfig);
     if (detectionAlertConfigId == null){
-      // revert
-      this.detectionAlertConfigDAO.deleteById(detectionConfigId);
+      // revert detection DTO
+      this.detectionConfigDAO.deleteById(detectionConfigId);
       return Response.serverError().entity(ImmutableMap.of("message", "Save detection alert config failed")).build();
     }
     LOG.info("saved detection alert config id {}", detectionAlertConfigId);
