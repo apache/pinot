@@ -177,7 +177,8 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     try (Connection connection = this.genericPojoDao.getConnection();
         PreparedStatement statement = connection.prepareStatement(COUNT_WAITING_TASKS);
         ResultSet rs = statement.executeQuery()){
-      return rs.getInt(0);
+      rs.next();
+      return rs.getInt(1);
     } catch (Exception e) {
       LOG.warn("Could not retrieve task backlog size. Defaulting to -1.", e);
       return -1;
