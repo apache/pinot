@@ -75,9 +75,7 @@ public class ControllerConf extends PropertiesConfiguration {
         "controller.segment.level.validation.intervalInSeconds";
 
     private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
-    @Deprecated // The ValidationManager has been split up into 3 separate tasks, each having their own frequency config settings
-    private static final int DEPRECATED_DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
-    private static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 6 Hours.
+    private static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
     private static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     private static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     private static final int DEFAULT_STATUS_CONTROLLER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
@@ -353,18 +351,11 @@ public class ControllerConf extends PropertiesConfiguration {
         Integer.toString(retentionFrequencyInSeconds));
   }
 
-  private int getValidationControllerFrequencyInSeconds() {
-    if (containsKey(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS)) {
-      return Integer.parseInt(
-          (String) getProperty(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS));
-    }
-    return ControllerPeriodicTasksConf.DEPRECATED_DEFAULT_VALIDATION_CONTROLLER_FREQUENCY_IN_SECONDS;
-  }
-
   /**
    * Returns the config value for controller.offline.segment.interval.checker.frequencyInSeconds if it exists.
    * If it doesn't exist, returns the segment level validation interval. This is done in order to retain the current behavior,
    * wherein the offline validation tasks were done at segment level validation interval frequency
+   * The default value is the new DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS
    * @return
    */
   public int getOfflineSegmentIntervalCheckerFrequencyInSeconds() {
@@ -372,7 +363,8 @@ public class ControllerConf extends PropertiesConfiguration {
       return Integer.parseInt(
           (String) getProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS));
     }
-    return getSegmentLevelValidationIntervalInSeconds();
+    return getInt(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS);
   }
 
   public void setOfflineSegmentIntervalCheckerFrequencyInSeconds(int validationFrequencyInSeconds) {
@@ -384,6 +376,7 @@ public class ControllerConf extends PropertiesConfiguration {
    * Returns the config value for controller.realtime.segment.validation.frequencyInSeconds if it exists.
    * If it doesn't exist, returns the validation controller frequency. This is done in order to retain the current behavior,
    * wherein the realtime validation tasks were done at validation controller frequency
+   * The default value is the new DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS
    * @return
    */
   public int getRealtimeSegmentValidationFrequencyInSeconds() {
@@ -391,7 +384,8 @@ public class ControllerConf extends PropertiesConfiguration {
       return Integer.parseInt(
           (String) getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS));
     }
-    return getValidationControllerFrequencyInSeconds();
+    return getInt(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS);
   }
 
   public void setRealtimeSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
@@ -402,7 +396,8 @@ public class ControllerConf extends PropertiesConfiguration {
   /**
    * Returns the config value for  controller.broker.resource.validation.frequencyInSeconds if it exists.
    * If it doesn't exist, returns the validation controller frequency. This is done in order to retain the current behavior,
-   * wherin the broker resource validation tasks were done at validation controller frequency
+   * wherein the broker resource validation tasks were done at validation controller frequency
+   * The default value is the new DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS
    * @return
    */
   public int getBrokerResourceValidationFrequencyInSeconds() {
@@ -410,7 +405,8 @@ public class ControllerConf extends PropertiesConfiguration {
       return Integer.parseInt(
           (String) getProperty(ControllerPeriodicTasksConf.BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS));
     }
-    return getValidationControllerFrequencyInSeconds();
+    return getInt(ControllerPeriodicTasksConf.DEPRECATED_VALIDATION_MANAGER_FREQUENCY_IN_SECONDS,
+        ControllerPeriodicTasksConf.DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS);
   }
 
   public void setBrokerResourceValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
