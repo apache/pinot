@@ -1113,9 +1113,6 @@
             <!-- Top level resources under main and test -->
             <exclude>**/main/resources/**/*.*</exclude>
             <exclude>**/test/resources/**/*.*</exclude>
-            <!-- Stuff that's generated through Thrift -->
-            <exclude>**/com/linkedin/pinot/common/request/*.*</exclude>
-            <exclude>**/com/linkedin/pinot/common/response/*.*</exclude>
             <exclude>thirdeye/**/*</exclude>
             <!-- Documentation files -->
             <exclude>**/docs/_build/**</exclude>
