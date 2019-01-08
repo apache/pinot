@@ -17,6 +17,8 @@
 package com.linkedin.thirdeye.detection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableMap;
+import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.thirdeye.api.Constants;
 import com.linkedin.thirdeye.constant.AnomalyResultSource;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -25,9 +27,11 @@ import com.linkedin.thirdeye.datalayer.bao.DetectionConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionAlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datasource.loader.AggregationLoader;
@@ -51,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -58,11 +63,13 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
+import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,6 +153,29 @@ public class DetectionResource {
     return Response.ok(detectionAlertConfigDTOs).build();
   }
 
+  @Path("{id}/anomalies")
+  @GET
+  @ApiOperation("Get all anomalies within the time range for a detection config id")
+  public Response getAnomalies(@PathParam("id") Long detectionConfigId, @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso) {
+    long startTime;
+    long endTime;
+    try {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+    } catch (Exception e) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity(ImmutableMap.of("message",
+              "Unable to parse strings, " + startTimeIso + " and " + endTimeIso + ", in ISO DateTime format"))
+          .build();
+    }
+
+    List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(Predicate.AND(
+            Predicate.EQ("detectionConfigId", detectionConfigId),
+            Predicate.LT("startTime", endTime),
+            Predicate.GT("endTime", startTime)));
+    return Response.ok(anomalies).build();
+  }
 
   @POST
   @Path("/preview")
