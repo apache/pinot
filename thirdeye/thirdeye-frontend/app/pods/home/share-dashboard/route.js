@@ -9,7 +9,6 @@ import columns from 'thirdeye-frontend/shared/anomaliesTableColumnsShared';
 import {
   get,
   set,
-  computed,
   setProperties
 } from '@ember/object';
 
@@ -32,8 +31,8 @@ export default Route.extend(AuthenticatedRouteMixin, {
   },
   appName: null,
   startDate: moment().subtract(1, 'day').utc().valueOf(), //taylored for Last 24 hours vs Today -> moment().startOf('day').utc().valueOf(),
-  endDate: moment().utc().valueOf(),//Last 24 hours
-  duration: '1d',//Last 24 hours
+  endDate: moment().utc().valueOf(), //Last 24 hours
+  duration: '1d', //Last 24 hours
   feedbackType: 'All Resolutions',
   shareId: null,
 
@@ -108,7 +107,6 @@ export default Route.extend(AuthenticatedRouteMixin, {
     applicationAnomalies.forEach(anomaly => {
       const metricName = get(anomaly, 'metricName');
       const metricId = get(anomaly, 'metricId');
-      const id = get(anomaly, 'id');
       const functionName = get(anomaly, 'functionName');
       const functionId = get(anomaly, 'functionId');
       //Grouping the anomalies of the same metric name
@@ -140,7 +138,7 @@ export default Route.extend(AuthenticatedRouteMixin, {
         this.controller.setProperties({
           'shareId': null,
           'showTooltip': false,
-          'shareUrl': null,
+          'shareUrl': null
         });
       }
     }
