@@ -141,13 +141,36 @@ public class LocalPinotFSTest {
     Assert.assertEquals(_newTmpDir.listFiles().length, files);
     Assert.assertFalse(dstFile.exists());
 
-    // Check that a moving a file a non-existent destination folder will work
+    // Check that copying a file to a non-existent destination folder will work
     FileUtils.deleteQuietly(_nonExistentTmpFolder);
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     File srcFile = new File(_absoluteTmpDirPath, "srcFile");
     localPinotFS.mkdir(_absoluteTmpDirPath.toURI());
     Assert.assertTrue(srcFile.createNewFile());
     dstFile = new File(_nonExistentTmpFolder.getPath() + "/newFile");
+    Assert.assertFalse(dstFile.exists());
+    Assert.assertTrue(localPinotFS.copy(srcFile.toURI(), dstFile.toURI()));
+    Assert.assertTrue(srcFile.exists());
+    Assert.assertTrue(dstFile.exists());
+
+    //Check that copying a folder to a non-existent destination folder works
+    FileUtils.deleteQuietly(_nonExistentTmpFolder);
+    Assert.assertFalse(_nonExistentTmpFolder.exists());
+    localPinotFS.mkdir(_absoluteTmpDirPath.toURI());
+    dstFile = new File(_nonExistentTmpFolder.getPath() + "/srcFile" );
+    Assert.assertFalse(dstFile.exists());
+    Assert.assertTrue(localPinotFS.copy(_absoluteTmpDirPath.toURI(), _nonExistentTmpFolder.toURI()));
+    Assert.assertTrue(dstFile.exists());
+    FileUtils.deleteQuietly(srcFile);
+    Assert.assertFalse(srcFile.exists());
+
+    // Check that moving a file to a non-existent destination folder will work
+    FileUtils.deleteQuietly(_nonExistentTmpFolder);
+    Assert.assertFalse(_nonExistentTmpFolder.exists());
+    srcFile = new File(_absoluteTmpDirPath, "srcFile");
+    localPinotFS.mkdir(_absoluteTmpDirPath.toURI());
+    Assert.assertTrue(srcFile.createNewFile());
+    dstFile = new File(_nonExistentTmpFolder.getPath() + "/newFile" );
     Assert.assertFalse(dstFile.exists());
     Assert.assertTrue(localPinotFS.move(srcFile.toURI(), dstFile.toURI(), true)); // overwrite flag has no impact
     Assert.assertFalse(srcFile.exists());
