@@ -63,6 +63,9 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     serverInstance.put("host", "2.3.4.5");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
 
+    // Sleep 0.5s for cache accessor to update cache.
+    Thread.sleep(500L);
+
     // Check that there are four instances
     instanceList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     assertEquals(instanceList.getJSONArray("instances").length(), 4,
