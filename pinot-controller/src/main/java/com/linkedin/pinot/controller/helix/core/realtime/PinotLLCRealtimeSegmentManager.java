@@ -947,7 +947,7 @@ public class PinotLLCRealtimeSegmentManager {
    *
    * TODO: We need to find a place to detect and update a gauge for nonConsumingPartitionsCount for a table, and reset it to 0 at the end of validateLLC
    */
-  public void validateLLCSegments(final TableConfig tableConfig) {
+  public void ensureAllPartitionsConsuming(final TableConfig tableConfig) {
     final String tableNameWithType = tableConfig.getTableName();
     final StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());
     final int partitionCount = getPartitionCount(streamConfig);
@@ -955,7 +955,7 @@ public class PinotLLCRealtimeSegmentManager {
       @Nullable
       @Override
       public IdealState apply(@Nullable IdealState idealState) {
-        return validateLLCSegments(tableConfig, idealState, partitionCount);
+        return ensureAllPartitionsConsuming(tableConfig, idealState, partitionCount);
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
   }
@@ -1075,7 +1075,7 @@ public class PinotLLCRealtimeSegmentManager {
    * TODO: split this method into multiple smaller methods
    */
   @VisibleForTesting
-  protected IdealState validateLLCSegments(final TableConfig tableConfig, IdealState idealState,
+  protected IdealState ensureAllPartitionsConsuming(final TableConfig tableConfig, IdealState idealState,
       final int partitionCount) {
     final String tableNameWithType = tableConfig.getTableName();
     final StreamConfig streamConfig = new StreamConfig(tableConfig.getIndexingConfig().getStreamConfigs());

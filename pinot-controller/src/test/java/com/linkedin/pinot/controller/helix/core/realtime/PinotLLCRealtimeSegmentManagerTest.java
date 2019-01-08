@@ -366,7 +366,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       oldMetadataMap.put(entry.getKey(), new LLCRealtimeSegmentZKMetadata(entry.getValue().toZNRecord()));
     }
     segmentManager._partitionAssignmentGenerator.setConsumingInstances(instances);
-    IdealState updatedIdealState = segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+    IdealState updatedIdealState = segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
     Map<String, Map<String, String>> updatedMapFields = updatedIdealState.getRecord().getMapFields();
     Map<String, LLCRealtimeSegmentZKMetadata> updatedMetadataMap = segmentManager._metadataMap;
 
@@ -522,13 +522,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
           Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
 
           if (tooSoonToCorrect) {
-            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+            segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
             // validate that all entries in oldMapFields are unchanged in new ideal state
             verifyNoChangeToOldEntries(oldMapFields, idealState);
             segmentManager.tooSoonToCorrect = false;
           }
 
-          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+          segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
 
           // verify that new segment gets created in ideal state with CONSUMING
           Assert.assertNotNull(idealState.getRecord().getMapFields().get(llcSegmentName.getSegmentName()));
@@ -569,13 +569,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
           Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
 
           if (tooSoonToCorrect) {
-            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+            segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
             // validate nothing changed and try again with disabled
             verifyNoChangeToOldEntries(oldMapFields, idealState);
             segmentManager.tooSoonToCorrect = false;
           }
 
-          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+          segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
 
           // verify that new segment gets created in ideal state with CONSUMING and old segment ONLINE
           Assert.assertNotNull(idealState.getRecord().getMapFields().get(latestSegment.getSegmentName()).values().
@@ -612,7 +612,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
               (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
           Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
 
-          segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+          segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
 
           verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
         } else {
@@ -641,12 +641,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
             Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
 
             if (tooSoonToCorrect) {
-              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+              segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
               // validate nothing changed and try again with disabled
               verifyNoChangeToOldEntries(oldMapFields, idealState);
               segmentManager.tooSoonToCorrect = false;
             }
-            segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+            segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
 
             verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
           } else {
@@ -674,13 +674,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
               Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
 
               if (tooSoonToCorrect) {
-                segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+                segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
                 // validate nothing changed and try again with disabled
                 verifyNoChangeToOldEntries(oldMapFields, idealState);
                 segmentManager.tooSoonToCorrect = false;
               }
 
-              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+              segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
 
               verifyRepairs(tableConfig, idealState, expectedPartitionAssignment, segmentManager, oldMapFields);
             } else {
@@ -692,7 +692,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
                   (ZNRecord) znRecordSerializer.deserialize(znRecordSerializer.serialize(idealState.getRecord())));
               Map<String, Map<String, String>> oldMapFields = idealStateCopy.getRecord().getMapFields();
 
-              segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+              segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
 
               // verify that nothing changed
               verifyNoChangeToOldEntries(oldMapFields, idealState);
@@ -827,7 +827,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     IdealState idealState = idealStateBuilder.clear().build();
     segmentManager._metadataMap.clear();
 
-    segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+    segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
     PartitionAssignment partitionAssignment =
         segmentManager._partitionAssignmentGenerator.getStreamPartitionAssignmentFromIdealState(tableConfig,
             idealState);
@@ -842,7 +842,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       FakePinotLLCRealtimeSegmentManager segmentManager, TableConfig tableConfig, int nPartitions) {
     IdealState idealState = idealStateBuilder.clear().build();
     segmentManager._metadataMap.clear();
-    segmentManager.validateLLCSegments(tableConfig, idealState, nPartitions);
+    segmentManager.ensureAllPartitionsConsuming(tableConfig, idealState, nPartitions);
     return idealStateBuilder.build();
   }
 
