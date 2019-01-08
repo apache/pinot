@@ -92,7 +92,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask {
         Map<String, String> streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
         StreamConfig streamConfig = new StreamConfig(streamConfigMap);
         if (streamConfig.hasLowLevelConsumerType()) {
-          _llcRealtimeSegmentManager.validateLLCSegments(tableConfig);
+          _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig);
         }
       }
     } catch (Exception e) {
