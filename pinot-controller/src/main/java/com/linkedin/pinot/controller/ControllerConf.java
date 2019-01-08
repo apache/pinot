@@ -352,6 +352,7 @@ public class ControllerConf extends PropertiesConfiguration {
   public void setRetentionControllerFrequencyInSeconds(int retentionFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.RETENTION_MANAGER_FREQUENCY_IN_SECONDS,
         Integer.toString(retentionFrequencyInSeconds));
+
   }
 
   /**
@@ -369,7 +370,7 @@ public class ControllerConf extends PropertiesConfiguration {
     return getInt(ControllerPeriodicTasksConf.SEGMENT_LEVEL_VALIDATION_INTERVAL_IN_SECONDS,
         ControllerPeriodicTasksConf.DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS);
   }
-
+  
   public void setOfflineSegmentIntervalCheckerFrequencyInSeconds(int validationFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS,
         Integer.toString(validationFrequencyInSeconds));
