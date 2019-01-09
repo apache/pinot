@@ -156,20 +156,8 @@ public class DetectionResource {
   @Path("{id}/anomalies")
   @GET
   @ApiOperation("Get all anomalies within the time range for a detection config id")
-  public Response getAnomalies(@PathParam("id") Long detectionConfigId, @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso) {
-    long startTime;
-    long endTime;
-    try {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
-    } catch (Exception e) {
-      return Response.status(Response.Status.BAD_REQUEST)
-          .entity(ImmutableMap.of("message",
-              "Unable to parse strings, " + startTimeIso + " and " + endTimeIso + ", in ISO DateTime format"))
-          .build();
-    }
-
+  public Response getAnomalies(@PathParam("id") Long detectionConfigId, @QueryParam("start") long startTime,
+      @QueryParam("end") long endTime) {
     List<MergedAnomalyResultDTO> anomalies = this.anomalyDAO.findByPredicate(Predicate.AND(
             Predicate.EQ("detectionConfigId", detectionConfigId),
             Predicate.LT("startTime", endTime),
