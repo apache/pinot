@@ -21,40 +21,42 @@ package org.apache.pinot.filesystem;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.fail;
 
-
-public class LocalPinotFSTest {
+public class HadoopPinotFSTest {
   private File testFile;
   private File _absoluteTmpDirPath;
   private File _newTmpDir;
   private File _nonExistentTmpFolder;
+  private HadoopPinotFS _hadoopPinotFS;
 
   @BeforeClass
-  public void setUp() {
+  public void setup() {
     _absoluteTmpDirPath =
-        new File(System.getProperty("java.io.tmpdir"), LocalPinotFSTest.class.getSimpleName() + "first");
+        new File(System.getProperty("java.io.tmpdir"), HadoopPinotFSTest.class.getSimpleName() + "first");
     FileUtils.deleteQuietly(_absoluteTmpDirPath);
     Assert.assertTrue(_absoluteTmpDirPath.mkdir(), "Could not make directory " + _absoluteTmpDirPath.getPath());
     try {
       testFile = new File(_absoluteTmpDirPath, "testFile");
       Assert.assertTrue(testFile.createNewFile(), "Could not create file " + testFile.getPath());
+      Assert.assertTrue(testFile.exists());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
 
-    _newTmpDir = new File(System.getProperty("java.io.tmpdir"), LocalPinotFSTest.class.getSimpleName() + "second");
+    _newTmpDir = new File(System.getProperty("java.io.tmpdir"), HadoopPinotFSTest.class.getSimpleName() + "second");
     FileUtils.deleteQuietly(_newTmpDir);
     Assert.assertTrue(_newTmpDir.mkdir(), "Could not make directory " + _newTmpDir.getPath());
 
     _nonExistentTmpFolder = new File(System.getProperty("java.io.tmpdir"),
-        LocalPinotFSTest.class.getSimpleName() + "nonExistentParent/nonExistent");
+        HadoopPinotFSTest.class.getSimpleName() + "nonExistentParent/nonExistent");
 
     _absoluteTmpDirPath.deleteOnExit();
     _newTmpDir.deleteOnExit();
@@ -68,28 +70,34 @@ public class LocalPinotFSTest {
   }
 
   @Test
-  public void testFS()
-      throws Exception {
-    LocalPinotFS localPinotFS = new LocalPinotFS();
-    URI testFileUri = testFile.toURI();
+  public void testHadoopPinotFS() throws Exception {
+    _hadoopPinotFS = new HadoopPinotFS();
+
+    final Configuration conf = new PropertiesConfiguration();
+    _hadoopPinotFS.init(conf);
+
     // Check whether a directory exists
-    Assert.assertTrue(localPinotFS.exists(_absoluteTmpDirPath.toURI()));
-    Assert.assertTrue(localPinotFS.lastModified(_absoluteTmpDirPath.toURI()) > 0L);
-    Assert.assertTrue(localPinotFS.isDirectory(_absoluteTmpDirPath.toURI()));
+    Assert.assertTrue(_hadoopPinotFS.exists(_absoluteTmpDirPath.toURI()));
+    Assert.assertTrue(_hadoopPinotFS.lastModified(_absoluteTmpDirPath.toURI()) > 0L);
+    Assert.assertTrue(_hadoopPinotFS.isDirectory(_absoluteTmpDirPath.toURI()));
+
+    URI testFileUri = testFile.toURI();
     // Check whether a file exists
-    Assert.assertTrue(localPinotFS.exists(testFileUri));
-    Assert.assertFalse(localPinotFS.isDirectory(testFileUri));
+    Assert.assertTrue(_hadoopPinotFS.exists(testFileUri));
+    Assert.assertFalse(_hadoopPinotFS.isDirectory(testFileUri));
 
     File file = new File(_absoluteTmpDirPath, "secondTestFile");
     URI secondTestFileUri = file.toURI();
     // Check that file does not exist
-    Assert.assertTrue(!localPinotFS.exists(secondTestFileUri));
+    Assert.assertFalse(_hadoopPinotFS.exists(secondTestFileUri));
 
-    localPinotFS.copy(testFileUri, secondTestFileUri);
-    Assert.assertEquals(2, localPinotFS.listFiles(_absoluteTmpDirPath.toURI(), true).length);
-
+    String[] files = _hadoopPinotFS.listFiles(_absoluteTmpDirPath.toURI(), true);
+    Assert.assertEquals(files.length, 1);
+    _hadoopPinotFS.copy(testFileUri, secondTestFileUri);
+    files = _hadoopPinotFS.listFiles(_absoluteTmpDirPath.toURI(), true);
+    Assert.assertEquals(files.length, 2);
     // Check file copy worked when file was not created
-    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
+    Assert.assertTrue(_hadoopPinotFS.exists(secondTestFileUri));
 
     // Create another file in the same path
     File thirdTestFile = new File(_absoluteTmpDirPath, "thirdTestFile");
@@ -104,9 +112,9 @@ public class LocalPinotFSTest {
     File testDirFile = new File(testDir, "testFile");
     // Assert that recursive list files and nonrecursive list files are as expected
     Assert.assertTrue(testDirFile.createNewFile(), "Could not create file " + testDir.getAbsolutePath());
-    Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), false),
+    Assert.assertEquals(_hadoopPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), false),
         new String[]{testDir.getAbsolutePath()});
-    Assert.assertEquals(localPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), true),
+    Assert.assertEquals(_hadoopPinotFS.listFiles(newAbsoluteTempDirPath.toURI(), true),
         new String[]{testDir.getAbsolutePath(), testDirFile.getAbsolutePath()});
 
     // Create another parent dir so we can test recursive move
@@ -114,26 +122,26 @@ public class LocalPinotFSTest {
     Assert.assertTrue(newAbsoluteTempDirPath3.mkdir());
     Assert.assertEquals(newAbsoluteTempDirPath3.listFiles().length, 0);
 
-    localPinotFS.move(newAbsoluteTempDirPath.toURI(), newAbsoluteTempDirPath3.toURI(), true);
-    Assert.assertFalse(localPinotFS.exists(newAbsoluteTempDirPath.toURI()));
-    Assert.assertTrue(localPinotFS.exists(newAbsoluteTempDirPath3.toURI()));
+    _hadoopPinotFS.move(newAbsoluteTempDirPath.toURI(), newAbsoluteTempDirPath3.toURI(), true);
+    Assert.assertFalse(_hadoopPinotFS.exists(newAbsoluteTempDirPath.toURI()));
+    Assert.assertTrue(_hadoopPinotFS.exists(newAbsoluteTempDirPath3.toURI()));
     File testDirUnderNewAbsoluteTempDirPath3 = new File(newAbsoluteTempDirPath3, "testDir");
-    Assert.assertTrue(localPinotFS.exists(testDirUnderNewAbsoluteTempDirPath3.toURI()));
-    Assert.assertTrue(localPinotFS.exists(new File(testDirUnderNewAbsoluteTempDirPath3, "testFile").toURI()));
+    Assert.assertTrue(_hadoopPinotFS.exists(testDirUnderNewAbsoluteTempDirPath3.toURI()));
+    Assert.assertTrue(_hadoopPinotFS.exists(new File(testDirUnderNewAbsoluteTempDirPath3, "testFile").toURI()));
 
     // Check file copy to location where something already exists still works
-    localPinotFS.copy(testFileUri, thirdTestFile.toURI());
+    _hadoopPinotFS.copy(testFileUri, thirdTestFile.toURI());
     // Check length of file
-    Assert.assertEquals(0, localPinotFS.length(secondTestFileUri));
-    Assert.assertTrue(localPinotFS.exists(thirdTestFile.toURI()));
+    Assert.assertEquals(_hadoopPinotFS.length(secondTestFileUri), 0);
+    Assert.assertTrue(_hadoopPinotFS.exists(thirdTestFile.toURI()));
 
     // Check that destination being directory within the source directory still works
     File anotherFileUnderAbsoluteThreeDir = new File(newAbsoluteTempDirPath3, "anotherFile");
-    Assert.assertFalse(localPinotFS.exists(anotherFileUnderAbsoluteThreeDir.toURI()));
+    Assert.assertFalse(_hadoopPinotFS.exists(anotherFileUnderAbsoluteThreeDir.toURI()));
     Assert.assertTrue(anotherFileUnderAbsoluteThreeDir.createNewFile());
-    Assert.assertTrue(localPinotFS.exists(anotherFileUnderAbsoluteThreeDir.toURI()));
-    localPinotFS.copy(newAbsoluteTempDirPath3.toURI(), testDirUnderNewAbsoluteTempDirPath3.toURI());
-    Assert.assertEquals(localPinotFS.listFiles(testDirUnderNewAbsoluteTempDirPath3.toURI(), false).length, 3);
+    Assert.assertTrue(_hadoopPinotFS.exists(anotherFileUnderAbsoluteThreeDir.toURI()));
+    _hadoopPinotFS.copy(newAbsoluteTempDirPath3.toURI(), testDirUnderNewAbsoluteTempDirPath3.toURI());
+    Assert.assertEquals(_hadoopPinotFS.listFiles(testDirUnderNewAbsoluteTempDirPath3.toURI(), false).length, 3);
 
     // Check that method deletes dst directory during move and is successful by overwriting dir
     Assert.assertTrue(_newTmpDir.exists());
@@ -141,24 +149,24 @@ public class LocalPinotFSTest {
     File dstFile = new File(_newTmpDir.getPath() + "/newFile");
     dstFile.createNewFile();
 
-    // Expected that a move without overwrite will not succeed
-    Assert.assertFalse(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), false));
+    // Expected that if the target already exists, a move without overwrite will not succeed
+    Assert.assertFalse(_hadoopPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), false));
 
-    int files = _absoluteTmpDirPath.listFiles().length;
-    Assert.assertTrue(localPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), true));
+    int numFiles = _absoluteTmpDirPath.listFiles().length;
+    Assert.assertTrue(_hadoopPinotFS.move(_absoluteTmpDirPath.toURI(), _newTmpDir.toURI(), true));
     Assert.assertEquals(_absoluteTmpDirPath.length(), 0);
-    Assert.assertEquals(_newTmpDir.listFiles().length, files);
+    Assert.assertEquals(_newTmpDir.listFiles().length, numFiles);
     Assert.assertFalse(dstFile.exists());
 
     // Check that copying a file to a non-existent destination folder will work
     FileUtils.deleteQuietly(_nonExistentTmpFolder);
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     File srcFile = new File(_absoluteTmpDirPath, "srcFile");
-    localPinotFS.mkdir(_absoluteTmpDirPath.toURI());
+    _hadoopPinotFS.mkdir(_absoluteTmpDirPath.toURI());
     Assert.assertTrue(srcFile.createNewFile());
     dstFile = new File(_nonExistentTmpFolder.getPath() + "/newFile");
     Assert.assertFalse(dstFile.exists());
-    Assert.assertTrue(localPinotFS.copy(srcFile.toURI(), dstFile.toURI()));
+    Assert.assertTrue(_hadoopPinotFS.copy(srcFile.toURI(), dstFile.toURI()));
     Assert.assertTrue(srcFile.exists());
     Assert.assertTrue(dstFile.exists());
 
@@ -167,7 +175,7 @@ public class LocalPinotFSTest {
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     dstFile = new File(_nonExistentTmpFolder.getPath() + "/srcFile");
     Assert.assertFalse(dstFile.exists());
-    Assert.assertTrue(localPinotFS.copy(_absoluteTmpDirPath.toURI(), _nonExistentTmpFolder.toURI()));
+    Assert.assertTrue(_hadoopPinotFS.copy(_absoluteTmpDirPath.toURI(), _nonExistentTmpFolder.toURI()));
     Assert.assertTrue(dstFile.exists());
     FileUtils.deleteQuietly(srcFile);
     Assert.assertFalse(srcFile.exists());
@@ -176,11 +184,11 @@ public class LocalPinotFSTest {
     FileUtils.deleteQuietly(_nonExistentTmpFolder);
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     srcFile = new File(_absoluteTmpDirPath, "srcFile");
-    localPinotFS.mkdir(_absoluteTmpDirPath.toURI());
+    _hadoopPinotFS.mkdir(_absoluteTmpDirPath.toURI());
     Assert.assertTrue(srcFile.createNewFile());
     dstFile = new File(_nonExistentTmpFolder.getPath() + "/newFile");
     Assert.assertFalse(dstFile.exists());
-    Assert.assertTrue(localPinotFS.move(srcFile.toURI(), dstFile.toURI(), true)); // overwrite flag has no impact
+    Assert.assertTrue(_hadoopPinotFS.move(srcFile.toURI(), dstFile.toURI(), true)); // overwrite flag has no impact
     Assert.assertFalse(srcFile.exists());
     Assert.assertTrue(dstFile.exists());
 
@@ -188,49 +196,26 @@ public class LocalPinotFSTest {
     FileUtils.deleteQuietly(_nonExistentTmpFolder);
     Assert.assertFalse(_nonExistentTmpFolder.exists());
     srcFile = new File(_absoluteTmpDirPath, "srcFile");
-    localPinotFS.mkdir(_absoluteTmpDirPath.toURI());
+    _hadoopPinotFS.mkdir(_absoluteTmpDirPath.toURI());
     Assert.assertTrue(srcFile.createNewFile());
     dstFile = new File(_nonExistentTmpFolder.getPath() + "/srcFile");
     Assert.assertFalse(dstFile.exists());
-    Assert.assertTrue(localPinotFS
-        .move(_absoluteTmpDirPath.toURI(), _nonExistentTmpFolder.toURI(), true)); // overwrite flag has no impact
+    Assert.assertTrue(_hadoopPinotFS.move(_absoluteTmpDirPath.toURI(), _nonExistentTmpFolder.toURI(),
+        true)); // overwrite flag has no impact
     Assert.assertTrue(dstFile.exists());
 
-    localPinotFS.delete(secondTestFileUri, true);
+    _hadoopPinotFS.delete(secondTestFileUri, true);
     // Check deletion from final location worked
-    Assert.assertTrue(!localPinotFS.exists(secondTestFileUri));
+    Assert.assertFalse(_hadoopPinotFS.exists(secondTestFileUri));
 
     File firstTempDir = new File(_absoluteTmpDirPath, "firstTempDir");
     File secondTempDir = new File(_absoluteTmpDirPath, "secondTempDir");
-    localPinotFS.mkdir(firstTempDir.toURI());
+    _hadoopPinotFS.mkdir(firstTempDir.toURI());
     Assert.assertTrue(firstTempDir.exists(), "Could not make directory " + firstTempDir.getPath());
 
-    // Check that touching a file works
-    File nonExistingFile = new File(_absoluteTmpDirPath, "nonExistingFile");
-    Assert.assertFalse(nonExistingFile.exists());
-    localPinotFS.touch(nonExistingFile.toURI());
-    Assert.assertTrue(nonExistingFile.exists());
-    long currentTime = System.currentTimeMillis();
-    Assert.assertTrue(localPinotFS.lastModified(nonExistingFile.toURI()) < currentTime);
-    Thread.sleep(1000L);
-    // update last modified.
-    localPinotFS.touch(nonExistingFile.toURI());
-    Assert.assertTrue(localPinotFS.lastModified(nonExistingFile.toURI()) > currentTime);
-    FileUtils.deleteQuietly(nonExistingFile);
-
-    // Check that touch an file in a directory that doesn't exist should throw an exception.
-    File nonExistingFileUnderNonExistingDir = new File(_absoluteTmpDirPath, "nonExistingDir/nonExistingFile");
-    Assert.assertFalse(nonExistingFileUnderNonExistingDir.exists());
-    try {
-      localPinotFS.touch(nonExistingFileUnderNonExistingDir.toURI());
-      Assert.fail("Touch method should throw an IOException");
-    } catch (IOException e) {
-      // Expected.
-    }
-
     // Check that directory only copy worked
-    localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
-    Assert.assertTrue(localPinotFS.exists(secondTempDir.toURI()));
+    _hadoopPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
+    Assert.assertTrue(_hadoopPinotFS.exists(secondTempDir.toURI()));
 
     // Copying directory with files to directory with files
     File testFile = new File(firstTempDir, "testFile");
@@ -238,22 +223,23 @@ public class LocalPinotFSTest {
     File newTestFile = new File(secondTempDir, "newTestFile");
     Assert.assertTrue(newTestFile.createNewFile(), "Could not create file " + newTestFile.getPath());
 
-    localPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
-    Assert.assertEquals(localPinotFS.listFiles(secondTempDir.toURI(), true).length, 2);
+    _hadoopPinotFS.copy(firstTempDir.toURI(), secondTempDir.toURI());
+    files = _hadoopPinotFS.listFiles(secondTempDir.toURI(), true);
+    Assert.assertEquals(files.length, 2);
 
-    // len of dir = exception
+    // len of a directory should throw an exception.
     try {
-      localPinotFS.length(firstTempDir.toURI());
-      fail();
+      _hadoopPinotFS.length(firstTempDir.toURI());
+      Assert.fail();
     } catch (IllegalArgumentException e) {
 
     }
 
     Assert.assertTrue(testFile.exists());
 
-    localPinotFS.copyFromLocalFile(testFile, secondTestFileUri);
-    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
-    localPinotFS.copyToLocalFile(testFile.toURI(), new File(secondTestFileUri));
-    Assert.assertTrue(localPinotFS.exists(secondTestFileUri));
+    _hadoopPinotFS.copyFromLocalFile(testFile, secondTestFileUri);
+    Assert.assertTrue(_hadoopPinotFS.exists(secondTestFileUri));
+    _hadoopPinotFS.copyToLocalFile(testFile.toURI(), new File(secondTestFileUri));
+    Assert.assertTrue(_hadoopPinotFS.exists(secondTestFileUri));
   }
 }

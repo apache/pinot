@@ -99,12 +99,28 @@ public class LocalPinotFS extends PinotFS {
   @Override
   public boolean copy(URI srcUri, URI dstUri)
       throws IOException {
+    if (!exists(srcUri)) {
+      String errorMsg = String.format("Source %s does not exist", srcUri);
+      LOGGER.warn(errorMsg);
+      throw new IOException(errorMsg);
+    }
+    if (srcUri.equals(dstUri)) {
+      LOGGER.info("Source {} and destination {} are the same.", srcUri, dstUri);
+      return true;
+    }
     File srcFile = new File(decodeURI(srcUri.getRawPath()));
     File dstFile = new File(decodeURI(dstUri.getRawPath()));
-    if (dstFile.exists()) {
-      FileUtils.deleteQuietly(dstFile);
+    if (exists(dstUri) && !isDirectory(dstUri)) {
+      if (isDirectory(srcUri)) {
+        String errorMsg = String.format("Source %s is a directory while destination %s is a file", srcUri, dstUri);
+        LOGGER.warn(errorMsg);
+        throw new IOException(errorMsg);
+      } else {
+        FileUtils.deleteQuietly(dstFile);
+      }
     }
     if (srcFile.isDirectory()) {
+      mkdir(dstUri);
       // Throws Exception on failure
       FileUtils.copyDirectory(srcFile, dstFile);
     } else {
@@ -117,6 +133,9 @@ public class LocalPinotFS extends PinotFS {
   @Override
   public boolean exists(URI fileUri)
       throws IOException {
+    if (fileUri == null) {
+      return false;
+    }
     File file = new File(decodeURI(fileUri.getRawPath()));
     return file.exists();
   }

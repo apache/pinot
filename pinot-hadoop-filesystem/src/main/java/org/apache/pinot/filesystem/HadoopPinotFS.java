@@ -23,13 +23,14 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.pinot.common.utils.retry.RetryPolicies;
 import org.apache.pinot.common.utils.retry.RetryPolicy;
@@ -82,6 +83,9 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public boolean delete(URI segmentUri, boolean forceDelete)
       throws IOException {
+    if (!exists(segmentUri)) {
+      return true;
+    }
     // Returns false if we are moving a directory and that directory is not empty
     if (isDirectory(segmentUri) && listFiles(segmentUri, false).length > 0 && !forceDelete) {
       return false;
@@ -92,8 +96,17 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public boolean move(URI srcUri, URI dstUri, boolean overwrite)
       throws IOException {
-    if (exists(dstUri) && !overwrite) {
+    if (!exists(srcUri)) {
+      LOGGER.warn("Source {} does not exist", srcUri);
       return false;
+    }
+    if (exists(dstUri)) {
+      if (!overwrite) {
+        return false;
+      } else {
+        delete(dstUri, true);
+        mkdir(dstUri);
+      }
     }
     return _hadoopFS.rename(new Path(srcUri), new Path(dstUri));
   }
@@ -105,31 +118,87 @@ public class HadoopPinotFS extends PinotFS {
   @Override
   public boolean copy(URI srcUri, URI dstUri)
       throws IOException {
-    Path source = new Path(srcUri);
-    Path target = new Path(dstUri);
-    RemoteIterator<LocatedFileStatus> sourceFiles = _hadoopFS.listFiles(source, true);
-    if (sourceFiles != null) {
-      while (sourceFiles.hasNext()) {
-        boolean succeeded =
-            FileUtil.copy(_hadoopFS, sourceFiles.next().getPath(), _hadoopFS, target, true, _hadoopConf);
-        if (!succeeded) {
-          return false;
+    if (!exists(srcUri)) {
+      String errorMsg = String.format("Source %s does not exist", srcUri);
+      LOGGER.warn(errorMsg);
+      throw new IOException(errorMsg);
+    }
+    if (srcUri.equals(dstUri)) {
+      LOGGER.info("Source {} and destination {} are the same.", srcUri, dstUri);
+      return true;
+    }
+    if (exists(dstUri) && !isDirectory(dstUri)) {
+      if (isDirectory(srcUri)) {
+        String errorMsg = String.format("Source %s is a directory while destination %s is a file", srcUri, dstUri);
+        LOGGER.warn(errorMsg);
+        throw new IOException(errorMsg);
+      } else {
+        delete(dstUri, true);
+      }
+    }
+    if (isDirectory(srcUri)) {
+      mkdir(dstUri);
+      List<String> exclusionList = null;
+      // Cater for destination being directory within the source directory
+      if (dstUri.getRawPath().startsWith(srcUri.getRawPath())) {
+        FileStatus[] srcFiles = listStatus(new Path(srcUri), false);
+        exclusionList = new ArrayList<>(srcFiles.length);
+        for (FileStatus srcFile : srcFiles) {
+          Path dstPath = new Path(dstUri.getRawPath(), srcFile.getPath().getName());
+          exclusionList.add(dstPath.toString());
+        }
+      }
+      doCopyDirectory(srcUri, dstUri, exclusionList);
+    } else {
+      doCopyFile(srcUri, dstUri);
+    }
+    return true;
+  }
+
+  /**
+   * Does the actual copy behavior on directory.
+   */
+  private void doCopyDirectory(URI srcUri, URI dstUri, List<String> exclusionList) throws IOException {
+    FileStatus[] srcFiles = listStatus(new Path(srcUri), true);
+    for (FileStatus srcFile : srcFiles) {
+      Path srcPath = srcFile.getPath();
+      Path dstPath = new Path(dstUri.getPath(), srcFile.getPath().getName());
+      if (exclusionList == null || !exclusionList.contains(srcPath.toUri().getRawPath())) {
+        if (isDirectory(srcPath.toUri())) {
+          doCopyDirectory(srcPath.toUri(), dstPath.toUri(), exclusionList);
+        } else {
+          doCopyFile(srcPath.toUri(), dstPath.toUri());
         }
       }
     }
-    return true;
+  }
+
+  /**
+   * Does the actual copy behavior on file.
+   */
+  private boolean doCopyFile(URI srcUri, URI dstUri) throws IOException {
+    Path source = new Path(srcUri);
+    Path target = new Path(dstUri);
+    URI parentUri = target.getParent().toUri();
+    if (!exists(parentUri)) {
+      mkdir(parentUri);
+    }
+    return FileUtil.copy(_hadoopFS, source, _hadoopFS, target, false, _hadoopConf);
   }
 
   @Override
   public boolean exists(URI fileUri)
       throws IOException {
-    return _hadoopFS.exists(new Path(fileUri));
+    return fileUri != null && _hadoopFS.exists(new Path(fileUri));
   }
 
   @Override
   public long length(URI fileUri)
       throws IOException {
-    return _hadoopFS.getLength(new Path(fileUri));
+    if (isDirectory(fileUri)) {
+      throw new IllegalArgumentException("File is directory");
+    }
+    return _hadoopFS.getFileStatus(new Path(fileUri)).getLen();
   }
 
   @Override
@@ -138,10 +207,10 @@ public class HadoopPinotFS extends PinotFS {
     ArrayList<String> filePathStrings = new ArrayList<>();
     Path path = new Path(fileUri);
     if (_hadoopFS.exists(path)) {
-      RemoteIterator<LocatedFileStatus> fileListItr = _hadoopFS.listFiles(path, recursive);
-      while (fileListItr != null && fileListItr.hasNext()) {
-        LocatedFileStatus file = fileListItr.next();
-        filePathStrings.add(file.getPath().toUri().toString());
+      // _hadoopFS.listFiles(path, false) will not return directories as files, thus use listStatus(path) here.
+      FileStatus[] files = listStatus(path, recursive);
+      for (FileStatus file : files) {
+        filePathStrings.add(file.getPath().toUri().getRawPath());
       }
     } else {
       throw new IllegalArgumentException("segmentUri is not valid");
@@ -149,6 +218,20 @@ public class HadoopPinotFS extends PinotFS {
     String[] retArray = new String[filePathStrings.size()];
     filePathStrings.toArray(retArray);
     return retArray;
+  }
+
+  private FileStatus[] listStatus(Path path, boolean recursive) throws IOException {
+    List<FileStatus> fileStatuses = new ArrayList<>();
+    FileStatus[] files = _hadoopFS.listStatus(path);
+    for (FileStatus file : files) {
+      fileStatuses.add(file);
+      if (file.isDirectory() && recursive) {
+        List<FileStatus> subFiles = Arrays.asList(listStatus(file.getPath(), true));
+        fileStatuses.addAll(subFiles);
+      }
+    }
+    FileStatus[] fileStatusesArr = new FileStatus[fileStatuses.size()];
+    return fileStatuses.toArray(fileStatusesArr);
   }
 
   @Override
@@ -189,9 +272,8 @@ public class HadoopPinotFS extends PinotFS {
   }
 
   @Override
-  public boolean isDirectory(URI uri) {
-    FileStatus fileStatus = new FileStatus();
-    fileStatus.setPath(new Path(uri));
+  public boolean isDirectory(URI uri) throws IOException {
+    FileStatus fileStatus = _hadoopFS.getFileStatus(new Path(uri));
     return fileStatus.isDirectory();
   }
 

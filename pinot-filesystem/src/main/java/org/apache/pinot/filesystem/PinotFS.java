@@ -74,8 +74,8 @@ public abstract class PinotFS implements Closeable {
       throws IOException;
 
   /**
-   * Same as move except the srcUri is not retained. For example, if x/y/z is copied to a/b/c, x/y/z will be retained
-   * and x/y/z will also be present as a/b/c
+   * Same as move except the srcUri is retained. For example, if x/y/z is copied to a/b/c, x/y/z will be retained
+   * and x/y/z will also be present as a/b/c; if x is copied to x/y, all the original files under x/y will be kept.
    * @param srcUri URI of the original file
    * @param dstUri URI of the final file location
    * @return true if copy is successful
@@ -105,7 +105,7 @@ public abstract class PinotFS implements Closeable {
       throws IOException;
 
   /**
-   * Lists all the files at the location provided. Lists recursively.
+   * Lists all the files and directories at the location provided. Lists recursively.
    * Throws exception if this abstract pathname is not valid, or if
    * an I/O error occurs.
    * @param fileUri location of file
@@ -143,7 +143,7 @@ public abstract class PinotFS implements Closeable {
    * @return true if uri is a directory, false otherwise.
    * @throws Exception if uri is not valid or present
    */
-  public abstract boolean isDirectory(URI uri);
+  public abstract boolean isDirectory(URI uri) throws IOException;
 
   /**
    * Returns the age of the file
