@@ -41,7 +41,9 @@ import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentMan
 import com.linkedin.pinot.controller.helix.core.rebalance.RebalanceSegmentStrategyFactory;
 import com.linkedin.pinot.controller.helix.core.relocation.RealtimeSegmentRelocator;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
-import com.linkedin.pinot.controller.validation.ValidationManager;
+import com.linkedin.pinot.controller.validation.BrokerResourceValidationManager;
+import com.linkedin.pinot.controller.validation.OfflineSegmentIntervalChecker;
+import com.linkedin.pinot.controller.validation.RealtimeSegmentValidationManager;
 import com.linkedin.pinot.core.crypt.PinotCrypterFactory;
 import com.linkedin.pinot.core.periodictask.PeriodicTask;
 import com.linkedin.pinot.filesystem.PinotFSFactory;
@@ -86,7 +88,9 @@ public class ControllerStarter {
   private final ControllerPeriodicTaskScheduler _controllerPeriodicTaskScheduler;
 
   // Can only be constructed after resource manager getting started
-  private ValidationManager _validationManager;
+  private OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
+  private RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
+  private BrokerResourceValidationManager _brokerResourceValidationManager;
   private RealtimeSegmentRelocator _realtimeSegmentRelocator;
   private PinotHelixTaskResourceManager _helixTaskResourceManager;
   private PinotTaskManager _taskManager;
@@ -95,8 +99,7 @@ public class ControllerStarter {
     _config = conf;
     _adminApp = new ControllerAdminApiApplication(_config.getQueryConsoleWebappPath(), _config.getQueryConsoleUseHttps());
     _helixResourceManager = new PinotHelixResourceManager(_config);
-    _retentionManager = new RetentionManager(_helixResourceManager, _config.getRetentionControllerFrequencyInSeconds(),
-        _config.getDeletedSegmentsRetentionInDays());
+    _retentionManager = new RetentionManager(_helixResourceManager, _config);
     _metricsRegistry = new MetricsRegistry();
     _controllerMetrics = new ControllerMetrics(_metricsRegistry);
     _realtimeSegmentsManager = new PinotRealtimeSegmentManager(_helixResourceManager);
@@ -111,8 +114,16 @@ public class ControllerStarter {
     return _helixResourceManager;
   }
 
-  public ValidationManager getValidationManager() {
-    return _validationManager;
+  public OfflineSegmentIntervalChecker getOfflineSegmentIntervalChecker() {
+    return _offlineSegmentIntervalChecker;
+  }
+
+  public RealtimeSegmentValidationManager getRealtimeSegmentValidationManager() {
+    return _realtimeSegmentValidationManager;
+  }
+
+  public BrokerResourceValidationManager getBrokerResourceValidationManager() {
+    return _brokerResourceValidationManager;
   }
 
   public PinotHelixTaskResourceManager getHelixTaskResourceManager() {
@@ -181,10 +192,17 @@ public class ControllerStarter {
     _taskManager = new PinotTaskManager(_helixTaskResourceManager, _helixResourceManager, _config, _controllerMetrics);
     periodicTasks.add(_taskManager);
     periodicTasks.add(_retentionManager);
-    _validationManager =
-        new ValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
+    _offlineSegmentIntervalChecker =
+        new OfflineSegmentIntervalChecker(_config, _helixResourceManager, new ValidationMetrics(_metricsRegistry));
+    _realtimeSegmentValidationManager =
+        new RealtimeSegmentValidationManager(_config, _helixResourceManager, PinotLLCRealtimeSegmentManager.getInstance(),
             new ValidationMetrics(_metricsRegistry));
-    periodicTasks.add(_validationManager);
+    _brokerResourceValidationManager =
+        new BrokerResourceValidationManager(_config, _helixResourceManager);
+
+    periodicTasks.add(_offlineSegmentIntervalChecker);
+    periodicTasks.add(_realtimeSegmentValidationManager);
+    periodicTasks.add(_brokerResourceValidationManager);
     periodicTasks.add(_segmentStatusChecker);
     periodicTasks.add(_realtimeSegmentRelocator);
 
@@ -351,7 +369,9 @@ public class ControllerStarter {
     conf.setControllerVipHost("localhost");
     conf.setControllerVipProtocol("http");
     conf.setRetentionControllerFrequencyInSeconds(3600 * 6);
-    conf.setValidationControllerFrequencyInSeconds(3600);
+    conf.setOfflineSegmentIntervalCheckerFrequencyInSeconds(3600);
+    conf.setRealtimeSegmentValidationFrequencyInSeconds(3600);
+    conf.setBrokerResourceValidationFrequencyInSeconds(3600);
     conf.setStatusCheckerFrequencyInSeconds(5 * 60);
     conf.setRealtimeSegmentRelocatorFrequency("1h");
     conf.setStatusCheckerWaitForPushTimeInSeconds(10 * 60);
