@@ -77,7 +77,7 @@ public class RetentionManager extends ControllerPeriodicTask {
       LOGGER.info("Start managing retention for table: {}", tableNameWithType);
       manageRetentionForTable(tableNameWithType);
     } catch (Exception e) {
-      LOGGER.error("Caught exception while managing retention for all tables", e);
+      LOGGER.error("Caught exception while managing retention for table: {}", tableNameWithType, e);
     }
   }
 
