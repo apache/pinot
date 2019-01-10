@@ -4,16 +4,16 @@
     xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>com.linkedin.thirdeye</groupId>
+    <groupId>org.apache.pinot.thirdeye</groupId>
     <artifactId>thirdeye</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-  <groupId>com.linkedin.thirdeye</groupId>
+  <groupId>org.apache.pinot.thirdeye</groupId>
   <artifactId>thirdeye-pinot</artifactId>
   <name>thirdeye-pinot</name>
   <url>http://maven.apache.org</url>
   <properties>
-    <mainClass>com.linkedin.thirdeye.dashboard.ThirdEyeDashboardApplication</mainClass>
+    <mainClass>org.apache.pinot.thirdeye.dashboard.ThirdEyeDashboardApplication</mainClass>
   </properties>
 
   <dependencies>
@@ -359,7 +359,7 @@
           <properties>
             <property>
               <name>listener</name>
-              <value>com.linkedin.thirdeye.TestListener</value>
+              <value>org.apache.pinot.thirdeye.TestListener</value>
             </property>
           </properties>
         </configuration>
