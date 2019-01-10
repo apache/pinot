@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.topk;
+package org.apache.pinot.thirdeye.hadoop.topk;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;

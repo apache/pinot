@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.wait;
+package org.apache.pinot.thirdeye.hadoop.wait;
 
 import java.lang.reflect.Constructor;
 import java.util.Properties;
@@ -22,7 +22,7 @@ import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.hadoop.wait.WaitPhaseJobConstants.*;
+import static org.apache.pinot.thirdeye.hadoop.wait.WaitPhaseJobConstants.*;
 
 public class WaitPhaseJob {
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.util;
+package org.apache.pinot.thirdeye.hadoop.util;
 
 import java.io.IOException;
 import java.util.Set;
@@ -31,10 +31,10 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
-import com.linkedin.thirdeye.hadoop.config.MetricSpec;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.config.DimensionSpec;
+import org.apache.pinot.thirdeye.hadoop.config.MetricSpec;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
 
 /**
  * This class contains the methods needed to transform

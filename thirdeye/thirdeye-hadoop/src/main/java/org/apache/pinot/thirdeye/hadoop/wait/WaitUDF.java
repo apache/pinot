@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.wait;
+package org.apache.pinot.thirdeye.hadoop.wait;
 
 import java.util.Properties;
 

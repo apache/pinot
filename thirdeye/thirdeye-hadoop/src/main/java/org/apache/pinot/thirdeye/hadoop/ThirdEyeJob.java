@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop;
+package org.apache.pinot.thirdeye.hadoop;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,22 +33,22 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseConstants;
-import com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseJob;
-import com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseConstants;
-import com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseJob;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
-import com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob;
-import com.linkedin.thirdeye.hadoop.join.JoinPhaseJob;
-import com.linkedin.thirdeye.hadoop.push.SegmentPushPhase;
-import com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants;
-import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants;
-import com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseJob;
-import com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants;
-import com.linkedin.thirdeye.hadoop.topk.TopKPhaseJob;
-import com.linkedin.thirdeye.hadoop.transform.TransformPhaseJob;
-import com.linkedin.thirdeye.hadoop.wait.WaitPhaseJob;
+import org.apache.pinot.thirdeye.hadoop.aggregation.AggregationPhaseConstants;
+import org.apache.pinot.thirdeye.hadoop.aggregation.AggregationPhaseJob;
+import org.apache.pinot.thirdeye.hadoop.backfill.BackfillPhaseConstants;
+import org.apache.pinot.thirdeye.hadoop.backfill.BackfillPhaseJob;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants;
+import org.apache.pinot.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseJob;
+import org.apache.pinot.thirdeye.hadoop.join.JoinPhaseJob;
+import org.apache.pinot.thirdeye.hadoop.push.SegmentPushPhase;
+import org.apache.pinot.thirdeye.hadoop.push.SegmentPushPhaseConstants;
+import org.apache.pinot.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants;
+import org.apache.pinot.thirdeye.hadoop.segment.creation.SegmentCreationPhaseJob;
+import org.apache.pinot.thirdeye.hadoop.topk.TopKPhaseConstants;
+import org.apache.pinot.thirdeye.hadoop.topk.TopKPhaseJob;
+import org.apache.pinot.thirdeye.hadoop.transform.TransformPhaseJob;
+import org.apache.pinot.thirdeye.hadoop.wait.WaitPhaseJob;
 
 /**
  * Wrapper to manage segment create and segment push jobs for thirdeye

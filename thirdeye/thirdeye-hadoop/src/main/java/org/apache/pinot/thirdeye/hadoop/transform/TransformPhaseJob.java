@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.transform;
+package org.apache.pinot.thirdeye.hadoop.transform;
 
-import static com.linkedin.thirdeye.hadoop.transform.TransformPhaseJobConstants.*;
+import static org.apache.pinot.thirdeye.hadoop.transform.TransformPhaseJobConstants.*;
 
 import java.io.FileInputStream;
 import java.io.IOException;

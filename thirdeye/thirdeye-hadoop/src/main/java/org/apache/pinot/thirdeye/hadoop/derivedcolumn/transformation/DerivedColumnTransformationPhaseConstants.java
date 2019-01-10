@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
+package org.apache.pinot.thirdeye.hadoop.derivedcolumn.transformation;
 
 /**
  * This class contains the properties to be set for topk column transformation phase

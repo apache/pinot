@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.topk;
+package org.apache.pinot.thirdeye.hadoop.topk;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -50,11 +50,11 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.topk.TopKPhaseJob.TopKPhaseMapper;
-import com.linkedin.thirdeye.hadoop.topk.TopKPhaseJob.TopKPhaseReducer;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.topk.TopKPhaseJob.TopKPhaseMapper;
+import org.apache.pinot.thirdeye.hadoop.topk.TopKPhaseJob.TopKPhaseReducer;
 
 /**
  * This test will test mapper of Topk phase,

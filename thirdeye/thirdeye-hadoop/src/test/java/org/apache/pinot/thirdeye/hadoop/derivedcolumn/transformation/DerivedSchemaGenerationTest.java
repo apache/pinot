@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
+package org.apache.pinot.thirdeye.hadoop.derivedcolumn.transformation;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -23,8 +23,8 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 
 public class DerivedSchemaGenerationTest {
   private static final String AVRO_SCHEMA = "schema.avsc";

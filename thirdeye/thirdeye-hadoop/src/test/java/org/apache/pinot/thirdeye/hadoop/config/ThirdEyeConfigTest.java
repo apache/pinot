@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.config;
+package org.apache.pinot.thirdeye.hadoop.config;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,9 +27,9 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.thirdeye.hadoop.config.MetricType;
-import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
-import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
+import org.apache.pinot.thirdeye.hadoop.config.MetricType;
+import org.apache.pinot.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
+import org.apache.pinot.thirdeye.hadoop.config.TopkWhitelistSpec;
 
 public class ThirdEyeConfigTest {
 

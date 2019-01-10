@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.segment.creation;
+package org.apache.pinot.thirdeye.hadoop.segment.creation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -28,9 +28,9 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -57,7 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataKeys.Segment.*;
-import static com.linkedin.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.*;
+import static org.apache.pinot.thirdeye.hadoop.segment.creation.SegmentCreationPhaseConstants.*;
 
 /**
  * Mapper class for SegmentCreation job, which sets configs required for

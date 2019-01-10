@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.util;
+package org.apache.pinot.thirdeye.hadoop.util;
 
 import java.util.concurrent.TimeUnit;
 

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.segment.creation;
+package org.apache.pinot.thirdeye.hadoop.segment.creation;
 
 /**
  * Properties to be set for the segment creation phase

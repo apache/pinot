@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.util;
+package org.apache.pinot.thirdeye.hadoop.util;
 
 import java.util.Arrays;
 import java.util.List;
@@ -24,9 +24,9 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import org.apache.pinot.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
 
 public class ThirdeyePinotSchemaUtilsTest {
 

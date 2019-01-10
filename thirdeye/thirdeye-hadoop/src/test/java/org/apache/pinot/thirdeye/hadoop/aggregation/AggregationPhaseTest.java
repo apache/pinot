@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.aggregation;
+package org.apache.pinot.thirdeye.hadoop.aggregation;
 
 import java.io.File;
 import java.io.IOException;
@@ -45,10 +45,10 @@ import org.junit.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
-import com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseJob.AggregationMapper;
-import com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseJob.AggregationReducer;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import org.apache.pinot.thirdeye.hadoop.aggregation.AggregationPhaseJob.AggregationMapper;
+import org.apache.pinot.thirdeye.hadoop.aggregation.AggregationPhaseJob.AggregationReducer;
 
 /**
  * This tests mapper of Aggregation phase, to check conversion of time column to bucket time

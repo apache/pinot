@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.join;
+package org.apache.pinot.thirdeye.hadoop.join;
 
-import static com.linkedin.thirdeye.hadoop.join.JoinPhaseConstants.*;
+import static org.apache.pinot.thirdeye.hadoop.join.JoinPhaseConstants.*;
 
 import java.io.FileInputStream;
 import java.io.IOException;

@@ -13,15 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.topk;
+package org.apache.pinot.thirdeye.hadoop.topk;
 
-import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
-import com.linkedin.thirdeye.hadoop.config.DimensionType;
-import com.linkedin.thirdeye.hadoop.config.MetricSpec;
-import com.linkedin.thirdeye.hadoop.config.MetricType;
-import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
-import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.DimensionSpec;
+import org.apache.pinot.thirdeye.hadoop.config.DimensionType;
+import org.apache.pinot.thirdeye.hadoop.config.MetricSpec;
+import org.apache.pinot.thirdeye.hadoop.config.MetricType;
+import org.apache.pinot.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
+import org.apache.pinot.thirdeye.hadoop.config.TopkWhitelistSpec;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
 
 import java.util.ArrayList;
 import java.util.HashMap;

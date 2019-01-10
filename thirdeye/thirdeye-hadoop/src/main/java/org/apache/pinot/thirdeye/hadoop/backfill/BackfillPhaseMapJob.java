@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.backfill;
+package org.apache.pinot.thirdeye.hadoop.backfill;
 
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 import java.io.File;
 import java.io.IOException;
 import org.apache.avro.Schema;
@@ -35,7 +35,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseConstants.*;
+import static org.apache.pinot.thirdeye.hadoop.backfill.BackfillPhaseConstants.*;
 
 /**
  * Mapper class for Backfill job, which converts a pinot segment to avro files

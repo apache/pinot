@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.aggregation;
+package org.apache.pinot.thirdeye.hadoop.aggregation;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -46,18 +46,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.hadoop.ThirdEyeJobProperties;
-import com.linkedin.thirdeye.hadoop.config.DimensionType;
-import com.linkedin.thirdeye.hadoop.config.MetricType;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.config.TimeGranularity;
-import com.linkedin.thirdeye.hadoop.config.TimeSpec;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
+import org.apache.pinot.thirdeye.hadoop.ThirdEyeJobProperties;
+import org.apache.pinot.thirdeye.hadoop.config.DimensionType;
+import org.apache.pinot.thirdeye.hadoop.config.MetricType;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.config.TimeGranularity;
+import org.apache.pinot.thirdeye.hadoop.config.TimeSpec;
+import org.apache.pinot.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
+import org.apache.pinot.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
-import static com.linkedin.thirdeye.hadoop.aggregation.AggregationPhaseConstants.*;
+import static org.apache.pinot.thirdeye.hadoop.aggregation.AggregationPhaseConstants.*;
 
 /**
  * Buckets input avro data according to granularity specified in config and aggregates metrics

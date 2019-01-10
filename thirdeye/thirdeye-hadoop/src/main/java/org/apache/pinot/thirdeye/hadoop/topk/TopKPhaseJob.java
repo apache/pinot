@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.topk;
+package org.apache.pinot.thirdeye.hadoop.topk;
 
-import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_INPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH;
-import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_THIRDEYE_CONFIG;
+import static org.apache.pinot.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_INPUT_PATH;
+import static org.apache.pinot.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH;
+import static org.apache.pinot.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_THIRDEYE_CONFIG;
 
 import java.io.DataOutput;
 import java.io.File;
@@ -51,14 +51,14 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.MinMaxPriorityQueue;
-import com.linkedin.thirdeye.hadoop.config.DimensionType;
-import com.linkedin.thirdeye.hadoop.config.MetricType;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
-import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
-import com.linkedin.thirdeye.hadoop.util.ThirdeyeAvroUtils;
+import org.apache.pinot.thirdeye.hadoop.config.DimensionType;
+import org.apache.pinot.thirdeye.hadoop.config.MetricType;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfig;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConfigProperties;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
+import org.apache.pinot.thirdeye.hadoop.util.ThirdeyeAggregateMetricUtils;
+import org.apache.pinot.thirdeye.hadoop.util.ThirdeyeAvroUtils;
 
 /**
  * This phase reads avro input, and produces a file with top k values for dimensions

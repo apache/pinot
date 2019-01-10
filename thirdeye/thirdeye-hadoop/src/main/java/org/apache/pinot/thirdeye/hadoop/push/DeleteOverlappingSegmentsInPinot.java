@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.push;
+package org.apache.pinot.thirdeye.hadoop.push;
 
 import java.io.File;
 import java.io.FileOutputStream;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.config;
+package org.apache.pinot.thirdeye.hadoop.config;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,14 +34,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.thirdeye.hadoop.config.DimensionSpec;
-import com.linkedin.thirdeye.hadoop.config.MetricSpec;
-import com.linkedin.thirdeye.hadoop.config.MetricType;
-import com.linkedin.thirdeye.hadoop.config.SplitSpec;
-import com.linkedin.thirdeye.hadoop.config.TimeGranularity;
-import com.linkedin.thirdeye.hadoop.config.TimeSpec;
-import com.linkedin.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
-import com.linkedin.thirdeye.hadoop.config.TopkWhitelistSpec;
+import org.apache.pinot.thirdeye.hadoop.config.DimensionSpec;
+import org.apache.pinot.thirdeye.hadoop.config.MetricSpec;
+import org.apache.pinot.thirdeye.hadoop.config.MetricType;
+import org.apache.pinot.thirdeye.hadoop.config.SplitSpec;
+import org.apache.pinot.thirdeye.hadoop.config.TimeGranularity;
+import org.apache.pinot.thirdeye.hadoop.config.TimeSpec;
+import org.apache.pinot.thirdeye.hadoop.config.TopKDimensionToMetricsSpec;
+import org.apache.pinot.thirdeye.hadoop.config.TopkWhitelistSpec;
 
 /**
  * This class represents the configs required by the thirdeye-hadoop jobs

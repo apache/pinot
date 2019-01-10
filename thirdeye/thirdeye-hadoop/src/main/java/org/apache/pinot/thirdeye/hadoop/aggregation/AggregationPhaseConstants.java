@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.aggregation;
+package org.apache.pinot.thirdeye.hadoop.aggregation;
 /**
  * This class contains the properties to be set for aggregation phase
  */

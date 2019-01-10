@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.join;
+package org.apache.pinot.thirdeye.hadoop.join;
 
 public enum JoinPhaseConstants {
   // SCHEMA AND INPUT PER SOURCE actual property access would be {source}.join.input.path

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.transform;
+package org.apache.pinot.thirdeye.hadoop.transform;
 
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;

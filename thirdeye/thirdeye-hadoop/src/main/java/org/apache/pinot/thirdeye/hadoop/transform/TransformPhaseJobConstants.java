@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.transform;
+package org.apache.pinot.thirdeye.hadoop.transform;
 
 public enum TransformPhaseJobConstants {
   TRANSFORM_INPUT_SCHEMA("transform.input.schema"),

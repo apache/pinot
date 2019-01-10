@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.join;
+package org.apache.pinot.thirdeye.hadoop.join;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +26,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.hadoop.join.GenericJoinUDFConfig.Field;
+import org.apache.pinot.thirdeye.hadoop.join.GenericJoinUDFConfig.Field;
 
 public class GenericJoinUDF implements JoinUDF {
 

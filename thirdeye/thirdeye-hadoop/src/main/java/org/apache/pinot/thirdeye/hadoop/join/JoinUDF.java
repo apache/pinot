@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.join;
+package org.apache.pinot.thirdeye.hadoop.join;
 
 import java.util.List;
 import java.util.Map;

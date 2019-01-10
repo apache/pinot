@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.util;
+package org.apache.pinot.thirdeye.hadoop.util;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -45,9 +45,9 @@ import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.data.readers.AvroRecordReader;
-import com.linkedin.thirdeye.hadoop.config.DimensionType;
-import com.linkedin.thirdeye.hadoop.config.MetricType;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.config.DimensionType;
+import org.apache.pinot.thirdeye.hadoop.config.MetricType;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
 
 /**
  * This class contains methods to extract avro schema, and get

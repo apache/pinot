@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop;
+package org.apache.pinot.thirdeye.hadoop;
 
 public enum ThirdEyeJobProperties {
   THIRDEYE_FLOW_SCHEDULE("thirdeye.flow.schedule"), // HOURLY, DAILY

@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.backfill;
+package org.apache.pinot.thirdeye.hadoop.backfill;
 
-import static com.linkedin.thirdeye.hadoop.backfill.BackfillPhaseConstants.*;
+import static org.apache.pinot.thirdeye.hadoop.backfill.BackfillPhaseConstants.*;
 
 import java.io.FileInputStream;
 import java.util.ArrayList;

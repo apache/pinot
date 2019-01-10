@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.linkedin.thirdeye.hadoop.wait;
+package org.apache.pinot.thirdeye.hadoop.wait;
 
 public enum WaitPhaseJobConstants {
   WAIT_UDF_CLASS("wait.udf.class"),

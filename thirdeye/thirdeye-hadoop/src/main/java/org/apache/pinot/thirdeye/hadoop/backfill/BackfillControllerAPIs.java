@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.backfill;
+package org.apache.pinot.thirdeye.hadoop.backfill;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.io.Files;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
+import org.apache.pinot.thirdeye.hadoop.config.ThirdEyeConstants;
 
 /**
  * Contains APIs which are used for backfilling the pinot segments with star tree index

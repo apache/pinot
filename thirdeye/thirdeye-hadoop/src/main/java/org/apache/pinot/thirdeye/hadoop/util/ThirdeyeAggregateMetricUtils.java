@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.util;
+package org.apache.pinot.thirdeye.hadoop.util;
 
 import java.util.List;
 
-import com.linkedin.thirdeye.hadoop.config.MetricType;
+import org.apache.pinot.thirdeye.hadoop.config.MetricType;
 
 /**
  * Class to aggregate metric values

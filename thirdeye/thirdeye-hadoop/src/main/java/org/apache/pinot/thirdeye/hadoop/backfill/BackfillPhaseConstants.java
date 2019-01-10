@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.thirdeye.hadoop.backfill;
+package org.apache.pinot.thirdeye.hadoop.backfill;
 
 /**
  * This class contains the properties to be set for backfill phase
