@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.api.resources;
 
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.ControllerTest;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.IOException;
 import org.json.JSONObject;
 import org.testng.annotations.BeforeClass;
@@ -50,9 +51,15 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
 
     // Check that there are two instances
-    instanceList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    assertEquals(instanceList.getJSONArray("instances").length(), 2,
-        "Expected two instances after creation of untagged instances");
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        // Check that there are four instances
+        JSONObject instanceList1 = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
+        return instanceList1.getJSONArray("instances").length() == 2;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 500L, 10_000L, "Expected two instances after creation of tagged instances");
 
     // Create tagged broker and server instances
     brokerInstance.put("tag", "someTag");
@@ -63,13 +70,16 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     serverInstance.put("host", "2.3.4.5");
     sendPostRequest(_controllerRequestURLBuilder.forInstanceCreate(), serverInstance.toString());
 
-    // Sleep 0.5s for cache accessor to update cache.
-    Thread.sleep(500L);
-
-    // Check that there are four instances
-    instanceList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
-    assertEquals(instanceList.getJSONArray("instances").length(), 4,
-        "Expected two instances after creation of tagged instances");
+    // It may take some time for cache data accessor to update its data.
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        // Check that there are four instances
+        JSONObject instanceList1 = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
+        return instanceList1.getJSONArray("instances").length() == 4;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 500L, 10_000L, "Expected four instances after creation of tagged instances");
 
     // Create duplicate broker and server instances (both calls should fail)
     try {
@@ -89,7 +99,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
     // Check that there are four instances
     instanceList = new JSONObject(sendGetRequest(_controllerRequestURLBuilder.forInstanceList()));
     assertEquals(instanceList.getJSONArray("instances").length(), 4,
-        "Expected two instances after creation of duplicate instances");
+        "Expected four instances after creation of duplicate instances");
 
     // Check that the instances are properly created
     JSONObject instance =
