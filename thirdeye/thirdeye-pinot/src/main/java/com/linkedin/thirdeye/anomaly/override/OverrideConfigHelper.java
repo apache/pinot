@@ -16,7 +16,7 @@
 
 package com.linkedin.thirdeye.anomaly.override;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
+import org.apache.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;

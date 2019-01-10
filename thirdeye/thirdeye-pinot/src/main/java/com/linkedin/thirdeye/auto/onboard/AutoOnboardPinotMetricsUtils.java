@@ -18,7 +18,7 @@ package com.linkedin.thirdeye.auto.onboard;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.data.Schema;
+import org.apache.pinot.common.data.Schema;
 import com.linkedin.thirdeye.datasource.DataSourceConfig;
 import com.linkedin.thirdeye.datasource.MetadataSourceConfig;
 import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSourceConfig;

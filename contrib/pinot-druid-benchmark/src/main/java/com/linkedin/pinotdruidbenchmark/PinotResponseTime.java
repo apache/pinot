@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package com.linkedin.pinotdruidbenchmark;
+package org.apache.pinotdruidbenchmark;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;

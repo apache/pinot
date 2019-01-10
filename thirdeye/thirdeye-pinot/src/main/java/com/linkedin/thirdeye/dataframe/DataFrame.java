@@ -16,8 +16,8 @@
 
 package com.linkedin.thirdeye.dataframe;
 
-import com.linkedin.pinot.client.ResultSet;
-import com.linkedin.pinot.client.ResultSetGroup;
+import org.apache.pinot.client.ResultSet;
+import org.apache.pinot.client.ResultSetGroup;
 import com.udojava.evalex.Expression;
 import java.io.IOException;
 import java.io.Reader;

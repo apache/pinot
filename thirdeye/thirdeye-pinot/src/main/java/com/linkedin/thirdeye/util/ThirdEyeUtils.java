@@ -19,7 +19,7 @@
 package com.linkedin.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
-import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
+import org.apache.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.thirdeye.api.DimensionMap;
 
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;

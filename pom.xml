@@ -21,7 +21,7 @@
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.linkedin.pinot</groupId>
+  <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
   <version>0.016</version>
   <packaging>pom</packaging>
@@ -209,72 +209,72 @@
         <version>4.4.6</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-common</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-api</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-core</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-controller</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-tools</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-hadoop</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-server</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-broker</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-minion</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-filesystem</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-hadoop-filesystem</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-azure-filesystem</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-transport</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.linkedin.pinot</groupId>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-perf</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -1070,7 +1070,7 @@
             <phase>site</phase>
             <configuration>
               <!-- Specific configuration for the aggregate report -->
-			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
+			  <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
               <skip>false</skip>
             </configuration>
           </execution>
@@ -1198,7 +1198,7 @@
             <id>non-aggregate</id>
             <configuration>
               <!-- Specific configuration for the non aggregate report -->
-			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
+			  <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>
@@ -1208,7 +1208,7 @@
           <reportSet>
             <id>aggregate</id>
             <configuration>
-			  <excludePackageNames>com.linkedin.pinot.pql.parsers:com.linkedin.pinot.common.response</excludePackageNames>
+			  <excludePackageNames>org.apache.pinot.pql.parsers:org.apache.pinot.common.response</excludePackageNames>
               <skip>true</skip>
             </configuration>
             <reports>

@@ -22,16 +22,16 @@
 <suite name="pinot-core">
   <test name="SingleValueQueriesTest">
     <classes>
-      <class name="com.linkedin.pinot.queries.InnerSegmentSelectionSingleValueQueriesTest"/>
-      <class name="com.linkedin.pinot.queries.InnerSegmentAggregationSingleValueQueriesTest"/>
-      <class name="com.linkedin.pinot.queries.InterSegmentAggregationSingleValueQueriesTest"/>
+      <class name="org.apache.pinot.queries.InnerSegmentSelectionSingleValueQueriesTest"/>
+      <class name="org.apache.pinot.queries.InnerSegmentAggregationSingleValueQueriesTest"/>
+      <class name="org.apache.pinot.queries.InterSegmentAggregationSingleValueQueriesTest"/>
     </classes>
   </test>
   <test name="MultiValueQueriesTest">
     <classes>
-      <class name="com.linkedin.pinot.queries.InnerSegmentSelectionMultiValueQueriesTest"/>
-      <class name="com.linkedin.pinot.queries.InnerSegmentAggregationMultiValueQueriesTest"/>
-      <class name="com.linkedin.pinot.queries.InterSegmentAggregationMultiValueQueriesTest"/>
+      <class name="org.apache.pinot.queries.InnerSegmentSelectionMultiValueQueriesTest"/>
+      <class name="org.apache.pinot.queries.InnerSegmentAggregationMultiValueQueriesTest"/>
+      <class name="org.apache.pinot.queries.InterSegmentAggregationMultiValueQueriesTest"/>
     </classes>
   </test>
 </suite>

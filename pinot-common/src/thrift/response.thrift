@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-namespace java com.linkedin.pinot.common.response
+namespace java org.apache.pinot.common.response
 
 /**
  * Processing exception

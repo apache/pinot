@@ -17,7 +17,7 @@ package com.linkedin.thirdeye.hadoop.push;
 
 import static com.linkedin.thirdeye.hadoop.push.SegmentPushPhaseConstants.*;
 
-import com.linkedin.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,7 +32,7 @@ import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.FileUploadDownloadClient;
+import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfigProperties;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 

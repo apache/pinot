@@ -23,12 +23,12 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import org.apache.pinot.common.data.DimensionFieldSpec;
+import org.apache.pinot.common.data.FieldSpec;
+import org.apache.pinot.common.data.FieldSpec.DataType;
+import org.apache.pinot.common.data.MetricFieldSpec;
+import org.apache.pinot.common.data.TimeFieldSpec;
+import org.apache.pinot.common.data.TimeGranularitySpec;
 
 public class ThirdeyeAvroUtilsTest {
 
@@ -74,7 +74,7 @@ public class ThirdeyeAvroUtilsTest {
 
   @Test
   public void testConstructAvroSchemaFromPinotSchema() throws Exception {
-    com.linkedin.pinot.common.data.Schema pinotSchema = new com.linkedin.pinot.common.data.Schema();
+    org.apache.pinot.common.data.Schema pinotSchema = new org.apache.pinot.common.data.Schema();
 
     pinotSchema.setSchemaName("test");
     FieldSpec spec = new DimensionFieldSpec("d1", DataType.STRING, true);

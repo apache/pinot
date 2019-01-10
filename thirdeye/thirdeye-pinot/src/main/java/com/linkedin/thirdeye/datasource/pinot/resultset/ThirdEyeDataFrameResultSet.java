@@ -17,7 +17,7 @@
 package com.linkedin.thirdeye.datasource.pinot.resultset;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.client.ResultSet;
+import org.apache.pinot.client.ResultSet;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.HashSet;
